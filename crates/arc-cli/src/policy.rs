@@ -728,7 +728,7 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         )));
     }
 
-    let compiled = arc_policy::compile_policy(&spec)?;
+    let compiled = arc_policy::compile_policy_with_source(&spec, Some(path))?;
     let kernel = KernelPolicyConfig::default();
     let default_capabilities =
         build_default_capabilities_from_scope(&compiled.default_scope, kernel.max_capability_ttl);

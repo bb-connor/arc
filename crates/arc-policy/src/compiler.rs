@@ -29,6 +29,7 @@
 //! |12 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
 
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::models::{
     DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
@@ -82,10 +83,20 @@ pub struct CompiledPolicy {
 /// mapping table. Missing sections compile to an empty pipeline; no error
 /// is raised for policies that simply do not exercise every guard type.
 pub fn compile_policy(policy: &HushSpec) -> Result<CompiledPolicy, CompileError> {
+    compile_policy_with_source(policy, None)
+}
+
+/// Compile a HushSpec policy with an optional source path used to resolve
+/// relative auxiliary assets referenced by the policy.
+pub fn compile_policy_with_source(
+    policy: &HushSpec,
+    source_path: Option<&Path>,
+) -> Result<CompiledPolicy, CompileError> {
     let mut builder = PipelineBuilder::new();
     let mut post_invocation = PostInvocationPipeline::new();
+    let source_dir = source_path.and_then(|path| path.parent());
     compile_rule_guards(policy, &mut builder, &mut post_invocation)?;
-    compile_detection_guards(policy, &mut builder)?;
+    compile_detection_guards(policy, &mut builder, source_dir)?;
     compile_budget_guards(policy, &mut builder)?;
     let default_scope = compile_scope(policy);
     let (guards, guard_names) = builder.finish();
@@ -271,6 +282,7 @@ fn compile_rule_guards(
 fn compile_detection_guards(
     policy: &HushSpec,
     builder: &mut PipelineBuilder,
+    source_dir: Option<&Path>,
 ) -> Result<(), CompileError> {
     let Some(extensions) = &policy.extensions else {
         return Ok(());
@@ -298,7 +310,7 @@ fn compile_detection_guards(
     // 10. detection.threat_intel -> SpiderSenseGuard
     if let Some(threat_intel) = &detection.threat_intel {
         if threat_intel.enabled.unwrap_or(true) {
-            builder.add(threat_intel_guard_from(threat_intel)?);
+            builder.add(threat_intel_guard_from(threat_intel, source_dir)?);
         }
     }
 
@@ -362,6 +374,7 @@ fn jailbreak_config_from(jb: &JailbreakDetection) -> Result<JailbreakGuardConfig
 
 fn threat_intel_guard_from(
     threat_intel: &ThreatIntelDetection,
+    source_dir: Option<&Path>,
 ) -> Result<SpiderSenseGuard, CompileError> {
     let pattern_db_path = threat_intel.pattern_db.as_deref().ok_or_else(|| {
         CompileError::Invalid(
@@ -369,14 +382,18 @@ fn threat_intel_guard_from(
         )
     })?;
 
-    let pattern_db_json = fs::read_to_string(pattern_db_path).map_err(|error| {
+    let resolved_pattern_db_path = resolve_policy_asset_path(pattern_db_path, source_dir);
+
+    let pattern_db_json = fs::read_to_string(&resolved_pattern_db_path).map_err(|error| {
         CompileError::Invalid(format!(
-            "failed to read detection.threat_intel.pattern_db '{pattern_db_path}': {error}"
+            "failed to read detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
+            resolved_pattern_db_path.display()
         ))
     })?;
     let pattern_db = PatternDb::from_json(&pattern_db_json).map_err(|error| {
         CompileError::Invalid(format!(
-            "invalid detection.threat_intel.pattern_db '{pattern_db_path}': {error}"
+            "invalid detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
+            resolved_pattern_db_path.display()
         ))
     })?;
 
@@ -393,6 +410,18 @@ fn threat_intel_guard_from(
             "invalid detection.threat_intel configuration: {error}"
         ))
     })
+}
+
+fn resolve_policy_asset_path(path: &str, source_dir: Option<&Path>) -> PathBuf {
+    let candidate = PathBuf::from(path);
+    if candidate.is_absolute() {
+        return candidate;
+    }
+
+    match source_dir {
+        Some(dir) => dir.join(candidate),
+        None => candidate,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -855,6 +884,40 @@ extensions:
         assert_eq!(compiled.guard_names, vec!["spider-sense".to_string()]);
 
         let _ = std::fs::remove_file(pattern_db);
+    }
+
+    #[test]
+    fn compile_detection_threat_intel_resolves_relative_pattern_db_against_source() {
+        let policy_dir = std::env::temp_dir().join(format!(
+            "arc-policy-threat-intel-dir-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&policy_dir).unwrap();
+        let pattern_db = policy_dir.join("pattern-db.json");
+        std::fs::write(&pattern_db, sample_threat_intel_pattern_db()).unwrap();
+        let policy_path = policy_dir.join("policy.yaml");
+        std::fs::write(&policy_path, "hushspec: \"0.1.0\"\n").unwrap();
+
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "pattern-db.json"
+      similarity_threshold: 0.8
+      top_k: 1
+"#,
+        )
+        .unwrap();
+
+        let compiled = compile_policy_with_source(&spec, Some(&policy_path)).unwrap();
+        assert_eq!(compiled.guard_names, vec!["spider-sense".to_string()]);
+
+        let _ = std::fs::remove_file(pattern_db);
+        let _ = std::fs::remove_file(policy_path);
+        let _ = std::fs::remove_dir(policy_dir);
     }
 
     #[test]

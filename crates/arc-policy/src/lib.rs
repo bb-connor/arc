@@ -30,7 +30,7 @@ pub mod validate;
 pub mod version;
 
 // Re-exports for convenience
-pub use compiler::{compile_policy, CompileError, CompiledPolicy};
+pub use compiler::{compile_policy, compile_policy_with_source, CompileError, CompiledPolicy};
 pub use conditions::{evaluate_condition, Condition, RuntimeContext};
 pub use evaluate::{
     activate_panic, deactivate_panic, evaluate, evaluate_with_context, is_panic_active,
