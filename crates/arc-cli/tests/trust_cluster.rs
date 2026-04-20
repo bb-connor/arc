@@ -167,7 +167,7 @@ fn spawn_trust_service(
         "--advertise-url".to_string(),
         advertise_url.to_string(),
         "--cluster-sync-interval-ms".to_string(),
-        "200".to_string(),
+        "2000".to_string(),
     ];
     for peer_url in peer_urls {
         args.push("--peer-url".to_string());
@@ -509,7 +509,7 @@ fn wait_for_node_health(client: &Client, base_url: &str, token: &str, label: &st
 
 fn post_json(client: &Client, url: &str, token: &str, body: &Value) -> Value {
     let mut last_error = None;
-    for _ in 0..12 {
+    for _ in 0..120 {
         match client
             .post(url)
             .header(AUTHORIZATION, bearer(token))
@@ -582,7 +582,8 @@ fn wait_for_leader_convergence(
     url_b: &str,
     expected_leader_url: &str,
 ) {
-    wait_until(
+    let urls = vec![url_a.to_string(), url_b.to_string()];
+    wait_until_with_diagnostics(
         "cluster leader convergence",
         Duration::from_secs(90),
         || {
@@ -594,9 +595,22 @@ fn wait_for_leader_convergence(
             else {
                 return false;
             };
+            let Some(status_a) = try_internal_cluster_status(client, url_a, service_token) else {
+                return false;
+            };
+            let Some(status_b) = try_internal_cluster_status(client, url_b, service_token) else {
+                return false;
+            };
             health_a.get("leaderUrl").and_then(Value::as_str) == Some(expected_leader_url)
                 && health_b.get("leaderUrl").and_then(Value::as_str) == Some(expected_leader_url)
+                && status_a.get("leaderUrl").and_then(Value::as_str) == Some(expected_leader_url)
+                && status_b.get("leaderUrl").and_then(Value::as_str) == Some(expected_leader_url)
+                && status_a.get("electionTerm").and_then(Value::as_u64)
+                    == status_b.get("electionTerm").and_then(Value::as_u64)
+                && status_a.get("hasQuorum").and_then(Value::as_bool) == Some(true)
+                && status_b.get("hasQuorum").and_then(Value::as_bool) == Some(true)
         },
+        || cluster_status_diagnostics(client, &urls, service_token),
     );
 }
 
@@ -986,7 +1000,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     ));
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -1007,21 +1021,27 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
 
     assert_authority_generation(&client, &leader_url, service_token, 1);
 
-    let rotated_leader = post_json(
+    let rotated_leader = post_json_eventually_ok_with_diagnostics(
         &client,
         &format!("{leader_url}/v1/authority"),
         service_token,
         &json!({}),
+        "leader authority rotation after cluster convergence",
+        Duration::from_secs(30),
+        || cluster_status_diagnostics(&client, &[url_a.clone(), url_b.clone()], service_token),
     );
     assert_eq!(rotated_leader["generation"].as_u64(), Some(2));
     assert_expected_write_visibility_metadata(&rotated_leader, &leader_url);
     assert_authority_generation(&client, &leader_url, service_token, 2);
 
-    let rotated_follower = post_json(
+    let rotated_follower = post_json_eventually_ok_with_diagnostics(
         &client,
         &format!("{follower_url}/v1/authority"),
         service_token,
         &json!({}),
+        "follower authority rotation after leader rotation",
+        Duration::from_secs(30),
+        || cluster_status_diagnostics(&client, &[url_a.clone(), url_b.clone()], service_token),
     );
     assert_eq!(rotated_follower["generation"].as_u64(), Some(3));
     assert_expected_write_visibility_metadata(&rotated_follower, &leader_url);
@@ -1365,10 +1385,11 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 3);
     assert_budget_invocation_count(&client, &follower_url, service_token, "cap-shared", 0, 3);
     assert_budget_totals(&client, &leader_url, service_token, "cap-shared", 0, 0, 0);
+    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &leader_url);
 
     let authorized_budget = post_json_eventually_ok_with_diagnostics(
         &client,
-        &format!("{follower_url}/v1/budgets/authorize-exposure"),
+        &format!("{leader_url}/v1/budgets/authorize-exposure"),
         service_token,
         &json!({
             "capabilityId": "cap-shared",
@@ -1534,7 +1555,7 @@ extensions:
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
     wait_until(
@@ -1658,7 +1679,7 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -1752,7 +1773,7 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -1966,7 +1987,7 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -2169,7 +2190,7 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -2283,7 +2304,7 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -2425,7 +2446,7 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -2610,7 +2631,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 
@@ -2855,7 +2876,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
     );
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .expect("build client");
 

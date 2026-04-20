@@ -230,11 +230,20 @@ impl SqliteCapabilityAuthority {
     ) -> Result<bool, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
         let current = Self::read_cluster_fence_from_connection(&connection)?;
+        let (_, authority_generation, authority_rotated_at) =
+            Self::read_public_state_from_connection(&connection)?;
         let next_leader = leader_url.map(ToOwned::to_owned);
+        let same_term_same_leader = election_term == current.election_term
+            && current.leader_url.as_deref() == next_leader.as_deref();
+        let fence_authority_state_is_stale = (current.election_term > 0
+            || current.leader_url.is_some())
+            && (current.authority_generation != authority_generation
+                || current.authority_rotated_at != authority_rotated_at);
         let should_update = election_term > current.election_term
             || (election_term == current.election_term
                 && current.leader_url.is_none()
-                && next_leader.is_some());
+                && next_leader.is_some())
+            || (same_term_same_leader && fence_authority_state_is_stale);
         if should_update {
             Self::write_cluster_fence_to_connection(&connection, next_leader, election_term)?;
         }
@@ -248,6 +257,17 @@ impl SqliteCapabilityAuthority {
     ) -> Result<(), AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
         let current = Self::read_cluster_fence_from_connection(&connection)?;
+        let (_, authority_generation, authority_rotated_at) =
+            Self::read_public_state_from_connection(&connection)?;
+        if (current.election_term > 0 || current.leader_url.is_some())
+            && (current.authority_generation != authority_generation
+                || current.authority_rotated_at != authority_rotated_at)
+        {
+            return Err(AuthorityStoreError::Fence(format!(
+                "persisted authority fence generation `{}` rotated_at `{}` does not match current authority generation `{authority_generation}` rotated_at `{authority_rotated_at}`",
+                current.authority_generation, current.authority_rotated_at
+            )));
+        }
         if election_term < current.election_term {
             return Err(AuthorityStoreError::Fence(format!(
                 "stale authority term `{election_term}` is below persisted term `{}`",
@@ -762,6 +782,54 @@ mod tests {
             .seed_cluster_fence(Some("http://leader-a"), 7)
             .unwrap());
         assert!(!authority.seed_cluster_fence(None, 7).unwrap());
+
+        let fence = authority.cluster_fence().unwrap();
+        let status = authority.status().unwrap();
+        assert_eq!(fence.election_term, 7);
+        assert_eq!(fence.leader_url.as_deref(), Some("http://leader-a"));
+        assert_eq!(fence.authority_generation, status.generation);
+        assert_eq!(fence.authority_rotated_at, status.rotated_at);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_enforce_cluster_fence_rejects_stale_rotation() {
+        let path = unique_db_path("arc-authority-fence-stale-rotation");
+        let authority = SqliteCapabilityAuthority::open(&path).unwrap();
+
+        assert!(authority
+            .seed_cluster_fence(Some("http://leader-a"), 7)
+            .unwrap());
+        let fence = authority.cluster_fence().unwrap();
+        authority.rotate().unwrap();
+
+        let error = authority
+            .enforce_cluster_fence("http://leader-a", 7)
+            .expect_err("stale persisted fence should fail closed")
+            .to_string();
+        assert!(error.contains("persisted authority fence generation"));
+        assert!(error.contains(&fence.authority_generation.to_string()));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_seed_cluster_fence_refreshes_same_term_authority_state() {
+        let path = unique_db_path("arc-authority-fence-same-term-refresh");
+        let authority = SqliteCapabilityAuthority::open(&path).unwrap();
+
+        assert!(authority
+            .seed_cluster_fence(Some("http://leader-a"), 7)
+            .unwrap());
+        authority.rotate().unwrap();
+
+        assert!(authority
+            .seed_cluster_fence(Some("http://leader-a"), 7)
+            .unwrap());
+        authority
+            .enforce_cluster_fence("http://leader-a", 7)
+            .expect("same-term reseed should refresh authority generation");
 
         let fence = authority.cluster_fence().unwrap();
         let status = authority.status().unwrap();

@@ -256,6 +256,7 @@ impl ExternalGuard for SnykGuard {
             url_encode(&args.version),
             url_encode(&self.cfg.org_id),
         );
+        super::super::endpoint_security::validate_external_guard_url("snyk base_url", &endpoint)?;
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));

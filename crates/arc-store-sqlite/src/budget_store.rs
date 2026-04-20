@@ -3902,6 +3902,59 @@ mod tests {
     }
 
     #[test]
+    fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite() {
+        let source_path = unique_db_path("arc-budget-import-replay-source");
+        let target_path = unique_db_path("arc-budget-import-replay-target");
+        let mut source = SqliteBudgetStore::open(&source_path).unwrap();
+
+        assert!(source
+            .try_charge_cost_with_ids(
+                "cap-import-replay",
+                0,
+                Some(5),
+                25,
+                Some(50),
+                Some(250),
+                Some("hold-import-replay-0"),
+                Some("hold-import-replay-0:authorize"),
+            )
+            .unwrap());
+        let usage = source
+            .get_usage("cap-import-replay", 0)
+            .unwrap()
+            .expect("source usage");
+        let events = source
+            .list_mutation_events(10, Some("cap-import-replay"), Some(0))
+            .unwrap();
+
+        let mut target = SqliteBudgetStore::open(&target_path).unwrap();
+        target
+            .import_snapshot_records(std::slice::from_ref(&usage), &events)
+            .unwrap();
+        target
+            .import_snapshot_records(std::slice::from_ref(&usage), &events)
+            .unwrap();
+
+        let replicated_usage = target
+            .get_usage("cap-import-replay", 0)
+            .unwrap()
+            .expect("replicated usage");
+        assert_eq!(replicated_usage.invocation_count, 1);
+        assert_usage_totals(&replicated_usage, 25, 0);
+        let replicated_events = target
+            .list_mutation_events(10, Some("cap-import-replay"), Some(0))
+            .unwrap();
+        assert_eq!(replicated_events.len(), 1);
+        assert_eq!(
+            replicated_events[0].event_id,
+            "hold-import-replay-0:authorize"
+        );
+
+        let _ = fs::remove_file(source_path);
+        let _ = fs::remove_file(target_path);
+    }
+
+    #[test]
     fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite() {
         let path = unique_db_path("arc-budget-import-atomic");
         let mut store = SqliteBudgetStore::open(&path).unwrap();

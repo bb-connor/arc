@@ -27,20 +27,25 @@ async fn handle_rotate_authority(
         return response;
     }
     match rotate_authority(&state.config) {
-        Ok(status) => respond_after_leader_visible_write(
-            &state,
-            "rotated authority was not visible on the leader after write",
-            || {
-                let visible_status = load_authority_status(&state.config)?;
-                if visible_status.generation == status.generation
-                    && visible_status.public_key == status.public_key
-                {
-                    Ok(Some(visible_status))
-                } else {
-                    Ok(None)
-                }
-            },
-        ),
+        Ok(status) => {
+            if let Err(response) = refresh_authority_mutation_fence(&state) {
+                return response;
+            }
+            respond_after_leader_visible_write(
+                &state,
+                "rotated authority was not visible on the leader after write",
+                || {
+                    let visible_status = load_authority_status(&state.config)?;
+                    if visible_status.generation == status.generation
+                        && visible_status.public_key == status.public_key
+                    {
+                        Ok(Some(visible_status))
+                    } else {
+                        Ok(None)
+                    }
+                },
+            )
+        }
         Err(response) => response,
     }
 }

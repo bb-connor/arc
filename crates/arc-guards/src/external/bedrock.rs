@@ -264,6 +264,7 @@ impl ExternalGuard for BedrockGuardrailGuard {
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
         let url = self.cfg.apply_url();
+        super::endpoint_security::validate_external_guard_url("bedrock endpoint", &url)?;
         let body = ApplyGuardrailRequest {
             source: self.cfg.source.as_str(),
             content: vec![GuardrailContentBlock {

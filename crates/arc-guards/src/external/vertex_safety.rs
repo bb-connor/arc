@@ -292,6 +292,7 @@ impl ExternalGuard for VertexSafetyGuard {
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
         let url = self.cfg.generate_url();
+        super::endpoint_security::validate_external_guard_url("vertex-safety endpoint", &url)?;
 
         let body = GenerateRequest {
             contents: vec![GenerateContent {

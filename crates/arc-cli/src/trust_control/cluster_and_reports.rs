@@ -648,6 +648,10 @@ fn sync_peer_budgets(
             .map(budget_mutation_record_from_view)
             .collect::<Result<Vec<_>, _>>()?;
         store.import_snapshot_records(&usage_records, &mutation_records)?;
+        // The peer cursor is process-local state. If the process crashes after
+        // this committed import but before the cursor update below, the next
+        // sync replays the same events. The store's event_id primary key is the
+        // authoritative dedup boundary, so replay is harmless.
         let mut next_cursor = cursor;
         for event in &response.mutation_events {
             next_cursor = Some(merge_budget_cursor(
@@ -1091,7 +1095,7 @@ async fn wait_for_budget_write_quorum_commit(
     }
 
     let timeout = budget_write_quorum_commit_timeout(state.config.cluster_sync_interval);
-    let poll_interval = Duration::from_millis(50);
+    let poll_interval = Duration::from_millis(250);
     let deadline = Instant::now() + timeout;
     loop {
         let Some(commit_view) = budget_write_quorum_commit_view(state, budget_seq) else {
@@ -1108,6 +1112,22 @@ async fn wait_for_budget_write_quorum_commit(
                     commit_view.budget_term,
                 ),
             ));
+        }
+        let sync_state = state.clone();
+        match tokio::task::spawn_blocking(move || sync_cluster_once(&sync_state)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                warn!(error = %error, "trust-control budget quorum sync failed");
+            }
+            Err(error) => {
+                warn!(error = %error, "trust-control budget quorum sync task panicked");
+            }
+        }
+        let Some(commit_view) = budget_write_quorum_commit_view(state, budget_seq) else {
+            return Ok(None);
+        };
+        if commit_view.quorum_committed {
+            return Ok(Some(commit_view));
         }
         if Instant::now() >= deadline {
             return Err(plain_http_error(
@@ -2182,6 +2202,18 @@ async fn forward_authority_post_to_leader<B: Serialize>(
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?;
+        if let Ok(status) = client.cluster_status() {
+            update_peer_reachable(state, &leader_url);
+            if status.has_quorum
+                && status.leader_url.as_deref() == Some(leader_url.as_str())
+            {
+                if let Some(lease) = status.authority_lease.as_ref() {
+                    if lease.lease_valid && lease.leader_url == leader_url {
+                        authority_term = lease.term;
+                    }
+                }
+            }
+        }
         match client.post_internal_json::<_, Value>(path, body, Some(authority_term)) {
             Ok(value) => return Ok(Some(Json(value).into_response())),
             Err(error) => {
@@ -2642,6 +2674,27 @@ fn enforce_authority_mutation_fence(
             .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
     }
     Ok(Some(authority_lease))
+}
+
+fn refresh_authority_mutation_fence(state: &TrustServiceState) -> Result<(), Response> {
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Ok(());
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before authority fence refresh",
+        ));
+    }
+    let Some(path) = state.config.authority_db_path.as_deref() else {
+        return Ok(());
+    };
+    SqliteCapabilityAuthority::open(path)
+        .and_then(|authority| {
+            authority.seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
+        })
+        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
+    Ok(())
 }
 
 fn validate_service_auth(headers: &HeaderMap, service_token: &str) -> Result<(), Response> {

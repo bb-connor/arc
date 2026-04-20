@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -210,6 +211,7 @@ fn reserve_listen_addr() -> std::net::SocketAddr {
 
 struct ServerGuard {
     child: Child,
+    _service_lock: MutexGuard<'static, ()>,
 }
 
 impl Drop for ServerGuard {
@@ -217,6 +219,13 @@ impl Drop for ServerGuard {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+fn trust_service_test_lock() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn read_child_stderr(child: &mut Child) -> String {
@@ -237,6 +246,7 @@ fn spawn_trust_service(
     authority_db_path: &PathBuf,
     budget_db_path: &PathBuf,
 ) -> ServerGuard {
+    let service_lock = trust_service_test_lock();
     let child = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
         .args([
@@ -260,7 +270,10 @@ fn spawn_trust_service(
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn trust service");
-    ServerGuard { child }
+    ServerGuard {
+        child,
+        _service_lock: service_lock,
+    }
 }
 
 fn spawn_trust_service_without_receipt_db(
@@ -270,6 +283,7 @@ fn spawn_trust_service_without_receipt_db(
     authority_db_path: &PathBuf,
     budget_db_path: &PathBuf,
 ) -> ServerGuard {
+    let service_lock = trust_service_test_lock();
     let child = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
         .args([
@@ -291,7 +305,10 @@ fn spawn_trust_service_without_receipt_db(
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn trust service without receipt db");
-    ServerGuard { child }
+    ServerGuard {
+        child,
+        _service_lock: service_lock,
+    }
 }
 
 fn wait_for_trust_service_result(

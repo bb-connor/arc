@@ -1356,6 +1356,7 @@ fn denied_external_guard_ip(address: IpAddr) -> bool {
             address.is_private()
                 || address.is_loopback()
                 || address.is_link_local()
+                || address.is_multicast()
                 || address.is_unspecified()
                 || address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1])
         }
@@ -2179,6 +2180,13 @@ guards:
             error.to_string().contains("resolved to disallowed address"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn external_guard_validation_rejects_ipv4_multicast_addresses() {
+        assert!(denied_external_guard_ip(IpAddr::V4(
+            std::net::Ipv4Addr::new(224, 0, 0, 1)
+        )));
     }
 
     #[test]
