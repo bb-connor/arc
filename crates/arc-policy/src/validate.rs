@@ -4,10 +4,12 @@
 //! policy and returns errors and warnings.
 
 use crate::models::{DetectionLevel, Extensions, HushSpec, Rules, TransitionTrigger};
+use crate::regex_safety::{compile_policy_regex, validate_policy_regex_count};
 use crate::version;
 use arc_core::capability::canonicalize_attestation_verifier;
-use regex::Regex;
 use std::collections::{BTreeSet, HashSet};
+
+const MAX_POLICY_DENYLIST_PATTERNS: usize = 64;
 
 #[derive(Debug, Clone)]
 pub struct ValidationResult {
@@ -79,6 +81,11 @@ pub fn validate(spec: &HushSpec) -> ValidationResult {
 
 fn validate_rules(rules: &Rules, errors: &mut Vec<ValidationError>) {
     if let Some(secret_patterns) = &rules.secret_patterns {
+        validate_regex_count(
+            secret_patterns.patterns.len(),
+            "rules.secret_patterns.patterns",
+            errors,
+        );
         let mut seen = HashSet::new();
         for pattern in &secret_patterns.patterns {
             if !seen.insert(&pattern.name) {
@@ -86,7 +93,7 @@ fn validate_rules(rules: &Rules, errors: &mut Vec<ValidationError>) {
             }
             validate_regex(
                 &pattern.pattern,
-                &format!("secret_patterns.patterns.{}", pattern.name),
+                &format!("rules.secret_patterns.patterns.{}", pattern.name),
                 errors,
             );
         }
@@ -98,6 +105,11 @@ fn validate_rules(rules: &Rules, errors: &mut Vec<ValidationError>) {
                 "rules.patch_integrity.max_imbalance_ratio must be > 0".to_string(),
             ));
         }
+        validate_regex_count(
+            patch_integrity.forbidden_patterns.len(),
+            "rules.patch_integrity.forbidden_patterns",
+            errors,
+        );
         for (index, pattern) in patch_integrity.forbidden_patterns.iter().enumerate() {
             validate_regex(
                 pattern,
@@ -108,6 +120,11 @@ fn validate_rules(rules: &Rules, errors: &mut Vec<ValidationError>) {
     }
 
     if let Some(shell_commands) = &rules.shell_commands {
+        validate_regex_count(
+            shell_commands.forbidden_patterns.len(),
+            "rules.shell_commands.forbidden_patterns",
+            errors,
+        );
         for (index, pattern) in shell_commands.forbidden_patterns.iter().enumerate() {
             validate_regex(
                 pattern,
@@ -563,12 +580,18 @@ fn validate_weight(value: Option<f64>, field: &str, errors: &mut Vec<ValidationE
 }
 
 fn validate_regex(pattern: &str, path: &str, errors: &mut Vec<ValidationError>) {
-    if let Err(error) = Regex::new(pattern) {
+    if let Err(error) = compile_policy_regex(pattern, path) {
         errors.push(ValidationError::InvalidRegex {
             field: path.to_string(),
             pattern: pattern.to_string(),
-            message: error.to_string(),
+            message: error,
         });
+    }
+}
+
+fn validate_regex_count(count: usize, path: &str, errors: &mut Vec<ValidationError>) {
+    if let Err(error) = validate_policy_regex_count(count, path, MAX_POLICY_DENYLIST_PATTERNS) {
+        errors.push(ValidationError::Custom(error));
     }
 }
 
@@ -585,6 +608,10 @@ fn is_valid_duration(value: &str) -> bool {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::models::{
+        Extensions, PatchIntegrityRule, SecretPattern, SecretPatternsRule, Severity,
+        ShellCommandsRule,
+    };
 
     fn assert_error_contains(result: &ValidationResult, needle: &str) {
         assert!(
@@ -606,6 +633,54 @@ mod tests {
             "expected warning containing {needle:?}, got: {:?}",
             result.warnings
         );
+    }
+
+    #[test]
+    fn denylist_regex_validation_rejects_unsafe_patterns() {
+        let spec = HushSpec {
+            hushspec: "0.1.0".to_string(),
+            name: Some("regex-validation".to_string()),
+            description: None,
+            extends: None,
+            merge_strategy: None,
+            rules: Some(Rules {
+                secret_patterns: Some(SecretPatternsRule {
+                    enabled: true,
+                    patterns: vec![SecretPattern {
+                        name: "broken".to_string(),
+                        pattern: "(".to_string(),
+                        severity: Severity::Critical,
+                        description: None,
+                    }],
+                    skip_paths: Vec::new(),
+                }),
+                patch_integrity: Some(PatchIntegrityRule {
+                    enabled: true,
+                    max_additions: 1000,
+                    max_deletions: 500,
+                    forbidden_patterns: vec!["a".repeat(513)],
+                    require_balance: false,
+                    max_imbalance_ratio: 2.0,
+                }),
+                shell_commands: Some(ShellCommandsRule {
+                    enabled: true,
+                    forbidden_patterns: vec!["a?".repeat(25); 65],
+                }),
+                ..Rules::default()
+            }),
+            extensions: Some(Extensions::default()),
+            metadata: None,
+        };
+
+        let result = validate(&spec);
+
+        assert_error_contains(&result, "rules.secret_patterns.patterns.broken");
+        assert_error_contains(&result, "must be at most 512 characters");
+        assert_error_contains(
+            &result,
+            "rules.shell_commands.forbidden_patterns allows at most 64 patterns",
+        );
+        assert_error_contains(&result, "complexity at most 96");
     }
 
     #[test]

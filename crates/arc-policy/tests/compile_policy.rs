@@ -9,8 +9,11 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use arc_policy::{compile_policy, HushSpec};
+
+static TEMP_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A HushSpec policy that exercises every guard type the compiler knows how
 /// to emit. The rule / extension blocks are deliberately minimal -- we only
@@ -32,8 +35,9 @@ fn sample_threat_intel_pattern_db() -> &'static str {
 
 fn write_temp_threat_intel_pattern_db() -> PathBuf {
     let path = std::env::temp_dir().join(format!(
-        "arc-policy-compile-test-{}-{}.json",
+        "arc-policy-compile-test-{}-{}-{}.json",
         std::process::id(),
+        TEMP_DB_COUNTER.fetch_add(1, Ordering::Relaxed),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time should be after unix epoch")

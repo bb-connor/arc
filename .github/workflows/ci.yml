@@ -30,7 +30,15 @@ jobs:
       - name: Install protobuf compiler
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
+      - name: Restore Lean 4 toolchain cache
+        id: elan-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: ${{ runner.os }}-elan-${{ env.ARC_ELAN_VERSION }}-${{ env.ARC_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
+
       - name: Install Lean 4 toolchain
+        if: steps.elan-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -40,13 +48,12 @@ jobs:
           echo "${ARC_ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
           tar -xzf /tmp/elan-x86_64-unknown-linux-gnu.tar.gz -C /tmp
           /tmp/elan-init -y --default-toolchain none
+
+      - name: Configure Lean 4 toolchain path
+        shell: bash
+        run: |
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.elan
-          key: ${{ runner.os }}-elan-${{ env.ARC_ELAN_VERSION }}-${{ env.ARC_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
 
       - name: Prime Lean 4 toolchain
         shell: bash

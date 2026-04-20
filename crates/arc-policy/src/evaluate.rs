@@ -10,7 +10,7 @@ use crate::models::{
     PostureExtension, RemoteDesktopChannelsRule, SecretPatternsRule, ShellCommandsRule,
     TransitionTrigger,
 };
-use regex::Regex;
+use crate::regex_safety::{compile_generated_policy_regex, policy_regex_is_match};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -67,7 +67,7 @@ async fn rate_limit_mcp_request(
     request: Request,
     next: axum::middleware::Next,
 ) -> Response {
-    let key = mcp_rate_limit_key(request.headers(), remote_addr);
+    let key = mcp_rate_limit_key(remote_addr);
     if let Err(retry_after) = limiter.check(key, mcp_rate_limit_now()) {
         let mut response =
             (StatusCode::TOO_MANY_REQUESTS, "MCP request rate limit exceeded").into_response();
@@ -81,23 +81,7 @@ async fn rate_limit_mcp_request(
     next.run(request).await
 }
 
-fn mcp_rate_limit_key(headers: &HeaderMap, remote_addr: SocketAddr) -> String {
-    if let Some(session_id) = headers
-        .get(MCP_SESSION_ID_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        return format!("session:{}", sha256_hex(session_id.as_bytes()));
-    }
-    if let Some(authorization) = headers
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        return format!("auth:{}", sha256_hex(authorization.as_bytes()));
-    }
+fn mcp_rate_limit_key(remote_addr: SocketAddr) -> String {
     format!("ip:{}", remote_addr.ip())
 }
 

@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn mcp_rate_limit_key_prefers_session_and_hashes_credentials() {
+    fn mcp_rate_limit_key_ignores_unverified_client_headers() {
         let mut headers = HeaderMap::new();
         headers.insert(
             MCP_SESSION_ID_HEADER,
@@ -66,8 +66,8 @@ mod tests {
             HeaderValue::from_static("Bearer token-secret"),
         );
 
-        let key = mcp_rate_limit_key(&headers, "127.0.0.1:8080".parse().unwrap());
-        assert!(key.starts_with("session:"));
+        let key = mcp_rate_limit_key("127.0.0.1:8080".parse().unwrap());
+        assert_eq!(key, "ip:127.0.0.1");
         assert!(!key.contains("session-secret"));
         assert!(!key.contains("token-secret"));
     }

@@ -761,7 +761,7 @@ fn build_cluster_state(
         ));
     }
 
-    if config.peer_urls.is_empty() && config.advertise_url.is_none() {
+    if config.peer_urls.is_empty() {
         return Ok(None);
     }
 
@@ -2827,7 +2827,7 @@ fn validate_service_auth(headers: &HeaderMap, service_token: &str) -> Result<(),
         .and_then(|value| value.to_str().ok())
         .unwrap_or_default();
     let provided = header.strip_prefix("Bearer ").unwrap_or_default();
-    if provided == service_token {
+    if bool::from(provided.as_bytes().ct_eq(service_token.as_bytes())) {
         return Ok(());
     }
     let mut response = plain_http_error(
@@ -4018,6 +4018,15 @@ mod cluster_and_reports_tests {
         assert!(
             build_cluster_state(&base_config(), "127.0.0.1:0".parse().unwrap())
                 .expect("standalone without advertise URL")
+                .is_none()
+        );
+
+        let mut standalone_advertised = base_config();
+        standalone_advertised.allow_local_peer_urls = false;
+        standalone_advertised.advertise_url = Some("http://127.0.0.1:3200/".to_string());
+        assert!(
+            build_cluster_state(&standalone_advertised, standalone_advertised.listen)
+                .expect("standalone advertise URL should not enable cluster validation")
                 .is_none()
         );
 

@@ -708,6 +708,42 @@ mod tests {
     }
 
     #[test]
+    fn file_write_secret_scanning_denies_invalid_regex() {
+        let spec = spec_with_rules(Rules {
+            secret_patterns: Some(SecretPatternsRule {
+                enabled: true,
+                patterns: vec![SecretPattern {
+                    name: "broken".to_string(),
+                    pattern: "(".to_string(),
+                    severity: Severity::Critical,
+                    description: None,
+                }],
+                skip_paths: Vec::new(),
+            }),
+            ..Rules::default()
+        });
+
+        let mut write_action = action("file_write", "/workspace/app.rs");
+        write_action.content = Some("no secret here".to_string());
+
+        let result = evaluate(&spec, &write_action);
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.secret_patterns.patterns.broken")
+        );
+        assert!(
+            result
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("invalid secret pattern regex")),
+            "unexpected reason: {:?}",
+            result.reason
+        );
+    }
+
+    #[test]
     fn patch_integrity_rejects_forbidden_patterns() {
         let spec = spec_with_rules(Rules {
             patch_integrity: Some(PatchIntegrityRule {

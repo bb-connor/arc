@@ -128,9 +128,9 @@ pub fn glob_matches(pattern: &str, target: &str) -> bool {
         }
     }
     regex.push('$');
-    Regex::new(&regex)
+    compile_generated_policy_regex(&regex, "policy glob pattern")
         .map(|compiled| compiled.is_match(target))
-        .unwrap_or(false)
+        .unwrap_or_else(|_| pattern == target)
 }
 
 struct PatchStats {
@@ -171,4 +171,3 @@ fn imbalance_ratio(additions: usize, deletions: usize) -> f64 {
         }
     }
 }
-

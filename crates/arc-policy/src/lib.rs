@@ -24,6 +24,7 @@ pub mod evaluate;
 pub mod merge;
 pub mod models;
 pub mod receipt;
+mod regex_safety;
 pub mod resolve;
 pub mod rulesets;
 pub mod validate;

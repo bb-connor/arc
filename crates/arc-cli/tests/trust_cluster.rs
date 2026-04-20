@@ -166,6 +166,7 @@ fn spawn_trust_service(
         service_token.to_string(),
         "--advertise-url".to_string(),
         advertise_url.to_string(),
+        "--allow-local-peer-urls".to_string(),
         "--cluster-sync-interval-ms".to_string(),
         "2000".to_string(),
     ];

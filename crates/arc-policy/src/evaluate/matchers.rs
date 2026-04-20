@@ -653,16 +653,25 @@ fn evaluate_secret_patterns(
     }
 
     for pattern in &rule.patterns {
-        if Regex::new(&pattern.pattern)
-            .map(|regex| regex.is_match(content))
-            .unwrap_or(false)
-        {
-            return deny_result(
-                Some(format!("rules.secret_patterns.patterns.{}", pattern.name)),
-                Some(format!("content matched secret pattern '{}'", pattern.name)),
-                origin_profile_id,
-                posture,
-            );
+        let field = format!("rules.secret_patterns.patterns.{}", pattern.name);
+        match policy_regex_is_match(&pattern.pattern, &field, content) {
+            Ok(true) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("content matched secret pattern '{}'", pattern.name)),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("invalid secret pattern regex: {error}")),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
@@ -680,16 +689,25 @@ fn evaluate_patch_integrity(
     }
 
     for (index, pattern) in rule.forbidden_patterns.iter().enumerate() {
-        if Regex::new(pattern)
-            .map(|regex| regex.is_match(content))
-            .unwrap_or(false)
-        {
-            return deny_result(
-                Some(format!("rules.patch_integrity.forbidden_patterns[{index}]")),
-                Some("patch content matched a forbidden pattern".to_string()),
-                origin_profile_id,
-                posture,
-            );
+        let field = format!("rules.patch_integrity.forbidden_patterns[{index}]");
+        match policy_regex_is_match(pattern, &field, content) {
+            Ok(true) => {
+                return deny_result(
+                    Some(field),
+                    Some("patch content matched a forbidden pattern".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("invalid forbidden patch regex: {error}")),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
@@ -736,16 +754,25 @@ fn evaluate_shell_rule(
     }
 
     for (index, pattern) in rule.forbidden_patterns.iter().enumerate() {
-        if Regex::new(pattern)
-            .map(|regex| regex.is_match(target))
-            .unwrap_or(false)
-        {
-            return deny_result(
-                Some(format!("rules.shell_commands.forbidden_patterns[{index}]")),
-                Some("shell command matched a forbidden pattern".to_string()),
-                origin_profile_id,
-                posture,
-            );
+        let field = format!("rules.shell_commands.forbidden_patterns[{index}]");
+        match policy_regex_is_match(pattern, &field, target) {
+            Ok(true) => {
+                return deny_result(
+                    Some(field),
+                    Some("shell command matched a forbidden pattern".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("invalid forbidden shell regex: {error}")),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
