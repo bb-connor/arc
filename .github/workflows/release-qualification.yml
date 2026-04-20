@@ -22,6 +22,17 @@ jobs:
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          android_sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [ -d "${android_sdk}" ]; then
+            # Keep ${android_sdk}/ndk available for the cargo-ndk mobile lane.
+            sudo rm -rf \
+              "${android_sdk}/emulator" \
+              "${android_sdk}/system-images" \
+              "${android_sdk}/platforms" \
+              "${android_sdk}/platform-tools" \
+              "${android_sdk}/build-tools" \
+              "${android_sdk}/cmdline-tools"
+          fi
           sudo docker image prune --all --force
           df -h /
 

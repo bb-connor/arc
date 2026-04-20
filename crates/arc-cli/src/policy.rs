@@ -1161,18 +1161,19 @@ fn build_azure_content_safety_guard(
     Ok(ScopedAsyncGuard::new(adapter, config.tool_patterns.clone()))
 }
 
+const SAFE_BROWSING_DEFAULT_BASE_URL: &str = "https://safebrowsing.googleapis.com/v4";
+
 fn build_safe_browsing_guard(
     config: &SafeBrowsingPolicyConfig,
 ) -> Result<ScopedAsyncGuard<SafeBrowsingGuard>, PolicyError> {
     validate_required_secret("threat_intel.safe_browsing.api_key", &config.api_key)?;
-    if let Some(base_url) = &config.base_url {
-        validate_https_url("threat_intel.safe_browsing.base_url", base_url)?;
-    }
-
     let mut guard_config = SafeBrowsingConfig::new(config.api_key.clone());
-    if let Some(base_url) = &config.base_url {
-        guard_config.base_url = Some(base_url.clone());
-    }
+    let base_url = config
+        .base_url
+        .as_deref()
+        .unwrap_or(SAFE_BROWSING_DEFAULT_BASE_URL);
+    validate_https_url("threat_intel.safe_browsing.base_url", base_url)?;
+    guard_config.base_url = Some(base_url.to_string());
     if let Some(client_id) = &config.client_id {
         if client_id.trim().is_empty() {
             return Err(PolicyError::Invalid(
@@ -1978,6 +1979,29 @@ guards:
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 2);
+    }
+
+    #[test]
+    fn build_pipeline_validates_safe_browsing_default_base_url() {
+        validate_https_url(
+            "threat_intel.safe_browsing.base_url",
+            SAFE_BROWSING_DEFAULT_BASE_URL,
+        )
+        .expect("default safe browsing base URL should pass external guard validation");
+
+        let policy = parse_policy(
+            r#"
+guards:
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: "sb-key"
+"#,
+        )
+        .unwrap();
+
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        assert_eq!(pipeline.len(), 1);
     }
 
     #[test]
