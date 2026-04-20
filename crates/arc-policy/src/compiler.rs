@@ -98,7 +98,7 @@ pub fn compile_policy_with_source(
     compile_rule_guards(policy, &mut builder, &mut post_invocation)?;
     compile_detection_guards(policy, &mut builder, source_dir)?;
     compile_budget_guards(policy, &mut builder)?;
-    let default_scope = compile_scope(policy);
+    let default_scope = compile_scope(policy)?;
     let (guards, guard_names) = builder.finish();
     Ok(CompiledPolicy {
         guards,
@@ -483,55 +483,54 @@ fn compile_budget_guards(
 /// `ArcScope`, each entry becomes a wildcard ToolGrant with `Invoke`
 /// permission. Policies that rely on negative matches or other semantics the
 /// scope model cannot encode fail closed and emit no default grants.
-fn compile_scope(policy: &HushSpec) -> ArcScope {
+fn compile_scope(policy: &HushSpec) -> Result<ArcScope, CompileError> {
     let Some(rules) = &policy.rules else {
-        return permissive_scope();
+        return Ok(permissive_scope());
     };
 
     let Some(ta) = &rules.tool_access else {
-        return permissive_scope();
+        return Ok(permissive_scope());
     };
 
     if !ta.enabled {
-        return permissive_scope();
+        return Ok(permissive_scope());
     }
 
     if ta.default == DefaultAction::Allow {
         if tool_access_can_safely_widen_to_wildcard(ta) {
-            return permissive_scope();
+            return Ok(permissive_scope());
         }
-        return ArcScope::default();
+        return Ok(ArcScope::default());
     }
 
     if ta.allow.is_empty() && ta.default == DefaultAction::Block {
         // Block-by-default with no allowlist: empty scope
-        return ArcScope::default();
+        return Ok(ArcScope::default());
     }
 
     if ta.require_workload_identity.is_some() || ta.prefer_workload_identity.is_some() {
-        return ArcScope::default();
+        return Ok(ArcScope::default());
     }
 
     // Each allowed tool pattern becomes a grant on a wildcard server
-    let grants = ta
-        .allow
-        .iter()
-        .map(|tool_pattern| ToolGrant {
+    let mut grants = Vec::with_capacity(ta.allow.len());
+    for tool_pattern in &ta.allow {
+        grants.push(ToolGrant {
             server_id: "*".to_string(),
             tool_name: tool_pattern.clone(),
             operations: vec![Operation::Invoke],
-            constraints: compile_tool_constraints(ta, tool_pattern),
+            constraints: compile_tool_constraints(ta, tool_pattern)?,
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
-        })
-        .collect();
+        });
+    }
 
-    ArcScope {
+    Ok(ArcScope {
         grants,
         ..ArcScope::default()
-    }
+    })
 }
 
 fn permissive_scope() -> ArcScope {
@@ -581,12 +580,15 @@ fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
         && rule.prefer_workload_identity.is_none()
 }
 
-fn compile_tool_constraints(rule: &ToolAccessRule, tool_pattern: &str) -> Vec<Constraint> {
+fn compile_tool_constraints(
+    rule: &ToolAccessRule,
+    tool_pattern: &str,
+) -> Result<Vec<Constraint>, CompileError> {
     let mut constraints = Vec::new();
     if let Some(max_args_size) = rule.max_args_size {
         constraints.push(Constraint::MaxArgsSize(max_args_size));
     }
-    if confirmation_overlap(tool_pattern, &rule.require_confirmation) {
+    if confirmation_overlap(tool_pattern, &rule.require_confirmation)? {
         constraints.push(Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
     if let Some(tier) = rule
@@ -595,28 +597,34 @@ fn compile_tool_constraints(rule: &ToolAccessRule, tool_pattern: &str) -> Vec<Co
     {
         constraints.push(Constraint::MinimumRuntimeAssurance(tier));
     }
-    constraints
+    Ok(constraints)
 }
 
-fn confirmation_overlap(tool_pattern: &str, confirmation_patterns: &[String]) -> bool {
-    confirmation_patterns
-        .iter()
-        .any(|pattern| tool_patterns_overlap(tool_pattern, pattern))
+fn confirmation_overlap(
+    tool_pattern: &str,
+    confirmation_patterns: &[String],
+) -> Result<bool, CompileError> {
+    for pattern in confirmation_patterns {
+        if tool_patterns_overlap(tool_pattern, pattern)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
-fn tool_patterns_overlap(left: &str, right: &str) -> bool {
+fn tool_patterns_overlap(left: &str, right: &str) -> Result<bool, CompileError> {
     if left == "*" || right == "*" {
-        return true;
+        return Ok(true);
     }
     if !contains_wildcards(left) && !contains_wildcards(right) {
-        return left == right;
+        return Ok(left == right);
     }
-    if glob_matches(left, right) || glob_matches(right, left) {
-        return true;
+    if glob_matches(left, right)? || glob_matches(right, left)? {
+        return Ok(true);
     }
     let left_prefix = literal_prefix(left);
     let right_prefix = literal_prefix(right);
-    left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix)
+    Ok(left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix))
 }
 
 fn contains_wildcards(pattern: &str) -> bool {
@@ -630,7 +638,7 @@ fn literal_prefix(pattern: &str) -> String {
         .collect()
 }
 
-fn glob_matches(pattern: &str, target: &str) -> bool {
+fn glob_matches(pattern: &str, target: &str) -> Result<bool, CompileError> {
     let mut regex = String::from("^");
     let mut chars = pattern.chars().peekable();
     while let Some(ch) = chars.next() {
@@ -654,7 +662,7 @@ fn glob_matches(pattern: &str, target: &str) -> bool {
     regex.push('$');
     crate::regex_safety::compile_generated_policy_regex(&regex, "compiler glob pattern")
         .map(|compiled| compiled.is_match(target))
-        .unwrap_or(true)
+        .map_err(|error| CompileError::Invalid(format!("invalid policy glob pattern: {error}")))
 }
 
 #[cfg(test)]
@@ -1083,6 +1091,32 @@ rules:
                 Constraint::MaxArgsSize(2048),
                 Constraint::RequireApprovalAbove { threshold_units: 0 }
             ]
+        );
+    }
+
+    #[test]
+    fn compile_tool_access_rejects_oversized_confirmation_globs() {
+        let oversized_glob = "*".repeat(600_000);
+        let spec = HushSpec::parse(&format!(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: [read_file]
+    require_confirmation: ["{oversized_glob}"]
+    default: block
+"#
+        ))
+        .unwrap();
+
+        let error = match compile_policy(&spec) {
+            Ok(_) => panic!("expected oversized glob to fail compilation"),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(error, CompileError::Invalid(ref message) if message.contains("invalid policy glob pattern")),
+            "unexpected compile error: {error:?}"
         );
     }
 
