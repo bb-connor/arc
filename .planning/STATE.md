@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v3.18
 milestone_name: Bounded ARC Ship Readiness Closure
 status: complete_local_pending_archival
-stopped_at: Completed v3.18 phases 417 through 421 and qualified the bounded ARC release gate
-last_updated: "2026-04-15T23:59:59Z"
-last_activity: "2026-04-15 -- completed the bounded ARC ship-readiness closure lane"
+stopped_at: Completed the post-v3.18 closure tracker, including portable browser qualification, CI and release gating, runtime-semantics doc sync, and the final release-truth gate
+last_updated: "2026-04-19T06:10:00Z"
+last_activity: "2026-04-19 -- completed the post-v3.18 closure tracker and left only archival plus hosted release observation"
 progress:
   total_phases: 374
   completed_phases: 289
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-15)
+See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.18 Bounded ARC Ship Readiness Closure` is complete
-locally and pending archival. No newer ship lane is active yet. `v3.17`
-remains the retained repo-local comptroller-capable packaging decision, and
-`v3.18` closes the remaining Track A P0 blockers required to ship one honest
-bounded ARC release.
+**Current focus:** no newer ship lane is active. `v3.18 Bounded ARC Ship
+Readiness Closure` is complete locally and pending archival, and the
+post-`v3.18` closure tracker is also complete locally. The next work is
+archival plus hosted release observation on the bounded candidate. `v3.17`
+remains the retained repo-local comptroller-capable packaging decision.
 
 ## Current Position
 
@@ -37,9 +37,11 @@ Plan: n/a
 Status: `v3.18` is now the latest completed milestone and bounded ARC
 ship-readiness lane. The retained decision boundary is: ARC is
 comptroller-capable software on repo-local proof, and bounded ARC is now the
-primary ship-facing release boundary.
-Last activity: 2026-04-15 -- completed `v3.18` and qualified the bounded ARC
-release gate.
+primary ship-facing release boundary. The post-`v3.18` closure tracker is now
+complete locally, so the remaining work is archival and hosted workflow
+observation rather than more repo-local runtime closure.
+Last activity: 2026-04-19 -- completed the post-`v3.18` closure tracker and
+the final release-truth sync gate.
 
 Progress: [#######...] 77%
 
@@ -190,7 +192,8 @@ Progress: [#######...] 77%
 - Archive `v3.16 Universal Control-Plane Thesis`.
 - Archive `v3.17 Comptroller Market Position Proof`.
 - Archive `v3.18 Bounded ARC Ship Readiness Closure`.
-- Resume `v4.0` planning/execution in parallel as capacity allows.
+- Observe hosted `CI` and `Release Qualification` on the bounded candidate commit before any external tag or publication.
+- Resume `v4.0` planning or execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
@@ -242,7 +245,7 @@ integration tests
 
 ## Session Continuity
 
-Last session: 2026-04-15T04:50:32.408Z
-Stopped at: Completed 389-02-PLAN.md
-Next action: execute 388-02-PLAN.md
+Last session: 2026-04-19T06:10:00Z
+Stopped at: Completed the post-v3.18 closure tracker and final release-truth sync
+Next action: archive `v3.15` through `v3.18`, then observe hosted release workflows on the bounded candidate
 Resume file: None

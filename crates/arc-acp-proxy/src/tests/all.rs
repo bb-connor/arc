@@ -2241,6 +2241,8 @@ mod attestation_and_telemetry_tests {
         decision: Decision,
         evidence: Vec<GuardEvidence>,
     ) -> ArcReceipt {
+        let action = ToolCallAction::from_parameters(json!({"tool": tool_name}))
+            .expect("hash receipt parameters");
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: id.to_string(),
@@ -2248,10 +2250,7 @@ mod attestation_and_telemetry_tests {
                 capability_id: "capability-1".to_string(),
                 tool_server: "acp-proxy".to_string(),
                 tool_name: tool_name.to_string(),
-                action: ToolCallAction {
-                    parameters: json!({"tool": tool_name}),
-                    parameter_hash: "hash-1".to_string(),
-                },
+                action,
                 decision,
                 content_hash: "content-hash".to_string(),
                 policy_hash: "policy-hash".to_string(),
@@ -2297,6 +2296,7 @@ mod attestation_and_telemetry_tests {
 
     impl ReceiptStore for MockReceiptStore {
         fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+            assert!(receipt.action.verify_hash().unwrap());
             let mut state = self.state.lock().expect("mock store lock should hold");
             state.appended_receipts.push(receipt.clone());
             Ok(())
@@ -3239,6 +3239,40 @@ mod attestation_and_telemetry_tests {
                     .and_then(serde_json::Value::as_str)
             }),
             Some("audit_only")
+        );
+    }
+
+    #[test]
+    fn kernel_receipt_signer_preserves_acp_content_hash_with_canonical_parameter_hash() {
+        let keypair = Keypair::generate();
+        let shared = Arc::new(Mutex::new(MockStoreState::default()));
+        let store = MockReceiptStore {
+            state: Arc::clone(&shared),
+            supports_checkpoints: false,
+        };
+        let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 10);
+
+        let mut entry = make_audit_entry("call-provenance", "session-provenance");
+        entry.content_hash = "acp-originated-content-hash".to_string();
+        let receipt = signer
+            .sign_acp_receipt(&AcpReceiptRequest {
+                audit_entry: entry,
+                tool_server: "proxy-server".to_string(),
+                tool_name: "terminal/create".to_string(),
+            })
+            .expect("receipt should sign");
+
+        assert!(receipt.action.verify_hash().unwrap());
+        assert_ne!(receipt.action.parameter_hash, "acp-originated-content-hash");
+        assert_eq!(receipt.content_hash, "acp-originated-content-hash");
+        assert_eq!(
+            receipt.action.parameters,
+            json!({
+                "tool_call_id": "call-provenance",
+                "title": "Test tool",
+                "kind": "terminal",
+                "status": "completed",
+            })
         );
     }
 

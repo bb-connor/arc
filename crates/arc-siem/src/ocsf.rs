@@ -379,16 +379,15 @@ mod tests {
 
     fn test_receipt(id: &str, decision: Decision) -> ArcReceipt {
         let kp = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({"path": "/etc/passwd"}))
+            .expect("hash receipt parameters");
         let body = ArcReceiptBody {
             id: id.to_string(),
             timestamp: 1_712_345_678,
             capability_id: "cap-abc".to_string(),
             tool_server: "srv-files".to_string(),
             tool_name: "file_read".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({"path": "/etc/passwd"}),
-                parameter_hash: "abc".to_string(),
-            },
+            action,
             decision,
             content_hash: "content-xyz".to_string(),
             policy_hash: "policy-xyz".to_string(),

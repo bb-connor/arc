@@ -64,10 +64,12 @@ from pathlib import Path
 checks = {
     ".planning/PROJECT.md": [
         "Latest completed milestone:** v3.18 Bounded ARC Ship Readiness Closure",
+        "Most recent implemented milestone:** Post-v3.18 ARC Closure Program",
     ],
     ".planning/STATE.md": [
         "Status: `v3.18` is now the latest completed milestone and bounded ARC",
         "ship-readiness lane.",
+        "post-`v3.18` closure tracker is also complete locally",
     ],
     ".planning/REQUIREMENTS.md": [
         "after completing the v3.18 bounded ARC ship-readiness closure",
@@ -83,6 +85,37 @@ for rel_path, required in checks.items():
     for needle in required:
         if needle not in text:
             raise SystemExit(f"missing planning truth in {rel_path}: {needle}")
+    print(f"ok: {rel_path}")
+PY
+
+python3 - <<'PY' >"${log_root}/release-doc-sync.log"
+from pathlib import Path
+
+checks = {
+    "README.md": [
+        "docs/release/RELEASE_CANDIDATE.md",
+        "docs/release/RELEASE_AUDIT.md",
+        "docs/release/QUALIFICATION.md",
+    ],
+    "docs/release/RELEASE_AUDIT.md": [
+        "./scripts/check-formal-proofs.sh",
+        "./scripts/check-portable-kernel.sh",
+        "./scripts/qualify-portable-browser.sh",
+        "./scripts/qualify-mobile-kernel.sh",
+    ],
+    "docs/release/RELEASE_CANDIDATE.md": [
+        "./scripts/check-formal-proofs.sh",
+        "./scripts/check-portable-kernel.sh",
+        "./scripts/qualify-portable-browser.sh",
+        "./scripts/qualify-mobile-kernel.sh",
+    ],
+}
+
+for rel_path, required in checks.items():
+    text = Path(rel_path).read_text()
+    for needle in required:
+        if needle not in text:
+            raise SystemExit(f"missing release-doc sync in {rel_path}: {needle}")
     print(f"ok: {rel_path}")
 PY
 
@@ -104,6 +137,7 @@ Executed checks:
 - bounded claim-discipline grep checks over README and competitive-positioning
   copy
 - planning-truth checks over `.planning/*`
+- release-doc sync checks over README and release candidate/audit docs
 
 Supporting documents:
 

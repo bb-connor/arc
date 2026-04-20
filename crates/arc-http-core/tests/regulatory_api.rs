@@ -17,6 +17,8 @@ use arc_http_core::{
 };
 
 fn make_receipt(keypair: &Keypair, id: &str, timestamp: u64) -> ArcReceipt {
+    let action =
+        ToolCallAction::from_parameters(serde_json::json!({})).expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -24,10 +26,7 @@ fn make_receipt(keypair: &Keypair, id: &str, timestamp: u64) -> ArcReceipt {
             capability_id: "cap-test".to_string(),
             tool_server: "srv".to_string(),
             tool_name: "t".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "hash".to_string(),
-            },
+            action,
             decision: Decision::Allow,
             content_hash: "ch".to_string(),
             policy_hash: "ph".to_string(),

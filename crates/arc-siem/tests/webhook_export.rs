@@ -17,6 +17,8 @@ use zeroize::Zeroizing;
 
 fn allow_receipt(id: &str) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let action =
+        ToolCallAction::from_parameters(serde_json::json!({})).expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -24,10 +26,7 @@ fn allow_receipt(id: &str) -> ArcReceipt {
             capability_id: "cap".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "h".to_string(),
-            },
+            action,
             decision: Decision::Allow,
             content_hash: "c".to_string(),
             policy_hash: "p".to_string(),
@@ -44,6 +43,8 @@ fn allow_receipt(id: &str) -> ArcReceipt {
 
 fn deny_receipt(id: &str, guard: &str) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let action =
+        ToolCallAction::from_parameters(serde_json::json!({})).expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -51,10 +52,7 @@ fn deny_receipt(id: &str, guard: &str) -> ArcReceipt {
             capability_id: "cap".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "h".to_string(),
-            },
+            action,
             decision: Decision::Deny {
                 reason: "denied".to_string(),
                 guard: guard.to_string(),

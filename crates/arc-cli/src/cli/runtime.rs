@@ -287,6 +287,7 @@ fn cmd_check(
         server_id: server.to_string(),
         tool_name: tool.to_string(),
         arguments: params.clone(),
+        model_metadata: None,
     });
 
     let response = match kernel.evaluate_session_operation(&context, &operation)? {
@@ -660,6 +661,7 @@ fn cmd_trust_serve(
     budget_db_path: Option<&Path>,
     _session_db_path: Option<&Path>,
     advertise_url: Option<&str>,
+    allow_local_peer_urls: bool,
     certification_public_metadata_ttl_seconds: u64,
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
@@ -689,6 +691,7 @@ fn cmd_trust_serve(
         issuance_policy,
         runtime_assurance_policy,
         advertise_url: advertise_url.map(ToOwned::to_owned),
+        allow_local_peer_urls,
         certification_public_metadata_ttl_seconds,
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),

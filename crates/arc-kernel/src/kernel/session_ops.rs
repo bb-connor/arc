@@ -4,6 +4,29 @@ use super::*;
 
 static GLOBAL_SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+fn bump_session_counter_from_id(session_id: &SessionId) {
+    let Some(number) = session_id
+        .as_str()
+        .strip_prefix("sess-")
+        .and_then(|value| value.parse::<u64>().ok())
+    else {
+        return;
+    };
+
+    let mut current = GLOBAL_SESSION_COUNTER.load(Ordering::SeqCst);
+    while current < number {
+        match GLOBAL_SESSION_COUNTER.compare_exchange(
+            current,
+            number,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => break,
+            Err(observed) => current = observed,
+        }
+    }
+}
+
 impl ArcKernel {
     pub fn open_session(
         &self,
@@ -13,19 +36,37 @@ impl ArcKernel {
         let session_number = GLOBAL_SESSION_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
         let session_id = SessionId::new(format!("sess-{}", session_number));
 
-        info!(session_id = %session_id, agent_id = %agent_id, "opening session");
-        let session_snapshot = self
-            .with_sessions_write(|sessions| {
-                let session = Session::new(session_id.clone(), agent_id, issued_capabilities);
-                let snapshot = session.clone();
-                sessions.insert(session_id.clone(), session);
-                Ok(snapshot)
-            })
-            .unwrap_or_else(|error| panic!("failed to open session: {error}"));
-        self.persist_session_anchor_snapshot(&session_snapshot, None)
-            .unwrap_or_else(|error| panic!("failed to persist initial session anchor: {error}"));
+        self.open_session_with_id(session_id, agent_id, issued_capabilities)
+            .unwrap_or_else(|error| panic!("failed to open session: {error}"))
+    }
 
-        session_id
+    pub fn open_session_with_id(
+        &self,
+        session_id: SessionId,
+        agent_id: AgentId,
+        issued_capabilities: Vec<CapabilityToken>,
+    ) -> Result<SessionId, KernelError> {
+        bump_session_counter_from_id(&session_id);
+
+        info!(session_id = %session_id, agent_id = %agent_id, "opening session");
+        let session_snapshot = self.with_sessions_write(|sessions| {
+            if sessions.contains_key(&session_id) {
+                return Err(KernelError::SessionAlreadyExists(session_id.clone()));
+            }
+            let session = Session::new(session_id.clone(), agent_id, issued_capabilities);
+            let snapshot = session.clone();
+            sessions.insert(session_id.clone(), session);
+            Ok(snapshot)
+        })?;
+        if let Err(error) = self.persist_session_anchor_snapshot(&session_snapshot, None) {
+            self.with_sessions_write(|sessions| {
+                sessions.remove(&session_id);
+                Ok(())
+            })?;
+            return Err(error);
+        }
+
+        Ok(session_id)
     }
 
     /// Transition a session into the `ready` state once setup is complete.
@@ -548,7 +589,7 @@ impl ArcKernel {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
-            model_metadata: None,
+            model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };
 
@@ -628,7 +669,7 @@ impl ArcKernel {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
-                    model_metadata: None,
+                    model_metadata: tool_call.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 };
                 let session_roots =

@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+publish = false
 
 [dependencies]
 arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }

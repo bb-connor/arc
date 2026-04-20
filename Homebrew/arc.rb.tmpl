@@ -7,28 +7,28 @@
 # asset with concrete version and checksum values.
 class Arc < Formula
   desc "Provable Agent Capability Transport sidecar runtime"
-  homepage "https://github.com/backbay/arc"
+  homepage "https://github.com/__ARC_GITHUB_REPO__"
   version "__ARC_VERSION__"
   license "Apache-2.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-aarch64-apple-darwin.tar.gz"
+      url "https://github.com/__ARC_GITHUB_REPO__/releases/download/v#{version}/arc-#{version}-aarch64-apple-darwin.tar.gz"
       sha256 "__ARC_SHA256_DARWIN_ARM64__"
     end
     on_intel do
-      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-x86_64-apple-darwin.tar.gz"
+      url "https://github.com/__ARC_GITHUB_REPO__/releases/download/v#{version}/arc-#{version}-x86_64-apple-darwin.tar.gz"
       sha256 "__ARC_SHA256_DARWIN_AMD64__"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-aarch64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/__ARC_GITHUB_REPO__/releases/download/v#{version}/arc-#{version}-aarch64-unknown-linux-gnu.tar.gz"
       sha256 "__ARC_SHA256_LINUX_ARM64__"
     end
     on_intel do
-      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-x86_64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/__ARC_GITHUB_REPO__/releases/download/v#{version}/arc-#{version}-x86_64-unknown-linux-gnu.tar.gz"
       sha256 "__ARC_SHA256_LINUX_AMD64__"
     end
   end

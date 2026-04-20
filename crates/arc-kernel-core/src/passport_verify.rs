@@ -28,11 +28,9 @@
 //! This module imports only `arc_core_types::crypto::PublicKey` /
 //! `Signature` / `canonical_json_bytes` and the kernel-core
 //! [`Clock`](crate::clock::Clock) trait. It contains zero `std::*`
-//! imports. The `arc-core-types` crate still pulls `std` transitively
-//! today, which blocks `cargo build --target wasm32-unknown-unknown`
-//! at the dependency level; once `arc-core-types` is modernized to
-//! `no_std` (a separate roadmap story), this module cross-compiles to
-//! `wasm32-unknown-unknown` unchanged.
+//! imports. It participates in the same scripted portability proof as the
+//! rest of `arc-kernel-core`: host plus `wasm32-unknown-unknown` builds with
+//! `--no-default-features` via `scripts/check-portable-kernel.sh`.
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

@@ -1,0 +1,80 @@
+schema = "arc.proof-manifest.v1"
+manifest_version = 1
+proof_boundary_status = "bounded_verified_core"
+lean_root_module = "Arc"
+boundary_doc = "docs/architecture/ARC_RUNTIME_BOUNDARIES.md"
+spec_anchor = "spec/PROTOCOL.md#55-verified-core-boundary"
+
+root_modules = [
+  "formal/lean4/Pact/Arc.lean",
+  "formal/lean4/Pact/Arc/Core/Capability.lean",
+  "formal/lean4/Pact/Arc/Core/Scope.lean",
+  "formal/lean4/Pact/Arc/Core/Receipt.lean",
+  "formal/lean4/Pact/Arc/Core/Revocation.lean",
+]
+
+gate_commands = [
+  "./scripts/check-formal-proofs.sh",
+  "cargo test -p arc-formal-diff-tests",
+  "./scripts/check-portable-kernel.sh",
+]
+
+covered_rust_modules = [
+  "crates/arc-kernel-core/src/capability_verify.rs",
+  "crates/arc-kernel-core/src/scope.rs",
+  "crates/arc-kernel-core/src/evaluate.rs",
+  "crates/arc-kernel-core/src/normalized.rs",
+  "crates/arc-kernel-core/src/receipts.rs",
+]
+
+covered_rust_symbols = [
+  "arc_kernel_core::capability_verify::verify_capability",
+  "arc_kernel_core::capability_verify::verify_capability_with_trusted",
+  "arc_kernel_core::scope::resolve_matching_grants",
+  "arc_kernel_core::scope::resolve_capability_grants",
+  "arc_kernel_core::evaluate::evaluate",
+  "arc_kernel_core::normalized::NormalizedToolGrant::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedResourceGrant::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedPromptGrant::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedScope::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedEvaluationVerdict::try_from_evaluation",
+  "arc_kernel_core::receipts::sign_receipt",
+]
+
+shell_entrypoints = [
+  "arc_kernel::ArcKernel::evaluate_portable_verdict",
+  "arc_kernel::ArcKernel::build_and_sign_receipt",
+]
+
+allowed_assumption_modules = [
+  "Arc.Core.Capability",
+  "Arc.Core.Scope",
+  "Arc.Core.Receipt",
+  "Arc.Core.Revocation",
+]
+
+allowed_axioms = [
+  "Arc.Core.verifyCapabilitySignature",
+]
+
+allowed_open_modules = [
+  "Arc.Core",
+  "Arc.Spec",
+  "Lake",
+  "DSL",
+]
+
+excluded_surfaces = [
+  "arc-kernel revocation-store lookups and delegation-store lineage checks",
+  "budget mutation, authorize/commit/reconcile hold flows, and payment authorization",
+  "DPoP verification, nonce replay caches, and transport admission",
+  "governed transaction evaluation, approval-token policy, and runtime-attestation enforcement",
+  "tool dispatch, subprocess or network effects, and hosted/session orchestration",
+  "receipt persistence, checkpoint publication, clustered trust-control, and external settlement rails",
+]
+
+notes = [
+  "The bounded verified core is the pure authorization and receipt-signing subset that can run in arc-kernel-core without transport, database, or runtime side effects.",
+  "Lean assets remain informative unless they are root-imported, sorry-free, and mapped to the covered Rust symbols above.",
+  "Release-facing runtime claims must not extend beyond the covered symbols and shell entrypoints named here until FORM-REG, FORM-REF, and GATE-CI land.",
+]

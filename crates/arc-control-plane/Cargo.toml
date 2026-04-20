@@ -6,6 +6,8 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
+publish = false
 
 [lib]
 name = "arc_control_plane"
@@ -14,7 +16,9 @@ name = "arc_control_plane"
 arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
+arc-data-guards = { package = "arc-data-guards", path = "../arc-data-guards" }
 arc-did = { package = "arc-did", path = "../arc-did" }
+arc-external-guards = { package = "arc-external-guards", path = "../arc-external-guards" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-guards = { package = "arc-guards", path = "../arc-guards" }
 arc-policy = { package = "arc-policy", path = "../arc-policy" }
@@ -31,6 +35,7 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+subtle = "2.6"
 axum = "0.8"
 reqwest = { workspace = true, features = ["blocking", "form", "json", "query", "rustls"] }
 ureq = { version = "2.10", features = ["json"] }

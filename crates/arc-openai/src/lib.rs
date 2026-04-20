@@ -795,6 +795,7 @@ mod tests {
                 model_id: "gpt-5".to_string(),
                 safety_tier: Some(ModelSafetyTier::High),
                 provider: Some("openai".to_string()),
+                provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
             }),
         };
 

@@ -5,14 +5,19 @@ use arc_core::capability::{
     GovernedCallChainProvenance, MeteredSettlementMode, MonetaryAmount, RuntimeAssuranceTier,
 };
 use arc_core::receipt::{
-    ArcReceipt, Decision, FinancialBudgetAuthorityReceiptMetadata,
-    GovernedTransactionReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, SettlementStatus,
-    SignedExportEnvelope,
+    ArcReceipt, Decision, EconomicAuthorizationReceiptMetadata,
+    FinancialBudgetAuthorityReceiptMetadata, GovernedTransactionReceiptMetadata,
+    MeteredUsageEvidenceReceiptMetadata, SettlementStatus, SignedExportEnvelope,
 };
 use arc_core::session::ArcIdentityAssertion;
 use arc_core::{
     ArcGovernedAuthorizationBinding, ArcPortableClaimCatalog, ArcPortableIdentityBinding,
 };
+use arc_credit::{
+    CreditBondDisposition, CreditBondListReport, CreditFacilityDisposition,
+    CreditFacilityListReport, ExposureLedgerQuery,
+};
+use arc_underwriting::{UnderwritingDecisionListReport, UnderwritingDecisionOutcome};
 
 use crate::cost_attribution::CostAttributionQuery;
 use crate::evidence_export::{
@@ -35,6 +40,8 @@ pub const MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT: usize = 200;
 pub const MAX_METERED_BILLING_LIMIT: usize = 200;
 /// Maximum number of authorization-context rows returned in one report.
 pub const MAX_AUTHORIZATION_CONTEXT_LIMIT: usize = 200;
+/// Maximum number of economic projection rows returned in one report.
+pub const MAX_ECONOMIC_RECEIPT_LIMIT: usize = 200;
 /// Stable schema identifier for ARC's normative OAuth-family authorization profile.
 pub const ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA: &str = "arc.oauth.authorization-profile.v1";
 /// Stable schema identifier for ARC's sender-constraint profile.
@@ -42,6 +49,8 @@ pub const ARC_OAUTH_SENDER_CONSTRAINT_SCHEMA: &str = "arc.oauth.sender-constrain
 /// Stable schema identifier for ARC authorization-context reports.
 pub const ARC_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA: &str =
     "arc.oauth.authorization-context-report.v1";
+/// Stable schema identifier for the deterministic economic completion flow bundle.
+pub const ECONOMIC_COMPLETION_FLOW_SCHEMA: &str = "arc.economic-completion-flow.v1";
 /// Stable schema identifier for ARC authorization-profile metadata artifacts.
 pub const ARC_OAUTH_AUTHORIZATION_METADATA_SCHEMA: &str = "arc.oauth.authorization-metadata.v1";
 /// Stable schema identifier for ARC enterprise IAM reviewer packs.
@@ -103,6 +112,8 @@ pub struct OperatorReportQuery {
     pub metered_limit: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub economic_limit: Option<usize>,
 }
 
 impl Default for OperatorReportQuery {
@@ -121,6 +132,7 @@ impl Default for OperatorReportQuery {
             settlement_limit: Some(50),
             metered_limit: Some(50),
             authorization_limit: Some(50),
+            economic_limit: Some(50),
         }
     }
 }
@@ -198,6 +210,13 @@ impl OperatorReportQuery {
         self.authorization_limit
             .unwrap_or(50)
             .clamp(1, MAX_AUTHORIZATION_CONTEXT_LIMIT)
+    }
+
+    #[must_use]
+    pub fn economic_limit_or_default(&self) -> usize {
+        self.economic_limit
+            .unwrap_or(50)
+            .clamp(1, MAX_ECONOMIC_RECEIPT_LIMIT)
     }
 
     #[must_use]
@@ -579,6 +598,117 @@ pub struct MeteredBillingReconciliationRow {
 pub struct MeteredBillingReconciliationReport {
     pub summary: MeteredBillingReconciliationSummary,
     pub receipts: Vec<MeteredBillingReconciliationRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicReceiptProjectionSummary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub metered_receipts: u64,
+    pub pending_settlement_receipts: u64,
+    pub failed_settlement_receipts: u64,
+    pub settlement_actionable_receipts: u64,
+    pub metering_actionable_receipts: u64,
+    pub metering_evidence_missing_receipts: u64,
+    pub metering_financial_mismatch_receipts: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicReceiptSettlementProjection {
+    pub settlement_status: SettlementStatus,
+    pub reconciliation_state: SettlementReconciliationState,
+    pub action_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicReceiptMeteringProjection {
+    pub reconciliation_state: MeteredBillingReconciliationState,
+    pub action_required: bool,
+    pub evidence_missing: bool,
+    pub exceeds_quoted_units: bool,
+    pub exceeds_max_billed_units: bool,
+    pub exceeds_quoted_cost: bool,
+    pub financial_mismatch: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<MeteredBillingEvidenceRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicReceiptProjectionRow {
+    pub receipt_id: String,
+    pub timestamp: u64,
+    pub capability_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub economic_authorization: EconomicAuthorizationReceiptMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_authority: Option<FinancialBudgetAuthorityReceiptMetadata>,
+    pub settlement: EconomicReceiptSettlementProjection,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metering: Option<EconomicReceiptMeteringProjection>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicReceiptProjectionReport {
+    pub summary: EconomicReceiptProjectionSummary,
+    pub receipts: Vec<EconomicReceiptProjectionRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicCompletionFlowSummary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub matching_underwriting_decisions: u64,
+    pub returned_underwriting_decisions: u64,
+    pub matching_credit_facilities: u64,
+    pub returned_credit_facilities: u64,
+    pub matching_credit_bonds: u64,
+    pub returned_credit_bonds: u64,
+    pub pending_settlement_receipts: u64,
+    pub failed_settlement_receipts: u64,
+    pub metering_actionable_receipts: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_underwriting_decision_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_underwriting_outcome: Option<UnderwritingDecisionOutcome>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_credit_facility_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_credit_facility_disposition: Option<CreditFacilityDisposition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_credit_bond_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_credit_bond_disposition: Option<CreditBondDisposition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomicCompletionFlowReport {
+    pub schema: String,
+    pub generated_at: u64,
+    pub filters: ExposureLedgerQuery,
+    pub summary: EconomicCompletionFlowSummary,
+    pub economic_receipts: EconomicReceiptProjectionReport,
+    pub underwriting_decisions: UnderwritingDecisionListReport,
+    pub credit_facilities: CreditFacilityListReport,
+    pub credit_bonds: CreditBondListReport,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -1416,6 +1546,19 @@ mod tests {
         assert_eq!(
             query.authorization_limit_or_default(),
             MAX_AUTHORIZATION_CONTEXT_LIMIT
+        );
+    }
+
+    #[test]
+    fn operator_report_query_clamps_economic_limit() {
+        let query = OperatorReportQuery {
+            economic_limit: Some(5_000),
+            ..OperatorReportQuery::default()
+        };
+
+        assert_eq!(
+            query.economic_limit_or_default(),
+            MAX_ECONOMIC_RECEIPT_LIMIT
         );
     }
 

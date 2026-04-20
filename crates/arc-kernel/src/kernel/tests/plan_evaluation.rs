@@ -275,11 +275,13 @@ fn plan_evaluation_model_metadata_scoped_per_step() {
         model_id: "claude-opus-4".to_string(),
         safety_tier: Some(ModelSafetyTier::High),
         provider: Some("anthropic".to_string()),
+        provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
     };
     let low_tier = ModelMetadata {
         model_id: "small-uncensored".to_string(),
         safety_tier: Some(ModelSafetyTier::Low),
         provider: None,
+        provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
     };
 
     let steps = vec![

@@ -517,6 +517,17 @@ fn collect_credit_provider_risk_evidence(
     for reference in credit_facility_receipt_refs_from_underwriting(underwriting_input) {
         push_ref(reference);
     }
+    if let Some(compliance_score) = underwriting_input.compliance_score.as_ref() {
+        push_ref(CreditScorecardEvidenceReference {
+            kind: CreditScorecardEvidenceKind::ComplianceScore,
+            reference_id: compliance_score.agent_id.clone(),
+            observed_at: Some(compliance_score.generated_at),
+            locator: Some(format!(
+                "compliance-score:{}",
+                compliance_score.agent_id
+            )),
+        });
+    }
     refs
 }
 
@@ -1466,6 +1477,25 @@ fn build_underwriting_policy_input(
         &selection,
         governed_actions.governed_receipts,
     );
+    let compliance_score = normalized_query
+        .agent_subject
+        .as_deref()
+        .map(|subject_key| {
+            receipt_store
+                .query_compliance_report(&operator_query)
+                .map_err(|error| TrustHttpError::internal(error.to_string()))
+                .and_then(|report| {
+                    build_underwriting_compliance_evidence(
+                        subject_key,
+                        generated_at,
+                        &activity,
+                        &report,
+                        &selection,
+                    )
+                    .map_err(TrustHttpError::internal)
+                })
+        })
+        .transpose()?;
     let signals = derive_underwriting_signals(
         &normalized_query,
         &receipts,
@@ -1484,8 +1514,47 @@ fn build_underwriting_policy_input(
         reputation,
         certification,
         runtime_assurance,
+        compliance_score,
         signals,
     })
+}
+
+fn build_underwriting_compliance_evidence(
+    subject_key: &str,
+    generated_at: u64,
+    activity: &arc_kernel::ReceiptAnalyticsResponse,
+    report: &arc_kernel::ComplianceReport,
+    selection: &arc_kernel::BehavioralFeedReceiptSelection,
+) -> Result<arc_kernel::UnderwritingComplianceEvidence, String> {
+    if report.export_query.agent_subject.as_deref() != Some(subject_key) {
+        return Err(format!(
+            "compliance report subject mismatch: expected `{subject_key}` but report was scoped to {:?}",
+            report.export_query.agent_subject
+        ));
+    }
+    let observed_capabilities = selection
+        .receipts
+        .iter()
+        .map(|receipt| receipt.capability_id.clone())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len() as u64;
+    let latest_receipt_timestamp = selection.receipts.iter().map(|receipt| receipt.timestamp).max();
+    let inputs = arc_kernel::ComplianceScoreInputs::new(
+        activity.summary.total_receipts,
+        activity.summary.deny_count,
+        observed_capabilities,
+        0,
+        activity.by_time.len() as u64,
+        0,
+        latest_receipt_timestamp.map(|timestamp| generated_at.saturating_sub(timestamp)),
+    );
+    let score = report.compliance_score(
+        &inputs,
+        &arc_kernel::ComplianceScoreConfig::default(),
+        subject_key,
+        generated_at,
+    );
+    Ok(score.as_underwriting_evidence())
 }
 
 fn underwriting_reputation_from_behavioral_summary(
@@ -1981,14 +2050,93 @@ fn load_behavioral_feed_signing_keypair(
                 .to_string(),
         )),
         (Some(path), None) => load_or_create_authority_keypair(path),
-        (None, Some(path)) => {
-            let snapshot = SqliteCapabilityAuthority::open(path)?.snapshot()?;
-            Ok(Keypair::from_seed_hex(snapshot.seed_hex.trim())?)
-        }
+        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?),
         (None, None) => Err(CliError::Other(
             "behavioral feed export requires --authority-seed-file or --authority-db so the export can be signed"
                 .to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod underwriting_and_support_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_path(prefix: &str, extension: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+    }
+
+    #[test]
+    fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
+        let source_path = unique_temp_path("arc-behavioral-feed-source", "sqlite");
+        let follower_path = unique_temp_path("arc-behavioral-feed-follower", "sqlite");
+        let source = SqliteCapabilityAuthority::open(&source_path).expect("open source authority");
+        let follower =
+            SqliteCapabilityAuthority::open(&follower_path).expect("open follower authority");
+        let follower_local_key = follower.local_keypair().expect("read follower seed");
+
+        source.rotate().expect("rotate source authority");
+        let snapshot = source.snapshot().expect("snapshot source authority");
+        assert!(follower
+            .apply_snapshot(&snapshot)
+            .expect("apply source snapshot"));
+        assert!(follower.current_keypair().is_err());
+
+        let signing_key = load_behavioral_feed_signing_keypair(None, Some(&follower_path))
+            .expect("resolve behavioral feed signer");
+        assert_eq!(signing_key.public_key(), follower_local_key.public_key());
+
+        let _ = fs::remove_file(source_path);
+        let _ = fs::remove_file(follower_path);
+    }
+
+    #[test]
+    fn underwriting_compliance_evidence_rejects_subject_mismatch() {
+        let activity = arc_kernel::ReceiptAnalyticsResponse {
+            summary: arc_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2),
+            by_agent: Vec::new(),
+            by_tool: Vec::new(),
+            by_time: Vec::new(),
+        };
+        let report = arc_kernel::ComplianceReport {
+            matching_receipts: 5,
+            evidence_ready_receipts: 5,
+            uncheckpointed_receipts: 0,
+            checkpoint_coverage_rate: Some(1.0),
+            lineage_covered_receipts: 5,
+            lineage_gap_receipts: 0,
+            lineage_coverage_rate: Some(1.0),
+            pending_settlement_receipts: 0,
+            failed_settlement_receipts: 0,
+            direct_evidence_export_supported: true,
+            child_receipt_scope: arc_kernel::EvidenceChildReceiptScope::OmittedNoJoinPath,
+            proofs_complete: true,
+            export_query: arc_kernel::EvidenceExportQuery {
+                agent_subject: Some("subject-other".to_string()),
+                ..arc_kernel::EvidenceExportQuery::default()
+            },
+            export_scope_note: None,
+        };
+        let selection = arc_kernel::BehavioralFeedReceiptSelection {
+            matching_receipts: 0,
+            receipts: Vec::new(),
+        };
+
+        let error = build_underwriting_compliance_evidence(
+            "subject-expected",
+            1_717_171_717,
+            &activity,
+            &report,
+            &selection,
+        )
+        .expect_err("mismatched report scope should fail closed");
+        assert!(error.contains("compliance report subject mismatch"));
     }
 }
 

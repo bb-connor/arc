@@ -389,14 +389,14 @@ fn constraint_matches(
         | Constraint::ColumnDenylist(_)
         | Constraint::MaxRowsReturned(_)
         | Constraint::OperationClass(_) => Ok(true),
-        Constraint::ContentReviewTier(_)
-        | Constraint::MaxTransactionAmountUsd(_)
-        | Constraint::RequireDualApproval(_) => Ok(false),
+        Constraint::ContentReviewTier(_) => Ok(false),
+        Constraint::MaxTransactionAmountUsd(_) | Constraint::RequireDualApproval(_) => Ok(false),
 
-        // Phase 2.3: evaluate the model-routing constraint against the
-        // request-supplied `model_metadata`. A grant is admitted only
-        // when the calling model satisfies both the allowlist (if any)
-        // and the minimum safety tier (if set).
+        // Phase 2.3 / RTC-08: evaluate the model-routing constraint
+        // against request-carried `model_metadata`. The separate
+        // provenance class rides on the metadata for receipt and audit
+        // surfaces; routing checks compare the concrete model identity
+        // and safety tier only.
         Constraint::ModelConstraint {
             allowed_model_ids,
             min_safety_tier,
@@ -457,9 +457,25 @@ mod tests {
     }
 
     #[test]
-    fn governed_only_constraints_fail_closed_without_specialized_enforcement() {
+    fn content_review_tier_fails_closed_without_review_guard_context() {
+        let capability = capability_with_constraints(vec![Constraint::ContentReviewTier(
+            ContentReviewTier::Strict,
+        )]);
+        assert!(
+            !capability_matches_request(
+                &capability,
+                "tool",
+                "srv",
+                &serde_json::json!({"text": "review this outbound message"}),
+            )
+            .expect("evaluate request match"),
+            "content review tier should deny until a review guard supplies runtime context"
+        );
+    }
+
+    #[test]
+    fn governed_transaction_constraints_fail_closed_without_specialized_enforcement() {
         let constraints = [
-            Constraint::ContentReviewTier(ContentReviewTier::Strict),
             Constraint::MaxTransactionAmountUsd("100.00".to_string()),
             Constraint::RequireDualApproval(true),
         ];
@@ -474,7 +490,7 @@ mod tests {
                     &serde_json::json!({"amount_usd": "25.00"}),
                 )
                 .expect("evaluate request match"),
-                "governed-only constraint should deny without its dedicated enforcement path"
+                "governed transaction constraint should deny without its dedicated enforcement path"
             );
         }
     }
@@ -541,7 +557,7 @@ mod tests {
     }
 }
 
-/// Evaluate `Constraint::ModelConstraint` against the request-supplied
+/// Evaluate `Constraint::ModelConstraint` against request-carried
 /// `model_metadata`.
 ///
 /// Denies (returns `false`) when:

@@ -17,6 +17,8 @@ use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
 
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 fn unique_test_dir() -> PathBuf {
     let nonce = SystemTime::now()
@@ -317,6 +319,14 @@ for line in sys.stdin:
         })
         continue
 
+    if method == "resources/subscribe" or method == "resources/unsubscribe":
+        respond({
+            "jsonrpc": "2.0",
+            "id": message["id"],
+            "result": {}
+        })
+        continue
+
     if method == "tools/call":
         tool_name = message["params"]["name"]
         arguments = message["params"].get("arguments", {})
@@ -499,8 +509,8 @@ for line in sys.stdin:
     path
 }
 
-fn write_policy(dir: &Path) -> PathBuf {
-    let policy = r#"
+fn write_policy_with_tools_and_ttl(dir: &Path, tools: &[&str], ttl: u64) -> PathBuf {
+    let mut policy = r#"
 kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
@@ -508,39 +518,36 @@ kernel:
 capabilities:
   default:
     tools:
-      - server: wrapped-http-mock
-        tool: echo_json
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: sampled_echo
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: slow_echo
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: slow_cancelable_echo
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: emit_fixture_notifications
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: emit_late_fixture_notifications
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: drop_stream_mid_call
-        operations: [invoke]
-        ttl: 300
-"#;
+"#
+    .to_string();
+    for tool in tools {
+        policy.push_str(&format!(
+            "      - server: wrapped-http-mock\n        tool: {tool}\n        operations: [invoke]\n        ttl: {ttl}\n"
+        ));
+    }
 
     let path = dir.join("http-policy.yaml");
     fs::write(&path, policy).expect("write HTTP policy");
     path
+}
+
+fn write_policy_with_tools(dir: &Path, tools: &[&str]) -> PathBuf {
+    write_policy_with_tools_and_ttl(dir, tools, 300)
+}
+
+fn write_policy(dir: &Path) -> PathBuf {
+    write_policy_with_tools(
+        dir,
+        &[
+            "echo_json",
+            "sampled_echo",
+            "slow_echo",
+            "slow_cancelable_echo",
+            "emit_fixture_notifications",
+            "emit_late_fixture_notifications",
+            "drop_stream_mid_call",
+        ],
+    )
 }
 
 fn spawn_http_server(dir: &Path, listen: SocketAddr, token: &str) -> ServerGuard {
@@ -600,6 +607,30 @@ fn spawn_http_server_with_session_lifecycle_env_prefix(
     env_prefix: &str,
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
+    spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        dir,
+        &policy_path,
+        listen,
+        token,
+        session_db_path,
+        idle_expiry_millis,
+        drain_grace_millis,
+        reaper_interval_millis,
+        env_prefix,
+    )
+}
+
+fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+    dir: &Path,
+    policy_path: &Path,
+    listen: SocketAddr,
+    token: &str,
+    session_db_path: Option<&Path>,
+    idle_expiry_millis: Option<u64>,
+    drain_grace_millis: Option<u64>,
+    reaper_interval_millis: Option<u64>,
+    env_prefix: &str,
+) -> ServerGuard {
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
@@ -658,6 +689,68 @@ fn spawn_http_server_with_session_lifecycle_env_prefix(
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn arc mcp serve-http");
+
+    ServerGuard { child }
+}
+
+fn spawn_http_server_with_policy_path_and_jwt_auth(
+    dir: &Path,
+    policy_path: &Path,
+    listen: SocketAddr,
+    jwt_public_key_hex: &str,
+    issuer: &str,
+    audience: &str,
+    admin_token: &str,
+    session_db_path: Option<&Path>,
+) -> ServerGuard {
+    let script_path = write_mock_server_script(dir);
+    let receipt_db_path = dir.join("remote-receipts.sqlite3");
+    let revocation_db_path = dir.join("remote-revocations.sqlite3");
+    let authority_seed_path = dir.join("remote-authority.seed");
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_arc"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--revocation-db",
+        revocation_db_path.to_str().expect("revocation db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+    ]);
+    if let Some(path) = session_db_path {
+        command.args(["--session-db", path.to_str().expect("session db path")]);
+    }
+    let child = command
+        .args([
+            "mcp",
+            "serve-http",
+            "--policy",
+            policy_path.to_str().expect("policy path"),
+            "--server-id",
+            "wrapped-http-mock",
+            "--server-name",
+            "Wrapped HTTP Mock",
+            "--listen",
+            &listen.to_string(),
+            "--auth-jwt-public-key",
+            jwt_public_key_hex,
+            "--auth-jwt-issuer",
+            issuer,
+            "--auth-jwt-audience",
+            audience,
+            "--auth-scope",
+            "mcp:invoke",
+            "--admin-token",
+            admin_token,
+            "--",
+            "python3",
+            script_path.to_str().expect("script path"),
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn arc mcp serve-http with jwt auth");
 
     ServerGuard { child }
 }
@@ -1346,7 +1439,8 @@ fn wait_for_server_result(
     base_url: &str,
     guard: &mut ServerGuard,
 ) -> Result<(), StartupError> {
-    for _ in 0..100 {
+    let deadline = Instant::now() + SERVER_STARTUP_TIMEOUT;
+    while Instant::now() < deadline {
         if let Some(status) = guard.child.try_wait().expect("poll remote MCP child") {
             return Err(StartupError::from_child_exit(
                 status,
@@ -1355,7 +1449,7 @@ fn wait_for_server_result(
         }
         match client.get(format!("{base_url}/mcp")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::UNAUTHORIZED => return Ok(()),
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(_) | Err(_) => thread::sleep(SERVER_STARTUP_POLL_INTERVAL),
         }
     }
     Err(StartupError::Timeout(
@@ -1364,10 +1458,11 @@ fn wait_for_server_result(
 }
 
 fn wait_for_server(client: &Client, base_url: &str) {
-    for _ in 0..100 {
+    let deadline = Instant::now() + SERVER_STARTUP_TIMEOUT;
+    while Instant::now() < deadline {
         match client.get(format!("{base_url}/mcp")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::UNAUTHORIZED => return,
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(_) | Err(_) => thread::sleep(SERVER_STARTUP_POLL_INTERVAL),
         }
     }
     panic!("remote MCP server did not become ready");
@@ -2165,15 +2260,18 @@ fn mcp_serve_http_requires_auth_reuses_sessions_and_supports_delete() {
 fn mcp_serve_http_session_trust_reports_lifecycle_and_reconnect_contract() {
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
-    let listen = reserve_listen_addr();
     let token = "test-token";
-    let _server = spawn_http_server(&dir, listen, token);
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
         .expect("build reqwest client");
+    let (listen, _server) = spawn_with_bind_retry(
+        &client,
+        "remote MCP server",
+        |listen| spawn_http_server(&dir, listen, token),
+        wait_for_server_result,
+    );
     let base_url = format!("http://{listen}");
-    wait_for_server(&client, &base_url);
 
     let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
 
@@ -2695,6 +2793,306 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
 }
 
 #[test]
+fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+
+    let (session_id, protocol_version) = {
+        let _server = spawn_http_server_with_session_lifecycle_tuning(
+            &dir,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+
+        let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
+        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+        assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
+        let trust_status: Value = trust_status.json().expect("ready trust json");
+        assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
+        (session_id, protocol_version)
+    };
+
+    let _server = spawn_http_server_with_session_lifecycle_tuning(
+        &dir,
+        listen,
+        token,
+        Some(&session_db_path),
+        Some(5_000),
+        Some(5_000),
+        Some(50),
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
+    let trust_status: Value = trust_status.json().expect("restored trust json");
+    assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
+
+    let resumed_post = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    assert_eq!(resumed_post.status(), reqwest::StatusCode::OK);
+    let (resumed_tools, notifications) = read_sse_until_response(resumed_post, json!(12), |_| {});
+    assert!(notifications.is_empty());
+    assert!(resumed_tools["result"]["tools"]
+        .as_array()
+        .is_some_and(|tools| !tools.is_empty()));
+
+    let resumed_get = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_id,
+        Some(&protocol_version),
+        None,
+    );
+    assert_eq!(resumed_get.status(), reqwest::StatusCode::OK);
+}
+
+#[test]
+fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+    let policy_path = write_policy_with_tools(&dir, &["echo_json", "sampled_echo"]);
+
+    let (session_id, protocol_version) = {
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+            &dir,
+            &policy_path,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+            "ARC",
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+        initialize_session(&client, &base_url, token)
+    };
+
+    let policy_path = write_policy_with_tools(&dir, &["sampled_echo"]);
+    let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        &dir,
+        &policy_path,
+        listen,
+        token,
+        Some(&session_db_path),
+        Some(5_000),
+        Some(5_000),
+        Some(50),
+        "ARC",
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
+
+    let denied_response = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 77,
+            "method": "tools/call",
+            "params": {
+                "name": "echo_json",
+                "arguments": {"message": "should now be denied"}
+            }
+        }),
+    );
+    assert_eq!(denied_response.status(), reqwest::StatusCode::OK);
+    let (denied_tool_call, denied_notifications) =
+        read_sse_until_response(denied_response, json!(77), |_| {});
+    assert_eq!(denied_notifications.len(), 1);
+    assert_eq!(
+        denied_notifications[0]["method"].as_str(),
+        Some("notifications/message")
+    );
+    assert_eq!(
+        denied_notifications[0]["params"]["data"]["event"].as_str(),
+        Some("tool_denied")
+    );
+    assert_eq!(
+        denied_notifications[0]["params"]["data"]["tool"].as_str(),
+        Some("echo_json")
+    );
+    assert_eq!(denied_tool_call["result"]["isError"], true);
+}
+
+#[test]
+fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+    let policy_path = write_policy_with_tools_and_ttl(&dir, &["echo_json"], 1);
+
+    let (session_id, protocol_version) = {
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+            &dir,
+            &policy_path,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+            "ARC",
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+        initialize_session(&client, &base_url, token)
+    };
+
+    thread::sleep(Duration::from_secs(2));
+
+    let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        &dir,
+        &policy_path,
+        listen,
+        token,
+        Some(&session_db_path),
+        Some(5_000),
+        Some(5_000),
+        Some(50),
+        "ARC",
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let restored_response = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 88,
+            "method": "tools/call",
+            "params": {
+                "name": "echo_json",
+                "arguments": {"message": "restored session should refresh capabilities"}
+            }
+        }),
+    );
+    assert_eq!(restored_response.status(), reqwest::StatusCode::OK);
+    let (tool_call, notifications) = read_sse_until_response(restored_response, json!(88), |_| {});
+    assert!(notifications.is_empty());
+    assert_ne!(tool_call["result"]["isError"], true);
+}
+
+#[test]
+fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+    let policy_path = write_policy(&dir);
+
+    let session_id = {
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+            &dir,
+            &policy_path,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+            "ARC",
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+        let (session_id, _) = initialize_session(&client, &base_url, token);
+        session_id
+    };
+
+    let auth_kp = Keypair::generate();
+    let issuer = "https://issuer.example/restore-auth-mode";
+    let audience = "arc-restore-auth-mode";
+    let admin_token = "admin-token";
+    let _server = spawn_http_server_with_policy_path_and_jwt_auth(
+        &dir,
+        &policy_path,
+        listen,
+        &auth_kp.public_key().to_hex(),
+        issuer,
+        audience,
+        admin_token,
+        Some(&session_db_path),
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let trust_status = get_admin_session_trust(&client, &base_url, admin_token, &session_id);
+    assert_eq!(trust_status.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[test]
 fn mcp_serve_http_isolates_multiple_sessions() {
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
@@ -2708,8 +3106,24 @@ fn mcp_serve_http_isolates_multiple_sessions() {
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
-    let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
+    let shared_owner_capabilities = json!({
+        "sampling": {
+            "includeContext": true,
+            "tools": {}
+        },
+        "resources": {
+            "subscribe": true,
+            "listChanged": true
+        }
+    });
+    let (session_a, protocol_a) = initialize_session_with_capabilities(
+        &client,
+        &base_url,
+        token,
+        shared_owner_capabilities.clone(),
+    );
+    let (session_b, protocol_b) =
+        initialize_session_with_capabilities(&client, &base_url, token, shared_owner_capabilities);
     assert_ne!(session_a, session_b);
 
     let session_a_task = post_json(
@@ -3419,6 +3833,98 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
             && message["params"]["status"].as_str() == Some("completed")
     }));
     assert!(task_result.get("error").is_none());
+}
+
+#[test]
+fn mcp_serve_http_shared_hosted_owner_broadcasts_global_notifications() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let startup_marker_path = dir.join("upstream-startups.log");
+    let _server = spawn_http_server_with_shared_owner(&dir, listen, token, &startup_marker_path);
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
+    let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
+    let get_stream_a = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_a,
+        Some(&protocol_a),
+        None,
+    );
+    assert_eq!(get_stream_a.status(), reqwest::StatusCode::OK);
+    let mut get_reader_a = BufReader::new(get_stream_a);
+    let get_stream_b = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_b,
+        Some(&protocol_b),
+        None,
+    );
+    assert_eq!(get_stream_b.status(), reqwest::StatusCode::OK);
+    let mut get_reader_b = BufReader::new(get_stream_b);
+
+    let emit_late = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_a),
+        Some(&protocol_a),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 60,
+            "method": "tools/call",
+            "params": {
+                "name": "emit_late_fixture_notifications",
+                "arguments": {
+                    "count": 1,
+                    "delayMs": 150
+                }
+            }
+        }),
+    );
+    let (terminal, post_messages) = read_sse_until_response(emit_late, json!(60), |_| {});
+    assert!(post_messages.is_empty());
+    assert!(terminal.get("error").is_none());
+
+    let mut saw_a_notification = false;
+    let mut saw_b_notification = false;
+    for _ in 0..5 {
+        let event_a = read_next_sse_event(&mut get_reader_a).expect("shared owner stream A event");
+        if let Some(message) = event_a.message.as_ref() {
+            if message["method"] == "notifications/resources/list_changed" {
+                saw_a_notification = true;
+                break;
+            }
+        }
+    }
+    for _ in 0..5 {
+        let event_b = read_next_sse_event(&mut get_reader_b).expect("shared owner stream B event");
+        if let Some(message) = event_b.message.as_ref() {
+            if message["method"] == "notifications/resources/list_changed" {
+                saw_b_notification = true;
+                break;
+            }
+        }
+    }
+
+    assert!(
+        saw_a_notification,
+        "expected the originating shared-owner session to receive the late global resources/list_changed notification"
+    );
+    assert!(
+        saw_b_notification,
+        "expected every shared-owner session stream to receive the late global resources/list_changed notification"
+    );
 }
 
 #[test]
@@ -5512,6 +6018,124 @@ fn mcp_serve_http_requires_both_accept_types_and_json_content_type() {
         bad_content_type.status(),
         reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE
     );
+}
+
+#[test]
+fn mcp_serve_http_sets_explicit_response_mode_headers() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let _server = spawn_http_server(&dir, listen, token);
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let initialize = post_raw(
+        &client,
+        &base_url,
+        Some(token),
+        None,
+        "application/json, text/event-stream",
+        "application/json",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "integration-test",
+                    "version": "0.1.0"
+                }
+            }
+        }),
+    );
+    assert_eq!(
+        initialize
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("initialize_sse")
+    );
+    let session_id = initialize
+        .headers()
+        .get("MCP-Session-Id")
+        .expect("session id header")
+        .to_str()
+        .expect("session id string")
+        .to_string();
+    let (initialize, init_messages) = read_sse_until_response(initialize, json!(1), |_| {});
+    assert!(init_messages.is_empty());
+    let protocol_version = initialize["result"]["protocolVersion"]
+        .as_str()
+        .expect("protocol version")
+        .to_string();
+
+    let initialized = post_notification(
+        &client,
+        &base_url,
+        token,
+        &session_id,
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        }),
+    );
+    assert_eq!(
+        initialized
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("post_notification_accepted")
+    );
+    assert_eq!(initialized.status(), reqwest::StatusCode::ACCEPTED);
+
+    let tools_list = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    assert_eq!(
+        tools_list
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("post_request_sse")
+    );
+    let (tools_list, notifications) = read_sse_until_response(tools_list, json!(2), |_| {});
+    assert!(notifications.is_empty());
+    assert!(tools_list["result"]["tools"].is_array());
+
+    let get_stream = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_id,
+        Some(&protocol_version),
+        None,
+    );
+    assert_eq!(
+        get_stream
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("get_sse_live")
+    );
+    assert_eq!(get_stream.status(), reqwest::StatusCode::OK);
 }
 
 #[test]

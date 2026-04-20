@@ -34,6 +34,8 @@ fn unique_db_path(prefix: &str) -> PathBuf {
 
 fn make_receipt(id: &str, capability_id: &str, timestamp: u64, decision: Decision) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let action =
+        ToolCallAction::from_parameters(serde_json::json!({})).expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -41,10 +43,7 @@ fn make_receipt(id: &str, capability_id: &str, timestamp: u64, decision: Decisio
             capability_id: capability_id.to_string(),
             tool_server: "srv".to_string(),
             tool_name: "tool".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "hash".to_string(),
-            },
+            action,
             decision,
             content_hash: "ch".to_string(),
             policy_hash: "ph".to_string(),

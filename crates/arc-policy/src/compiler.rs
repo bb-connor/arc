@@ -10,8 +10,8 @@
 //! document. The first seven are driven directly by the `rules` section; the
 //! remaining five are driven either by the `extensions.detection`
 //! sub-section or by auxiliary semantics layered on top of existing rule
-//! blocks (SSRF protection on egress, output sanitization on secret
-//! patterns, per-agent velocity from origin budgets).
+//! blocks (SSRF protection on egress, per-agent velocity from origin
+//! budgets).
 //!
 //! | # | Guard | Triggered by |
 //! |---|----------------------------|----------------------------------------|
@@ -24,13 +24,16 @@
 //! | 7 | `PathAllowlistGuard`       | `rules.path_allowlist` |
 //! | 8 | `PromptInjectionGuard`     | `extensions.detection.prompt_injection`|
 //! | 9 | `JailbreakGuard`           | `extensions.detection.jailbreak` |
-//! |10 | `InternalNetworkGuard`     | `rules.egress` (SSRF companion) |
-//! |11 | `ResponseSanitizationGuard`| `rules.secret_patterns` (output path) |
+//! |10 | `SpiderSenseGuard`         | `extensions.detection.threat_intel` |
+//! |11 | `InternalNetworkGuard`     | `rules.egress` (SSRF companion) |
 //! |12 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
+
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::models::{
     DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
-    SecretPatternsRule, Severity, ToolAccessRule,
+    SecretPatternsRule, ThreatIntelDetection, ToolAccessRule,
 };
 
 use arc_core::capability::{ArcScope, Constraint, Operation, ToolGrant};
@@ -39,15 +42,12 @@ use arc_guards::{
     jailbreak::{DetectorConfig as JailbreakDetectorConfig, JailbreakGuardConfig},
     post_invocation::SanitizerHook,
     prompt_injection::PromptInjectionConfig,
-    response_sanitization::{
-        build_pattern, OutputSanitizerConfig, SanitizationAction, SensitivePattern,
-        SensitivityLevel,
-    },
+    response_sanitization::OutputSanitizerConfig,
     secret_leak::CustomSecretPattern,
     AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
     InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
-    PostInvocationPipeline, PromptInjectionGuard, ResponseSanitizationGuard, SecretLeakGuard,
-    ShellCommandGuard,
+    PatternDb, PostInvocationPipeline, PromptInjectionGuard, SecretLeakGuard, ShellCommandGuard,
+    SpiderSenseConfig, SpiderSenseGuard,
 };
 
 /// Errors that can occur during policy compilation.
@@ -83,12 +83,22 @@ pub struct CompiledPolicy {
 /// mapping table. Missing sections compile to an empty pipeline; no error
 /// is raised for policies that simply do not exercise every guard type.
 pub fn compile_policy(policy: &HushSpec) -> Result<CompiledPolicy, CompileError> {
+    compile_policy_with_source(policy, None)
+}
+
+/// Compile a HushSpec policy with an optional source path used to resolve
+/// relative auxiliary assets referenced by the policy.
+pub fn compile_policy_with_source(
+    policy: &HushSpec,
+    source_path: Option<&Path>,
+) -> Result<CompiledPolicy, CompileError> {
     let mut builder = PipelineBuilder::new();
     let mut post_invocation = PostInvocationPipeline::new();
+    let source_dir = source_path.and_then(|path| path.parent());
     compile_rule_guards(policy, &mut builder, &mut post_invocation)?;
-    compile_detection_guards(policy, &mut builder)?;
+    compile_detection_guards(policy, &mut builder, source_dir)?;
     compile_budget_guards(policy, &mut builder)?;
-    let default_scope = compile_scope(policy);
+    let default_scope = compile_scope(policy)?;
     let (guards, guard_names) = builder.finish();
     Ok(CompiledPolicy {
         guards,
@@ -129,7 +139,7 @@ impl PipelineBuilder {
 }
 
 // ---------------------------------------------------------------------------
-// Rule-driven guards (1-7 + InternalNetworkGuard + ResponseSanitizationGuard)
+// Rule-driven guards (1-7 + InternalNetworkGuard)
 // ---------------------------------------------------------------------------
 
 fn compile_rule_guards(
@@ -209,13 +219,10 @@ fn compile_rule_guards(
     }
 
     // 5. secret_patterns -> SecretLeakGuard
-    // 11. secret_patterns -> ResponseSanitizationGuard
     //
     // SecretLeakGuard handles the write path (detect secrets in outbound
-    // file writes) while ResponseSanitizationGuard handles the read path
-    // (redact PII/PHI/secrets in tool results before the agent sees them).
-    // Both are activated by the same HushSpec rule so operators need
-    // configure only one block to cover both directions.
+    // file writes) while the post-invocation SanitizerHook handles the read
+    // path (redact secrets in tool results before the agent sees them).
     if let Some(sp) = &rules.secret_patterns {
         if sp.enabled {
             let config = arc_guards::secret_leak::SecretLeakConfig {
@@ -227,11 +234,6 @@ fn compile_rule_guards(
                 SecretLeakGuard::with_config(config)
                     .map_err(|error| CompileError::Invalid(error.to_string()))?,
             );
-            builder.add(ResponseSanitizationGuard::with_additional_patterns(
-                compile_response_patterns(sp)?,
-                SensitivityLevel::High,
-                SanitizationAction::Redact,
-            ));
             post_invocation.add(Box::new(
                 SanitizerHook::with_config(compile_output_sanitizer_config(sp))
                     .map_err(|error| CompileError::Invalid(error.to_string()))?,
@@ -274,12 +276,13 @@ fn compile_rule_guards(
 }
 
 // ---------------------------------------------------------------------------
-// Detection-extension guards (8, 9)
+// Detection-extension guards (8, 9, 10)
 // ---------------------------------------------------------------------------
 
 fn compile_detection_guards(
     policy: &HushSpec,
     builder: &mut PipelineBuilder,
+    source_dir: Option<&Path>,
 ) -> Result<(), CompileError> {
     let Some(extensions) = &policy.extensions else {
         return Ok(());
@@ -301,6 +304,13 @@ fn compile_detection_guards(
     if let Some(jb) = &detection.jailbreak {
         if jb.enabled.unwrap_or(true) {
             builder.add(JailbreakGuard::with_config(jailbreak_config_from(jb)?));
+        }
+    }
+
+    // 10. detection.threat_intel -> SpiderSenseGuard
+    if let Some(threat_intel) = &detection.threat_intel {
+        if threat_intel.enabled.unwrap_or(true) {
+            builder.add(threat_intel_guard_from(threat_intel, source_dir)?);
         }
     }
 
@@ -362,6 +372,58 @@ fn jailbreak_config_from(jb: &JailbreakDetection) -> Result<JailbreakGuardConfig
     Ok(config)
 }
 
+fn threat_intel_guard_from(
+    threat_intel: &ThreatIntelDetection,
+    source_dir: Option<&Path>,
+) -> Result<SpiderSenseGuard, CompileError> {
+    let pattern_db_path = threat_intel.pattern_db.as_deref().ok_or_else(|| {
+        CompileError::Invalid(
+            "detection.threat_intel.pattern_db is required when enabled".to_string(),
+        )
+    })?;
+
+    let resolved_pattern_db_path = resolve_policy_asset_path(pattern_db_path, source_dir);
+
+    let pattern_db_json = fs::read_to_string(&resolved_pattern_db_path).map_err(|error| {
+        CompileError::Invalid(format!(
+            "failed to read detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
+            resolved_pattern_db_path.display()
+        ))
+    })?;
+    let pattern_db = PatternDb::from_json(&pattern_db_json).map_err(|error| {
+        CompileError::Invalid(format!(
+            "invalid detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
+            resolved_pattern_db_path.display()
+        ))
+    })?;
+
+    let mut config = SpiderSenseConfig::default();
+    if let Some(similarity_threshold) = threat_intel.similarity_threshold {
+        config.similarity_threshold = similarity_threshold;
+    }
+    if let Some(top_k) = threat_intel.top_k {
+        config.top_k = top_k;
+    }
+
+    SpiderSenseGuard::new(pattern_db, config).map_err(|error| {
+        CompileError::Invalid(format!(
+            "invalid detection.threat_intel configuration: {error}"
+        ))
+    })
+}
+
+fn resolve_policy_asset_path(path: &str, source_dir: Option<&Path>) -> PathBuf {
+    let candidate = PathBuf::from(path);
+    if candidate.is_absolute() {
+        return candidate;
+    }
+
+    match source_dir {
+        Some(dir) => dir.join(candidate),
+        None => candidate,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Budget-driven guards (12)
 // ---------------------------------------------------------------------------
@@ -421,55 +483,54 @@ fn compile_budget_guards(
 /// `ArcScope`, each entry becomes a wildcard ToolGrant with `Invoke`
 /// permission. Policies that rely on negative matches or other semantics the
 /// scope model cannot encode fail closed and emit no default grants.
-fn compile_scope(policy: &HushSpec) -> ArcScope {
+fn compile_scope(policy: &HushSpec) -> Result<ArcScope, CompileError> {
     let Some(rules) = &policy.rules else {
-        return permissive_scope();
+        return Ok(permissive_scope());
     };
 
     let Some(ta) = &rules.tool_access else {
-        return permissive_scope();
+        return Ok(permissive_scope());
     };
 
     if !ta.enabled {
-        return permissive_scope();
+        return Ok(permissive_scope());
     }
 
     if ta.default == DefaultAction::Allow {
         if tool_access_can_safely_widen_to_wildcard(ta) {
-            return permissive_scope();
+            return Ok(permissive_scope());
         }
-        return ArcScope::default();
+        return Ok(ArcScope::default());
     }
 
     if ta.allow.is_empty() && ta.default == DefaultAction::Block {
         // Block-by-default with no allowlist: empty scope
-        return ArcScope::default();
+        return Ok(ArcScope::default());
     }
 
     if ta.require_workload_identity.is_some() || ta.prefer_workload_identity.is_some() {
-        return ArcScope::default();
+        return Ok(ArcScope::default());
     }
 
     // Each allowed tool pattern becomes a grant on a wildcard server
-    let grants = ta
-        .allow
-        .iter()
-        .map(|tool_pattern| ToolGrant {
+    let mut grants = Vec::with_capacity(ta.allow.len());
+    for tool_pattern in &ta.allow {
+        grants.push(ToolGrant {
             server_id: "*".to_string(),
             tool_name: tool_pattern.clone(),
             operations: vec![Operation::Invoke],
-            constraints: compile_tool_constraints(ta, tool_pattern),
+            constraints: compile_tool_constraints(ta, tool_pattern)?,
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
-        })
-        .collect();
+        });
+    }
 
-    ArcScope {
+    Ok(ArcScope {
         grants,
         ..ArcScope::default()
-    }
+    })
 }
 
 fn permissive_scope() -> ArcScope {
@@ -498,28 +559,6 @@ fn compile_custom_secret_patterns(rule: &SecretPatternsRule) -> Vec<CustomSecret
         .collect()
 }
 
-fn compile_response_patterns(
-    rule: &SecretPatternsRule,
-) -> Result<Vec<SensitivePattern>, CompileError> {
-    rule.patterns
-        .iter()
-        .map(|pattern| {
-            build_pattern(
-                &pattern.name,
-                &pattern.pattern,
-                severity_to_sensitivity(pattern.severity),
-                "[SECRET REDACTED]",
-            )
-            .ok_or_else(|| {
-                CompileError::Invalid(format!(
-                    "secret_patterns.patterns.{} failed to compile as a response sanitizer regex",
-                    pattern.name
-                ))
-            })
-        })
-        .collect()
-}
-
 fn compile_output_sanitizer_config(rule: &SecretPatternsRule) -> OutputSanitizerConfig {
     let mut config = OutputSanitizerConfig::default();
     config.denylist.patterns = rule
@@ -528,13 +567,6 @@ fn compile_output_sanitizer_config(rule: &SecretPatternsRule) -> OutputSanitizer
         .map(|pattern| pattern.pattern.clone())
         .collect();
     config
-}
-
-fn severity_to_sensitivity(severity: Severity) -> SensitivityLevel {
-    match severity {
-        Severity::Critical | Severity::Error => SensitivityLevel::High,
-        Severity::Warn => SensitivityLevel::Medium,
-    }
 }
 
 fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
@@ -548,12 +580,15 @@ fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
         && rule.prefer_workload_identity.is_none()
 }
 
-fn compile_tool_constraints(rule: &ToolAccessRule, tool_pattern: &str) -> Vec<Constraint> {
+fn compile_tool_constraints(
+    rule: &ToolAccessRule,
+    tool_pattern: &str,
+) -> Result<Vec<Constraint>, CompileError> {
     let mut constraints = Vec::new();
     if let Some(max_args_size) = rule.max_args_size {
         constraints.push(Constraint::MaxArgsSize(max_args_size));
     }
-    if confirmation_overlap(tool_pattern, &rule.require_confirmation) {
+    if confirmation_overlap(tool_pattern, &rule.require_confirmation)? {
         constraints.push(Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
     if let Some(tier) = rule
@@ -562,28 +597,34 @@ fn compile_tool_constraints(rule: &ToolAccessRule, tool_pattern: &str) -> Vec<Co
     {
         constraints.push(Constraint::MinimumRuntimeAssurance(tier));
     }
-    constraints
+    Ok(constraints)
 }
 
-fn confirmation_overlap(tool_pattern: &str, confirmation_patterns: &[String]) -> bool {
-    confirmation_patterns
-        .iter()
-        .any(|pattern| tool_patterns_overlap(tool_pattern, pattern))
+fn confirmation_overlap(
+    tool_pattern: &str,
+    confirmation_patterns: &[String],
+) -> Result<bool, CompileError> {
+    for pattern in confirmation_patterns {
+        if tool_patterns_overlap(tool_pattern, pattern)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
-fn tool_patterns_overlap(left: &str, right: &str) -> bool {
+fn tool_patterns_overlap(left: &str, right: &str) -> Result<bool, CompileError> {
     if left == "*" || right == "*" {
-        return true;
+        return Ok(true);
     }
     if !contains_wildcards(left) && !contains_wildcards(right) {
-        return left == right;
+        return Ok(left == right);
     }
-    if glob_matches(left, right) || glob_matches(right, left) {
-        return true;
+    if glob_matches(left, right)? || glob_matches(right, left)? {
+        return Ok(true);
     }
     let left_prefix = literal_prefix(left);
     let right_prefix = literal_prefix(right);
-    left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix)
+    Ok(left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix))
 }
 
 fn contains_wildcards(pattern: &str) -> bool {
@@ -597,7 +638,7 @@ fn literal_prefix(pattern: &str) -> String {
         .collect()
 }
 
-fn glob_matches(pattern: &str, target: &str) -> bool {
+fn glob_matches(pattern: &str, target: &str) -> Result<bool, CompileError> {
     let mut regex = String::from("^");
     let mut chars = pattern.chars().peekable();
     while let Some(ch) = chars.next() {
@@ -619,15 +660,39 @@ fn glob_matches(pattern: &str, target: &str) -> bool {
         }
     }
     regex.push('$');
-    regex::Regex::new(&regex)
+    crate::regex_safety::compile_generated_policy_regex(&regex, "compiler glob pattern")
         .map(|compiled| compiled.is_match(target))
-        .unwrap_or(false)
+        .map_err(|error| CompileError::Invalid(format!("invalid policy glob pattern: {error}")))
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    fn sample_threat_intel_pattern_db() -> &'static str {
+        r#"
+[
+  {
+    "id": "known-prompt-injection",
+    "category": "prompt_injection",
+    "stage": "perception",
+    "label": "Known malicious prompt embedding",
+    "embedding": [1.0, 0.0, 0.0]
+  }
+]
+"#
+    }
+
+    fn write_temp_threat_intel_pattern_db() -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "arc-policy-threat-intel-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, sample_threat_intel_pattern_db()).unwrap();
+        path
+    }
 
     #[test]
     fn compile_empty_policy() {
@@ -739,7 +804,7 @@ rules:
     }
 
     #[test]
-    fn compile_secret_patterns_adds_response_sanitization() {
+    fn compile_secret_patterns_use_post_invocation_sanitizer_only() {
         let spec = HushSpec::parse(
             r#"
 hushspec: "0.1.0"
@@ -754,15 +819,9 @@ rules:
         )
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
-        assert_eq!(compiled.guards.len(), 2);
+        assert_eq!(compiled.guards.len(), 1);
         assert_eq!(compiled.post_invocation.len(), 1);
-        assert_eq!(
-            compiled.guard_names,
-            vec![
-                "secret-leak".to_string(),
-                "response-sanitization".to_string()
-            ]
-        );
+        assert_eq!(compiled.guard_names, vec!["secret-leak".to_string()]);
         let outcome = compiled.post_invocation.evaluate_with_evidence(
             "read_file",
             &serde_json::json!({
@@ -812,6 +871,64 @@ extensions:
     }
 
     #[test]
+    fn compile_detection_threat_intel_adds_guard() {
+        let pattern_db = write_temp_threat_intel_pattern_db();
+        let spec = HushSpec::parse(&format!(
+            r#"
+hushspec: "0.1.0"
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+      similarity_threshold: 0.8
+      top_k: 1
+"#,
+            pattern_db.display()
+        ))
+        .unwrap();
+
+        let compiled = compile_policy(&spec).unwrap();
+        assert_eq!(compiled.guard_names, vec!["spider-sense".to_string()]);
+
+        let _ = std::fs::remove_file(pattern_db);
+    }
+
+    #[test]
+    fn compile_detection_threat_intel_resolves_relative_pattern_db_against_source() {
+        let policy_dir = std::env::temp_dir().join(format!(
+            "arc-policy-threat-intel-dir-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&policy_dir).unwrap();
+        let pattern_db = policy_dir.join("pattern-db.json");
+        std::fs::write(&pattern_db, sample_threat_intel_pattern_db()).unwrap();
+        let policy_path = policy_dir.join("policy.yaml");
+        std::fs::write(&policy_path, "hushspec: \"0.1.0\"\n").unwrap();
+
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "pattern-db.json"
+      similarity_threshold: 0.8
+      top_k: 1
+"#,
+        )
+        .unwrap();
+
+        let compiled = compile_policy_with_source(&spec, Some(&policy_path)).unwrap();
+        assert_eq!(compiled.guard_names, vec!["spider-sense".to_string()]);
+
+        let _ = std::fs::remove_file(pattern_db);
+        let _ = std::fs::remove_file(policy_path);
+        let _ = std::fs::remove_dir(policy_dir);
+    }
+
+    #[test]
     fn compile_origin_budget_adds_agent_velocity() {
         let spec = HushSpec::parse(
             r#"
@@ -831,7 +948,8 @@ extensions:
 
     #[test]
     fn compile_all_12_guard_types() {
-        let spec = HushSpec::parse(
+        let pattern_db = write_temp_threat_intel_pattern_db();
+        let spec = HushSpec::parse(&format!(
             r#"
 hushspec: "0.1.0"
 rules:
@@ -856,7 +974,7 @@ rules:
     enabled: true
     patterns:
       - name: aws
-        pattern: "AKIA[0-9A-Z]{16}"
+        pattern: "AKIA[0-9A-Z]{{16}}"
         severity: critical
   patch_integrity:
     enabled: true
@@ -868,13 +986,19 @@ extensions:
     jailbreak:
       enabled: true
       block_threshold: 70
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+      similarity_threshold: 0.8
+      top_k: 1
   origins:
     profiles:
       - id: default
         budgets:
           tool_calls: 1000
 "#,
-        )
+            pattern_db.display()
+        ))
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
 
@@ -885,11 +1009,11 @@ extensions:
             "internal-network",
             "mcp-tool",
             "secret-leak",
-            "response-sanitization",
             "patch-integrity",
             "path-allowlist",
             "prompt-injection",
             "jailbreak",
+            "spider-sense",
             "agent-velocity",
         ]
         .into_iter()
@@ -903,6 +1027,8 @@ extensions:
             "all 12 guard types should compile; got {actual:?}"
         );
         assert_eq!(compiled.guards.len(), 12);
+
+        let _ = std::fs::remove_file(pattern_db);
     }
 
     #[test]
@@ -965,6 +1091,32 @@ rules:
                 Constraint::MaxArgsSize(2048),
                 Constraint::RequireApprovalAbove { threshold_units: 0 }
             ]
+        );
+    }
+
+    #[test]
+    fn compile_tool_access_rejects_oversized_confirmation_globs() {
+        let oversized_glob = "*".repeat(600_000);
+        let spec = HushSpec::parse(&format!(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: [read_file]
+    require_confirmation: ["{oversized_glob}"]
+    default: block
+"#
+        ))
+        .unwrap();
+
+        let error = match compile_policy(&spec) {
+            Ok(_) => panic!("expected oversized glob to fail compilation"),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(error, CompileError::Invalid(ref message) if message.contains("invalid policy glob pattern")),
+            "unexpected compile error: {error:?}"
         );
     }
 

@@ -185,6 +185,7 @@ For the ship-facing bounded release gate specifically:
 
 ```bash
 ./scripts/qualify-bounded-arc.sh
+./scripts/qualify-trust-control.sh
 ```
 
 Minimum deploy-time smoke checks:

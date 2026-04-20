@@ -66,9 +66,12 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "${{ matrix.target }}"
 
       - name: Install protoc
         # arc-envoy-ext-authz's build.rs invokes tonic-build at compile
@@ -112,10 +115,12 @@ jobs:
       - name: Resolve release version
         id: version
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
+            tag="${INPUT_TAG}"
           else
             tag="${GITHUB_REF_NAME}"
           fi
@@ -135,11 +140,15 @@ jobs:
       - name: Stage artifacts (unix)
         if: matrix.archive == 'tar.gz'
         shell: bash
+        env:
+          ARC_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          ARC_TARGET: ${{ matrix.target }}
+          ARC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          stage_dir="arc-${{ steps.version.outputs.version }}-${{ matrix.target }}"
+          stage_dir="arc-${ARC_VERSION}-${ARC_TARGET}"
           mkdir -p "dist/${stage_dir}"
-          cp "target/${{ matrix.target }}/release/${BINARY_NAME}${{ matrix.bin_suffix }}" "dist/${stage_dir}/"
+          cp "target/${ARC_TARGET}/release/${BINARY_NAME}${ARC_BIN_SUFFIX}" "dist/${stage_dir}/"
           cp README.md LICENSE "dist/${stage_dir}/" 2>/dev/null || true
           (cd dist && tar czf "${stage_dir}.tar.gz" "${stage_dir}")
           (cd dist && shasum -a 256 "${stage_dir}.tar.gz" > "${stage_dir}.tar.gz.sha256")
@@ -147,11 +156,15 @@ jobs:
       - name: Stage artifacts (windows)
         if: matrix.archive == 'zip'
         shell: pwsh
+        env:
+          ARC_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          ARC_TARGET: ${{ matrix.target }}
+          ARC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $stage = "arc-${{ steps.version.outputs.version }}-${{ matrix.target }}"
+          $stage = "arc-${env:ARC_VERSION}-${env:ARC_TARGET}"
           New-Item -ItemType Directory -Force -Path "dist/$stage" | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/${env:BINARY_NAME}${{ matrix.bin_suffix }}" "dist/$stage/"
+          Copy-Item "target/${env:ARC_TARGET}/release/${env:BINARY_NAME}${env:ARC_BIN_SUFFIX}" "dist/$stage/"
           if (Test-Path README.md) { Copy-Item README.md "dist/$stage/" }
           if (Test-Path LICENSE) { Copy-Item LICENSE "dist/$stage/" }
           Compress-Archive -Path "dist/$stage" -DestinationPath "dist/$stage.zip"
@@ -193,10 +206,12 @@ jobs:
       - name: Resolve release version
         id: version
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
+            tag="${INPUT_TAG}"
           else
             tag="${GITHUB_REF_NAME}"
           fi
@@ -239,9 +254,13 @@ jobs:
 
       - name: Render Homebrew formula
         shell: bash
+        env:
+          ARC_GITHUB_REPO: ${{ github.repository }}
+          ARC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          version="${{ steps.version.outputs.version }}"
+          version="${ARC_VERSION}"
+          repo="${ARC_GITHUB_REPO}"
           formula_src="Homebrew/arc.rb.tmpl"
           formula_out="release/arc.rb"
           if [[ ! -f "$formula_src" ]]; then
@@ -276,27 +295,39 @@ jobs:
               -e "s|__ARC_SHA256_DARWIN_AMD64__|${x86_mac}|" \
               -e "s|__ARC_SHA256_LINUX_ARM64__|${arm_lin}|" \
               -e "s|__ARC_SHA256_LINUX_AMD64__|${x86_lin}|" \
+              -e "s|__ARC_GITHUB_REPO__|${repo}|" \
               -e "s|__ARC_VERSION__|${version}|" \
               "$formula_src" > "$formula_out"
+          if grep -q "__ARC_" "$formula_out"; then
+            echo "::error::rendered Homebrew formula still contains template placeholders" >&2
+            grep -n "__ARC_" "$formula_out" >&2
+            exit 1
+          fi
           echo "updated formula at ${formula_out}:"
-          grep -E "version |sha256 " "$formula_out"
+          grep -E "homepage |version |sha256 " "$formula_out"
 
       - name: Render release notes
         id: notes
         shell: bash
+        env:
+          ARC_GITHUB_REPO: ${{ github.repository }}
+          ARC_GITHUB_REPO_OWNER: ${{ github.repository_owner }}
+          ARC_RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          ARC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          arc_ghcr_owner="$(printf '%s' "${ARC_GITHUB_REPO_OWNER}" | tr '[:upper:]' '[:lower:]')"
           {
-            echo "## arc ${{ steps.version.outputs.tag }}"
+            echo "## arc ${ARC_RELEASE_TAG}"
             echo
             echo "Pre-built ARC sidecar binaries. Install via Homebrew, Docker, or by downloading an archive below."
             echo
             echo "### Install"
             echo
             echo '```bash'
-            echo "curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb"
+            echo "curl -fsSL -o /tmp/arc.rb https://github.com/${ARC_GITHUB_REPO}/releases/latest/download/arc.rb"
             echo "brew install --formula /tmp/arc.rb"
-            echo "docker pull ghcr.io/backbay/arc-sidecar:${{ steps.version.outputs.version }}"
+            echo "docker pull ghcr.io/${arc_ghcr_owner}/arc-sidecar:${ARC_VERSION}"
             echo '```'
             echo
             echo "### Verify"

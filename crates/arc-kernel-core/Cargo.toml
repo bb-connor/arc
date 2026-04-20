@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+publish = false
 
 [lib]
 name = "arc_kernel_core"
@@ -15,22 +16,17 @@ name = "arc_kernel_core"
 # This crate contains the pure-compute subset of ARC kernel evaluation:
 # capability verification, scope matching, guard pipeline evaluation, and
 # receipt signing. It is a `no_std + alloc` crate by source, which means
-# the crate itself never imports from `std`, so later phases (browser
-# adapter, edge adapter, mobile adapter) can consume it without the
-# std runtime once `arc-core-types` is made no-std-ready.
+# the crate itself never imports from `std`. The current in-repo proof is
+# `scripts/check-portable-kernel.sh`, which builds `arc-kernel-core` both for
+# the host and for `wasm32-unknown-unknown` with `--no-default-features`.
 #
-# Today `arc-core-types` still imports from `std` (BTreeMap aliases,
-# `std::fmt`, `std::cmp::Ordering`) and pulls in `getrandom` without the
-# `js` feature, which blocks `cargo build --target wasm32-unknown-unknown`
-# at the dependency level. This crate is structured so that when
-# `arc-core-types` is modernised (a separate roadmap story), arc-kernel-core
-# will cross-compile to wasm32 with no changes beyond adding the `getrandom`
-# js feature to arc-core-types. See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
+# Later portability tickets qualify the browser and mobile adapter crates on
+# top of this core build proof. See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
 [dependencies]
 # Depend on `arc-core-types` with `default-features = false` and forward the
 # `std` feature through our own feature flag so downstream consumers can
 # select between the hosted `std` build and the portable `no_std + alloc`
-# build that targets wasm32-unknown-unknown.
+# build used by the scripted host + wasm proof.
 arc-core-types = { package = "arc-core-types", path = "../arc-core-types", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }

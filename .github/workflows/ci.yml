@@ -6,9 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   ARC_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
+  ARC_ELAN_VERSION: v4.2.1
+  ARC_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
 
 jobs:
   check:
@@ -17,23 +22,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
 
       - name: Install protobuf compiler
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Install Lean 4 toolchain
-        run: |
-          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
-          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-          echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@v4
+      - name: Restore Lean 4 toolchain cache
+        id: elan-cache
+        uses: actions/cache@v4
         with:
           path: ~/.elan
-          key: ${{ runner.os }}-elan-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
+          key: ${{ runner.os }}-elan-${{ env.ARC_ELAN_VERSION }}-${{ env.ARC_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
+
+      - name: Install Lean 4 toolchain
+        if: steps.elan-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/leanprover/elan/releases/download/${ARC_ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/elan-x86_64-unknown-linux-gnu.tar.gz
+          echo "${ARC_ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/elan-x86_64-unknown-linux-gnu.tar.gz -C /tmp
+          /tmp/elan-init -y --default-toolchain none
+
+      - name: Configure Lean 4 toolchain path
+        shell: bash
+        run: |
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
 
       - name: Prime Lean 4 toolchain
         shell: bash
@@ -70,11 +90,33 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install portable qualification dependencies
+        run: |
+          cargo install wasm-pack --locked
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+          rustup target add aarch64-linux-android
+          sudo apt-get update
+          if ! sudo apt-get install -y chromium-driver chromium; then
+            sudo apt-get install -y chromium-driver chromium-browser
+          fi
+
       - name: Workspace CI lane
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/ci-workspace.sh
+
+      - name: Portable browser qualification
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: ./scripts/qualify-portable-browser.sh
+
+      - name: Portable mobile qualification
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: ./scripts/qualify-mobile-kernel.sh
 
       - name: SDK parity contract lane
         env:
@@ -87,7 +129,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.93.0
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal
+          rustup default 1.93.0
 
       - name: Install protobuf compiler
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
@@ -115,7 +160,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
 
       - name: Install protobuf compiler
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler

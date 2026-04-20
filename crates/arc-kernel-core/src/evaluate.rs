@@ -24,6 +24,13 @@
 //! The caller -- today `arc-kernel::ArcKernel::evaluate_tool_call_sync` and
 //! tomorrow `arc-kernel-wasm::BrowserKernel::evaluate` -- wraps this pure
 //! core in the I/O checks it needs.
+//!
+//! Verified-core boundary note:
+//! `formal/proof-manifest.toml` names this module as covered Rust surface for
+//! the current bounded verified core. The covered semantics stop at pure
+//! capability verification, subject binding, portable scope matching, and the
+//! synchronous guard pipeline; revocation lookups, budget mutation, DPoP, and
+//! tool dispatch stay outside this module and outside the present proof claim.
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -34,6 +41,7 @@ use arc_core_types::crypto::PublicKey;
 use crate::capability_verify::{verify_capability, CapabilityError, VerifiedCapability};
 use crate::clock::Clock;
 use crate::guard::{Guard, GuardContext, PortableToolCallRequest};
+use crate::normalized::{NormalizationError, NormalizedEvaluationVerdict};
 use crate::scope::{resolve_matching_grants, MatchedGrant};
 use crate::Verdict;
 
@@ -86,6 +94,14 @@ impl EvaluationVerdict {
     #[must_use]
     pub fn is_deny(&self) -> bool {
         self.verdict == Verdict::Deny
+    }
+
+    /// Project this evaluation result into the proof-facing normalized AST.
+    pub fn normalized(
+        &self,
+        request: &PortableToolCallRequest,
+    ) -> Result<NormalizedEvaluationVerdict, NormalizationError> {
+        NormalizedEvaluationVerdict::try_from_evaluation(request, self)
     }
 }
 

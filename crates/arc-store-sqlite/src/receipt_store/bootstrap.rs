@@ -924,7 +924,7 @@ impl SqliteReceiptStore {
 
         Ok(Self {
             pool,
-            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(false),
+            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
         })
     }
 
@@ -971,7 +971,7 @@ impl SqliteReceiptStore {
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
-            SELECT raw_json
+            SELECT seq, raw_json
             FROM arc_tool_receipts
             WHERE (?1 IS NULL OR capability_id = ?1)
               AND (?2 IS NULL OR tool_server = ?2)
@@ -989,12 +989,16 @@ impl SqliteReceiptStore {
                 decision_kind,
                 limit as i64,
             ],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
 
         rows.map(|row| {
-            let raw_json = row?;
-            Ok(serde_json::from_str(&raw_json)?)
+            let (seq, raw_json) = row?;
+            decode_verified_arc_receipt(
+                &raw_json,
+                "persisted tool receipt",
+                Some(seq.max(0) as u64),
+            )
         })
         .collect()
     }
@@ -1010,18 +1014,24 @@ impl SqliteReceiptStore {
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
-            SELECT r.raw_json
+            SELECT r.seq, r.raw_json
             FROM arc_tool_receipts r
             LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
             WHERE COALESCE(r.subject_key, cl.subject_key) = ?1
             ORDER BY r.timestamp ASC, r.seq ASC
             "#,
         )?;
-        let rows = statement.query_map(params![subject_key], |row| row.get::<_, String>(0))?;
+        let rows = statement.query_map(params![subject_key], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
 
         rows.map(|row| {
-            let raw_json = row?;
-            Ok(serde_json::from_str(&raw_json)?)
+            let (seq, raw_json) = row?;
+            decode_verified_arc_receipt(
+                &raw_json,
+                "persisted tool receipt",
+                Some(seq.max(0) as u64),
+            )
         })
         .collect()
     }
@@ -1046,9 +1056,14 @@ impl SqliteReceiptStore {
         })?;
         rows.map(|row| {
             let (seq, raw_json) = row?;
+            let seq = seq.max(0) as u64;
             Ok(StoredToolReceipt {
-                seq: seq.max(0) as u64,
-                receipt: serde_json::from_str(&raw_json)?,
+                seq,
+                receipt: decode_verified_arc_receipt(
+                    &raw_json,
+                    "persisted tool receipt",
+                    Some(seq),
+                )?,
             })
         })
         .collect()
@@ -1066,7 +1081,7 @@ impl SqliteReceiptStore {
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
-            SELECT raw_json
+            SELECT seq, raw_json
             FROM arc_child_receipts
             WHERE (?1 IS NULL OR session_id = ?1)
               AND (?2 IS NULL OR parent_request_id = ?2)
@@ -1086,12 +1101,16 @@ impl SqliteReceiptStore {
                 terminal_state,
                 limit as i64,
             ],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
 
         rows.map(|row| {
-            let raw_json = row?;
-            Ok(serde_json::from_str(&raw_json)?)
+            let (seq, raw_json) = row?;
+            decode_verified_child_receipt(
+                &raw_json,
+                "persisted child receipt",
+                Some(seq.max(0) as u64),
+            )
         })
         .collect()
     }
@@ -1116,9 +1135,14 @@ impl SqliteReceiptStore {
         })?;
         rows.map(|row| {
             let (seq, raw_json) = row?;
+            let seq = seq.max(0) as u64;
             Ok(StoredChildReceipt {
-                seq: seq.max(0) as u64,
-                receipt: serde_json::from_str(&raw_json)?,
+                seq,
+                receipt: decode_verified_child_receipt(
+                    &raw_json,
+                    "persisted child receipt",
+                    Some(seq),
+                )?,
             })
         })
         .collect()
@@ -1428,9 +1452,15 @@ impl SqliteReceiptStore {
                     ],
                     |row| {
                         let raw_json = row.get::<_, String>(1)?;
+                        let seq = row.get::<_, i64>(0)?.max(0) as u64;
                         Ok(StoredToolReceipt {
-                            seq: row.get::<_, i64>(0)?.max(0) as u64,
-                            receipt: serde_json::from_str(&raw_json).map_err(|error| {
+                            seq,
+                            receipt: decode_verified_arc_receipt(
+                                &raw_json,
+                                "federated share tool receipt",
+                                Some(seq),
+                            )
+                            .map_err(|error| {
                                 rusqlite::Error::FromSqlConversionFailure(
                                     raw_json.len(),
                                     rusqlite::types::Type::Text,

@@ -1,4 +1,5 @@
 use super::*;
+use subtle::ConstantTimeEq;
 
 pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<RemoteAppState> {
     router
@@ -84,6 +85,17 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
                 "invalidCount": 0,
             })
         });
+    let shared_hosted_owner_stats =
+        state
+            .factory
+            .shared_upstream_owner
+            .lock()
+            .ok()
+            .and_then(|owner| {
+                owner
+                    .as_ref()
+                    .map(|owner| owner.notification_stats_snapshot())
+            });
 
     Json(json!({
         "ok": true,
@@ -92,6 +104,7 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
             "serverName": &state.factory.config.server_name,
             "serverVersion": &state.factory.config.server_version,
             "sharedHostedOwner": state.factory.config.shared_hosted_owner,
+            "sharedHostedOwnerStats": shared_hosted_owner_stats,
         },
         "auth": {
             "mode": remote_auth_mode_label(&state.auth_mode),
@@ -650,7 +663,17 @@ async fn handle_admin_session_drain(
     };
     let record = match entry {
         RemoteSessionEntry::Active(session) => {
-            state.sessions.mark_draining(&session).await;
+            if let Err(error) = state.sessions.mark_draining(&session).await {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "failed to drain MCP session without resumable-state risk"
+                );
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to drain MCP session safely",
+                );
+            }
             session.diagnostic_record()
         }
         RemoteSessionEntry::Terminal(record) => (*record).clone(),
@@ -682,7 +705,17 @@ async fn handle_admin_session_shutdown(
     };
     let record = match entry {
         RemoteSessionEntry::Active(session) => {
-            state.sessions.mark_closed(&session).await;
+            if let Err(error) = state.sessions.mark_closed(&session).await {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "failed to shut down MCP session without resumable-state risk"
+                );
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to shut down MCP session safely",
+                );
+            }
             state.sessions.remove_active(&session_id).await;
             session.diagnostic_record()
         }
@@ -706,7 +739,7 @@ fn validate_admin_auth(headers: &HeaderMap, admin_token: Option<&str>) -> Result
         ));
     };
     let token = extract_bearer_token(headers, None)?;
-    if token == expected_token {
+    if token.as_bytes().ct_eq(expected_token.as_bytes()).into() {
         Ok(())
     } else {
         Err(unauthorized_bearer_response(

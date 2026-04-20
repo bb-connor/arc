@@ -62,6 +62,12 @@ automatically, use:
 ./scripts/check-sdk-publication-examples.sh
 ```
 
+## Canonical Example Links
+
+- `../../../docs/guides/WEB_BACKEND_QUICKSTART.md`
+- `../../../examples/hello-openapi-sidecar/README.md`
+- `../../../examples/hello-fastapi/README.md`
+
 ## Release Checks
 
 ```bash

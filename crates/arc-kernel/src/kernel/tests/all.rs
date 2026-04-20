@@ -1253,6 +1253,36 @@ impl ReceiptStore for AppendOnlyReceiptStore {
     }
 }
 
+#[derive(Default)]
+struct FailingSessionAnchorReceiptStore;
+
+impl ReceiptStore for FailingSessionAnchorReceiptStore {
+    fn append_arc_receipt(&mut self, _receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &mut self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn record_session_anchor(
+        &mut self,
+        _session_id: &str,
+        _anchor_id: &str,
+        _auth_context_fingerprint: &str,
+        _issued_at: u64,
+        _supersedes_anchor_id: Option<&str>,
+        _anchor_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "session anchor write failed".to_string(),
+        ))
+    }
+}
+
 impl ResourceProvider for FilesystemResourceProvider {
     fn list_resources(&self) -> Vec<ResourceDefinition> {
         vec![
@@ -1452,6 +1482,20 @@ fn kernel_accepts_capabilities_from_configured_authority() {
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(cap.issuer, authority_keypair.public_key());
     assert_eq!(response.verdict, Verdict::Allow);
+}
+
+#[test]
+fn kernel_reports_capability_issuer_trust() {
+    let authority_keypair = make_keypair();
+    let untrusted_keypair = make_keypair();
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+        authority_keypair.clone(),
+    )));
+
+    assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
+    assert!(kernel.capability_issuer_is_trusted(&kernel.public_key()));
+    assert!(!kernel.capability_issuer_is_trusted(&untrusted_keypair.public_key()));
 }
 
 #[test]
@@ -2495,6 +2539,58 @@ fn open_session_assigns_unique_ids_across_kernel_instances() {
 }
 
 #[test]
+fn open_session_with_id_rejects_duplicate_ids() {
+    let kernel = ArcKernel::new(make_config());
+    let session_id = SessionId::new("sess-restored");
+
+    let opened = kernel
+        .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
+        .unwrap();
+    assert_eq!(opened, session_id);
+
+    let error = kernel
+        .open_session_with_id(session_id.clone(), "agent-b".to_string(), Vec::new())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        KernelError::SessionAlreadyExists(existing) if existing == session_id
+    ));
+    assert_eq!(kernel.session_count(), 1);
+    assert_eq!(
+        kernel
+            .session(&session_id)
+            .map(|session| session.agent_id().to_string()),
+        Some("agent-a".to_string())
+    );
+}
+
+#[test]
+fn open_session_with_id_rolls_back_insert_when_anchor_persistence_fails() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.set_receipt_store(Box::new(FailingSessionAnchorReceiptStore));
+    let session_id = SessionId::new("sess-anchor-fail");
+
+    let error = kernel
+        .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        KernelError::ReceiptPersistence(ReceiptStoreError::Conflict(message))
+            if message == "session anchor write failed"
+    ));
+    assert_eq!(kernel.session_count(), 0);
+    assert!(kernel.session(&session_id).is_none());
+
+    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore));
+    let opened = kernel
+        .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
+        .unwrap();
+    assert_eq!(opened, session_id);
+    assert_eq!(kernel.session_count(), 1);
+}
+
+#[test]
 fn web3_evidence_required_activation_rejects_missing_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;
@@ -2574,6 +2670,7 @@ fn session_operation_tool_call_tracks_and_clears_inflight() {
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(
@@ -3039,6 +3136,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3133,6 +3231,7 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3230,6 +3329,7 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         server_id: "nested".to_string(),
         tool_name: "elicit_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3311,6 +3411,7 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         server_id: "nested".to_string(),
         tool_name: "roots_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3386,6 +3487,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3480,6 +3582,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3558,6 +3661,7 @@ fn session_tool_call_records_incomplete_terminal_state() {
         server_id: "broken".to_string(),
         tool_name: "drop_stream".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(
@@ -3797,6 +3901,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
         server_id: "nested".to_string(),
         tool_name: "notify_resources_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel

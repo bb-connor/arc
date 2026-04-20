@@ -99,14 +99,33 @@ fn deny_result(
     }
 }
 
-fn find_first_match(target: &str, patterns: &[String]) -> Option<usize> {
-    patterns
-        .iter()
-        .enumerate()
-        .find_map(|(index, pattern)| glob_matches(pattern, target).then_some(index))
+fn find_first_match(target: &str, patterns: &[String]) -> Result<Option<usize>, String> {
+    for (index, pattern) in patterns.iter().enumerate() {
+        if glob_matches(pattern, target)? {
+            return Ok(Some(index));
+        }
+    }
+    Ok(None)
 }
 
-pub fn glob_matches(pattern: &str, target: &str) -> bool {
+fn find_first_match_or_deny(
+    target: &str,
+    patterns: &[String],
+    field: &str,
+    origin_profile_id: Option<String>,
+    posture: Option<PostureResult>,
+) -> Result<Option<usize>, Box<EvaluationResult>> {
+    find_first_match(target, patterns).map_err(|error| {
+        Box::new(deny_result(
+            Some(field.to_string()),
+            Some(format!("invalid policy glob pattern: {error}")),
+            origin_profile_id,
+            posture,
+        ))
+    })
+}
+
+pub fn glob_matches(pattern: &str, target: &str) -> Result<bool, String> {
     let mut regex = String::from("^");
     let mut chars = pattern.chars().peekable();
     while let Some(ch) = chars.next() {
@@ -128,9 +147,8 @@ pub fn glob_matches(pattern: &str, target: &str) -> bool {
         }
     }
     regex.push('$');
-    Regex::new(&regex)
+    compile_generated_policy_regex(&regex, "policy glob pattern")
         .map(|compiled| compiled.is_match(target))
-        .unwrap_or(false)
 }
 
 struct PatchStats {
@@ -171,4 +189,3 @@ fn imbalance_ratio(additions: usize, deletions: usize) -> f64 {
         }
     }
 }
-

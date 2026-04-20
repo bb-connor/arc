@@ -231,6 +231,8 @@ Established-session rules:
   `MCP-Protocol-Version`, that header **MUST** match the stored session value.
 - POST requests **MUST** use `Content-Type: application/json`.
 - GET notification streams **MUST** include `MCP-Session-Id`.
+- Ready-state methods such as `tools/list` and `tools/call` **MUST** not run
+  until the session has received `notifications/initialized`.
 
 ### 3.2 Notification Stream And Replay
 
@@ -238,6 +240,10 @@ Established-session rules:
 - Notification replay uses the `Last-Event-ID` request header.
 - Event identifiers are encoded as `{session_id}-{sequence}`.
 - Replay requests outside the retained event window fail with `409 Conflict`.
+- Hosted deployments that reuse one upstream owner across multiple sessions
+  **MUST** keep late notifications and task handles scoped to the originating
+  session. They **MUST NOT** fan out unattributed notifications or allow a
+  different session to act on a foreign task id.
 
 ### 3.3 Hosted Session Lifecycle
 
@@ -277,6 +283,17 @@ Hosted MCP negotiation rules:
   `result.capabilities.experimental.arcProtocol.selectedProtocolVersion`.
 - On failure, initialize is rejected with JSON-RPC `-32600` plus a structured
   ARC protocol error descriptor in `error.data.arcError`.
+
+### 3.5 Model Metadata Admission
+
+- Hosted `tools/call` requests **MAY** carry model metadata under either
+  `_meta.modelMetadata` or `_meta.arcModelMetadata`.
+- The hosted edge normalizes that payload into ARC request `model_metadata`.
+- Caller-supplied metadata **MUST** be treated as `asserted` provenance at
+  admission time even if the caller marks it `verified`.
+- Receipts and downstream exports **MUST** preserve the effective provenance
+  class instead of silently upgrading caller assertions into verified runtime
+  truth.
 
 Native ARC direct transport versioning rules:
 

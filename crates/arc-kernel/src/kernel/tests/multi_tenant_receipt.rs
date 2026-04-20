@@ -68,6 +68,7 @@ fn session_tenant_id_is_stamped_on_tool_call_receipt() {
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(
@@ -106,6 +107,7 @@ fn session_without_tenant_id_produces_untagged_receipt() {
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(
@@ -182,6 +184,7 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(

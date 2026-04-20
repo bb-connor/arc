@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
 use std::io::{self, Write};
 use std::net::SocketAddr;
@@ -6,7 +6,7 @@ use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex as StdMutex, Weak};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::CapabilityToken;
@@ -14,6 +14,7 @@ use arc_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signa
 use arc_core::session::{
     ArcIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
     OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
+    SessionId,
 };
 use arc_kernel::operator_report::{
     ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
@@ -24,7 +25,8 @@ use arc_kernel::operator_report::{
 use arc_kernel::{
     is_supported_dpop_schema, ArcOAuthAuthorizationProfile, DpopConfig, DpopNonceStore, DpopProof,
     GovernedAuthorizationDetail, GovernedAuthorizationTransactionContext, KernelError,
-    RevocationStore, ToolServerConnection, ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
+    PeerCapabilities, RevocationStore, ToolServerConnection,
+    ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
     ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, ARC_OAUTH_AUTHORIZATION_PROFILE_ID,
     ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, ARC_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
     ARC_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, ARC_OAUTH_SENDER_PROOF_ARC_DPOP,
@@ -98,6 +100,9 @@ const PROTECTED_RESOURCE_METADATA_ROOT_PATH: &str = "/.well-known/oauth-protecte
 const PROTECTED_RESOURCE_METADATA_MCP_PATH: &str = "/.well-known/oauth-protected-resource/mcp";
 const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
 const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
+const ARC_RESPONSE_MODE_HEADER: &str = "x-arc-mcp-response-mode";
+const ARC_TOOL_STREAMING_CAPABILITY_KEY: &str = "arcToolStreaming";
+const LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY: &str = "pactToolStreaming";
 const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
 const DEFAULT_NOTIFICATION_STREAM_IDLE_MILLIS: u64 = 100;
 const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;
@@ -111,6 +116,7 @@ const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"arc.identity_federation.v1";
+const REMOTE_SESSION_RESUME_INTEGRITY_LABEL: &[u8] = b"arc.remote_mcp.resume_integrity.v1";
 const SESSION_IDLE_EXPIRY_ENV: &str = "ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const LEGACY_SESSION_IDLE_EXPIRY_ENV: &str = "ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const SESSION_DRAIN_GRACE_ENV: &str = "ARC_MCP_SESSION_DRAIN_GRACE_MILLIS";
@@ -119,6 +125,7 @@ const SESSION_REAPER_INTERVAL_ENV: &str = "ARC_MCP_SESSION_REAPER_INTERVAL_MILLI
 const LEGACY_SESSION_REAPER_INTERVAL_ENV: &str = "ARC_MCP_SESSION_REAPER_INTERVAL_MILLIS";
 const SESSION_TOMBSTONE_RETENTION_ENV: &str = "ARC_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
 const LEGACY_SESSION_TOMBSTONE_RETENTION_ENV: &str = "ARC_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
+const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
 
 type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
 type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
@@ -214,6 +221,25 @@ struct RemoteSessionDiagnosticRecord {
     terminal_at: u64,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RemoteSessionResumeRecord {
+    session_id: String,
+    agent_id: String,
+    auth_context: SessionAuthContext,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auth_mode_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    policy_fingerprint: Option<String>,
+    hosted_isolation: RemoteHostedIsolationMode,
+    lifecycle: RemoteSessionLifecycleSnapshot,
+    protocol_version: Option<String>,
+    peer_capabilities: PeerCapabilities,
+    initialize_params: Value,
+    issued_capabilities: Vec<CapabilityToken>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    resume_integrity_tag: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 enum RemoteSessionEntry {
     Active(Arc<RemoteSession>),
@@ -238,10 +264,39 @@ struct SharedUpstreamToolServer {
 struct SharedUpstreamOwner {
     upstream_server: Arc<AdaptedMcpServer>,
     notification_subscribers: NotificationSubscriberList,
+    notification_stats: Arc<SharedUpstreamNotificationStats>,
 }
 
 struct SharedUpstreamNotificationTap {
     queue: NotificationTapQueue,
+}
+
+#[derive(Default)]
+struct SharedUpstreamNotificationStats {
+    fanout_batches: AtomicU64,
+    fanout_notifications: AtomicU64,
+    fanout_targets: AtomicU64,
+    pruned_subscribers: AtomicU64,
+    queue_lock_skips: AtomicU64,
+    subscriber_lock_failures: AtomicU64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SharedUpstreamNotificationStatsSnapshot {
+    fanout_batches: u64,
+    fanout_notifications: u64,
+    fanout_targets: u64,
+    pruned_subscribers: u64,
+    queue_lock_skips: u64,
+    subscriber_lock_failures: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RetainedRemoteSessionEvent {
+    seq: u64,
+    event_id: String,
+    message: Value,
 }
 
 #[derive(Clone, Debug)]
@@ -256,13 +311,6 @@ struct RemoteSessionEvent {
 enum RemoteSessionEventKind {
     Notification,
     RequestCorrelated,
-}
-
-#[derive(Clone, Debug)]
-struct RetainedRemoteSessionEvent {
-    seq: u64,
-    event_id: String,
-    message: Value,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -425,11 +473,17 @@ impl Default for RemoteSessionOwnershipSnapshot {
 #[derive(Debug)]
 struct RemoteSession {
     session_id: String,
+    agent_id: String,
     capabilities: Vec<RemoteSessionCapability>,
+    issued_capabilities: Vec<CapabilityToken>,
     auth_context: SessionAuthContext,
+    auth_mode_fingerprint: String,
+    policy_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: StdMutex<Option<String>>,
+    peer_capabilities: StdMutex<Option<PeerCapabilities>>,
+    initialize_params: StdMutex<Option<Value>>,
     lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
     input_tx: mpsc::Sender<Value>,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
@@ -437,18 +491,30 @@ struct RemoteSession {
     active_request_stream: Arc<Mutex<()>>,
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
+    session_db_path: Option<PathBuf>,
+    resume_integrity_secret: Option<[u8; 32]>,
 }
 
 struct RemoteSessionInit {
     session_id: String,
+    agent_id: String,
     capabilities: Vec<RemoteSessionCapability>,
+    issued_capabilities: Vec<CapabilityToken>,
     auth_context: SessionAuthContext,
+    auth_mode_fingerprint: String,
+    policy_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
+    protocol_version: Option<String>,
+    peer_capabilities: Option<PeerCapabilities>,
+    initialize_params: Option<Value>,
+    lifecycle_snapshot: Option<RemoteSessionLifecycleSnapshot>,
     input_tx: mpsc::Sender<Value>,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
+    session_db_path: Option<PathBuf>,
+    resume_integrity_secret: Option<[u8; 32]>,
 }
 
 struct NotificationStreamAttachment {
@@ -1409,6 +1475,123 @@ fn derive_federated_agent_keypair(
     Ok(Keypair::from_seed(&seed))
 }
 
+#[derive(Serialize)]
+struct RemoteAuthContractFingerprint {
+    mode: &'static str,
+    issuer: Option<String>,
+    audience: Option<String>,
+    required_scopes: Vec<String>,
+    provider_profile: String,
+    static_token_fingerprint: Option<String>,
+    verification_key_identity: Option<String>,
+    discovery_url: Option<String>,
+    introspection_url: Option<String>,
+    enterprise_provider_registry_hash: Option<String>,
+}
+
+fn enterprise_provider_registry_hash(path: Option<&FsPath>) -> Result<Option<String>, CliError> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let bytes = std::fs::read(path)?;
+    Ok(Some(sha256_hex(&bytes)))
+}
+
+fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<String, CliError> {
+    let provider_profile = config
+        .auth_jwt_provider_profile
+        .unwrap_or(JwtProviderProfile::Generic);
+    let enterprise_provider_registry_hash =
+        enterprise_provider_registry_hash(config.enterprise_providers_file.as_deref())?;
+    let fingerprint = if let Some(token) = config.auth_token.as_deref() {
+        RemoteAuthContractFingerprint {
+            mode: "static_bearer",
+            issuer: None,
+            audience: None,
+            required_scopes: Vec::new(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: Some(sha256_hex(token.as_bytes())),
+            verification_key_identity: None,
+            discovery_url: None,
+            introspection_url: None,
+            enterprise_provider_registry_hash,
+        }
+    } else if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
+        let verification_key_identity = authority_public_key_from_seed_file(seed_path)?
+            .map(|public_key| public_key.to_hex())
+            .ok_or_else(|| {
+                CliError::Other(format!(
+                    "auth server seed file `{}` did not yield a public key",
+                    seed_path.display()
+                ))
+            })?;
+        RemoteAuthContractFingerprint {
+            mode: "jwt_bearer",
+            issuer: config.auth_jwt_issuer.clone(),
+            audience: config.auth_jwt_audience.clone(),
+            required_scopes: config.auth_scopes.clone(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: None,
+            verification_key_identity: Some(verification_key_identity),
+            discovery_url: None,
+            introspection_url: None,
+            enterprise_provider_registry_hash,
+        }
+    } else if let Some(introspection_url) = config.auth_introspection_url.as_deref() {
+        RemoteAuthContractFingerprint {
+            mode: "introspection_bearer",
+            issuer: config.auth_jwt_issuer.clone(),
+            audience: config.auth_jwt_audience.clone(),
+            required_scopes: config.auth_scopes.clone(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: None,
+            verification_key_identity: None,
+            discovery_url: config.auth_jwt_discovery_url.clone(),
+            introspection_url: Some(introspection_url.to_string()),
+            enterprise_provider_registry_hash,
+        }
+    } else {
+        RemoteAuthContractFingerprint {
+            mode: "jwt_bearer",
+            issuer: config.auth_jwt_issuer.clone(),
+            audience: config.auth_jwt_audience.clone(),
+            required_scopes: config.auth_scopes.clone(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: None,
+            verification_key_identity: config.auth_jwt_public_key.clone(),
+            discovery_url: config.auth_jwt_discovery_url.clone(),
+            introspection_url: None,
+            enterprise_provider_registry_hash,
+        }
+    };
+
+    let encoded = canonical_json_bytes(&fingerprint).map_err(|error| {
+        CliError::Other(format!("serialize auth contract fingerprint: {error}"))
+    })?;
+    Ok(sha256_hex(&encoded))
+}
+
+fn fingerprint_remote_policy_contract(
+    loaded_policy: &crate::policy::LoadedPolicy,
+) -> Result<String, CliError> {
+    let fingerprint = json!({
+        "format": loaded_policy.format_name(),
+        "identity": {
+            "source_hash": loaded_policy.identity.source_hash,
+            "runtime_hash": loaded_policy.identity.runtime_hash,
+        },
+        "default_capabilities": loaded_policy.default_capabilities,
+        "issuance_policy": loaded_policy.issuance_policy,
+        "runtime_assurance_policy": loaded_policy.runtime_assurance_policy,
+    });
+    let encoded = canonical_json_bytes(&fingerprint).map_err(|error| {
+        CliError::Other(format!(
+            "serialize resumable policy contract fingerprint: {error}"
+        ))
+    })?;
+    Ok(sha256_hex(&encoded))
+}
+
 fn derive_session_agent_keypair(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
@@ -1423,6 +1606,153 @@ fn derive_session_agent_keypair(
         } => derive_federated_agent_keypair(seed_path, principal),
         _ => Ok(Keypair::generate()),
     }
+}
+
+#[derive(Serialize)]
+struct RemoteSessionResumeIntegrityEnvelope<'a> {
+    session_id: &'a str,
+    agent_id: &'a str,
+    auth_context: &'a SessionAuthContext,
+    auth_mode_fingerprint: Option<&'a str>,
+    policy_fingerprint: Option<&'a str>,
+    hosted_isolation: RemoteHostedIsolationMode,
+    lifecycle: &'a RemoteSessionLifecycleSnapshot,
+    protocol_version: Option<&'a str>,
+    initialize_params: &'a Value,
+    issued_capabilities: &'a [CapabilityToken],
+}
+
+fn derive_resume_integrity_seed_from_secret(secret: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(REMOTE_SESSION_RESUME_INTEGRITY_LABEL);
+    hasher.update([0u8]);
+    hasher.update(secret);
+    let digest = hasher.finalize();
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&digest);
+    seed
+}
+
+fn derive_resume_record_integrity_seed(
+    config: &RemoteServeHttpConfig,
+) -> Result<Option<[u8; 32]>, CliError> {
+    if let Some(path) = config.authority_db_path.as_deref() {
+        let authority = arc_store_sqlite::SqliteCapabilityAuthority::open(path)
+            .map_err(|error| CliError::Other(error.to_string()))?;
+        let keypair = authority
+            .local_keypair()
+            .map_err(|error| CliError::Other(error.to_string()))?;
+        return Ok(Some(keypair.seed_bytes()));
+    }
+    if let Some(seed_path) = [
+        config.authority_seed_path.as_deref(),
+        config.auth_server_seed_path.as_deref(),
+        config.identity_federation_seed_path.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .next()
+    {
+        let keypair = load_or_create_authority_keypair(seed_path)?;
+        return Ok(Some(keypair.seed_bytes()));
+    }
+    if let Some(secret) = config.control_token.as_deref() {
+        return Ok(Some(derive_resume_integrity_seed_from_secret(
+            secret.as_bytes(),
+        )));
+    }
+    if let Some(secret) = config.auth_token.as_deref() {
+        return Ok(Some(derive_resume_integrity_seed_from_secret(
+            secret.as_bytes(),
+        )));
+    }
+    Ok(None)
+}
+
+fn expected_resume_agent_id(
+    config: &RemoteServeHttpConfig,
+    auth_context: &SessionAuthContext,
+) -> Result<Option<String>, CliError> {
+    let Some(seed_path) = config.identity_federation_seed_path.as_deref() else {
+        return Ok(None);
+    };
+    match &auth_context.method {
+        SessionAuthMethod::OAuthBearer {
+            principal: Some(principal),
+            ..
+        } => Ok(Some(
+            derive_federated_agent_keypair(seed_path, principal)?
+                .public_key()
+                .to_hex(),
+        )),
+        _ => Ok(None),
+    }
+}
+
+fn compute_resume_record_integrity_tag(
+    seed: &[u8; 32],
+    record: &RemoteSessionResumeRecord,
+) -> Result<String, CliError> {
+    let envelope = RemoteSessionResumeIntegrityEnvelope {
+        session_id: &record.session_id,
+        agent_id: &record.agent_id,
+        auth_context: &record.auth_context,
+        auth_mode_fingerprint: record.auth_mode_fingerprint.as_deref(),
+        policy_fingerprint: record.policy_fingerprint.as_deref(),
+        hosted_isolation: record.hosted_isolation,
+        lifecycle: &record.lifecycle,
+        protocol_version: record.protocol_version.as_deref(),
+        initialize_params: &record.initialize_params,
+        issued_capabilities: &record.issued_capabilities,
+    };
+    let canonical = canonical_json_bytes(&envelope)
+        .map_err(|error| CliError::Other(format!("serialize resumable session envelope: {error}")))?;
+    let mut hasher = Sha256::new();
+    hasher.update(REMOTE_SESSION_RESUME_INTEGRITY_LABEL);
+    hasher.update([0u8]);
+    hasher.update(seed);
+    hasher.update([0u8]);
+    hasher.update(&canonical);
+    Ok(sha256_hex(&hasher.finalize()))
+}
+
+fn validate_resume_record_integrity(
+    config: &RemoteServeHttpConfig,
+    record: &RemoteSessionResumeRecord,
+) -> Result<(), CliError> {
+    let Some(stored_tag) = record.resume_integrity_tag.as_deref() else {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} predates resumable integrity binding and must be re-initialized",
+            record.session_id
+        )));
+    };
+    let Some(seed) = derive_resume_record_integrity_seed(config)? else {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} cannot be restored because this server has no local secret material for resumable session integrity",
+            record.session_id
+        )));
+    };
+    let expected_tag = compute_resume_record_integrity_tag(&seed, record)?;
+    if stored_tag != expected_tag {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} failed resumable integrity validation",
+            record.session_id
+        )));
+    }
+    Ok(())
+}
+
+fn validate_restored_peer_capabilities(
+    record: &RemoteSessionResumeRecord,
+) -> Result<PeerCapabilities, CliError> {
+    let derived = parse_remote_session_peer_capabilities(&record.initialize_params);
+    if derived != record.peer_capabilities {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} failed peer capability re-validation against initialize params",
+            record.session_id
+        )));
+    }
+    Ok(derived)
 }
 
 impl SharedUpstreamToolServer {
@@ -1493,12 +1823,15 @@ impl SharedUpstreamOwner {
         let upstream_server = Arc::new(AdaptedMcpServer::new(adapter)?);
         let notification_subscribers =
             Arc::new(StdMutex::new(Vec::<Weak<StdMutex<VecDeque<Value>>>>::new()));
+        let notification_stats = Arc::new(SharedUpstreamNotificationStats::default());
         let notification_source_for_thread = notification_source.clone();
         let notification_subscribers_for_thread = notification_subscribers.clone();
+        let notification_stats_for_thread = notification_stats.clone();
         thread::spawn(move || loop {
             let notifications = notification_source_for_thread.drain_notifications();
             fan_out_shared_upstream_notifications(
                 &notification_subscribers_for_thread,
+                notification_stats_for_thread.as_ref(),
                 notifications,
             );
             thread::sleep(Duration::from_millis(
@@ -1509,6 +1842,7 @@ impl SharedUpstreamOwner {
         Ok(Self {
             upstream_server,
             notification_subscribers,
+            notification_stats,
         })
     }
 
@@ -1522,6 +1856,32 @@ impl SharedUpstreamOwner {
             subscribers.push(Arc::downgrade(&queue));
         }
         Arc::new(SharedUpstreamNotificationTap { queue })
+    }
+
+    fn notification_stats_snapshot(&self) -> SharedUpstreamNotificationStatsSnapshot {
+        SharedUpstreamNotificationStatsSnapshot {
+            fanout_batches: self.notification_stats.fanout_batches.load(Ordering::Relaxed),
+            fanout_notifications: self
+                .notification_stats
+                .fanout_notifications
+                .load(Ordering::Relaxed),
+            fanout_targets: self
+                .notification_stats
+                .fanout_targets
+                .load(Ordering::Relaxed),
+            pruned_subscribers: self
+                .notification_stats
+                .pruned_subscribers
+                .load(Ordering::Relaxed),
+            queue_lock_skips: self
+                .notification_stats
+                .queue_lock_skips
+                .load(Ordering::Relaxed),
+            subscriber_lock_failures: self
+                .notification_stats
+                .subscriber_lock_failures
+                .load(Ordering::Relaxed),
+        }
     }
 }
 
@@ -1552,23 +1912,49 @@ impl McpTransport for SharedUpstreamNotificationTap {
 
 fn fan_out_shared_upstream_notifications(
     subscribers: &NotificationSubscriberList,
+    stats: &SharedUpstreamNotificationStats,
     notifications: Vec<Value>,
 ) {
     if notifications.is_empty() {
         return;
     }
+    stats.fanout_batches.fetch_add(1, Ordering::Relaxed);
+    stats
+        .fanout_notifications
+        .fetch_add(notifications.len() as u64, Ordering::Relaxed);
     let Ok(mut subscribers) = subscribers.lock() else {
+        stats
+            .subscriber_lock_failures
+            .fetch_add(1, Ordering::Relaxed);
+        warn!("failed to lock shared hosted-owner notification subscribers");
         return;
     };
+    let before_prune = subscribers.len();
     subscribers.retain(|subscriber| subscriber.strong_count() > 0);
-    for notification in notifications {
-        for subscriber in subscribers.iter() {
-            if let Some(queue) = subscriber.upgrade() {
-                if let Ok(mut queue) = queue.lock() {
-                    queue.push_back(notification.clone());
-                }
-            }
-        }
+    let pruned = before_prune.saturating_sub(subscribers.len());
+    if pruned > 0 {
+        stats
+            .pruned_subscribers
+            .fetch_add(pruned as u64, Ordering::Relaxed);
+    }
+    // Shared hosted-owner mode multiplexes one upstream subprocess across many
+    // sessions. Each session-local ArcMcpEdge still applies its own resource
+    // subscription and elicitation filtering before surfacing client-visible
+    // notifications, so the shared tap can safely replay raw upstream
+    // notifications into every live session queue.
+    for subscriber in subscribers.iter() {
+        let Some(queue) = subscriber.upgrade() else {
+            continue;
+        };
+        let Ok(mut queue) = queue.lock() else {
+            stats
+                .queue_lock_skips
+                .fetch_add(notifications.len() as u64, Ordering::Relaxed);
+            warn!("failed to lock shared hosted-owner notification tap queue");
+            continue;
+        };
+        stats.fanout_targets.fetch_add(1, Ordering::Relaxed);
+        queue.extend(notifications.iter().cloned());
     }
 }
 
@@ -1700,26 +2086,40 @@ struct TokenRequestForm {
 impl RemoteSession {
     fn new(init: RemoteSessionInit) -> Self {
         let now = session_now_millis();
+        let mut lifecycle_snapshot =
+            init.lifecycle_snapshot
+                .unwrap_or(RemoteSessionLifecycleSnapshot {
+                    state: RemoteSessionState::Initializing,
+                    created_at: now,
+                    last_seen_at: now,
+                    idle_expires_at: now,
+                    drain_deadline_at: None,
+                });
+        if lifecycle_snapshot.state == RemoteSessionState::Ready {
+            lifecycle_snapshot.drain_deadline_at = None;
+        }
         Self {
             session_id: init.session_id,
+            agent_id: init.agent_id,
             capabilities: init.capabilities,
+            issued_capabilities: init.issued_capabilities,
             auth_context: init.auth_context,
+            auth_mode_fingerprint: init.auth_mode_fingerprint,
+            policy_fingerprint: init.policy_fingerprint,
             hosted_isolation: init.hosted_isolation,
             lifecycle_policy: init.lifecycle_policy,
-            protocol_version: StdMutex::new(None),
-            lifecycle: StdMutex::new(RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Initializing,
-                created_at: now,
-                last_seen_at: now,
-                idle_expires_at: now,
-                drain_deadline_at: None,
-            }),
+            protocol_version: StdMutex::new(init.protocol_version),
+            peer_capabilities: StdMutex::new(init.peer_capabilities),
+            initialize_params: StdMutex::new(init.initialize_params),
+            lifecycle: StdMutex::new(lifecycle_snapshot),
             input_tx: init.input_tx,
             event_tx: init.event_tx,
             retained_notification_events: init.retained_notification_events,
             active_request_stream: Arc::new(Mutex::new(())),
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
+            session_db_path: init.session_db_path,
+            resume_integrity_secret: init.resume_integrity_secret,
         }
     }
 
@@ -1816,6 +2216,19 @@ impl RemoteSession {
         }
     }
 
+    fn set_initialize_contract(
+        &self,
+        initialize_params: Value,
+        peer_capabilities: PeerCapabilities,
+    ) {
+        if let Ok(mut guard) = self.initialize_params.lock() {
+            *guard = Some(initialize_params);
+        }
+        if let Ok(mut guard) = self.peer_capabilities.lock() {
+            *guard = Some(peer_capabilities);
+        }
+    }
+
     fn lifecycle_snapshot(&self) -> RemoteSessionLifecycleSnapshot {
         self.lifecycle
             .lock()
@@ -1829,8 +2242,72 @@ impl RemoteSession {
             })
     }
 
-    fn mark_ready(&self, protocol_version: Option<String>) {
+    fn resume_record(&self) -> Option<RemoteSessionResumeRecord> {
+        let lifecycle = self.lifecycle_snapshot();
+        if lifecycle.state != RemoteSessionState::Ready {
+            return None;
+        }
+        let protocol_version = self.protocol_version();
+        let peer_capabilities = self
+            .peer_capabilities
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())?;
+        let initialize_params = self
+            .initialize_params
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())?;
+        let mut record = RemoteSessionResumeRecord {
+            session_id: self.session_id.clone(),
+            agent_id: self.agent_id.clone(),
+            auth_context: self.auth_context.clone(),
+            auth_mode_fingerprint: Some(self.auth_mode_fingerprint.clone()),
+            policy_fingerprint: Some(self.policy_fingerprint.clone()),
+            hosted_isolation: self.hosted_isolation,
+            lifecycle,
+            protocol_version,
+            peer_capabilities,
+            initialize_params,
+            issued_capabilities: self.issued_capabilities.clone(),
+            resume_integrity_tag: None,
+        };
+        let seed = self.resume_integrity_secret.as_ref()?;
+        record.resume_integrity_tag = Some(compute_resume_record_integrity_tag(seed, &record).ok()?);
+        Some(record)
+    }
+
+    fn persist_resumable_record(&self) {
+        let Some(path) = self.session_db_path.as_deref() else {
+            return;
+        };
+        let Some(record) = self.resume_record() else {
+            return;
+        };
+        if let Err(error) = persist_active_session_record(path, &record) {
+            warn!(
+                session_id = %self.session_id,
+                error = %error,
+                "failed to persist resumable MCP session record"
+            );
+        }
+    }
+
+    fn remove_resumable_record(&self) -> Result<(), CliError> {
+        let Some(path) = self.session_db_path.as_deref() else {
+            return Ok(());
+        };
+        delete_active_session_record(path, &self.session_id)
+    }
+
+    fn mark_ready(
+        &self,
+        protocol_version: Option<String>,
+        initialize_params: Value,
+        peer_capabilities: PeerCapabilities,
+    ) {
         self.set_protocol_version(protocol_version);
+        self.set_initialize_contract(initialize_params, peer_capabilities);
         if let Ok(mut guard) = self.lifecycle.lock() {
             guard.state = RemoteSessionState::Ready;
             guard.last_seen_at = session_now_millis();
@@ -1839,20 +2316,29 @@ impl RemoteSession {
                 .saturating_add(self.lifecycle_policy.idle_expiry_millis);
             guard.drain_deadline_at = None;
         }
+        self.persist_resumable_record();
     }
 
     fn touch(&self) {
+        let mut touched = false;
         if let Ok(mut guard) = self.lifecycle.lock() {
             if guard.state == RemoteSessionState::Ready {
-                guard.last_seen_at = session_now_millis();
+                let now = session_now_millis();
+                touched =
+                    now.saturating_sub(guard.last_seen_at) >= SESSION_TOUCH_PERSIST_INTERVAL_MILLIS;
+                guard.last_seen_at = now;
                 guard.idle_expires_at = guard
                     .last_seen_at
                     .saturating_add(self.lifecycle_policy.idle_expiry_millis);
             }
         }
+        if touched {
+            self.persist_resumable_record();
+        }
     }
 
-    fn begin_draining(&self) {
+    fn begin_draining(&self) -> Result<(), CliError> {
+        self.remove_resumable_record()?;
         if let Ok(mut guard) = self.lifecycle.lock() {
             guard.state = RemoteSessionState::Draining;
             guard.last_seen_at = session_now_millis();
@@ -1862,6 +2348,7 @@ impl RemoteSession {
                     .saturating_add(self.lifecycle_policy.drain_grace_millis),
             );
         }
+        Ok(())
     }
 
     fn mark_deleted(&self) {
@@ -2059,12 +2546,23 @@ impl RemoteSessionFactory {
         Ok(owner)
     }
 
+    fn configured_hosted_isolation(&self) -> RemoteHostedIsolationMode {
+        if self.config.shared_hosted_owner {
+            RemoteHostedIsolationMode::SharedHostedOwnerCompatibility
+        } else {
+            RemoteHostedIsolationMode::DedicatedPerSession
+        }
+    }
+
     fn spawn_session(
         &self,
         auth_context: SessionAuthContext,
     ) -> Result<Arc<RemoteSession>, CliError> {
         let loaded_policy = load_policy(&self.config.policy_path)?;
+        let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
+        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -2120,11 +2618,7 @@ impl RemoteSessionFactory {
             upstream_server.clone(),
         )));
 
-        let hosted_isolation = if self.config.shared_hosted_owner {
-            RemoteHostedIsolationMode::SharedHostedOwnerCompatibility
-        } else {
-            RemoteHostedIsolationMode::DedicatedPerSession
-        };
+        let hosted_isolation = self.configured_hosted_isolation();
         let session_auth_context = hosted_isolation.snapshot_auth_context(auth_context);
 
         let agent_kp = derive_session_agent_keypair(&self.config, &session_auth_context)?;
@@ -2155,8 +2649,8 @@ impl RemoteSessionFactory {
                 logging_enabled: true,
             },
             kernel,
-            agent_id,
-            capabilities,
+            agent_id.clone(),
+            capabilities.clone(),
             vec![manifest],
         )?;
         edge.set_session_auth_context(session_auth_context.clone());
@@ -2183,14 +2677,213 @@ impl RemoteSessionFactory {
 
         Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
             session_id,
+            agent_id,
             capabilities: session_capabilities,
+            issued_capabilities: capabilities,
             auth_context: session_auth_context,
+            auth_mode_fingerprint,
+            policy_fingerprint,
             hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
+            protocol_version: None,
+            peer_capabilities: None,
+            initialize_params: None,
+            lifecycle_snapshot: None,
             input_tx,
             event_tx,
             retained_notification_events,
             next_event_id,
+            session_db_path: self.config.session_db_path.clone(),
+            resume_integrity_secret,
+        })))
+    }
+
+    fn restore_session(
+        &self,
+        record: &RemoteSessionResumeRecord,
+    ) -> Result<Arc<RemoteSession>, CliError> {
+        validate_resume_record_integrity(&self.config, record)?;
+        let configured_hosted_isolation = self.configured_hosted_isolation();
+        if configured_hosted_isolation != record.hosted_isolation {
+            return Err(CliError::Other(format!(
+                "stored MCP session {} expects hosted isolation {:?} but the server is configured for {:?}",
+                record.session_id, record.hosted_isolation, configured_hosted_isolation
+            )));
+        }
+        if let Some(expected_agent_id) =
+            expected_resume_agent_id(&self.config, &record.auth_context)?
+        {
+            if expected_agent_id != record.agent_id {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} failed authenticated principal re-validation during restore",
+                    record.session_id
+                )));
+            }
+        }
+
+        let loaded_policy = load_policy(&self.config.policy_path)?;
+        let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
+        let default_capabilities = loaded_policy.default_capabilities.clone();
+        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
+        match record.auth_mode_fingerprint.as_deref() {
+            Some(stored) if stored == auth_mode_fingerprint => {}
+            Some(_) => {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} was created under different serve-http auth settings",
+                    record.session_id
+                )));
+            }
+            None => {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} predates auth contract fingerprinting and must be re-initialized",
+                    record.session_id
+                )));
+            }
+        }
+        let issuance_policy = loaded_policy.issuance_policy.clone();
+        let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+        let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
+            let owner = self.shared_upstream_owner()?;
+            (owner.upstream_server(), owner.notification_tap())
+        } else {
+            let upstream_server = self.build_session_upstream_server()?;
+            let notification_source = upstream_server.notification_source();
+            (upstream_server, notification_source)
+        };
+        let upstream_capabilities = upstream_server.upstream_capabilities();
+        let manifest = upstream_server.manifest_clone();
+
+        let kernel_kp = Keypair::generate();
+        let mut kernel = build_kernel(loaded_policy, &kernel_kp);
+        configure_receipt_store(
+            &mut kernel,
+            self.config.receipt_db_path.as_deref(),
+            self.config.control_url.as_deref(),
+            self.config.control_token.as_deref(),
+        )?;
+        configure_revocation_store(
+            &mut kernel,
+            self.config.revocation_db_path.as_deref(),
+            self.config.control_url.as_deref(),
+            self.config.control_token.as_deref(),
+        )?;
+        configure_capability_authority(
+            &mut kernel,
+            &kernel_kp,
+            self.config.authority_seed_path.as_deref(),
+            self.config.authority_db_path.as_deref(),
+            self.config.receipt_db_path.as_deref(),
+            self.config.budget_db_path.as_deref(),
+            self.config.control_url.as_deref(),
+            self.config.control_token.as_deref(),
+            issuance_policy,
+            runtime_assurance_policy,
+        )?;
+        configure_budget_store(
+            &mut kernel,
+            self.config.budget_db_path.as_deref(),
+            self.config.control_url.as_deref(),
+            self.config.control_token.as_deref(),
+        )?;
+        if let Some(resource_provider) = upstream_server.resource_provider() {
+            kernel.register_resource_provider(Box::new(resource_provider));
+        }
+        if let Some(prompt_provider) = upstream_server.prompt_provider() {
+            kernel.register_prompt_provider(Box::new(prompt_provider));
+        }
+        kernel.register_tool_server(Box::new(SharedUpstreamToolServer::new(
+            upstream_server.clone(),
+        )));
+
+        let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
+        let restored_peer_capabilities = validate_restored_peer_capabilities(record)?;
+        let issued_capabilities = match record.policy_fingerprint.as_deref() {
+            Some(stored)
+                if stored == policy_fingerprint
+                    && stored_capabilities_are_current(&record.issued_capabilities)
+                    && stored_capability_issuers_are_trusted(&kernel, &record.issued_capabilities)
+                    && record
+                        .issued_capabilities
+                        .iter()
+                        .all(|capability| capability.subject == agent_public_key) =>
+            {
+                record.issued_capabilities.clone()
+            }
+            _ => issue_default_capabilities(&kernel, &agent_public_key, &default_capabilities)?,
+        };
+        let session_capabilities = issued_capabilities
+            .iter()
+            .map(|capability| RemoteSessionCapability {
+                id: capability.id.clone(),
+                issuer_public_key: capability.issuer.to_hex(),
+                subject_public_key: capability.subject.to_hex(),
+            })
+            .collect::<Vec<_>>();
+
+        let mut edge = ArcMcpEdge::new(
+            McpEdgeConfig {
+                server_name: "ARC MCP Edge".to_string(),
+                server_version: env!("CARGO_PKG_VERSION").to_string(),
+                page_size: self.config.page_size,
+                tools_list_changed: self.config.tools_list_changed
+                    || upstream_capabilities.tools_list_changed,
+                completion_enabled: Some(upstream_capabilities.completions_supported),
+                resources_subscribe: upstream_capabilities.resources_subscribe,
+                resources_list_changed: upstream_capabilities.resources_list_changed,
+                prompts_list_changed: upstream_capabilities.prompts_list_changed,
+                logging_enabled: true,
+            },
+            kernel,
+            record.agent_id.clone(),
+            issued_capabilities.clone(),
+            vec![manifest],
+        )?;
+        edge.set_session_auth_context(record.auth_context.clone());
+        edge.attach_upstream_transport(upstream_notification_source);
+        edge.restore_ready_session(
+            restored_kernel_session_id(&record.session_id),
+            restored_peer_capabilities.clone(),
+        )?;
+
+        let (input_tx, input_rx) = mpsc::channel::<Value>();
+        let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
+        let retained_notification_events =
+            Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
+        let next_event_id = Arc::new(AtomicU64::new(0));
+        let writer = BroadcastJsonRpcWriter::new(
+            event_tx.clone(),
+            retained_notification_events.clone(),
+            next_event_id.clone(),
+            record.session_id.clone(),
+        );
+
+        std::thread::spawn(move || {
+            if let Err(error) = edge.serve_message_channels(input_rx, writer) {
+                error!(error = %error, "remote MCP edge session worker exited with error");
+            }
+        });
+
+        Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
+            session_id: record.session_id.clone(),
+            agent_id: record.agent_id.clone(),
+            capabilities: session_capabilities,
+            issued_capabilities,
+            auth_context: record.auth_context.clone(),
+            auth_mode_fingerprint,
+            policy_fingerprint,
+            hosted_isolation: record.hosted_isolation,
+            lifecycle_policy: self.lifecycle_policy.clone(),
+            protocol_version: record.protocol_version.clone(),
+            peer_capabilities: Some(restored_peer_capabilities),
+            initialize_params: Some(record.initialize_params.clone()),
+            lifecycle_snapshot: Some(record.lifecycle.clone()),
+            input_tx,
+            event_tx,
+            retained_notification_events,
+            next_event_id,
+            session_db_path: self.config.session_db_path.clone(),
+            resume_integrity_secret,
         })))
     }
 }
@@ -2261,26 +2954,23 @@ impl RemoteSessionLedger {
         (active, terminal)
     }
 
-    async fn mark_deleted(&self, session: &Arc<RemoteSession>) {
-        session.mark_deleted();
+    async fn mark_deleted(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Deleted)
-            .await;
+            .await
     }
 
-    async fn mark_draining(&self, session: &Arc<RemoteSession>) {
-        session.begin_draining();
+    async fn mark_draining(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
+        session.begin_draining()
     }
 
-    async fn mark_closed(&self, session: &Arc<RemoteSession>) {
-        session.mark_closed();
+    async fn mark_closed(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Closed)
-            .await;
+            .await
     }
 
-    async fn mark_expired(&self, session: &Arc<RemoteSession>) {
-        session.mark_expired();
+    async fn mark_expired(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Expired)
-            .await;
+            .await
     }
 
     async fn cleanup_due_sessions(&self) {
@@ -2294,8 +2984,18 @@ impl RemoteSessionLedger {
             let snapshot = session.lifecycle_snapshot();
             match snapshot.state {
                 RemoteSessionState::Ready if snapshot.idle_expires_at <= now => {
-                    self.mark_expired(&session).await;
-                    self.active.lock().await.remove(&session.session_id);
+                    match self.mark_expired(&session).await {
+                        Ok(()) => {
+                            self.active.lock().await.remove(&session.session_id);
+                        }
+                        Err(error) => {
+                            warn!(
+                                session_id = %session.session_id,
+                                error = %error,
+                                "failed to expire MCP session without resumable-state risk"
+                            );
+                        }
+                    }
                 }
                 RemoteSessionState::Ready => {}
                 RemoteSessionState::Draining => {
@@ -2303,15 +3003,24 @@ impl RemoteSessionLedger {
                         .drain_deadline_at
                         .is_some_and(|deadline| deadline <= now)
                     {
-                        self.mark_deleted(&session).await;
-                        self.active.lock().await.remove(&session.session_id);
+                        match self.mark_deleted(&session).await {
+                            Ok(()) => {
+                                self.active.lock().await.remove(&session.session_id);
+                            }
+                            Err(error) => {
+                                warn!(
+                                    session_id = %session.session_id,
+                                    error = %error,
+                                    "failed to delete drained MCP session without resumable-state risk"
+                                );
+                            }
+                        }
                     }
                 }
                 RemoteSessionState::Initializing
                 | RemoteSessionState::Deleted
                 | RemoteSessionState::Expired => {}
                 RemoteSessionState::Closed => {
-                    self.mark_closed(&session).await;
                     self.active.lock().await.remove(&session.session_id);
                 }
             }
@@ -2324,23 +3033,69 @@ impl RemoteSessionLedger {
         &self,
         session: &Arc<RemoteSession>,
         state: RemoteSessionState,
-    ) {
+    ) -> Result<(), CliError> {
+        match state {
+            RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed => {}
+            RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {
+                return Err(CliError::Other(format!(
+                    "unsupported terminal MCP session state: {}",
+                    state.as_str()
+                )));
+            }
+        }
+        let terminal_at = session_now_millis();
         let mut record = session.diagnostic_record();
         record.lifecycle.state = state;
-        record.terminal_at = session_now_millis();
+        record.lifecycle.last_seen_at = terminal_at;
+        record.lifecycle.drain_deadline_at = None;
+        record.terminal_at = terminal_at;
+        let mut tombstone_guards_restore = self.tombstone_db_path.is_none();
+        let mut tombstone_error = None;
+        if let Some(path) = self.tombstone_db_path.as_deref() {
+            match persist_terminal_session_record(path, &record) {
+                Ok(()) => {
+                    tombstone_guards_restore = true;
+                }
+                Err(error) => {
+                    tombstone_error = Some(error.to_string());
+                    warn!(
+                        session_id = %session.session_id,
+                        error = %error,
+                        "failed to persist terminal MCP session tombstone"
+                    );
+                }
+            }
+        }
+
+        if let Err(delete_error) = session.remove_resumable_record() {
+            if tombstone_guards_restore {
+                warn!(
+                    session_id = %session.session_id,
+                    error = %delete_error,
+                    "failed to delete resumable MCP session record; terminal tombstone will block restore"
+                );
+            } else {
+                let tombstone_error = tombstone_error
+                    .unwrap_or_else(|| "terminal tombstone was not persisted".to_string());
+                return Err(CliError::Other(format!(
+                    "failed to terminalize MCP session {}: {tombstone_error}; active resume delete failed: {delete_error}",
+                    session.session_id
+                )));
+            }
+        }
+
+        match state {
+            RemoteSessionState::Deleted => session.mark_deleted(),
+            RemoteSessionState::Expired => session.mark_expired(),
+            RemoteSessionState::Closed => session.mark_closed(),
+            RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {}
+        }
+
         self.terminal
             .lock()
             .await
-            .insert(session.session_id.clone(), Arc::new(record.clone()));
-        if let Some(path) = self.tombstone_db_path.as_deref() {
-            if let Err(error) = persist_terminal_session_record(path, &record) {
-                warn!(
-                    session_id = %session.session_id,
-                    error = %error,
-                    "failed to persist terminal MCP session tombstone"
-                );
-            }
-        }
+            .insert(session.session_id.clone(), Arc::new(record));
+        Ok(())
     }
 
     async fn purge_old_terminal_records(&self, now: u64) {
@@ -2360,25 +3115,95 @@ impl RemoteSessionLedger {
     }
 }
 
+const SESSION_ACTIVE_TABLE: &str = "remote_active_sessions";
 const SESSION_TOMBSTONE_TABLE: &str = "remote_session_tombstones";
 
-fn open_terminal_session_db(path: &FsPath) -> Result<Connection, CliError> {
+struct LoadedActiveSessionRecords {
+    records: Vec<RemoteSessionResumeRecord>,
+    invalid_session_ids: Vec<String>,
+}
+
+fn open_session_state_db(path: &FsPath) -> Result<Connection, CliError> {
     let conn = Connection::open(path)?;
     conn.execute_batch(&format!(
-        "CREATE TABLE IF NOT EXISTS {table} (
+        "CREATE TABLE IF NOT EXISTS {active_table} (
+            session_id TEXT PRIMARY KEY NOT NULL,
+            updated_at INTEGER NOT NULL,
+            record_json TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS {table} (
             session_id TEXT PRIMARY KEY NOT NULL,
             terminal_at INTEGER NOT NULL,
             record_json TEXT NOT NULL
         );",
+        active_table = SESSION_ACTIVE_TABLE,
         table = SESSION_TOMBSTONE_TABLE,
     ))?;
     Ok(conn)
 }
 
+fn load_active_session_records(path: &FsPath) -> Result<LoadedActiveSessionRecords, CliError> {
+    let conn = open_session_state_db(path)?;
+    let mut terminal_stmt = conn.prepare(&format!(
+        "SELECT session_id FROM {table}",
+        table = SESSION_TOMBSTONE_TABLE,
+    ))?;
+    let terminal_rows = terminal_stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut terminal_session_ids = HashSet::new();
+    for row in terminal_rows {
+        terminal_session_ids.insert(row?);
+    }
+
+    let mut stmt = conn.prepare(&format!(
+        "SELECT session_id, record_json FROM {table}",
+        table = SESSION_ACTIVE_TABLE,
+    ))?;
+    let mut rows = stmt.query([])?;
+    let mut records = Vec::new();
+    let mut invalid_session_ids = Vec::new();
+
+    while let Some(row) = rows.next()? {
+        let session_id: String = row.get(0)?;
+        let record_json: String = row.get(1)?;
+        if terminal_session_ids.contains(&session_id) {
+            warn!(
+                session_id = %session_id,
+                "dropping persisted MCP active session row because a terminal tombstone exists"
+            );
+            invalid_session_ids.push(session_id);
+            continue;
+        }
+        match serde_json::from_str::<RemoteSessionResumeRecord>(&record_json) {
+            Ok(record) if record.session_id == session_id => records.push(record),
+            Ok(record) => {
+                warn!(
+                    session_id = %session_id,
+                    record_session_id = %record.session_id,
+                    "dropping persisted MCP session row whose primary key does not match the stored session payload"
+                );
+                invalid_session_ids.push(session_id);
+            }
+            Err(error) => {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "dropping malformed persisted MCP session row"
+                );
+                invalid_session_ids.push(session_id);
+            }
+        }
+    }
+
+    Ok(LoadedActiveSessionRecords {
+        records,
+        invalid_session_ids,
+    })
+}
+
 fn load_terminal_session_records(
     path: &FsPath,
 ) -> Result<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>, CliError> {
-    let conn = open_terminal_session_db(path)?;
+    let conn = open_session_state_db(path)?;
     let mut stmt = conn.prepare(&format!(
         "SELECT session_id, record_json FROM {table}",
         table = SESSION_TOMBSTONE_TABLE,
@@ -2396,11 +3221,29 @@ fn load_terminal_session_records(
     Ok(records)
 }
 
+fn stored_capabilities_are_current(capabilities: &[CapabilityToken]) -> bool {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_secs());
+    capabilities
+        .iter()
+        .all(|capability| capability.expires_at > now)
+}
+
+fn stored_capability_issuers_are_trusted(
+    kernel: &arc_kernel::ArcKernel,
+    capabilities: &[CapabilityToken],
+) -> bool {
+    capabilities
+        .iter()
+        .all(|capability| kernel.capability_issuer_is_trusted(&capability.issuer))
+}
+
 fn persist_terminal_session_record(
     path: &FsPath,
     record: &RemoteSessionDiagnosticRecord,
 ) -> Result<(), CliError> {
-    let conn = open_terminal_session_db(path)?;
+    let conn = open_session_state_db(path)?;
     let record_json = serde_json::to_string(record)?;
     conn.execute(
         &format!(
@@ -2420,12 +3263,54 @@ fn persist_terminal_session_record(
     Ok(())
 }
 
-fn purge_terminal_session_records_before(path: &FsPath, cutoff: u64) -> Result<(), CliError> {
-    let conn = open_terminal_session_db(path)?;
+fn persist_active_session_record(
+    path: &FsPath,
+    record: &RemoteSessionResumeRecord,
+) -> Result<(), CliError> {
+    let conn = open_session_state_db(path)?;
+    let record_json = serde_json::to_string(record)?;
     conn.execute(
         &format!(
-            "DELETE FROM {table} WHERE terminal_at < ?1",
-            table = SESSION_TOMBSTONE_TABLE,
+            "INSERT INTO {table} (session_id, updated_at, record_json)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(session_id) DO UPDATE SET
+                 updated_at = excluded.updated_at,
+                 record_json = excluded.record_json",
+            table = SESSION_ACTIVE_TABLE,
+        ),
+        params![
+            record.session_id.as_str(),
+            session_now_millis() as i64,
+            record_json,
+        ],
+    )?;
+    Ok(())
+}
+
+fn delete_active_session_record(path: &FsPath, session_id: &str) -> Result<(), CliError> {
+    let conn = open_session_state_db(path)?;
+    conn.execute(
+        &format!(
+            "DELETE FROM {table} WHERE session_id = ?1",
+            table = SESSION_ACTIVE_TABLE,
+        ),
+        params![session_id],
+    )?;
+    Ok(())
+}
+
+fn purge_terminal_session_records_before(path: &FsPath, cutoff: u64) -> Result<(), CliError> {
+    let conn = open_session_state_db(path)?;
+    conn.execute(
+        &format!(
+            "DELETE FROM {terminal_table}
+             WHERE terminal_at < ?1
+               AND NOT EXISTS (
+                   SELECT 1 FROM {active_table}
+                   WHERE {active_table}.session_id = {terminal_table}.session_id
+               )",
+            active_table = SESSION_ACTIVE_TABLE,
+            terminal_table = SESSION_TOMBSTONE_TABLE,
         ),
         params![cutoff as i64],
     )?;

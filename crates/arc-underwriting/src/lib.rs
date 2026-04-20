@@ -20,6 +20,7 @@ use crate::crypto::sha256_hex;
 use crate::receipt::SignedExportEnvelope;
 
 pub const UNDERWRITING_POLICY_INPUT_SCHEMA: &str = "arc.underwriting.policy-input.v1";
+pub const UNDERWRITING_COMPLIANCE_EVIDENCE_SCHEMA: &str = "arc.underwriting.compliance-evidence.v1";
 pub const UNDERWRITING_RISK_TAXONOMY_VERSION: &str = "arc.underwriting.taxonomy.v1";
 pub const UNDERWRITING_DECISION_POLICY_SCHEMA: &str = "arc.underwriting.decision-policy.v1";
 pub const UNDERWRITING_DECISION_POLICY_VERSION: &str =
@@ -213,6 +214,21 @@ pub struct UnderwritingRuntimeAssuranceEvidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct UnderwritingComplianceEvidence {
+    pub schema: String,
+    pub agent_id: String,
+    pub score: u32,
+    pub generated_at: u64,
+    pub total_receipts: u64,
+    pub deny_receipts: u64,
+    pub observed_capabilities: u64,
+    pub revoked_capabilities: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attestation_age_secs: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct UnderwritingPolicyInputQuery {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability_id: Option<String>,
@@ -295,6 +311,8 @@ pub struct UnderwritingPolicyInput {
     pub certification: Option<UnderwritingCertificationEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance: Option<UnderwritingRuntimeAssuranceEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compliance_score: Option<UnderwritingComplianceEvidence>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub signals: Vec<UnderwritingSignal>,
 }
@@ -314,6 +332,7 @@ pub enum UnderwritingDecisionOutcome {
 #[serde(rename_all = "snake_case")]
 pub enum UnderwritingDecisionReasonCode {
     PolicySignal,
+    ComplianceScoreRequired,
     InsufficientReceiptHistory,
     StaleReceiptHistory,
     ReputationBelowApproveThreshold,
@@ -346,6 +365,7 @@ pub struct UnderwritingDecisionPolicy {
     pub minimum_step_up_runtime_assurance_tier: RuntimeAssuranceTier,
     pub minimum_approve_runtime_assurance_tier: RuntimeAssuranceTier,
     pub require_active_tool_certification: bool,
+    pub require_compliance_score_reference: bool,
     pub reduce_ceiling_factor: f64,
 }
 
@@ -361,6 +381,7 @@ impl Default for UnderwritingDecisionPolicy {
             minimum_step_up_runtime_assurance_tier: RuntimeAssuranceTier::Attested,
             minimum_approve_runtime_assurance_tier: RuntimeAssuranceTier::Verified,
             require_active_tool_certification: true,
+            require_compliance_score_reference: false,
             reduce_ceiling_factor: 0.5,
         }
     }
@@ -743,6 +764,20 @@ pub fn evaluate_underwriting_policy_input(
                 });
             }
         }
+    }
+
+    if policy.require_compliance_score_reference && input.compliance_score.is_none() {
+        findings.push(UnderwritingDecisionFinding {
+            class: UnderwritingRiskClass::Elevated,
+            outcome: UnderwritingDecisionOutcome::StepUp,
+            reason: UnderwritingDecisionReasonCode::ComplianceScoreRequired,
+            signal_reason: None,
+            description:
+                "policy requires a compliance-score reference, but no signed score evidence was included in the underwriting input"
+                    .to_string(),
+            remediation: Some(UnderwritingRemediation::ManualReview),
+            evidence_refs: Vec::new(),
+        });
     }
 
     if let Some(reputation) = input.reputation.as_ref() {
@@ -1255,6 +1290,7 @@ mod tests {
                 latest_evidence_sha256: Some("sha256-runtime".to_string()),
                 observed_verifier_families: vec![AttestationVerifierFamily::AzureMaa],
             }),
+            compliance_score: None,
             signals: Vec::new(),
         }
     }
@@ -1334,6 +1370,23 @@ mod tests {
         assert_eq!(report.outcome, UnderwritingDecisionOutcome::StepUp);
         assert!(report.findings.iter().any(|finding| {
             finding.reason == UnderwritingDecisionReasonCode::StaleReceiptHistory
+        }));
+    }
+
+    #[test]
+    fn underwriting_evaluator_requires_compliance_reference_when_policy_demands_it() {
+        let report = evaluate_underwriting_policy_input(
+            sample_underwriting_input(1_000_000),
+            &UnderwritingDecisionPolicy {
+                require_compliance_score_reference: true,
+                ..UnderwritingDecisionPolicy::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(report.outcome, UnderwritingDecisionOutcome::StepUp);
+        assert!(report.findings.iter().any(|finding| {
+            finding.reason == UnderwritingDecisionReasonCode::ComplianceScoreRequired
         }));
     }
 

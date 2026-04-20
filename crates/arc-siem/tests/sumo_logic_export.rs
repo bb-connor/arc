@@ -18,10 +18,8 @@ fn sample_receipt(id: &str) -> ArcReceipt {
             capability_id: "cap-sumo".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({"cmd": "ls"}),
-                parameter_hash: "h".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({"cmd": "ls"}))
+                .expect("action parameters serialize"),
             decision: Decision::Allow,
             content_hash: "c".to_string(),
             policy_hash: "p".to_string(),

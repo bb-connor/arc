@@ -1,0 +1,187 @@
+{
+  "schema": "arc.theorem-inventory.v1",
+  "rootModule": "formal/lean4/Pact/Arc.lean",
+  "assumptions": [
+    {
+      "id": "assumption.crypto.verify_capability_signature",
+      "leanName": "Arc.Core.verifyCapabilitySignature",
+      "file": "formal/lean4/Pact/Pact/Core/Revocation.lean",
+      "kind": "axiom",
+      "rootImported": true,
+      "claimClass": "audited_axiom",
+      "notes": "Axiomatized capability-signature verification over a trusted key set. This is an audited proof assumption, not a theorem over the concrete Rust Ed25519 or canonicalization implementation."
+    }
+  ],
+  "theorems": [
+    {
+      "id": "core.scope.empty_isSubsetOf",
+      "leanName": "Arc.Core.ArcScope.empty_isSubsetOf",
+      "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Structural empty-scope attenuation lemma over the bounded ArcScope model."
+    },
+    {
+      "id": "core.tool_grant.isSubsetOf_refl",
+      "leanName": "Arc.Core.ToolGrant.isSubsetOf_refl",
+      "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Reflexivity lemma for ToolGrant subset in the bounded capability model."
+    },
+    {
+      "id": "spec.capability_monotonicity",
+      "leanName": "Arc.Spec.capability_monotonicity",
+      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Primary attenuation theorem over ArcScope grants only; no Rust refinement proof yet."
+    },
+    {
+      "id": "spec.empty_scope_monotonicity",
+      "leanName": "Arc.Spec.empty_scope_monotonicity",
+      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Shows the empty scope is always a valid attenuation in the bounded model."
+    },
+    {
+      "id": "spec.scope_budgets_nonnegative",
+      "leanName": "Arc.Spec.scope_budgets_nonnegative",
+      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Budget theorem is about Nat-valued maxInvocations in the reduced model only."
+    },
+    {
+      "id": "proof.list_isSubsetOf_trans",
+      "leanName": "Arc.Proofs.list_isSubsetOf_trans",
+      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Helper theorem for subset transitivity over bounded lists."
+    },
+    {
+      "id": "proof.scope_subset_of_grants_subset",
+      "leanName": "Arc.Proofs.scope_subset_of_grants_subset",
+      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Bridges grant-wise subset assumptions into ArcScope subset truth."
+    },
+    {
+      "id": "proof.wildcard_subsumes",
+      "leanName": "Arc.Proofs.wildcard_subsumes",
+      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Bounded wildcard-subsumption theorem for tool-name matching."
+    },
+    {
+      "id": "proof.reduced_budget_is_subset",
+      "leanName": "Arc.Proofs.reduced_budget_is_subset",
+      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Budget-tightening attenuation theorem over maxInvocations only."
+    },
+    {
+      "id": "proof.added_constraint_is_subset",
+      "leanName": "Arc.Proofs.added_constraint_is_subset",
+      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P1"],
+      "notes": "Additional constraint makes a ToolGrant more restrictive in the bounded model."
+    },
+    {
+      "id": "proof.delegation_chain_integrity",
+      "leanName": "Arc.Proofs.delegation_chain_integrity",
+      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P5"],
+      "notes": "Covers presented delegation-chain narrowing, not full runtime graph acyclicity."
+    },
+    {
+      "id": "proof.applyProof_append",
+      "leanName": "Arc.Proofs.applyProof_append",
+      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "symbolic_crypto",
+      "mapsTo": ["P4"],
+      "notes": "Helper theorem for symbolic Merkle-proof composition."
+    },
+    {
+      "id": "proof.membership_proof_sound",
+      "leanName": "Arc.Proofs.membership_proof_sound",
+      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "symbolic_crypto",
+      "mapsTo": ["P4"],
+      "notes": "Merkle inclusion soundness under the symbolic ReceiptTree hash model."
+    },
+    {
+      "id": "proof.membership_proof_verifies",
+      "leanName": "Arc.Proofs.membership_proof_verifies",
+      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "symbolic_crypto",
+      "mapsTo": ["P4"],
+      "notes": "Executable verification theorem for symbolic membership proofs."
+    },
+    {
+      "id": "proof.checkpoint_consistency",
+      "leanName": "Arc.Proofs.checkpoint_consistency",
+      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "symbolic_crypto",
+      "mapsTo": ["P4"],
+      "notes": "Checkpoint consistency over the bounded checkpoint-store model."
+    },
+    {
+      "id": "proof.receipt_sign_then_verify",
+      "leanName": "Arc.Proofs.receipt_sign_then_verify",
+      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "symbolic_crypto",
+      "mapsTo": ["P4"],
+      "notes": "Receipt signature theorem over the symbolic sign/verify model, not Ed25519 implementation proofs."
+    },
+    {
+      "id": "proof.receipt_immutability",
+      "leanName": "Arc.Proofs.receipt_immutability",
+      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "symbolic_crypto",
+      "mapsTo": ["P4"],
+      "notes": "Tampering theorem under the symbolic receipt-signature model."
+    }
+  ]
+}

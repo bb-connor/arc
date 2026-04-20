@@ -623,6 +623,57 @@ impl ArcMcpEdge {
         self.session_auth_context = auth_context;
     }
 
+    pub fn restore_ready_session(
+        &mut self,
+        session_id: SessionId,
+        peer_capabilities: PeerCapabilities,
+    ) -> Result<(), AdapterError> {
+        if !matches!(self.state, EdgeState::Uninitialized) {
+            return Err(AdapterError::ParseError(
+                "restore_ready_session requires an uninitialized MCP edge".to_string(),
+            ));
+        }
+
+        let restored_session_id = self
+            .kernel
+            .open_session_with_id(session_id, self.agent_id.clone(), self.capabilities.clone())
+            .map_err(|error| {
+                AdapterError::ConnectionFailed(format!("failed to restore session: {error}"))
+            })?;
+        self.kernel
+            .set_session_auth_context(&restored_session_id, self.session_auth_context.clone())
+            .map_err(|error| {
+                AdapterError::ConnectionFailed(format!(
+                    "failed to restore session auth context: {error}"
+                ))
+            })?;
+        self.kernel
+            .set_session_peer_capabilities(&restored_session_id, peer_capabilities)
+            .map_err(|error| {
+                AdapterError::ConnectionFailed(format!(
+                    "failed to restore session peer capabilities: {error}"
+                ))
+            })?;
+        self.kernel
+            .activate_session(&restored_session_id)
+            .map_err(|error| {
+                AdapterError::ConnectionFailed(format!(
+                    "failed to activate restored session: {error}"
+                ))
+            })?;
+        self.state = EdgeState::Ready {
+            session_id: restored_session_id.clone(),
+        };
+        if self
+            .kernel
+            .session(&restored_session_id)
+            .is_some_and(|session| session.peer_capabilities().supports_roots)
+        {
+            self.queue_roots_refresh(restored_session_id, "restore");
+        }
+        Ok(())
+    }
+
     pub fn handle_jsonrpc(&mut self, message: Value) -> Option<Value> {
         if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
             return Some(jsonrpc_error(
@@ -1120,6 +1171,7 @@ impl ArcMcpEdge {
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
+        let model_metadata = parse_request_model_metadata(id, params)?;
 
         let Some(&tool_index) = self.tool_index.get(tool_name) else {
             return Err(jsonrpc_error(
@@ -1135,6 +1187,7 @@ impl ArcMcpEdge {
             &binding.tool_name,
             &binding.server_id,
             &arguments,
+            model_metadata.as_ref(),
         ) {
             Some(capability) => capability,
             None => {
@@ -1166,6 +1219,7 @@ impl ArcMcpEdge {
                 server_id: binding.server_id,
                 tool_name: binding.tool_name,
                 arguments,
+                model_metadata,
             },
         ))
     }

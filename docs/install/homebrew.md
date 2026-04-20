@@ -3,7 +3,7 @@
 ## One-line install
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb
+curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
 brew install --formula /tmp/arc.rb
 ```
 
@@ -16,7 +16,7 @@ result as the `arc.rb` release asset alongside the platform archives.
 ## Upgrading
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb
+curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
 brew upgrade --formula /tmp/arc.rb
 ```
 

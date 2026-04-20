@@ -878,7 +878,9 @@ dependencies = [
  "arc-core",
  "arc-credentials",
  "arc-credit",
+ "arc-data-guards",
  "arc-did",
+ "arc-external-guards",
  "arc-federation",
  "arc-guards",
  "arc-hosted-mcp",
@@ -912,6 +914,7 @@ dependencies = [
  "serde_urlencoded",
  "serde_yml",
  "sha2",
+ "subtle",
  "tar",
  "tempfile",
  "thiserror 1.0.69",
@@ -922,6 +925,7 @@ dependencies = [
  "ureq",
  "url",
  "wasmparser 0.221.3",
+ "wiremock",
 ]
 
 [[package]]
@@ -956,7 +960,9 @@ dependencies = [
  "arc-conformance",
  "arc-core",
  "arc-credentials",
+ "arc-data-guards",
  "arc-did",
+ "arc-external-guards",
  "arc-guards",
  "arc-kernel",
  "arc-link",
@@ -982,6 +988,7 @@ dependencies = [
  "serde_urlencoded",
  "serde_yml",
  "sha2",
+ "subtle",
  "thiserror 1.0.69",
  "tokio",
  "tower-http",
@@ -1166,6 +1173,7 @@ dependencies = [
  "sha2",
  "tokio",
  "tracing",
+ "url",
  "wiremock",
  "zeroize",
 ]
@@ -1187,6 +1195,7 @@ name = "arc-formal-diff-tests"
 version = "0.1.0"
 dependencies = [
  "arc-core-types",
+ "arc-kernel-core",
  "proptest",
  "serde_json",
 ]
@@ -1264,6 +1273,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "tokio",
  "tracing",
  "ureq",

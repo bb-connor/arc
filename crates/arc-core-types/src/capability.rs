@@ -2044,6 +2044,27 @@ pub struct ModelMetadata {
     /// Optional provider label (e.g. `"anthropic"`, `"openai"`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    /// Provenance class describing how ARC learned this model identity.
+    ///
+    /// Defaults to `asserted` for backward compatibility with legacy
+    /// callers that only forwarded raw model identifiers.
+    #[serde(
+        default,
+        skip_serializing_if = "is_default_model_metadata_provenance_class"
+    )]
+    pub provenance_class: ProvenanceEvidenceClass,
+}
+
+fn is_default_model_metadata_provenance_class(class: &ProvenanceEvidenceClass) -> bool {
+    *class == ProvenanceEvidenceClass::Asserted
+}
+
+impl ModelMetadata {
+    #[must_use]
+    pub fn with_provenance_class(mut self, provenance_class: ProvenanceEvidenceClass) -> Self {
+        self.provenance_class = provenance_class;
+        self
+    }
 }
 
 /// A link in the delegation chain, recording that `delegator` granted a

@@ -100,28 +100,47 @@ fn evaluate_tool_call(
     }
 
     // Block list
-    if base_rule
-        .and_then(|rule| find_first_match(target, &rule.block))
-        .is_some()
-    {
-        return deny_result(
-            Some("rules.tool_access.block".to_string()),
-            Some("tool is explicitly blocked".to_string()),
-            origin_profile_id,
-            posture,
-        );
-    }
-    if let Some(prefix) = profile_prefix.as_ref() {
-        if profile_rule
-            .and_then(|rule| find_first_match(target, &rule.block))
-            .is_some()
-        {
+    if let Some(rule) = base_rule {
+        let matched = match find_first_match_or_deny(
+            target,
+            &rule.block,
+            "rules.tool_access.block",
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched,
+            Err(result) => return *result,
+        };
+        if matched.is_some() {
             return deny_result(
-                Some(format!("{prefix}.block")),
+                Some("rules.tool_access.block".to_string()),
                 Some("tool is explicitly blocked".to_string()),
                 origin_profile_id,
                 posture,
             );
+        }
+    }
+    if let Some(prefix) = profile_prefix.as_ref() {
+        if let Some(rule) = profile_rule {
+            let field = format!("{prefix}.block");
+            let matched = match find_first_match_or_deny(
+                target,
+                &rule.block,
+                &field,
+                origin_profile_id.clone(),
+                posture.clone(),
+            ) {
+                Ok(matched) => matched,
+                Err(result) => return *result,
+            };
+            if matched.is_some() {
+                return deny_result(
+                    Some(field),
+                    Some("tool is explicitly blocked".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
@@ -252,42 +271,86 @@ fn evaluate_tool_call(
     }
 
     // Confirmation
-    if base_rule
-        .and_then(|rule| find_first_match(target, &rule.require_confirmation))
-        .is_some()
-    {
-        return warn_result(
-            Some("rules.tool_access.require_confirmation".to_string()),
-            Some("tool requires confirmation".to_string()),
-            origin_profile_id,
-            posture,
-        );
-    }
-    if let Some(prefix) = profile_prefix.as_ref() {
-        if profile_rule
-            .and_then(|rule| find_first_match(target, &rule.require_confirmation))
-            .is_some()
-        {
+    if let Some(rule) = base_rule {
+        let matched = match find_first_match_or_deny(
+            target,
+            &rule.require_confirmation,
+            "rules.tool_access.require_confirmation",
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched,
+            Err(result) => return *result,
+        };
+        if matched.is_some() {
             return warn_result(
-                Some(format!("{prefix}.require_confirmation")),
+                Some("rules.tool_access.require_confirmation".to_string()),
                 Some("tool requires confirmation".to_string()),
                 origin_profile_id,
                 posture,
             );
         }
     }
+    if let Some(prefix) = profile_prefix.as_ref() {
+        if let Some(rule) = profile_rule {
+            let field = format!("{prefix}.require_confirmation");
+            let matched = match find_first_match_or_deny(
+                target,
+                &rule.require_confirmation,
+                &field,
+                origin_profile_id.clone(),
+                posture.clone(),
+            ) {
+                Ok(matched) => matched,
+                Err(result) => return *result,
+            };
+            if matched.is_some() {
+                return warn_result(
+                    Some(field),
+                    Some("tool requires confirmation".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+        }
+    }
 
     // Allow list
     let base_has_allow = base_rule.is_some_and(|rule| !rule.allow.is_empty());
     let profile_has_allow = profile_rule.is_some_and(|rule| !rule.allow.is_empty());
-    let base_allow_match = !base_has_allow
-        || base_rule
-            .and_then(|rule| find_first_match(target, &rule.allow))
-            .is_some();
-    let profile_allow_match = !profile_has_allow
-        || profile_rule
-            .and_then(|rule| find_first_match(target, &rule.allow))
-            .is_some();
+    let base_allow_match = if let Some(rule) = base_rule.filter(|rule| !rule.allow.is_empty()) {
+        match find_first_match_or_deny(
+            target,
+            &rule.allow,
+            "rules.tool_access.allow",
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched.is_some(),
+            Err(result) => return *result,
+        }
+    } else {
+        true
+    };
+    let profile_allow_match = if let Some(rule) = profile_rule.filter(|rule| !rule.allow.is_empty())
+    {
+        let field = profile_prefix
+            .as_ref()
+            .map(|prefix| format!("{prefix}.allow"))
+            .unwrap_or_else(|| "extensions.origins.profiles.tool_access.allow".to_string());
+        match find_first_match_or_deny(
+            target,
+            &rule.allow,
+            &field,
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched.is_some(),
+            Err(result) => return *result,
+        }
+    } else {
+        true
+    };
     if (base_has_allow || profile_has_allow) && base_allow_match && profile_allow_match {
         let matched_rule = if profile_has_allow {
             profile_prefix
@@ -381,41 +444,85 @@ fn evaluate_egress(
     let target = action.target.as_deref().unwrap_or_default();
     let profile_prefix = matched_profile.map(|profile| profile_rule_prefix(&profile.id, "egress"));
 
-    if base_rule
-        .and_then(|rule| find_first_match(target, &rule.block))
-        .is_some()
-    {
-        return deny_result(
-            Some("rules.egress.block".to_string()),
-            Some("domain is explicitly blocked".to_string()),
-            origin_profile_id,
-            posture,
-        );
-    }
-    if let Some(prefix) = profile_prefix.as_ref() {
-        if profile_rule
-            .and_then(|rule| find_first_match(target, &rule.block))
-            .is_some()
-        {
+    if let Some(rule) = base_rule {
+        let matched = match find_first_match_or_deny(
+            target,
+            &rule.block,
+            "rules.egress.block",
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched,
+            Err(result) => return *result,
+        };
+        if matched.is_some() {
             return deny_result(
-                Some(format!("{prefix}.block")),
+                Some("rules.egress.block".to_string()),
                 Some("domain is explicitly blocked".to_string()),
                 origin_profile_id,
                 posture,
             );
         }
     }
+    if let Some(prefix) = profile_prefix.as_ref() {
+        if let Some(rule) = profile_rule {
+            let field = format!("{prefix}.block");
+            let matched = match find_first_match_or_deny(
+                target,
+                &rule.block,
+                &field,
+                origin_profile_id.clone(),
+                posture.clone(),
+            ) {
+                Ok(matched) => matched,
+                Err(result) => return *result,
+            };
+            if matched.is_some() {
+                return deny_result(
+                    Some(field),
+                    Some("domain is explicitly blocked".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+        }
+    }
 
     let base_has_allow = base_rule.is_some_and(|rule| !rule.allow.is_empty());
     let profile_has_allow = profile_rule.is_some_and(|rule| !rule.allow.is_empty());
-    let base_allow_match = !base_has_allow
-        || base_rule
-            .and_then(|rule| find_first_match(target, &rule.allow))
-            .is_some();
-    let profile_allow_match = !profile_has_allow
-        || profile_rule
-            .and_then(|rule| find_first_match(target, &rule.allow))
-            .is_some();
+    let base_allow_match = if let Some(rule) = base_rule.filter(|rule| !rule.allow.is_empty()) {
+        match find_first_match_or_deny(
+            target,
+            &rule.allow,
+            "rules.egress.allow",
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched.is_some(),
+            Err(result) => return *result,
+        }
+    } else {
+        true
+    };
+    let profile_allow_match = if let Some(rule) = profile_rule.filter(|rule| !rule.allow.is_empty())
+    {
+        let field = profile_prefix
+            .as_ref()
+            .map(|prefix| format!("{prefix}.allow"))
+            .unwrap_or_else(|| "extensions.origins.profiles.egress.allow".to_string());
+        match find_first_match_or_deny(
+            target,
+            &rule.allow,
+            &field,
+            origin_profile_id.clone(),
+            posture.clone(),
+        ) {
+            Ok(matched) => matched.is_some(),
+            Err(result) => return *result,
+        }
+    } else {
+        true
+    };
     if (base_has_allow || profile_has_allow) && base_allow_match && profile_allow_match {
         let matched_rule = if profile_has_allow {
             profile_prefix
@@ -643,7 +750,17 @@ fn evaluate_secret_patterns(
         return allow_result(None, None, origin_profile_id, posture);
     }
 
-    if find_first_match(target, &rule.skip_paths).is_some() {
+    let skip_path_match = match find_first_match_or_deny(
+        target,
+        &rule.skip_paths,
+        "rules.secret_patterns.skip_paths",
+        origin_profile_id.clone(),
+        posture.clone(),
+    ) {
+        Ok(matched) => matched,
+        Err(result) => return *result,
+    };
+    if skip_path_match.is_some() {
         return allow_result(
             Some("rules.secret_patterns.skip_paths".to_string()),
             Some("path is excluded from secret scanning".to_string()),
@@ -653,16 +770,25 @@ fn evaluate_secret_patterns(
     }
 
     for pattern in &rule.patterns {
-        if Regex::new(&pattern.pattern)
-            .map(|regex| regex.is_match(content))
-            .unwrap_or(false)
-        {
-            return deny_result(
-                Some(format!("rules.secret_patterns.patterns.{}", pattern.name)),
-                Some(format!("content matched secret pattern '{}'", pattern.name)),
-                origin_profile_id,
-                posture,
-            );
+        let field = format!("rules.secret_patterns.patterns.{}", pattern.name);
+        match policy_regex_is_match(&pattern.pattern, &field, content) {
+            Ok(true) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("content matched secret pattern '{}'", pattern.name)),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("invalid secret pattern regex: {error}")),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
@@ -680,16 +806,25 @@ fn evaluate_patch_integrity(
     }
 
     for (index, pattern) in rule.forbidden_patterns.iter().enumerate() {
-        if Regex::new(pattern)
-            .map(|regex| regex.is_match(content))
-            .unwrap_or(false)
-        {
-            return deny_result(
-                Some(format!("rules.patch_integrity.forbidden_patterns[{index}]")),
-                Some("patch content matched a forbidden pattern".to_string()),
-                origin_profile_id,
-                posture,
-            );
+        let field = format!("rules.patch_integrity.forbidden_patterns[{index}]");
+        match policy_regex_is_match(pattern, &field, content) {
+            Ok(true) => {
+                return deny_result(
+                    Some(field),
+                    Some("patch content matched a forbidden pattern".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("invalid forbidden patch regex: {error}")),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
@@ -736,16 +871,25 @@ fn evaluate_shell_rule(
     }
 
     for (index, pattern) in rule.forbidden_patterns.iter().enumerate() {
-        if Regex::new(pattern)
-            .map(|regex| regex.is_match(target))
-            .unwrap_or(false)
-        {
-            return deny_result(
-                Some(format!("rules.shell_commands.forbidden_patterns[{index}]")),
-                Some("shell command matched a forbidden pattern".to_string()),
-                origin_profile_id,
-                posture,
-            );
+        let field = format!("rules.shell_commands.forbidden_patterns[{index}]");
+        match policy_regex_is_match(pattern, &field, target) {
+            Ok(true) => {
+                return deny_result(
+                    Some(field),
+                    Some("shell command matched a forbidden pattern".to_string()),
+                    origin_profile_id,
+                    posture,
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return deny_result(
+                    Some(field),
+                    Some(format!("invalid forbidden shell regex: {error}")),
+                    origin_profile_id,
+                    posture,
+                );
+            }
         }
     }
 
@@ -936,14 +1080,44 @@ fn evaluate_forbidden_paths(
         };
     }
 
-    if find_first_match(target, &rule.exceptions).is_some() {
+    let exception_match = match find_first_match_or_deny(
+        target,
+        &rule.exceptions,
+        "rules.forbidden_paths.exceptions",
+        origin_profile_id.clone(),
+        posture.clone(),
+    ) {
+        Ok(matched) => matched,
+        Err(result) => {
+            return ForbiddenPathOutcome {
+                denied: Some(*result),
+                exception_matched: false,
+            };
+        }
+    };
+    if exception_match.is_some() {
         return ForbiddenPathOutcome {
             denied: None,
             exception_matched: true,
         };
     }
 
-    if find_first_match(target, &rule.patterns).is_some() {
+    let forbidden_match = match find_first_match_or_deny(
+        target,
+        &rule.patterns,
+        "rules.forbidden_paths.patterns",
+        origin_profile_id.clone(),
+        posture.clone(),
+    ) {
+        Ok(matched) => matched,
+        Err(result) => {
+            return ForbiddenPathOutcome {
+                denied: Some(*result),
+                exception_matched: false,
+            };
+        }
+    };
+    if forbidden_match.is_some() {
         return ForbiddenPathOutcome {
             denied: Some(deny_result(
                 Some("rules.forbidden_paths.patterns".to_string()),
@@ -984,7 +1158,17 @@ fn evaluate_path_allowlist(
         }
     };
 
-    if find_first_match(target, patterns).is_some() {
+    let allowlist_match = match find_first_match_or_deny(
+        target,
+        patterns,
+        "rules.path_allowlist",
+        origin_profile_id.clone(),
+        posture.clone(),
+    ) {
+        Ok(matched) => matched,
+        Err(result) => return Some(*result),
+    };
+    if allowlist_match.is_some() {
         return Some(allow_result(
             Some("rules.path_allowlist".to_string()),
             Some("path matched allowlist".to_string()),

@@ -13,6 +13,12 @@
 //! All four are orchestrated by `arc-kernel::ArcKernel::evaluate_tool_call_sync`,
 //! which calls into this module for the pure pieces and its own async/std
 //! plumbing for the rest.
+//!
+//! Verified-core boundary note:
+//! `formal/proof-manifest.toml` includes this module in the bounded verified
+//! core because it performs only issuer-trust, signature, and time-window
+//! checks over an in-memory capability token. Revocation stores, delegation
+//! lineage joins, and transport-bound subject proof remain excluded surfaces.
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -21,6 +27,7 @@ use arc_core_types::capability::{ArcScope, CapabilityToken};
 use arc_core_types::crypto::PublicKey;
 
 use crate::clock::Clock;
+use crate::normalized::{NormalizationError, NormalizedVerifiedCapability};
 
 /// The subset of a verified capability that portable callers actually need.
 ///
@@ -44,6 +51,13 @@ pub struct VerifiedCapability {
     pub expires_at: u64,
     /// The clock value used for time-bound enforcement.
     pub evaluated_at: u64,
+}
+
+impl VerifiedCapability {
+    /// Project this verification result into the proof-facing normalized AST.
+    pub fn normalized(&self) -> Result<NormalizedVerifiedCapability, NormalizationError> {
+        NormalizedVerifiedCapability::try_from(self)
+    }
 }
 
 /// Errors raised by [`verify_capability`].

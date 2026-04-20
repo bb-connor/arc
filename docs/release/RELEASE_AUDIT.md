@@ -1,6 +1,6 @@
 # Release Audit
 
-**Prepared:** 2026-04-15
+**Prepared:** 2026-04-19
 **Role:** authoritative repo-local release-go record for the current ARC
 production candidate
 
@@ -35,7 +35,7 @@ This file now records one primary ship-facing decision boundary for the current
 repo state: bounded ARC. Stronger v3.16 and v3.17 claim gates still exist as
 repo-local addenda, but they are no longer the front-door release framing.
 
-**Local bounded-ship status:** bounded ARC qualified locally on 2026-04-15.
+**Local bounded-ship status:** bounded ARC qualified locally on 2026-04-19.
 The current retained decision is that ARC can ship honestly as a bounded
 governance and evidence control plane with signed receipts, explicit bounded
 hosted/auth profiles, bounded provenance semantics, and explicit local or
@@ -60,6 +60,7 @@ Qualified claim:
 Not yet qualified:
 
 - theorem-prover completion for every protocol claim
+- broad Lean 4 verification claims beyond the bounded proof manifest and claim registry
 - authenticated recursive delegation ancestry beyond the preserved presented
   chain
 - verifier-backed runtime assurance as the sole admission boundary
@@ -73,10 +74,18 @@ Primary bounded-ship evidence commands:
 
 - `./scripts/qualify-bounded-arc.sh`
 - `./scripts/qualify-release.sh`
+- `./scripts/check-formal-proofs.sh`
+- `cargo test -p arc-formal-diff-tests`
 
 Primary bounded-ship machine-readable gate:
 
 - [ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json](../standards/ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json)
+
+Formal boundary artifacts:
+
+- [`../../formal/proof-manifest.toml`](../../formal/proof-manifest.toml)
+- [`../../formal/theorem-inventory.json`](../../formal/theorem-inventory.json)
+- [../CLAIM_REGISTRY.md](../CLAIM_REGISTRY.md)
 
 ## Decision
 
@@ -94,8 +103,9 @@ settlement proof bundle.
 Meaning:
 
 - release inputs, workspace correctness, dashboard packaging, SDK packaging,
-  live conformance, repeat-run clustered trust qualification, and the bounded
-  web3 runtime qualification lanes are green locally
+  live conformance, repeat-run clustered trust qualification, portable
+  kernel/browser/mobile qualification, formal boundary and diff gates, and the
+  bounded web3 runtime qualification lanes are green locally
 - operator deployment, backup/restore, upgrade/rollback, and observability
   contracts are documented explicitly
 - release-governance documents now separate scope, evidence, decision, and
@@ -105,20 +115,26 @@ Meaning:
 - hosted `CI` and `Release Qualification` workflows are still required before
   tagging a release from `main`
 
-**Local qualification date:** 2026-04-02
+**Local qualification date:** 2026-04-19
 
 ## Evidence
 
 Primary local qualification commands:
 
 - `./scripts/ci-workspace.sh`
+- `./scripts/check-formal-proofs.sh`
+- `./scripts/check-portable-kernel.sh`
 - `./scripts/check-sdk-parity.sh`
 - `./scripts/check-web3-contract-parity.sh`
 - `./scripts/qualify-release.sh`
+- `./scripts/qualify-portable-browser.sh`
+- `./scripts/qualify-mobile-kernel.sh`
 - `./scripts/qualify-web3-runtime.sh`
 - `./scripts/qualify-web3-e2e.sh`
 - `./scripts/qualify-web3-ops-controls.sh`
 - `./scripts/qualify-web3-promotion.sh`
+- `./scripts/qualify-trust-control.sh`
+- `cargo test -p arc-formal-diff-tests`
 - `cargo clippy -p arc-cli -- -D warnings`
 - `cargo test -p arc-cli --test provider_admin trust_service_health_reports_enterprise_and_verifier_policy_state -- --nocapture`
 - `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_admin_health_reports_runtime_state -- --nocapture`
@@ -201,7 +217,12 @@ Primary release artifacts:
 - `target/release-qualification/conformance/wave3/report.md`
 - `target/release-qualification/conformance/wave4/report.md`
 - `target/release-qualification/conformance/wave5/report.md`
+- `target/release-qualification/browser-kernel/report.md`
+- `target/release-qualification/browser-kernel/summary.json`
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
+- `target/release-qualification/mobile-kernel/report.md`
+- `target/release-qualification/mobile-kernel/summary.json`
+- `target/release-qualification/trust-control/qualification-report.md`
 - `target/release-qualification/web3-runtime/artifact-manifest.json`
 - `target/release-qualification/web3-runtime/logs/qualification.log`
 - `target/release-qualification/web3-runtime/logs/e2e-qualification.log`
@@ -304,7 +325,7 @@ than implied:
 
 | Gate class | Requirement | Status |
 | --- | --- | --- |
-| local qualification | `./scripts/ci-workspace.sh`, `./scripts/check-sdk-parity.sh`, `./scripts/check-web3-contract-parity.sh`, and `./scripts/qualify-release.sh` green, with the bounded web3 runtime lanes green locally | satisfied |
+| local qualification | `./scripts/ci-workspace.sh`, `./scripts/check-formal-proofs.sh`, `./scripts/check-portable-kernel.sh`, `./scripts/check-sdk-parity.sh`, `./scripts/check-web3-contract-parity.sh`, `./scripts/qualify-release.sh`, `./scripts/qualify-portable-browser.sh`, and `./scripts/qualify-mobile-kernel.sh` green, with the bounded web3 runtime lanes green locally | satisfied |
 | launch materials | release, partner, operational, and standards-facing docs updated to the current ARC surface | satisfied |
 | hosted publication | hosted `CI` and `Release Qualification` observed green on the candidate commit, including the staged runtime, `e2e`, `ops`, and promotion bundles under `target/release-qualification/web3-runtime/` | pending external observation |
 

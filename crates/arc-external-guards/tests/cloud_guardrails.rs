@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use arc_external_guards::external::{
     AsyncGuardAdapter, AzureContentSafetyConfig, AzureContentSafetyGuard, BackoffStrategy,
-    BedrockGuardrailConfig, BedrockGuardrailGuard, GuardCallContext, RetryConfig,
+    BedrockGuardrailConfig, BedrockGuardrailGuard, ExternalGuard, GuardCallContext, RetryConfig,
     VertexProbability, VertexSafetyConfig, VertexSafetyGuard,
 };
 use arc_kernel::Verdict;
@@ -125,6 +125,35 @@ async fn bedrock_fails_closed_on_5xx() {
         Verdict::Deny,
         "5xx must fail closed"
     );
+}
+
+#[tokio::test]
+async fn cloud_guardrails_recheck_runtime_endpoints_before_send() {
+    let bedrock = BedrockGuardrailGuard::new(
+        BedrockGuardrailConfig::new("test-token", "us-east-1", "gr-123", "1")
+            .with_endpoint("https://224.0.0.1"),
+    )
+    .expect("guard build");
+    let error = bedrock
+        .eval(&make_ctx("chat", json!({"text": "hi"})))
+        .await
+        .expect_err("multicast endpoint should fail closed before HTTP send");
+    assert!(error
+        .to_string()
+        .contains("must not target localhost, link-local, or private-network hosts"));
+
+    let vertex = VertexSafetyGuard::new(
+        VertexSafetyConfig::new("test-token", "proj", "us-central1", "gemini-1.5-pro")
+            .with_endpoint("https://224.0.0.1"),
+    )
+    .expect("guard build");
+    let error = vertex
+        .eval(&make_ctx("chat", json!({"text": "hi"})))
+        .await
+        .expect_err("multicast endpoint should fail closed before HTTP send");
+    assert!(error
+        .to_string()
+        .contains("must not target localhost, link-local, or private-network hosts"));
 }
 
 #[tokio::test]

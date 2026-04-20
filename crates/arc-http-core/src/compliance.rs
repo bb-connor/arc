@@ -16,7 +16,7 @@ use arc_kernel::compliance_score::{
     compliance_score, ComplianceScore, ComplianceScoreConfig, ComplianceScoreInputs,
 };
 use arc_kernel::operator_report::ComplianceReport;
-use arc_kernel::ArcKernel;
+use arc_kernel::{ArcKernel, UnderwritingComplianceEvidence};
 use serde::{Deserialize, Serialize};
 
 /// Time window over which to compute the score.
@@ -51,6 +51,13 @@ pub struct ComplianceScoreRequest {
 pub struct ComplianceScoreResponse {
     #[serde(flatten)]
     pub score: ComplianceScore,
+}
+
+impl ComplianceScoreResponse {
+    #[must_use]
+    pub fn underwriting_evidence(&self) -> UnderwritingComplianceEvidence {
+        self.score.as_underwriting_evidence()
+    }
 }
 
 /// Inputs the handler requires from the backing store.

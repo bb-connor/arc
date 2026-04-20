@@ -17,6 +17,9 @@ fi
 # is the ship-facing qualification boundary.
 ./scripts/ci-workspace.sh
 ./scripts/qualify-bounded-arc.sh
+./scripts/qualify-trust-control.sh
+./scripts/qualify-portable-browser.sh
+./scripts/qualify-mobile-kernel.sh
 ./scripts/check-dashboard-release.sh
 ./scripts/check-arc-ts-release.sh
 ./scripts/check-arc-py-release.sh

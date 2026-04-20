@@ -1,11 +1,24 @@
 # Examples
 
+If you only want the supported first steps:
+
+- Docker smoke path: [`docker/`](./docker/)
+- Web backend path: [`hello-openapi-sidecar/`](./hello-openapi-sidecar/), then [`hello-fastapi/`](./hello-fastapi/)
+- Native ARC tool example: [`hello-tool/`](./hello-tool/)
+
 This directory has two layers:
 
 - flagship examples that show ARC as a real control plane in a multi-process or multi-operator setting
 - small `hello-*` examples that isolate one surface at a time and can be understood in a few minutes
 
 For a one-page map of what each example teaches, see [EXAMPLE_SURFACE_MATRIX.md](./EXAMPLE_SURFACE_MATRIX.md).
+
+For web backends, the supported order is:
+
+1. [`hello-openapi-sidecar/`](./hello-openapi-sidecar/)
+2. [`hello-fastapi/`](./hello-fastapi/)
+
+See [`docs/guides/WEB_BACKEND_QUICKSTART.md`](/Users/connor/Medica/backbay/standalone/arc/docs/guides/WEB_BACKEND_QUICKSTART.md) for the shared verification flow.
 
 ## Current Flagship Examples
 

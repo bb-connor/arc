@@ -40,6 +40,10 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
     }
 
+    fn valid_tool_action(parameters: serde_json::Value) -> ToolCallAction {
+        ToolCallAction::from_parameters(parameters).unwrap()
+    }
+
     fn make_receipt_with_metadata(
         id: &str,
         capability_id: &str,
@@ -57,10 +61,7 @@ mod tests {
                 capability_id: capability_id.to_string(),
                 tool_server: tool_server.to_string(),
                 tool_name: tool_name.to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: "abc123".to_string(),
-                },
+                action: valid_tool_action(serde_json::json!({})),
                 decision,
                 content_hash: "content-hash".to_string(),
                 policy_hash: "policy-hash".to_string(),

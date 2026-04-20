@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
@@ -18,16 +21,55 @@ jobs:
 
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          android_sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [ -d "${android_sdk}" ]; then
+            # Keep ${android_sdk}/ndk available for the cargo-ndk mobile lane.
+            sudo rm -rf \
+              "${android_sdk}/emulator" \
+              "${android_sdk}/system-images" \
+              "${android_sdk}/platforms" \
+              "${android_sdk}/platform-tools" \
+              "${android_sdk}/build-tools" \
+              "${android_sdk}/cmdline-tools"
+          fi
           sudo docker image prune --all --force
           df -h /
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
 
       - name: Install MSRV toolchain
         run: rustup toolchain install 1.93.0 --profile minimal
+
+      - name: Install Lean 4 toolchain
+        shell: bash
+        env:
+          ELAN_VERSION: v4.2.1
+          ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/leanprover/elan/releases/download/${ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/elan-x86_64-unknown-linux-gnu.tar.gz
+          echo "${ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/elan-x86_64-unknown-linux-gnu.tar.gz -C /tmp
+          /tmp/elan-init -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
+
+      - name: Prime Lean 4 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
+          "$HOME/.elan/bin/elan" toolchain install "$toolchain"
+          (
+            cd formal/lean4/Pact
+            "$HOME/.elan/bin/lake" --version
+          )
 
       - uses: actions/setup-node@v4
         with:
@@ -48,6 +90,18 @@ jobs:
           go-version: "1.23.0"
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install portable qualification dependencies
+        run: |
+          cargo install wasm-pack --locked
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+          rustup target add aarch64-linux-android
+          sudo apt-get update
+          if ! sudo apt-get install -y chromium-driver chromium; then
+            sudo apt-get install -y chromium-driver chromium-browser
+          fi
 
       - name: SDK parity contract lane
         run: ./scripts/check-sdk-parity.sh

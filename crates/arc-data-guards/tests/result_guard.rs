@@ -19,7 +19,7 @@
 use arc_core::capability::{ArcScope, Constraint, Operation, ToolGrant};
 use arc_data_guards::{QueryResultGuard, QueryResultGuardConfig};
 use arc_guards::post_invocation::{
-    PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
 };
 
 fn grant(constraints: Vec<Constraint>) -> ToolGrant {
@@ -44,7 +44,7 @@ fn scope(constraints: Vec<Constraint>) -> ArcScope {
 
 #[test]
 fn truncates_results_exceeding_max_rows_returned() {
-    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![Constraint::MaxRowsReturned(10)]);
     let mut value = serde_json::json!({
         "rows": (0..50).map(|i| serde_json::json!({"id": i})).collect::<Vec<_>>()
@@ -55,7 +55,7 @@ fn truncates_results_exceeding_max_rows_returned() {
 
 #[test]
 fn redacts_columns_in_column_denylist() {
-    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![Constraint::ColumnDenylist(vec![
         "email".into(),
         "users.ssn".into(),
@@ -78,7 +78,7 @@ fn redacts_columns_in_column_denylist() {
 
 #[test]
 fn pipeline_integration_via_post_invocation_hook() {
-    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![
         Constraint::MaxRowsReturned(1),
         Constraint::ColumnDenylist(vec!["password".into()]),
@@ -111,7 +111,7 @@ fn pipeline_integration_via_post_invocation_hook() {
 
 #[test]
 fn pipeline_allows_when_scope_has_no_constraints() {
-    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![]);
     let mut pipeline = PostInvocationPipeline::new();
     pipeline.add(Box::new(OwnedHook { guard, scope }));
@@ -126,7 +126,8 @@ fn pii_patterns_are_applied_in_pipeline() {
     let guard = QueryResultGuard::new(QueryResultGuardConfig {
         redact_pii_patterns: vec![r"\b\d{3}-\d{2}-\d{4}\b".into()],
         ..Default::default()
-    });
+    })
+    .unwrap();
     let scope = scope(vec![]);
     let mut pipeline = PostInvocationPipeline::new();
     pipeline.add(Box::new(OwnedHook { guard, scope }));
@@ -146,8 +147,38 @@ fn pii_patterns_are_applied_in_pipeline() {
 }
 
 #[test]
+fn pii_pattern_count_limit_fails_closed() {
+    let error = QueryResultGuard::new(QueryResultGuardConfig {
+        redact_pii_patterns: (0..65).map(|idx| format!("pattern-{idx}")).collect(),
+        ..Default::default()
+    })
+    .expect_err("too many PII patterns should fail closed");
+    assert!(error.contains("allows at most 64 patterns"));
+}
+
+#[test]
+fn pii_pattern_length_limit_fails_closed() {
+    let error = QueryResultGuard::new(QueryResultGuardConfig {
+        redact_pii_patterns: vec!["a".repeat(513)],
+        ..Default::default()
+    })
+    .expect_err("overlong PII pattern should fail closed");
+    assert!(error.contains("must be at most 512 characters"));
+}
+
+#[test]
+fn pii_pattern_complexity_limit_fails_closed() {
+    let error = QueryResultGuard::new(QueryResultGuardConfig {
+        redact_pii_patterns: vec!["(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+".into()],
+        ..Default::default()
+    })
+    .expect_err("over-complex PII pattern should fail closed");
+    assert!(error.contains("complexity at most"));
+}
+
+#[test]
 fn constrained_unknown_row_shape_is_redacted_in_pipeline() {
-    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);
     let mut pipeline = PostInvocationPipeline::new();
     pipeline.add(Box::new(OwnedHook { guard, scope }));
@@ -173,7 +204,7 @@ fn constrained_unknown_row_shape_is_redacted_in_pipeline() {
 
 #[test]
 fn constrained_unknown_shape_redacts_all_top_level_fields() {
-    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);
     let mut pipeline = PostInvocationPipeline::new();
     pipeline.add(Box::new(OwnedHook { guard, scope }));
@@ -210,7 +241,11 @@ impl PostInvocationHook for OwnedHook {
         "query-result"
     }
 
-    fn inspect(&self, _tool: &str, response: &serde_json::Value) -> PostInvocationVerdict {
+    fn inspect(
+        &self,
+        _ctx: &PostInvocationContext<'_>,
+        response: &serde_json::Value,
+    ) -> PostInvocationVerdict {
         let mut redacted = response.clone();
         self.guard.redact_result(&self.scope, &mut redacted);
         if redacted == *response {

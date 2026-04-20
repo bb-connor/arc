@@ -88,7 +88,6 @@ pub struct AuthorityTrustedKeySnapshot {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoritySnapshot {
-    pub seed_hex: String,
     pub public_key_hex: String,
     pub generation: u64,
     pub rotated_at: u64,
@@ -105,4 +104,7 @@ pub enum AuthorityStoreError {
 
     #[error("invalid authority seed: {0}")]
     Core(#[from] arc_core::error::Error),
+
+    #[error("authority fence rejected mutation: {0}")]
+    Fence(String),
 }

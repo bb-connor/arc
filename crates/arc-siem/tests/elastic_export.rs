@@ -24,10 +24,8 @@ fn sample_receipt(id: &str) -> ArcReceipt {
             capability_id: "cap-elastic-test".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({"cmd": "ls"}),
-                parameter_hash: "abc123".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({"cmd": "ls"}))
+                .expect("action parameters serialize"),
             decision: Decision::Allow,
             content_hash: "content-hash-test".to_string(),
             policy_hash: "policy-hash-test".to_string(),
@@ -68,10 +66,8 @@ fn sample_receipt_with_financial(id: &str) -> ArcReceipt {
             capability_id: "cap-elastic-financial".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "python".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({"script": "main.py"}),
-                parameter_hash: "ghi789".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({"script": "main.py"}))
+                .expect("action parameters serialize"),
             decision: Decision::Allow,
             content_hash: "content-hash-financial".to_string(),
             policy_hash: "policy-hash-financial".to_string(),

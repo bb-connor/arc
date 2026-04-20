@@ -6,8 +6,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arc_external_guards::external::{
-    AsyncGuardAdapter, BackoffStrategy, GuardCallContext, RetryConfig, SafeBrowsingConfig,
-    SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity, VirusTotalConfig, VirusTotalGuard,
+    AsyncGuardAdapter, BackoffStrategy, ExternalGuard, GuardCallContext, RetryConfig,
+    SafeBrowsingConfig, SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity, VirusTotalConfig,
+    VirusTotalGuard,
 };
 use arc_kernel::Verdict;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -105,6 +106,49 @@ async fn virustotal_allows_clean_hash() {
             .await,
         Verdict::Allow
     );
+}
+
+#[tokio::test]
+async fn threat_intel_rechecks_runtime_endpoints_before_send() {
+    let safe_browsing = SafeBrowsingGuard::new(
+        SafeBrowsingConfig::new("sb-key").with_base_url("https://224.0.0.1"),
+    )
+    .expect("guard build");
+    let error = safe_browsing
+        .eval(&make_ctx(
+            "visit_url",
+            json!({"url": "https://example.com"}),
+        ))
+        .await
+        .expect_err("multicast endpoint should fail closed before HTTP send");
+    assert!(error
+        .to_string()
+        .contains("must not target localhost, link-local, or private-network hosts"));
+
+    let virustotal =
+        VirusTotalGuard::new(VirusTotalConfig::new("vt-key").with_base_url("https://224.0.0.1"))
+            .expect("guard build");
+    let error = virustotal
+        .eval(&make_ctx("scan", json!({"hash": KNOWN_BAD_HASH})))
+        .await
+        .expect_err("multicast endpoint should fail closed before HTTP send");
+    assert!(error
+        .to_string()
+        .contains("must not target localhost, link-local, or private-network hosts"));
+
+    let snyk =
+        SnykGuard::new(SnykConfig::new("snyk-token", "org-123").with_base_url("https://224.0.0.1"))
+            .expect("guard build");
+    let error = snyk
+        .eval(&make_ctx(
+            "install",
+            json!({"package": "lodash", "version": "4.17.21", "ecosystem": "npm"}),
+        ))
+        .await
+        .expect_err("multicast endpoint should fail closed before HTTP send");
+    assert!(error
+        .to_string()
+        .contains("must not target localhost, link-local, or private-network hosts"));
 }
 
 #[tokio::test]

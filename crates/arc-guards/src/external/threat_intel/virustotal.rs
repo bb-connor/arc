@@ -249,6 +249,10 @@ impl ExternalGuard for VirusTotalGuard {
                 "virustotal: arguments must include `hash` or `url`".to_string(),
             ));
         };
+        super::super::endpoint_security::validate_external_guard_url(
+            "virustotal base_url",
+            &endpoint,
+        )?;
 
         let mut headers = HeaderMap::new();
         headers.insert(

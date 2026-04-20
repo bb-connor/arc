@@ -282,6 +282,206 @@ fn governed_runtime_assurance_receipt_metadata(
     verified_runtime_assurance_receipt_metadata(&verified_runtime_attestation)
 }
 
+fn governed_economic_authorization_metadata(
+    request: &ToolCallRequest,
+    financial: &FinancialReceiptMetadata,
+) -> Result<Option<arc_core::receipt::EconomicAuthorizationReceiptMetadata>, KernelError> {
+    let Some(intent) = request.governed_intent.as_ref() else {
+        return Ok(None);
+    };
+
+    let approved_max = intent
+        .max_amount
+        .clone()
+        .unwrap_or(arc_core::capability::MonetaryAmount {
+            units: financial.budget_total,
+            currency: financial.currency.clone(),
+        });
+    let hold_amount_units = financial.attempted_cost.or_else(|| {
+        financial
+            .payment_reference
+            .as_ref()
+            .map(|_| financial.cost_charged)
+    });
+    let settlement_cap_units = financial.attempted_cost.unwrap_or(financial.cost_charged);
+    let commerce = intent.commerce.as_ref();
+    let metered = intent.metered_billing.as_ref();
+
+    let pricing_basis = metered
+        .map(|metered| {
+            canonical_json_bytes(&metered.quote)
+                .map(|quote_bytes| arc_core::sha256_hex(&quote_bytes))
+                .map(
+                    |quote_hash| arc_core::receipt::EconomicPricingBasisReceiptMetadata {
+                        quote_hash: Some(quote_hash),
+                        tariff_hash: None,
+                        quote_expiry: metered.quote.expires_at,
+                    },
+                )
+                .map_err(|error| {
+                    KernelError::ReceiptSigningFailed(format!(
+                        "failed to canonicalize metered billing quote for receipt metadata: {error}"
+                    ))
+                })
+        })
+        .transpose()?;
+
+    let metering = metered
+        .map(|metered| {
+            canonical_json_bytes(&serde_json::json!({
+                "provider": &metered.quote.provider,
+                "billing_unit": &metered.quote.billing_unit,
+                "quoted_units": metered.quote.quoted_units,
+                "settlement_mode": metered.settlement_mode,
+                "max_billed_units": metered.max_billed_units,
+            }))
+            .map(|profile_bytes| arc_core::sha256_hex(&profile_bytes))
+            .map(
+                |meter_profile_hash| arc_core::receipt::EconomicMeteringReceiptMetadata {
+                    provider: metered.quote.provider.clone(),
+                    meter_profile_hash,
+                    max_billable_units: metered.max_billed_units,
+                    billing_unit: Some(metered.quote.billing_unit.clone()),
+                },
+            )
+            .map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to canonicalize metering profile for receipt metadata: {error}"
+                ))
+            })
+        })
+        .transpose()?;
+
+    let economic_mode = if let Some(metered) = metered {
+        match metered.settlement_mode {
+            arc_core::capability::MeteredSettlementMode::MustPrepay => {
+                arc_core::receipt::EconomicAuthorizationMode::PrepaidFixed
+            }
+            arc_core::capability::MeteredSettlementMode::HoldCapture => {
+                arc_core::receipt::EconomicAuthorizationMode::MeteredHoldCapture
+            }
+            arc_core::capability::MeteredSettlementMode::AllowThenSettle => {
+                arc_core::receipt::EconomicAuthorizationMode::ExternalDispatch
+            }
+        }
+    } else if financial.payment_reference.is_some() {
+        arc_core::receipt::EconomicAuthorizationMode::HoldCapture
+    } else {
+        arc_core::receipt::EconomicAuthorizationMode::BudgetOnly
+    };
+
+    Ok(Some(
+        arc_core::receipt::EconomicAuthorizationReceiptMetadata {
+            version: arc_core::receipt::EconomicAuthorizationReceiptMetadataVersion::V1,
+            economic_mode,
+            payer: arc_core::receipt::EconomicPayerReceiptMetadata {
+                party_id: request.agent_id.clone(),
+                funding_source_ref: commerce
+                    .map(|commerce| commerce.shared_payment_token_id.clone())
+                    .or_else(|| financial.payment_reference.clone())
+                    .unwrap_or_else(|| request.capability.id.clone()),
+                custody_provider: None,
+                obligor_ref: None,
+            },
+            merchant: arc_core::receipt::EconomicMerchantReceiptMetadata {
+                merchant_id: commerce
+                    .map(|commerce| commerce.seller.clone())
+                    .unwrap_or_else(|| request.server_id.clone()),
+                merchant_of_record: None,
+                order_ref: Some(request.request_id.clone()),
+            },
+            payee: arc_core::receipt::EconomicPayeeReceiptMetadata {
+                beneficiary_id: request.server_id.clone(),
+                settlement_destination_ref: financial
+                    .payment_reference
+                    .clone()
+                    .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone()))
+                    .unwrap_or_else(|| request.server_id.clone()),
+            },
+            rail: arc_core::receipt::EconomicRailReceiptMetadata {
+                kind: if commerce.is_some() {
+                    "shared_payment_token".to_string()
+                } else if metered.is_some() {
+                    "metered_billing".to_string()
+                } else if financial.payment_reference.is_some() {
+                    "payment_adapter".to_string()
+                } else {
+                    "kernel_budget".to_string()
+                },
+                asset: financial.currency.clone(),
+                network: None,
+                facilitator: metered.map(|metered| metered.quote.provider.clone()),
+                contract_or_account_ref: financial
+                    .payment_reference
+                    .clone()
+                    .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone())),
+            },
+            amount_bounds: arc_core::receipt::EconomicAmountBoundsReceiptMetadata {
+                approved_max,
+                hold_amount: hold_amount_units.map(|units| arc_core::capability::MonetaryAmount {
+                    units,
+                    currency: financial.currency.clone(),
+                }),
+                settlement_cap: arc_core::capability::MonetaryAmount {
+                    units: settlement_cap_units,
+                    currency: financial.currency.clone(),
+                },
+            },
+            pricing_basis,
+            metering,
+            liability_refs: None,
+            budget: arc_core::receipt::EconomicBudgetReceiptMetadata {
+                grant_index: financial.grant_index,
+                cost_charged: financial.cost_charged,
+                currency: financial.currency.clone(),
+                budget_remaining: financial.budget_remaining,
+                budget_total: financial.budget_total,
+                delegation_depth: financial.delegation_depth,
+                root_budget_holder: financial.root_budget_holder.clone(),
+                attempted_cost: financial.attempted_cost,
+            },
+            settlement: arc_core::receipt::EconomicSettlementReceiptMetadata {
+                settlement_status: financial.settlement_status.clone(),
+            },
+        },
+    ))
+}
+
+fn inject_governed_economic_authorization_metadata(
+    metadata: Option<serde_json::Value>,
+    economic_authorization: Option<arc_core::receipt::EconomicAuthorizationReceiptMetadata>,
+) -> Result<Option<serde_json::Value>, KernelError> {
+    let Some(economic_authorization) = economic_authorization else {
+        return Ok(metadata);
+    };
+    let Some(mut metadata) = metadata else {
+        return Ok(None);
+    };
+    let Some(metadata_object) = metadata.as_object_mut() else {
+        return Ok(Some(metadata));
+    };
+    let Some(governed_transaction) = metadata_object.get_mut("governed_transaction") else {
+        return Ok(Some(metadata));
+    };
+    let Some(governed_transaction_object) = governed_transaction.as_object_mut() else {
+        return Err(KernelError::ReceiptSigningFailed(
+            "governed receipt metadata was not an object while attaching economic authorization"
+                .to_string(),
+        ));
+    };
+
+    governed_transaction_object.insert(
+        "economic_authorization".to_string(),
+        serde_json::to_value(economic_authorization).map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to serialize governed economic receipt metadata: {error}"
+            ))
+        })?,
+    );
+
+    Ok(Some(metadata))
+}
+
 pub(super) fn governed_request_metadata(
     request: &ToolCallRequest,
     attestation_trust_policy: Option<&AttestationTrustPolicy>,
@@ -366,6 +566,7 @@ pub(super) fn governed_request_metadata(
         runtime_assurance,
         call_chain: call_chain.clone(),
         autonomy,
+        economic_authorization: None,
     };
 
     let mut metadata_object = serde_json::Map::from_iter([(
@@ -390,6 +591,33 @@ pub(super) fn governed_request_metadata(
     Ok(Some(serde_json::Value::Object(metadata_object)))
 }
 
+pub(super) fn request_receipt_metadata(
+    request: &ToolCallRequest,
+    attestation_trust_policy: Option<&AttestationTrustPolicy>,
+    now: u64,
+    extra_metadata: Option<&serde_json::Value>,
+) -> Result<Option<serde_json::Value>, KernelError> {
+    let governed_metadata = governed_request_metadata(request, attestation_trust_policy, now)?;
+    let financial = extra_metadata
+        .and_then(serde_json::Value::as_object)
+        .and_then(|extra_metadata| extra_metadata.get("financial"))
+        .cloned()
+        .and_then(|financial| serde_json::from_value::<FinancialReceiptMetadata>(financial).ok());
+    let governed_metadata = inject_governed_economic_authorization_metadata(
+        governed_metadata,
+        financial
+            .as_ref()
+            .map(|financial| governed_economic_authorization_metadata(request, financial))
+            .transpose()?
+            .flatten(),
+    )?;
+
+    Ok(merge_metadata_objects(
+        governed_metadata,
+        request_model_metadata_receipt_metadata(request),
+    ))
+}
+
 pub(super) fn receipt_attribution_metadata(
     capability: &CapabilityToken,
     matched_grant_index: Option<usize>,
@@ -402,6 +630,16 @@ pub(super) fn receipt_attribution_metadata(
             grant_index: matched_grant_index.map(|index| index as u32),
         }
     }))
+}
+
+pub(super) fn request_model_metadata_receipt_metadata(
+    request: &ToolCallRequest,
+) -> Option<serde_json::Value> {
+    request.model_metadata.as_ref().map(|model_metadata| {
+        serde_json::json!({
+            "model_metadata": arc_core::receipt::ModelMetadataReceiptMetadata::from(model_metadata)
+        })
+    })
 }
 
 fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_json::Value> {
@@ -1109,5 +1347,148 @@ mod tests {
             ),
             "expected mismatch error, got {error}"
         );
+    }
+
+    #[test]
+    fn request_receipt_metadata_projects_economic_authorization_from_financial_metadata() {
+        let request = ToolCallRequest {
+            request_id: "req-economic-1".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-economic-1" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-economic-1".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: Some(arc_core::capability::MonetaryAmount {
+                    units: 500,
+                    currency: "USD".to_string(),
+                }),
+                commerce: Some(arc_core::capability::GovernedCommerceContext {
+                    seller: "seller-1".to_string(),
+                    shared_payment_token_id: "shared-token-1".to_string(),
+                }),
+                metered_billing: Some(arc_core::capability::MeteredBillingContext {
+                    settlement_mode: arc_core::capability::MeteredSettlementMode::HoldCapture,
+                    quote: arc_core::capability::MeteredBillingQuote {
+                        quote_id: "quote-1".to_string(),
+                        provider: "meterd".to_string(),
+                        billing_unit: "1k_tokens".to_string(),
+                        quoted_units: 42,
+                        quoted_cost: arc_core::capability::MonetaryAmount {
+                            units: 230,
+                            currency: "USD".to_string(),
+                        },
+                        issued_at: 100,
+                        expires_at: Some(200),
+                    },
+                    max_billed_units: Some(100),
+                }),
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let extra_metadata = serde_json::json!({
+            "financial": FinancialReceiptMetadata {
+                grant_index: 1,
+                cost_charged: 230,
+                currency: "USD".to_string(),
+                budget_remaining: 770,
+                budget_total: 1000,
+                delegation_depth: 0,
+                root_budget_holder: "issuer-1".to_string(),
+                payment_reference: Some("payref-1".to_string()),
+                settlement_status: SettlementStatus::Pending,
+                cost_breakdown: None,
+                oracle_evidence: None,
+                attempted_cost: Some(250),
+            }
+        });
+
+        let metadata = request_receipt_metadata(&request, None, 150, Some(&extra_metadata))
+            .expect("metadata should build")
+            .expect("receipt metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("governed metadata should deserialize");
+        let economic = governed
+            .economic_authorization
+            .expect("economic authorization should be present");
+
+        assert_eq!(
+            economic.economic_mode,
+            arc_core::receipt::EconomicAuthorizationMode::MeteredHoldCapture
+        );
+        assert_eq!(economic.budget.currency, "USD");
+        assert_eq!(economic.budget.cost_charged, 230);
+        assert_eq!(economic.rail.kind, "shared_payment_token");
+        assert_eq!(
+            economic.rail.contract_or_account_ref.as_deref(),
+            Some("payref-1")
+        );
+        assert_eq!(
+            economic.settlement.settlement_status,
+            SettlementStatus::Pending
+        );
+        assert_eq!(
+            economic
+                .metering
+                .expect("metering projection should be present")
+                .provider,
+            "meterd"
+        );
+    }
+
+    #[test]
+    fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_through() {
+        let request = ToolCallRequest {
+            request_id: "req-economic-legacy-financial".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-legacy-financial" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-legacy-financial".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let extra_metadata = serde_json::json!({
+            "financial": {
+                "legacy_payload": true,
+                "vendor": "custom-financial-metadata"
+            }
+        });
+
+        let metadata = request_receipt_metadata(&request, None, 150, Some(&extra_metadata))
+            .expect("legacy financial metadata should not fail receipt metadata")
+            .expect("governed metadata should still exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("governed metadata should deserialize");
+
+        assert!(governed.economic_authorization.is_none());
     }
 }

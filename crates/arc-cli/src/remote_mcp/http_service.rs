@@ -4,6 +4,93 @@ pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
     runtime.block_on(async move { serve_http_async(config).await })
 }
 
+const MCP_RATE_LIMIT_MAX_REQUESTS: u32 = 600;
+const MCP_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
+const MCP_RATE_LIMIT_MAX_KEYS: usize = 4_096;
+
+#[derive(Clone)]
+struct McpRateLimiter {
+    windows: Arc<StdMutex<HashMap<String, McpRateWindow>>>,
+}
+
+#[derive(Clone, Copy)]
+struct McpRateWindow {
+    window_start: u64,
+    count: u32,
+}
+
+impl McpRateLimiter {
+    fn new() -> Self {
+        Self {
+            windows: Arc::new(StdMutex::new(HashMap::new())),
+        }
+    }
+
+    fn check(&self, key: String, now: u64) -> Result<(), u64> {
+        let window_secs = MCP_RATE_LIMIT_WINDOW.as_secs().max(1);
+        let window_start = now.saturating_sub(now % window_secs);
+        let retry_after = window_start
+            .saturating_add(window_secs)
+            .saturating_sub(now)
+            .max(1);
+        let mut windows = self.windows.lock().map_err(|_| retry_after)?;
+        if windows.len() >= MCP_RATE_LIMIT_MAX_KEYS && !windows.contains_key(&key) {
+            windows.retain(|_, window| window.window_start == window_start);
+            if windows.len() >= MCP_RATE_LIMIT_MAX_KEYS {
+                return Err(retry_after);
+            }
+        }
+        match windows.get_mut(&key) {
+            Some(window) if window.window_start == window_start => {
+                if window.count >= MCP_RATE_LIMIT_MAX_REQUESTS {
+                    return Err(retry_after);
+                }
+                window.count = window.count.saturating_add(1);
+            }
+            _ => {
+                windows.insert(
+                    key,
+                    McpRateWindow {
+                        window_start,
+                        count: 1,
+                    },
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+async fn rate_limit_mcp_request(
+    axum::extract::ConnectInfo(remote_addr): axum::extract::ConnectInfo<SocketAddr>,
+    State(limiter): State<McpRateLimiter>,
+    request: Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let key = mcp_rate_limit_key(remote_addr);
+    if let Err(retry_after) = limiter.check(key, mcp_rate_limit_now()) {
+        let mut response =
+            (StatusCode::TOO_MANY_REQUESTS, "MCP request rate limit exceeded").into_response();
+        if let Ok(value) = HeaderValue::from_str(&retry_after.to_string()) {
+            response
+                .headers_mut()
+                .insert(HeaderName::from_static("retry-after"), value);
+        }
+        return response;
+    }
+    next.run(request).await
+}
+
+fn mcp_rate_limit_key(remote_addr: SocketAddr) -> String {
+    format!("ip:{}", remote_addr.ip())
+}
+
+fn mcp_rate_limit_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_secs())
+}
+
 fn load_enterprise_provider_registry(
     path: Option<&FsPath>,
     surface: &str,
@@ -64,11 +151,45 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         SessionLifecyclePolicy::from_env(),
         config.session_db_path.clone(),
     )?);
+    let factory = Arc::new(RemoteSessionFactory::new(config.clone()));
+    if let Some(path) = config.session_db_path.as_deref() {
+        let loaded_records = load_active_session_records(path)?;
+        for session_id in loaded_records.invalid_session_ids {
+            if let Err(delete_error) = delete_active_session_record(path, &session_id) {
+                warn!(
+                    session_id = %session_id,
+                    error = %delete_error,
+                    "failed to delete malformed persisted MCP session record"
+                );
+            }
+        }
+        for record in loaded_records.records {
+            match factory.restore_session(&record) {
+                Ok(session) => sessions.insert_active(session).await,
+                Err(error) => {
+                    warn!(
+                        session_id = %record.session_id,
+                        error = %error,
+                        "dropping persisted MCP session record that could not be restored"
+                    );
+                    if let Err(delete_error) =
+                        delete_active_session_record(path, &record.session_id)
+                    {
+                        warn!(
+                            session_id = %record.session_id,
+                            error = %delete_error,
+                            "failed to delete unrestorable MCP session record"
+                        );
+                    }
+                }
+            }
+        }
+    }
     sessions.cleanup_due_sessions().await;
 
     let state = RemoteAppState {
         sessions,
-        factory: Arc::new(RemoteSessionFactory::new(config.clone())),
+        factory,
         auth_mode: Arc::new(auth_mode),
         enterprise_provider_registry,
         admin_token,
@@ -82,11 +203,17 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         session_reaper_loop(reaper_state).await;
     });
 
-    let router = remote_mcp_admin::install_admin_routes(Router::new())
+    let mcp_routes = Router::new()
         .route(
             MCP_ENDPOINT_PATH,
             post(handle_post).get(handle_get).delete(handle_delete),
         )
+        .route_layer(axum::middleware::from_fn_with_state(
+            McpRateLimiter::new(),
+            rate_limit_mcp_request,
+        ));
+
+    let router = remote_mcp_admin::install_admin_routes(mcp_routes)
         .route(
             PROTECTED_RESOURCE_METADATA_ROOT_PATH,
             get(handle_protected_resource_metadata),
@@ -118,7 +245,10 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     );
     eprintln!("remote MCP edge listening on http://{local_addr}{MCP_ENDPOINT_PATH}");
 
-    axum::serve(listener, router)
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
         .await
         .map_err(|error| CliError::Other(format!("remote MCP edge server failed: {error}")))
 }
@@ -231,7 +361,10 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
         let Some(stream_lock) = stream_lock else {
-            return StatusCode::ACCEPTED.into_response();
+            return response_with_mode(
+                StatusCode::ACCEPTED.into_response(),
+                "post_notification_accepted",
+            );
         };
 
         let buffered_events = match collect_session_events_until_idle(&session, &mut event_rx).await
@@ -247,10 +380,18 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             .collect::<Vec<_>>();
         if buffered_events.is_empty() {
             drop(stream_lock);
-            return StatusCode::ACCEPTED.into_response();
+            return response_with_mode(
+                StatusCode::ACCEPTED.into_response(),
+                "post_notification_accepted",
+            );
         }
 
-        return sse_response_from_buffered_events(session.clone(), buffered_events, stream_lock);
+        return sse_response_from_buffered_events(
+            session.clone(),
+            buffered_events,
+            stream_lock,
+            "post_notification_sse",
+        );
     }
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
@@ -308,7 +449,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         }
     };
 
-    Sse::new(stream).into_response()
+    response_with_mode(Sse::new(stream).into_response(), "post_request_sse")
 }
 
 async fn handle_initialize_post(
@@ -333,6 +474,8 @@ async fn handle_initialize_post(
     };
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
+    let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+    let peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send(message) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
@@ -352,6 +495,8 @@ async fn handle_initialize_post(
                             .and_then(|result| result.get("protocolVersion"))
                             .and_then(Value::as_str)
                             .map(ToOwned::to_owned),
+                        initialize_params.clone(),
+                        peer_capabilities.clone(),
                     );
                 }
                 buffered_events.push(event);
@@ -364,6 +509,7 @@ async fn handle_initialize_post(
                         &session,
                         buffered_events,
                         is_success.then_some(session.session_id.as_str()),
+                        "initialize_sse",
                     );
                 }
             }
@@ -388,6 +534,7 @@ fn sse_response_from_events(
     session: &RemoteSession,
     buffered_events: Vec<RemoteSessionEvent>,
     session_header: Option<&str>,
+    response_mode: &'static str,
 ) -> Response {
     let priming_event_id = session.next_stream_event_id();
     let stream = stream! {
@@ -412,13 +559,14 @@ fn sse_response_from_events(
                 .insert(HeaderName::from_static(MCP_SESSION_ID_HEADER), value);
         }
     }
-    response
+    response_with_mode(response, response_mode)
 }
 
 fn sse_response_from_buffered_events(
     session: Arc<RemoteSession>,
     buffered_events: Vec<RemoteSessionEvent>,
     stream_lock: tokio::sync::OwnedMutexGuard<()>,
+    response_mode: &'static str,
 ) -> Response {
     let priming_event_id = session.next_stream_event_id();
     let stream = stream! {
@@ -436,7 +584,7 @@ fn sse_response_from_buffered_events(
         }
     };
 
-    Sse::new(stream).into_response()
+    response_with_mode(Sse::new(stream).into_response(), response_mode)
 }
 
 async fn collect_session_events_until_idle(
@@ -574,7 +722,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
             }
         };
 
-        return Sse::new(stream).into_response();
+        return response_with_mode(Sse::new(stream).into_response(), "get_sse_live");
     };
 
     let (mut delivered_through, replay_events) =
@@ -617,7 +765,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         }
     };
 
-    Sse::new(stream).into_response()
+    response_with_mode(Sse::new(stream).into_response(), "get_sse_replay")
 }
 
 async fn handle_protected_resource_metadata(State(state): State<RemoteAppState>) -> Response {
@@ -762,7 +910,17 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
     {
         return response;
     }
-    state.sessions.mark_deleted(&session).await;
+    if let Err(error) = state.sessions.mark_deleted(&session).await {
+        warn!(
+            session_id = %session_id,
+            error = %error,
+            "failed to delete MCP session without resumable-state risk"
+        );
+        return plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to delete MCP session safely",
+        );
+    }
     state.sessions.remove_active(&session_id).await;
 
     StatusCode::NO_CONTENT.into_response()
@@ -797,6 +955,210 @@ fn parse_session_event_id(event_id: &str, expected_session_id: &str) -> Result<u
     }
     seq.parse::<u64>()
         .map_err(|_| "invalid Last-Event-ID sequence for MCP session".to_string())
+}
+
+fn response_with_mode(mut response: Response, response_mode: &'static str) -> Response {
+    response.headers_mut().insert(
+        HeaderName::from_static(ARC_RESPONSE_MODE_HEADER),
+        HeaderValue::from_static(response_mode),
+    );
+    response
+}
+
+fn restored_kernel_session_id(session_id: &str) -> SessionId {
+    let fingerprint = sha256_hex(session_id.as_bytes());
+    SessionId::new(format!("sess-restore-{}", &fingerprint[..16]))
+}
+
+fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
+    match capabilities.and_then(|value| value.get(key)) {
+        Some(Value::Bool(enabled)) => *enabled,
+        Some(Value::Object(_)) => true,
+        _ => false,
+    }
+}
+
+fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
+    let capabilities = params.get("capabilities");
+    let experimental = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("experimental"));
+    let resources = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("resources"));
+    let roots = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("roots"));
+    let sampling = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("sampling"));
+    let elicitation = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("elicitation"));
+    let elicitation_form = elicitation.is_some_and(|value| {
+        value.as_object().is_some_and(|object| object.is_empty()) || value.get("form").is_some()
+    });
+    let elicitation_url = elicitation
+        .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
+
+    PeerCapabilities {
+        supports_progress: declared_peer_capability(capabilities, "progress"),
+        supports_cancellation: declared_peer_capability(capabilities, "cancellation"),
+        supports_subscriptions: resources
+            .and_then(|value| value.get("subscribe"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_arc_tool_streaming: experimental
+            .and_then(|value| {
+                value
+                    .get(ARC_TOOL_STREAMING_CAPABILITY_KEY)
+                    .or_else(|| value.get(LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY))
+            })
+            .and_then(|value| value.get("toolCallChunkNotifications"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_roots: declared_peer_capability(capabilities, "roots"),
+        roots_list_changed: roots
+            .and_then(|value| value.get("listChanged"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_sampling: declared_peer_capability(capabilities, "sampling"),
+        sampling_context: sampling
+            .and_then(|value| value.get("includeContext"))
+            .is_some(),
+        sampling_tools: sampling.and_then(|value| value.get("tools")).is_some(),
+        supports_elicitation: declared_peer_capability(capabilities, "elicitation"),
+        elicitation_form,
+        elicitation_url,
+    }
+}
+
+#[cfg(test)]
+mod http_service_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_progress_and_cancellation_declarations() {
+        let omitted = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {}
+        }));
+        assert!(!omitted.supports_progress);
+        assert!(!omitted.supports_cancellation);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "progress": {},
+                "cancellation": true
+            }
+        }));
+        assert!(declared.supports_progress);
+        assert!(declared.supports_cancellation);
+
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "progress": false,
+                "cancellation": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_progress);
+        assert!(!explicitly_disabled.supports_cancellation);
+
+        let null_and_string = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "progress": null,
+                "cancellation": "yes"
+            }
+        }));
+        assert!(!null_and_string.supports_progress);
+        assert!(!null_and_string.supports_cancellation);
+    }
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_explicitly_disabled_roots() {
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "roots": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_roots);
+        assert!(!explicitly_disabled.roots_list_changed);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "roots": {
+                    "listChanged": true
+                }
+            }
+        }));
+        assert!(declared.supports_roots);
+        assert!(declared.roots_list_changed);
+    }
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_explicitly_disabled_sampling() {
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "sampling": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_sampling);
+        assert!(!explicitly_disabled.sampling_context);
+        assert!(!explicitly_disabled.sampling_tools);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "sampling": {
+                    "includeContext": "thisServer",
+                    "tools": {}
+                }
+            }
+        }));
+        assert!(declared.supports_sampling);
+        assert!(declared.sampling_context);
+        assert!(declared.sampling_tools);
+
+        let null_declaration = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "sampling": null
+            }
+        }));
+        assert!(!null_declaration.supports_sampling);
+        assert!(!null_declaration.sampling_context);
+        assert!(!null_declaration.sampling_tools);
+    }
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_explicitly_disabled_elicitation() {
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "elicitation": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_elicitation);
+        assert!(!explicitly_disabled.elicitation_form);
+        assert!(!explicitly_disabled.elicitation_url);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "elicitation": {
+                    "form": {}
+                }
+            }
+        }));
+        assert!(declared.supports_elicitation);
+        assert!(declared.elicitation_form);
+        assert!(!declared.elicitation_url);
+
+        let null_declaration = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "elicitation": null
+            }
+        }));
+        assert!(!null_declaration.supports_elicitation);
+        assert!(!null_declaration.elicitation_form);
+        assert!(!null_declaration.elicitation_url);
+    }
 }
 
 fn should_emit_post_stream_event(
@@ -1944,4 +2306,3 @@ fn validate_sender_constraint_runtime(
     }
     Ok(())
 }
-

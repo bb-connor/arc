@@ -17,6 +17,7 @@ use arc_kernel_core::{
     evaluate, sign_receipt, verify_capability, CapabilityError, EvaluateInput, FixedClock, Guard,
     GuardContext, KernelCoreError, PortableToolCallRequest, Verdict,
 };
+use serde_json::json;
 
 const ISSUED_AT: u64 = 1_700_000_000;
 const EXPIRES_AT: u64 = 1_700_100_000;
@@ -287,7 +288,7 @@ fn evaluate_fails_closed_on_unsupported_constraint() {
 }
 
 #[test]
-fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
+fn resolve_matching_grants_fails_closed_when_target_match_has_unsupported_constraint() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = CapabilityToken::sign(
@@ -310,8 +311,8 @@ fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
                         dpop_required: None,
                     },
                     ToolGrant {
-                        server_id: "srv-a".to_string(),
-                        tool_name: "echo".to_string(),
+                        server_id: "*".to_string(),
+                        tool_name: "*".to_string(),
                         operations: vec![Operation::Invoke],
                         constraints: vec![],
                         max_invocations: None,
@@ -331,16 +332,23 @@ fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
     )
     .unwrap();
 
-    let matches = arc_kernel_core::scope::resolve_matching_grants(
+    let error = arc_kernel_core::scope::resolve_matching_grants(
         &capability.scope,
         "echo",
         "srv-a",
         &serde_json::json!({"msg": "hello"}),
     )
-    .unwrap();
+    .expect_err("unsupported target-matching constraints must fail closed");
 
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].index, 1);
+    match error {
+        arc_kernel_core::ScopeMatchError::ConstraintError(reason) => {
+            assert!(
+                reason.contains("minimum_runtime_assurance"),
+                "reason was: {reason}"
+            );
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
 }
 
 #[test]
@@ -428,4 +436,61 @@ fn sign_receipt_with_backend() {
 
     let receipt = sign_receipt(body, &backend).unwrap();
     assert!(receipt.verify_signature().unwrap());
+}
+
+#[test]
+fn sign_receipt_signature_changes_when_economic_authorization_changes() {
+    let keypair = Keypair::generate();
+    let backend = arc_core_types::crypto::Ed25519Backend::new(keypair.clone());
+
+    let mut body = ArcReceiptBody {
+        id: "rcpt-economic-1".to_string(),
+        timestamp: ISSUED_AT,
+        capability_id: "cap-economic-1".to_string(),
+        tool_server: "srv-pay".to_string(),
+        tool_name: "charge".to_string(),
+        action: ToolCallAction::from_parameters(json!({"invoice_id": "inv-1"})).unwrap(),
+        decision: Decision::Allow,
+        content_hash: "1".repeat(64),
+        policy_hash: "2".repeat(64),
+        evidence: vec![],
+        metadata: Some(json!({
+            "governed_transaction": {
+                "economic_authorization": {
+                    "version": "v1",
+                    "economic_mode": "metered_hold_capture",
+                    "budget": {
+                        "currency": "USD",
+                        "cost_charged": 230,
+                        "budget_remaining": 770,
+                        "budget_total": 1000
+                    }
+                }
+            }
+        })),
+        trust_level: TrustLevel::Mediated,
+        tenant_id: None,
+        kernel_key: keypair.public_key(),
+    };
+
+    let original = sign_receipt(body.clone(), &backend).unwrap();
+    body.metadata = Some(json!({
+        "governed_transaction": {
+            "economic_authorization": {
+                "version": "v1",
+                "economic_mode": "metered_hold_capture",
+                "budget": {
+                    "currency": "USD",
+                    "cost_charged": 231,
+                    "budget_remaining": 769,
+                    "budget_total": 1000
+                }
+            }
+        }
+    }));
+    let changed = sign_receipt(body, &backend).unwrap();
+
+    assert!(original.verify_signature().unwrap());
+    assert!(changed.verify_signature().unwrap());
+    assert_ne!(original.signature.to_hex(), changed.signature.to_hex());
 }

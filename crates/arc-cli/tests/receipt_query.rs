@@ -6,8 +6,9 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -84,11 +85,27 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn build_test_client() -> Client {
+    Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(120))
+        .build()
+        .expect("build reqwest client")
+}
+
+const TEST_REPUTATION_RECEIPT_TARGET: u64 = 100;
+const LARGE_RECEIPT_HISTORY_LEN: u64 = 128;
+const CAPITAL_ALLOCATION_QUEUE_HISTORY_LEN: u64 = 240;
+
 fn unix_now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_secs()
+}
+
+fn tool_action(parameters: serde_json::Value) -> ToolCallAction {
+    ToolCallAction::from_parameters(parameters).expect("hash tool action parameters")
 }
 
 fn sample_google_runtime_attestation() -> RuntimeAttestationEvidence {
@@ -198,6 +215,7 @@ fn reserve_listen_addr() -> std::net::SocketAddr {
 
 struct ServerGuard {
     child: Child,
+    _service_lock: MutexGuard<'static, ()>,
 }
 
 impl Drop for ServerGuard {
@@ -205,6 +223,13 @@ impl Drop for ServerGuard {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+fn trust_service_test_lock() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn read_child_stderr(child: &mut Child) -> String {
@@ -217,6 +242,41 @@ fn read_child_stderr(child: &mut Child) -> String {
     output
 }
 
+fn write_test_reputation_policy(receipt_db_path: &Path) -> PathBuf {
+    let policy_path = receipt_db_path
+        .parent()
+        .expect("receipt db parent")
+        .join("test-reputation-policy.yaml");
+    let policy = format!(
+        r#"hushspec: "0.1.0"
+name: "receipt-query-test-reputation"
+description: "Test reputation policy for receipt query integration fixtures"
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+      - safe_invoke
+extensions:
+  reputation:
+    scoring:
+      temporal_decay_half_life_days: 30
+      probationary_receipt_count: {TEST_REPUTATION_RECEIPT_TARGET}
+      probationary_min_days: 30
+      probationary_score_ceiling: 0.60
+    tiers:
+      mature:
+        score_range: [0.0, 1.0]
+        max_scope:
+          operations: [invoke, read, get, read_result]
+          ttl_seconds: 300
+"#
+    );
+    std::fs::write(&policy_path, policy).expect("write test reputation policy");
+    policy_path
+}
+
 fn spawn_trust_service(
     listen: std::net::SocketAddr,
     service_token: &str,
@@ -225,6 +285,8 @@ fn spawn_trust_service(
     authority_db_path: &PathBuf,
     budget_db_path: &PathBuf,
 ) -> ServerGuard {
+    let service_lock = trust_service_test_lock();
+    let policy_path = write_test_reputation_policy(receipt_db_path);
     let child = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
         .args([
@@ -242,13 +304,18 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--policy",
+            policy_path.to_str().expect("policy path"),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn trust service");
-    ServerGuard { child }
+    ServerGuard {
+        child,
+        _service_lock: service_lock,
+    }
 }
 
 fn spawn_trust_service_without_receipt_db(
@@ -258,6 +325,7 @@ fn spawn_trust_service_without_receipt_db(
     authority_db_path: &PathBuf,
     budget_db_path: &PathBuf,
 ) -> ServerGuard {
+    let service_lock = trust_service_test_lock();
     let child = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
         .args([
@@ -279,7 +347,10 @@ fn spawn_trust_service_without_receipt_db(
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn trust service without receipt db");
-    ServerGuard { child }
+    ServerGuard {
+        child,
+        _service_lock: service_lock,
+    }
 }
 
 fn wait_for_trust_service_result(
@@ -287,7 +358,7 @@ fn wait_for_trust_service_result(
     base_url: &str,
     service: &mut ServerGuard,
 ) -> Result<(), String> {
-    for _ in 0..300 {
+    for _ in 0..900 {
         if let Some(status) = service.child.try_wait().expect("poll trust service child") {
             let stderr = read_child_stderr(&mut service.child);
             return Err(format!(
@@ -303,13 +374,24 @@ fn wait_for_trust_service_result(
 }
 
 fn wait_for_trust_service(client: &Client, base_url: &str) {
-    for _ in 0..300 {
+    let mut last_error = None;
+    for _ in 0..900 {
         match client.get(format!("{base_url}/health")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::OK => return,
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(response) => {
+                last_error = Some(format!("health returned {}", response.status()));
+                thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => {
+                last_error = Some(error.to_string());
+                thread::sleep(Duration::from_millis(100));
+            }
         }
     }
-    panic!("trust service did not become ready");
+    panic!(
+        "trust service did not become ready: {}",
+        last_error.unwrap_or_else(|| "no health response observed".to_string())
+    );
 }
 
 fn assert_trust_service_auth_required(client: &Client, base_url: &str, path: &str) {
@@ -584,10 +666,7 @@ fn make_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "abc123".to_string(),
-            },
+            action: tool_action(serde_json::json!({})),
             decision,
             content_hash: "content-hash".to_string(),
             policy_hash: "policy-hash".to_string(),
@@ -681,10 +760,7 @@ fn make_financial_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({})),
             decision,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -760,10 +836,7 @@ fn make_financial_receipt_with_budget_authority(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "budget-lineage" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "budget-lineage" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -850,10 +923,7 @@ fn make_financial_receipt_with_settlement_status(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "reconcile-me" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "reconcile-me" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -924,6 +994,7 @@ fn make_governed_financial_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -933,10 +1004,7 @@ fn make_governed_financial_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "insured-feed" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "insured-feed" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1010,6 +1078,7 @@ fn make_governed_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1019,10 +1088,7 @@ fn make_governed_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": "inv-1001" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": "inv-1001" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1171,6 +1237,7 @@ fn make_governed_authorization_receipt_with_runtime_profile(
                 },
             )),
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1180,10 +1247,7 @@ fn make_governed_authorization_receipt_with_runtime_profile(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": "inv-auth-1001" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": "inv-auth-1001" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1290,6 +1354,7 @@ fn make_credit_history_receipt(
             }),
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1299,10 +1364,7 @@ fn make_credit_history_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": format!("inv-{id}") }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": format!("inv-{id}") })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1370,6 +1432,7 @@ fn make_governed_authorization_receipt_without_runtime_assurance(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1379,10 +1442,7 @@ fn make_governed_authorization_receipt_without_runtime_assurance(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": "inv-facility-1001" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": "inv-facility-1001" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1456,6 +1516,7 @@ fn make_underwriting_simulation_receipt(
             }),
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1465,10 +1526,7 @@ fn make_underwriting_simulation_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "simulation": true }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "simulation": true })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1537,6 +1595,7 @@ fn make_governed_x402_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1546,10 +1605,7 @@ fn make_governed_x402_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "dataset-pro" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "dataset-pro" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1622,6 +1678,7 @@ fn make_governed_acp_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1631,10 +1688,7 @@ fn make_governed_acp_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "merchant-result-pro" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "merchant-result-pro" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1740,7 +1794,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
     }
 
     let service_token = "test-secret-token".to_string();
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let mut startup_error = None;
     let mut started = None;
     for _ in 0..3 {
@@ -1894,7 +1948,7 @@ fn test_receipt_query_surfaces_governed_transaction_metadata() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -1979,7 +2033,7 @@ fn test_receipt_query_surfaces_x402_payment_metadata() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -2058,7 +2112,7 @@ fn test_receipt_query_surfaces_acp_payment_metadata() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -2142,7 +2196,7 @@ fn receipt_query_surfaces_financial_hold_lineage_and_guarantee_level() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -2388,7 +2442,7 @@ fn test_lineage_get_capability_snapshot() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2461,7 +2515,7 @@ fn test_lineage_get_delegation_chain() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2620,7 +2674,7 @@ fn test_agent_subject_filter_via_http() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2729,7 +2783,7 @@ fn test_agent_receipts_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2888,7 +2942,7 @@ fn test_cost_attribution_report_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3099,7 +3153,7 @@ fn test_operator_report_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3277,7 +3331,7 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3460,7 +3514,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3790,7 +3844,7 @@ fn test_authorization_context_report_and_cli() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4097,7 +4151,7 @@ fn authorization_context_report_does_not_mark_asserted_call_chain_as_sender_boun
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4196,7 +4250,7 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4460,10 +4514,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
                 capability_id: "cap-auth-invalid".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({ "invoice_id": "inv-invalid-1" }),
-                    parameter_hash: "param-invalid".to_string(),
-                },
+                action: tool_action(serde_json::json!({ "invoice_id": "inv-invalid-1" })),
                 decision: Decision::Allow,
                 content_hash: "content-invalid".to_string(),
                 policy_hash: "policy-invalid".to_string(),
@@ -4495,6 +4546,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
                         runtime_assurance: None,
                         call_chain: None,
                         autonomy: None,
+                        economic_authorization: None,
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
@@ -4520,7 +4572,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4585,7 +4637,7 @@ fn test_authorization_context_report_rejects_missing_sender_binding_material() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4679,7 +4731,7 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4745,10 +4797,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
                 capability_id: "cap-auth-invalid-assurance".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({ "cmd": "echo auth" }),
-                    parameter_hash: "param-invalid-assurance".to_string(),
-                },
+                action: tool_action(serde_json::json!({ "cmd": "echo auth" })),
                 decision: Decision::Allow,
                 content_hash: "content-invalid-assurance".to_string(),
                 policy_hash: "policy-invalid-assurance".to_string(),
@@ -4789,6 +4838,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
                         }),
                         call_chain: None,
                         autonomy: None,
+                        economic_authorization: None,
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
@@ -4814,7 +4864,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4880,10 +4930,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
                 capability_id: "cap-auth-invalid-call-chain".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({ "cmd": "echo delegated" }),
-                    parameter_hash: "param-invalid-call-chain".to_string(),
-                },
+                action: tool_action(serde_json::json!({ "cmd": "echo delegated" })),
                 decision: Decision::Allow,
                 content_hash: "content-invalid-call-chain".to_string(),
                 policy_hash: "policy-invalid-call-chain".to_string(),
@@ -4923,6 +4970,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
                             },
                         )),
                         autonomy: None,
+                        economic_authorization: None,
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
@@ -4948,7 +4996,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5195,7 +5243,7 @@ fn test_shared_evidence_reporting_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5433,7 +5481,7 @@ fn test_behavioral_feed_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5609,7 +5657,7 @@ extensions:
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5791,7 +5839,7 @@ extensions:
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6006,7 +6054,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6407,7 +6455,7 @@ fn test_exposure_ledger_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6553,7 +6601,7 @@ fn test_exposure_ledger_requires_anchor() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6620,7 +6668,7 @@ fn test_exposure_ledger_rejects_contradictory_currency_row() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6731,7 +6779,7 @@ fn test_credit_scorecard_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6853,7 +6901,7 @@ fn test_credit_scorecard_requires_agent_subject() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6897,7 +6945,7 @@ fn test_credit_scorecard_requires_matching_history() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6936,7 +6984,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-facility-grant-{day}"),
@@ -6967,7 +7015,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7136,7 +7184,7 @@ fn test_credit_issue_endpoints_require_service_auth() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7215,7 +7263,7 @@ fn test_credit_issue_endpoints_require_receipt_db_configuration() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7287,7 +7335,7 @@ fn test_trust_control_report_endpoints_require_service_auth() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7328,7 +7376,7 @@ fn test_trust_control_report_endpoints_require_receipt_db_configuration() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7445,7 +7493,7 @@ fn test_credit_facility_report_denies_missing_prerequisites() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7555,7 +7603,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7654,7 +7702,7 @@ fn test_credit_facility_report_manual_review_for_mixed_runtime_assurance_provena
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7811,7 +7859,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7902,7 +7950,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-lock-good-{day}"),
@@ -7933,7 +7981,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8139,7 +8187,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-hold-{day}"),
@@ -8187,7 +8235,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8275,7 +8323,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-impair-good-{day}"),
@@ -8342,7 +8390,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8451,7 +8499,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-good-{day}"),
@@ -8482,7 +8530,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8690,7 +8738,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-release-good-{day}"),
@@ -8721,7 +8769,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9064,7 +9112,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-slash-good-{day}"),
@@ -9095,7 +9143,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9360,7 +9408,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bonded-execution-good-{day}"),
@@ -9407,7 +9455,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9657,7 +9705,7 @@ fn test_provider_risk_package_export_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-risk-good-{day}"),
@@ -9687,7 +9735,7 @@ fn test_provider_risk_package_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9844,7 +9892,7 @@ fn test_capital_book_report_export_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-good-{day}"),
@@ -9875,7 +9923,7 @@ fn test_capital_book_report_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10205,7 +10253,7 @@ fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10272,7 +10320,7 @@ fn test_capital_instruction_issue_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-instruction-good-{day}"),
@@ -10303,7 +10351,7 @@ fn test_capital_instruction_issue_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10506,7 +10554,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-instruction-negative-{day}"),
@@ -10537,7 +10585,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10734,7 +10782,7 @@ fn test_capital_allocation_issue_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-good-{day}"),
@@ -10765,7 +10813,7 @@ fn test_capital_allocation_issue_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10965,7 +11013,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-manual-good-{day}"),
@@ -11001,6 +11049,27 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
                 ))
                 .expect("append queue allocation history");
         }
+        // Preserve queue-depth boundary coverage without making every large-history fixture pay
+        // for the full reserve-depth dataset.
+        for day in LARGE_RECEIPT_HISTORY_LEN..CAPITAL_ALLOCATION_QUEUE_HISTORY_LEN {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-allocation-queue-good-{day}"),
+                    &format!("cap-capital-allocation-queue-good-{day}"),
+                    queue_subject,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    100,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append queue allocation reserve depth");
+        }
     }
 
     let listen = reserve_listen_addr();
@@ -11013,7 +11082,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -11287,7 +11356,7 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -11523,8 +11592,25 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+fn run_large_stack_test(name: &str, test_fn: fn()) {
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(test_fn)
+        .expect("spawn large-stack test thread")
+        .join()
+        .expect("join large-stack test thread");
+}
+
 #[test]
 fn test_liability_market_quote_and_bind_workflow_surfaces() {
+    run_large_stack_test(
+        "test_liability_market_quote_and_bind_workflow_surfaces",
+        test_liability_market_quote_and_bind_workflow_surfaces_inner,
+    );
+}
+
+fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     let dir = unique_dir("arc-liability-market-workflow");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -11537,7 +11623,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-market-{day}"),
@@ -11567,7 +11653,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -11833,6 +11919,13 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
 
 #[test]
 fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
+    run_large_stack_test(
+        "test_liability_market_pricing_authority_and_auto_bind_surfaces",
+        test_liability_market_pricing_authority_and_auto_bind_surfaces_inner,
+    );
+}
+
+fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
     let dir = unique_dir("arc-liability-market-auto-bind");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -11845,7 +11938,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-autobind-{day}"),
@@ -11876,7 +11969,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -12243,6 +12336,13 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
 
 #[test]
 fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes() {
+    run_large_stack_test(
+        "test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes",
+        test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes_inner,
+    );
+}
+
+fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes_inner() {
     let dir = unique_dir("arc-liability-market-auto-bind-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -12255,7 +12355,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             let exposure_units = if day < 10 { 100 } else { 5_000 };
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
@@ -12287,7 +12387,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -12698,6 +12798,13 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
 
 #[test]
 fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch() {
+    run_large_stack_test(
+        "test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch",
+        test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch_inner,
+    );
+}
+
+fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch_inner() {
     let dir = unique_dir("arc-liability-market-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -12710,7 +12817,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-negative-{day}"),
@@ -12740,7 +12847,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -12974,6 +13081,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         .json()
         .expect("parse fresh quote request");
 
+    let expiring_quote_expires_at = unix_now_secs().saturating_add(15);
     let expiring_quote_response = client
         .post(format!("{base_url}/v1/liability/quote-responses/issue"))
         .header(
@@ -12987,7 +13095,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 22000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 950, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(2)
+                "expiresAt": expiring_quote_expires_at
             }
         }))
         .send()
@@ -12997,7 +13105,15 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         .json()
         .expect("parse expiring quote response");
 
-    thread::sleep(Duration::from_secs(3));
+    let sleep_until_expired = expiring_quote_response
+        .body
+        .quoted_terms
+        .as_ref()
+        .expect("expiring quote response should carry quoted terms")
+        .expires_at
+        .saturating_sub(unix_now_secs())
+        .saturating_add(1);
+    thread::sleep(Duration::from_secs(sleep_until_expired));
 
     let expired_placement = client
         .post(format!("{base_url}/v1/liability/placements/issue"))
@@ -13108,13 +13224,10 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
 
 #[test]
 fn test_liability_claim_workflow_surfaces() {
-    std::thread::Builder::new()
-        .name("test_liability_claim_workflow_surfaces".to_string())
-        .stack_size(16 * 1024 * 1024)
-        .spawn(test_liability_claim_workflow_surfaces_inner)
-        .expect("spawn liability claim workflow test thread")
-        .join()
-        .expect("join liability claim workflow test thread");
+    run_large_stack_test(
+        "test_liability_claim_workflow_surfaces",
+        test_liability_claim_workflow_surfaces_inner,
+    );
 }
 
 fn test_liability_claim_workflow_surfaces_inner() {
@@ -13130,7 +13243,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-claims-{day}"),
@@ -13161,7 +13274,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -13572,6 +13685,28 @@ fn test_liability_claim_workflow_surfaces_inner() {
         String::from_utf8(adjudication_output.stdout).expect("adjudication CLI json");
     assert!(adjudication_json.contains("\"adjudicationId\""));
 
+    let governed_receipt_id = "rc-liability-claims-payout-1";
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                governed_receipt_id,
+                "cap-liability-claims-payout-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                unix_now_secs().saturating_sub(30),
+                SettlementStatus::Settled,
+                "USD",
+                18_000,
+                "USD",
+                false,
+                false,
+            ))
+            .expect("append settled payout governed receipt");
+    }
+
     let capital_instruction_input_path = dir.join("liability-payout-capital-instruction.json");
     std::fs::write(
         &capital_instruction_input_path,
@@ -13585,6 +13720,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
             },
             "sourceKind": "facility_commitment",
             "action": "transfer_funds",
+            "governedReceiptId": governed_receipt_id,
             "amount": { "units": 18000, "currency": "USD" },
             "authorityChain": [
                 {
@@ -14001,7 +14137,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14389,7 +14525,7 @@ fn test_underwriting_policy_input_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14553,7 +14689,7 @@ fn test_underwriting_decision_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14772,7 +14908,7 @@ fn test_underwriting_decision_links_failed_settlement_evidence() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14863,7 +14999,7 @@ fn test_underwriting_simulation_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14978,7 +15114,7 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15182,7 +15318,7 @@ fn test_underwriting_decision_issue_with_mixed_currency_exposure_withholds_premi
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15275,7 +15411,7 @@ fn test_underwriting_decision_list_partitions_premium_totals_by_currency() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15369,7 +15505,7 @@ fn test_underwriting_appeal_and_supersession_lifecycle() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15550,7 +15686,7 @@ fn test_underwriting_rejected_appeal_cannot_link_replacement_decision() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 

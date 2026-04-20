@@ -9,6 +9,8 @@ mod tests {
     use rsa::rand_core::OsRng;
     use rsa::signature::{RandomizedSigner as _, SignatureEncoding as _};
     use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::atomic::Ordering;
 
     fn sign_jwt_with_header(
         header: Value,
@@ -22,6 +24,52 @@ mod tests {
         let signing_input = format!("{header}.{payload}");
         let signature = URL_SAFE_NO_PAD.encode(sign(signing_input.as_bytes()));
         format!("{signing_input}.{signature}")
+    }
+
+    #[test]
+    fn mcp_rate_limiter_caps_session_window() {
+        let limiter = McpRateLimiter::new();
+        for _ in 0..MCP_RATE_LIMIT_MAX_REQUESTS {
+            assert!(limiter.check("session:test".to_string(), 120).is_ok());
+        }
+
+        let retry_after = limiter
+            .check("session:test".to_string(), 120)
+            .expect_err("session should be rate limited after the window budget is exhausted");
+        assert_eq!(retry_after, 60);
+        assert!(limiter.check("session:test".to_string(), 180).is_ok());
+    }
+
+    #[test]
+    fn mcp_rate_limiter_caps_tracked_keys() {
+        let limiter = McpRateLimiter::new();
+        for idx in 0..MCP_RATE_LIMIT_MAX_KEYS {
+            assert!(limiter.check(format!("session:{idx}"), 120).is_ok());
+        }
+
+        let retry_after = limiter
+            .check("session:overflow".to_string(), 120)
+            .expect_err("new rate-limit keys should be capped within a window");
+        assert_eq!(retry_after, 60);
+        assert!(limiter.check("session:0".to_string(), 120).is_ok());
+    }
+
+    #[test]
+    fn mcp_rate_limit_key_ignores_unverified_client_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            MCP_SESSION_ID_HEADER,
+            HeaderValue::from_static("session-secret"),
+        );
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer token-secret"),
+        );
+
+        let key = mcp_rate_limit_key("127.0.0.1:8080".parse().unwrap());
+        assert_eq!(key, "ip:127.0.0.1");
+        assert!(!key.contains("session-secret"));
+        assert!(!key.contains("token-secret"));
     }
 
     fn sign_jwt_rs256(
@@ -130,8 +178,507 @@ mod tests {
         (store, config)
     }
 
+    fn test_kernel_config() -> arc_kernel::KernelConfig {
+        arc_kernel::KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: "test-policy-hash".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        }
+    }
+
     fn empty_header_map() -> HeaderMap {
         HeaderMap::new()
+    }
+
+    fn test_remote_config() -> RemoteServeHttpConfig {
+        RemoteServeHttpConfig {
+            listen: "127.0.0.1:0".parse().expect("parse listen addr"),
+            auth_token: Some("remote-auth-token".to_string()),
+            auth_jwt_public_key: None,
+            auth_jwt_discovery_url: None,
+            auth_introspection_url: None,
+            auth_introspection_client_id: None,
+            auth_introspection_client_secret: None,
+            auth_jwt_provider_profile: None,
+            auth_server_seed_path: None,
+            identity_federation_seed_path: None,
+            enterprise_providers_file: None,
+            auth_jwt_issuer: None,
+            auth_jwt_audience: None,
+            admin_token: Some("admin-token".to_string()),
+            control_url: None,
+            control_token: None,
+            public_base_url: None,
+            auth_servers: vec![],
+            auth_authorization_endpoint: None,
+            auth_token_endpoint: None,
+            auth_registration_endpoint: None,
+            auth_jwks_uri: None,
+            auth_scopes: vec!["mcp:invoke".to_string()],
+            auth_subject: "operator".to_string(),
+            auth_code_ttl_secs: 300,
+            auth_access_token_ttl_secs: 600,
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            session_db_path: None,
+            policy_path: PathBuf::from("policy.yaml"),
+            server_id: "srv".to_string(),
+            server_name: "srv".to_string(),
+            server_version: "0.1.0".to_string(),
+            manifest_public_key: None,
+            page_size: 50,
+            tools_list_changed: false,
+            shared_hosted_owner: false,
+            wrapped_command: "python3".to_string(),
+            wrapped_args: vec!["mock.py".to_string()],
+        }
+    }
+
+    fn sample_resume_record() -> RemoteSessionResumeRecord {
+        RemoteSessionResumeRecord {
+            session_id: "session-valid".to_string(),
+            agent_id: "agent-valid".to_string(),
+            auth_context: SessionAuthContext::streamable_http_oauth_bearer(
+                Some("principal-valid".to_string()),
+                Some("https://issuer.example".to_string()),
+                Some("subject-valid".to_string()),
+                Some("audience-valid".to_string()),
+                vec!["mcp:invoke".to_string(), "mcp:read".to_string()],
+                Some("token-fingerprint".to_string()),
+                None,
+            ),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Ready,
+                created_at: 10,
+                last_seen_at: 11,
+                idle_expires_at: 12,
+                drain_deadline_at: None,
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        }
+    }
+
+    #[test]
+    fn shared_hosted_owner_notification_fanout_replays_to_all_live_taps() {
+        let subscriber_a = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let subscriber_b = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let stats = SharedUpstreamNotificationStats::default();
+        let subscribers: NotificationSubscriberList = Arc::new(StdMutex::new(vec![
+            Arc::downgrade(&subscriber_a),
+            Arc::downgrade(&subscriber_b),
+        ]));
+
+        fan_out_shared_upstream_notifications(
+            &subscribers,
+            &stats,
+            vec![json!({
+                "jsonrpc": "2.0",
+                "method": "notifications/resources/list_changed"
+            })],
+        );
+
+        let subscriber_a = subscriber_a.lock().expect("lock subscriber a");
+        let subscriber_b = subscriber_b.lock().expect("lock subscriber b");
+        assert_eq!(subscriber_a.len(), 1);
+        assert_eq!(subscriber_b.len(), 1);
+        assert_eq!(
+            subscriber_a[0]["method"].as_str(),
+            Some("notifications/resources/list_changed")
+        );
+        assert_eq!(subscriber_a.as_slices(), subscriber_b.as_slices());
+        assert_eq!(stats.fanout_batches.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.fanout_notifications.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.fanout_targets.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn shared_hosted_owner_notification_fanout_tracks_pruned_dead_subscribers() {
+        let stats = SharedUpstreamNotificationStats::default();
+        let live = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let dropped = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let subscribers: NotificationSubscriberList = Arc::new(StdMutex::new(vec![
+            Arc::downgrade(&live),
+            Arc::downgrade(&dropped),
+        ]));
+        drop(dropped);
+
+        fan_out_shared_upstream_notifications(
+            &subscribers,
+            &stats,
+            vec![json!({
+                "jsonrpc": "2.0",
+                "method": "notifications/tools/list_changed"
+            })],
+        );
+
+        assert_eq!(stats.pruned_subscribers.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.fanout_targets.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn validate_resume_record_integrity_rejects_tampered_auth_context() {
+        let config = test_remote_config();
+        let seed = derive_resume_record_integrity_seed(&config)
+            .expect("derive integrity seed")
+            .expect("integrity seed");
+        let mut record = sample_resume_record();
+        record.resume_integrity_tag = Some(
+            compute_resume_record_integrity_tag(&seed, &record)
+                .expect("compute integrity tag"),
+        );
+        if let SessionAuthMethod::OAuthBearer { scopes, .. } = &mut record.auth_context.method {
+            scopes.push("mcp:admin".to_string());
+        } else {
+            panic!("expected OAuth bearer auth context");
+        }
+
+        let error = validate_resume_record_integrity(&config, &record)
+            .expect_err("tampered auth context should fail integrity validation");
+        assert!(error
+            .to_string()
+            .contains("failed resumable integrity validation"));
+    }
+
+    #[test]
+    fn stored_capability_issuer_revalidation_rejects_untrusted_restart_issuer() {
+        let old_authority = Keypair::generate();
+        let subject = Keypair::generate().public_key();
+        let stale_capability = CapabilityToken::sign(
+            arc_core::capability::CapabilityTokenBody {
+                id: "cap-stale-issuer".to_string(),
+                issuer: old_authority.public_key(),
+                subject,
+                scope: arc_core::capability::ArcScope::default(),
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: vec![],
+            },
+            &old_authority,
+        )
+        .expect("sign stale capability");
+
+        let restarted_kernel = arc_kernel::ArcKernel::new(test_kernel_config());
+        assert!(!stored_capability_issuers_are_trusted(
+            &restarted_kernel,
+            std::slice::from_ref(&stale_capability)
+        ));
+
+        let mut trusted_kernel = arc_kernel::ArcKernel::new(test_kernel_config());
+        trusted_kernel.set_capability_authority(Box::new(
+            arc_kernel::LocalCapabilityAuthority::new(old_authority),
+        ));
+        assert!(stored_capability_issuers_are_trusted(
+            &trusted_kernel,
+            &[stale_capability]
+        ));
+    }
+
+    #[test]
+    fn validate_restored_peer_capabilities_rejects_tampered_record() {
+        let mut record = sample_resume_record();
+        record.initialize_params = json!({
+            "capabilities": {
+                "tools": { "listChanged": true },
+                "resources": { "subscribe": true, "listChanged": true },
+                "prompts": { "listChanged": true }
+            }
+        });
+        record.peer_capabilities = PeerCapabilities::default();
+
+        let error = validate_restored_peer_capabilities(&record)
+            .expect_err("tampered peer capabilities should fail restore validation");
+        assert!(error
+            .to_string()
+            .contains("failed peer capability re-validation"));
+    }
+
+    #[test]
+    fn expected_resume_agent_id_is_revalidated_from_identity_federation_seed() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        let seed_path = std::env::temp_dir().join(format!(
+            "arc-identity-federation-resume-{}-{nonce}.seed",
+            std::process::id()
+        ));
+        let mut config = test_remote_config();
+        config.identity_federation_seed_path = Some(seed_path.clone());
+        let auth_context = SessionAuthContext::streamable_http_oauth_bearer(
+            Some("oidc:https://issuer.example#sub:user-123".to_string()),
+            Some("https://issuer.example".to_string()),
+            Some("user-123".to_string()),
+            Some("audience-valid".to_string()),
+            vec!["mcp:invoke".to_string()],
+            Some("token-fingerprint".to_string()),
+            None,
+        );
+
+        let expected = expected_resume_agent_id(&config, &auth_context)
+            .expect("derive expected agent id")
+            .expect("expected agent id");
+        let foreign = derive_federated_agent_keypair(
+            &seed_path,
+            "oidc:https://issuer.example#sub:user-456",
+        )
+        .expect("derive foreign principal keypair")
+        .public_key()
+        .to_hex();
+
+        assert_ne!(expected, foreign);
+
+        let _ = std::fs::remove_file(seed_path);
+    }
+
+    #[test]
+    fn load_active_session_records_skips_malformed_rows() {
+        let path = std::env::temp_dir().join(format!(
+            "arc-remote-active-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let valid_record = RemoteSessionResumeRecord {
+            session_id: "session-valid".to_string(),
+            agent_id: "agent-valid".to_string(),
+            auth_context: SessionAuthContext::streamable_http_static_bearer(
+                "agent-valid",
+                "token-fingerprint",
+                None,
+            ),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Ready,
+                created_at: 10,
+                last_seen_at: 11,
+                idle_expires_at: 12,
+                drain_deadline_at: None,
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        };
+        persist_active_session_record(&path, &valid_record).expect("persist valid session row");
+
+        let conn = open_session_state_db(&path).expect("open session state db");
+        conn.execute(
+            &format!(
+                "INSERT OR REPLACE INTO {table} (session_id, updated_at, record_json)
+                 VALUES (?1, ?2, ?3)",
+                table = SESSION_ACTIVE_TABLE,
+            ),
+            params!["session-bad", session_now_millis() as i64, "{not json"],
+        )
+        .expect("insert malformed session row");
+        drop(conn);
+
+        let loaded = load_active_session_records(&path).expect("load active session records");
+        assert_eq!(loaded.records.len(), 1);
+        assert_eq!(loaded.records[0].session_id, "session-valid");
+        assert_eq!(loaded.invalid_session_ids, vec!["session-bad".to_string()]);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_active_session_records_skips_terminal_tombstoned_rows() {
+        let path = std::env::temp_dir().join(format!(
+            "arc-remote-tombstoned-active-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let auth_context = SessionAuthContext::streamable_http_static_bearer(
+            "agent-terminal",
+            "token-fingerprint",
+            None,
+        );
+        let lifecycle = RemoteSessionLifecycleSnapshot {
+            state: RemoteSessionState::Ready,
+            created_at: 10,
+            last_seen_at: 11,
+            idle_expires_at: 12,
+            drain_deadline_at: None,
+        };
+        let active_record = RemoteSessionResumeRecord {
+            session_id: "session-terminal".to_string(),
+            agent_id: "agent-terminal".to_string(),
+            auth_context: auth_context.clone(),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: lifecycle.clone(),
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        };
+        persist_active_session_record(&path, &active_record).expect("persist active session row");
+
+        let terminal_record = RemoteSessionDiagnosticRecord {
+            session_id: "session-terminal".to_string(),
+            auth_context,
+            capabilities: Vec::new(),
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Deleted,
+                ..lifecycle
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            ownership: RemoteSessionOwnershipSnapshot::default(),
+            terminal_at: 13,
+        };
+        persist_terminal_session_record(&path, &terminal_record)
+            .expect("persist terminal session tombstone");
+
+        let loaded = load_active_session_records(&path).expect("load active session records");
+        assert!(loaded.records.is_empty());
+        assert_eq!(
+            loaded.invalid_session_ids,
+            vec!["session-terminal".to_string()]
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn purge_terminal_session_records_keeps_tombstones_for_stale_active_rows() {
+        let path = std::env::temp_dir().join(format!(
+            "arc-remote-terminal-retain-active-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let auth_context = SessionAuthContext::streamable_http_static_bearer(
+            "agent-terminal",
+            "token-fingerprint",
+            None,
+        );
+        let lifecycle = RemoteSessionLifecycleSnapshot {
+            state: RemoteSessionState::Ready,
+            created_at: 10,
+            last_seen_at: 11,
+            idle_expires_at: 12,
+            drain_deadline_at: None,
+        };
+        let active_record = RemoteSessionResumeRecord {
+            session_id: "session-terminal".to_string(),
+            agent_id: "agent-terminal".to_string(),
+            auth_context: auth_context.clone(),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: lifecycle.clone(),
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        };
+        persist_active_session_record(&path, &active_record).expect("persist active session row");
+
+        let terminal_record = RemoteSessionDiagnosticRecord {
+            session_id: "session-terminal".to_string(),
+            auth_context,
+            capabilities: Vec::new(),
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Deleted,
+                ..lifecycle
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            ownership: RemoteSessionOwnershipSnapshot::default(),
+            terminal_at: 10,
+        };
+        persist_terminal_session_record(&path, &terminal_record)
+            .expect("persist terminal session tombstone");
+
+        purge_terminal_session_records_before(&path, 11)
+            .expect("purge should keep tombstone while active row remains");
+        let records =
+            load_terminal_session_records(&path).expect("load terminal session records after purge");
+        assert!(records.contains_key("session-terminal"));
+
+        delete_active_session_record(&path, "session-terminal").expect("delete active session row");
+        purge_terminal_session_records_before(&path, 11)
+            .expect("purge should remove tombstone after active row is gone");
+        let records = load_terminal_session_records(&path)
+            .expect("load terminal session records after second purge");
+        assert!(!records.contains_key("session-terminal"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn remote_session_new_preserves_ready_lifecycle_on_restore() {
+        let (input_tx, _input_rx) = mpsc::channel::<Value>();
+        let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
+        let retained_notification_events =
+            Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
+        let next_event_id = Arc::new(AtomicU64::new(0));
+        let lifecycle_policy = SessionLifecyclePolicy {
+            idle_expiry_millis: 5_000,
+            drain_grace_millis: 1_000,
+            reaper_interval_millis: 100,
+            tombstone_retention_millis: 10_000,
+        };
+        let session = RemoteSession::new(RemoteSessionInit {
+            session_id: "session-restore".to_string(),
+            agent_id: "agent-restore".to_string(),
+            capabilities: Vec::new(),
+            issued_capabilities: Vec::new(),
+            auth_context: SessionAuthContext::streamable_http_static_bearer(
+                "agent-restore",
+                "restore-token",
+                None,
+            ),
+            auth_mode_fingerprint: "auth-contract-v1".to_string(),
+            policy_fingerprint: "policy-contract-v1".to_string(),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle_policy: lifecycle_policy.clone(),
+            protocol_version: None,
+            peer_capabilities: None,
+            initialize_params: None,
+            lifecycle_snapshot: Some(RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Ready,
+                created_at: 11,
+                last_seen_at: 12,
+                idle_expires_at: 13,
+                drain_deadline_at: Some(14),
+            }),
+            input_tx,
+            event_tx,
+            retained_notification_events,
+            next_event_id,
+            session_db_path: None,
+            resume_integrity_secret: None,
+        });
+
+        let lifecycle = session.lifecycle_snapshot();
+        assert_eq!(lifecycle.state, RemoteSessionState::Ready);
+        assert_eq!(lifecycle.created_at, 11);
+        assert_eq!(lifecycle.last_seen_at, 12);
+        assert_eq!(lifecycle.idle_expires_at, 13);
+        assert_eq!(lifecycle.drain_deadline_at, None);
     }
 
     #[test]
@@ -997,8 +1544,9 @@ mod tests {
     }
 
     #[test]
-    fn shared_upstream_notification_fanout_copies_notifications_to_live_subscribers() {
+    fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queues() {
         let subscribers = Arc::new(StdMutex::new(Vec::new()));
+        let stats = SharedUpstreamNotificationStats::default();
         let queue_a = Arc::new(StdMutex::new(VecDeque::new()));
         let queue_b = Arc::new(StdMutex::new(VecDeque::new()));
         let dropped_queue = Arc::new(StdMutex::new(VecDeque::new()));
@@ -1011,6 +1559,7 @@ mod tests {
 
         fan_out_shared_upstream_notifications(
             &subscribers,
+            &stats,
             vec![
                 json!({"jsonrpc": "2.0", "method": "notifications/resources/list_changed"}),
                 json!({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}),
@@ -1026,9 +1575,10 @@ mod tests {
             Some("notifications/resources/list_changed")
         );
         assert_eq!(
-            queue_b[1]["method"].as_str(),
+            queue_a[1]["method"].as_str(),
             Some("notifications/tools/list_changed")
         );
+        assert_eq!(queue_a.as_slices(), queue_b.as_slices());
         drop(queue_a);
         drop(queue_b);
 

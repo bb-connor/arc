@@ -87,20 +87,22 @@ impl ArcKernel {
                 oracle_evidence: None,
                 attempted_cost: Some(attempted_cost),
             };
+            let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
+            let deny_extra_metadata =
+                merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
+            let request_metadata = request_receipt_metadata(
+                request,
+                self.attestation_trust_policy.as_ref(),
+                timestamp,
+                deny_extra_metadata.as_ref(),
+            )?;
 
             let metadata = merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_attribution_metadata(cap, Some(mg.index)),
-                        Some(serde_json::json!({ "financial": financial_meta })),
-                    ),
-                    extra_metadata.clone(),
+                    receipt_attribution_metadata(cap, Some(mg.index)),
+                    deny_extra_metadata,
                 ),
-                governed_request_metadata(
-                    request,
-                    self.attestation_trust_policy.as_ref(),
-                    timestamp,
-                )?,
+                request_metadata,
             );
             let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -195,6 +197,15 @@ impl ArcKernel {
             oracle_evidence: None,
             attempted_cost: Some(charge.cost_charged),
         };
+        let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
+        let deny_extra_metadata =
+            merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
+        let request_metadata = request_receipt_metadata(
+            request,
+            self.attestation_trust_policy.as_ref(),
+            timestamp,
+            deny_extra_metadata.as_ref(),
+        )?;
 
         let receipt_content = receipt_content_for_output(None, None)?;
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
@@ -213,17 +224,10 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_attribution_metadata(cap, Some(charge.grant_index)),
-                        Some(serde_json::json!({ "financial": financial_meta })),
-                    ),
-                    extra_metadata,
+                    receipt_attribution_metadata(cap, Some(charge.grant_index)),
+                    deny_extra_metadata,
                 ),
-                governed_request_metadata(
-                    request,
-                    self.attestation_trust_policy.as_ref(),
-                    timestamp,
-                )?,
+                request_metadata,
             ),
             timestamp,
             trust_level: arc_core::TrustLevel::default(),
@@ -271,8 +275,12 @@ impl ArcKernel {
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         let output = self.apply_stream_limits(output, elapsed)?;
-        let post_invocation =
-            self.apply_post_invocation_pipeline(request, output, extra_metadata)?;
+        let post_invocation = self.apply_post_invocation_pipeline(
+            request,
+            output,
+            Some(matched_grant_index),
+            extra_metadata,
+        )?;
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation.evidence);
         if let Some(reason) = post_invocation.blocked_reason.as_deref() {
@@ -545,6 +553,7 @@ impl ArcKernel {
         let post_invocation = self.apply_post_invocation_pipeline(
             request,
             limited_output,
+            Some(charge.grant_index),
             merge_metadata_objects(financial_json, extra_metadata.clone()),
         )?;
         let _post_invocation_evidence_scope =
@@ -595,6 +604,7 @@ impl ArcKernel {
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
+        matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<PostInvocationHandling, KernelError> {
         if self.post_invocation_pipeline.is_empty() {
@@ -607,9 +617,13 @@ impl ArcKernel {
         }
 
         let response = self.output_to_post_invocation_value(&output);
+        let context = crate::post_invocation::PostInvocationContext::from_request(
+            request,
+            matched_grant_index,
+        );
         let outcome = self
             .post_invocation_pipeline
-            .evaluate_with_evidence(&request.tool_name, &response);
+            .evaluate_with_context_and_evidence(&context, &response);
         let metadata =
             merge_metadata_objects(extra_metadata, self.post_invocation_metadata(&outcome));
 
@@ -798,6 +812,12 @@ impl ArcKernel {
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
         })?;
+        let request_metadata = request_receipt_metadata(
+            request,
+            self.attestation_trust_policy.as_ref(),
+            timestamp,
+            extra_metadata.as_ref(),
+        )?;
 
         let receipt = self.build_and_sign_receipt(ReceiptParams {
             capability_id: &cap.id,
@@ -811,14 +831,7 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_content.metadata,
-                        governed_request_metadata(
-                            request,
-                            self.attestation_trust_policy.as_ref(),
-                            timestamp,
-                        )?,
-                    ),
+                    merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
                 receipt_attribution_metadata(cap, matched_grant_index),
@@ -872,6 +885,12 @@ impl ArcKernel {
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
         })?;
+        let request_metadata = request_receipt_metadata(
+            request,
+            self.attestation_trust_policy.as_ref(),
+            timestamp,
+            extra_metadata.as_ref(),
+        )?;
 
         let receipt = self.build_and_sign_receipt(ReceiptParams {
             capability_id: &cap.id,
@@ -884,14 +903,7 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_content.metadata,
-                        governed_request_metadata(
-                            request,
-                            self.attestation_trust_policy.as_ref(),
-                            timestamp,
-                        )?,
-                    ),
+                    merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
                 receipt_attribution_metadata(cap, matched_grant_index),
@@ -967,6 +979,12 @@ impl ArcKernel {
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
         })?;
+        let request_metadata = request_receipt_metadata(
+            request,
+            self.attestation_trust_policy.as_ref(),
+            timestamp,
+            extra_metadata.as_ref(),
+        )?;
 
         let receipt = self.build_and_sign_receipt(ReceiptParams {
             capability_id: &cap.id,
@@ -979,14 +997,7 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_content.metadata,
-                        governed_request_metadata(
-                            request,
-                            self.attestation_trust_policy.as_ref(),
-                            timestamp,
-                        )?,
-                    ),
+                    merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
                 receipt_attribution_metadata(cap, matched_grant_index),
@@ -1057,19 +1068,18 @@ impl ArcKernel {
             }
             _ => None,
         };
+        let request_metadata = request_receipt_metadata(
+            request,
+            self.attestation_trust_policy.as_ref(),
+            timestamp,
+            extra_metadata.as_ref(),
+        )?;
 
         // Merge extra_metadata (e.g. "financial") into receipt_content.metadata.
         let metadata = merge_metadata_objects(
             merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_content.metadata,
-                        governed_request_metadata(
-                            request,
-                            self.attestation_trust_policy.as_ref(),
-                            timestamp,
-                        )?,
-                    ),
+                    merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
                 receipt_attribution_metadata(cap, matched_grant_index),
@@ -1289,6 +1299,12 @@ impl ArcKernel {
         // portable TCB stays in one place. The full kernel still owns body
         // construction (tenant scope resolution, policy_hash injection,
         // evidence assembly) because those are std/tokio-aware concerns.
+        //
+        // Verified-core boundary note:
+        // `formal/proof-manifest.toml` includes this shell method only for the
+        // direct call into `arc_kernel_core::sign_receipt`. Receipt body
+        // assembly, metadata shaping, and persistence remain operational-shell
+        // behavior outside the current bounded proof claim.
         let backend = arc_core::crypto::Ed25519Backend::new(self.config.keypair.clone());
         arc_kernel_core::sign_receipt(body, &backend).map_err(|error| {
             use arc_kernel_core::ReceiptSigningError;

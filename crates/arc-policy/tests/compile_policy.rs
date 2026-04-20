@@ -8,14 +8,48 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use arc_policy::{compile_policy, HushSpec};
+
+static TEMP_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A HushSpec policy that exercises every guard type the compiler knows how
 /// to emit. The rule / extension blocks are deliberately minimal -- we only
 /// need each block present and enabled; the specific patterns / thresholds
 /// are not the subject of this test.
-const ALL_TWELVE_GUARDS_YAML: &str = r#"
+fn sample_threat_intel_pattern_db() -> &'static str {
+    r#"
+[
+  {
+    "id": "known-prompt-injection",
+    "category": "prompt_injection",
+    "stage": "perception",
+    "label": "Known malicious prompt embedding",
+    "embedding": [1.0, 0.0, 0.0]
+  }
+]
+"#
+}
+
+fn write_temp_threat_intel_pattern_db() -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "arc-policy-compile-test-{}-{}-{}.json",
+        std::process::id(),
+        TEMP_DB_COUNTER.fetch_add(1, Ordering::Relaxed),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos()
+    ));
+    std::fs::write(&path, sample_threat_intel_pattern_db()).expect("write pattern db");
+    path
+}
+
+fn all_twelve_guards_yaml(pattern_db: &Path) -> String {
+    format!(
+        r#"
 hushspec: "0.1.0"
 name: phase-5.5-coverage
 description: Exercises every guard type the compiler can emit.
@@ -53,7 +87,7 @@ rules:
     enabled: true
     patterns:
       - name: aws
-        pattern: "AKIA[0-9A-Z]{16}"
+        pattern: "AKIA[0-9A-Z]{{16}}"
         severity: critical
     skip_paths:
       - "**/tests/**"
@@ -73,17 +107,26 @@ extensions:
       block_threshold: 70
       warn_threshold: 30
       max_input_bytes: 200000
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+      similarity_threshold: 0.8
+      top_k: 1
   origins:
     default_behavior: deny
     profiles:
       - id: default
         budgets:
           tool_calls: 1000
-"#;
+"#,
+        pattern_db.display()
+    )
+}
 
 #[test]
 fn compile_policy_emits_all_twelve_guard_types() {
-    let spec = HushSpec::parse(ALL_TWELVE_GUARDS_YAML).expect("parse hushspec");
+    let pattern_db = write_temp_threat_intel_pattern_db();
+    let spec = HushSpec::parse(&all_twelve_guards_yaml(&pattern_db)).expect("parse hushspec");
     let compiled = compile_policy(&spec).expect("compile should succeed");
 
     let expected: HashSet<&'static str> = [
@@ -93,11 +136,11 @@ fn compile_policy_emits_all_twelve_guard_types() {
         "internal-network",
         "mcp-tool",
         "secret-leak",
-        "response-sanitization",
         "patch-integrity",
         "path-allowlist",
         "prompt-injection",
         "jailbreak",
+        "spider-sense",
         "agent-velocity",
     ]
     .into_iter()
@@ -120,6 +163,8 @@ fn compile_policy_emits_all_twelve_guard_types() {
         "guard pipeline should contain at least 12 guards, found {}",
         compiled.guards.len()
     );
+
+    let _ = std::fs::remove_file(pattern_db);
 }
 
 #[test]
@@ -129,9 +174,11 @@ fn compile_policy_produces_vec_of_guards_accessible_via_pipeline() {
     // size. Together they satisfy the phase 5.5 acceptance wording that
     // `compile_policy(yaml)` produces a `Vec<Box<dyn Guard>>` containing
     // all 12 guard types.
-    let spec = HushSpec::parse(ALL_TWELVE_GUARDS_YAML).expect("parse hushspec");
+    let pattern_db = write_temp_threat_intel_pattern_db();
+    let spec = HushSpec::parse(&all_twelve_guards_yaml(&pattern_db)).expect("parse hushspec");
     let compiled = compile_policy(&spec).expect("compile should succeed");
     assert_eq!(compiled.guards.len(), compiled.guard_names.len());
+    let _ = std::fs::remove_file(pattern_db);
 }
 
 #[test]

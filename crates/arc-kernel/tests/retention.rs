@@ -36,7 +36,18 @@ mod retention {
     }
 
     fn receipt_with_capability_and_ts(id: &str, capability_id: &str, timestamp: u64) -> ArcReceipt {
+        receipt_with_capability_ts_and_tenant(id, capability_id, timestamp, None)
+    }
+
+    fn receipt_with_capability_ts_and_tenant(
+        id: &str,
+        capability_id: &str,
+        timestamp: u64,
+        tenant_id: Option<String>,
+    ) -> ArcReceipt {
         let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: id.to_string(),
@@ -44,17 +55,14 @@ mod retention {
                 capability_id: capability_id.to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: "abc123".to_string(),
-                },
+                action,
                 decision: Decision::Allow,
                 content_hash: "content-1".to_string(),
                 policy_hash: "policy-1".to_string(),
                 evidence: Vec::new(),
                 metadata: None,
                 trust_level: arc_core::TrustLevel::default(),
-                tenant_id: None,
+                tenant_id,
                 kernel_key: keypair.public_key(),
             },
             &keypair,
@@ -64,6 +72,10 @@ mod retention {
 
     fn receipt_with_ts(id: &str, timestamp: u64) -> ArcReceipt {
         receipt_with_capability_and_ts(id, "cap-1", timestamp)
+    }
+
+    fn receipt_with_tenant(id: &str, timestamp: u64, tenant_id: &str) -> ArcReceipt {
+        receipt_with_capability_ts_and_tenant(id, "cap-1", timestamp, Some(tenant_id.to_string()))
     }
 
     fn child_receipt_with_ts(id: &str, timestamp: u64) -> ChildRequestReceipt {
@@ -161,6 +173,137 @@ mod retention {
         let _ = fs::remove_file(&archive_path);
     }
 
+    #[test]
+    fn retention_archive_for_tenant_preserves_other_tenants() {
+        let live_path = unique_db_path("retention-tenant-live");
+        let archive_path = unique_db_path("retention-tenant-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-old", 100, "tenant-a"))
+            .unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-b-old", 100, "tenant-b"))
+            .unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-new", 200, "tenant-a"))
+            .unwrap();
+
+        let archived = store
+            .archive_receipts_before_for_tenant(150, archive_path.to_str().unwrap(), "tenant-a")
+            .unwrap();
+        assert_eq!(archived, 1, "should only archive tenant-a old receipt");
+        assert_eq!(store.tool_receipt_count().unwrap(), 2);
+
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        assert_eq!(
+            archive_store.tool_receipt_count().unwrap(),
+            1,
+            "archive should only contain tenant-a evidence selected by the scoped cutoff"
+        );
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
+    #[test]
+    fn retention_archive_for_tenant_archives_old_child_receipts() {
+        let live_path = unique_db_path("retention-tenant-child-live");
+        let archive_path = unique_db_path("retention-tenant-child-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        let tenant_a_parent = receipt_with_tenant("rcpt-a-old", 100, "tenant-a");
+        let tenant_b_parent = receipt_with_tenant("rcpt-b-old", 100, "tenant-b");
+        let tenant_a_child = child_receipt_with_ts("tenant-child-a", 100);
+        let tenant_b_child = child_receipt_with_ts("tenant-child-b", 100);
+        store
+            .append_arc_receipt_returning_seq(&tenant_a_parent)
+            .unwrap();
+        store
+            .append_arc_receipt_returning_seq(&tenant_b_parent)
+            .unwrap();
+        store.append_child_receipt(&tenant_a_child).unwrap();
+        store.append_child_receipt(&tenant_b_child).unwrap();
+        store
+            .record_receipt_lineage_statement_record(
+                &tenant_a_child.id,
+                Some(tenant_a_child.request_id.as_str()),
+                Some(tenant_a_child.session_id.as_str()),
+                None,
+                Some(tenant_a_child.parent_request_id.as_str()),
+                Some(&tenant_a_parent.id),
+                Some("tenant-a-chain"),
+                100,
+                &serde_json::json!({
+                    "child_receipt_id": tenant_a_child.id,
+                    "parent_receipt_id": tenant_a_parent.id,
+                    "parent_request_id": tenant_a_child.parent_request_id.as_str(),
+                    "child_request_id": tenant_a_child.request_id.as_str()
+                }),
+            )
+            .unwrap();
+        store
+            .record_receipt_lineage_statement_record(
+                &tenant_b_child.id,
+                Some(tenant_b_child.request_id.as_str()),
+                Some(tenant_b_child.session_id.as_str()),
+                None,
+                Some(tenant_b_child.parent_request_id.as_str()),
+                Some(&tenant_b_parent.id),
+                Some("tenant-b-chain"),
+                100,
+                &serde_json::json!({
+                    "child_receipt_id": tenant_b_child.id,
+                    "parent_receipt_id": tenant_b_parent.id,
+                    "parent_request_id": tenant_b_child.parent_request_id.as_str(),
+                    "child_request_id": tenant_b_child.request_id.as_str()
+                }),
+            )
+            .unwrap();
+
+        let archived = store
+            .archive_receipts_before_for_tenant(150, archive_path.to_str().unwrap(), "tenant-a")
+            .unwrap();
+        assert_eq!(archived, 1);
+        assert_eq!(store.tool_receipt_count().unwrap(), 1);
+        assert_eq!(store.child_receipt_count().unwrap(), 1);
+        assert_eq!(
+            store
+                .list_child_receipts(
+                    10,
+                    None,
+                    None,
+                    Some(tenant_b_child.request_id.as_str()),
+                    None,
+                    None
+                )
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        assert_eq!(archive_store.tool_receipt_count().unwrap(), 1);
+        assert_eq!(archive_store.child_receipt_count().unwrap(), 1);
+        assert_eq!(
+            archive_store
+                .list_child_receipts(
+                    10,
+                    None,
+                    None,
+                    Some(tenant_a_child.request_id.as_str()),
+                    None,
+                    None
+                )
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
     /// Size-based rotation: if the DB size exceeds max_size_bytes, rotate_if_needed
     /// archives some receipts.
     #[test]
@@ -185,6 +328,7 @@ mod retention {
             retention_days: 3650, // 10 years -- time threshold won't trigger
             max_size_bytes: current_size.saturating_sub(1),
             archive_path: archive_path.to_str().unwrap().to_string(),
+            tenant_id: None,
         };
 
         let archived = store.rotate_if_needed(&config).unwrap();

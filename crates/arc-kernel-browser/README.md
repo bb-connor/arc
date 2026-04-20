@@ -189,6 +189,15 @@ Phase 14.2 acceptance, verbatim from `docs/ROADMAP.md`:
 > `evaluate()` returns a verdict in <5ms. Receipt signing works using
 > Web Crypto for entropy.
 
+The repo-local qualification lane for this crate is:
+
+```bash
+./scripts/qualify-portable-browser.sh
+```
+
+It builds the browser package, records the emitted wasm artifact size,
+and runs the headless browser bindings test suite with latency output.
+
 Drive the acceptance flow from the `examples/` directory:
 
 1. `wasm-pack build --target web --release crates/arc-kernel-browser`.

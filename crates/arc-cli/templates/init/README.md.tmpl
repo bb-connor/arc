@@ -26,6 +26,33 @@ This project was scaffolded by `arc init`.
 3. The demo writes the local receipt store under `.arc/receipts.db` and prints
    the latest receipt after the governed tool call succeeds.
 
+## Prove The Loop
+
+After the demo works, prove one allow, one deny, and one receipt:
+
+```bash
+# Allow: the only governed tool in the starter policy
+arc check --policy ./policy.yaml \
+  --server hello \
+  --tool hello_world \
+  --params '{"name":"ARC"}'
+
+# Deny: any tool outside the starter capability should fail closed
+arc check --policy ./policy.yaml \
+  --server hello \
+  --tool read_file \
+  --params '{}'
+
+# Inspect the signed receipt store produced by the demo
+arc --receipt-db ./.arc/receipts.db receipt list --limit 5
+```
+
+Use the latest receipt id from that output with:
+
+```bash
+arc --receipt-db ./.arc/receipts.db receipt verify <receipt-id>
+```
+
 ## Customize It
 
 - Rename `hello_world` in `src/bin/hello_server.rs` to your first tool

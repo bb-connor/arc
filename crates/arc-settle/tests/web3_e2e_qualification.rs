@@ -315,6 +315,10 @@ fn sample_capital_instruction(
             subject_key: "subject-1".to_string(),
             source_id: "capital-source:facility:facility-1".to_string(),
             source_kind: CapitalBookSourceKind::FacilityCommitment,
+            governed_receipt_id: Some(format!("governed-{instruction_id}")),
+            completion_flow_row_id: Some(format!(
+                "economic-completion-flow:governed-{instruction_id}"
+            )),
             action: arc_core::credit::CapitalExecutionInstructionAction::TransferFunds,
             owner_role: CapitalExecutionRole::OperatorTreasury,
             counterparty_role: CapitalExecutionRole::AgentCounterparty,

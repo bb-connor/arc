@@ -1,7 +1,10 @@
 //! Post-invocation hook pipeline executed after a tool returns output.
 
 use arc_core::receipt::GuardEvidence;
+use arc_core::{AgentId, ArcScope, ServerId};
 use serde_json::Value;
+
+use crate::runtime::ToolCallRequest;
 
 /// Verdict from a post-invocation hook.
 #[derive(Debug, Clone)]
@@ -12,11 +15,48 @@ pub enum PostInvocationVerdict {
     Escalate(String),
 }
 
+/// Context available to post-invocation hooks after a tool has executed.
+#[derive(Clone, Copy, Debug)]
+pub struct PostInvocationContext<'a> {
+    pub tool_name: &'a str,
+    pub request: Option<&'a ToolCallRequest>,
+    pub scope: Option<&'a ArcScope>,
+    pub agent_id: Option<&'a AgentId>,
+    pub server_id: Option<&'a ServerId>,
+    pub matched_grant_index: Option<usize>,
+}
+
+impl<'a> PostInvocationContext<'a> {
+    #[must_use]
+    pub fn synthetic(tool_name: &'a str) -> Self {
+        Self {
+            tool_name,
+            request: None,
+            scope: None,
+            agent_id: None,
+            server_id: None,
+            matched_grant_index: None,
+        }
+    }
+
+    #[must_use]
+    pub fn from_request(request: &'a ToolCallRequest, matched_grant_index: Option<usize>) -> Self {
+        Self {
+            tool_name: request.tool_name.as_str(),
+            request: Some(request),
+            scope: Some(&request.capability.scope),
+            agent_id: Some(&request.agent_id),
+            server_id: Some(&request.server_id),
+            matched_grant_index,
+        }
+    }
+}
+
 /// A hook that inspects tool responses after invocation.
 pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
 
-    fn inspect(&self, tool_name: &str, response: &Value) -> PostInvocationVerdict;
+    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
 
     fn take_evidence(&self) -> Option<GuardEvidence> {
         None
@@ -58,12 +98,22 @@ impl PostInvocationPipeline {
 
     #[must_use]
     pub fn evaluate_with_evidence(&self, tool_name: &str, response: &Value) -> PipelineOutcome {
+        let context = PostInvocationContext::synthetic(tool_name);
+        self.evaluate_with_context_and_evidence(&context, response)
+    }
+
+    #[must_use]
+    pub fn evaluate_with_context_and_evidence(
+        &self,
+        context: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PipelineOutcome {
         let mut current_response = response.clone();
         let mut escalations = Vec::new();
         let mut evidence = Vec::new();
 
         for hook in &self.hooks {
-            let verdict = hook.inspect(tool_name, &current_response);
+            let verdict = hook.inspect(context, &current_response);
             if let Some(ev) = hook.take_evidence() {
                 evidence.push(ev);
             }

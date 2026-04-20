@@ -169,9 +169,14 @@ impl SqliteReceiptStore {
 
         rows.map(|row| {
             let (seq, raw_json) = row?;
+            let seq = seq.max(0) as u64;
             Ok(EvidenceChildReceiptRecord {
-                seq: seq.max(0) as u64,
-                receipt: serde_json::from_str(&raw_json)?,
+                seq,
+                receipt: crate::receipt_store::decode_verified_child_receipt(
+                    &raw_json,
+                    "persisted child receipt",
+                    Some(seq),
+                )?,
             })
         })
         .collect()

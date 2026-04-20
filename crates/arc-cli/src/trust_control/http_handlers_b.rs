@@ -1384,6 +1384,46 @@ async fn handle_metered_billing_report(
     }
 }
 
+async fn handle_economic_receipt_report(
+    State(state): State<TrustServiceState>,
+    Query(query): Query<OperatorReportQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+
+    match receipt_store.query_economic_receipt_projection_report(&query) {
+        Ok(report) => Json::<EconomicReceiptProjectionReport>(report).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_economic_completion_flow_report(
+    State(state): State<TrustServiceState>,
+    Query(query): Query<ExposureLedgerQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+
+    match build_economic_completion_flow_report(&receipt_store, &query) {
+        Ok(report) => Json::<EconomicCompletionFlowReport>(report).into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
 async fn handle_authorization_context_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<OperatorReportQuery>,
@@ -2306,12 +2346,16 @@ async fn handle_reverse_charge_cost(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let authority = match current_budget_event_authority(&state) {
-        Ok(authority) => authority,
-        Err(response) => return response,
-    };
     let mut store = match open_budget_store(&state.config) {
         Ok(store) => store,
+        Err(response) => return response,
+    };
+    let authority = match resolve_budget_hold_authority(
+        &state,
+        &mut store,
+        payload.hold_id.as_deref(),
+    ) {
+        Ok(authority) => authority,
         Err(response) => return response,
     };
     if let Err(error) = store.reverse_charge_cost_with_ids_and_authority(
@@ -2369,12 +2413,16 @@ async fn handle_reduce_charge_cost(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let authority = match current_budget_event_authority(&state) {
-        Ok(authority) => authority,
-        Err(response) => return response,
-    };
     let mut store = match open_budget_store(&state.config) {
         Ok(store) => store,
+        Err(response) => return response,
+    };
+    let authority = match resolve_budget_hold_authority(
+        &state,
+        &mut store,
+        payload.hold_id.as_deref(),
+    ) {
+        Ok(authority) => authority,
         Err(response) => return response,
     };
     let reconcile_result = if let (Some(exposure_units), Some(realized_spend_units)) =
@@ -2432,4 +2480,24 @@ async fn handle_reduce_charge_cost(
         committed_response,
     )
     .await
+}
+
+fn resolve_budget_hold_authority(
+    state: &TrustServiceState,
+    store: &mut SqliteBudgetStore,
+    hold_id: Option<&str>,
+) -> Result<Option<BudgetEventAuthority>, Response> {
+    if let Some(hold_id) = hold_id {
+        match store.hold_authority(hold_id) {
+            Ok(Some(authority)) => return Ok(Some(authority)),
+            Ok(None) => {}
+            Err(error) => {
+                return Err(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error.to_string(),
+                ));
+            }
+        }
+    }
+    current_budget_event_authority(state)
 }

@@ -15,7 +15,7 @@ use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::capability::ProvenanceEvidenceClass;
+use crate::capability::{ModelMetadata, ProvenanceEvidenceClass};
 use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::Result;
 use crate::{AgentId, CapabilityToken, ServerId};
@@ -1186,6 +1186,8 @@ pub struct ToolCallOperation {
     pub server_id: ServerId,
     pub tool_name: String,
     pub arguments: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_metadata: Option<ModelMetadata>,
 }
 
 /// Resource metadata exposed through the session layer.
@@ -1584,6 +1586,12 @@ mod tests {
             server_id: "srv-a".to_string(),
             tool_name: "read_file".to_string(),
             arguments: serde_json::json!({"path": "/app/src/lib.rs"}),
+            model_metadata: Some(ModelMetadata {
+                model_id: "gpt-5".to_string(),
+                safety_tier: None,
+                provider: Some("openai".to_string()),
+                provenance_class: ProvenanceEvidenceClass::Observed,
+            }),
         });
 
         let encoded = serde_json::to_string(&op).unwrap();
@@ -1594,6 +1602,20 @@ mod tests {
                 assert_eq!(payload.server_id, "srv-a");
                 assert_eq!(payload.tool_name, "read_file");
                 assert_eq!(payload.arguments["path"], "/app/src/lib.rs");
+                assert_eq!(
+                    payload
+                        .model_metadata
+                        .as_ref()
+                        .map(|metadata| metadata.model_id.as_str()),
+                    Some("gpt-5")
+                );
+                assert_eq!(
+                    payload
+                        .model_metadata
+                        .as_ref()
+                        .map(|metadata| metadata.provenance_class),
+                    Some(ProvenanceEvidenceClass::Observed)
+                );
             }
             _ => panic!("expected tool call"),
         }

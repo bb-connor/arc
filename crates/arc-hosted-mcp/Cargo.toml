@@ -6,6 +6,8 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
+publish = false
 
 [lib]
 name = "arc_hosted_mcp"
@@ -31,6 +33,7 @@ rsa = { version = "0.9", features = ["sha2"] }
 p256 = { version = "0.13", features = ["ecdsa"] }
 p384 = { version = "0.13", features = ["ecdsa"] }
 sha2 = { workspace = true }
+subtle = "2.6"
 
 [dev-dependencies]
 arc-siem = { package = "arc-siem", path = "../arc-siem" }

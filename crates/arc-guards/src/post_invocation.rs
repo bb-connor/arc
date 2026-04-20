@@ -19,7 +19,8 @@
 
 use arc_core::receipt::GuardEvidence;
 pub use arc_kernel::{
-    PipelineOutcome, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationPipeline,
+    PostInvocationVerdict,
 };
 use serde_json::Value;
 
@@ -106,7 +107,7 @@ impl PostInvocationHook for SanitizerHook {
         &self.hook_name
     }
 
-    fn inspect(&self, _tool_name: &str, response: &Value) -> PostInvocationVerdict {
+    fn inspect(&self, _ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
         let sanitized = self.sanitizer.sanitize_value(response);
         if !sanitized.was_redacted {
             // Clear any stale evidence from a previous run.
@@ -189,7 +190,11 @@ mod tests {
         fn name(&self) -> &str {
             "allow-all"
         }
-        fn inspect(&self, _tool: &str, _resp: &Value) -> PostInvocationVerdict {
+        fn inspect(
+            &self,
+            _ctx: &PostInvocationContext<'_>,
+            _resp: &Value,
+        ) -> PostInvocationVerdict {
             PostInvocationVerdict::Allow
         }
     }
@@ -199,7 +204,11 @@ mod tests {
         fn name(&self) -> &str {
             "block-all"
         }
-        fn inspect(&self, _tool: &str, _resp: &Value) -> PostInvocationVerdict {
+        fn inspect(
+            &self,
+            _ctx: &PostInvocationContext<'_>,
+            _resp: &Value,
+        ) -> PostInvocationVerdict {
             PostInvocationVerdict::Block(self.0.clone())
         }
     }
@@ -209,7 +218,11 @@ mod tests {
         fn name(&self) -> &str {
             "redact-all"
         }
-        fn inspect(&self, _tool: &str, _resp: &Value) -> PostInvocationVerdict {
+        fn inspect(
+            &self,
+            _ctx: &PostInvocationContext<'_>,
+            _resp: &Value,
+        ) -> PostInvocationVerdict {
             PostInvocationVerdict::Redact(serde_json::json!({"redacted": true}))
         }
     }
@@ -219,7 +232,11 @@ mod tests {
         fn name(&self) -> &str {
             "escalate"
         }
-        fn inspect(&self, _tool: &str, _resp: &Value) -> PostInvocationVerdict {
+        fn inspect(
+            &self,
+            _ctx: &PostInvocationContext<'_>,
+            _resp: &Value,
+        ) -> PostInvocationVerdict {
             PostInvocationVerdict::Escalate(self.0.clone())
         }
     }

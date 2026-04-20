@@ -14,5 +14,19 @@
 
 #[allow(clippy::unwrap_used)]
 fn main() {
+    println!("cargo:rerun-if-env-changed=ANDROID_NDK_HOME");
+    println!("cargo:rerun-if-env-changed=ANDROID_NDK_ROOT");
+    println!("cargo:rerun-if-env-changed=CARGO_NDK_ANDROID_PLATFORM");
+
+    if std::env::var("CARGO_CFG_TARGET_OS").ok().as_deref() == Some("android")
+        && std::env::var_os("ANDROID_NDK_HOME").is_none()
+        && std::env::var_os("ANDROID_NDK_ROOT").is_none()
+        && std::env::var_os("CARGO_NDK_ANDROID_PLATFORM").is_none()
+    {
+        println!(
+            "cargo:warning=arc-kernel-mobile Android builds require a real NDK toolchain; use cargo ndk or set ANDROID_NDK_HOME/ANDROID_NDK_ROOT."
+        );
+    }
+
     uniffi::generate_scaffolding("src/arc_kernel_mobile.udl").unwrap();
 }

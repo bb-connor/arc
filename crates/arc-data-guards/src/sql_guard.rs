@@ -15,7 +15,7 @@
 //! - the guard passes non-`DatabaseQuery` actions through with
 //!   `Verdict::Allow` (guards are additive).
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use tracing::warn;
 
 use arc_guards::{extract_action, ToolAction};
@@ -31,13 +31,37 @@ pub struct SqlQueryGuard {
     denylist_regex: Vec<(String, Regex)>,
 }
 
+const MAX_DENYLISTED_PREDICATES: usize = 64;
+const MAX_DENYLISTED_PREDICATE_LEN: usize = 512;
+const MAX_DENYLISTED_PREDICATE_COMPLEXITY: usize = 96;
+const DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT: usize = 1 << 20;
+const DENYLISTED_PREDICATE_DFA_SIZE_LIMIT: usize = 1 << 20;
+
 impl SqlQueryGuard {
     /// Construct a new guard with the given configuration.
     ///
-    /// Invalid regex patterns in `denylisted_predicates` are logged and
-    /// skipped; every other pattern compiles to a case-insensitive matcher
-    /// against the canonicalized WHERE clause.
+    /// Invalid or over-broad `denylisted_predicates` produce a guard that
+    /// denies every SQL query. Use [`Self::try_new`] when policy loading should
+    /// reject invalid configurations directly.
     pub fn new(config: SqlGuardConfig) -> Self {
+        match Self::try_new(config) {
+            Ok(guard) => guard,
+            Err(error) => {
+                warn!(
+                    target: "arc.data-guards.sql",
+                    error = %error,
+                    "invalid sql-query-guard config; constructing fail-closed deny-all guard"
+                );
+                Self {
+                    config: SqlGuardConfig::default(),
+                    denylist_regex: Vec::new(),
+                }
+            }
+        }
+    }
+
+    /// Construct a new guard or reject invalid user-supplied regex patterns.
+    pub fn try_new(config: SqlGuardConfig) -> Result<Self, String> {
         if config.allow_all {
             warn!(
                 target: "arc.data-guards.sql",
@@ -45,23 +69,43 @@ impl SqlQueryGuard {
             );
         }
 
+        if config.denylisted_predicates.len() > MAX_DENYLISTED_PREDICATES {
+            return Err(format!(
+                "sql_query.denylisted_predicates allows at most {MAX_DENYLISTED_PREDICATES} patterns"
+            ));
+        }
         let mut denylist_regex = Vec::with_capacity(config.denylisted_predicates.len());
         for pattern in &config.denylisted_predicates {
-            match Regex::new(&format!("(?i){pattern}")) {
-                Ok(re) => denylist_regex.push((pattern.clone(), re)),
-                Err(e) => warn!(
-                    target: "arc.data-guards.sql",
-                    pattern = %pattern,
-                    error = %e,
-                    "invalid denylist regex, skipping"
-                ),
+            let trimmed = pattern.trim();
+            if trimmed.is_empty() {
+                return Err("sql_query.denylisted_predicates cannot contain empty patterns".into());
             }
+            if trimmed.len() > MAX_DENYLISTED_PREDICATE_LEN {
+                return Err(format!(
+                    "sql_query.denylisted_predicates entries must be at most {MAX_DENYLISTED_PREDICATE_LEN} characters"
+                ));
+            }
+            let complexity = predicate_pattern_complexity(trimmed);
+            if complexity > MAX_DENYLISTED_PREDICATE_COMPLEXITY {
+                return Err(format!(
+                    "sql_query.denylisted_predicates entries must have complexity at most {MAX_DENYLISTED_PREDICATE_COMPLEXITY}"
+                ));
+            }
+            let re = RegexBuilder::new(trimmed)
+                .case_insensitive(true)
+                .size_limit(DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT)
+                .dfa_size_limit(DENYLISTED_PREDICATE_DFA_SIZE_LIMIT)
+                .build()
+                .map_err(|error| {
+                    format!("invalid sql_query.denylisted_predicates entry `{trimmed}`: {error}")
+                })?;
+            denylist_regex.push((trimmed.to_string(), re));
         }
 
-        Self {
+        Ok(Self {
             config,
             denylist_regex,
-        }
+        })
     }
 
     /// Read-only access to the configuration (useful for tests and
@@ -232,6 +276,24 @@ impl SqlQueryGuard {
         }
         Ok(())
     }
+}
+
+fn predicate_pattern_complexity(pattern: &str) -> usize {
+    let mut score = 0usize;
+    let mut escaped = false;
+    for ch in pattern.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '|' | '*' | '+' | '?' => score = score.saturating_add(4),
+            '{' | '[' | '(' => score = score.saturating_add(2),
+            _ => {}
+        }
+    }
+    score
 }
 
 impl arc_kernel::Guard for SqlQueryGuard {

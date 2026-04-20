@@ -1,7 +1,8 @@
 use super::support::{
-    checkpoint_error_to_receipt_store, ensure_checkpoint_transparency_guards,
-    load_claim_tree_canonical_bytes_range, load_persisted_checkpoint_row,
-    parse_persisted_checkpoint_row, verify_checkpoint_chain_integrity,
+    checkpoint_error_to_receipt_store, ensure_arc_receipt_verified,
+    ensure_checkpoint_transparency_guards, load_claim_tree_canonical_bytes_range,
+    load_persisted_checkpoint_row, parse_persisted_checkpoint_row,
+    verify_checkpoint_chain_integrity,
 };
 use super::*;
 
@@ -10,6 +11,7 @@ impl SqliteReceiptStore {
         &self,
         receipt: &ArcReceipt,
     ) -> Result<u64, ReceiptStoreError> {
+        ensure_arc_receipt_verified(receipt)?;
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
         let mut connection = self.connection()?;
@@ -219,6 +221,19 @@ impl SqliteReceiptStore {
         Ok(ts.map(|t| t.max(0) as u64))
     }
 
+    /// Return the oldest live receipt timestamp for a tenant.
+    pub fn oldest_receipt_timestamp_for_tenant(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let ts = self.connection()?.query_row(
+            "SELECT MIN(timestamp) FROM arc_tool_receipts WHERE tenant_id = ?1",
+            params![tenant_id],
+            |row| row.get::<_, Option<i64>>(0),
+        )?;
+        Ok(ts.map(|t| t.max(0) as u64))
+    }
+
     /// Archive all receipts with `timestamp < cutoff_unix_secs` to an external
     /// SQLite file, then delete them from the live database.
     ///
@@ -231,6 +246,26 @@ impl SqliteReceiptStore {
         &mut self,
         cutoff_unix_secs: u64,
         archive_path: &str,
+    ) -> Result<u64, ReceiptStoreError> {
+        self.archive_receipts_before_scoped(cutoff_unix_secs, archive_path, None)
+    }
+
+    /// Archive receipts for a single tenant without deleting other tenants'
+    /// evidence that may have a longer retention window.
+    pub fn archive_receipts_before_for_tenant(
+        &mut self,
+        cutoff_unix_secs: u64,
+        archive_path: &str,
+        tenant_id: &str,
+    ) -> Result<u64, ReceiptStoreError> {
+        self.archive_receipts_before_scoped(cutoff_unix_secs, archive_path, Some(tenant_id))
+    }
+
+    fn archive_receipts_before_scoped(
+        &mut self,
+        cutoff_unix_secs: u64,
+        archive_path: &str,
+        tenant_id: Option<&str>,
     ) -> Result<u64, ReceiptStoreError> {
         // Escape single quotes in the path to safely embed it in an ATTACH statement.
         let escaped_path = archive_path.replace('\'', "''");
@@ -302,31 +337,72 @@ impl SqliteReceiptStore {
         let cutoff = cutoff_unix_secs as i64;
 
         // Copy qualifying receipts to the archive (ignore duplicates from prior runs).
-        self.connection()?.execute(
-            "INSERT OR IGNORE INTO archive.arc_tool_receipts \
-             SELECT * FROM main.arc_tool_receipts WHERE timestamp < ?1",
-            params![cutoff],
-        )?;
-        self.connection()?.execute(
-            "INSERT OR IGNORE INTO archive.arc_child_receipts \
-             SELECT * FROM main.arc_child_receipts WHERE timestamp < ?1",
-            params![cutoff],
-        )?;
-        self.connection()?.execute(
-            "INSERT OR IGNORE INTO archive.capability_lineage
-             SELECT DISTINCT cl.*
-             FROM main.capability_lineage cl
-             INNER JOIN main.arc_tool_receipts r ON r.capability_id = cl.capability_id
-             WHERE r.timestamp < ?1",
-            params![cutoff],
-        )?;
+        match tenant_id {
+            Some(tenant_id) => {
+                self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.arc_tool_receipts \
+                     SELECT * FROM main.arc_tool_receipts WHERE timestamp < ?1 AND tenant_id = ?2",
+                    params![cutoff, tenant_id],
+                )?;
+                self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.arc_child_receipts \
+                     SELECT child.* \
+                     FROM main.arc_child_receipts child \
+                     WHERE child.timestamp < ?1 \
+                       AND EXISTS ( \
+                           SELECT 1 \
+                           FROM main.receipt_lineage_statements lineage \
+                           INNER JOIN main.arc_tool_receipts parent \
+                               ON parent.receipt_id = lineage.parent_receipt_id \
+                           WHERE lineage.receipt_id = child.receipt_id \
+                             AND parent.tenant_id = ?2 \
+                       )",
+                    params![cutoff, tenant_id],
+                )?;
+                self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.capability_lineage
+                     SELECT DISTINCT cl.*
+                     FROM main.capability_lineage cl
+                     INNER JOIN main.arc_tool_receipts r ON r.capability_id = cl.capability_id
+                     WHERE r.timestamp < ?1 AND r.tenant_id = ?2",
+                    params![cutoff, tenant_id],
+                )?;
+            }
+            None => {
+                self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.arc_tool_receipts \
+                     SELECT * FROM main.arc_tool_receipts WHERE timestamp < ?1",
+                    params![cutoff],
+                )?;
+                self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.arc_child_receipts \
+                     SELECT * FROM main.arc_child_receipts WHERE timestamp < ?1",
+                    params![cutoff],
+                )?;
+                self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.capability_lineage
+                     SELECT DISTINCT cl.*
+                     FROM main.capability_lineage cl
+                     INNER JOIN main.arc_tool_receipts r ON r.capability_id = cl.capability_id
+                     WHERE r.timestamp < ?1",
+                    params![cutoff],
+                )?;
+            }
+        }
 
         // Find the maximum seq among archived receipts (for checkpoint filtering).
-        let max_archived_seq: Option<i64> = self.connection()?.query_row(
-            "SELECT MAX(seq) FROM main.arc_tool_receipts WHERE timestamp < ?1",
-            params![cutoff],
-            |row| row.get(0),
-        )?;
+        let max_archived_seq: Option<i64> = match tenant_id {
+            Some(tenant_id) => self.connection()?.query_row(
+                "SELECT MAX(seq) FROM main.arc_tool_receipts WHERE timestamp < ?1 AND tenant_id = ?2",
+                params![cutoff, tenant_id],
+                |row| row.get(0),
+            )?,
+            None => self.connection()?.query_row(
+                "SELECT MAX(seq) FROM main.arc_tool_receipts WHERE timestamp < ?1",
+                params![cutoff],
+                |row| row.get(0),
+            )?,
+        };
 
         if let Some(max_seq) = max_archived_seq {
             // Copy checkpoint rows whose full batch is covered by the archived receipts.
@@ -364,14 +440,44 @@ impl SqliteReceiptStore {
         }
 
         // Delete archived receipts from the live database.
-        let deleted = self.connection()?.execute(
-            "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1",
-            params![cutoff],
-        )? as u64;
-        self.connection()?.execute(
-            "DELETE FROM main.arc_child_receipts WHERE timestamp < ?1",
-            params![cutoff],
-        )?;
+        let deleted = match tenant_id {
+            Some(tenant_id) => {
+                // Delete linked child receipts before deleting their tenant parent receipts,
+                // because the tenant association is derived through receipt_lineage_statements.
+                self.connection()?.execute(
+                    "DELETE FROM main.arc_child_receipts \
+                     WHERE rowid IN ( \
+                         SELECT child.rowid \
+                         FROM main.arc_child_receipts child \
+                         WHERE child.timestamp < ?1 \
+                           AND EXISTS ( \
+                               SELECT 1 \
+                               FROM main.receipt_lineage_statements lineage \
+                               INNER JOIN main.arc_tool_receipts parent \
+                                   ON parent.receipt_id = lineage.parent_receipt_id \
+                               WHERE lineage.receipt_id = child.receipt_id \
+                                 AND parent.tenant_id = ?2 \
+                           ) \
+                    )",
+                    params![cutoff, tenant_id],
+                )?;
+                self.connection()?.execute(
+                    "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1 AND tenant_id = ?2",
+                    params![cutoff, tenant_id],
+                )? as u64
+            }
+            None => {
+                let deleted = self.connection()?.execute(
+                    "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1",
+                    params![cutoff],
+                )? as u64;
+                self.connection()?.execute(
+                    "DELETE FROM main.arc_child_receipts WHERE timestamp < ?1",
+                    params![cutoff],
+                )?;
+                deleted
+            }
+        };
 
         // Detach the archive and checkpoint WAL.
         self.connection()?
@@ -396,11 +502,22 @@ impl SqliteReceiptStore {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
-        let oldest = self.oldest_receipt_timestamp()?;
+        let tenant_id = config.tenant_id.as_deref();
+        let oldest = match tenant_id {
+            Some(tenant_id) => self.oldest_receipt_timestamp_for_tenant(tenant_id)?,
+            None => self.oldest_receipt_timestamp()?,
+        };
 
         if let Some(oldest_ts) = oldest {
             if oldest_ts < time_cutoff {
-                return self.archive_receipts_before(time_cutoff, &config.archive_path);
+                return match tenant_id {
+                    Some(tenant_id) => self.archive_receipts_before_for_tenant(
+                        time_cutoff,
+                        &config.archive_path,
+                        tenant_id,
+                    ),
+                    None => self.archive_receipts_before(time_cutoff, &config.archive_path),
+                };
             }
         }
 
@@ -408,22 +525,47 @@ impl SqliteReceiptStore {
         let size = self.db_size_bytes()?;
         if size > config.max_size_bytes {
             // Use the median timestamp as the cutoff to archive roughly half the receipts.
-            let median_cutoff: Option<i64> = self
-                .connection()?
-                .query_row(
-                    r#"
-                    SELECT timestamp FROM arc_tool_receipts
-                    ORDER BY timestamp
-                    LIMIT 1
-                    OFFSET (SELECT COUNT(*) FROM arc_tool_receipts) / 2
-                    "#,
-                    [],
-                    |row| row.get(0),
-                )
-                .optional()?;
+            let median_cutoff: Option<i64> = match tenant_id {
+                Some(tenant_id) => self
+                    .connection()?
+                    .query_row(
+                        r#"
+                        SELECT timestamp FROM arc_tool_receipts
+                        WHERE tenant_id = ?1
+                        ORDER BY timestamp
+                        LIMIT 1
+                        OFFSET (SELECT COUNT(*) FROM arc_tool_receipts WHERE tenant_id = ?1) / 2
+                        "#,
+                        params![tenant_id],
+                        |row| row.get(0),
+                    )
+                    .optional()?,
+                None => self
+                    .connection()?
+                    .query_row(
+                        r#"
+                        SELECT timestamp FROM arc_tool_receipts
+                        ORDER BY timestamp
+                        LIMIT 1
+                        OFFSET (SELECT COUNT(*) FROM arc_tool_receipts) / 2
+                        "#,
+                        [],
+                        |row| row.get(0),
+                    )
+                    .optional()?,
+            };
 
             if let Some(cutoff) = median_cutoff {
-                return self.archive_receipts_before(cutoff.max(0) as u64, &config.archive_path);
+                return match tenant_id {
+                    Some(tenant_id) => self.archive_receipts_before_for_tenant(
+                        cutoff.max(0) as u64,
+                        &config.archive_path,
+                        tenant_id,
+                    ),
+                    None => {
+                        self.archive_receipts_before(cutoff.max(0) as u64, &config.archive_path)
+                    }
+                };
             }
         }
 
@@ -456,12 +598,12 @@ impl SqliteReceiptStore {
         // WHERE fragment. Three modes:
         //
         //   * `tenant_filter = None`           -> "1=1" (admin/compat).
-        //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=false
-        //     (default) -> `tenant_id = ?X OR tenant_id IS NULL` so
-        //     legacy pre-1.5 receipts stay visible during the
-        //     transition.
         //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=true
         //     -> `tenant_id = ?X` (legacy rows hidden).
+        //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=false
+        //     -> `tenant_id = ?X OR tenant_id IS NULL` so legacy
+        //     pre-1.5 receipts stay visible during explicit
+        //     compatibility mode.
         //
         // Bound parameter ?12 carries the tenant string when present.
         // When `tenant_filter = None`, `?12 IS NULL` makes the fragment
@@ -616,11 +758,10 @@ impl SqliteReceiptStore {
         let mut receipts = Vec::new();
         for row in rows {
             let (seq, raw_json) = row?;
-            let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
-            receipts.push(StoredToolReceipt {
-                seq: seq.max(0) as u64,
-                receipt,
-            });
+            let seq = seq.max(0) as u64;
+            let receipt =
+                decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
+            receipts.push(StoredToolReceipt { seq, receipt });
         }
 
         // Execute count query (same filters, no cursor, no limit).

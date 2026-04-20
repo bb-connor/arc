@@ -239,6 +239,9 @@ pub enum KernelError {
     #[error("unknown session: {0}")]
     UnknownSession(SessionId),
 
+    #[error("session already exists: {0}")]
+    SessionAlreadyExists(SessionId),
+
     #[error("session error: {0}")]
     Session(#[from] SessionError),
 
@@ -408,6 +411,11 @@ impl KernelError {
                 "ARC-KERNEL-UNKNOWN-SESSION",
                 serde_json::json!({ "session_id": session_id.to_string() }),
                 "Create the session first or reuse a session ID returned by the kernel before issuing follow-up operations.",
+            ),
+            Self::SessionAlreadyExists(session_id) => self.report_with_context(
+                "ARC-KERNEL-SESSION-ALREADY-EXISTS",
+                serde_json::json!({ "session_id": session_id.to_string() }),
+                "Use a fresh session ID or drop the duplicate restored record before opening the session.",
             ),
             Self::Session(error) => self.report_with_context(
                 "ARC-KERNEL-SESSION",
@@ -3254,6 +3262,10 @@ impl ArcKernel {
         self.config.keypair.public_key()
     }
 
+    pub fn capability_issuer_is_trusted(&self, issuer: &arc_core::PublicKey) -> bool {
+        self.trusted_issuer_keys().contains(issuer)
+    }
+
     /// Verify the capability's signature against the trusted CA keys or the
     /// kernel's own key (for locally-issued capabilities).
     /// Resolve the trusted-issuer set for capability verification.
@@ -3306,6 +3318,12 @@ impl ArcKernel {
     /// it does not require a tokio runtime, a sqlite database, or any
     /// IO adapter. The full `evaluate_tool_call_*` API remains the
     /// authoritative path for the desktop sidecar.
+    ///
+    /// Verified-core boundary note:
+    /// `formal/proof-manifest.toml` treats this shell method as the one
+    /// `arc-kernel` entrypoint inside the current bounded verified core,
+    /// because it delegates directly to `arc_kernel_core::evaluate` after
+    /// supplying trusted issuers and portable guard/context wiring.
     pub fn evaluate_portable_verdict<'a>(
         &self,
         capability: &'a CapabilityToken,

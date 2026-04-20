@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_core::appraisal::{
@@ -131,6 +131,7 @@ use arc_kernel::{
     ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry, ExposureLedgerEvidenceKind,
     ExposureLedgerEvidenceReference, ExposureLedgerQuery, ExposureLedgerReceiptEntry,
     ExposureLedgerReport, ExposureLedgerSummary, ExposureLedgerSupportBoundary,
+    EconomicCompletionFlowReport, EconomicReceiptProjectionReport,
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition,
     LiabilityBoundCoverageArtifact, LiabilityClaimAdjudicationArtifact,
     LiabilityClaimAdjudicationOutcome, LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind,
@@ -203,11 +204,13 @@ use axum::{Json, Router};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
+use subtle::ConstantTimeEq;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
 use ureq::Agent;
 use url::form_urlencoded::Serializer as UrlFormSerializer;
+use url::{Host, Url};
 
 use crate::{
     authority_public_key_from_seed_file,
@@ -341,6 +344,14 @@ const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/del
 const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
 const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
 const INTERNAL_LINEAGE_DELTA_PATH: &str = "/v1/internal/lineage/delta";
+const CLUSTER_NODE_ID_HEADER: &str = "x-arc-cluster-node-id";
+const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-arc-cluster-auth-issued-at";
+const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-arc-cluster-auth-signature";
+const CLUSTER_AUTH_TERM_HEADER: &str = "x-arc-cluster-auth-term";
+const CLUSTER_AUTH_SCHEME: &str = "arc.cluster.peer.v1";
+const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
+const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;
+const CLUSTER_AUTH_FAILURE_BURST: usize = 8;
 const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
 const RECEIPT_ANALYTICS_PATH: &str = "/v1/receipts/analytics";
 const EVIDENCE_EXPORT_PATH: &str = "/v1/evidence/export";
@@ -398,6 +409,8 @@ const SETTLEMENT_REPORT_PATH: &str = "/v1/reports/settlements";
 const SETTLEMENT_RECONCILE_PATH: &str = "/v1/settlements/reconcile";
 const METERED_BILLING_REPORT_PATH: &str = "/v1/reports/metered-billing";
 const METERED_BILLING_RECONCILE_PATH: &str = "/v1/metered-billing/reconcile";
+const ECONOMIC_RECEIPT_REPORT_PATH: &str = "/v1/reports/economic-receipts";
+const ECONOMIC_COMPLETION_FLOW_REPORT_PATH: &str = "/v1/reports/economic-completion-flow";
 const AUTHORIZATION_CONTEXT_REPORT_PATH: &str = "/v1/reports/authorization-context";
 const AUTHORIZATION_PROFILE_METADATA_PATH: &str = "/v1/reports/authorization-profile-metadata";
 const AUTHORIZATION_REVIEW_PACK_PATH: &str = "/v1/reports/authorization-review-pack";
@@ -420,6 +433,7 @@ const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
 const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 const DEFAULT_LIST_LIMIT: usize = 50;
 const MAX_LIST_LIMIT: usize = 200;
+const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
 const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
 const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 const CLUSTER_SNAPSHOT_RECORD_THRESHOLD: u64 = 8;
@@ -445,6 +459,7 @@ pub struct TrustServiceConfig {
     pub issuance_policy: Option<crate::policy::ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<crate::policy::RuntimeAssuranceIssuancePolicy>,
     pub advertise_url: Option<String>,
+    pub allow_local_peer_urls: bool,
     pub certification_public_metadata_ttl_seconds: u64,
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
@@ -465,6 +480,12 @@ pub struct TrustControlClient {
     preferred_index: Arc<Mutex<usize>>,
     token: Arc<str>,
     http: Agent,
+    cluster_peer_auth: Option<ClusterPeerClientAuth>,
+}
+
+#[derive(Clone)]
+struct ClusterPeerClientAuth {
+    node_id: Arc<str>,
 }
 
 struct RemoteCapabilityAuthority {
@@ -1219,6 +1240,8 @@ pub struct CapitalExecutionInstructionRequest {
     pub source_kind: CapitalBookSourceKind,
     pub action: CapitalExecutionInstructionAction,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_receipt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<MonetaryAmount>,
     pub authority_chain: Vec<CapitalExecutionAuthorityStep>,
     pub execution_window: CapitalExecutionWindow,
@@ -1860,6 +1883,7 @@ struct BudgetMutationEventView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     allowed: Option<bool>,
     recorded_at: i64,
+    event_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     usage_seq: Option<u64>,
     exposure_units: u64,
@@ -1880,7 +1904,6 @@ struct BudgetMutationEventView {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AuthoritySnapshotView {
-    seed_hex: String,
     public_key_hex: String,
     generation: u64,
     rotated_at: u64,

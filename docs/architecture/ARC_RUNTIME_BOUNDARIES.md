@@ -28,6 +28,43 @@ quietly collapse back into monolithic shells.
   the main kernel flow so policy and dispatch changes do not hide low-level
   security drift.
 
+## Verified Core Boundary
+
+The current bounded verified-core contract is defined machine-readably in
+`formal/proof-manifest.toml`. It is intentionally narrower than the full ARC
+runtime and names exactly which pure symbols can participate in the current
+formal-evidence story.
+
+### Covered Pure Core
+
+| Rust surface | Why it is inside the current boundary |
+| --- | --- |
+| `arc_kernel_core::capability_verify::{verify_capability, verify_capability_with_trusted}` | pure issuer-trust, signature, and time-window checks over one in-memory capability |
+| `arc_kernel_core::scope::{resolve_matching_grants, resolve_capability_grants}` | fail-closed portable scope matching over request arguments only |
+| `arc_kernel_core::evaluate::evaluate` | pure authorization path that composes capability verification, subject binding, scope match, and sync guards |
+| `arc_kernel_core::receipts::sign_receipt` | pure receipt-signing step over an already-constructed receipt body |
+
+### Covered Shell Entry Points
+
+| Shell surface | Covered part |
+| --- | --- |
+| `arc_kernel::ArcKernel::evaluate_portable_verdict` | direct delegation into `arc_kernel_core::evaluate` with trusted issuer and portable guard wiring |
+| `arc_kernel::ArcKernel::build_and_sign_receipt` | direct delegation into `arc_kernel_core::sign_receipt` after the shell has assembled the receipt body |
+
+### Explicit Exclusions
+
+The current verified-core boundary does **not** cover:
+
+- revocation-store lookups or receipt-store lineage joins
+- budget mutation, payment authorization, or any metering state transition
+- DPoP verification, nonce replay caches, or hosted/session transport admission
+- governed transaction policy, approval-token flow, or runtime-attestation enforcement
+- tool dispatch, subprocess effects, network effects, or remote MCP orchestration
+- receipt persistence, checkpoint publication, trust-control clustering, or settlement rails
+
+Those surfaces stay in the operational shell until a later formal phase names a
+smaller normalized model and a corresponding refinement story.
+
 ## Regression Guard
 
 `crates/arc-control-plane/tests/runtime_boundaries.rs` is the source-shape

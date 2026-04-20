@@ -265,6 +265,40 @@ fn invalid_regex_pattern_fails_initialization() {
 }
 
 #[test]
+fn extra_pattern_count_limit_fails_initialization() {
+    let mut config = ContentReviewConfig::default();
+    config.default_rules.extra_patterns = (0..65).map(|idx| format!("pattern-{idx}")).collect();
+    let result = ContentReviewGuard::with_config(config);
+    let Err(error) = result else {
+        panic!("too many extra patterns should fail closed");
+    };
+    assert!(error.to_string().contains("allows at most 64 patterns"));
+}
+
+#[test]
+fn extra_pattern_length_limit_fails_initialization() {
+    let mut config = ContentReviewConfig::default();
+    config.default_rules.extra_patterns = vec!["a".repeat(513)];
+    let result = ContentReviewGuard::with_config(config);
+    let Err(error) = result else {
+        panic!("overlong extra pattern should fail closed");
+    };
+    assert!(error.to_string().contains("must be at most 512 characters"));
+}
+
+#[test]
+fn extra_pattern_complexity_limit_fails_initialization() {
+    let mut config = ContentReviewConfig::default();
+    config.default_rules.extra_patterns =
+        vec!["(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+".into()];
+    let result = ContentReviewGuard::with_config(config);
+    let Err(error) = result else {
+        panic!("over-complex extra pattern should fail closed");
+    };
+    assert!(error.to_string().contains("complexity at most"));
+}
+
+#[test]
 fn slack_blocks_api_pii_detected_in_nested_text() {
     let guard = ContentReviewGuard::new();
     let v = eval_simple(

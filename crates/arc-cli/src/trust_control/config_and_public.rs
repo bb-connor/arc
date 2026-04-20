@@ -1354,8 +1354,7 @@ fn build_oid4vp_request_for_service(
 
 fn resolve_oid4vp_verifier_signing_key(config: &TrustServiceConfig) -> Result<Keypair, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        let snapshot = SqliteCapabilityAuthority::open(path)?.snapshot()?;
-        return Ok(Keypair::from_seed_hex(&snapshot.seed_hex)?);
+        return Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?);
     }
     let path = config.authority_seed_path.as_deref().ok_or_else(|| {
         CliError::Other(
@@ -1716,6 +1715,7 @@ fn build_scim_deprovision_receipt(
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod config_and_public_tests {
     use super::*;
+    use arc_credentials::verify_signed_public_issuer_discovery;
     use std::path::PathBuf;
 
     fn base_config() -> TrustServiceConfig {
@@ -1739,6 +1739,7 @@ mod config_and_public_tests {
             issuance_policy: None,
             runtime_assurance_policy: None,
             advertise_url: None,
+            allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
@@ -1934,5 +1935,34 @@ mod config_and_public_tests {
         let discovery_version =
             public_discovery_version(&config).expect("derive public discovery version");
         assert_eq!(discovery_version, 1);
+    }
+
+    #[test]
+    fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
+        let source_path = unique_temp_path("arc-trust-control-authority-source", "sqlite");
+        let follower_path = unique_temp_path("arc-trust-control-authority-follower", "sqlite");
+        let source = SqliteCapabilityAuthority::open(&source_path).expect("open source authority");
+        let follower =
+            SqliteCapabilityAuthority::open(&follower_path).expect("open follower authority");
+        let follower_local_key = follower.local_keypair().expect("read follower seed");
+
+        source.rotate().expect("rotate source authority");
+        let snapshot = source.snapshot().expect("snapshot source authority");
+        assert!(follower
+            .apply_snapshot(&snapshot)
+            .expect("apply source snapshot"));
+        assert!(follower.current_keypair().is_err());
+
+        let mut config = base_config();
+        config.advertise_url = Some("https://trust.example.com".to_string());
+        config.authority_db_path = Some(follower_path.clone());
+
+        let signing_key =
+            resolve_oid4vp_verifier_signing_key(&config).expect("resolve follower signer");
+        assert_eq!(signing_key.public_key(), follower_local_key.public_key());
+
+        let issuer = build_public_issuer_discovery(&config).expect("build issuer discovery");
+        assert_eq!(issuer.body.signer_public_key, follower_local_key.public_key());
+        verify_signed_public_issuer_discovery(&issuer).expect("verify issuer discovery");
     }
 }

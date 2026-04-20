@@ -82,10 +82,8 @@ fn make_receipt(id: &str) -> ArcReceipt {
             capability_id: "cap-manager-test".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "abc123".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .expect("action parameters serialize"),
             decision: Decision::Allow,
             content_hash: "content-hash".to_string(),
             policy_hash: "policy-hash".to_string(),

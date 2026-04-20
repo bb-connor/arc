@@ -8,8 +8,9 @@ use crate::appraisal::AttestationVerifierFamily;
 use crate::capability::{GovernedAutonomyTier, MonetaryAmount, RuntimeAssuranceTier};
 use crate::receipt::{Decision, SettlementStatus, SignedExportEnvelope};
 use crate::underwriting::{
-    UnderwritingCertificationState, UnderwritingDecisionLifecycleState,
-    UnderwritingDecisionOutcome, UnderwritingReviewState, UnderwritingRiskClass,
+    UnderwritingCertificationState, UnderwritingComplianceEvidence,
+    UnderwritingDecisionLifecycleState, UnderwritingDecisionOutcome, UnderwritingReviewState,
+    UnderwritingRiskClass,
 };
 
 pub const EXPOSURE_LEDGER_SCHEMA: &str = "arc.credit.exposure-ledger.v1";
@@ -328,6 +329,7 @@ pub enum CreditScorecardEvidenceKind {
     SettlementReconciliation,
     UnderwritingDecision,
     ReputationInspection,
+    ComplianceScore,
     ExposureLedger,
     CreditBond,
     CreditLossLifecycle,
@@ -1458,6 +1460,7 @@ pub struct CreditProviderRiskPackageSupportBoundary {
     pub signed_exposure_authoritative: bool,
     pub signed_scorecard_authoritative: bool,
     pub facility_policy_authoritative: bool,
+    pub compliance_score_reference_supported: bool,
     pub external_capital_review_supported: bool,
     pub autonomous_pricing_supported: bool,
     pub liability_market_supported: bool,
@@ -1469,6 +1472,7 @@ impl Default for CreditProviderRiskPackageSupportBoundary {
             signed_exposure_authoritative: true,
             signed_scorecard_authoritative: true,
             facility_policy_authoritative: true,
+            compliance_score_reference_supported: true,
             external_capital_review_supported: true,
             autonomous_pricing_supported: false,
             liability_market_supported: false,
@@ -1502,6 +1506,8 @@ pub struct CreditProviderRiskPackage {
     pub exposure: SignedExposureLedgerReport,
     pub scorecard: SignedCreditScorecardReport,
     pub facility_report: CreditFacilityReport,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compliance_score: Option<UnderwritingComplianceEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_facility: Option<CreditProviderFacilitySnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
