@@ -212,14 +212,53 @@ mod retention {
         let archive_path = unique_db_path("retention-tenant-child-archive");
 
         let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        let tenant_a_parent = receipt_with_tenant("rcpt-a-old", 100, "tenant-a");
+        let tenant_b_parent = receipt_with_tenant("rcpt-b-old", 100, "tenant-b");
+        let tenant_a_child = child_receipt_with_ts("tenant-child-a", 100);
+        let tenant_b_child = child_receipt_with_ts("tenant-child-b", 100);
         store
-            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-old", 100, "tenant-a"))
+            .append_arc_receipt_returning_seq(&tenant_a_parent)
             .unwrap();
         store
-            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-b-old", 100, "tenant-b"))
+            .append_arc_receipt_returning_seq(&tenant_b_parent)
+            .unwrap();
+        store.append_child_receipt(&tenant_a_child).unwrap();
+        store.append_child_receipt(&tenant_b_child).unwrap();
+        store
+            .record_receipt_lineage_statement_record(
+                &tenant_a_child.id,
+                Some(tenant_a_child.request_id.as_str()),
+                Some(tenant_a_child.session_id.as_str()),
+                None,
+                Some(tenant_a_child.parent_request_id.as_str()),
+                Some(&tenant_a_parent.id),
+                Some("tenant-a-chain"),
+                100,
+                &serde_json::json!({
+                    "child_receipt_id": tenant_a_child.id,
+                    "parent_receipt_id": tenant_a_parent.id,
+                    "parent_request_id": tenant_a_child.parent_request_id.as_str(),
+                    "child_request_id": tenant_a_child.request_id.as_str()
+                }),
+            )
             .unwrap();
         store
-            .append_child_receipt(&child_receipt_with_ts("tenant-child-old", 100))
+            .record_receipt_lineage_statement_record(
+                &tenant_b_child.id,
+                Some(tenant_b_child.request_id.as_str()),
+                Some(tenant_b_child.session_id.as_str()),
+                None,
+                Some(tenant_b_child.parent_request_id.as_str()),
+                Some(&tenant_b_parent.id),
+                Some("tenant-b-chain"),
+                100,
+                &serde_json::json!({
+                    "child_receipt_id": tenant_b_child.id,
+                    "parent_receipt_id": tenant_b_parent.id,
+                    "parent_request_id": tenant_b_child.parent_request_id.as_str(),
+                    "child_request_id": tenant_b_child.request_id.as_str()
+                }),
+            )
             .unwrap();
 
         let archived = store
@@ -227,11 +266,39 @@ mod retention {
             .unwrap();
         assert_eq!(archived, 1);
         assert_eq!(store.tool_receipt_count().unwrap(), 1);
-        assert_eq!(store.child_receipt_count().unwrap(), 0);
+        assert_eq!(store.child_receipt_count().unwrap(), 1);
+        assert_eq!(
+            store
+                .list_child_receipts(
+                    10,
+                    None,
+                    None,
+                    Some(tenant_b_child.request_id.as_str()),
+                    None,
+                    None
+                )
+                .unwrap()
+                .len(),
+            1
+        );
 
         let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
         assert_eq!(archive_store.tool_receipt_count().unwrap(), 1);
         assert_eq!(archive_store.child_receipt_count().unwrap(), 1);
+        assert_eq!(
+            archive_store
+                .list_child_receipts(
+                    10,
+                    None,
+                    None,
+                    Some(tenant_a_child.request_id.as_str()),
+                    None,
+                    None
+                )
+                .unwrap()
+                .len(),
+            1
+        );
 
         let _ = fs::remove_file(&live_path);
         let _ = fs::remove_file(&archive_path);

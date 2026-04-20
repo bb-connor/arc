@@ -346,8 +346,18 @@ impl SqliteReceiptStore {
                 )?;
                 self.connection()?.execute(
                     "INSERT OR IGNORE INTO archive.arc_child_receipts \
-                     SELECT * FROM main.arc_child_receipts WHERE timestamp < ?1",
-                    params![cutoff],
+                     SELECT child.* \
+                     FROM main.arc_child_receipts child \
+                     WHERE child.timestamp < ?1 \
+                       AND EXISTS ( \
+                           SELECT 1 \
+                           FROM main.receipt_lineage_statements lineage \
+                           INNER JOIN main.arc_tool_receipts parent \
+                               ON parent.receipt_id = lineage.parent_receipt_id \
+                           WHERE lineage.receipt_id = child.receipt_id \
+                             AND parent.tenant_id = ?2 \
+                       )",
+                    params![cutoff, tenant_id],
                 )?;
                 self.connection()?.execute(
                     "INSERT OR IGNORE INTO archive.capability_lineage
@@ -432,15 +442,29 @@ impl SqliteReceiptStore {
         // Delete archived receipts from the live database.
         let deleted = match tenant_id {
             Some(tenant_id) => {
-                let deleted = self.connection()?.execute(
+                // Delete linked child receipts before deleting their tenant parent receipts,
+                // because the tenant association is derived through receipt_lineage_statements.
+                self.connection()?.execute(
+                    "DELETE FROM main.arc_child_receipts \
+                     WHERE rowid IN ( \
+                         SELECT child.rowid \
+                         FROM main.arc_child_receipts child \
+                         WHERE child.timestamp < ?1 \
+                           AND EXISTS ( \
+                               SELECT 1 \
+                               FROM main.receipt_lineage_statements lineage \
+                               INNER JOIN main.arc_tool_receipts parent \
+                                   ON parent.receipt_id = lineage.parent_receipt_id \
+                               WHERE lineage.receipt_id = child.receipt_id \
+                                 AND parent.tenant_id = ?2 \
+                           ) \
+                    )",
+                    params![cutoff, tenant_id],
+                )?;
+                self.connection()?.execute(
                     "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1 AND tenant_id = ?2",
                     params![cutoff, tenant_id],
-                )? as u64;
-                self.connection()?.execute(
-                    "DELETE FROM main.arc_child_receipts WHERE timestamp < ?1",
-                    params![cutoff],
-                )?;
-                deleted
+                )? as u64
             }
             None => {
                 let deleted = self.connection()?.execute(
