@@ -1253,6 +1253,36 @@ impl ReceiptStore for AppendOnlyReceiptStore {
     }
 }
 
+#[derive(Default)]
+struct FailingSessionAnchorReceiptStore;
+
+impl ReceiptStore for FailingSessionAnchorReceiptStore {
+    fn append_arc_receipt(&mut self, _receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &mut self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn record_session_anchor(
+        &mut self,
+        _session_id: &str,
+        _anchor_id: &str,
+        _auth_context_fingerprint: &str,
+        _issued_at: u64,
+        _supersedes_anchor_id: Option<&str>,
+        _anchor_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "session anchor write failed".to_string(),
+        ))
+    }
+}
+
 impl ResourceProvider for FilesystemResourceProvider {
     fn list_resources(&self) -> Vec<ResourceDefinition> {
         vec![
@@ -2532,6 +2562,32 @@ fn open_session_with_id_rejects_duplicate_ids() {
             .map(|session| session.agent_id().to_string()),
         Some("agent-a".to_string())
     );
+}
+
+#[test]
+fn open_session_with_id_rolls_back_insert_when_anchor_persistence_fails() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.set_receipt_store(Box::new(FailingSessionAnchorReceiptStore));
+    let session_id = SessionId::new("sess-anchor-fail");
+
+    let error = kernel
+        .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        KernelError::ReceiptPersistence(ReceiptStoreError::Conflict(message))
+            if message == "session anchor write failed"
+    ));
+    assert_eq!(kernel.session_count(), 0);
+    assert!(kernel.session(&session_id).is_none());
+
+    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore));
+    let opened = kernel
+        .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
+        .unwrap();
+    assert_eq!(opened, session_id);
+    assert_eq!(kernel.session_count(), 1);
 }
 
 #[test]

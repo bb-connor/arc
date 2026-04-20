@@ -58,7 +58,13 @@ impl ArcKernel {
             sessions.insert(session_id.clone(), session);
             Ok(snapshot)
         })?;
-        self.persist_session_anchor_snapshot(&session_snapshot, None)?;
+        if let Err(error) = self.persist_session_anchor_snapshot(&session_snapshot, None) {
+            self.with_sessions_write(|sessions| {
+                sessions.remove(&session_id);
+                Ok(())
+            })?;
+            return Err(error);
+        }
 
         Ok(session_id)
     }

@@ -654,7 +654,7 @@ fn glob_matches(pattern: &str, target: &str) -> bool {
     regex.push('$');
     crate::regex_safety::compile_generated_policy_regex(&regex, "compiler glob pattern")
         .map(|compiled| compiled.is_match(target))
-        .unwrap_or_else(|_| pattern == target)
+        .unwrap_or(true)
 }
 
 #[cfg(test)]

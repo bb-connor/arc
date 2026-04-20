@@ -660,6 +660,38 @@ mod tests {
     }
 
     #[test]
+    fn generated_glob_compile_errors_fail_closed_for_allow_rules() {
+        let spec = spec_with_rules(Rules {
+            tool_access: Some(ToolAccessRule {
+                enabled: true,
+                allow: vec!["*".repeat(600_000)],
+                block: Vec::new(),
+                require_confirmation: Vec::new(),
+                default: DefaultAction::Block,
+                max_args_size: None,
+                require_runtime_assurance_tier: None,
+                prefer_runtime_assurance_tier: None,
+                require_workload_identity: None,
+                prefer_workload_identity: None,
+            }),
+            ..Rules::default()
+        });
+
+        let result = evaluate(&spec, &action("tool_call", "read_file"));
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(result.matched_rule.as_deref(), Some("rules.tool_access.allow"));
+        assert!(
+            result
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("invalid policy glob pattern")),
+            "expected invalid glob denial reason, got {:?}",
+            result.reason
+        );
+    }
+
+    #[test]
     fn file_read_forbidden_path_exception_allows_the_target() {
         let spec = spec_with_rules(Rules {
             forbidden_paths: Some(ForbiddenPathsRule {
