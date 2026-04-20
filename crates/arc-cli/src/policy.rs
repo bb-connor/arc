@@ -4,7 +4,7 @@
 //! initial capability definitions for the agent.
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -58,6 +58,13 @@ impl PolicyFormat {
 pub struct PolicyIdentity {
     pub source_hash: String,
     pub runtime_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PolicyAssetDigest {
+    field: &'static str,
+    path: String,
+    sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -747,13 +754,17 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         )));
     }
 
+    let source_dir = path.parent();
+    let auxiliary_assets = hushspec_auxiliary_asset_digests(&spec, source_dir)?;
+    let source_hash = hushspec_source_hash_with_assets(&source_hash, &auxiliary_assets)?;
     let compiled = arc_policy::compile_policy_with_source(&spec, Some(path))?;
     let kernel = KernelPolicyConfig::default();
     let default_capabilities =
         build_default_capabilities_from_scope(&compiled.default_scope, kernel.max_capability_ttl);
     let issuance_policy = materialize_reputation_issuance_policy(&spec)?;
     let runtime_assurance_policy = materialize_runtime_assurance_policy(&spec)?;
-    let runtime_hash = runtime_hash_for_hushspec(&kernel, &default_capabilities, &spec)?;
+    let runtime_hash =
+        runtime_hash_for_hushspec(&kernel, &default_capabilities, &spec, &auxiliary_assets)?;
 
     Ok(LoadedPolicy {
         format: PolicyFormat::HushSpec,
@@ -768,6 +779,72 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         issuance_policy,
         runtime_assurance_policy,
     })
+}
+
+fn hushspec_auxiliary_asset_digests(
+    spec: &arc_policy::HushSpec,
+    source_dir: Option<&Path>,
+) -> Result<Vec<PolicyAssetDigest>, PolicyError> {
+    let mut assets = Vec::new();
+    let Some(threat_intel) = spec
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.detection.as_ref())
+        .and_then(|detection| detection.threat_intel.as_ref())
+    else {
+        return Ok(assets);
+    };
+    if !threat_intel.enabled.unwrap_or(true) {
+        return Ok(assets);
+    }
+    let Some(pattern_db) = threat_intel.pattern_db.as_deref() else {
+        return Ok(assets);
+    };
+
+    let resolved_path = resolve_policy_asset_path(pattern_db, source_dir);
+    let bytes = std::fs::read(&resolved_path).map_err(|error| {
+        PolicyError::Invalid(format!(
+            "failed to read HushSpec auxiliary asset detection.threat_intel.pattern_db '{}' (resolved to '{}'): {error}",
+            pattern_db,
+            resolved_path.display()
+        ))
+    })?;
+    let identity_path = std::fs::canonicalize(&resolved_path)
+        .unwrap_or_else(|_| resolved_path.clone())
+        .display()
+        .to_string();
+    assets.push(PolicyAssetDigest {
+        field: "extensions.detection.threat_intel.pattern_db",
+        path: identity_path,
+        sha256: hash_bytes(&bytes),
+    });
+    Ok(assets)
+}
+
+fn resolve_policy_asset_path(path: &str, source_dir: Option<&Path>) -> PathBuf {
+    let candidate = PathBuf::from(path);
+    if candidate.is_absolute() {
+        return candidate;
+    }
+
+    match source_dir {
+        Some(dir) => dir.join(candidate),
+        None => candidate,
+    }
+}
+
+fn hushspec_source_hash_with_assets(
+    source_hash: &str,
+    auxiliary_assets: &[PolicyAssetDigest],
+) -> Result<String, PolicyError> {
+    if auxiliary_assets.is_empty() {
+        return Ok(source_hash.to_string());
+    }
+    hash_json_value(&serde_json::json!({
+        "format": PolicyFormat::HushSpec.as_str(),
+        "source_hash": source_hash,
+        "auxiliary_assets": auxiliary_assets,
+    }))
 }
 
 fn materialize_reputation_issuance_policy(
@@ -1504,34 +1581,36 @@ fn synthesize_tool_access_scope(
         }));
     }
 
-    if let Some(unrepresentable_allow_pattern) = tool_access.allow.iter().find(|allow_pattern| {
-        tool_pattern_has_wildcard(allow_pattern)
-            && confirmation_overlap(allow_pattern, &tool_access.require_confirmation)
+    for allow_pattern in &tool_access.allow {
+        if tool_pattern_has_wildcard(allow_pattern)
+            && confirmation_overlap(allow_pattern, &tool_access.require_confirmation)?
             && !tool_access
                 .require_confirmation
                 .iter()
-                .any(|pattern| pattern == "*" || pattern == *allow_pattern)
-    }) {
-        return Err(PolicyError::Invalid(format!(
-            "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern '{unrepresentable_allow_pattern}'; use an exact matching confirmation pattern or '*'"
-        )));
+                .any(|pattern| pattern == "*" || pattern == allow_pattern)
+        {
+            return Err(PolicyError::Invalid(format!(
+                "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern '{allow_pattern}'; use an exact matching confirmation pattern or '*'"
+            )));
+        }
+    }
+
+    let mut grants = Vec::with_capacity(tool_access.allow.len());
+    for tool_name in &tool_access.allow {
+        grants.push(ToolGrant {
+            server_id: "*".to_string(),
+            tool_name: tool_name.clone(),
+            operations: vec![Operation::Invoke],
+            constraints: compile_tool_constraints(tool_access, tool_name)?,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        });
     }
 
     Ok(Some(ArcScope {
-        grants: tool_access
-            .allow
-            .iter()
-            .map(|tool_name| ToolGrant {
-                server_id: "*".to_string(),
-                tool_name: tool_name.clone(),
-                operations: vec![Operation::Invoke],
-                constraints: compile_tool_constraints(tool_access, tool_name),
-                max_invocations: None,
-                max_cost_per_invocation: None,
-                max_total_cost: None,
-                dpop_required: None,
-            })
-            .collect(),
+        grants,
         ..ArcScope::default()
     }))
 }
@@ -1558,38 +1637,75 @@ fn tool_pattern_has_wildcard(pattern: &str) -> bool {
     pattern.contains('*') || pattern.contains('?')
 }
 
+const MAX_TOOL_ACCESS_GLOB_PATTERN_BYTES: usize = 512;
+const MAX_TOOL_ACCESS_GLOB_OVERLAP_STATES: usize = 16_384;
+
 fn compile_tool_constraints(
     tool_access: &ToolAccessConfig,
     tool_pattern: &str,
-) -> Vec<arc_core::capability::Constraint> {
+) -> Result<Vec<arc_core::capability::Constraint>, PolicyError> {
     let mut constraints = Vec::new();
     if let Some(max_args_size) = tool_access.max_args_size {
         constraints.push(arc_core::capability::Constraint::MaxArgsSize(max_args_size));
     }
-    if confirmation_overlap(tool_pattern, &tool_access.require_confirmation) {
+    if confirmation_overlap(tool_pattern, &tool_access.require_confirmation)? {
         constraints
             .push(arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
-    constraints
+    Ok(constraints)
 }
 
-fn confirmation_overlap(tool_pattern: &str, confirmation_patterns: &[String]) -> bool {
-    confirmation_patterns
-        .iter()
-        .any(|pattern| tool_patterns_overlap(tool_pattern, pattern))
+fn confirmation_overlap(
+    tool_pattern: &str,
+    confirmation_patterns: &[String],
+) -> Result<bool, PolicyError> {
+    for pattern in confirmation_patterns {
+        if tool_patterns_overlap(tool_pattern, pattern)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
-fn tool_patterns_overlap(left: &str, right: &str) -> bool {
+fn tool_patterns_overlap(left: &str, right: &str) -> Result<bool, PolicyError> {
+    validate_tool_overlap_pattern_len(left, "left")?;
+    validate_tool_overlap_pattern_len(right, "right")?;
+    validate_tool_overlap_budget(left, right)?;
     if left == "*" || right == "*" {
-        return true;
+        return Ok(true);
     }
     // Confirmation constraints are synthesized onto one grant, so a pair of
     // leading unbounded globs must fail closed instead of risking a gap.
     if left.starts_with('*') && right.starts_with('*') {
-        return true;
+        return Ok(true);
     }
     let mut memo = HashMap::new();
-    pattern_suffixes_overlap(left.as_bytes(), 0, right.as_bytes(), 0, &mut memo)
+    Ok(pattern_suffixes_overlap(
+        left.as_bytes(),
+        0,
+        right.as_bytes(),
+        0,
+        &mut memo,
+    ))
+}
+
+fn validate_tool_overlap_pattern_len(pattern: &str, side: &str) -> Result<(), PolicyError> {
+    if pattern.len() > MAX_TOOL_ACCESS_GLOB_PATTERN_BYTES {
+        return Err(PolicyError::Invalid(format!(
+            "guards.tool_access {side} glob pattern exceeds {MAX_TOOL_ACCESS_GLOB_PATTERN_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_tool_overlap_budget(left: &str, right: &str) -> Result<(), PolicyError> {
+    let state_count = (left.len() + 1).saturating_mul(right.len() + 1);
+    if state_count > MAX_TOOL_ACCESS_GLOB_OVERLAP_STATES {
+        return Err(PolicyError::Invalid(format!(
+            "guards.tool_access glob overlap exceeds {MAX_TOOL_ACCESS_GLOB_OVERLAP_STATES} recursive states"
+        )));
+    }
+    Ok(())
 }
 
 fn pattern_suffixes_overlap(
@@ -1668,6 +1784,7 @@ fn runtime_hash_for_hushspec(
     kernel: &KernelPolicyConfig,
     default_capabilities: &[DefaultCapability],
     spec: &arc_policy::HushSpec,
+    auxiliary_assets: &[PolicyAssetDigest],
 ) -> Result<String, PolicyError> {
     let rules = spec.rules.as_ref();
     let extensions = spec.extensions.as_ref();
@@ -1685,6 +1802,7 @@ fn runtime_hash_for_hushspec(
             "tool_access": rules.and_then(|entry| entry.tool_access.as_ref()),
         },
         "reputation": extensions.and_then(|entry| entry.reputation.as_ref()),
+        "auxiliary_assets": auxiliary_assets,
     });
     hash_json_value(&fingerprint)
 }
@@ -1802,6 +1920,22 @@ guards:
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../examples/policies")
             .join(name)
+    }
+
+    fn sample_threat_intel_pattern_db(label: &str) -> String {
+        format!(
+            r#"
+[
+  {{
+    "id": "known-prompt-injection",
+    "category": "prompt_injection",
+    "stage": "perception",
+    "label": "{label}",
+    "embedding": [1.0, 0.0, 0.0]
+  }}
+]
+"#
+        )
     }
 
     #[test]
@@ -2513,12 +2647,30 @@ guards:
     }
 
     #[test]
-    fn wildcard_overlap_does_not_treat_empty_prefix_patterns_as_match_all() {
-        assert!(!tool_patterns_overlap("read_file", "*_write"));
-        assert!(!tool_patterns_overlap("*_write", "git_push"));
-        assert!(tool_patterns_overlap("*_read", "*_write"));
-        assert!(!tool_patterns_overlap("bb*", "?a"));
-        assert!(tool_patterns_overlap("read_*", "*_read"));
+    fn wildcard_overlap_conservatively_rejects_ambiguous_leading_globs() {
+        assert!(!tool_patterns_overlap("read_file", "*_write").unwrap());
+        assert!(!tool_patterns_overlap("*_write", "git_push").unwrap());
+        // Leading unbounded globs are intentionally treated as overlapping so
+        // capability synthesis fails closed instead of under-confirming.
+        assert!(tool_patterns_overlap("*_read", "*_write").unwrap());
+        assert!(!tool_patterns_overlap("bb*", "?a").unwrap());
+        assert!(tool_patterns_overlap("read_*", "*_read").unwrap());
+    }
+
+    #[test]
+    fn wildcard_overlap_rejects_oversized_patterns_before_recursing() {
+        let oversized = "*".repeat(MAX_TOOL_ACCESS_GLOB_PATTERN_BYTES + 1);
+        let error = tool_patterns_overlap(&oversized, "read_file")
+            .expect_err("oversized overlap pattern should fail policy loading");
+        assert!(error.to_string().contains("glob pattern exceeds"));
+    }
+
+    #[test]
+    fn wildcard_overlap_rejects_excessive_recursive_state_budget() {
+        let pattern = "a".repeat(200);
+        let error = tool_patterns_overlap(&pattern, &pattern)
+            .expect_err("large overlap state space should fail policy loading");
+        assert!(error.to_string().contains("recursive states"));
     }
 
     #[test]
@@ -2870,6 +3022,50 @@ capabilities:
             "read_file"
         );
         assert_ne!(loaded.identity.source_hash, loaded.identity.runtime_hash);
+    }
+
+    #[test]
+    fn load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes() {
+        let policy_dir = std::env::temp_dir().join(format!(
+            "arc-hushspec-asset-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        ));
+        std::fs::create_dir_all(&policy_dir).unwrap();
+        let pattern_db = policy_dir.join("pattern-db.json");
+        let policy_path = policy_dir.join("policy.yaml");
+
+        std::fs::write(&pattern_db, sample_threat_intel_pattern_db("first")).unwrap();
+        std::fs::write(
+            &policy_path,
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "pattern-db.json"
+"#,
+        )
+        .unwrap();
+
+        let first = load_policy(&policy_path).unwrap();
+        std::fs::write(&pattern_db, sample_threat_intel_pattern_db("second")).unwrap();
+        let second = load_policy(&policy_path).unwrap();
+
+        assert_ne!(first.identity.source_hash, second.identity.source_hash);
+        assert_ne!(first.identity.runtime_hash, second.identity.runtime_hash);
+
+        let _ = std::fs::remove_dir_all(policy_dir);
     }
 
     #[test]

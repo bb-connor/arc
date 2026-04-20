@@ -3021,18 +3021,7 @@ impl RemoteSessionLedger {
                 | RemoteSessionState::Deleted
                 | RemoteSessionState::Expired => {}
                 RemoteSessionState::Closed => {
-                    match self.mark_closed(&session).await {
-                        Ok(()) => {
-                            self.active.lock().await.remove(&session.session_id);
-                        }
-                        Err(error) => {
-                            warn!(
-                                session_id = %session.session_id,
-                                error = %error,
-                                "failed to close MCP session without resumable-state risk"
-                            );
-                        }
-                    }
+                    self.active.lock().await.remove(&session.session_id);
                 }
             }
         }
@@ -3046,9 +3035,7 @@ impl RemoteSessionLedger {
         state: RemoteSessionState,
     ) -> Result<(), CliError> {
         match state {
-            RemoteSessionState::Deleted => session.mark_deleted(),
-            RemoteSessionState::Expired => session.mark_expired(),
-            RemoteSessionState::Closed => session.mark_closed(),
+            RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed => {}
             RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {
                 return Err(CliError::Other(format!(
                     "unsupported terminal MCP session state: {}",
@@ -3056,9 +3043,12 @@ impl RemoteSessionLedger {
                 )));
             }
         }
+        let terminal_at = session_now_millis();
         let mut record = session.diagnostic_record();
         record.lifecycle.state = state;
-        record.terminal_at = session_now_millis();
+        record.lifecycle.last_seen_at = terminal_at;
+        record.lifecycle.drain_deadline_at = None;
+        record.terminal_at = terminal_at;
         let mut tombstone_guards_restore = self.tombstone_db_path.is_none();
         let mut tombstone_error = None;
         if let Some(path) = self.tombstone_db_path.as_deref() {
@@ -3092,6 +3082,13 @@ impl RemoteSessionLedger {
                     session.session_id
                 )));
             }
+        }
+
+        match state {
+            RemoteSessionState::Deleted => session.mark_deleted(),
+            RemoteSessionState::Expired => session.mark_expired(),
+            RemoteSessionState::Closed => session.mark_closed(),
+            RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {}
         }
 
         self.terminal
