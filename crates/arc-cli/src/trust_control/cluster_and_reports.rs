@@ -634,37 +634,79 @@ fn sync_peer_budgets(
             after_seq: cursor.as_ref().map(|value| value.seq),
             limit: Some(MAX_LIST_LIMIT),
         })?;
-        if response.mutation_events.is_empty() {
-            break;
-        }
-        let usage_records = response
-            .records
-            .iter()
-            .map(budget_usage_record_from_view)
-            .collect::<Vec<_>>();
-        let mutation_records = response
-            .mutation_events
-            .iter()
-            .map(budget_mutation_record_from_view)
-            .collect::<Result<Vec<_>, _>>()?;
-        store.import_snapshot_records(&usage_records, &mutation_records)?;
-        // The peer cursor is process-local state. If the process crashes after
-        // this committed import but before the cursor update below, the next
-        // sync replays the same events. The store's event_id primary key is the
-        // authoritative dedup boundary, so replay is harmless.
-        let mut next_cursor = cursor;
-        for event in &response.mutation_events {
-            next_cursor = Some(merge_budget_cursor(
-                next_cursor,
-                budget_cursor_from_event(event),
-            ));
-        }
-        applied = applied.saturating_add(mutation_records.len() as u64);
-        if let Some(cursor) = next_cursor {
+        let outcome = import_budget_delta_response(&mut store, &response, cursor)?;
+        applied = applied.saturating_add(outcome.applied_count);
+        if let Some(cursor) = outcome.next_cursor {
             update_peer_budget_cursor(state, peer_url, cursor);
+        }
+        if !outcome.should_continue {
+            break;
         }
     }
     Ok(applied)
+}
+
+struct BudgetDeltaImportOutcome {
+    applied_count: u64,
+    next_cursor: Option<BudgetCursor>,
+    should_continue: bool,
+}
+
+fn import_budget_delta_response(
+    store: &mut SqliteBudgetStore,
+    response: &BudgetDeltaResponse,
+    current_cursor: Option<BudgetCursor>,
+) -> Result<BudgetDeltaImportOutcome, CliError> {
+    if response.records.is_empty() && response.mutation_events.is_empty() {
+        return Ok(BudgetDeltaImportOutcome {
+            applied_count: 0,
+            next_cursor: current_cursor,
+            should_continue: false,
+        });
+    }
+
+    let usage_records = response
+        .records
+        .iter()
+        .map(budget_usage_record_from_view)
+        .collect::<Vec<_>>();
+    let mutation_records = response
+        .mutation_events
+        .iter()
+        .map(budget_mutation_record_from_view)
+        .collect::<Result<Vec<_>, _>>()?;
+    store.import_snapshot_records(&usage_records, &mutation_records)?;
+
+    let previous_cursor_seq = current_cursor.as_ref().map(|cursor| cursor.seq).unwrap_or(0);
+    let mut next_cursor = current_cursor;
+    for event in &response.mutation_events {
+        next_cursor = Some(merge_budget_cursor(
+            next_cursor,
+            budget_cursor_from_event(event),
+        ));
+    }
+    if response.mutation_events.is_empty() {
+        for usage in &response.records {
+            if let Some(cursor) = budget_cursor_from_usage(usage) {
+                next_cursor = Some(merge_budget_cursor(next_cursor, cursor));
+            }
+        }
+    }
+
+    let cursor_advanced = next_cursor
+        .as_ref()
+        .is_some_and(|cursor| cursor.seq > previous_cursor_seq);
+    let applied_count = if mutation_records.is_empty() {
+        usage_records.len()
+    } else {
+        mutation_records.len()
+    } as u64;
+
+    Ok(BudgetDeltaImportOutcome {
+        applied_count,
+        next_cursor,
+        should_continue: !response.mutation_events.is_empty() || cursor_advanced,
+    })
 }
 
 fn sync_peer_lineage(
@@ -1952,6 +1994,15 @@ fn budget_cursor_from_event(event: &BudgetMutationEventView) -> BudgetCursor {
         capability_id: event.capability_id.clone(),
         grant_index: event.grant_index,
     }
+}
+
+fn budget_cursor_from_usage(usage: &BudgetUsageView) -> Option<BudgetCursor> {
+    Some(BudgetCursor {
+        seq: usage.seq?,
+        updated_at: usage.updated_at,
+        capability_id: usage.capability_id.clone(),
+        grant_index: usage.grant_index,
+    })
 }
 
 fn merge_budget_cursor(current: Option<BudgetCursor>, candidate: BudgetCursor) -> BudgetCursor {
@@ -4766,6 +4817,43 @@ mod cluster_and_reports_tests {
         assert_eq!(cursor.seq, 4);
         assert_eq!(cursor.capability_id, "cap-1");
         assert_eq!(cursor.grant_index, 2);
+    }
+
+    #[test]
+    fn budget_delta_import_preserves_record_only_legacy_deltas() {
+        let budget_db = unique_temp_path("cluster-legacy-budget-delta", "sqlite3");
+        let mut store = SqliteBudgetStore::open(&budget_db).expect("open budget db");
+        let response = BudgetDeltaResponse {
+            records: vec![BudgetUsageView {
+                capability_id: "cap-legacy".to_string(),
+                grant_index: 0,
+                invocation_count: 3,
+                total_cost_exposed: 55,
+                total_cost_realized_spend: 21,
+                updated_at: 1_717_171_717,
+                seq: Some(42),
+            }],
+            mutation_events: Vec::new(),
+        };
+
+        let outcome = import_budget_delta_response(&mut store, &response, None)
+            .expect("import legacy record-only budget delta");
+        assert_eq!(outcome.applied_count, 1);
+        assert!(outcome.should_continue);
+        assert_eq!(outcome.next_cursor.expect("legacy cursor").seq, 42);
+
+        let usage = store
+            .get_usage("cap-legacy", 0)
+            .expect("load imported usage")
+            .expect("legacy usage row");
+        assert_eq!(usage.invocation_count, 3);
+        assert_eq!(usage.seq, 42);
+        assert_eq!(usage.total_cost_exposed, 55);
+        assert_eq!(usage.total_cost_realized_spend, 21);
+        assert!(store
+            .list_mutation_events(10, Some("cap-legacy"), Some(0))
+            .expect("list mutation events")
+            .is_empty());
     }
 
     #[test]
