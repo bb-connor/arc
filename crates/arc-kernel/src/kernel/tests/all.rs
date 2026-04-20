@@ -2509,6 +2509,32 @@ fn open_session_assigns_unique_ids_across_kernel_instances() {
 }
 
 #[test]
+fn open_session_with_id_rejects_duplicate_ids() {
+    let kernel = ArcKernel::new(make_config());
+    let session_id = SessionId::new("sess-restored");
+
+    let opened = kernel
+        .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
+        .unwrap();
+    assert_eq!(opened, session_id);
+
+    let error = kernel
+        .open_session_with_id(session_id.clone(), "agent-b".to_string(), Vec::new())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        KernelError::SessionAlreadyExists(existing) if existing == session_id
+    ));
+    assert_eq!(kernel.session_count(), 1);
+    assert_eq!(
+        kernel
+            .session(&session_id)
+            .map(|session| session.agent_id().to_string()),
+        Some("agent-a".to_string())
+    );
+}
+
+#[test]
 fn web3_evidence_required_activation_rejects_missing_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;

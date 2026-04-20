@@ -634,11 +634,12 @@ impl ArcMcpEdge {
             ));
         }
 
-        let restored_session_id = self.kernel.open_session_with_id(
-            session_id,
-            self.agent_id.clone(),
-            self.capabilities.clone(),
-        );
+        let restored_session_id = self
+            .kernel
+            .open_session_with_id(session_id, self.agent_id.clone(), self.capabilities.clone())
+            .map_err(|error| {
+                AdapterError::ConnectionFailed(format!("failed to restore session: {error}"))
+            })?;
         self.kernel
             .set_session_auth_context(&restored_session_id, self.session_auth_context.clone())
             .map_err(|error| {

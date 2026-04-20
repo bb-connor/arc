@@ -37,6 +37,7 @@ impl ArcKernel {
         let session_id = SessionId::new(format!("sess-{}", session_number));
 
         self.open_session_with_id(session_id, agent_id, issued_capabilities)
+            .unwrap_or_else(|error| panic!("failed to open session: {error}"))
     }
 
     pub fn open_session_with_id(
@@ -44,22 +45,22 @@ impl ArcKernel {
         session_id: SessionId,
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
-    ) -> SessionId {
+    ) -> Result<SessionId, KernelError> {
         bump_session_counter_from_id(&session_id);
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
-        let session_snapshot = self
-            .with_sessions_write(|sessions| {
-                let session = Session::new(session_id.clone(), agent_id, issued_capabilities);
-                let snapshot = session.clone();
-                sessions.insert(session_id.clone(), session);
-                Ok(snapshot)
-            })
-            .unwrap_or_else(|error| panic!("failed to open session: {error}"));
-        self.persist_session_anchor_snapshot(&session_snapshot, None)
-            .unwrap_or_else(|error| panic!("failed to persist initial session anchor: {error}"));
+        let session_snapshot = self.with_sessions_write(|sessions| {
+            if sessions.contains_key(&session_id) {
+                return Err(KernelError::SessionAlreadyExists(session_id.clone()));
+            }
+            let session = Session::new(session_id.clone(), agent_id, issued_capabilities);
+            let snapshot = session.clone();
+            sessions.insert(session_id.clone(), session);
+            Ok(snapshot)
+        })?;
+        self.persist_session_anchor_snapshot(&session_snapshot, None)?;
 
-        session_id
+        Ok(session_id)
     }
 
     /// Transition a session into the `ready` state once setup is complete.

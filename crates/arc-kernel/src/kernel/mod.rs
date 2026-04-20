@@ -239,6 +239,9 @@ pub enum KernelError {
     #[error("unknown session: {0}")]
     UnknownSession(SessionId),
 
+    #[error("session already exists: {0}")]
+    SessionAlreadyExists(SessionId),
+
     #[error("session error: {0}")]
     Session(#[from] SessionError),
 
@@ -408,6 +411,11 @@ impl KernelError {
                 "ARC-KERNEL-UNKNOWN-SESSION",
                 serde_json::json!({ "session_id": session_id.to_string() }),
                 "Create the session first or reuse a session ID returned by the kernel before issuing follow-up operations.",
+            ),
+            Self::SessionAlreadyExists(session_id) => self.report_with_context(
+                "ARC-KERNEL-SESSION-ALREADY-EXISTS",
+                serde_json::json!({ "session_id": session_id.to_string() }),
+                "Use a fresh session ID or drop the duplicate restored record before opening the session.",
             ),
             Self::Session(error) => self.report_with_context(
                 "ARC-KERNEL-SESSION",
