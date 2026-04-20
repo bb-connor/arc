@@ -6,7 +6,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
@@ -92,6 +92,9 @@ fn build_test_client() -> Client {
         .build()
         .expect("build reqwest client")
 }
+
+const TEST_REPUTATION_RECEIPT_TARGET: u64 = 200;
+const LARGE_RECEIPT_HISTORY_LEN: u64 = 240;
 
 fn unix_now_secs() -> u64 {
     SystemTime::now()
@@ -238,6 +241,41 @@ fn read_child_stderr(child: &mut Child) -> String {
     output
 }
 
+fn write_test_reputation_policy(receipt_db_path: &Path) -> PathBuf {
+    let policy_path = receipt_db_path
+        .parent()
+        .expect("receipt db parent")
+        .join("test-reputation-policy.yaml");
+    let policy = format!(
+        r#"hushspec: "0.1.0"
+name: "receipt-query-test-reputation"
+description: "Test reputation policy for receipt query integration fixtures"
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+      - safe_invoke
+extensions:
+  reputation:
+    scoring:
+      temporal_decay_half_life_days: 30
+      probationary_receipt_count: {TEST_REPUTATION_RECEIPT_TARGET}
+      probationary_min_days: 30
+      probationary_score_ceiling: 0.60
+    tiers:
+      mature:
+        score_range: [0.0, 1.0]
+        max_scope:
+          operations: [invoke, read, get, read_result]
+          ttl_seconds: 300
+"#
+    );
+    std::fs::write(&policy_path, policy).expect("write test reputation policy");
+    policy_path
+}
+
 fn spawn_trust_service(
     listen: std::net::SocketAddr,
     service_token: &str,
@@ -247,6 +285,7 @@ fn spawn_trust_service(
     budget_db_path: &PathBuf,
 ) -> ServerGuard {
     let service_lock = trust_service_test_lock();
+    let policy_path = write_test_reputation_policy(receipt_db_path);
     let child = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
         .args([
@@ -264,6 +303,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--policy",
+            policy_path.to_str().expect("policy path"),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -6942,7 +6983,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-facility-grant-{day}"),
@@ -7908,7 +7949,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-lock-good-{day}"),
@@ -8145,7 +8186,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-hold-{day}"),
@@ -8281,7 +8322,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-impair-good-{day}"),
@@ -8457,7 +8498,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-good-{day}"),
@@ -8696,7 +8737,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-release-good-{day}"),
@@ -9070,7 +9111,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-slash-good-{day}"),
@@ -9366,7 +9407,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bonded-execution-good-{day}"),
@@ -9663,7 +9704,7 @@ fn test_provider_risk_package_export_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-risk-good-{day}"),
@@ -9850,7 +9891,7 @@ fn test_capital_book_report_export_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-good-{day}"),
@@ -10278,7 +10319,7 @@ fn test_capital_instruction_issue_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-instruction-good-{day}"),
@@ -10512,7 +10553,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-instruction-negative-{day}"),
@@ -10740,7 +10781,7 @@ fn test_capital_allocation_issue_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-good-{day}"),
@@ -10971,7 +11012,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-manual-good-{day}"),
@@ -11560,7 +11601,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-market-{day}"),
@@ -11875,7 +11916,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-autobind-{day}"),
@@ -12292,7 +12333,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             let exposure_units = if day < 10 { 100 } else { 5_000 };
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
@@ -12754,7 +12795,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-negative-{day}"),
@@ -13171,7 +13212,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..1_000_u64 {
+        for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
                 .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-claims-{day}"),
