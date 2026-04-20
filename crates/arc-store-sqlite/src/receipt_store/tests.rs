@@ -177,6 +177,33 @@ fn sample_receipt_with_id_and_timestamp(id: &str, timestamp: u64) -> ArcReceipt 
     .unwrap()
 }
 
+fn legacy_receipt_with_mismatched_parameter_hash(id: &str) -> ArcReceipt {
+    let keypair = Keypair::generate();
+    ArcReceipt::sign(
+        ArcReceiptBody {
+            id: id.to_string(),
+            timestamp: 1,
+            capability_id: "cap-1".to_string(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action: ToolCallAction {
+                parameters: serde_json::json!({ "cmd": "echo legacy" }),
+                parameter_hash: "0".repeat(64),
+            },
+            decision: Decision::Allow,
+            content_hash: "content-1".to_string(),
+            policy_hash: "policy-1".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+        },
+        &keypair,
+    )
+    .unwrap()
+}
+
 fn sample_child_receipt_with_id_and_timestamp(id: &str, timestamp: u64) -> ChildRequestReceipt {
     let keypair = Keypair::generate();
     ChildRequestReceipt::sign(
@@ -751,6 +778,59 @@ fn append_arc_receipt_rejects_mismatched_parameter_hash() {
         arc_kernel::ReceiptStoreError::Conflict(message)
             if message.contains("mismatched action parameter hash")
     ));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn decode_verified_arc_receipt_preserves_legacy_mismatched_parameter_hash() {
+    let receipt = legacy_receipt_with_mismatched_parameter_hash("rcpt-legacy-parameter-hash");
+    let raw_json = serde_json::to_string(&receipt).unwrap();
+
+    let decoded =
+        decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(1)).unwrap();
+
+    assert_eq!(decoded.id, receipt.id);
+    assert!(!decoded.action.verify_hash().unwrap());
+}
+
+#[test]
+fn list_tool_receipts_preserves_legacy_mismatched_parameter_hash_rows() {
+    let path = unique_db_path("arc-receipts-legacy-parameter-hash");
+    let store = SqliteReceiptStore::open(&path).unwrap();
+    let receipt = legacy_receipt_with_mismatched_parameter_hash("rcpt-legacy-row");
+    {
+        let connection = store.connection().unwrap();
+        connection
+            .execute(
+                r#"
+                INSERT INTO arc_tool_receipts (
+                    receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index,
+                    tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json
+                ) VALUES (?1, ?2, ?3, NULL, NULL, NULL, ?4, ?5, ?6, ?7, ?8, ?9)
+                "#,
+                rusqlite::params![
+                    receipt.id.as_str(),
+                    receipt.timestamp as i64,
+                    receipt.capability_id.as_str(),
+                    receipt.tool_server.as_str(),
+                    receipt.tool_name.as_str(),
+                    support::decision_kind(&receipt.decision),
+                    receipt.policy_hash.as_str(),
+                    receipt.content_hash.as_str(),
+                    serde_json::to_string(&receipt).unwrap(),
+                ],
+            )
+            .unwrap();
+    }
+
+    let receipts = store
+        .list_tool_receipts(10, None, None, None, None)
+        .unwrap();
+
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].id, "rcpt-legacy-row");
+    assert!(!receipts[0].action.verify_hash().unwrap());
 
     let _ = fs::remove_file(path);
 }
