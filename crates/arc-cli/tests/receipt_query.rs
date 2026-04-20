@@ -13081,6 +13081,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         .json()
         .expect("parse fresh quote request");
 
+    let expiring_quote_expires_at = unix_now_secs().saturating_add(15);
     let expiring_quote_response = client
         .post(format!("{base_url}/v1/liability/quote-responses/issue"))
         .header(
@@ -13094,7 +13095,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 22000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 950, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(2)
+                "expiresAt": expiring_quote_expires_at
             }
         }))
         .send()
@@ -13104,7 +13105,15 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         .json()
         .expect("parse expiring quote response");
 
-    thread::sleep(Duration::from_secs(3));
+    let sleep_until_expired = expiring_quote_response
+        .body
+        .quoted_terms
+        .as_ref()
+        .expect("expiring quote response should carry quoted terms")
+        .expires_at
+        .saturating_sub(unix_now_secs())
+        .saturating_add(1);
+    thread::sleep(Duration::from_secs(sleep_until_expired));
 
     let expired_placement = client
         .post(format!("{base_url}/v1/liability/placements/issue"))
