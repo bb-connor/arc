@@ -115,6 +115,7 @@ fn denied_ip(address: IpAddr) -> bool {
             address.is_loopback()
                 || address.is_unspecified()
                 || address.is_unique_local()
+                || address.is_multicast()
                 || address.is_unicast_link_local()
         }
     }
@@ -174,6 +175,16 @@ mod tests {
             "https://[::ffff:169.254.169.254]/moderate",
         )
         .expect_err("IPv4-mapped IPv6 private endpoint should fail closed");
+        assert!(error
+            .to_string()
+            .contains("must not target localhost, link-local, or private-network hosts"));
+    }
+
+    #[test]
+    fn runtime_endpoint_validation_rejects_ipv6_multicast_literals() {
+        let error =
+            validate_external_guard_url("external guard endpoint", "https://[ff02::1]/moderate")
+                .expect_err("IPv6 multicast should fail closed");
         assert!(error
             .to_string()
             .contains("must not target localhost, link-local, or private-network hosts"));

@@ -124,7 +124,7 @@ ensure_matching_chromedriver() {
   zip_path="$cleanup_driver_dir/chromedriver-${cft_platform}.zip"
   zip_url="https://storage.googleapis.com/chrome-for-testing-public/${resolved_version}/${cft_platform}/chromedriver-${cft_platform}.zip"
   expected_md5_b64="$(
-    curl -fsSI "$zip_url" | tr -d '\r' | python - <<'PY'
+    curl -fsSI "$zip_url" | tr -d '\r' | python -c '
 import sys
 
 for line in sys.stdin:
@@ -136,7 +136,7 @@ for line in sys.stdin:
             print(item[4:])
             raise SystemExit(0)
 raise SystemExit(1)
-PY
+'
   )"
 
   curl -fsSL "$zip_url" -o "$zip_path"
