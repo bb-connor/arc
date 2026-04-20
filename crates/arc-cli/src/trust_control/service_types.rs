@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_core::appraisal::{
@@ -348,6 +348,8 @@ const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-arc-cluster-auth-signature";
 const CLUSTER_AUTH_TERM_HEADER: &str = "x-arc-cluster-auth-term";
 const CLUSTER_AUTH_SCHEME: &str = "arc.cluster.peer.v1";
 const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
+const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;
+const CLUSTER_AUTH_FAILURE_BURST: usize = 8;
 const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
 const RECEIPT_ANALYTICS_PATH: &str = "/v1/receipts/analytics";
 const EVIDENCE_EXPORT_PATH: &str = "/v1/evidence/export";

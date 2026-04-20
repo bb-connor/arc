@@ -10,34 +10,7 @@ fn build_capital_book_report_from_store(
         .ok_or_else(|| TrustHttpError::bad_request("capital book requires --agent-subject"))?;
 
     let exposure = build_exposure_ledger_report(receipt_store, &normalized.exposure_query())?;
-    for receipt in &exposure.receipts {
-        let carries_monetary_state = receipt.governed_max_amount.is_some()
-            || receipt.financial_amount.is_some()
-            || receipt.reserve_required_amount.is_some()
-            || receipt.provisional_loss_amount.is_some()
-            || receipt.recovered_amount.is_some();
-        if !carries_monetary_state {
-            continue;
-        }
-        let Some(receipt_subject) = receipt.subject_key.as_deref() else {
-            return Err(TrustHttpError::new(
-                StatusCode::CONFLICT,
-                format!(
-                    "capital book receipt `{}` is missing counterparty subject attribution",
-                    receipt.receipt_id
-                ),
-            ));
-        };
-        if receipt_subject != subject_key {
-            return Err(TrustHttpError::new(
-                StatusCode::CONFLICT,
-                format!(
-                    "capital book receipt `{}` resolved subject `{}` but query subject is `{}`",
-                    receipt.receipt_id, receipt_subject, subject_key
-                ),
-            ));
-        }
-    }
+    validate_capital_book_receipts(&exposure.receipts, &subject_key)?;
 
     let facility_report = receipt_store
         .query_credit_facilities(&normalized.facility_query())
@@ -592,6 +565,51 @@ fn build_capital_book_report_from_store(
         sources,
         events,
     })
+}
+
+fn validate_capital_book_receipts(
+    receipts: &[ExposureLedgerReceiptEntry],
+    subject_key: &str,
+) -> Result<(), TrustHttpError> {
+    let mut seen_monetary_receipt_ids = std::collections::BTreeSet::<&str>::new();
+    for receipt in receipts {
+        let carries_monetary_state = receipt.governed_max_amount.is_some()
+            || receipt.financial_amount.is_some()
+            || receipt.reserve_required_amount.is_some()
+            || receipt.provisional_loss_amount.is_some()
+            || receipt.recovered_amount.is_some();
+        if !carries_monetary_state {
+            continue;
+        }
+        if !seen_monetary_receipt_ids.insert(receipt.receipt_id.as_str()) {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital book resolved duplicate monetary receipt `{}`; governed receipt ids must be unique",
+                    receipt.receipt_id
+                ),
+            ));
+        }
+        let Some(receipt_subject) = receipt.subject_key.as_deref() else {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital book receipt `{}` is missing counterparty subject attribution",
+                    receipt.receipt_id
+                ),
+            ));
+        };
+        if receipt_subject != subject_key {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital book receipt `{}` resolved subject `{}` but query subject is `{}`",
+                    receipt.receipt_id, receipt_subject, subject_key
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn build_capital_execution_instruction_artifact_from_store(
@@ -2871,4 +2889,53 @@ fn build_credit_backtest_report_from_store(
         },
         windows,
     })
+}
+
+#[cfg(test)]
+mod capital_and_liability_tests {
+    use super::*;
+
+    fn monetary_receipt(receipt_id: &str, subject_key: Option<&str>) -> ExposureLedgerReceiptEntry {
+        ExposureLedgerReceiptEntry {
+            receipt_id: receipt_id.to_string(),
+            timestamp: 1_717_171_717,
+            capability_id: "cap-1".to_string(),
+            subject_key: subject_key.map(ToOwned::to_owned),
+            issuer_key: Some("issuer-1".to_string()),
+            tool_server: "ledger".to_string(),
+            tool_name: "transfer".to_string(),
+            decision: Decision::Allow,
+            settlement_status: SettlementStatus::Settled,
+            action_required: false,
+            governed_max_amount: Some(MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            }),
+            financial_amount: Some(MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            }),
+            reserve_required_amount: None,
+            provisional_loss_amount: None,
+            recovered_amount: None,
+            metered_action_required: false,
+            evidence_refs: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn validate_capital_book_receipts_rejects_duplicate_monetary_receipt_ids() {
+        let error = validate_capital_book_receipts(
+            &[
+                monetary_receipt("rcpt-1", Some("subject-1")),
+                monetary_receipt("rcpt-1", Some("subject-1")),
+            ],
+            "subject-1",
+        )
+        .expect_err("duplicate governed receipt ids should fail closed");
+        assert_eq!(error.status, StatusCode::CONFLICT);
+        assert!(error
+            .message
+            .contains("governed receipt ids must be unique"));
+    }
 }

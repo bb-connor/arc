@@ -710,7 +710,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         kernel: policy.kernel.clone(),
         default_capabilities,
         guard_pipeline: build_guard_pipeline(&policy.guards)?,
-        post_invocation_pipeline: build_post_invocation_pipeline(&policy.guards),
+        post_invocation_pipeline: build_post_invocation_pipeline(&policy.guards)?,
         issuance_policy: None,
         runtime_assurance_policy: None,
     })
@@ -1263,12 +1263,20 @@ fn validate_https_url(field: &str, value: &str) -> Result<(), PolicyError> {
     validate_http_url(field, value)?;
     let parsed = Url::parse(value)
         .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
-    if parsed.scheme() == "https" || is_localhost_http_url(&parsed) {
+    if is_localhost_http_url(&parsed) {
         return Ok(());
     }
-    Err(PolicyError::Invalid(format!(
-        "{field} must use https or localhost-only http"
-    )))
+    if parsed.scheme() != "https" {
+        return Err(PolicyError::Invalid(format!(
+            "{field} must use https or localhost-only http"
+        )));
+    }
+    if host_is_denied_for_external_guard(&parsed) {
+        return Err(PolicyError::Invalid(format!(
+            "{field} must not target localhost, link-local, or private-network hosts"
+        )));
+    }
+    Ok(())
 }
 
 fn is_localhost_http_url(parsed: &Url) -> bool {
@@ -1287,7 +1295,30 @@ fn is_localhost_http_url(parsed: &Url) -> bool {
     {
         return true;
     }
-    host.to_ascii_lowercase().ends_with(".localhost")
+    false
+}
+
+fn host_is_denied_for_external_guard(parsed: &Url) -> bool {
+    match parsed.host() {
+        Some(url::Host::Domain(host)) => {
+            let host = host.to_ascii_lowercase();
+            host == "localhost" || host.ends_with(".localhost")
+        }
+        Some(url::Host::Ipv4(address)) => {
+            address.is_private()
+                || address.is_loopback()
+                || address.is_link_local()
+                || address.is_unspecified()
+                || address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1])
+        }
+        Some(url::Host::Ipv6(address)) => {
+            address.is_loopback()
+                || address.is_unspecified()
+                || address.is_unique_local()
+                || address.is_unicast_link_local()
+        }
+        None => true,
+    }
 }
 
 fn parse_azure_category(category: &str) -> Result<AzureCategory, PolicyError> {
@@ -1303,13 +1334,14 @@ fn parse_azure_category(category: &str) -> Result<AzureCategory, PolicyError> {
 }
 
 /// Build a `PostInvocationPipeline` from a policy's guard configuration.
-pub fn build_post_invocation_pipeline(config: &GuardPolicyConfig) -> PostInvocationPipeline {
+pub fn build_post_invocation_pipeline(
+    config: &GuardPolicyConfig,
+) -> Result<PostInvocationPipeline, PolicyError> {
     let mut pipeline = PostInvocationPipeline::new();
 
     if let Some(query_result) = &config.query_result {
-        pipeline.add(Box::new(
-            QueryResultGuard::new(query_result.clone()).into_owned_hook(ArcScope::default()),
-        ));
+        let guard = QueryResultGuard::new(query_result.clone()).map_err(PolicyError::Invalid)?;
+        pipeline.add(Box::new(guard.into_owned_hook(ArcScope::default())));
     }
 
     if let Some(secret_patterns) = &config.secret_patterns {
@@ -1318,7 +1350,7 @@ pub fn build_post_invocation_pipeline(config: &GuardPolicyConfig) -> PostInvocat
         }
     }
 
-    pipeline
+    Ok(pipeline)
 }
 
 /// Convert policy tool grant configs into one or more capabilities grouped by TTL.
@@ -1898,7 +1930,7 @@ guards:
     #[test]
     fn build_post_invocation_pipeline_from_secret_patterns() {
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
-        let pipeline = build_post_invocation_pipeline(&policy.guards);
+        let pipeline = build_post_invocation_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 1);
     }
 
@@ -1922,7 +1954,7 @@ guards:
         .unwrap();
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        let post_invocation = build_post_invocation_pipeline(&policy.guards);
+        let post_invocation = build_post_invocation_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 3);
         assert_eq!(post_invocation.len(), 1);
     }
@@ -2057,6 +2089,64 @@ guards:
     }
 
     #[test]
+    fn build_pipeline_rejects_private_network_external_guard_urls_even_over_https() {
+        let policy = parse_policy(
+            r#"
+guards:
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "https://169.254.169.254/content-safety"
+      api_key: "azure-key"
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: "sb-key"
+      base_url: "https://192.168.1.10/v4"
+"#,
+        )
+        .unwrap();
+
+        let error = build_guard_pipeline(&policy.guards)
+            .err()
+            .expect("private-network external guard URLs should fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("must not target localhost, link-local, or private-network hosts"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn build_pipeline_rejects_dot_localhost_external_guard_urls() {
+        let policy = parse_policy(
+            r#"
+guards:
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "http://metadata.localhost:8080/moderate"
+      api_key: "azure-key"
+"#,
+        )
+        .unwrap();
+
+        let error = build_guard_pipeline(&policy.guards)
+            .err()
+            .expect(".localhost endpoints should fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("must use https or localhost-only http")
+                || error
+                    .to_string()
+                    .contains("must not target localhost, link-local, or private-network hosts"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
     fn query_result_policy_pipeline_redacts_wrapped_value_output() {
         let policy = parse_policy(
             r#"
@@ -2068,7 +2158,7 @@ guards:
         )
         .unwrap();
 
-        let pipeline = build_post_invocation_pipeline(&policy.guards);
+        let pipeline = build_post_invocation_pipeline(&policy.guards).unwrap();
         let context = arc_guards::post_invocation::PostInvocationContext::synthetic("sql");
         let outcome = pipeline.evaluate_with_context_and_evidence(
             &context,
@@ -2088,6 +2178,25 @@ guards:
             }
             other => panic!("expected Redact, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn build_post_invocation_pipeline_rejects_excessive_redact_pii_patterns() {
+        let patterns = (0..65)
+            .map(|idx| format!("      - \"pattern-{idx}\"\n"))
+            .collect::<String>();
+        let policy = parse_policy(&format!(
+            "guards:\n  query_result:\n    redact_pii_patterns:\n{patterns}"
+        ))
+        .unwrap();
+
+        let error = build_post_invocation_pipeline(&policy.guards)
+            .err()
+            .expect("excessive PII pattern count should fail closed");
+        assert!(
+            error.to_string().contains("allows at most 64 patterns"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -2700,7 +2809,7 @@ capabilities:
     fn arc_yaml_guard_surface_matches_hushspec_fixture() {
         let arc_policy = parse_policy(FULL_GUARD_POLICY).unwrap();
         let arc_pipeline = build_guard_pipeline(&arc_policy.guards).unwrap();
-        let arc_post_invocation = build_post_invocation_pipeline(&arc_policy.guards);
+        let arc_post_invocation = build_post_invocation_pipeline(&arc_policy.guards).unwrap();
         let arc_capabilities = build_runtime_default_capabilities(&arc_policy).unwrap();
 
         let hushspec = load_policy(&fixture_path("hushspec-guard-heavy.yaml")).unwrap();

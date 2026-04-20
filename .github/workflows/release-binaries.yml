@@ -112,10 +112,12 @@ jobs:
       - name: Resolve release version
         id: version
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
+            tag="${INPUT_TAG}"
           else
             tag="${GITHUB_REF_NAME}"
           fi
@@ -193,10 +195,12 @@ jobs:
       - name: Resolve release version
         id: version
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
+            tag="${INPUT_TAG}"
           else
             tag="${GITHUB_REF_NAME}"
           fi

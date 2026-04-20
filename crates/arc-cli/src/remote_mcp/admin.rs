@@ -84,6 +84,17 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
                 "invalidCount": 0,
             })
         });
+    let shared_hosted_owner_stats =
+        state
+            .factory
+            .shared_upstream_owner
+            .lock()
+            .ok()
+            .and_then(|owner| {
+                owner
+                    .as_ref()
+                    .map(|owner| owner.notification_stats_snapshot())
+            });
 
     Json(json!({
         "ok": true,
@@ -92,6 +103,7 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
             "serverName": &state.factory.config.server_name,
             "serverVersion": &state.factory.config.server_version,
             "sharedHostedOwner": state.factory.config.shared_hosted_owner,
+            "sharedHostedOwnerStats": shared_hosted_owner_stats,
         },
         "auth": {
             "mode": remote_auth_mode_label(&state.auth_mode),

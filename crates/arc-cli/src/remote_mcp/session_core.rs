@@ -116,6 +116,7 @@ const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"arc.identity_federation.v1";
+const REMOTE_SESSION_RESUME_INTEGRITY_LABEL: &[u8] = b"arc.remote_mcp.resume_integrity.v1";
 const SESSION_IDLE_EXPIRY_ENV: &str = "ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const LEGACY_SESSION_IDLE_EXPIRY_ENV: &str = "ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const SESSION_DRAIN_GRACE_ENV: &str = "ARC_MCP_SESSION_DRAIN_GRACE_MILLIS";
@@ -235,6 +236,8 @@ struct RemoteSessionResumeRecord {
     peer_capabilities: PeerCapabilities,
     initialize_params: Value,
     issued_capabilities: Vec<CapabilityToken>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    resume_integrity_tag: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -261,10 +264,32 @@ struct SharedUpstreamToolServer {
 struct SharedUpstreamOwner {
     upstream_server: Arc<AdaptedMcpServer>,
     notification_subscribers: NotificationSubscriberList,
+    notification_stats: Arc<SharedUpstreamNotificationStats>,
 }
 
 struct SharedUpstreamNotificationTap {
     queue: NotificationTapQueue,
+}
+
+#[derive(Default)]
+struct SharedUpstreamNotificationStats {
+    fanout_batches: AtomicU64,
+    fanout_notifications: AtomicU64,
+    fanout_targets: AtomicU64,
+    pruned_subscribers: AtomicU64,
+    queue_lock_skips: AtomicU64,
+    subscriber_lock_failures: AtomicU64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SharedUpstreamNotificationStatsSnapshot {
+    fanout_batches: u64,
+    fanout_notifications: u64,
+    fanout_targets: u64,
+    pruned_subscribers: u64,
+    queue_lock_skips: u64,
+    subscriber_lock_failures: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -467,6 +492,7 @@ struct RemoteSession {
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
+    resume_integrity_secret: Option<[u8; 32]>,
 }
 
 struct RemoteSessionInit {
@@ -488,6 +514,7 @@ struct RemoteSessionInit {
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
+    resume_integrity_secret: Option<[u8; 32]>,
 }
 
 struct NotificationStreamAttachment {
@@ -1581,6 +1608,152 @@ fn derive_session_agent_keypair(
     }
 }
 
+#[derive(Serialize)]
+struct RemoteSessionResumeIntegrityEnvelope<'a> {
+    session_id: &'a str,
+    agent_id: &'a str,
+    auth_context: &'a SessionAuthContext,
+    auth_mode_fingerprint: Option<&'a str>,
+    policy_fingerprint: Option<&'a str>,
+    hosted_isolation: RemoteHostedIsolationMode,
+    lifecycle: &'a RemoteSessionLifecycleSnapshot,
+    protocol_version: Option<&'a str>,
+    initialize_params: &'a Value,
+    issued_capabilities: &'a [CapabilityToken],
+}
+
+fn derive_resume_integrity_seed_from_secret(secret: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(REMOTE_SESSION_RESUME_INTEGRITY_LABEL);
+    hasher.update([0u8]);
+    hasher.update(secret);
+    let digest = hasher.finalize();
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&digest);
+    seed
+}
+
+fn derive_resume_record_integrity_seed(
+    config: &RemoteServeHttpConfig,
+) -> Result<Option<[u8; 32]>, CliError> {
+    if let Some(path) = config.authority_db_path.as_deref() {
+        let authority = arc_store_sqlite::SqliteCapabilityAuthority::open(path)
+            .map_err(|error| CliError::Other(error.to_string()))?;
+        let keypair = authority
+            .local_keypair()
+            .map_err(|error| CliError::Other(error.to_string()))?;
+        return Ok(Some(keypair.seed_bytes()));
+    }
+    for seed_path in [
+        config.authority_seed_path.as_deref(),
+        config.auth_server_seed_path.as_deref(),
+        config.identity_federation_seed_path.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let keypair = load_or_create_authority_keypair(seed_path)?;
+        return Ok(Some(keypair.seed_bytes()));
+    }
+    if let Some(secret) = config.control_token.as_deref() {
+        return Ok(Some(derive_resume_integrity_seed_from_secret(
+            secret.as_bytes(),
+        )));
+    }
+    if let Some(secret) = config.auth_token.as_deref() {
+        return Ok(Some(derive_resume_integrity_seed_from_secret(
+            secret.as_bytes(),
+        )));
+    }
+    Ok(None)
+}
+
+fn expected_resume_agent_id(
+    config: &RemoteServeHttpConfig,
+    auth_context: &SessionAuthContext,
+) -> Result<Option<String>, CliError> {
+    let Some(seed_path) = config.identity_federation_seed_path.as_deref() else {
+        return Ok(None);
+    };
+    match &auth_context.method {
+        SessionAuthMethod::OAuthBearer {
+            principal: Some(principal),
+            ..
+        } => Ok(Some(
+            derive_federated_agent_keypair(seed_path, principal)?
+                .public_key()
+                .to_hex(),
+        )),
+        _ => Ok(None),
+    }
+}
+
+fn compute_resume_record_integrity_tag(
+    seed: &[u8; 32],
+    record: &RemoteSessionResumeRecord,
+) -> Result<String, CliError> {
+    let envelope = RemoteSessionResumeIntegrityEnvelope {
+        session_id: &record.session_id,
+        agent_id: &record.agent_id,
+        auth_context: &record.auth_context,
+        auth_mode_fingerprint: record.auth_mode_fingerprint.as_deref(),
+        policy_fingerprint: record.policy_fingerprint.as_deref(),
+        hosted_isolation: record.hosted_isolation,
+        lifecycle: &record.lifecycle,
+        protocol_version: record.protocol_version.as_deref(),
+        initialize_params: &record.initialize_params,
+        issued_capabilities: &record.issued_capabilities,
+    };
+    let canonical = canonical_json_bytes(&envelope)
+        .map_err(|error| CliError::Other(format!("serialize resumable session envelope: {error}")))?;
+    let mut hasher = Sha256::new();
+    hasher.update(REMOTE_SESSION_RESUME_INTEGRITY_LABEL);
+    hasher.update([0u8]);
+    hasher.update(seed);
+    hasher.update([0u8]);
+    hasher.update(&canonical);
+    Ok(sha256_hex(&hasher.finalize()))
+}
+
+fn validate_resume_record_integrity(
+    config: &RemoteServeHttpConfig,
+    record: &RemoteSessionResumeRecord,
+) -> Result<(), CliError> {
+    let Some(stored_tag) = record.resume_integrity_tag.as_deref() else {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} predates resumable integrity binding and must be re-initialized",
+            record.session_id
+        )));
+    };
+    let Some(seed) = derive_resume_record_integrity_seed(config)? else {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} cannot be restored because this server has no local secret material for resumable session integrity",
+            record.session_id
+        )));
+    };
+    let expected_tag = compute_resume_record_integrity_tag(&seed, record)?;
+    if stored_tag != expected_tag {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} failed resumable integrity validation",
+            record.session_id
+        )));
+    }
+    Ok(())
+}
+
+fn validate_restored_peer_capabilities(
+    record: &RemoteSessionResumeRecord,
+) -> Result<PeerCapabilities, CliError> {
+    let derived = parse_remote_session_peer_capabilities(&record.initialize_params);
+    if derived != record.peer_capabilities {
+        return Err(CliError::Other(format!(
+            "stored MCP session {} failed peer capability re-validation against initialize params",
+            record.session_id
+        )));
+    }
+    Ok(derived)
+}
+
 impl SharedUpstreamToolServer {
     fn new(upstream: Arc<AdaptedMcpServer>) -> Self {
         let manifest = upstream.manifest_clone();
@@ -1649,12 +1822,15 @@ impl SharedUpstreamOwner {
         let upstream_server = Arc::new(AdaptedMcpServer::new(adapter)?);
         let notification_subscribers =
             Arc::new(StdMutex::new(Vec::<Weak<StdMutex<VecDeque<Value>>>>::new()));
+        let notification_stats = Arc::new(SharedUpstreamNotificationStats::default());
         let notification_source_for_thread = notification_source.clone();
         let notification_subscribers_for_thread = notification_subscribers.clone();
+        let notification_stats_for_thread = notification_stats.clone();
         thread::spawn(move || loop {
             let notifications = notification_source_for_thread.drain_notifications();
             fan_out_shared_upstream_notifications(
                 &notification_subscribers_for_thread,
+                notification_stats_for_thread.as_ref(),
                 notifications,
             );
             thread::sleep(Duration::from_millis(
@@ -1665,6 +1841,7 @@ impl SharedUpstreamOwner {
         Ok(Self {
             upstream_server,
             notification_subscribers,
+            notification_stats,
         })
     }
 
@@ -1678,6 +1855,32 @@ impl SharedUpstreamOwner {
             subscribers.push(Arc::downgrade(&queue));
         }
         Arc::new(SharedUpstreamNotificationTap { queue })
+    }
+
+    fn notification_stats_snapshot(&self) -> SharedUpstreamNotificationStatsSnapshot {
+        SharedUpstreamNotificationStatsSnapshot {
+            fanout_batches: self.notification_stats.fanout_batches.load(Ordering::Relaxed),
+            fanout_notifications: self
+                .notification_stats
+                .fanout_notifications
+                .load(Ordering::Relaxed),
+            fanout_targets: self
+                .notification_stats
+                .fanout_targets
+                .load(Ordering::Relaxed),
+            pruned_subscribers: self
+                .notification_stats
+                .pruned_subscribers
+                .load(Ordering::Relaxed),
+            queue_lock_skips: self
+                .notification_stats
+                .queue_lock_skips
+                .load(Ordering::Relaxed),
+            subscriber_lock_failures: self
+                .notification_stats
+                .subscriber_lock_failures
+                .load(Ordering::Relaxed),
+        }
     }
 }
 
@@ -1708,15 +1911,31 @@ impl McpTransport for SharedUpstreamNotificationTap {
 
 fn fan_out_shared_upstream_notifications(
     subscribers: &NotificationSubscriberList,
+    stats: &SharedUpstreamNotificationStats,
     notifications: Vec<Value>,
 ) {
     if notifications.is_empty() {
         return;
     }
+    stats.fanout_batches.fetch_add(1, Ordering::Relaxed);
+    stats
+        .fanout_notifications
+        .fetch_add(notifications.len() as u64, Ordering::Relaxed);
     let Ok(mut subscribers) = subscribers.lock() else {
+        stats
+            .subscriber_lock_failures
+            .fetch_add(1, Ordering::Relaxed);
+        warn!("failed to lock shared hosted-owner notification subscribers");
         return;
     };
+    let before_prune = subscribers.len();
     subscribers.retain(|subscriber| subscriber.strong_count() > 0);
+    let pruned = before_prune.saturating_sub(subscribers.len());
+    if pruned > 0 {
+        stats
+            .pruned_subscribers
+            .fetch_add(pruned as u64, Ordering::Relaxed);
+    }
     // Shared hosted-owner mode multiplexes one upstream subprocess across many
     // sessions. Each session-local ArcMcpEdge still applies its own resource
     // subscription and elicitation filtering before surfacing client-visible
@@ -1727,8 +1946,13 @@ fn fan_out_shared_upstream_notifications(
             continue;
         };
         let Ok(mut queue) = queue.lock() else {
+            stats
+                .queue_lock_skips
+                .fetch_add(notifications.len() as u64, Ordering::Relaxed);
+            warn!("failed to lock shared hosted-owner notification tap queue");
             continue;
         };
+        stats.fanout_targets.fetch_add(1, Ordering::Relaxed);
         queue.extend(notifications.iter().cloned());
     }
 }
@@ -1894,6 +2118,7 @@ impl RemoteSession {
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
             session_db_path: init.session_db_path,
+            resume_integrity_secret: init.resume_integrity_secret,
         }
     }
 
@@ -2032,7 +2257,7 @@ impl RemoteSession {
             .lock()
             .ok()
             .and_then(|guard| guard.clone())?;
-        Some(RemoteSessionResumeRecord {
+        let mut record = RemoteSessionResumeRecord {
             session_id: self.session_id.clone(),
             agent_id: self.agent_id.clone(),
             auth_context: self.auth_context.clone(),
@@ -2044,7 +2269,11 @@ impl RemoteSession {
             peer_capabilities,
             initialize_params,
             issued_capabilities: self.issued_capabilities.clone(),
-        })
+            resume_integrity_tag: None,
+        };
+        let seed = self.resume_integrity_secret.as_ref()?;
+        record.resume_integrity_tag = Some(compute_resume_record_integrity_tag(seed, &record).ok()?);
+        Some(record)
     }
 
     fn persist_resumable_record(&self) {
@@ -2340,6 +2569,7 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
+        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -2471,6 +2701,7 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
+            resume_integrity_secret,
         })))
     }
 
@@ -2478,6 +2709,7 @@ impl RemoteSessionFactory {
         &self,
         record: &RemoteSessionResumeRecord,
     ) -> Result<Arc<RemoteSession>, CliError> {
+        validate_resume_record_integrity(&self.config, record)?;
         let configured_hosted_isolation = self.configured_hosted_isolation();
         if configured_hosted_isolation != record.hosted_isolation {
             return Err(CliError::Other(format!(
@@ -2485,11 +2717,22 @@ impl RemoteSessionFactory {
                 record.session_id, record.hosted_isolation, configured_hosted_isolation
             )));
         }
+        if let Some(expected_agent_id) =
+            expected_resume_agent_id(&self.config, &record.auth_context)?
+        {
+            if expected_agent_id != record.agent_id {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} failed authenticated principal re-validation during restore",
+                    record.session_id
+                )));
+            }
+        }
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
+        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
             Some(_) => {
@@ -2561,10 +2804,15 @@ impl RemoteSessionFactory {
         )));
 
         let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
+        let restored_peer_capabilities = validate_restored_peer_capabilities(record)?;
         let issued_capabilities = match record.policy_fingerprint.as_deref() {
             Some(stored)
                 if stored == policy_fingerprint
-                    && stored_capabilities_are_current(&record.issued_capabilities) =>
+                    && stored_capabilities_are_current(&record.issued_capabilities)
+                    && record
+                        .issued_capabilities
+                        .iter()
+                        .all(|capability| capability.subject == agent_public_key) =>
             {
                 record.issued_capabilities.clone()
             }
@@ -2601,7 +2849,7 @@ impl RemoteSessionFactory {
         edge.attach_upstream_transport(upstream_notification_source);
         edge.restore_ready_session(
             restored_kernel_session_id(&record.session_id),
-            record.peer_capabilities.clone(),
+            restored_peer_capabilities.clone(),
         )?;
 
         let (input_tx, input_rx) = mpsc::channel::<Value>();
@@ -2633,7 +2881,7 @@ impl RemoteSessionFactory {
             hosted_isolation: record.hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: record.protocol_version.clone(),
-            peer_capabilities: Some(record.peer_capabilities.clone()),
+            peer_capabilities: Some(restored_peer_capabilities),
             initialize_params: Some(record.initialize_params.clone()),
             lifecycle_snapshot: Some(record.lifecycle.clone()),
             input_tx,
@@ -2641,6 +2889,7 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
+            resume_integrity_secret,
         })))
     }
 }

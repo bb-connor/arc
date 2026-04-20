@@ -23,6 +23,7 @@ covered_rust_modules = [
   "crates/arc-kernel-core/src/capability_verify.rs",
   "crates/arc-kernel-core/src/scope.rs",
   "crates/arc-kernel-core/src/evaluate.rs",
+  "crates/arc-kernel-core/src/normalized.rs",
   "crates/arc-kernel-core/src/receipts.rs",
 ]
 

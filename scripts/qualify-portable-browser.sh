@@ -123,8 +123,39 @@ ensure_matching_chromedriver() {
   cleanup_driver_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-chromedriver.XXXXXX")"
   zip_path="$cleanup_driver_dir/chromedriver-${cft_platform}.zip"
   zip_url="https://storage.googleapis.com/chrome-for-testing-public/${resolved_version}/${cft_platform}/chromedriver-${cft_platform}.zip"
+  expected_md5_b64="$(
+    curl -fsSI "$zip_url" | tr -d '\r' | python - <<'PY'
+import sys
+
+for line in sys.stdin:
+    if not line.lower().startswith("x-goog-hash:"):
+        continue
+    for item in line.split(":", 1)[1].split(","):
+        item = item.strip()
+        if item.startswith("md5="):
+            print(item[4:])
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+  )"
 
   curl -fsSL "$zip_url" -o "$zip_path"
+  actual_md5_b64="$(
+    python - "$zip_path" <<'PY'
+import base64
+import hashlib
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+digest = hashlib.md5(path.read_bytes()).digest()
+print(base64.b64encode(digest).decode("ascii"))
+PY
+  )"
+  if [[ "$actual_md5_b64" != "$expected_md5_b64" ]]; then
+    echo "[portable-browser] checksum verification failed for $zip_url" >&2
+    exit 1
+  fi
   unzip -q "$zip_path" -d "$cleanup_driver_dir"
   extracted_driver="$cleanup_driver_dir/chromedriver-${cft_platform}/chromedriver"
   if [[ ! -x "$extracted_driver" ]]; then

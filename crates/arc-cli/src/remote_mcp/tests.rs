@@ -9,6 +9,8 @@ mod tests {
     use rsa::rand_core::OsRng;
     use rsa::signature::{RandomizedSigner as _, SignatureEncoding as _};
     use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::atomic::Ordering;
 
     fn sign_jwt_with_header(
         header: Value,
@@ -134,10 +136,89 @@ mod tests {
         HeaderMap::new()
     }
 
+    fn test_remote_config() -> RemoteServeHttpConfig {
+        RemoteServeHttpConfig {
+            listen: "127.0.0.1:0".parse().expect("parse listen addr"),
+            auth_token: Some("remote-auth-token".to_string()),
+            auth_jwt_public_key: None,
+            auth_jwt_discovery_url: None,
+            auth_introspection_url: None,
+            auth_introspection_client_id: None,
+            auth_introspection_client_secret: None,
+            auth_jwt_provider_profile: None,
+            auth_server_seed_path: None,
+            identity_federation_seed_path: None,
+            enterprise_providers_file: None,
+            auth_jwt_issuer: None,
+            auth_jwt_audience: None,
+            admin_token: Some("admin-token".to_string()),
+            control_url: None,
+            control_token: None,
+            public_base_url: None,
+            auth_servers: vec![],
+            auth_authorization_endpoint: None,
+            auth_token_endpoint: None,
+            auth_registration_endpoint: None,
+            auth_jwks_uri: None,
+            auth_scopes: vec!["mcp:invoke".to_string()],
+            auth_subject: "operator".to_string(),
+            auth_code_ttl_secs: 300,
+            auth_access_token_ttl_secs: 600,
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            session_db_path: None,
+            policy_path: PathBuf::from("policy.yaml"),
+            server_id: "srv".to_string(),
+            server_name: "srv".to_string(),
+            server_version: "0.1.0".to_string(),
+            manifest_public_key: None,
+            page_size: 50,
+            tools_list_changed: false,
+            shared_hosted_owner: false,
+            wrapped_command: "python3".to_string(),
+            wrapped_args: vec!["mock.py".to_string()],
+        }
+    }
+
+    fn sample_resume_record() -> RemoteSessionResumeRecord {
+        RemoteSessionResumeRecord {
+            session_id: "session-valid".to_string(),
+            agent_id: "agent-valid".to_string(),
+            auth_context: SessionAuthContext::streamable_http_oauth_bearer(
+                Some("principal-valid".to_string()),
+                Some("https://issuer.example".to_string()),
+                Some("subject-valid".to_string()),
+                Some("audience-valid".to_string()),
+                vec!["mcp:invoke".to_string(), "mcp:read".to_string()],
+                Some("token-fingerprint".to_string()),
+                None,
+            ),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Ready,
+                created_at: 10,
+                last_seen_at: 11,
+                idle_expires_at: 12,
+                drain_deadline_at: None,
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        }
+    }
+
     #[test]
     fn shared_hosted_owner_notification_fanout_replays_to_all_live_taps() {
         let subscriber_a = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
         let subscriber_b = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let stats = SharedUpstreamNotificationStats::default();
         let subscribers: NotificationSubscriberList = Arc::new(StdMutex::new(vec![
             Arc::downgrade(&subscriber_a),
             Arc::downgrade(&subscriber_b),
@@ -145,6 +226,7 @@ mod tests {
 
         fan_out_shared_upstream_notifications(
             &subscribers,
+            &stats,
             vec![json!({
                 "jsonrpc": "2.0",
                 "method": "notifications/resources/list_changed"
@@ -160,6 +242,114 @@ mod tests {
             Some("notifications/resources/list_changed")
         );
         assert_eq!(subscriber_a.as_slices(), subscriber_b.as_slices());
+        assert_eq!(stats.fanout_batches.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.fanout_notifications.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.fanout_targets.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn shared_hosted_owner_notification_fanout_tracks_pruned_dead_subscribers() {
+        let stats = SharedUpstreamNotificationStats::default();
+        let live = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let dropped = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let subscribers: NotificationSubscriberList = Arc::new(StdMutex::new(vec![
+            Arc::downgrade(&live),
+            Arc::downgrade(&dropped),
+        ]));
+        drop(dropped);
+
+        fan_out_shared_upstream_notifications(
+            &subscribers,
+            &stats,
+            vec![json!({
+                "jsonrpc": "2.0",
+                "method": "notifications/tools/list_changed"
+            })],
+        );
+
+        assert_eq!(stats.pruned_subscribers.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.fanout_targets.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn validate_resume_record_integrity_rejects_tampered_auth_context() {
+        let config = test_remote_config();
+        let seed = derive_resume_record_integrity_seed(&config)
+            .expect("derive integrity seed")
+            .expect("integrity seed");
+        let mut record = sample_resume_record();
+        record.resume_integrity_tag = Some(
+            compute_resume_record_integrity_tag(&seed, &record)
+                .expect("compute integrity tag"),
+        );
+        if let SessionAuthMethod::OAuthBearer { scopes, .. } = &mut record.auth_context.method {
+            scopes.push("mcp:admin".to_string());
+        } else {
+            panic!("expected OAuth bearer auth context");
+        }
+
+        let error = validate_resume_record_integrity(&config, &record)
+            .expect_err("tampered auth context should fail integrity validation");
+        assert!(error
+            .to_string()
+            .contains("failed resumable integrity validation"));
+    }
+
+    #[test]
+    fn validate_restored_peer_capabilities_rejects_tampered_record() {
+        let mut record = sample_resume_record();
+        record.initialize_params = json!({
+            "capabilities": {
+                "tools": { "listChanged": true },
+                "resources": { "subscribe": true, "listChanged": true },
+                "prompts": { "listChanged": true }
+            }
+        });
+        record.peer_capabilities = PeerCapabilities::default();
+
+        let error = validate_restored_peer_capabilities(&record)
+            .expect_err("tampered peer capabilities should fail restore validation");
+        assert!(error
+            .to_string()
+            .contains("failed peer capability re-validation"));
+    }
+
+    #[test]
+    fn expected_resume_agent_id_is_revalidated_from_identity_federation_seed() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        let seed_path = std::env::temp_dir().join(format!(
+            "arc-identity-federation-resume-{}-{nonce}.seed",
+            std::process::id()
+        ));
+        let mut config = test_remote_config();
+        config.identity_federation_seed_path = Some(seed_path.clone());
+        let auth_context = SessionAuthContext::streamable_http_oauth_bearer(
+            Some("oidc:https://issuer.example#sub:user-123".to_string()),
+            Some("https://issuer.example".to_string()),
+            Some("user-123".to_string()),
+            Some("audience-valid".to_string()),
+            vec!["mcp:invoke".to_string()],
+            Some("token-fingerprint".to_string()),
+            None,
+        );
+
+        let expected = expected_resume_agent_id(&config, &auth_context)
+            .expect("derive expected agent id")
+            .expect("expected agent id");
+        let foreign = derive_federated_agent_keypair(
+            &seed_path,
+            "oidc:https://issuer.example#sub:user-456",
+        )
+        .expect("derive foreign principal keypair")
+        .public_key()
+        .to_hex();
+
+        assert_ne!(expected, foreign);
+
+        let _ = std::fs::remove_file(seed_path);
     }
 
     #[test]
@@ -191,6 +381,7 @@ mod tests {
             peer_capabilities: PeerCapabilities::default(),
             initialize_params: json!({}),
             issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
         };
         persist_active_session_record(&path, &valid_record).expect("persist valid session row");
 
@@ -256,6 +447,7 @@ mod tests {
             retained_notification_events,
             next_event_id,
             session_db_path: None,
+            resume_integrity_secret: None,
         });
 
         let lifecycle = session.lifecycle_snapshot();
@@ -1131,6 +1323,7 @@ mod tests {
     #[test]
     fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queues() {
         let subscribers = Arc::new(StdMutex::new(Vec::new()));
+        let stats = SharedUpstreamNotificationStats::default();
         let queue_a = Arc::new(StdMutex::new(VecDeque::new()));
         let queue_b = Arc::new(StdMutex::new(VecDeque::new()));
         let dropped_queue = Arc::new(StdMutex::new(VecDeque::new()));
@@ -1143,6 +1336,7 @@ mod tests {
 
         fan_out_shared_upstream_notifications(
             &subscribers,
+            &stats,
             vec![
                 json!({"jsonrpc": "2.0", "method": "notifications/resources/list_changed"}),
                 json!({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}),

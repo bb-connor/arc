@@ -154,6 +154,33 @@ impl SqliteBudgetStore {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        Self::upsert_usage_in_transaction(&transaction, record)?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn import_snapshot_records(
+        &mut self,
+        usages: &[BudgetUsageRecord],
+        events: &[BudgetMutationRecord],
+    ) -> Result<(), BudgetStoreError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for usage in usages {
+            Self::upsert_usage_in_transaction(&transaction, usage)?;
+        }
+        for event in events {
+            Self::import_mutation_record_in_transaction(&transaction, event)?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn upsert_usage_in_transaction(
+        transaction: &rusqlite::Transaction<'_>,
+        record: &BudgetUsageRecord,
+    ) -> Result<(), BudgetStoreError> {
         raise_budget_replication_seq_floor(&transaction, record.seq)?;
         transaction.execute(
             r#"
@@ -199,7 +226,6 @@ impl SqliteBudgetStore {
                 record.total_cost_realized_spend as i64,
             ],
         )?;
-        transaction.commit()?;
         Ok(())
     }
 
@@ -246,6 +272,15 @@ impl SqliteBudgetStore {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        Self::import_mutation_record_in_transaction(&transaction, record)?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn import_mutation_record_in_transaction(
+        transaction: &rusqlite::Transaction<'_>,
+        record: &BudgetMutationRecord,
+    ) -> Result<(), BudgetStoreError> {
         raise_budget_replication_seq_floor(&transaction, record.event_seq)?;
         if let Some(usage_seq) = record.usage_seq {
             raise_budget_replication_seq_floor(&transaction, usage_seq)?;
@@ -255,7 +290,6 @@ impl SqliteBudgetStore {
             Self::load_mutation_event(&transaction, &record.event_id)?
         {
             if existing != *record {
-                transaction.rollback()?;
                 return Err(BudgetStoreError::Invariant(format!(
                     "budget event_id `{}` was reused for a different mutation",
                     record.event_id
@@ -315,12 +349,10 @@ impl SqliteBudgetStore {
         };
 
         if duplicate_event {
-            transaction.commit()?;
             return Ok(());
         }
 
         Self::apply_imported_hold_state(&transaction, record)?;
-        transaction.commit()?;
         Ok(())
     }
 
@@ -3484,6 +3516,52 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].event_id, authorize_event_id);
         assert_eq!(events[1].event_id, release_event_id);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite() {
+        let path = unique_db_path("arc-budget-import-atomic");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        let initial_authority = authority("budget-primary", "lease-1", 1);
+        let conflicting_authority = authority("budget-primary", "lease-2", 2);
+
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-import",
+                0,
+                Some(10),
+                25,
+                Some(100),
+                Some(500),
+                Some("hold-cap-import-atomic-0"),
+                Some("hold-cap-import-atomic-0:authorize"),
+                Some(&initial_authority),
+            )
+            .unwrap());
+
+        let mut conflicting_event = store
+            .list_mutation_events(10, Some("cap-import"), Some(0))
+            .unwrap()
+            .into_iter()
+            .find(|record| record.event_id == "hold-cap-import-atomic-0:authorize")
+            .expect("existing authorize event");
+        conflicting_event.authority = Some(conflicting_authority);
+
+        let imported_usage = usage_record("cap-import-rollback", 0, 2, unix_now(), 88, 40, 5);
+
+        let error = store
+            .import_snapshot_records(&[imported_usage], &[conflicting_event])
+            .expect_err("conflicting event import should fail atomically");
+        assert!(error
+            .to_string()
+            .contains("reused for a different mutation"));
+        assert!(store.get_usage("cap-import-rollback", 0).unwrap().is_none());
+
+        let existing = store.get_usage("cap-import", 0).unwrap().unwrap();
+        assert_eq!(existing.invocation_count, 1);
+        assert_usage_totals(&existing, 25, 0);
 
         let _ = fs::remove_file(path);
     }

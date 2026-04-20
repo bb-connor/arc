@@ -1483,7 +1483,8 @@ fn build_underwriting_policy_input(
         .map(|subject_key| {
             receipt_store
                 .query_compliance_report(&operator_query)
-                .map(|report| {
+                .map_err(|error| TrustHttpError::internal(error.to_string()))
+                .and_then(|report| {
                     build_underwriting_compliance_evidence(
                         subject_key,
                         generated_at,
@@ -1491,8 +1492,8 @@ fn build_underwriting_policy_input(
                         &report,
                         &selection,
                     )
+                    .map_err(TrustHttpError::internal)
                 })
-                .map_err(|error| TrustHttpError::internal(error.to_string()))
         })
         .transpose()?;
     let signals = derive_underwriting_signals(
@@ -1524,7 +1525,13 @@ fn build_underwriting_compliance_evidence(
     activity: &arc_kernel::ReceiptAnalyticsResponse,
     report: &arc_kernel::ComplianceReport,
     selection: &arc_kernel::BehavioralFeedReceiptSelection,
-) -> arc_kernel::UnderwritingComplianceEvidence {
+) -> Result<arc_kernel::UnderwritingComplianceEvidence, String> {
+    if report.export_query.agent_subject.as_deref() != Some(subject_key) {
+        return Err(format!(
+            "compliance report subject mismatch: expected `{subject_key}` but report was scoped to {:?}",
+            report.export_query.agent_subject
+        ));
+    }
     let observed_capabilities = selection
         .receipts
         .iter()
@@ -1547,7 +1554,7 @@ fn build_underwriting_compliance_evidence(
         subject_key,
         generated_at,
     );
-    score.as_underwriting_evidence()
+    Ok(score.as_underwriting_evidence())
 }
 
 fn underwriting_reputation_from_behavioral_summary(
@@ -2052,7 +2059,7 @@ fn load_behavioral_feed_signing_keypair(
 }
 
 #[cfg(test)]
-mod tests {
+mod underwriting_and_support_tests {
     use super::*;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -2087,6 +2094,49 @@ mod tests {
 
         let _ = fs::remove_file(source_path);
         let _ = fs::remove_file(follower_path);
+    }
+
+    #[test]
+    fn underwriting_compliance_evidence_rejects_subject_mismatch() {
+        let activity = arc_kernel::ReceiptAnalyticsResponse {
+            summary: arc_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2),
+            by_agent: Vec::new(),
+            by_tool: Vec::new(),
+            by_time: Vec::new(),
+        };
+        let report = arc_kernel::ComplianceReport {
+            matching_receipts: 5,
+            evidence_ready_receipts: 5,
+            uncheckpointed_receipts: 0,
+            checkpoint_coverage_rate: Some(1.0),
+            lineage_covered_receipts: 5,
+            lineage_gap_receipts: 0,
+            lineage_coverage_rate: Some(1.0),
+            pending_settlement_receipts: 0,
+            failed_settlement_receipts: 0,
+            direct_evidence_export_supported: true,
+            child_receipt_scope: arc_kernel::EvidenceChildReceiptScope::OmittedNoJoinPath,
+            proofs_complete: true,
+            export_query: arc_kernel::EvidenceExportQuery {
+                agent_subject: Some("subject-other".to_string()),
+                ..arc_kernel::EvidenceExportQuery::default()
+            },
+            export_scope_note: None,
+        };
+        let selection = arc_kernel::BehavioralFeedReceiptSelection {
+            matching_receipts: 0,
+            receipts: Vec::new(),
+        };
+
+        let error = build_underwriting_compliance_evidence(
+            "subject-expected",
+            1_717_171_717,
+            &activity,
+            &report,
+            &selection,
+        )
+        .expect_err("mismatched report scope should fail closed");
+        assert!(error.contains("compliance report subject mismatch"));
     }
 }
 

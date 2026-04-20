@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
@@ -30,8 +33,18 @@ jobs:
         run: rustup toolchain install 1.93.0 --profile minimal
 
       - name: Install Lean 4 toolchain
+        shell: bash
+        env:
+          ELAN_VERSION: v4.2.1
+          ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
         run: |
-          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/leanprover/elan/releases/download/${ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/elan-x86_64-unknown-linux-gnu.tar.gz
+          echo "${ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/elan-x86_64-unknown-linux-gnu.tar.gz -C /tmp
+          /tmp/elan-init -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
 

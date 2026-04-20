@@ -52,7 +52,7 @@
 
 use std::borrow::Cow;
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::warn;
@@ -65,6 +65,10 @@ use arc_kernel::{GuardContext, KernelError, Verdict};
 
 /// Default redaction marker written in place of denied columns.
 pub const DEFAULT_REDACTION_MARKER: &str = "[REDACTED]";
+const MAX_REDACT_PII_PATTERNS: usize = 64;
+const MAX_REDACT_PII_PATTERN_LEN: usize = 512;
+const REDACT_PII_REGEX_SIZE_LIMIT: usize = 1 << 20;
+const REDACT_PII_DFA_SIZE_LIMIT: usize = 1 << 20;
 
 /// Configuration for [`QueryResultGuard`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -112,6 +116,7 @@ impl Default for QueryResultGuardConfig {
 
 /// Post-invocation guard that enforces row and column constraints on
 /// query tool responses.
+#[derive(Debug)]
 pub struct QueryResultGuard {
     config: QueryResultGuardConfig,
     pii_regex: Vec<(String, Regex)>,
@@ -120,21 +125,38 @@ pub struct QueryResultGuard {
 impl QueryResultGuard {
     /// Construct a guard with the given configuration.
     ///
-    /// Invalid PII regex patterns are logged and skipped.
-    pub fn new(config: QueryResultGuardConfig) -> Self {
+    /// Invalid or over-broad PII regex patterns reject guard construction so
+    /// policy loading fails closed instead of silently widening output.
+    pub fn new(config: QueryResultGuardConfig) -> Result<Self, String> {
+        if config.redact_pii_patterns.len() > MAX_REDACT_PII_PATTERNS {
+            return Err(format!(
+                "query_result.redact_pii_patterns allows at most {MAX_REDACT_PII_PATTERNS} patterns"
+            ));
+        }
         let mut pii_regex = Vec::with_capacity(config.redact_pii_patterns.len());
         for pattern in &config.redact_pii_patterns {
-            match Regex::new(&format!("(?i){pattern}")) {
-                Ok(re) => pii_regex.push((pattern.clone(), re)),
-                Err(e) => warn!(
-                    target: "arc.data-guards.result",
-                    pattern = %pattern,
-                    error = %e,
-                    "invalid PII regex, skipping"
-                ),
+            let trimmed = pattern.trim();
+            if trimmed.is_empty() {
+                return Err(
+                    "query_result.redact_pii_patterns cannot contain empty patterns".to_string(),
+                );
             }
+            if trimmed.len() > MAX_REDACT_PII_PATTERN_LEN {
+                return Err(format!(
+                    "query_result.redact_pii_patterns entries must be at most {MAX_REDACT_PII_PATTERN_LEN} characters"
+                ));
+            }
+            let re = RegexBuilder::new(trimmed)
+                .case_insensitive(true)
+                .size_limit(REDACT_PII_REGEX_SIZE_LIMIT)
+                .dfa_size_limit(REDACT_PII_DFA_SIZE_LIMIT)
+                .build()
+                .map_err(|error| {
+                    format!("invalid query_result.redact_pii_patterns entry `{trimmed}`: {error}")
+                })?;
+            pii_regex.push((trimmed.to_string(), re));
         }
-        Self { config, pii_regex }
+        Ok(Self { config, pii_regex })
     }
 
     /// Read-only access to the configuration.
@@ -534,7 +556,7 @@ mod tests {
 
     #[test]
     fn truncates_rows_to_max_rows_returned() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::MaxRowsReturned(2)]);
         let mut value = serde_json::json!({
             "rows": [
@@ -548,7 +570,7 @@ mod tests {
 
     #[test]
     fn leaves_rows_untouched_when_no_max_rows() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![]);
         let mut value = serde_json::json!({"rows": [{"id": 1}, {"id": 2}]});
         guard.redact_result(&scope, &mut value);
@@ -557,7 +579,7 @@ mod tests {
 
     #[test]
     fn redacts_bare_column_name() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);
         let mut value = serde_json::json!({
             "rows": [
@@ -576,7 +598,7 @@ mod tests {
     fn redacts_qualified_column_name_on_flat_row() {
         // "users.email" should still match a flat row with an "email"
         // column (last segment wins).
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::ColumnDenylist(vec!["users.email".into()])]);
         let mut value = serde_json::json!({
             "rows": [{"id": 1, "email": "a@b.com"}]
@@ -587,7 +609,7 @@ mod tests {
 
     #[test]
     fn redacts_qualified_column_name_on_nested_row() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::ColumnDenylist(vec!["users.email".into()])]);
         let mut value = serde_json::json!({
             "rows": [
@@ -604,7 +626,7 @@ mod tests {
 
     #[test]
     fn truncation_then_redaction_compose() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![
             Constraint::MaxRowsReturned(1),
             Constraint::ColumnDenylist(vec!["email".into()]),
@@ -626,7 +648,8 @@ mod tests {
         let guard = QueryResultGuard::new(QueryResultGuardConfig {
             redact_pii_patterns: vec![r"\b\d{3}-\d{2}-\d{4}\b".into()],
             ..Default::default()
-        });
+        })
+        .unwrap();
         let scope = scope(vec![]);
         let mut value = serde_json::json!({
             "rows": [{"id": 1, "note": "SSN: 123-45-6789"}]
@@ -638,21 +661,18 @@ mod tests {
     }
 
     #[test]
-    fn invalid_pii_pattern_is_skipped_not_panics() {
-        // Construct with an invalid pattern.  Guard should log+skip.
-        let guard = QueryResultGuard::new(QueryResultGuardConfig {
+    fn invalid_pii_pattern_rejects_guard_construction() {
+        let error = QueryResultGuard::new(QueryResultGuardConfig {
             redact_pii_patterns: vec!["[".into()],
             ..Default::default()
-        });
-        let scope = scope(vec![]);
-        let mut value = serde_json::json!({"rows": [{"id": 1}]});
-        guard.redact_result(&scope, &mut value);
-        assert_eq!(value["rows"][0]["id"], 1);
+        })
+        .unwrap_err();
+        assert!(error.contains("invalid query_result.redact_pii_patterns entry"));
     }
 
     #[test]
     fn top_level_array_is_treated_as_rows() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::MaxRowsReturned(1)]);
         let mut value = serde_json::json!([1, 2, 3]);
         guard.redact_result(&scope, &mut value);
@@ -661,7 +681,7 @@ mod tests {
 
     #[test]
     fn constrained_unknown_row_key_is_redacted_fail_closed() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);
         let mut value = serde_json::json!({
             "items": [
@@ -685,7 +705,7 @@ mod tests {
 
     #[test]
     fn post_invocation_hook_returns_redact_when_modified() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::MaxRowsReturned(1)]);
         let hook = guard.as_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}, {"id": 2}]});
@@ -700,7 +720,7 @@ mod tests {
 
     #[test]
     fn post_invocation_hook_returns_allow_when_unchanged() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![]);
         let hook = guard.as_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}]});
@@ -715,7 +735,7 @@ mod tests {
     fn pre_invocation_guard_impl_allows_everything() {
         // The kernel Guard::evaluate path is a no-op for this guard.
         // We assert the default name is stable for observability.
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         assert_eq!(
             <QueryResultGuard as arc_kernel::Guard>::name(&guard),
             "query-result"
@@ -724,7 +744,7 @@ mod tests {
 
     #[test]
     fn strictest_max_rows_wins() {
-        let g = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let g = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope_multi = ArcScope {
             grants: vec![
                 grant(vec![Constraint::MaxRowsReturned(10)]),
@@ -743,7 +763,7 @@ mod tests {
 
     #[test]
     fn matched_grant_constraints_override_other_grants() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope_multi = ArcScope {
             grants: vec![
                 grant(vec![
@@ -776,7 +796,7 @@ mod tests {
 
     #[test]
     fn alternative_rows_key_respected() {
-        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::MaxRowsReturned(1)]);
         let mut value = serde_json::json!({
             "results": [{"id": 1}, {"id": 2}, {"id": 3}]

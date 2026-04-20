@@ -21,7 +21,7 @@ ARG ALPINE_VERSION=3.22
 ############################
 # Stage 1: build the binary
 ############################
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION} AS builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:3c06253e433c1b2ac2c279a98226d385d25c5f324138ab2861a5414bfa6855f9 AS builder
 # `protoc` is required because arc-envoy-ext-authz (transitively reachable
 # through the workspace) invokes tonic-build at compile time. CI installs
 # `protobuf-compiler` for the same reason; keep this image consistent so
@@ -73,7 +73,7 @@ RUN cargo build --release --locked --package arc-cli --bin arc \
 ############################
 # Stage 2: minimal runtime
 ############################
-FROM alpine:${ALPINE_VERSION} AS runtime
+FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601 AS runtime
 
 # The `rust:alpine` builder produces a musl-linked `arc` binary, so the
 # runtime image only needs CA roots and tini. No dynamic libgcc/libstdc++
