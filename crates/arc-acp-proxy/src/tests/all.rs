@@ -3242,6 +3242,42 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
+    fn kernel_receipt_signer_preserves_acp_content_hash_as_parameter_hash() {
+        let keypair = Keypair::generate();
+        let shared = Arc::new(Mutex::new(MockStoreState::default()));
+        let store = MockReceiptStore {
+            state: Arc::clone(&shared),
+            supports_checkpoints: false,
+        };
+        let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 10);
+
+        let mut entry = make_audit_entry("call-provenance", "session-provenance");
+        entry.content_hash = "acp-originated-content-hash".to_string();
+        let receipt = signer
+            .sign_acp_receipt(&AcpReceiptRequest {
+                audit_entry: entry,
+                tool_server: "proxy-server".to_string(),
+                tool_name: "terminal/create".to_string(),
+            })
+            .expect("receipt should sign");
+
+        assert_eq!(
+            receipt.action.parameter_hash,
+            "acp-originated-content-hash"
+        );
+        assert_eq!(receipt.content_hash, "acp-originated-content-hash");
+        assert_eq!(
+            receipt.action.parameters,
+            json!({
+                "tool_call_id": "call-provenance",
+                "title": "Test tool",
+                "kind": "terminal",
+                "status": "completed",
+            })
+        );
+    }
+
+    #[test]
     fn kernel_receipt_signer_skips_unsupported_or_empty_checkpoint_batches() {
         let keypair = Keypair::generate();
 
