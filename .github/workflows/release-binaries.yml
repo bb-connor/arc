@@ -258,6 +258,7 @@ jobs:
           set -euo pipefail
           version="${ARC_VERSION}"
           repo="${ARC_GITHUB_REPO}"
+          homepage="https://github.com/${repo}"
           formula_src="Homebrew/arc.rb.tmpl"
           formula_out="release/arc.rb"
           if [[ ! -f "$formula_src" ]]; then
@@ -293,10 +294,16 @@ jobs:
               -e "s|__ARC_SHA256_LINUX_ARM64__|${arm_lin}|" \
               -e "s|__ARC_SHA256_LINUX_AMD64__|${x86_lin}|" \
               -e "s|__ARC_GITHUB_REPO__|${repo}|" \
+              -e "s|__ARC_HOMEPAGE__|${homepage}|" \
               -e "s|__ARC_VERSION__|${version}|" \
               "$formula_src" > "$formula_out"
+          if grep -q "__ARC_" "$formula_out"; then
+            echo "::error::rendered Homebrew formula still contains template placeholders" >&2
+            grep -n "__ARC_" "$formula_out" >&2
+            exit 1
+          fi
           echo "updated formula at ${formula_out}:"
-          grep -E "version |sha256 " "$formula_out"
+          grep -E "homepage |version |sha256 " "$formula_out"
 
       - name: Render release notes
         id: notes
