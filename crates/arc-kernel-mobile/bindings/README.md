@@ -60,6 +60,10 @@ Status values are explicit:
   lane was qualified
 - `fail`: the host had the required prerequisites and the lane still failed
 
+The overall qualification gate fails unless at least one target-backed iOS or
+Android lane runs and passes. The host FFI test is required coverage, but it
+does not by itself qualify the mobile target surface.
+
 ## Generating the Swift bindings
 
 ```bash
@@ -160,7 +164,8 @@ three halves:
 - one `*.log` file per lane
 
 That output is the authoritative host-local record of which mobile lanes are
-currently qualified versus environment-dependent.
+currently qualified versus environment-dependent. A run with only
+environment-dependent target lanes is not release-qualified.
 
 ## UniFFI bindgen invocation verification
 

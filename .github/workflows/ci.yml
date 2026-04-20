@@ -86,6 +86,10 @@ jobs:
       - name: Install portable qualification dependencies
         run: |
           cargo install wasm-pack --locked
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+          rustup target add aarch64-linux-android
           sudo apt-get update
           if ! sudo apt-get install -y chromium-driver chromium; then
             sudo apt-get install -y chromium-driver chromium-browser

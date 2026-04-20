@@ -335,7 +335,8 @@ cargo test -p arc-kernel-mobile --test ffi_roundtrip
 
 The qualification script records each lane as `pass`, `fail`, or
 `environment_dependent` so iOS and Android support claims stay tied to
-actual toolchain availability on the qualifying host.
+actual toolchain availability on the qualifying host. The overall gate fails
+unless at least one target-backed iOS or Android lane runs and passes.
 
 ### 4.5 Desktop (Current Model)
 
