@@ -875,9 +875,11 @@ fn restored_kernel_session_id(session_id: &str) -> SessionId {
 }
 
 fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
-    capabilities
-        .and_then(|value| value.get(key))
-        .is_some_and(|value| value.as_bool().unwrap_or(true))
+    match capabilities.and_then(|value| value.get(key)) {
+        Some(Value::Bool(enabled)) => *enabled,
+        Some(Value::Object(_)) => true,
+        _ => false,
+    }
 }
 
 fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
@@ -965,6 +967,15 @@ mod http_service_tests {
         }));
         assert!(!explicitly_disabled.supports_progress);
         assert!(!explicitly_disabled.supports_cancellation);
+
+        let null_and_string = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "progress": null,
+                "cancellation": "yes"
+            }
+        }));
+        assert!(!null_and_string.supports_progress);
+        assert!(!null_and_string.supports_cancellation);
     }
 
     #[test]
@@ -1010,6 +1021,15 @@ mod http_service_tests {
         assert!(declared.supports_sampling);
         assert!(declared.sampling_context);
         assert!(declared.sampling_tools);
+
+        let null_declaration = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "sampling": null
+            }
+        }));
+        assert!(!null_declaration.supports_sampling);
+        assert!(!null_declaration.sampling_context);
+        assert!(!null_declaration.sampling_tools);
     }
 }
 
