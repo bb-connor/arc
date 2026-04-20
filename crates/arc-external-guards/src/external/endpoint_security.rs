@@ -106,7 +106,7 @@ fn denied_ip(address: IpAddr) -> bool {
                 || address.is_link_local()
                 || address.is_multicast()
                 || address.is_unspecified()
-                || address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1])
+                || (address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1]))
         }
         IpAddr::V6(address) => {
             if let Some(mapped) = ipv4_mapped_ipv6(address) {
