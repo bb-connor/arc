@@ -1248,11 +1248,11 @@ fn validate_required_secret(field: &str, value: &str) -> Result<(), PolicyError>
     Ok(())
 }
 
-fn validate_http_url(field: &str, value: &str) -> Result<(), PolicyError> {
+fn validate_http_url(field: &str, value: &str) -> Result<Url, PolicyError> {
     let parsed = Url::parse(value)
         .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
     match parsed.scheme() {
-        "http" | "https" => Ok(()),
+        "http" | "https" => Ok(parsed),
         scheme => Err(PolicyError::Invalid(format!(
             "{field} must use http or https, got {scheme}"
         ))),
@@ -1260,9 +1260,7 @@ fn validate_http_url(field: &str, value: &str) -> Result<(), PolicyError> {
 }
 
 fn validate_https_url(field: &str, value: &str) -> Result<(), PolicyError> {
-    validate_http_url(field, value)?;
-    let parsed = Url::parse(value)
-        .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
+    let parsed = validate_http_url(field, value)?;
     if is_localhost_http_url(&parsed) {
         return Ok(());
     }
