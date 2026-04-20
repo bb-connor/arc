@@ -69,17 +69,11 @@ pub fn resolve_matching_grants<'a>(
     arguments: &serde_json::Value,
 ) -> Result<Vec<MatchedGrant<'a>>, ScopeMatchError> {
     let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
-    let mut deferred_constraint_error: Option<ScopeMatchError> = None;
 
     for (index, grant) in scope.grants.iter().enumerate() {
         let covered = match grant_covers(grant, tool_name, server_id, arguments) {
             Ok(covered) => covered,
-            Err(error @ ScopeMatchError::ConstraintError(_)) => {
-                if deferred_constraint_error.is_none() {
-                    deferred_constraint_error = Some(error);
-                }
-                continue;
-            }
+            Err(error @ ScopeMatchError::ConstraintError(_)) => return Err(error),
             Err(error) => return Err(error),
         };
         if !covered {
@@ -103,12 +97,6 @@ pub fn resolve_matching_grants<'a>(
             .cmp(&left.specificity)
             .then_with(|| left.index.cmp(&right.index))
     });
-
-    if matches.is_empty() {
-        if let Some(error) = deferred_constraint_error {
-            return Err(error);
-        }
-    }
 
     Ok(matches)
 }

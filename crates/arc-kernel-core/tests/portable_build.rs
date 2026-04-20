@@ -288,7 +288,7 @@ fn evaluate_fails_closed_on_unsupported_constraint() {
 }
 
 #[test]
-fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
+fn resolve_matching_grants_fails_closed_when_target_match_has_unsupported_constraint() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = CapabilityToken::sign(
@@ -311,8 +311,8 @@ fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
                         dpop_required: None,
                     },
                     ToolGrant {
-                        server_id: "srv-a".to_string(),
-                        tool_name: "echo".to_string(),
+                        server_id: "*".to_string(),
+                        tool_name: "*".to_string(),
                         operations: vec![Operation::Invoke],
                         constraints: vec![],
                         max_invocations: None,
@@ -332,16 +332,23 @@ fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
     )
     .unwrap();
 
-    let matches = arc_kernel_core::scope::resolve_matching_grants(
+    let error = arc_kernel_core::scope::resolve_matching_grants(
         &capability.scope,
         "echo",
         "srv-a",
         &serde_json::json!({"msg": "hello"}),
     )
-    .unwrap();
+    .expect_err("unsupported target-matching constraints must fail closed");
 
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].index, 1);
+    match error {
+        arc_kernel_core::ScopeMatchError::ConstraintError(reason) => {
+            assert!(
+                reason.contains("minimum_runtime_assurance"),
+                "reason was: {reason}"
+            );
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
 }
 
 #[test]
