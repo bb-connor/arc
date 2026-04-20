@@ -3254,6 +3254,10 @@ impl ArcKernel {
         self.config.keypair.public_key()
     }
 
+    pub fn capability_issuer_is_trusted(&self, issuer: &arc_core::PublicKey) -> bool {
+        self.trusted_issuer_keys().contains(issuer)
+    }
+
     /// Verify the capability's signature against the trusted CA keys or the
     /// kernel's own key (for locally-issued capabilities).
     /// Resolve the trusted-issuer set for capability verification.

@@ -1455,6 +1455,20 @@ fn kernel_accepts_capabilities_from_configured_authority() {
 }
 
 #[test]
+fn kernel_reports_capability_issuer_trust() {
+    let authority_keypair = make_keypair();
+    let untrusted_keypair = make_keypair();
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+        authority_keypair.clone(),
+    )));
+
+    assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
+    assert!(kernel.capability_issuer_is_trusted(&kernel.public_key()));
+    assert!(!kernel.capability_issuer_is_trusted(&untrusted_keypair.public_key()));
+}
+
+#[test]
 fn expired_capability_denied() {
     let mut kernel = ArcKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));

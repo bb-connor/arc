@@ -132,6 +132,23 @@ mod tests {
         (store, config)
     }
 
+    fn test_kernel_config() -> arc_kernel::KernelConfig {
+        arc_kernel::KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: "test-policy-hash".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        }
+    }
+
     fn empty_header_map() -> HeaderMap {
         HeaderMap::new()
     }
@@ -293,6 +310,40 @@ mod tests {
         assert!(error
             .to_string()
             .contains("failed resumable integrity validation"));
+    }
+
+    #[test]
+    fn stored_capability_issuer_revalidation_rejects_untrusted_restart_issuer() {
+        let old_authority = Keypair::generate();
+        let subject = Keypair::generate().public_key();
+        let stale_capability = CapabilityToken::sign(
+            arc_core::capability::CapabilityTokenBody {
+                id: "cap-stale-issuer".to_string(),
+                issuer: old_authority.public_key(),
+                subject,
+                scope: arc_core::capability::ArcScope::default(),
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: vec![],
+            },
+            &old_authority,
+        )
+        .expect("sign stale capability");
+
+        let restarted_kernel = arc_kernel::ArcKernel::new(test_kernel_config());
+        assert!(!stored_capability_issuers_are_trusted(
+            &restarted_kernel,
+            std::slice::from_ref(&stale_capability)
+        ));
+
+        let mut trusted_kernel = arc_kernel::ArcKernel::new(test_kernel_config());
+        trusted_kernel.set_capability_authority(Box::new(
+            arc_kernel::LocalCapabilityAuthority::new(old_authority),
+        ));
+        assert!(stored_capability_issuers_are_trusted(
+            &trusted_kernel,
+            &[stale_capability]
+        ));
     }
 
     #[test]

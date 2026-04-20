@@ -2802,6 +2802,7 @@ impl RemoteSessionFactory {
             Some(stored)
                 if stored == policy_fingerprint
                     && stored_capabilities_are_current(&record.issued_capabilities)
+                    && stored_capability_issuers_are_trusted(&kernel, &record.issued_capabilities)
                     && record
                         .issued_capabilities
                         .iter()
@@ -3230,6 +3231,15 @@ fn stored_capabilities_are_current(capabilities: &[CapabilityToken]) -> bool {
     capabilities
         .iter()
         .all(|capability| capability.expires_at > now)
+}
+
+fn stored_capability_issuers_are_trusted(
+    kernel: &arc_kernel::ArcKernel,
+    capabilities: &[CapabilityToken],
+) -> bool {
+    capabilities
+        .iter()
+        .all(|capability| kernel.capability_issuer_is_trusted(&capability.issuer))
 }
 
 fn persist_terminal_session_record(
