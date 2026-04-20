@@ -1179,7 +1179,7 @@ fn build_safe_browsing_guard(
         .map_err(|error| PolicyError::Invalid(error.to_string()))?;
         SAFE_BROWSING_DEFAULT_BASE_URL.to_string()
     };
-    guard_config.base_url = Some(base_url.to_string());
+    guard_config.base_url = Some(base_url);
     if let Some(client_id) = &config.client_id {
         if client_id.trim().is_empty() {
             return Err(PolicyError::Invalid(
