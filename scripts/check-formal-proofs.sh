@@ -41,7 +41,6 @@ echo "==> Proof manifest and theorem inventory sanity"
 python3 - <<'PY'
 import json
 import re
-import tomllib
 from pathlib import Path
 
 repo = Path(".")
@@ -49,7 +48,72 @@ manifest_path = repo / "formal" / "proof-manifest.toml"
 inventory_path = repo / "formal" / "theorem-inventory.json"
 claim_registry_path = repo / "docs" / "CLAIM_REGISTRY.md"
 
-manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+def parse_string(value):
+    return json.loads(value)
+
+def strip_toml_comment(line):
+    in_string = False
+    escaped = False
+    for index, char in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and in_string:
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if char == "#" and not in_string:
+            return line[:index]
+    return line
+
+def parse_manifest_subset(text):
+    manifest = {}
+    array_key = None
+    array_values = []
+    for raw_line in text.splitlines():
+        line = strip_toml_comment(raw_line).strip()
+        if not line:
+            continue
+        if array_key is not None:
+            if line == "]":
+                manifest[array_key] = array_values
+                array_key = None
+                array_values = []
+                continue
+            if line.endswith(","):
+                line = line[:-1].strip()
+            array_values.append(parse_string(line))
+            continue
+        key, separator, value = line.partition("=")
+        if not separator:
+            raise SystemExit(f"unsupported proof manifest line: {raw_line}")
+        key = key.strip()
+        value = value.strip()
+        if value == "[":
+            array_key = key
+            array_values = []
+        elif value.startswith('"'):
+            manifest[key] = parse_string(value.rstrip(","))
+        elif value.isdigit():
+            manifest[key] = int(value)
+        else:
+            raise SystemExit(f"unsupported proof manifest value for {key}: {value}")
+    if array_key is not None:
+        raise SystemExit(f"unterminated proof manifest array: {array_key}")
+    return manifest
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:
+        tomllib = None
+
+manifest_text = manifest_path.read_text(encoding="utf-8")
+manifest = tomllib.loads(manifest_text) if tomllib else parse_manifest_subset(manifest_text)
 if manifest.get("schema") != "arc.proof-manifest.v1":
     raise SystemExit("proof manifest schema mismatch")
 
