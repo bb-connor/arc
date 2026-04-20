@@ -93,8 +93,9 @@ fn build_test_client() -> Client {
         .expect("build reqwest client")
 }
 
-const TEST_REPUTATION_RECEIPT_TARGET: u64 = 200;
-const LARGE_RECEIPT_HISTORY_LEN: u64 = 240;
+const TEST_REPUTATION_RECEIPT_TARGET: u64 = 100;
+const LARGE_RECEIPT_HISTORY_LEN: u64 = 128;
+const CAPITAL_ALLOCATION_QUEUE_HISTORY_LEN: u64 = 240;
 
 fn unix_now_secs() -> u64 {
     SystemTime::now()
@@ -11047,6 +11048,27 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
                     false,
                 ))
                 .expect("append queue allocation history");
+        }
+        // Preserve queue-depth boundary coverage without making every large-history fixture pay
+        // for the full reserve-depth dataset.
+        for day in LARGE_RECEIPT_HISTORY_LEN..CAPITAL_ALLOCATION_QUEUE_HISTORY_LEN {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-allocation-queue-good-{day}"),
+                    &format!("cap-capital-allocation-queue-good-{day}"),
+                    queue_subject,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    100,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append queue allocation reserve depth");
         }
     }
 
