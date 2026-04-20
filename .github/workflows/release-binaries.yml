@@ -308,6 +308,7 @@ jobs:
           ARC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          arc_ghcr_owner="$(printf '%s' "${ARC_GITHUB_REPO_OWNER}" | tr '[:upper:]' '[:lower:]')"
           {
             echo "## arc ${ARC_RELEASE_TAG}"
             echo
@@ -318,7 +319,7 @@ jobs:
             echo '```bash'
             echo "curl -fsSL -o /tmp/arc.rb https://github.com/${ARC_GITHUB_REPO}/releases/latest/download/arc.rb"
             echo "brew install --formula /tmp/arc.rb"
-            echo "docker pull ghcr.io/${ARC_GITHUB_REPO_OWNER}/arc-sidecar:${ARC_VERSION}"
+            echo "docker pull ghcr.io/${arc_ghcr_owner}/arc-sidecar:${ARC_VERSION}"
             echo '```'
             echo
             echo "### Verify"
