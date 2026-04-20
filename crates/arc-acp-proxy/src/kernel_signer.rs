@@ -145,11 +145,8 @@ impl ReceiptSigner for KernelReceiptSigner {
             "kind": entry.kind,
             "status": entry.status,
         });
-        // Preserve the ACP-originated content hash for audit correlation.
-        let action = ToolCallAction {
-            parameters: action_parameters,
-            parameter_hash: entry.content_hash.clone(),
-        };
+        let action = ToolCallAction::from_parameters(action_parameters)
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("hash ACP parameters: {e}")))?;
 
         let timestamp = entry.timestamp.parse::<u64>().unwrap_or_else(|_| {
             SystemTime::now()

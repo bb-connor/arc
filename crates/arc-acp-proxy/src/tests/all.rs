@@ -2296,6 +2296,7 @@ mod attestation_and_telemetry_tests {
 
     impl ReceiptStore for MockReceiptStore {
         fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+            assert!(receipt.action.verify_hash().unwrap());
             let mut state = self.state.lock().expect("mock store lock should hold");
             state.appended_receipts.push(receipt.clone());
             Ok(())
@@ -3242,7 +3243,7 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
-    fn kernel_receipt_signer_preserves_acp_content_hash_as_parameter_hash() {
+    fn kernel_receipt_signer_preserves_acp_content_hash_with_canonical_parameter_hash() {
         let keypair = Keypair::generate();
         let shared = Arc::new(Mutex::new(MockStoreState::default()));
         let store = MockReceiptStore {
@@ -3261,10 +3262,8 @@ mod attestation_and_telemetry_tests {
             })
             .expect("receipt should sign");
 
-        assert_eq!(
-            receipt.action.parameter_hash,
-            "acp-originated-content-hash"
-        );
+        assert!(receipt.action.verify_hash().unwrap());
+        assert_ne!(receipt.action.parameter_hash, "acp-originated-content-hash");
         assert_eq!(receipt.content_hash, "acp-originated-content-hash");
         assert_eq!(
             receipt.action.parameters,

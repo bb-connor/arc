@@ -206,6 +206,37 @@ mod retention {
         let _ = fs::remove_file(&archive_path);
     }
 
+    #[test]
+    fn retention_archive_for_tenant_archives_old_child_receipts() {
+        let live_path = unique_db_path("retention-tenant-child-live");
+        let archive_path = unique_db_path("retention-tenant-child-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-old", 100, "tenant-a"))
+            .unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-b-old", 100, "tenant-b"))
+            .unwrap();
+        store
+            .append_child_receipt(&child_receipt_with_ts("tenant-child-old", 100))
+            .unwrap();
+
+        let archived = store
+            .archive_receipts_before_for_tenant(150, archive_path.to_str().unwrap(), "tenant-a")
+            .unwrap();
+        assert_eq!(archived, 1);
+        assert_eq!(store.tool_receipt_count().unwrap(), 1);
+        assert_eq!(store.child_receipt_count().unwrap(), 0);
+
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        assert_eq!(archive_store.tool_receipt_count().unwrap(), 1);
+        assert_eq!(archive_store.child_receipt_count().unwrap(), 1);
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
     /// Size-based rotation: if the DB size exceeds max_size_bytes, rotate_if_needed
     /// archives some receipts.
     #[test]

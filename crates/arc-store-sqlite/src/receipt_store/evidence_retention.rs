@@ -345,6 +345,11 @@ impl SqliteReceiptStore {
                     params![cutoff, tenant_id],
                 )?;
                 self.connection()?.execute(
+                    "INSERT OR IGNORE INTO archive.arc_child_receipts \
+                     SELECT * FROM main.arc_child_receipts WHERE timestamp < ?1",
+                    params![cutoff],
+                )?;
+                self.connection()?.execute(
                     "INSERT OR IGNORE INTO archive.capability_lineage
                      SELECT DISTINCT cl.*
                      FROM main.capability_lineage cl
@@ -426,10 +431,17 @@ impl SqliteReceiptStore {
 
         // Delete archived receipts from the live database.
         let deleted = match tenant_id {
-            Some(tenant_id) => self.connection()?.execute(
-                "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1 AND tenant_id = ?2",
-                params![cutoff, tenant_id],
-            )? as u64,
+            Some(tenant_id) => {
+                let deleted = self.connection()?.execute(
+                    "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1 AND tenant_id = ?2",
+                    params![cutoff, tenant_id],
+                )? as u64;
+                self.connection()?.execute(
+                    "DELETE FROM main.arc_child_receipts WHERE timestamp < ?1",
+                    params![cutoff],
+                )?;
+                deleted
+            }
             None => {
                 let deleted = self.connection()?.execute(
                     "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1",
