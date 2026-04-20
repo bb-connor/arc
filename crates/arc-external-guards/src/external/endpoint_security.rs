@@ -1,4 +1,4 @@
-use std::net::{IpAddr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
 use url::Url;
 
@@ -112,11 +112,25 @@ fn denied_ip(address: IpAddr) -> bool {
                 || address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1])
         }
         IpAddr::V6(address) => {
+            if let Some(mapped) = ipv4_mapped_ipv6(address) {
+                return denied_ip(IpAddr::V4(mapped));
+            }
             address.is_loopback()
                 || address.is_unspecified()
                 || address.is_unique_local()
                 || address.is_unicast_link_local()
         }
+    }
+}
+
+fn ipv4_mapped_ipv6(address: Ipv6Addr) -> Option<Ipv4Addr> {
+    let octets = address.octets();
+    if octets[0..10].iter().all(|octet| *octet == 0) && octets[10] == 0xff && octets[11] == 0xff {
+        Some(Ipv4Addr::new(
+            octets[12], octets[13], octets[14], octets[15],
+        ))
+    } else {
+        None
     }
 }
 
@@ -151,6 +165,18 @@ mod tests {
         let error =
             validate_external_guard_url("external guard endpoint", "https://224.0.0.1/moderate")
                 .expect_err("IPv4 multicast should fail closed");
+        assert!(error
+            .to_string()
+            .contains("must not target localhost, link-local, or private-network hosts"));
+    }
+
+    #[test]
+    fn runtime_endpoint_validation_rejects_ipv4_mapped_ipv6_private_literals() {
+        let error = validate_external_guard_url(
+            "external guard endpoint",
+            "https://[::ffff:169.254.169.254]/moderate",
+        )
+        .expect_err("IPv4-mapped IPv6 private endpoint should fail closed");
         assert!(error
             .to_string()
             .contains("must not target localhost, link-local, or private-network hosts"));

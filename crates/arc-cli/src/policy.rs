@@ -4,7 +4,7 @@
 //! initial capability definitions for the agent.
 
 use std::collections::{BTreeMap, HashMap};
-use std::net::{IpAddr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -1361,11 +1361,25 @@ fn denied_external_guard_ip(address: IpAddr) -> bool {
                 || address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1])
         }
         IpAddr::V6(address) => {
+            if let Some(mapped) = ipv4_mapped_ipv6(address) {
+                return denied_external_guard_ip(IpAddr::V4(mapped));
+            }
             address.is_loopback()
                 || address.is_unspecified()
                 || address.is_unique_local()
                 || address.is_unicast_link_local()
         }
+    }
+}
+
+fn ipv4_mapped_ipv6(address: Ipv6Addr) -> Option<Ipv4Addr> {
+    let octets = address.octets();
+    if octets[0..10].iter().all(|octet| *octet == 0) && octets[10] == 0xff && octets[11] == 0xff {
+        Some(Ipv4Addr::new(
+            octets[12], octets[13], octets[14], octets[15],
+        ))
+    } else {
+        None
     }
 }
 
@@ -1585,7 +1599,7 @@ fn synthesize_tool_access_scope(
     }
 
     if let Some(unrepresentable_allow_pattern) = tool_access.allow.iter().find(|allow_pattern| {
-        allow_pattern.contains('*')
+        tool_pattern_has_wildcard(allow_pattern)
             && confirmation_overlap(allow_pattern, &tool_access.require_confirmation)
             && !tool_access
                 .require_confirmation
@@ -1632,6 +1646,10 @@ fn compile_wildcard_tool_constraints(
             .push(arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
     constraints
+}
+
+fn tool_pattern_has_wildcard(pattern: &str) -> bool {
+    pattern.contains('*') || pattern.contains('?')
 }
 
 fn compile_tool_constraints(
@@ -2190,6 +2208,16 @@ guards:
     }
 
     #[test]
+    fn external_guard_validation_rejects_ipv4_mapped_ipv6_private_addresses() {
+        assert!(denied_external_guard_ip(IpAddr::V6(
+            "::ffff:169.254.169.254".parse().unwrap()
+        )));
+        assert!(denied_external_guard_ip(IpAddr::V6(
+            "::ffff:10.0.0.1".parse().unwrap()
+        )));
+    }
+
+    #[test]
     fn build_pipeline_rejects_dot_localhost_external_guard_urls() {
         let policy = parse_policy(
             r#"
@@ -2469,6 +2497,31 @@ guards:
             .expect_err("scoped confirmation cannot narrow an explicit wildcard allow grant");
         assert!(error.to_string().contains(
             "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern '*'"
+        ));
+    }
+
+    #[test]
+    fn yaml_tool_access_question_wildcard_allow_with_scoped_confirmation_is_rejected() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - db_?
+    require_confirmation:
+      - db_a
+"#,
+        )
+        .unwrap();
+
+        let error = build_runtime_default_capabilities(&policy)
+            .expect_err("scoped confirmation cannot narrow a question-mark wildcard allow grant");
+        assert!(error.to_string().contains(
+            "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern 'db_?'"
         ));
     }
 
