@@ -11,7 +11,8 @@ use arc_kernel::{Guard, GuardContext, KernelError, Verdict};
 pub mod external;
 
 pub use external::{
-    retry_with_jitter, retry_with_jitter_rng, AsyncGuardAdapter, AsyncGuardAdapterBuilder,
+    retry_with_jitter, retry_with_jitter_rng, validate_external_guard_url,
+    validate_external_guard_url_with_resolver, AsyncGuardAdapter, AsyncGuardAdapterBuilder,
     AsyncGuardAdapterConfig, AzureCategory, AzureCategoryBreakdown, AzureContentSafetyConfig,
     AzureContentSafetyGuard, AzureDecisionDetails, BackoffStrategy, BedrockDecisionDetails,
     BedrockGuardrailConfig, BedrockGuardrailGuard, BedrockSource, CircuitBreaker,

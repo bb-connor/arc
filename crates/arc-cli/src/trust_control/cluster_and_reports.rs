@@ -2474,11 +2474,8 @@ fn clear_cluster_peer_auth_failures(node_id: &str) {
 fn cluster_peer_auth_unverified_failure_key(
     node_id: &str,
     endpoint: &str,
-    issued_at: i64,
-    term: Option<u64>,
-    signature: &str,
 ) -> String {
-    let payload = format!("{node_id}\0{endpoint}\0{issued_at}\0{term:?}\0{signature}");
+    let payload = format!("{node_id}\0{endpoint}");
     format!("unverified:{}", sha256_hex(payload.as_bytes()))
 }
 
@@ -2534,8 +2531,7 @@ fn validate_cluster_peer_auth(
             })
         })
         .transpose()?;
-    let unverified_failure_key =
-        cluster_peer_auth_unverified_failure_key(&node_id, endpoint, issued_at, term, signature);
+    let unverified_failure_key = cluster_peer_auth_unverified_failure_key(&node_id, endpoint);
     let allowlisted = config
         .peer_urls
         .iter()
@@ -4264,9 +4260,6 @@ mod cluster_and_reports_tests {
         clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
             "http://node-b",
             INTERNAL_CLUSTER_STATUS_PATH,
-            issued_at,
-            None,
-            "deadbeef",
         ));
 
         let expired_issued_at = issued_at - (CLUSTER_AUTH_MAX_SKEW_SECS as i64) - 1;
@@ -4295,15 +4288,17 @@ mod cluster_and_reports_tests {
         assert_eq!(expired_peer.status(), StatusCode::UNAUTHORIZED);
         clear_cluster_peer_auth_failures("http://node-b");
 
-        headers.insert(
-            CLUSTER_AUTH_ISSUED_AT_HEADER,
-            HeaderValue::from_str(&issued_at.to_string()).expect("issued-at header"),
-        );
-        headers.insert(
-            CLUSTER_AUTH_SIGNATURE_HEADER,
-            HeaderValue::from_static("deadbeef"),
-        );
-        for _ in 0..CLUSTER_AUTH_FAILURE_BURST {
+        for attempt in 0..CLUSTER_AUTH_FAILURE_BURST {
+            let invalid_issued_at = issued_at + attempt as i64;
+            headers.insert(
+                CLUSTER_AUTH_ISSUED_AT_HEADER,
+                HeaderValue::from_str(&invalid_issued_at.to_string()).expect("issued-at header"),
+            );
+            headers.insert(
+                CLUSTER_AUTH_SIGNATURE_HEADER,
+                HeaderValue::from_str(&format!("deadbeef-{attempt}"))
+                    .expect("invalid signature header"),
+            );
             let response = validate_cluster_peer_auth(
                 &headers,
                 &cluster_state.config,
@@ -4312,6 +4307,15 @@ mod cluster_and_reports_tests {
             .expect_err("invalid cluster peer signature should fail");
             assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         }
+        let limited_issued_at = issued_at + CLUSTER_AUTH_FAILURE_BURST as i64;
+        headers.insert(
+            CLUSTER_AUTH_ISSUED_AT_HEADER,
+            HeaderValue::from_str(&limited_issued_at.to_string()).expect("issued-at header"),
+        );
+        headers.insert(
+            CLUSTER_AUTH_SIGNATURE_HEADER,
+            HeaderValue::from_static("deadbeef-final"),
+        );
         let limited_peer = validate_cluster_peer_auth(
             &headers,
             &cluster_state.config,
@@ -4319,6 +4323,10 @@ mod cluster_and_reports_tests {
         )
         .expect_err("repeated failures should trip rate limit");
         assert_eq!(limited_peer.status(), StatusCode::TOO_MANY_REQUESTS);
+        headers.insert(
+            CLUSTER_AUTH_ISSUED_AT_HEADER,
+            HeaderValue::from_str(&issued_at.to_string()).expect("issued-at header"),
+        );
         headers.insert(
             CLUSTER_AUTH_SIGNATURE_HEADER,
             HeaderValue::from_str(&signature).expect("signature header"),
@@ -4333,9 +4341,6 @@ mod cluster_and_reports_tests {
         clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
             "http://node-b",
             INTERNAL_CLUSTER_STATUS_PATH,
-            issued_at,
-            None,
-            "deadbeef",
         ));
         clear_cluster_peer_auth_failures("http://node-b");
 

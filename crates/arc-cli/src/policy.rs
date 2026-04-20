@@ -4,7 +4,6 @@
 //! initial capability definitions for the agent.
 
 use std::collections::{BTreeMap, HashMap};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,7 +22,6 @@ use arc_reputation::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use url::Url;
 
 use arc_core::capability::{
     ArcScope, AttestationTrustPolicy, AttestationTrustRule, MonetaryAmount, Operation, PromptGrant,
@@ -1248,137 +1246,9 @@ fn validate_required_secret(field: &str, value: &str) -> Result<(), PolicyError>
     Ok(())
 }
 
-fn validate_http_url(field: &str, value: &str) -> Result<Url, PolicyError> {
-    let parsed = Url::parse(value)
-        .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
-    match parsed.scheme() {
-        "http" | "https" => Ok(parsed),
-        scheme => Err(PolicyError::Invalid(format!(
-            "{field} must use http or https, got {scheme}"
-        ))),
-    }
-}
-
 fn validate_https_url(field: &str, value: &str) -> Result<(), PolicyError> {
-    let parsed = validate_http_url(field, value)?;
-    if is_localhost_http_url(&parsed) {
-        return Ok(());
-    }
-    if parsed.scheme() != "https" {
-        return Err(PolicyError::Invalid(format!(
-            "{field} must use https or localhost-only http"
-        )));
-    }
-    if host_is_denied_for_external_guard(&parsed) {
-        return Err(PolicyError::Invalid(format!(
-            "{field} must not target localhost, link-local, or private-network hosts"
-        )));
-    }
-    validate_external_guard_dns_resolution(field, &parsed)?;
-    Ok(())
-}
-
-fn is_localhost_http_url(parsed: &Url) -> bool {
-    if parsed.scheme() != "http" {
-        return false;
-    }
-    match parsed.host() {
-        Some(url::Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
-        Some(url::Host::Ipv4(address)) => address.is_loopback(),
-        Some(url::Host::Ipv6(address)) => address.is_loopback(),
-        None => false,
-    }
-}
-
-fn host_is_denied_for_external_guard(parsed: &Url) -> bool {
-    match parsed.host() {
-        Some(url::Host::Domain(host)) => {
-            let host = host.to_ascii_lowercase();
-            host == "localhost" || host.ends_with(".localhost")
-        }
-        Some(url::Host::Ipv4(address)) => denied_external_guard_ip(IpAddr::V4(address)),
-        Some(url::Host::Ipv6(address)) => denied_external_guard_ip(IpAddr::V6(address)),
-        None => true,
-    }
-}
-
-fn validate_external_guard_dns_resolution(field: &str, parsed: &Url) -> Result<(), PolicyError> {
-    validate_external_guard_dns_resolution_with(field, parsed, |host, port| {
-        (host, port)
-            .to_socket_addrs()
-            .map(|addrs| addrs.map(|addr| addr.ip()).collect::<Vec<_>>())
-            .map_err(|error| error.to_string())
-    })
-}
-
-fn validate_external_guard_dns_resolution_with<F>(
-    field: &str,
-    parsed: &Url,
-    resolver: F,
-) -> Result<(), PolicyError>
-where
-    F: FnOnce(&str, u16) -> Result<Vec<IpAddr>, String>,
-{
-    let Some(url::Host::Domain(host)) = parsed.host() else {
-        return Ok(());
-    };
-    let port = parsed
-        .port_or_known_default()
-        .ok_or_else(|| PolicyError::Invalid(format!("{field} must include a resolvable port")))?;
-    let addrs = resolver(host, port).map_err(|error| {
-        PolicyError::Invalid(format!(
-            "{field} host `{host}` could not be resolved: {error}"
-        ))
-    })?;
-    let mut resolved = false;
-    for addr in addrs {
-        resolved = true;
-        if denied_external_guard_ip(addr) {
-            return Err(PolicyError::Invalid(format!(
-                "{field} host `{host}` resolved to disallowed address `{}`",
-                addr
-            )));
-        }
-    }
-    if !resolved {
-        return Err(PolicyError::Invalid(format!(
-            "{field} host `{host}` did not resolve to any addresses"
-        )));
-    }
-    Ok(())
-}
-
-fn denied_external_guard_ip(address: IpAddr) -> bool {
-    match address {
-        IpAddr::V4(address) => {
-            address.is_private()
-                || address.is_loopback()
-                || address.is_link_local()
-                || address.is_multicast()
-                || address.is_unspecified()
-                || address.octets()[0] == 100 && (64..=127).contains(&address.octets()[1])
-        }
-        IpAddr::V6(address) => {
-            if let Some(mapped) = ipv4_mapped_ipv6(address) {
-                return denied_external_guard_ip(IpAddr::V4(mapped));
-            }
-            address.is_loopback()
-                || address.is_unspecified()
-                || address.is_unique_local()
-                || address.is_unicast_link_local()
-        }
-    }
-}
-
-fn ipv4_mapped_ipv6(address: Ipv6Addr) -> Option<Ipv4Addr> {
-    let octets = address.octets();
-    if octets[0..10].iter().all(|octet| *octet == 0) && octets[10] == 0xff && octets[11] == 0xff {
-        Some(Ipv4Addr::new(
-            octets[12], octets[13], octets[14], octets[15],
-        ))
-    } else {
-        None
-    }
+    arc_external_guards::validate_external_guard_url(field, value)
+        .map_err(|error| PolicyError::Invalid(error.to_string()))
 }
 
 fn parse_azure_category(category: &str) -> Result<AzureCategory, PolicyError> {
@@ -1791,6 +1661,7 @@ fn hash_bytes(bytes: &[u8]) -> String {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::net::IpAddr;
     use std::path::PathBuf;
 
     const EXAMPLE_POLICY: &str = r#"
@@ -2184,10 +2055,9 @@ guards:
 
     #[test]
     fn external_guard_dns_resolution_rejects_rebound_private_addresses() {
-        let parsed = Url::parse("https://guard.example.test/moderate").unwrap();
-        let error = validate_external_guard_dns_resolution_with(
+        let error = arc_external_guards::validate_external_guard_url_with_resolver(
             "cloud_guardrails.azure_content_safety.endpoint",
-            &parsed,
+            "https://guard.example.test/moderate",
             |_host, _port| Ok(vec![IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, 8))]),
         )
         .expect_err("private DNS answers should fail closed");
@@ -2200,19 +2070,35 @@ guards:
 
     #[test]
     fn external_guard_validation_rejects_ipv4_multicast_addresses() {
-        assert!(denied_external_guard_ip(IpAddr::V4(
-            std::net::Ipv4Addr::new(224, 0, 0, 1)
-        )));
+        let error = validate_https_url(
+            "cloud_guardrails.azure_content_safety.endpoint",
+            "https://224.0.0.1/moderate",
+        )
+        .expect_err("IPv4 multicast should fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("must not target localhost, link-local, or private-network hosts"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
     fn external_guard_validation_rejects_ipv4_mapped_ipv6_private_addresses() {
-        assert!(denied_external_guard_ip(IpAddr::V6(
-            "::ffff:169.254.169.254".parse().unwrap()
-        )));
-        assert!(denied_external_guard_ip(IpAddr::V6(
-            "::ffff:10.0.0.1".parse().unwrap()
-        )));
+        for endpoint in [
+            "https://[::ffff:169.254.169.254]/moderate",
+            "https://[::ffff:10.0.0.1]/moderate",
+        ] {
+            let error =
+                validate_https_url("cloud_guardrails.azure_content_safety.endpoint", endpoint)
+                    .expect_err("IPv4-mapped IPv6 private endpoint should fail closed");
+            assert!(
+                error
+                    .to_string()
+                    .contains("must not target localhost, link-local, or private-network hosts"),
+                "unexpected error for {endpoint}: {error}"
+            );
+        }
     }
 
     #[test]

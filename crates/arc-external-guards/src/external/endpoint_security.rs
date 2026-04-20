@@ -4,10 +4,7 @@ use url::Url;
 
 use super::ExternalGuardError;
 
-pub(crate) fn validate_external_guard_url(
-    field: &str,
-    value: &str,
-) -> Result<(), ExternalGuardError> {
+pub fn validate_external_guard_url(field: &str, value: &str) -> Result<(), ExternalGuardError> {
     validate_external_guard_url_with_resolver(field, value, |host, port| {
         (host, port)
             .to_socket_addrs()
@@ -16,7 +13,7 @@ pub(crate) fn validate_external_guard_url(
     })
 }
 
-fn validate_external_guard_url_with_resolver<F>(
+pub fn validate_external_guard_url_with_resolver<F>(
     field: &str,
     value: &str,
     resolver: F,
