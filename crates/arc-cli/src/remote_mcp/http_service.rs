@@ -919,7 +919,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(|value| value.get("toolCallChunkNotifications"))
             .and_then(Value::as_bool)
             .unwrap_or(false),
-        supports_roots: roots.is_some(),
+        supports_roots: declared_peer_capability(capabilities, "roots"),
         roots_list_changed: roots
             .and_then(|value| value.get("listChanged"))
             .and_then(Value::as_bool)
@@ -965,6 +965,27 @@ mod http_service_tests {
         }));
         assert!(!explicitly_disabled.supports_progress);
         assert!(!explicitly_disabled.supports_cancellation);
+    }
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_explicitly_disabled_roots() {
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "roots": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_roots);
+        assert!(!explicitly_disabled.roots_list_changed);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "roots": {
+                    "listChanged": true
+                }
+            }
+        }));
+        assert!(declared.supports_roots);
+        assert!(declared.roots_list_changed);
     }
 }
 
