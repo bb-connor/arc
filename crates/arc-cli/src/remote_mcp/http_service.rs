@@ -931,7 +931,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(|value| value.get("includeContext"))
             .is_some(),
         sampling_tools: sampling.and_then(|value| value.get("tools")).is_some(),
-        supports_elicitation: elicitation.is_some(),
+        supports_elicitation: declared_peer_capability(capabilities, "elicitation"),
         elicitation_form,
         elicitation_url,
     }
@@ -1030,6 +1030,38 @@ mod http_service_tests {
         assert!(!null_declaration.supports_sampling);
         assert!(!null_declaration.sampling_context);
         assert!(!null_declaration.sampling_tools);
+    }
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_explicitly_disabled_elicitation() {
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "elicitation": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_elicitation);
+        assert!(!explicitly_disabled.elicitation_form);
+        assert!(!explicitly_disabled.elicitation_url);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "elicitation": {
+                    "form": {}
+                }
+            }
+        }));
+        assert!(declared.supports_elicitation);
+        assert!(declared.elicitation_form);
+        assert!(!declared.elicitation_url);
+
+        let null_declaration = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "elicitation": null
+            }
+        }));
+        assert!(!null_declaration.supports_elicitation);
+        assert!(!null_declaration.elicitation_form);
+        assert!(!null_declaration.elicitation_url);
     }
 }
 

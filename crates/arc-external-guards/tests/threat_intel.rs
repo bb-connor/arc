@@ -110,6 +110,21 @@ async fn virustotal_allows_clean_hash() {
 
 #[tokio::test]
 async fn threat_intel_rechecks_runtime_endpoints_before_send() {
+    let safe_browsing = SafeBrowsingGuard::new(
+        SafeBrowsingConfig::new("sb-key").with_base_url("https://224.0.0.1"),
+    )
+    .expect("guard build");
+    let error = safe_browsing
+        .eval(&make_ctx(
+            "visit_url",
+            json!({"url": "https://example.com"}),
+        ))
+        .await
+        .expect_err("multicast endpoint should fail closed before HTTP send");
+    assert!(error
+        .to_string()
+        .contains("must not target localhost, link-local, or private-network hosts"));
+
     let virustotal =
         VirusTotalGuard::new(VirusTotalConfig::new("vt-key").with_base_url("https://224.0.0.1"))
             .expect("guard build");
