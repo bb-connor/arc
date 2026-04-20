@@ -924,7 +924,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(|value| value.get("listChanged"))
             .and_then(Value::as_bool)
             .unwrap_or(false),
-        supports_sampling: sampling.is_some(),
+        supports_sampling: declared_peer_capability(capabilities, "sampling"),
         sampling_context: sampling
             .and_then(|value| value.get("includeContext"))
             .is_some(),
@@ -986,6 +986,30 @@ mod http_service_tests {
         }));
         assert!(declared.supports_roots);
         assert!(declared.roots_list_changed);
+    }
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_explicitly_disabled_sampling() {
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "sampling": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_sampling);
+        assert!(!explicitly_disabled.sampling_context);
+        assert!(!explicitly_disabled.sampling_tools);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "sampling": {
+                    "includeContext": "thisServer",
+                    "tools": {}
+                }
+            }
+        }));
+        assert!(declared.supports_sampling);
+        assert!(declared.sampling_context);
+        assert!(declared.sampling_tools);
     }
 }
 
