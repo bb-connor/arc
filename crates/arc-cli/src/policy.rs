@@ -1574,6 +1574,11 @@ fn tool_patterns_overlap(left: &str, right: &str) -> bool {
     if left == "*" || right == "*" {
         return true;
     }
+    // Confirmation constraints are synthesized onto one grant, so a pair of
+    // leading unbounded globs must fail closed instead of risking a gap.
+    if left.starts_with('*') && right.starts_with('*') {
+        return true;
+    }
     let mut memo = HashMap::new();
     pattern_suffixes_overlap(left.as_bytes(), 0, right.as_bytes(), 0, &mut memo)
 }
@@ -2479,9 +2484,35 @@ guards:
     fn wildcard_overlap_does_not_treat_empty_prefix_patterns_as_match_all() {
         assert!(!tool_patterns_overlap("read_file", "*_write"));
         assert!(!tool_patterns_overlap("*_write", "git_push"));
-        assert!(!tool_patterns_overlap("*_read", "*_write"));
+        assert!(tool_patterns_overlap("*_read", "*_write"));
         assert!(!tool_patterns_overlap("bb*", "?a"));
         assert!(tool_patterns_overlap("read_*", "*_read"));
+    }
+
+    #[test]
+    fn yaml_tool_access_rejects_leading_wildcard_confirmation_overlap() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - "*_read"
+    require_confirmation:
+      - "*_write"
+"#,
+        )
+        .unwrap();
+
+        let error = build_runtime_default_capabilities(&policy)
+            .expect_err("leading wildcard confirmation overlap is unrepresentable");
+
+        assert!(error
+            .to_string()
+            .contains("cannot narrow wildcard allow pattern '*_read'"));
     }
 
     #[test]
