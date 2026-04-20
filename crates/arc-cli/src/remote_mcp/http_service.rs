@@ -814,7 +814,17 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
     {
         return response;
     }
-    state.sessions.mark_deleted(&session).await;
+    if let Err(error) = state.sessions.mark_deleted(&session).await {
+        warn!(
+            session_id = %session_id,
+            error = %error,
+            "failed to delete MCP session without resumable-state risk"
+        );
+        return plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to delete MCP session safely",
+        );
+    }
     state.sessions.remove_active(&session_id).await;
 
     StatusCode::NO_CONTENT.into_response()

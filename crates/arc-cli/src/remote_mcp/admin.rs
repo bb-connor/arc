@@ -662,7 +662,17 @@ async fn handle_admin_session_drain(
     };
     let record = match entry {
         RemoteSessionEntry::Active(session) => {
-            state.sessions.mark_draining(&session).await;
+            if let Err(error) = state.sessions.mark_draining(&session).await {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "failed to drain MCP session without resumable-state risk"
+                );
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to drain MCP session safely",
+                );
+            }
             session.diagnostic_record()
         }
         RemoteSessionEntry::Terminal(record) => (*record).clone(),
@@ -694,7 +704,17 @@ async fn handle_admin_session_shutdown(
     };
     let record = match entry {
         RemoteSessionEntry::Active(session) => {
-            state.sessions.mark_closed(&session).await;
+            if let Err(error) = state.sessions.mark_closed(&session).await {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "failed to shut down MCP session without resumable-state risk"
+                );
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to shut down MCP session safely",
+                );
+            }
             state.sessions.remove_active(&session_id).await;
             session.diagnostic_record()
         }

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
 use std::io::{self, Write};
 use std::net::SocketAddr;
@@ -2293,17 +2293,11 @@ impl RemoteSession {
         }
     }
 
-    fn remove_resumable_record(&self) {
+    fn remove_resumable_record(&self) -> Result<(), CliError> {
         let Some(path) = self.session_db_path.as_deref() else {
-            return;
+            return Ok(());
         };
-        if let Err(error) = delete_active_session_record(path, &self.session_id) {
-            warn!(
-                session_id = %self.session_id,
-                error = %error,
-                "failed to delete resumable MCP session record"
-            );
-        }
+        delete_active_session_record(path, &self.session_id)
     }
 
     fn mark_ready(
@@ -2343,7 +2337,8 @@ impl RemoteSession {
         }
     }
 
-    fn begin_draining(&self) {
+    fn begin_draining(&self) -> Result<(), CliError> {
+        self.remove_resumable_record()?;
         if let Ok(mut guard) = self.lifecycle.lock() {
             guard.state = RemoteSessionState::Draining;
             guard.last_seen_at = session_now_millis();
@@ -2353,7 +2348,7 @@ impl RemoteSession {
                     .saturating_add(self.lifecycle_policy.drain_grace_millis),
             );
         }
-        self.remove_resumable_record();
+        Ok(())
     }
 
     fn mark_deleted(&self) {
@@ -2362,7 +2357,6 @@ impl RemoteSession {
             guard.last_seen_at = session_now_millis();
             guard.drain_deadline_at = None;
         }
-        self.remove_resumable_record();
     }
 
     fn mark_expired(&self) {
@@ -2371,7 +2365,6 @@ impl RemoteSession {
             guard.last_seen_at = session_now_millis();
             guard.drain_deadline_at = None;
         }
-        self.remove_resumable_record();
     }
 
     fn mark_closed(&self) {
@@ -2380,7 +2373,6 @@ impl RemoteSession {
             guard.last_seen_at = session_now_millis();
             guard.drain_deadline_at = None;
         }
-        self.remove_resumable_record();
     }
 
     fn auth_context(&self) -> &SessionAuthContext {
@@ -2961,26 +2953,23 @@ impl RemoteSessionLedger {
         (active, terminal)
     }
 
-    async fn mark_deleted(&self, session: &Arc<RemoteSession>) {
-        session.mark_deleted();
+    async fn mark_deleted(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Deleted)
-            .await;
+            .await
     }
 
-    async fn mark_draining(&self, session: &Arc<RemoteSession>) {
-        session.begin_draining();
+    async fn mark_draining(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
+        session.begin_draining()
     }
 
-    async fn mark_closed(&self, session: &Arc<RemoteSession>) {
-        session.mark_closed();
+    async fn mark_closed(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Closed)
-            .await;
+            .await
     }
 
-    async fn mark_expired(&self, session: &Arc<RemoteSession>) {
-        session.mark_expired();
+    async fn mark_expired(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Expired)
-            .await;
+            .await
     }
 
     async fn cleanup_due_sessions(&self) {
@@ -2994,8 +2983,18 @@ impl RemoteSessionLedger {
             let snapshot = session.lifecycle_snapshot();
             match snapshot.state {
                 RemoteSessionState::Ready if snapshot.idle_expires_at <= now => {
-                    self.mark_expired(&session).await;
-                    self.active.lock().await.remove(&session.session_id);
+                    match self.mark_expired(&session).await {
+                        Ok(()) => {
+                            self.active.lock().await.remove(&session.session_id);
+                        }
+                        Err(error) => {
+                            warn!(
+                                session_id = %session.session_id,
+                                error = %error,
+                                "failed to expire MCP session without resumable-state risk"
+                            );
+                        }
+                    }
                 }
                 RemoteSessionState::Ready => {}
                 RemoteSessionState::Draining => {
@@ -3003,16 +3002,36 @@ impl RemoteSessionLedger {
                         .drain_deadline_at
                         .is_some_and(|deadline| deadline <= now)
                     {
-                        self.mark_deleted(&session).await;
-                        self.active.lock().await.remove(&session.session_id);
+                        match self.mark_deleted(&session).await {
+                            Ok(()) => {
+                                self.active.lock().await.remove(&session.session_id);
+                            }
+                            Err(error) => {
+                                warn!(
+                                    session_id = %session.session_id,
+                                    error = %error,
+                                    "failed to delete drained MCP session without resumable-state risk"
+                                );
+                            }
+                        }
                     }
                 }
                 RemoteSessionState::Initializing
                 | RemoteSessionState::Deleted
                 | RemoteSessionState::Expired => {}
                 RemoteSessionState::Closed => {
-                    self.mark_closed(&session).await;
-                    self.active.lock().await.remove(&session.session_id);
+                    match self.mark_closed(&session).await {
+                        Ok(()) => {
+                            self.active.lock().await.remove(&session.session_id);
+                        }
+                        Err(error) => {
+                            warn!(
+                                session_id = %session.session_id,
+                                error = %error,
+                                "failed to close MCP session without resumable-state risk"
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -3024,24 +3043,61 @@ impl RemoteSessionLedger {
         &self,
         session: &Arc<RemoteSession>,
         state: RemoteSessionState,
-    ) {
-        session.remove_resumable_record();
+    ) -> Result<(), CliError> {
+        match state {
+            RemoteSessionState::Deleted => session.mark_deleted(),
+            RemoteSessionState::Expired => session.mark_expired(),
+            RemoteSessionState::Closed => session.mark_closed(),
+            RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {
+                return Err(CliError::Other(format!(
+                    "unsupported terminal MCP session state: {}",
+                    state.as_str()
+                )));
+            }
+        }
         let mut record = session.diagnostic_record();
         record.lifecycle.state = state;
         record.terminal_at = session_now_millis();
+        let mut tombstone_guards_restore = self.tombstone_db_path.is_none();
+        let mut tombstone_error = None;
+        if let Some(path) = self.tombstone_db_path.as_deref() {
+            match persist_terminal_session_record(path, &record) {
+                Ok(()) => {
+                    tombstone_guards_restore = true;
+                }
+                Err(error) => {
+                    tombstone_error = Some(error.to_string());
+                    warn!(
+                        session_id = %session.session_id,
+                        error = %error,
+                        "failed to persist terminal MCP session tombstone"
+                    );
+                }
+            }
+        }
+
+        if let Err(delete_error) = session.remove_resumable_record() {
+            if tombstone_guards_restore {
+                warn!(
+                    session_id = %session.session_id,
+                    error = %delete_error,
+                    "failed to delete resumable MCP session record; terminal tombstone will block restore"
+                );
+            } else {
+                let tombstone_error = tombstone_error
+                    .unwrap_or_else(|| "terminal tombstone was not persisted".to_string());
+                return Err(CliError::Other(format!(
+                    "failed to terminalize MCP session {}: {tombstone_error}; active resume delete failed: {delete_error}",
+                    session.session_id
+                )));
+            }
+        }
+
         self.terminal
             .lock()
             .await
-            .insert(session.session_id.clone(), Arc::new(record.clone()));
-        if let Some(path) = self.tombstone_db_path.as_deref() {
-            if let Err(error) = persist_terminal_session_record(path, &record) {
-                warn!(
-                    session_id = %session.session_id,
-                    error = %error,
-                    "failed to persist terminal MCP session tombstone"
-                );
-            }
-        }
+            .insert(session.session_id.clone(), Arc::new(record));
+        Ok(())
     }
 
     async fn purge_old_terminal_records(&self, now: u64) {
@@ -3090,6 +3146,16 @@ fn open_session_state_db(path: &FsPath) -> Result<Connection, CliError> {
 
 fn load_active_session_records(path: &FsPath) -> Result<LoadedActiveSessionRecords, CliError> {
     let conn = open_session_state_db(path)?;
+    let mut terminal_stmt = conn.prepare(&format!(
+        "SELECT session_id FROM {table}",
+        table = SESSION_TOMBSTONE_TABLE,
+    ))?;
+    let terminal_rows = terminal_stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut terminal_session_ids = HashSet::new();
+    for row in terminal_rows {
+        terminal_session_ids.insert(row?);
+    }
+
     let mut stmt = conn.prepare(&format!(
         "SELECT session_id, record_json FROM {table}",
         table = SESSION_ACTIVE_TABLE,
@@ -3101,6 +3167,14 @@ fn load_active_session_records(path: &FsPath) -> Result<LoadedActiveSessionRecor
     while let Some(row) = rows.next()? {
         let session_id: String = row.get(0)?;
         let record_json: String = row.get(1)?;
+        if terminal_session_ids.contains(&session_id) {
+            warn!(
+                session_id = %session_id,
+                "dropping persisted MCP active session row because a terminal tombstone exists"
+            );
+            invalid_session_ids.push(session_id);
+            continue;
+        }
         match serde_json::from_str::<RemoteSessionResumeRecord>(&record_json) {
             Ok(record) if record.session_id == session_id => records.push(record),
             Ok(record) => {

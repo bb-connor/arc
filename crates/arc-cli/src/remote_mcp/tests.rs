@@ -406,6 +406,66 @@ mod tests {
     }
 
     #[test]
+    fn load_active_session_records_skips_terminal_tombstoned_rows() {
+        let path = std::env::temp_dir().join(format!(
+            "arc-remote-tombstoned-active-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let auth_context = SessionAuthContext::streamable_http_static_bearer(
+            "agent-terminal",
+            "token-fingerprint",
+            None,
+        );
+        let lifecycle = RemoteSessionLifecycleSnapshot {
+            state: RemoteSessionState::Ready,
+            created_at: 10,
+            last_seen_at: 11,
+            idle_expires_at: 12,
+            drain_deadline_at: None,
+        };
+        let active_record = RemoteSessionResumeRecord {
+            session_id: "session-terminal".to_string(),
+            agent_id: "agent-terminal".to_string(),
+            auth_context: auth_context.clone(),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: lifecycle.clone(),
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        };
+        persist_active_session_record(&path, &active_record).expect("persist active session row");
+
+        let terminal_record = RemoteSessionDiagnosticRecord {
+            session_id: "session-terminal".to_string(),
+            auth_context,
+            capabilities: Vec::new(),
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Deleted,
+                ..lifecycle
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            ownership: RemoteSessionOwnershipSnapshot::default(),
+            terminal_at: 13,
+        };
+        persist_terminal_session_record(&path, &terminal_record)
+            .expect("persist terminal session tombstone");
+
+        let loaded = load_active_session_records(&path).expect("load active session records");
+        assert!(loaded.records.is_empty());
+        assert_eq!(
+            loaded.invalid_session_ids,
+            vec!["session-terminal".to_string()]
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn remote_session_new_preserves_ready_lifecycle_on_restore() {
         let (input_tx, _input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
