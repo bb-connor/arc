@@ -597,19 +597,12 @@ pub(super) fn request_receipt_metadata(
     now: u64,
     extra_metadata: Option<&serde_json::Value>,
 ) -> Result<Option<serde_json::Value>, KernelError> {
+    let governed_metadata = governed_request_metadata(request, attestation_trust_policy, now)?;
     let financial = extra_metadata
-        .and_then(|extra_metadata| extra_metadata.as_object())
+        .and_then(serde_json::Value::as_object)
         .and_then(|extra_metadata| extra_metadata.get("financial"))
         .cloned()
-        .map(|financial| {
-            serde_json::from_value::<FinancialReceiptMetadata>(financial).map_err(|error| {
-                KernelError::ReceiptSigningFailed(format!(
-                    "failed to deserialize receipt financial metadata for economic projection: {error}"
-                ))
-            })
-        })
-        .transpose()?;
-    let governed_metadata = governed_request_metadata(request, attestation_trust_policy, now)?;
+        .and_then(|financial| serde_json::from_value::<FinancialReceiptMetadata>(financial).ok());
     let governed_metadata = inject_governed_economic_authorization_metadata(
         governed_metadata,
         financial
@@ -1453,5 +1446,49 @@ mod tests {
                 .provider,
             "meterd"
         );
+    }
+
+    #[test]
+    fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_through() {
+        let request = ToolCallRequest {
+            request_id: "req-economic-legacy-financial".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-legacy-financial" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-legacy-financial".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let extra_metadata = serde_json::json!({
+            "financial": {
+                "legacy_payload": true,
+                "vendor": "custom-financial-metadata"
+            }
+        });
+
+        let metadata = request_receipt_metadata(&request, None, 150, Some(&extra_metadata))
+            .expect("legacy financial metadata should not fail receipt metadata")
+            .expect("governed metadata should still exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("governed metadata should deserialize");
+
+        assert!(governed.economic_authorization.is_none());
     }
 }
