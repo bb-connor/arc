@@ -137,6 +137,27 @@ if not assumptions:
 if sorted(assumption.get("leanName") for assumption in assumptions) != sorted(approved_axioms):
     raise SystemExit("approved axiom list does not match theorem inventory assumptions")
 
+def lean_axioms_in_file(lean_file):
+    namespace_stack = []
+    axioms = []
+    text = lean_file.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        namespace_match = re.match(r"^\s*namespace\s+([A-Za-z0-9_.']+)\b", line)
+        if namespace_match:
+            namespace_stack.append(namespace_match.group(1))
+            continue
+        end_match = re.match(r"^\s*end(?:\s+([A-Za-z0-9_.']+))?\s*$", line)
+        if end_match and namespace_stack:
+            namespace_stack.pop()
+            continue
+        axiom_match = re.match(r"^\s*axiom\s+([A-Za-z0-9_']+)\b", line)
+        if axiom_match:
+            prefix = ".".join(namespace_stack)
+            short_name = axiom_match.group(1)
+            full_name = f"{prefix}.{short_name}" if prefix else short_name
+            axioms.append((full_name, lean_file.relative_to(repo).as_posix()))
+    return axioms
+
 for assumption in assumptions:
     if assumption.get("kind") != "axiom":
         raise SystemExit(f"assumption is not marked as axiom: {assumption.get('id')}")
@@ -145,11 +166,11 @@ for assumption in assumptions:
     assumption_file = assumption.get("file")
     if not assumption_file or not (repo / assumption_file).exists():
         raise SystemExit(f"assumption file missing: {assumption.get('id')}")
-    short_name = assumption.get("leanName", "").rsplit(".", 1)[-1]
-    if not short_name:
+    lean_name = assumption.get("leanName", "")
+    if not lean_name:
         raise SystemExit(f"assumption leanName missing: {assumption.get('id')}")
-    assumption_text = (repo / assumption_file).read_text(encoding="utf-8")
-    if not re.search(rf"(?m)^\s*axiom\s+{re.escape(short_name)}\b", assumption_text):
+    assumption_axioms = {name for name, _ in lean_axioms_in_file(repo / assumption_file)}
+    if lean_name not in assumption_axioms:
         raise SystemExit(f"assumption definition missing from file: {assumption.get('id')}")
 
 theorems = inventory.get("theorems", [])
@@ -163,12 +184,10 @@ for theorem in theorems:
     if not theorem_file or not (repo / theorem_file).exists():
         raise SystemExit(f"theorem file missing: {theorem.get('id')}")
 
-approved_axiom_names = {name.rsplit(".", 1)[-1] for name in approved_axioms}
+approved_axiom_names = set(approved_axioms)
 found_axioms = []
 for lean_file in (repo / "formal" / "lean4" / "Pact").rglob("*.lean"):
-    text = lean_file.read_text(encoding="utf-8")
-    for match in re.finditer(r"(?m)^\s*axiom\s+([A-Za-z0-9_']+)\b", text):
-        found_axioms.append((match.group(1), lean_file.relative_to(repo).as_posix()))
+    found_axioms.extend(lean_axioms_in_file(lean_file))
 
 unexpected_axioms = sorted(
     f"{name} ({file})"
