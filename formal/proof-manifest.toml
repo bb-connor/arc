@@ -33,6 +33,11 @@ covered_rust_symbols = [
   "arc_kernel_core::scope::resolve_matching_grants",
   "arc_kernel_core::scope::resolve_capability_grants",
   "arc_kernel_core::evaluate::evaluate",
+  "arc_kernel_core::normalized::NormalizedToolGrant::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedResourceGrant::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedPromptGrant::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedScope::is_subset_of",
+  "arc_kernel_core::normalized::NormalizedEvaluationVerdict::try_from_evaluation",
   "arc_kernel_core::receipts::sign_receipt",
 ]
 

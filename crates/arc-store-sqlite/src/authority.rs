@@ -22,6 +22,8 @@ pub struct AuthorityClusterFence {
     pub leader_url: Option<String>,
     pub election_term: u64,
     pub updated_at: u64,
+    pub authority_generation: u64,
+    pub authority_rotated_at: u64,
 }
 
 impl SqliteCapabilityAuthority {
@@ -296,7 +298,9 @@ impl SqliteCapabilityAuthority {
                 singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
                 leader_url TEXT,
                 election_term INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
+                updated_at INTEGER NOT NULL,
+                authority_generation INTEGER NOT NULL DEFAULT 0,
+                authority_rotated_at INTEGER NOT NULL DEFAULT 0
             );
 
             INSERT INTO authority_cluster_fence (singleton_id, leader_url, election_term, updated_at)
@@ -307,6 +311,26 @@ impl SqliteCapabilityAuthority {
         if !Self::table_has_column(&connection, "authority_state", "public_key_hex")? {
             connection.execute(
                 "ALTER TABLE authority_state ADD COLUMN public_key_hex TEXT",
+                [],
+            )?;
+        }
+        if !Self::table_has_column(
+            &connection,
+            "authority_cluster_fence",
+            "authority_generation",
+        )? {
+            connection.execute(
+                "ALTER TABLE authority_cluster_fence ADD COLUMN authority_generation INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
+        if !Self::table_has_column(
+            &connection,
+            "authority_cluster_fence",
+            "authority_rotated_at",
+        )? {
+            connection.execute(
+                "ALTER TABLE authority_cluster_fence ADD COLUMN authority_rotated_at INTEGER NOT NULL DEFAULT 0",
                 [],
             )?;
         }
@@ -476,25 +500,30 @@ impl SqliteCapabilityAuthority {
     fn read_cluster_fence_from_connection(
         connection: &Connection,
     ) -> Result<AuthorityClusterFence, AuthorityStoreError> {
-        let (leader_url, election_term, updated_at) = connection.query_row(
-            r#"
-            SELECT leader_url, election_term, updated_at
+        let (leader_url, election_term, updated_at, authority_generation, authority_rotated_at) =
+            connection.query_row(
+                r#"
+            SELECT leader_url, election_term, updated_at, authority_generation, authority_rotated_at
             FROM authority_cluster_fence
             WHERE singleton_id = 1
             "#,
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, Option<String>>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, i64>(2)?,
-                ))
-            },
-        )?;
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                },
+            )?;
         Ok(AuthorityClusterFence {
             leader_url,
             election_term: election_term.max(0) as u64,
             updated_at: updated_at.max(0) as u64,
+            authority_generation: authority_generation.max(0) as u64,
+            authority_rotated_at: authority_rotated_at.max(0) as u64,
         })
     }
 
@@ -503,13 +532,26 @@ impl SqliteCapabilityAuthority {
         leader_url: Option<String>,
         election_term: u64,
     ) -> Result<(), AuthorityStoreError> {
+        let (_, authority_generation, authority_rotated_at) =
+            Self::read_public_state_from_connection(connection)?;
         connection.execute(
             r#"
             UPDATE authority_cluster_fence
-            SET leader_url = ?1, election_term = ?2, updated_at = ?3
+            SET
+                leader_url = ?1,
+                election_term = ?2,
+                updated_at = ?3,
+                authority_generation = ?4,
+                authority_rotated_at = ?5
             WHERE singleton_id = 1
             "#,
-            params![leader_url, election_term as i64, unix_now() as i64],
+            params![
+                leader_url,
+                election_term as i64,
+                unix_now() as i64,
+                authority_generation as i64,
+                authority_rotated_at as i64,
+            ],
         )?;
         Ok(())
     }
@@ -722,8 +764,11 @@ mod tests {
         assert!(!authority.seed_cluster_fence(None, 7).unwrap());
 
         let fence = authority.cluster_fence().unwrap();
+        let status = authority.status().unwrap();
         assert_eq!(fence.election_term, 7);
         assert_eq!(fence.leader_url.as_deref(), Some("http://leader-a"));
+        assert_eq!(fence.authority_generation, status.generation);
+        assert_eq!(fence.authority_rotated_at, status.rotated_at);
 
         let _ = fs::remove_file(path);
     }

@@ -94,6 +94,14 @@ async fn handle_internal_cluster_status(
     .into_response()
 }
 
+fn internal_cluster_http_error(
+    context: &'static str,
+    error: &dyn std::fmt::Display,
+) -> Response {
+    warn!(error = %error, "{context}");
+    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, context)
+}
+
 async fn handle_internal_cluster_snapshot(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
@@ -356,7 +364,7 @@ async fn handle_internal_budgets_delta(
     ) {
         Ok(events) => events,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return internal_cluster_http_error("failed to collect budget mutation deltas", &error)
         }
     };
     let records = if mutation_events.is_empty() {
@@ -365,7 +373,7 @@ async fn handle_internal_budgets_delta(
         match collect_budget_projection_views_for_events(&store, &mutation_events) {
             Ok(records) => records,
             Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                return internal_cluster_http_error("failed to collect budget projection deltas", &error)
             }
         }
     };
@@ -629,13 +637,26 @@ fn sync_peer_budgets(
         if response.mutation_events.is_empty() {
             break;
         }
-        let mut last_cursor = None;
+        let usage_records = response
+            .records
+            .iter()
+            .map(budget_usage_record_from_view)
+            .collect::<Vec<_>>();
+        let mutation_records = response
+            .mutation_events
+            .iter()
+            .map(budget_mutation_record_from_view)
+            .collect::<Result<Vec<_>, _>>()?;
+        store.import_snapshot_records(&usage_records, &mutation_records)?;
+        let mut next_cursor = cursor;
         for event in &response.mutation_events {
-            replay_budget_mutation_event(&mut store, event)?;
-            applied = applied.saturating_add(1);
-            last_cursor = Some(budget_cursor_from_event(event));
+            next_cursor = Some(merge_budget_cursor(
+                next_cursor,
+                budget_cursor_from_event(event),
+            ));
         }
-        if let Some(cursor) = last_cursor {
+        applied = applied.saturating_add(mutation_records.len() as u64);
+        if let Some(cursor) = next_cursor {
             update_peer_budget_cursor(state, peer_url, cursor);
         }
     }
@@ -709,12 +730,25 @@ fn build_cluster_state(
     let mut persisted_leader_url = None;
     if let Some(path) = config.authority_db_path.as_deref() {
         let authority = SqliteCapabilityAuthority::open(path)?;
+        let status = authority.status()?;
         let fence = authority.cluster_fence()?;
-        persisted_term = fence.election_term;
-        persisted_leader_url = fence
-            .leader_url
-            .and_then(|leader_url| normalize_cluster_url(&leader_url).ok())
-            .filter(|leader_url| leader_url == &self_url || peers.contains_key(leader_url));
+        if fence.authority_generation == status.generation
+            && fence.authority_rotated_at == status.rotated_at
+        {
+            persisted_term = fence.election_term;
+            persisted_leader_url = fence
+                .leader_url
+                .and_then(|leader_url| normalize_cluster_url(&leader_url).ok())
+                .filter(|leader_url| leader_url == &self_url || peers.contains_key(leader_url));
+        } else if fence.election_term > 0 || fence.leader_url.is_some() {
+            warn!(
+                fence_generation = fence.authority_generation,
+                authority_generation = status.generation,
+                fence_rotated_at = fence.authority_rotated_at,
+                authority_rotated_at = status.rotated_at,
+                "discarding stale persisted authority fence after authority rotation"
+            );
+        }
     }
     Ok(Some(Arc::new(Mutex::new(ClusterRuntimeState {
         self_url,
@@ -1605,11 +1639,6 @@ fn apply_cluster_snapshot(
         store
             .import_snapshot_records(&usage_records, &mutation_records)
             .map_err(|error| CliError::Other(error.to_string()))?;
-        for usage in &budgets {
-            if let Some(candidate) = budget_cursor_from_usage(usage) {
-                budget_cursor = Some(merge_budget_cursor(budget_cursor, candidate));
-            }
-        }
         for event in &budget_mutation_events {
             budget_cursor = Some(merge_budget_cursor(
                 budget_cursor,
@@ -1662,30 +1691,43 @@ fn seed_cluster_authority_from_snapshot(
             .seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term)
             .map_err(|error| CliError::Other(error.to_string()))?;
     }
-    let should_seed = |guard: &ClusterRuntimeState| {
-        snapshot_term > guard.election_term
+    let seed_guard = |guard: &mut ClusterRuntimeState| {
+        let conflicting_same_term_self_leader = snapshot_term == guard.election_term
+            && guard
+                .last_leader_url
+                .as_deref()
+                .is_some_and(|leader| leader == guard.self_url)
+            && snapshot_leader
+                .as_deref()
+                .is_some_and(|leader| leader != guard.self_url);
+        if conflicting_same_term_self_leader {
+            let now = unix_timestamp_now();
+            guard.election_term = guard.election_term.saturating_add(1);
+            guard.last_leader_url = Some(guard.self_url.clone());
+            guard.term_started_at = Some(now);
+            guard.lease_expires_at = Some(now.saturating_add(guard.lease_ttl_ms / 1000));
+            return;
+        }
+
+        if snapshot_term > guard.election_term
             || (snapshot_term == guard.election_term
                 && guard.last_leader_url.is_none()
                 && snapshot_leader.is_some())
+        {
+            guard.election_term = snapshot_term;
+            guard.last_leader_url = snapshot_leader.clone();
+            guard.term_started_at = authority_lease.and_then(|lease| lease.term_started_at);
+            guard.lease_expires_at = authority_lease.map(|lease| lease.lease_expires_at);
+        }
     };
 
     match cluster.lock() {
         Ok(mut guard) => {
-            if should_seed(&guard) {
-                guard.election_term = snapshot_term;
-                guard.last_leader_url = snapshot_leader.clone();
-                guard.term_started_at = authority_lease.and_then(|lease| lease.term_started_at);
-                guard.lease_expires_at = authority_lease.map(|lease| lease.lease_expires_at);
-            }
+            seed_guard(&mut guard);
         }
         Err(poisoned) => {
             let mut guard = poisoned.into_inner();
-            if should_seed(&guard) {
-                guard.election_term = snapshot_term;
-                guard.last_leader_url = snapshot_leader;
-                guard.term_started_at = authority_lease.and_then(|lease| lease.term_started_at);
-                guard.lease_expires_at = authority_lease.map(|lease| lease.lease_expires_at);
-            }
+            seed_guard(&mut guard);
         }
     }
     Ok(())
@@ -1883,18 +1925,9 @@ fn budget_usage_record_from_view(usage: &BudgetUsageView) -> arc_kernel::BudgetU
     }
 }
 
-fn budget_cursor_from_usage(usage: &BudgetUsageView) -> Option<BudgetCursor> {
-    Some(BudgetCursor {
-        seq: usage.seq?,
-        updated_at: usage.updated_at,
-        capability_id: usage.capability_id.clone(),
-        grant_index: usage.grant_index,
-    })
-}
-
 fn budget_cursor_from_event(event: &BudgetMutationEventView) -> BudgetCursor {
     BudgetCursor {
-        seq: std::cmp::max(event.event_seq, event.usage_seq.unwrap_or(0)),
+        seq: event.event_seq,
         updated_at: event.recorded_at,
         capability_id: event.capability_id.clone(),
         grant_index: event.grant_index,
@@ -1956,131 +1989,6 @@ fn budget_mutation_record_from_view(
             .as_ref()
             .map(budget_event_authority_from_view),
     })
-}
-
-fn replay_budget_mutation_event(
-    store: &mut SqliteBudgetStore,
-    event: &BudgetMutationEventView,
-) -> Result<(), CliError> {
-    let authority = event
-        .authority
-        .as_ref()
-        .map(budget_event_authority_from_view);
-    let grant_index = event.grant_index as usize;
-    let kind = BudgetMutationKind::parse(&event.kind).ok_or_else(|| {
-        CliError::Other(format!(
-            "unknown budget mutation kind `{}` in cluster snapshot",
-            event.kind
-        ))
-    })?;
-
-    match kind {
-        BudgetMutationKind::IncrementInvocation => {
-            let allowed = event.allowed.ok_or_else(|| {
-                CliError::Other(format!(
-                    "missing `allowed` value for budget increment event `{}`",
-                    event.event_id
-                ))
-            })?;
-            let replayed = if allowed {
-                store.try_increment_with_event_id(
-                    &event.capability_id,
-                    grant_index,
-                    event.max_invocations,
-                    Some(event.event_id.as_str()),
-                )?
-            } else {
-                store.try_increment_with_event_id(
-                    &event.capability_id,
-                    grant_index,
-                    event.max_invocations.or(Some(event.invocation_count_after)),
-                    Some(event.event_id.as_str()),
-                )?
-            };
-            if replayed != allowed {
-                return Err(CliError::Other(format!(
-                    "budget increment event `{}` replayed with allowed={replayed} instead of {allowed}",
-                    event.event_id
-                )));
-            }
-        }
-        BudgetMutationKind::AuthorizeExposure => {
-            let allowed = event.allowed.ok_or_else(|| {
-                CliError::Other(format!(
-                    "missing `allowed` value for budget authorize event `{}`",
-                    event.event_id
-                ))
-            })?;
-            let replayed = if allowed {
-                store.try_charge_cost_with_ids_and_authority(
-                    &event.capability_id,
-                    grant_index,
-                    event.max_invocations,
-                    event.exposure_units,
-                    event.max_cost_per_invocation,
-                    event.max_total_cost_units,
-                    event.hold_id.as_deref(),
-                    Some(event.event_id.as_str()),
-                    authority.as_ref(),
-                )?
-            } else {
-                store.try_charge_cost_with_ids_and_authority(
-                    &event.capability_id,
-                    grant_index,
-                    event.max_invocations.or(Some(event.invocation_count_after)),
-                    event.exposure_units,
-                    event.max_cost_per_invocation,
-                    event.max_total_cost_units.or(Some(
-                        event
-                            .total_cost_exposed_after
-                            .saturating_add(event.total_cost_realized_spend_after),
-                    )),
-                    event.hold_id.as_deref(),
-                    Some(event.event_id.as_str()),
-                    authority.as_ref(),
-                )?
-            };
-            if replayed != allowed {
-                return Err(CliError::Other(format!(
-                    "budget authorize event `{}` replayed with allowed={replayed} instead of {allowed}",
-                    event.event_id
-                )));
-            }
-        }
-        BudgetMutationKind::ReverseExposure => {
-            store.reverse_charge_cost_with_ids_and_authority(
-                &event.capability_id,
-                grant_index,
-                event.exposure_units,
-                event.hold_id.as_deref(),
-                Some(event.event_id.as_str()),
-                authority.as_ref(),
-            )?;
-        }
-        BudgetMutationKind::ReleaseExposure => {
-            store.reduce_charge_cost_with_ids_and_authority(
-                &event.capability_id,
-                grant_index,
-                event.exposure_units,
-                event.hold_id.as_deref(),
-                Some(event.event_id.as_str()),
-                authority.as_ref(),
-            )?;
-        }
-        BudgetMutationKind::ReconcileSpend => {
-            store.settle_charge_cost_with_ids_and_authority(
-                &event.capability_id,
-                grant_index,
-                event.exposure_units,
-                event.realized_spend_units,
-                event.hold_id.as_deref(),
-                Some(event.event_id.as_str()),
-                authority.as_ref(),
-            )?;
-        }
-    }
-
-    Ok(())
 }
 
 fn forwarded_control_response(response: ureq::Response) -> Result<Response, CliError> {
@@ -4727,7 +4635,7 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
-    fn budget_cursor_from_event_prefers_max_usage_or_event_seq() {
+    fn budget_cursor_from_event_uses_mutation_event_sequence() {
         let cursor = budget_cursor_from_event(&BudgetMutationEventView {
             event_id: "evt-1".to_string(),
             hold_id: Some("hold-1".to_string()),
@@ -4749,7 +4657,7 @@ mod cluster_and_reports_tests {
             authority: None,
         });
 
-        assert_eq!(cursor.seq, 9);
+        assert_eq!(cursor.seq, 4);
         assert_eq!(cursor.capability_id, "cap-1");
         assert_eq!(cursor.grant_index, 2);
     }
@@ -4815,7 +4723,7 @@ mod cluster_and_reports_tests {
         let authority =
             SqliteCapabilityAuthority::open(&authority_db_path).expect("open authority db");
         authority
-            .seed_cluster_fence(Some("http://node-z"), 7)
+            .seed_cluster_fence(Some("http://node-b"), 7)
             .expect("seed persisted authority fence");
 
         let mut config = base_config();
@@ -4828,7 +4736,7 @@ mod cluster_and_reports_tests {
             .expect("cluster enabled");
         let guard = cluster.lock().expect("cluster guard");
         assert_eq!(guard.election_term, 7);
-        assert_eq!(guard.last_leader_url.as_deref(), Some("http://node-z"));
+        assert_eq!(guard.last_leader_url.as_deref(), Some("http://node-b"));
 
         let _ = std::fs::remove_file(authority_db_path);
     }
@@ -4857,6 +4765,32 @@ mod cluster_and_reports_tests {
             guard.last_leader_url.is_none(),
             "unknown persisted leader should be cleared"
         );
+
+        let _ = std::fs::remove_file(authority_db_path);
+    }
+
+    #[test]
+    fn build_cluster_state_discards_persisted_authority_fence_after_rotation() {
+        let authority_db_path =
+            unique_temp_path("cluster-authority-fence-stale-generation", "sqlite3");
+        let authority =
+            SqliteCapabilityAuthority::open(&authority_db_path).expect("open authority db");
+        authority
+            .seed_cluster_fence(Some("http://node-b"), 7)
+            .expect("seed persisted authority fence");
+        authority.rotate().expect("rotate authority");
+
+        let mut config = base_config();
+        config.advertise_url = Some("http://node-a".to_string());
+        config.peer_urls = vec!["http://node-b".to_string()];
+        config.authority_db_path = Some(authority_db_path.clone());
+
+        let cluster = build_cluster_state(&config, config.listen)
+            .expect("build cluster with stale persisted authority fence")
+            .expect("cluster enabled");
+        let guard = cluster.lock().expect("cluster guard");
+        assert_eq!(guard.election_term, 0);
+        assert!(guard.last_leader_url.is_none());
 
         let _ = std::fs::remove_file(authority_db_path);
     }

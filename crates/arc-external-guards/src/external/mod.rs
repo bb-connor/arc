@@ -5,6 +5,8 @@ pub use arc_guards::external::{
     RateLimitedVerdict, RetryConfig, TokenBucket, TokioClock, TtlCache,
 };
 
+mod endpoint_security;
+
 #[path = "../../../arc-guards/src/external/azure_content_safety.rs"]
 pub mod azure_content_safety;
 #[path = "../../../arc-guards/src/external/bedrock.rs"]

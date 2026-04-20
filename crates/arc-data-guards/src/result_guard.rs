@@ -47,8 +47,8 @@
 //!   caller with *every* value in the `data` field replaced by the
 //!   redaction marker, rather than passing through unredacted.
 //! - Unknown column structures inside a row are redacted to the marker.
-//! - PII regex compilation errors are logged and skipped so they cannot
-//!   accidentally widen redaction to everything.
+//! - PII regex compilation errors reject guard construction so invalid
+//!   policies fail closed before serving traffic.
 
 use std::borrow::Cow;
 
@@ -67,6 +67,7 @@ use arc_kernel::{GuardContext, KernelError, Verdict};
 pub const DEFAULT_REDACTION_MARKER: &str = "[REDACTED]";
 const MAX_REDACT_PII_PATTERNS: usize = 64;
 const MAX_REDACT_PII_PATTERN_LEN: usize = 512;
+const MAX_REDACT_PII_PATTERN_COMPLEXITY: usize = 96;
 const REDACT_PII_REGEX_SIZE_LIMIT: usize = 1 << 20;
 const REDACT_PII_DFA_SIZE_LIMIT: usize = 1 << 20;
 
@@ -144,6 +145,12 @@ impl QueryResultGuard {
             if trimmed.len() > MAX_REDACT_PII_PATTERN_LEN {
                 return Err(format!(
                     "query_result.redact_pii_patterns entries must be at most {MAX_REDACT_PII_PATTERN_LEN} characters"
+                ));
+            }
+            let complexity = pii_pattern_complexity(trimmed);
+            if complexity > MAX_REDACT_PII_PATTERN_COMPLEXITY {
+                return Err(format!(
+                    "query_result.redact_pii_patterns entries must have complexity at most {MAX_REDACT_PII_PATTERN_COMPLEXITY}"
                 ));
             }
             let re = RegexBuilder::new(trimmed)
@@ -232,6 +239,24 @@ impl QueryResultGuard {
         self.redact_result_for_request(scope, matched_grant_index, &mut out);
         out
     }
+}
+
+fn pii_pattern_complexity(pattern: &str) -> usize {
+    let mut score = 0usize;
+    let mut escaped = false;
+    for ch in pattern.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '|' | '*' | '+' | '?' => score = score.saturating_add(4),
+            '{' | '[' | '(' => score = score.saturating_add(2),
+            _ => {}
+        }
+    }
+    score
 }
 
 /// Non-mutating convenience that bundles the scope.

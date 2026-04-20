@@ -167,6 +167,16 @@ fn pii_pattern_length_limit_fails_closed() {
 }
 
 #[test]
+fn pii_pattern_complexity_limit_fails_closed() {
+    let error = QueryResultGuard::new(QueryResultGuardConfig {
+        redact_pii_patterns: vec!["(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+".into()],
+        ..Default::default()
+    })
+    .expect_err("over-complex PII pattern should fail closed");
+    assert!(error.contains("complexity at most"));
+}
+
+#[test]
 fn constrained_unknown_row_shape_is_redacted_in_pipeline() {
     let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
     let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);

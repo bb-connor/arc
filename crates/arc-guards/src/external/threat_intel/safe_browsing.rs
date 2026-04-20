@@ -221,6 +221,10 @@ impl ExternalGuard for SafeBrowsingGuard {
     }
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
+        super::super::endpoint_security::validate_external_guard_url(
+            "safe-browsing base_url",
+            &self.base_url,
+        )?;
         let args: SafeBrowsingArgs = serde_json::from_str(&ctx.arguments_json).map_err(|e| {
             ExternalGuardError::Permanent(format!("invalid safe-browsing arguments: {e}"))
         })?;

@@ -239,6 +239,10 @@ impl ExternalGuard for AzureContentSafetyGuard {
     }
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
+        super::endpoint_security::validate_external_guard_url(
+            "azure-content-safety endpoint",
+            &self.cfg.endpoint,
+        )?;
         let url = self.cfg.analyze_url();
 
         let cats_ref: Vec<&str> = if self.cfg.categories.is_empty() {
