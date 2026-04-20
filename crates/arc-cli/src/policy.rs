@@ -1168,11 +1168,17 @@ fn build_safe_browsing_guard(
 ) -> Result<ScopedAsyncGuard<SafeBrowsingGuard>, PolicyError> {
     validate_required_secret("threat_intel.safe_browsing.api_key", &config.api_key)?;
     let mut guard_config = SafeBrowsingConfig::new(config.api_key.clone());
-    let base_url = config
-        .base_url
-        .as_deref()
-        .unwrap_or(SAFE_BROWSING_DEFAULT_BASE_URL);
-    validate_https_url("threat_intel.safe_browsing.base_url", base_url)?;
+    let base_url = if let Some(base_url) = config.base_url.as_deref() {
+        validate_https_url("threat_intel.safe_browsing.base_url", base_url)?;
+        base_url.to_string()
+    } else {
+        arc_external_guards::validate_external_guard_url_without_dns(
+            "threat_intel.safe_browsing.base_url",
+            SAFE_BROWSING_DEFAULT_BASE_URL,
+        )
+        .map_err(|error| PolicyError::Invalid(error.to_string()))?;
+        SAFE_BROWSING_DEFAULT_BASE_URL.to_string()
+    };
     guard_config.base_url = Some(base_url.to_string());
     if let Some(client_id) = &config.client_id {
         if client_id.trim().is_empty() {
@@ -1983,7 +1989,7 @@ guards:
 
     #[test]
     fn build_pipeline_validates_safe_browsing_default_base_url() {
-        validate_https_url(
+        arc_external_guards::validate_external_guard_url_without_dns(
             "threat_intel.safe_browsing.base_url",
             SAFE_BROWSING_DEFAULT_BASE_URL,
         )

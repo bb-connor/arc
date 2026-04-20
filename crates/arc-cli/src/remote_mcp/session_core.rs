@@ -3296,8 +3296,14 @@ fn purge_terminal_session_records_before(path: &FsPath, cutoff: u64) -> Result<(
     let conn = open_session_state_db(path)?;
     conn.execute(
         &format!(
-            "DELETE FROM {table} WHERE terminal_at < ?1",
-            table = SESSION_TOMBSTONE_TABLE,
+            "DELETE FROM {terminal_table}
+             WHERE terminal_at < ?1
+               AND NOT EXISTS (
+                   SELECT 1 FROM {active_table}
+                   WHERE {active_table}.session_id = {terminal_table}.session_id
+               )",
+            active_table = SESSION_ACTIVE_TABLE,
+            terminal_table = SESSION_TOMBSTONE_TABLE,
         ),
         params![cutoff as i64],
     )?;

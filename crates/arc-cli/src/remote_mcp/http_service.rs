@@ -874,7 +874,14 @@ fn restored_kernel_session_id(session_id: &str) -> SessionId {
     SessionId::new(format!("sess-restore-{}", &fingerprint[..16]))
 }
 
+fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
+    capabilities
+        .and_then(|value| value.get(key))
+        .is_some_and(|value| value.as_bool().unwrap_or(true))
+}
+
 fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
+    let capabilities = params.get("capabilities");
     let experimental = params
         .get("capabilities")
         .and_then(|capabilities| capabilities.get("experimental"));
@@ -897,8 +904,8 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
         .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
 
     PeerCapabilities {
-        supports_progress: true,
-        supports_cancellation: true,
+        supports_progress: declared_peer_capability(capabilities, "progress"),
+        supports_cancellation: declared_peer_capability(capabilities, "cancellation"),
         supports_subscriptions: resources
             .and_then(|value| value.get("subscribe"))
             .and_then(Value::as_bool)
@@ -925,6 +932,39 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
         supports_elicitation: elicitation.is_some(),
         elicitation_form,
         elicitation_url,
+    }
+}
+
+#[cfg(test)]
+mod http_service_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_remote_session_peer_capabilities_honors_progress_and_cancellation_declarations() {
+        let omitted = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {}
+        }));
+        assert!(!omitted.supports_progress);
+        assert!(!omitted.supports_cancellation);
+
+        let declared = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "progress": {},
+                "cancellation": true
+            }
+        }));
+        assert!(declared.supports_progress);
+        assert!(declared.supports_cancellation);
+
+        let explicitly_disabled = parse_remote_session_peer_capabilities(&json!({
+            "capabilities": {
+                "progress": false,
+                "cancellation": false
+            }
+        }));
+        assert!(!explicitly_disabled.supports_progress);
+        assert!(!explicitly_disabled.supports_cancellation);
     }
 }
 

@@ -8,6 +8,7 @@ pub use arc_guards::external::{
 mod endpoint_security;
 pub use endpoint_security::{
     validate_external_guard_url, validate_external_guard_url_with_resolver,
+    validate_external_guard_url_without_dns,
 };
 
 #[path = "../../../arc-guards/src/external/azure_content_safety.rs"]

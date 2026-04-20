@@ -13,6 +13,29 @@ pub fn validate_external_guard_url(field: &str, value: &str) -> Result<(), Exter
     })
 }
 
+pub fn validate_external_guard_url_without_dns(
+    field: &str,
+    value: &str,
+) -> Result<(), ExternalGuardError> {
+    let parsed = Url::parse(value).map_err(|error| {
+        ExternalGuardError::Permanent(format!("{field} must be a valid URL: {error}"))
+    })?;
+    if is_localhost_http_url(&parsed) {
+        return Ok(());
+    }
+    if parsed.scheme() != "https" {
+        return Err(ExternalGuardError::Permanent(format!(
+            "{field} must use https or localhost-only http"
+        )));
+    }
+    if host_is_denied(&parsed) {
+        return Err(ExternalGuardError::Permanent(format!(
+            "{field} must not target localhost, link-local, or private-network hosts"
+        )));
+    }
+    Ok(())
+}
+
 pub fn validate_external_guard_url_with_resolver<F>(
     field: &str,
     value: &str,
@@ -166,6 +189,24 @@ mod tests {
         assert!(error
             .to_string()
             .contains("must not target localhost, link-local, or private-network hosts"));
+    }
+
+    #[test]
+    fn static_endpoint_validation_does_not_require_dns_resolution() {
+        validate_external_guard_url_without_dns(
+            "external guard endpoint",
+            "https://guard.example.test/moderate",
+        )
+        .expect("domain-only static validation should not resolve DNS");
+
+        let error = validate_external_guard_url_without_dns(
+            "external guard endpoint",
+            "http://example.com",
+        )
+        .expect_err("non-HTTPS static endpoint should fail closed");
+        assert!(error
+            .to_string()
+            .contains("must use https or localhost-only http"));
     }
 
     #[test]
