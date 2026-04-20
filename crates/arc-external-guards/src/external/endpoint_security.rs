@@ -121,7 +121,7 @@ fn host_is_denied(parsed: &Url) -> bool {
     }
 }
 
-fn denied_ip(address: IpAddr) -> bool {
+pub fn denied_external_guard_ip(address: IpAddr) -> bool {
     match address {
         IpAddr::V4(address) => {
             address.is_private()
@@ -153,6 +153,10 @@ fn ipv4_mapped_ipv6(address: Ipv6Addr) -> Option<Ipv4Addr> {
     } else {
         None
     }
+}
+
+fn denied_ip(address: IpAddr) -> bool {
+    denied_external_guard_ip(address)
 }
 
 #[cfg(test)]

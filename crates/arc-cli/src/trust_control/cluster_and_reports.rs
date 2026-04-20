@@ -664,6 +664,15 @@ fn import_budget_delta_response(
             should_continue: false,
         });
     }
+    let record_count = response
+        .records
+        .len()
+        .saturating_add(response.mutation_events.len());
+    if record_count > BUDGET_DELTA_MAX_RECORDS {
+        return Err(CliError::Other(format!(
+            "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}"
+        )));
+    }
 
     let usage_records = response
         .records
@@ -756,15 +765,16 @@ fn build_cluster_state(
         return Ok(None);
     }
 
-    let self_url = normalize_cluster_url(
+    let self_url = normalize_cluster_config_url(
         config
             .advertise_url
             .as_deref()
             .unwrap_or(&format!("http://{local_addr}")),
+        config.allow_local_peer_urls,
     )?;
     let mut peers = HashMap::new();
     for peer_url in &config.peer_urls {
-        let peer_url = normalize_cluster_url(peer_url)?;
+        let peer_url = normalize_cluster_config_url(peer_url, config.allow_local_peer_urls)?;
         if peer_url != self_url {
             peers.insert(peer_url, PeerSyncState::default());
         }
@@ -1486,6 +1496,73 @@ fn normalize_cluster_url(value: &str) -> Result<String, CliError> {
         return Err(CliError::Other("cluster URL must not be empty".to_string()));
     }
     Ok(normalized.to_string())
+}
+
+fn normalize_cluster_config_url(value: &str, allow_local: bool) -> Result<String, CliError> {
+    let normalized = normalize_cluster_url(value)?;
+    let parsed = Url::parse(&normalized)
+        .map_err(|error| CliError::Other(format!("cluster URL must be valid: {error}")))?;
+    match parsed.scheme() {
+        "http" | "https" => {}
+        scheme => {
+            return Err(CliError::Other(format!(
+                "cluster URL scheme `{scheme}` is not allowed"
+            )))
+        }
+    }
+    if allow_local {
+        return Ok(normalized);
+    }
+    validate_cluster_url_host(&parsed)?;
+    Ok(normalized)
+}
+
+fn validate_cluster_url_host(parsed: &Url) -> Result<(), CliError> {
+    match parsed.host() {
+        Some(Host::Ipv4(address)) => {
+            if arc_external_guards::denied_external_guard_ip(IpAddr::V4(address)) {
+                return Err(CliError::Other(format!(
+                    "cluster URL must not target disallowed address `{address}` without --allow-local-peer-urls"
+                )));
+            }
+        }
+        Some(Host::Ipv6(address)) => {
+            if arc_external_guards::denied_external_guard_ip(IpAddr::V6(address)) {
+                return Err(CliError::Other(format!(
+                    "cluster URL must not target disallowed address `{address}` without --allow-local-peer-urls"
+                )));
+            }
+        }
+        Some(Host::Domain(host)) => {
+            let lower = host.to_ascii_lowercase();
+            if lower == "localhost" || lower.ends_with(".localhost") {
+                return Err(CliError::Other(
+                    "cluster URL must not target localhost without --allow-local-peer-urls"
+                        .to_string(),
+                ));
+            }
+            let port = parsed.port_or_known_default().ok_or_else(|| {
+                CliError::Other("cluster URL must include a resolvable port".to_string())
+            })?;
+            let addrs = (host, port).to_socket_addrs().map_err(|error| {
+                CliError::Other(format!("cluster URL host `{host}` could not be resolved: {error}"))
+            })?;
+            for addr in addrs {
+                if arc_external_guards::denied_external_guard_ip(addr.ip()) {
+                    return Err(CliError::Other(format!(
+                        "cluster URL host `{host}` resolved to disallowed address `{}` without --allow-local-peer-urls",
+                        addr.ip()
+                    )));
+                }
+            }
+        }
+        None => {
+            return Err(CliError::Other(
+                "cluster URL must include a host".to_string(),
+            ))
+        }
+    }
+    Ok(())
 }
 
 fn cluster_consensus_view(state: &TrustServiceState) -> Option<ClusterConsensusView> {
@@ -2600,7 +2677,7 @@ fn validate_cluster_peer_auth(
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?;
-    if signature != expected {
+    if !bool::from(signature.as_bytes().ct_eq(expected.as_bytes())) {
         if cluster_peer_auth_is_rate_limited(&unverified_failure_key, now as u64) {
             let mut response = plain_http_error(
                 StatusCode::TOO_MANY_REQUESTS,
@@ -3820,6 +3897,7 @@ mod cluster_and_reports_tests {
             issuance_policy: None,
             runtime_assurance_policy: None,
             advertise_url: None,
+            allow_local_peer_urls: true,
             certification_public_metadata_ttl_seconds: 300,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
@@ -3958,6 +4036,17 @@ mod cluster_and_reports_tests {
         assert_eq!(guard.self_url, "http://127.0.0.1:3200");
         assert_eq!(guard.peers.len(), 1);
         assert!(guard.peers.contains_key("http://127.0.0.1:3300"));
+    }
+
+    #[test]
+    fn cluster_peer_url_validation_rejects_local_networks_by_default() {
+        let error = normalize_cluster_config_url("http://127.0.0.1:3300", false)
+            .expect_err("loopback cluster URLs require explicit local mode");
+        assert!(error.to_string().contains("--allow-local-peer-urls"));
+
+        let normalized = normalize_cluster_config_url(" http://127.0.0.1:3300/ ", true)
+            .expect("local cluster mode permits loopback URLs");
+        assert_eq!(normalized, "http://127.0.0.1:3300");
     }
 
     #[test]
@@ -4854,6 +4943,32 @@ mod cluster_and_reports_tests {
             .list_mutation_events(10, Some("cap-legacy"), Some(0))
             .expect("list mutation events")
             .is_empty());
+    }
+
+    #[test]
+    fn budget_delta_import_rejects_oversized_peer_payloads() {
+        let budget_db = unique_temp_path("cluster-oversized-budget-delta", "sqlite3");
+        let mut store = SqliteBudgetStore::open(&budget_db).expect("open budget db");
+        let response = BudgetDeltaResponse {
+            records: (0..=BUDGET_DELTA_MAX_RECORDS)
+                .map(|idx| BudgetUsageView {
+                    capability_id: format!("cap-{idx}"),
+                    grant_index: 0,
+                    invocation_count: 1,
+                    total_cost_exposed: 0,
+                    total_cost_realized_spend: 0,
+                    updated_at: 1_717_171_717,
+                    seq: Some(idx as u64 + 1),
+                })
+                .collect(),
+            mutation_events: Vec::new(),
+        };
+
+        let result = import_budget_delta_response(&mut store, &response, None);
+        let Err(error) = result else {
+            panic!("oversized peer budget deltas should fail closed");
+        };
+        assert!(error.to_string().contains("budget delta response contains"));
     }
 
     #[test]

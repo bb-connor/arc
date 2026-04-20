@@ -29,8 +29,8 @@
 //! # Fail-closed
 //!
 //! Every guard in this crate is fail-closed.  Parse errors deny, empty
-//! configurations deny, and errors during regex compilation are logged
-//! and dropped so they cannot accidentally widen policy.
+//! configurations deny, and invalid user-supplied regex configuration
+//! rejects policy loading or constructs a deny-all guard.
 
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 

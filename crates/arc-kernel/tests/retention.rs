@@ -36,6 +36,15 @@ mod retention {
     }
 
     fn receipt_with_capability_and_ts(id: &str, capability_id: &str, timestamp: u64) -> ArcReceipt {
+        receipt_with_capability_ts_and_tenant(id, capability_id, timestamp, None)
+    }
+
+    fn receipt_with_capability_ts_and_tenant(
+        id: &str,
+        capability_id: &str,
+        timestamp: u64,
+        tenant_id: Option<String>,
+    ) -> ArcReceipt {
         let keypair = Keypair::generate();
         let action = ToolCallAction::from_parameters(serde_json::json!({}))
             .expect("hash receipt parameters");
@@ -53,7 +62,7 @@ mod retention {
                 evidence: Vec::new(),
                 metadata: None,
                 trust_level: arc_core::TrustLevel::default(),
-                tenant_id: None,
+                tenant_id,
                 kernel_key: keypair.public_key(),
             },
             &keypair,
@@ -63,6 +72,10 @@ mod retention {
 
     fn receipt_with_ts(id: &str, timestamp: u64) -> ArcReceipt {
         receipt_with_capability_and_ts(id, "cap-1", timestamp)
+    }
+
+    fn receipt_with_tenant(id: &str, timestamp: u64, tenant_id: &str) -> ArcReceipt {
+        receipt_with_capability_ts_and_tenant(id, "cap-1", timestamp, Some(tenant_id.to_string()))
     }
 
     fn child_receipt_with_ts(id: &str, timestamp: u64) -> ChildRequestReceipt {
@@ -160,6 +173,39 @@ mod retention {
         let _ = fs::remove_file(&archive_path);
     }
 
+    #[test]
+    fn retention_archive_for_tenant_preserves_other_tenants() {
+        let live_path = unique_db_path("retention-tenant-live");
+        let archive_path = unique_db_path("retention-tenant-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-old", 100, "tenant-a"))
+            .unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-b-old", 100, "tenant-b"))
+            .unwrap();
+        store
+            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-new", 200, "tenant-a"))
+            .unwrap();
+
+        let archived = store
+            .archive_receipts_before_for_tenant(150, archive_path.to_str().unwrap(), "tenant-a")
+            .unwrap();
+        assert_eq!(archived, 1, "should only archive tenant-a old receipt");
+        assert_eq!(store.tool_receipt_count().unwrap(), 2);
+
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        assert_eq!(
+            archive_store.tool_receipt_count().unwrap(),
+            1,
+            "archive should only contain tenant-a evidence selected by the scoped cutoff"
+        );
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
     /// Size-based rotation: if the DB size exceeds max_size_bytes, rotate_if_needed
     /// archives some receipts.
     #[test]
@@ -184,6 +230,7 @@ mod retention {
             retention_days: 3650, // 10 years -- time threshold won't trigger
             max_size_bytes: current_size.saturating_sub(1),
             archive_path: archive_path.to_str().unwrap().to_string(),
+            tenant_id: None,
         };
 
         let archived = store.rotate_if_needed(&config).unwrap();

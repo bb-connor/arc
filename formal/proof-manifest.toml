@@ -57,6 +57,13 @@ allowed_axioms = [
   "Arc.Core.verifyCapabilitySignature",
 ]
 
+allowed_open_modules = [
+  "Arc.Core",
+  "Arc.Spec",
+  "Lake",
+  "DSL",
+]
+
 excluded_surfaces = [
   "arc-kernel revocation-store lookups and delegation-store lineage checks",
   "budget mutation, authorize/commit/reconcile hold flows, and payment authorization",

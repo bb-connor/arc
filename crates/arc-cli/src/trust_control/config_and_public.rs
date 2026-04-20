@@ -1739,6 +1739,7 @@ mod config_and_public_tests {
             issuance_policy: None,
             runtime_assurance_policy: None,
             advertise_url: None,
+            allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),

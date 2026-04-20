@@ -26,6 +26,52 @@ mod tests {
         format!("{signing_input}.{signature}")
     }
 
+    #[test]
+    fn mcp_rate_limiter_caps_session_window() {
+        let limiter = McpRateLimiter::new();
+        for _ in 0..MCP_RATE_LIMIT_MAX_REQUESTS {
+            assert!(limiter.check("session:test".to_string(), 120).is_ok());
+        }
+
+        let retry_after = limiter
+            .check("session:test".to_string(), 120)
+            .expect_err("session should be rate limited after the window budget is exhausted");
+        assert_eq!(retry_after, 60);
+        assert!(limiter.check("session:test".to_string(), 180).is_ok());
+    }
+
+    #[test]
+    fn mcp_rate_limiter_caps_tracked_keys() {
+        let limiter = McpRateLimiter::new();
+        for idx in 0..MCP_RATE_LIMIT_MAX_KEYS {
+            assert!(limiter.check(format!("session:{idx}"), 120).is_ok());
+        }
+
+        let retry_after = limiter
+            .check("session:overflow".to_string(), 120)
+            .expect_err("new rate-limit keys should be capped within a window");
+        assert_eq!(retry_after, 60);
+        assert!(limiter.check("session:0".to_string(), 120).is_ok());
+    }
+
+    #[test]
+    fn mcp_rate_limit_key_prefers_session_and_hashes_credentials() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            MCP_SESSION_ID_HEADER,
+            HeaderValue::from_static("session-secret"),
+        );
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer token-secret"),
+        );
+
+        let key = mcp_rate_limit_key(&headers, "127.0.0.1:8080".parse().unwrap());
+        assert!(key.starts_with("session:"));
+        assert!(!key.contains("session-secret"));
+        assert!(!key.contains("token-secret"));
+    }
+
     fn sign_jwt_rs256(
         private_key: &rsa::RsaPrivateKey,
         claims: &serde_json::Value,

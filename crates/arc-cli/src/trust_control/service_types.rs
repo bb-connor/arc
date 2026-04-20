@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -204,11 +204,13 @@ use axum::{Json, Router};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
+use subtle::ConstantTimeEq;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
 use ureq::Agent;
 use url::form_urlencoded::Serializer as UrlFormSerializer;
+use url::{Host, Url};
 
 use crate::{
     authority_public_key_from_seed_file,
@@ -431,6 +433,7 @@ const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
 const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 const DEFAULT_LIST_LIMIT: usize = 50;
 const MAX_LIST_LIMIT: usize = 200;
+const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
 const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
 const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 const CLUSTER_SNAPSHOT_RECORD_THRESHOLD: u64 = 8;
@@ -456,6 +459,7 @@ pub struct TrustServiceConfig {
     pub issuance_policy: Option<crate::policy::ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<crate::policy::RuntimeAssuranceIssuancePolicy>,
     pub advertise_url: Option<String>,
+    pub allow_local_peer_urls: bool,
     pub certification_public_metadata_ttl_seconds: u64,
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,

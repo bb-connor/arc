@@ -131,6 +131,7 @@ if inventory.get("schema") != "arc.theorem-inventory.v1":
 
 assumptions = inventory.get("assumptions", [])
 approved_axioms = manifest.get("allowed_axioms", [])
+approved_open_modules = set(manifest.get("allowed_open_modules", []))
 if not assumptions:
     raise SystemExit("theorem inventory assumptions list is empty")
 
@@ -157,6 +158,37 @@ def lean_axioms_in_file(lean_file):
             full_name = f"{prefix}.{short_name}" if prefix else short_name
             axioms.append((full_name, lean_file.relative_to(repo).as_posix()))
     return axioms
+
+def lean_surface_controls_in_file(lean_file):
+    namespace_stack = []
+    opens = []
+    exports = []
+    abbrevs = []
+    for line_number, line in enumerate(lean_file.read_text(encoding="utf-8").splitlines(), 1):
+        namespace_match = re.match(r"^\s*namespace\s+([A-Za-z0-9_.']+)\b", line)
+        if namespace_match:
+            namespace_stack.append(namespace_match.group(1))
+            continue
+        end_match = re.match(r"^\s*end(?:\s+([A-Za-z0-9_.']+))?\s*$", line)
+        if end_match and namespace_stack:
+            namespace_stack.pop()
+            continue
+        open_match = re.match(r"^\s*open\s+(.+)$", line)
+        if open_match:
+            for module in re.findall(r"[A-Za-z][A-Za-z0-9_.']*", open_match.group(1)):
+                opens.append((module, lean_file.relative_to(repo).as_posix(), line_number))
+            continue
+        export_match = re.match(r"^\s*export\s+(.+)$", line)
+        if export_match:
+            exports.append((lean_file.relative_to(repo).as_posix(), line_number))
+            continue
+        abbrev_match = re.match(r"^\s*abbrev\s+([A-Za-z0-9_']+)\b", line)
+        if abbrev_match:
+            prefix = ".".join(namespace_stack)
+            short_name = abbrev_match.group(1)
+            full_name = f"{prefix}.{short_name}" if prefix else short_name
+            abbrevs.append((full_name, short_name, lean_file.relative_to(repo).as_posix(), line_number))
+    return opens, exports, abbrevs
 
 for assumption in assumptions:
     if assumption.get("kind") != "axiom":
@@ -185,9 +217,17 @@ for theorem in theorems:
         raise SystemExit(f"theorem file missing: {theorem.get('id')}")
 
 approved_axiom_names = set(approved_axioms)
+approved_axiom_short_names = {name.rsplit(".", 1)[-1] for name in approved_axioms}
 found_axioms = []
+found_open_modules = []
+found_exports = []
+found_abbrevs = []
 for lean_file in (repo / "formal" / "lean4" / "Pact").rglob("*.lean"):
     found_axioms.extend(lean_axioms_in_file(lean_file))
+    opens, exports, abbrevs = lean_surface_controls_in_file(lean_file)
+    found_open_modules.extend(opens)
+    found_exports.extend(exports)
+    found_abbrevs.extend(abbrevs)
 
 unexpected_axioms = sorted(
     f"{name} ({file})"
@@ -196,6 +236,26 @@ unexpected_axioms = sorted(
 )
 if unexpected_axioms:
     raise SystemExit(f"unexpected Lean axioms found: {', '.join(unexpected_axioms)}")
+
+unexpected_open_modules = sorted(
+    f"{module} ({file}:{line})"
+    for module, file, line in found_open_modules
+    if module not in approved_open_modules
+)
+if unexpected_open_modules:
+    raise SystemExit(f"unexpected Lean open modules found: {', '.join(unexpected_open_modules)}")
+
+if found_exports:
+    formatted = ", ".join(f"{file}:{line}" for file, line in sorted(found_exports))
+    raise SystemExit(f"unexpected Lean export declarations found: {formatted}")
+
+shadowing_abbrevs = sorted(
+    f"{full_name} ({file}:{line})"
+    for full_name, short_name, file, line in found_abbrevs
+    if full_name in approved_axiom_names or short_name in approved_axiom_short_names
+)
+if shadowing_abbrevs:
+    raise SystemExit(f"Lean abbrevs shadow approved axioms: {', '.join(shadowing_abbrevs)}")
 
 if not claim_registry_path.exists():
     raise SystemExit("claim registry missing: docs/CLAIM_REGISTRY.md")

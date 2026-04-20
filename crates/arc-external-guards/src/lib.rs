@@ -12,17 +12,17 @@ use arc_kernel::{Guard, GuardContext, KernelError, Verdict};
 pub mod external;
 
 pub use external::{
-    retry_with_jitter, retry_with_jitter_rng, validate_external_guard_url,
-    validate_external_guard_url_with_resolver, validate_external_guard_url_without_dns,
-    AsyncGuardAdapter, AsyncGuardAdapterBuilder, AsyncGuardAdapterConfig, AzureCategory,
-    AzureCategoryBreakdown, AzureContentSafetyConfig, AzureContentSafetyGuard,
-    AzureDecisionDetails, BackoffStrategy, BedrockDecisionDetails, BedrockGuardrailConfig,
-    BedrockGuardrailGuard, BedrockSource, CircuitBreaker, CircuitBreakerConfig, CircuitOpenVerdict,
-    CircuitState, Clock, ExternalGuard, ExternalGuardError, GuardCallContext, RateLimitedVerdict,
-    RetryConfig, SafeBrowsingConfig, SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity,
-    TokenBucket, TokioClock, TtlCache, VertexDecisionDetails, VertexProbability,
-    VertexRatingBreakdown, VertexSafetyConfig, VertexSafetyGuard, VirusTotalConfig,
-    VirusTotalGuard,
+    denied_external_guard_ip, retry_with_jitter, retry_with_jitter_rng,
+    validate_external_guard_url, validate_external_guard_url_with_resolver,
+    validate_external_guard_url_without_dns, AsyncGuardAdapter, AsyncGuardAdapterBuilder,
+    AsyncGuardAdapterConfig, AzureCategory, AzureCategoryBreakdown, AzureContentSafetyConfig,
+    AzureContentSafetyGuard, AzureDecisionDetails, BackoffStrategy, BedrockDecisionDetails,
+    BedrockGuardrailConfig, BedrockGuardrailGuard, BedrockSource, CircuitBreaker,
+    CircuitBreakerConfig, CircuitOpenVerdict, CircuitState, Clock, ExternalGuard,
+    ExternalGuardError, GuardCallContext, RateLimitedVerdict, RetryConfig, SafeBrowsingConfig,
+    SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity, TokenBucket, TokioClock, TtlCache,
+    VertexDecisionDetails, VertexProbability, VertexRatingBreakdown, VertexSafetyConfig,
+    VertexSafetyGuard, VirusTotalConfig, VirusTotalGuard,
 };
 
 /// Synchronous kernel bridge for an async external guard adapter.

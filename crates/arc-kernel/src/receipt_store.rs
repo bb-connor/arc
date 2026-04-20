@@ -18,6 +18,9 @@ pub struct RetentionConfig {
     pub max_size_bytes: u64,
     /// Path for the archive SQLite file. Must be writable on first rotation.
     pub archive_path: String,
+    /// Optional tenant scope for retention. When set, rotation only archives
+    /// receipts for this tenant and leaves other tenant evidence untouched.
+    pub tenant_id: Option<String>,
 }
 
 impl Default for RetentionConfig {
@@ -26,6 +29,7 @@ impl Default for RetentionConfig {
             retention_days: 90,
             max_size_bytes: 10_737_418_240,
             archive_path: "receipts-archive.sqlite3".to_string(),
+            tenant_id: None,
         }
     }
 }

@@ -1,4 +1,5 @@
 use super::*;
+use subtle::ConstantTimeEq;
 
 pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<RemoteAppState> {
     router
@@ -738,7 +739,7 @@ fn validate_admin_auth(headers: &HeaderMap, admin_token: Option<&str>) -> Result
         ));
     };
     let token = extract_bearer_token(headers, None)?;
-    if token == expected_token {
+    if token.as_bytes().ct_eq(expected_token.as_bytes()).into() {
         Ok(())
     } else {
         Err(unauthorized_bearer_response(

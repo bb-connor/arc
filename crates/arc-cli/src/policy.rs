@@ -1066,7 +1066,9 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
     }
 
     if let Some(sql_query) = &config.sql_query {
-        pipeline.add(Box::new(SqlQueryGuard::new(sql_query.clone())));
+        pipeline.add(Box::new(
+            SqlQueryGuard::try_new(sql_query.clone()).map_err(PolicyError::Invalid)?,
+        ));
     }
 
     if let Some(vector_db) = &config.vector_db {

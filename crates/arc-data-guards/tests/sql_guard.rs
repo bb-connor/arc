@@ -280,6 +280,42 @@ fn denylisted_predicate_blocks_sql_injection_pattern() {
 }
 
 #[test]
+fn denylisted_predicate_count_limit_fails_closed() {
+    let result = SqlQueryGuard::try_new(SqlGuardConfig {
+        denylisted_predicates: (0..65).map(|idx| format!("pattern-{idx}")).collect(),
+        ..base_cfg()
+    });
+    let Err(error) = result else {
+        panic!("too many denylisted predicates should fail closed");
+    };
+    assert!(error.contains("allows at most 64 patterns"));
+}
+
+#[test]
+fn denylisted_predicate_length_limit_fails_closed() {
+    let result = SqlQueryGuard::try_new(SqlGuardConfig {
+        denylisted_predicates: vec!["a".repeat(513)],
+        ..base_cfg()
+    });
+    let Err(error) = result else {
+        panic!("overlong denylisted predicate should fail closed");
+    };
+    assert!(error.contains("must be at most 512 characters"));
+}
+
+#[test]
+fn denylisted_predicate_complexity_limit_fails_closed() {
+    let result = SqlQueryGuard::try_new(SqlGuardConfig {
+        denylisted_predicates: vec!["(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+".into()],
+        ..base_cfg()
+    });
+    let Err(error) = result else {
+        panic!("over-complex denylisted predicate should fail closed");
+    };
+    assert!(error.contains("complexity at most"));
+}
+
+#[test]
 fn delete_without_where_denied_by_default() {
     let cfg = SqlGuardConfig {
         operation_allowlist: vec![SqlOperation::Delete],

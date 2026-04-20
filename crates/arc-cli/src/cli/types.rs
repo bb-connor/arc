@@ -513,6 +513,10 @@ enum TrustCommands {
         #[arg(long = "peer-url")]
         peer_urls: Vec<String>,
 
+        /// Allow loopback/private cluster peer URLs for local development only.
+        #[arg(long, default_value_t = false)]
+        allow_local_peer_urls: bool,
+
         /// Background cluster sync interval in milliseconds.
         #[arg(long, default_value_t = 500)]
         cluster_sync_interval_ms: u64,
