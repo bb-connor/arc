@@ -241,6 +241,10 @@ pub struct GuardPolicyConfig {
     #[serde(default)]
     pub egress_allowlist: Option<EgressAllowlistConfig>,
 
+    /// Internal-network SSRF guard configuration.
+    #[serde(default)]
+    pub internal_network: Option<InternalNetworkConfig>,
+
     /// MCP tool access guard configuration.
     #[serde(default)]
     pub tool_access: Option<ToolAccessConfig>,
@@ -456,6 +460,23 @@ pub struct EgressAllowlistConfig {
     /// Domains to explicitly block (takes precedence over allow).
     #[serde(default)]
     pub blocked_domains: Vec<String>,
+}
+
+/// Configuration for the internal-network SSRF guard.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InternalNetworkConfig {
+    /// Whether this guard is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Additional hostnames to block beyond the built-in metadata/internal list.
+    #[serde(default)]
+    pub extra_blocked_hosts: Vec<String>,
+
+    /// Enable DNS rebinding detection heuristics.
+    #[serde(default = "default_true")]
+    pub dns_rebinding_detection: bool,
 }
 
 /// Default behavior when a tool is not explicitly allowed or blocked.
@@ -981,7 +1002,15 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     .map_err(|error| PolicyError::Invalid(error.to_string()))?,
                 ));
             }
-            pipeline.add(Box::new(InternalNetworkGuard::new()));
+        }
+    }
+
+    if let Some(internal_network) = &config.internal_network {
+        if internal_network.enabled {
+            pipeline.add(Box::new(InternalNetworkGuard::with_config(
+                internal_network.extra_blocked_hosts.clone(),
+                internal_network.dns_rebinding_detection,
+            )));
         }
     }
 
@@ -1688,6 +1717,8 @@ guards:
       - "*.github.com"
       - "*.openai.com"
       - "api.anthropic.com"
+  internal_network:
+    enabled: true
 
 capabilities:
   default:
@@ -1727,6 +1758,11 @@ guards:
       - "*.openai.com"
     blocked_domains:
       - "evil.example"
+  internal_network:
+    enabled: true
+    extra_blocked_hosts:
+      - "internal.corp.example.com"
+    dns_rebinding_detection: true
   tool_access:
     enabled: true
     default_action: block
@@ -1771,6 +1807,7 @@ guards:
         assert!(policy.guards.path_allowlist.is_some());
         assert!(policy.guards.shell_command.is_some());
         assert!(policy.guards.egress_allowlist.is_some());
+        assert!(policy.guards.internal_network.is_some());
     }
 
     #[test]
@@ -1800,6 +1837,7 @@ kernel:
         assert!(policy.guards.path_allowlist.is_some());
         assert!(policy.guards.shell_command.is_some());
         assert!(policy.guards.egress_allowlist.is_some());
+        assert!(policy.guards.internal_network.is_some());
         assert!(policy.guards.tool_access.is_some());
         assert!(policy.guards.secret_patterns.is_some());
         assert!(policy.guards.patch_integrity.is_some());
@@ -2512,6 +2550,8 @@ guards:
     enabled: false
   egress_allowlist:
     enabled: false
+  internal_network:
+    enabled: false
 "#;
         let policy = parse_policy(yaml).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
@@ -2519,7 +2559,7 @@ guards:
     }
 
     #[test]
-    fn internal_network_guard_only_materializes_with_egress_policy() {
+    fn internal_network_guard_requires_explicit_policy() {
         let without_egress = parse_policy(
             r#"
 guards:
@@ -2542,7 +2582,22 @@ guards:
         )
         .unwrap();
         let with_egress_pipeline = build_guard_pipeline(&with_egress.guards).unwrap();
-        assert_eq!(with_egress_pipeline.len(), 2);
+        assert_eq!(with_egress_pipeline.len(), 1);
+
+        let with_internal_network = parse_policy(
+            r#"
+guards:
+  internal_network:
+    enabled: true
+    extra_blocked_hosts:
+      - "internal.corp.example.com"
+    dns_rebinding_detection: false
+"#,
+        )
+        .unwrap();
+        let with_internal_network_pipeline =
+            build_guard_pipeline(&with_internal_network.guards).unwrap();
+        assert_eq!(with_internal_network_pipeline.len(), 1);
     }
 
     #[test]

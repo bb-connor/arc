@@ -24,6 +24,8 @@ guards:
       - "registry.npmjs.org"
       - "pypi.org"
       - "crates.io"
+  internal_network:
+    enabled: true
 
 capabilities:
   default:

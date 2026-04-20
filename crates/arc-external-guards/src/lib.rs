@@ -5,6 +5,7 @@
 //! caching, and circuit-breaker infrastructure remains in `arc-guards`.
 
 use std::future::Future;
+use std::thread;
 
 use arc_kernel::{Guard, GuardContext, KernelError, Verdict};
 
@@ -59,17 +60,17 @@ impl<E: ExternalGuard> ScopedAsyncGuard<E> {
         }
     }
 
-    fn block_on<T>(&self, future: impl Future<Output = T>) -> Result<T, KernelError> {
+    fn block_on<T>(&self, future: impl Future<Output = T> + Send) -> Result<T, KernelError>
+    where
+        T: Send,
+    {
         match tokio::runtime::Handle::try_current() {
             Ok(handle) => match handle.runtime_flavor() {
                 tokio::runtime::RuntimeFlavor::MultiThread => {
                     Ok(tokio::task::block_in_place(|| handle.block_on(future)))
                 }
                 tokio::runtime::RuntimeFlavor::CurrentThread => {
-                    Err(KernelError::GuardDenied(format!(
-                        "external guard {} requires a multithreaded Tokio runtime",
-                        self.name()
-                    )))
+                    self.block_on_fallback_thread(future)
                 }
                 flavor => Err(KernelError::GuardDenied(format!(
                     "external guard {} cannot run on Tokio runtime flavor {flavor:?}",
@@ -87,6 +88,35 @@ impl<E: ExternalGuard> ScopedAsyncGuard<E> {
                 })
                 .map(|runtime| runtime.block_on(future)),
         }
+    }
+
+    fn block_on_fallback_thread<T>(
+        &self,
+        future: impl Future<Output = T> + Send,
+    ) -> Result<T, KernelError>
+    where
+        T: Send,
+    {
+        let guard_name = self.name().to_string();
+        let runtime_guard_name = guard_name.clone();
+        thread::scope(|scope| {
+            let handle = scope.spawn(move || {
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|error| {
+                        KernelError::GuardDenied(format!(
+                            "external guard {runtime_guard_name} could not start a fallback runtime: {error}"
+                        ))
+                    })?;
+                Ok(runtime.block_on(future))
+            });
+            handle.join().map_err(|_| {
+                KernelError::GuardDenied(format!(
+                    "external guard {guard_name} fallback runtime thread panicked"
+                ))
+            })?
+        })
     }
 }
 
@@ -141,4 +171,46 @@ fn wildcard_matches(pattern: &str, target: &str) -> bool {
     }
 
     pattern_index == pattern.len()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::Arc;
+
+    struct AllowExternalGuard;
+
+    #[async_trait]
+    impl ExternalGuard for AllowExternalGuard {
+        fn name(&self) -> &str {
+            "allow-external"
+        }
+
+        fn cache_key(&self, _ctx: &GuardCallContext) -> Option<String> {
+            None
+        }
+
+        async fn eval(&self, _ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
+            Ok(Verdict::Allow)
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn scoped_async_guard_uses_fallback_runtime_on_current_thread_tokio() {
+        let adapter = AsyncGuardAdapter::builder(Arc::new(AllowExternalGuard)).build();
+        let guard = ScopedAsyncGuard::new(adapter, Vec::new());
+        let context = GuardCallContext {
+            tool_name: "echo".to_string(),
+            agent_id: "agent".to_string(),
+            server_id: "server".to_string(),
+            arguments_json: "{}".to_string(),
+        };
+
+        let verdict = guard
+            .block_on(guard.adapter.evaluate(&context))
+            .expect("current-thread fallback should evaluate guard");
+
+        assert!(matches!(verdict, Verdict::Allow));
+    }
 }
