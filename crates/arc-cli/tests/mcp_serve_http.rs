@@ -17,6 +17,8 @@ use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
 
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 fn unique_test_dir() -> PathBuf {
     let nonce = SystemTime::now()
@@ -1437,7 +1439,8 @@ fn wait_for_server_result(
     base_url: &str,
     guard: &mut ServerGuard,
 ) -> Result<(), StartupError> {
-    for _ in 0..100 {
+    let deadline = Instant::now() + SERVER_STARTUP_TIMEOUT;
+    while Instant::now() < deadline {
         if let Some(status) = guard.child.try_wait().expect("poll remote MCP child") {
             return Err(StartupError::from_child_exit(
                 status,
@@ -1446,7 +1449,7 @@ fn wait_for_server_result(
         }
         match client.get(format!("{base_url}/mcp")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::UNAUTHORIZED => return Ok(()),
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(_) | Err(_) => thread::sleep(SERVER_STARTUP_POLL_INTERVAL),
         }
     }
     Err(StartupError::Timeout(
@@ -1455,10 +1458,11 @@ fn wait_for_server_result(
 }
 
 fn wait_for_server(client: &Client, base_url: &str) {
-    for _ in 0..100 {
+    let deadline = Instant::now() + SERVER_STARTUP_TIMEOUT;
+    while Instant::now() < deadline {
         match client.get(format!("{base_url}/mcp")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::UNAUTHORIZED => return,
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(_) | Err(_) => thread::sleep(SERVER_STARTUP_POLL_INTERVAL),
         }
     }
     panic!("remote MCP server did not become ready");
@@ -2256,15 +2260,18 @@ fn mcp_serve_http_requires_auth_reuses_sessions_and_supports_delete() {
 fn mcp_serve_http_session_trust_reports_lifecycle_and_reconnect_contract() {
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
-    let listen = reserve_listen_addr();
     let token = "test-token";
-    let _server = spawn_http_server(&dir, listen, token);
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
         .expect("build reqwest client");
+    let (listen, _server) = spawn_with_bind_retry(
+        &client,
+        "remote MCP server",
+        |listen| spawn_http_server(&dir, listen, token),
+        wait_for_server_result,
+    );
     let base_url = format!("http://{listen}");
-    wait_for_server(&client, &base_url);
 
     let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
 
