@@ -51,11 +51,18 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
     assert_eq!(status.public_key.to_hex(), snapshot.public_key_hex);
     assert_eq!(
         primary
-            .current_keypair()
-            .expect("read primary local signing key after snapshot")
+            .local_keypair()
+            .expect("read primary local signing custody after snapshot")
             .public_key(),
         primary_local_key_before
     );
+    let current_keypair_error = match primary.current_keypair() {
+        Ok(_) => panic!("replicated authority snapshot must fence stale local signing custody"),
+        Err(error) => error,
+    };
+    assert!(current_keypair_error
+        .to_string()
+        .contains("does not match replicated authority public key"));
     assert!(status
         .trusted_public_keys
         .iter()

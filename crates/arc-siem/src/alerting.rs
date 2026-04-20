@@ -589,6 +589,8 @@ mod tests {
 
     fn deny_receipt(guard: &str) -> ArcReceipt {
         let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: "alert-rcpt-1".to_string(),
@@ -596,10 +598,7 @@ mod tests {
                 capability_id: "cap".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: "h".to_string(),
-                },
+                action,
                 decision: Decision::Deny {
                     reason: "denied".to_string(),
                     guard: guard.to_string(),
@@ -623,6 +622,8 @@ mod tests {
 
     fn allow_receipt() -> ArcReceipt {
         let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: "alert-rcpt-2".to_string(),
@@ -630,10 +631,7 @@ mod tests {
                 capability_id: "cap".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: "h".to_string(),
-                },
+                action,
                 decision: Decision::Allow,
                 content_hash: "c".to_string(),
                 policy_hash: "p".to_string(),

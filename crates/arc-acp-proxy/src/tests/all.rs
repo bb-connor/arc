@@ -2241,6 +2241,8 @@ mod attestation_and_telemetry_tests {
         decision: Decision,
         evidence: Vec<GuardEvidence>,
     ) -> ArcReceipt {
+        let action = ToolCallAction::from_parameters(json!({"tool": tool_name}))
+            .expect("hash receipt parameters");
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: id.to_string(),
@@ -2248,10 +2250,7 @@ mod attestation_and_telemetry_tests {
                 capability_id: "capability-1".to_string(),
                 tool_server: "acp-proxy".to_string(),
                 tool_name: tool_name.to_string(),
-                action: ToolCallAction {
-                    parameters: json!({"tool": tool_name}),
-                    parameter_hash: "hash-1".to_string(),
-                },
+                action,
                 decision,
                 content_hash: "content-hash".to_string(),
                 policy_hash: "policy-hash".to_string(),

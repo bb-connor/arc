@@ -29,10 +29,8 @@ fn receipt_with(
         capability_id: "cap-xyz".to_string(),
         tool_server: "srv-shell".to_string(),
         tool_name: "bash".to_string(),
-        action: ToolCallAction {
-            parameters: serde_json::json!({"cmd": "ls"}),
-            parameter_hash: "param-hash".to_string(),
-        },
+        action: ToolCallAction::from_parameters(serde_json::json!({"cmd": "ls"}))
+            .expect("action parameters serialize"),
         decision,
         content_hash: "content-hash".to_string(),
         policy_hash: "policy-hash".to_string(),

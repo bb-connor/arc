@@ -37,6 +37,8 @@ mod retention {
 
     fn receipt_with_capability_and_ts(id: &str, capability_id: &str, timestamp: u64) -> ArcReceipt {
         let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: id.to_string(),
@@ -44,10 +46,7 @@ mod retention {
                 capability_id: capability_id.to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: "abc123".to_string(),
-                },
+                action,
                 decision: Decision::Allow,
                 content_hash: "content-1".to_string(),
                 policy_hash: "policy-1".to_string(),

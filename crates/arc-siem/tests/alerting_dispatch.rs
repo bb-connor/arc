@@ -29,10 +29,8 @@ fn allow_receipt(id: &str) -> ArcReceipt {
             capability_id: "cap".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "h".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .expect("action parameters serialize"),
             decision: Decision::Allow,
             content_hash: "c".to_string(),
             policy_hash: "p".to_string(),
@@ -56,10 +54,8 @@ fn deny_receipt(id: &str, guard: &str) -> ArcReceipt {
             capability_id: "cap".to_string(),
             tool_server: "python".to_string(),
             tool_name: "run".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "h".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .expect("action parameters serialize"),
             decision: Decision::Deny {
                 reason: "blocked by policy".to_string(),
                 guard: guard.to_string(),

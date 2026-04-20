@@ -39,6 +39,13 @@ fn internal_peer_registry() -> &'static Mutex<HashMap<String, String>> {
     REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn trust_cluster_test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 fn register_internal_peer(base_url: &str, peer_urls: &[String]) {
     let mut registry = internal_peer_registry()
         .lock()
@@ -632,6 +639,8 @@ fn wait_for_cluster_leader_convergence(
 
 fn sample_receipt(id: &str, capability_id: &str) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let action = ToolCallAction::from_parameters(json!({"message": "cluster"}))
+        .expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -639,10 +648,7 @@ fn sample_receipt(id: &str, capability_id: &str) -> ArcReceipt {
             capability_id: capability_id.to_string(),
             tool_server: "wrapped-http-mock".to_string(),
             tool_name: "echo_json".to_string(),
-            action: ToolCallAction {
-                parameters: json!({"message": "cluster"}),
-                parameter_hash: "param-hash".to_string(),
-            },
+            action,
             decision: Decision::Allow,
             content_hash: "content-hash".to_string(),
             policy_hash: "policy-hash".to_string(),
@@ -1454,12 +1460,14 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
 
 #[test]
 fn trust_control_cluster_replicates_state_and_fails_closed_without_quorum() {
+    let _test_lock = trust_cluster_test_lock();
     run_trust_control_cluster_proving_scenario(1, 1);
 }
 
 #[test]
 #[ignore = "qualification lane exercises trust-control runtime assurance issuance"]
 fn trust_cluster_runtime_assurance_policy_gates_capability_issuance() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
 
@@ -1615,6 +1623,7 @@ extensions:
 
 #[test]
 fn trust_control_cluster_internal_status_requires_signed_node_identity() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("cluster-node-identity");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -1694,6 +1703,7 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
 
 #[test]
 fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("quorum-heal");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -1897,6 +1907,7 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
 
 #[test]
 fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("authority-fence-failover");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -1988,6 +1999,11 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
         "majority authority failover convergence",
         Duration::from_secs(90),
         || {
+            let leader_status = try_internal_cluster_status(&client, &url_b, service_token);
+            let leader_term_advanced = leader_status
+                .as_ref()
+                .and_then(|status| status["authorityLease"]["term"].as_u64())
+                .is_some_and(|term| term > initial_term);
             majority_urls.iter().all(|base_url| {
                 let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
                 else {
@@ -1996,8 +2012,7 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
                 status["leaderUrl"].as_str() == Some(url_b.as_str())
                     && status["hasQuorum"].as_bool() == Some(true)
                     && status["reachableNodes"].as_u64() == Some(2)
-                    && status["authorityLease"]["term"].as_u64().unwrap_or(0) > initial_term
-            })
+            }) && leader_term_advanced
         },
         || cluster_status_diagnostics(&client, &majority_urls, service_token),
     );
@@ -2077,29 +2092,49 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
         .expect("generation after stale mutation rejection");
     assert_eq!(generation_after_reject, generation_before);
 
+    let forwarding_leader = wait_for_cluster_leader_convergence(
+        &client,
+        service_token,
+        &urls,
+        "cluster leader remains stable before follower forwarding",
+    );
+    let forwarding_generation_before = get_json(
+        &client,
+        &format!("{forwarding_leader}/v1/authority"),
+        service_token,
+    )["generation"]
+        .as_u64()
+        .expect("generation before follower forwarding");
+    let forwarding_peer_url = urls
+        .iter()
+        .find(|candidate| *candidate != &forwarding_leader)
+        .cloned()
+        .expect("forwarding peer url");
+
     let forwarded = post_json(
         &client,
-        &format!("{stale_peer_url}/v1/authority"),
+        &format!("{forwarding_peer_url}/v1/authority"),
         service_token,
         &json!({}),
     );
     assert_eq!(
         forwarded["handledBy"].as_str(),
-        Some(restarted_leader.as_str())
+        Some(forwarding_leader.as_str())
     );
     assert_eq!(
         forwarded["leaderUrl"].as_str(),
-        Some(restarted_leader.as_str())
+        Some(forwarding_leader.as_str())
     );
     assert_eq!(
         forwarded["generation"].as_u64(),
-        Some(generation_before.saturating_add(1))
+        Some(forwarding_generation_before.saturating_add(1))
     );
 }
 
 #[cfg(unix)]
 #[test]
 fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("budget-quorum-commit-timeout");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -2206,6 +2241,7 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
 
 #[test]
 fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("denied-budget-events");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -2354,6 +2390,7 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
 
 #[test]
 fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("late-joiner");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -2535,6 +2572,7 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
 
 #[test]
 fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("snapshot-budget-holds");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -2769,6 +2807,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
 
 #[test]
 fn trust_control_cluster_multi_region_partition_qualification() {
+    let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("multi-region-qualification");
     fs::create_dir_all(&dir).expect("create test dir");
 
@@ -3014,6 +3053,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
 #[test]
 #[ignore = "qualification lane repeats the full failover scenario"]
 fn trust_control_cluster_repeat_run_qualification() {
+    let _test_lock = trust_cluster_test_lock();
     for run_index in 1..=TRUST_CLUSTER_QUALIFICATION_RUNS {
         run_trust_control_cluster_proving_scenario(run_index, TRUST_CLUSTER_QUALIFICATION_RUNS);
     }

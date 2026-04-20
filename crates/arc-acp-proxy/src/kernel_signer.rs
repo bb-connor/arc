@@ -140,15 +140,17 @@ impl ReceiptSigner for KernelReceiptSigner {
         let entry = &request.audit_entry;
 
         // Build the receipt body from the audit entry.
-        let action = ToolCallAction {
-            parameters: serde_json::json!({
-                "tool_call_id": entry.tool_call_id,
-                "title": entry.title,
-                "kind": entry.kind,
-                "status": entry.status,
-            }),
-            parameter_hash: entry.content_hash.clone(),
-        };
+        let action = ToolCallAction::from_parameters(serde_json::json!({
+            "tool_call_id": entry.tool_call_id,
+            "title": entry.title,
+            "kind": entry.kind,
+            "status": entry.status,
+        }))
+        .map_err(|error| {
+            ReceiptSignError::SigningFailed(format!(
+                "failed to hash ACP receipt parameters: {error}"
+            ))
+        })?;
 
         let timestamp = entry.timestamp.parse::<u64>().unwrap_or_else(|_| {
             SystemTime::now()

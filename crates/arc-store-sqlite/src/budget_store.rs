@@ -181,7 +181,7 @@ impl SqliteBudgetStore {
         transaction: &rusqlite::Transaction<'_>,
         record: &BudgetUsageRecord,
     ) -> Result<(), BudgetStoreError> {
-        raise_budget_replication_seq_floor(&transaction, record.seq)?;
+        raise_budget_replication_seq_floor(transaction, record.seq)?;
         transaction.execute(
             r#"
             INSERT INTO capability_grant_budgets (
@@ -281,21 +281,36 @@ impl SqliteBudgetStore {
         transaction: &rusqlite::Transaction<'_>,
         record: &BudgetMutationRecord,
     ) -> Result<(), BudgetStoreError> {
-        raise_budget_replication_seq_floor(&transaction, record.event_seq)?;
+        raise_budget_replication_seq_floor(transaction, record.event_seq)?;
         if let Some(usage_seq) = record.usage_seq {
-            raise_budget_replication_seq_floor(&transaction, usage_seq)?;
+            raise_budget_replication_seq_floor(transaction, usage_seq)?;
         }
 
         let duplicate_event = if let Some(existing) =
-            Self::load_mutation_event(&transaction, &record.event_id)?
+            Self::load_mutation_event(transaction, &record.event_id)?
         {
             if existing != *record {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget event_id `{}` was reused for a different mutation",
-                    record.event_id
-                )));
+                if Self::rolled_back_authorize_can_be_replaced(transaction, &existing, record)? {
+                    transaction.execute(
+                        "DELETE FROM budget_mutation_events WHERE event_id = ?1",
+                        params![record.event_id],
+                    )?;
+                    if let Some(hold_id) = record.hold_id.as_deref() {
+                        transaction.execute(
+                            "DELETE FROM budget_authorization_holds WHERE hold_id = ?1",
+                            params![hold_id],
+                        )?;
+                    }
+                    false
+                } else {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "budget event_id `{}` was reused for a different mutation",
+                        record.event_id
+                    )));
+                }
+            } else {
+                true
             }
-            true
         } else {
             transaction.execute(
                 r#"
@@ -352,7 +367,7 @@ impl SqliteBudgetStore {
             return Ok(());
         }
 
-        Self::apply_imported_hold_state(&transaction, record)?;
+        Self::apply_imported_hold_state(transaction, record)?;
         Ok(())
     }
 
@@ -894,6 +909,70 @@ impl SqliteBudgetStore {
         Ok(Some(existing_allowed.unwrap_or(0) > 0))
     }
 
+    fn sqlite_like_prefix_pattern(prefix: &str) -> String {
+        let mut pattern = String::with_capacity(prefix.len() + 1);
+        for ch in prefix.chars() {
+            match ch {
+                '\\' | '%' | '_' => {
+                    pattern.push('\\');
+                    pattern.push(ch);
+                }
+                _ => pattern.push(ch),
+            }
+        }
+        pattern.push('%');
+        pattern
+    }
+
+    fn rollback_event_exists(
+        transaction: &rusqlite::Transaction<'_>,
+        event_id: &str,
+    ) -> Result<bool, BudgetStoreError> {
+        let legacy_rollback_event_id = format!("{event_id}:rollback");
+        let rollback_prefix = format!("{event_id}:rollback:");
+        let rollback_prefix_pattern = Self::sqlite_like_prefix_pattern(&rollback_prefix);
+        Ok(transaction
+            .query_row(
+                r#"
+                SELECT 1
+                FROM budget_mutation_events
+                WHERE event_id = ?1
+                   OR event_id LIKE ?2 ESCAPE '\'
+                LIMIT 1
+                "#,
+                params![legacy_rollback_event_id, rollback_prefix_pattern],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some())
+    }
+
+    fn rolled_back_authorize_can_be_replaced(
+        transaction: &rusqlite::Transaction<'_>,
+        existing: &BudgetMutationRecord,
+        replacement: &BudgetMutationRecord,
+    ) -> Result<bool, BudgetStoreError> {
+        if existing.kind != BudgetMutationKind::AuthorizeExposure
+            || replacement.kind != BudgetMutationKind::AuthorizeExposure
+            || existing.allowed != Some(true)
+            || replacement.allowed != Some(true)
+        {
+            return Ok(false);
+        }
+        let same_mutation_scope = existing.hold_id == replacement.hold_id
+            && existing.capability_id == replacement.capability_id
+            && existing.grant_index == replacement.grant_index
+            && existing.exposure_units == replacement.exposure_units
+            && existing.realized_spend_units == replacement.realized_spend_units
+            && existing.max_invocations == replacement.max_invocations
+            && existing.max_cost_per_invocation == replacement.max_cost_per_invocation
+            && existing.max_total_cost_units == replacement.max_total_cost_units;
+        if !same_mutation_scope {
+            return Ok(false);
+        }
+        Self::rollback_event_exists(transaction, &existing.event_id)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn existing_event_allowed(
         transaction: &rusqlite::Transaction<'_>,
@@ -993,18 +1072,9 @@ impl SqliteBudgetStore {
             && max_per_matches
             && max_total_matches;
         let existing_allowed = existing_allowed.map(|value| value > 0);
-        let rollback_exists =
-            kind == BudgetMutationKind::AuthorizeExposure && existing_allowed == Some(true) && {
-                let rollback_event_id = format!("{event_id}:rollback");
-                transaction
-                    .query_row(
-                        "SELECT 1 FROM budget_mutation_events WHERE event_id = ?1",
-                        params![rollback_event_id],
-                        |_| Ok(()),
-                    )
-                    .optional()?
-                    .is_some()
-            };
+        let rollback_exists = kind == BudgetMutationKind::AuthorizeExposure
+            && existing_allowed == Some(true)
+            && Self::rollback_event_exists(transaction, event_id)?;
         if !mutation_matches {
             return Err(BudgetStoreError::Invariant(format!(
                 "budget event_id `{event_id}` was reused for a different mutation"
@@ -1373,6 +1443,89 @@ impl BudgetStore for SqliteBudgetStore {
             .optional()?;
         let (current_count, current_exposed, current_realized) = row.unwrap_or((0, 0, 0));
         let current_count = current_count.max(0) as u32;
+
+        if let Some(hold_id) = hold_id {
+            let retry_follows_rollback = match event_id {
+                Some(event_id) => Self::rollback_event_exists(&transaction, event_id)?,
+                None => false,
+            };
+            if let Some(hold) = SqliteBudgetStore::load_hold(&transaction, hold_id)? {
+                if hold.capability_id == capability_id
+                    && hold.grant_index == grant_index
+                    && hold.authorized_exposure_units == cost_units
+                    && hold.remaining_exposure_units == cost_units
+                    && hold.invocation_count_debited
+                    && hold.disposition == HoldDisposition::Open
+                    && current_exposed >= cost_units
+                {
+                    let current = transaction
+                        .query_row(
+                            r#"
+                            SELECT seq, invocation_count, total_cost_exposed, total_cost_realized_spend
+                            FROM capability_grant_budgets
+                            WHERE capability_id = ?1 AND grant_index = ?2
+                            "#,
+                            params![capability_id, grant_index as i64],
+                            |row| {
+                                Ok((
+                                    row.get::<_, i64>(0)?.max(0) as u64,
+                                    row.get::<_, i64>(1)?.max(0) as u32,
+                                    row.get::<_, i64>(2)?.max(0) as u64,
+                                    row.get::<_, i64>(3)?.max(0) as u64,
+                                ))
+                            },
+                        )
+                        .optional()?;
+                    if let Some((
+                        usage_seq,
+                        invocation_count_after,
+                        total_cost_exposed_after,
+                        total_cost_realized_spend_after,
+                    )) = current
+                    {
+                        let event_seq = allocate_budget_replication_seq(&transaction)?;
+                        if retry_follows_rollback {
+                            SqliteBudgetStore::upsert_hold(
+                                &transaction,
+                                hold_id,
+                                capability_id,
+                                grant_index,
+                                cost_units,
+                                cost_units,
+                                HoldDisposition::Open,
+                                authority,
+                            )?;
+                        }
+                        SqliteBudgetStore::append_mutation_event(
+                            &transaction,
+                            event_id,
+                            Some(hold_id),
+                            authority,
+                            capability_id,
+                            grant_index,
+                            BudgetMutationKind::AuthorizeExposure,
+                            Some(true),
+                            event_seq,
+                            Some(usage_seq),
+                            cost_units,
+                            0,
+                            max_invocations,
+                            max_cost_per_invocation,
+                            max_total_cost_units,
+                            invocation_count_after,
+                            total_cost_exposed_after,
+                            total_cost_realized_spend_after,
+                        )?;
+                        transaction.commit()?;
+                        return Ok(true);
+                    }
+                }
+            }
+            if retry_follows_rollback {
+                Self::delete_hold_if_exists(&transaction, hold_id)?;
+            }
+        }
+
         let mut allowed = true;
 
         if let Some(max) = max_invocations {
@@ -1406,7 +1559,83 @@ impl BudgetStore for SqliteBudgetStore {
         );
         if allowed {
             if let Some(hold_id) = hold_id {
-                if let Some(hold) = SqliteBudgetStore::load_hold(&transaction, hold_id)? {
+                let retry_follows_rollback = match event_id {
+                    Some(event_id) => Self::rollback_event_exists(&transaction, event_id)?,
+                    None => false,
+                };
+                if retry_follows_rollback {
+                    if let Some(hold) = SqliteBudgetStore::load_hold(&transaction, hold_id)? {
+                        if hold.capability_id == capability_id
+                            && hold.grant_index == grant_index
+                            && hold.authorized_exposure_units == cost_units
+                            && hold.remaining_exposure_units == cost_units
+                            && hold.invocation_count_debited
+                            && hold.disposition == HoldDisposition::Open
+                            && current_exposed >= cost_units
+                        {
+                            let current = transaction
+                                .query_row(
+                                    r#"
+                                    SELECT seq, invocation_count, total_cost_exposed, total_cost_realized_spend
+                                    FROM capability_grant_budgets
+                                    WHERE capability_id = ?1 AND grant_index = ?2
+                                    "#,
+                                    params![capability_id, grant_index as i64],
+                                    |row| {
+                                        Ok((
+                                            row.get::<_, i64>(0)?.max(0) as u64,
+                                            row.get::<_, i64>(1)?.max(0) as u32,
+                                            row.get::<_, i64>(2)?.max(0) as u64,
+                                            row.get::<_, i64>(3)?.max(0) as u64,
+                                        ))
+                                    },
+                                )
+                                .optional()?;
+                            if let Some((
+                                usage_seq,
+                                invocation_count_after,
+                                total_cost_exposed_after,
+                                total_cost_realized_spend_after,
+                            )) = current
+                            {
+                                let event_seq = allocate_budget_replication_seq(&transaction)?;
+                                SqliteBudgetStore::upsert_hold(
+                                    &transaction,
+                                    hold_id,
+                                    capability_id,
+                                    grant_index,
+                                    cost_units,
+                                    cost_units,
+                                    HoldDisposition::Open,
+                                    authority,
+                                )?;
+                                SqliteBudgetStore::append_mutation_event(
+                                    &transaction,
+                                    event_id,
+                                    Some(hold_id),
+                                    authority,
+                                    capability_id,
+                                    grant_index,
+                                    BudgetMutationKind::AuthorizeExposure,
+                                    Some(true),
+                                    event_seq,
+                                    Some(usage_seq),
+                                    cost_units,
+                                    0,
+                                    max_invocations,
+                                    max_cost_per_invocation,
+                                    max_total_cost_units,
+                                    invocation_count_after,
+                                    total_cost_exposed_after,
+                                    total_cost_realized_spend_after,
+                                )?;
+                                transaction.commit()?;
+                                return Ok(true);
+                            }
+                        }
+                    }
+                    Self::delete_hold_if_exists(&transaction, hold_id)?;
+                } else if let Some(hold) = SqliteBudgetStore::load_hold(&transaction, hold_id)? {
                     if hold.capability_id == capability_id
                         && hold.grant_index == grant_index
                         && hold.authorized_exposure_units == cost_units
@@ -1439,6 +1668,12 @@ impl BudgetStore for SqliteBudgetStore {
                             total_cost_realized_spend_after,
                         )) = current
                         {
+                            if total_cost_exposed_after < cost_units {
+                                transaction.rollback()?;
+                                return Err(BudgetStoreError::Invariant(format!(
+                                    "budget hold `{hold_id}` is not reflected in usage totals"
+                                )));
+                            }
                             SqliteBudgetStore::append_mutation_event(
                                 &transaction,
                                 event_id,
@@ -2511,7 +2746,10 @@ fn initialize_budget_replication_seq(connection: &mut Connection) -> Result<(), 
 fn allocate_budget_replication_seq(
     transaction: &rusqlite::Transaction<'_>,
 ) -> Result<u64, BudgetStoreError> {
-    let next_seq = current_budget_replication_seq(transaction)?.saturating_add(1);
+    let current = current_budget_replication_seq(transaction)?
+        .max(max_budget_usage_seq(transaction)?)
+        .max(max_budget_mutation_event_seq(transaction)?);
+    let next_seq = current.saturating_add(1);
     set_budget_replication_seq(transaction, next_seq)?;
     Ok(next_seq)
 }
@@ -3398,7 +3636,7 @@ mod tests {
         let mut store = SqliteBudgetStore::open(&path).unwrap();
         let hold_id = "hold-cap-lease-0";
         let event_id = "hold-cap-lease-0:authorize";
-        let rollback_event_id = "hold-cap-lease-0:authorize:rollback";
+        let rollback_event_id = "hold-cap-lease-0:authorize:rollback:2";
         let initial = authority("budget-primary", "lease-7", 7);
         let changed = authority("budget-primary", "lease-8", 8);
 
@@ -3452,6 +3690,149 @@ mod tests {
             .find(|record| record.event_id == event_id)
             .expect("replacement authorize event");
         assert_eq!(authorize.authority.as_ref(), Some(&changed));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn budget_store_retry_after_rollback_replaces_orphaned_open_hold_sqlite() {
+        let path = unique_db_path("arc-hold-rollback-orphan-retry");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        let hold_id = "hold-cap-orphan-0";
+        let event_id = "hold-cap-orphan-0:authorize";
+        let rollback_event_id = "hold-cap-orphan-0:authorize:rollback:5";
+        let initial = authority("budget-primary", "lease-7", 7);
+        let changed = authority("budget-primary", "lease-8", 8);
+
+        for _ in 0..3 {
+            assert!(store
+                .try_increment_with_event_id("cap-orphan", 0, Some(10), None)
+                .unwrap());
+        }
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-orphan",
+                0,
+                Some(10),
+                75,
+                Some(100),
+                Some(400),
+                Some(hold_id),
+                Some(event_id),
+                Some(&initial),
+            )
+            .unwrap());
+        store
+            .reverse_charge_cost_with_ids_and_authority(
+                "cap-orphan",
+                0,
+                75,
+                Some(hold_id),
+                Some(rollback_event_id),
+                Some(&initial),
+            )
+            .unwrap();
+
+        let transaction = store
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        transaction
+            .execute(
+                "DELETE FROM budget_mutation_events WHERE event_id = ?1",
+                params![event_id],
+            )
+            .unwrap();
+        SqliteBudgetStore::upsert_hold(
+            &transaction,
+            hold_id,
+            "cap-orphan",
+            0,
+            75,
+            75,
+            HoldDisposition::Open,
+            Some(&initial),
+        )
+        .unwrap();
+        transaction.commit().unwrap();
+
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-orphan",
+                0,
+                Some(10),
+                75,
+                Some(100),
+                Some(400),
+                Some(hold_id),
+                Some(event_id),
+                Some(&changed),
+            )
+            .unwrap());
+
+        let usage = store.get_usage("cap-orphan", 0).unwrap().unwrap();
+        assert_eq!(usage.invocation_count, 4);
+        assert_usage_totals(&usage, 75, 0);
+
+        let events = store
+            .list_mutation_events(20, Some("cap-orphan"), Some(0))
+            .unwrap();
+        let rollback = events
+            .iter()
+            .find(|record| record.event_id == rollback_event_id)
+            .expect("rollback event");
+        let retry = events
+            .iter()
+            .find(|record| record.event_id == event_id)
+            .expect("retry authorize event");
+        assert!(retry.event_seq > rollback.event_seq);
+        assert_eq!(retry.authority.as_ref(), Some(&changed));
+
+        let transaction = store
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+            .unwrap()
+            .expect("retry open hold");
+        assert_eq!(hold.remaining_exposure_units, 75);
+        assert_eq!(hold.disposition, HoldDisposition::Open);
+        drop(transaction);
+
+        let transaction = store
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        transaction
+            .execute(
+                "DELETE FROM budget_mutation_events WHERE event_id = ?1",
+                params![event_id],
+            )
+            .unwrap();
+        transaction.commit().unwrap();
+
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-orphan",
+                0,
+                Some(10),
+                75,
+                Some(100),
+                Some(400),
+                Some(hold_id),
+                Some(event_id),
+                Some(&changed),
+            )
+            .unwrap());
+        let events = store
+            .list_mutation_events(20, Some("cap-orphan"), Some(0))
+            .unwrap();
+        let replayed_retry = events
+            .iter()
+            .find(|record| record.event_id == event_id)
+            .expect("replayed retry authorize event");
+        assert_eq!(replayed_retry.allowed, Some(true));
+        assert_eq!(replayed_retry.usage_seq, Some(usage.seq));
 
         let _ = fs::remove_file(path);
     }

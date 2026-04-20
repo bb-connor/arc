@@ -12,6 +12,8 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn allow_receipt(id: &str) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let action = ToolCallAction::from_parameters(serde_json::json!({"cmd": "ls"}))
+        .expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -19,10 +21,7 @@ fn allow_receipt(id: &str) -> ArcReceipt {
             capability_id: "cap-dd-allow".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({"cmd": "ls"}),
-                parameter_hash: "h1".to_string(),
-            },
+            action,
             decision: Decision::Allow,
             content_hash: "c1".to_string(),
             policy_hash: "p1".to_string(),
@@ -39,6 +38,8 @@ fn allow_receipt(id: &str) -> ArcReceipt {
 
 fn deny_receipt(id: &str, guard: &str) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let action = ToolCallAction::from_parameters(serde_json::json!({"cmd": "cat /etc/shadow"}))
+        .expect("hash receipt parameters");
     ArcReceipt::sign(
         ArcReceiptBody {
             id: id.to_string(),
@@ -46,10 +47,7 @@ fn deny_receipt(id: &str, guard: &str) -> ArcReceipt {
             capability_id: "cap-dd-deny".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({"cmd": "cat /etc/shadow"}),
-                parameter_hash: "h2".to_string(),
-            },
+            action,
             decision: Decision::Deny {
                 reason: "file not permitted".to_string(),
                 guard: guard.to_string(),

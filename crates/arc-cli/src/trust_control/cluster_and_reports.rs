@@ -884,10 +884,10 @@ fn budget_authorize_compensation_event_id(
     budget_seq: u64,
 ) -> String {
     if let Some(event_id) = payload.event_id.as_deref() {
-        return format!("{event_id}:rollback");
+        return format!("{event_id}:rollback:{budget_seq}");
     }
     if let Some(hold_id) = payload.hold_id.as_deref() {
-        return format!("{hold_id}:rollback");
+        return format!("{hold_id}:rollback:{budget_seq}");
     }
     format!(
         "rollback:{}:{}:{}",
@@ -1075,11 +1075,11 @@ fn budget_write_quorum_commit_view_locked(
 
 fn budget_write_quorum_commit_timeout(sync_interval: Duration) -> Duration {
     let scaled = sync_interval
-        .checked_mul(8)
-        .unwrap_or_else(|| Duration::from_secs(10));
+        .checked_mul(20)
+        .unwrap_or_else(|| Duration::from_secs(30));
     scaled
-        .max(Duration::from_secs(2))
-        .min(Duration::from_secs(10))
+        .max(Duration::from_secs(5))
+        .min(Duration::from_secs(30))
 }
 
 async fn wait_for_budget_write_quorum_commit(
@@ -2439,6 +2439,17 @@ fn clear_cluster_peer_auth_failures(node_id: &str) {
     }
 }
 
+fn cluster_peer_auth_unverified_failure_key(
+    node_id: &str,
+    endpoint: &str,
+    issued_at: i64,
+    term: Option<u64>,
+    signature: &str,
+) -> String {
+    let payload = format!("{node_id}\0{endpoint}\0{issued_at}\0{term:?}\0{signature}");
+    format!("unverified:{}", sha256_hex(payload.as_bytes()))
+}
+
 fn cluster_peer_auth_signature(
     service_token: &str,
     node_id: &str,
@@ -2491,6 +2502,8 @@ fn validate_cluster_peer_auth(
             })
         })
         .transpose()?;
+    let unverified_failure_key =
+        cluster_peer_auth_unverified_failure_key(&node_id, endpoint, issued_at, term, signature);
     let allowlisted = config
         .peer_urls
         .iter()
@@ -2503,10 +2516,30 @@ fn validate_cluster_peer_auth(
         ));
     }
     let now = unix_timestamp_now() as i64;
+    let expected =
+        cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
+            .map_err(|error| {
+                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            })?;
+    if signature != expected {
+        if cluster_peer_auth_is_rate_limited(&unverified_failure_key, now as u64) {
+            let mut response = plain_http_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "cluster peer authentication temporarily rate limited after repeated invalid signatures",
+            );
+            response.headers_mut().insert(
+                axum::http::header::RETRY_AFTER,
+                HeaderValue::from_static("60"),
+            );
+            return Err(response);
+        }
+        record_cluster_peer_auth_failure(&unverified_failure_key);
+        return Err(cluster_peer_auth_error());
+    }
     if cluster_peer_auth_is_rate_limited(&node_id, now as u64) {
         let mut response = plain_http_error(
             StatusCode::TOO_MANY_REQUESTS,
-            "cluster peer authentication temporarily rate limited after repeated failures",
+            "cluster peer authentication temporarily rate limited after repeated verified failures",
         );
         response.headers_mut().insert(
             axum::http::header::RETRY_AFTER,
@@ -2527,15 +2560,6 @@ fn validate_cluster_peer_auth(
             StatusCode::UNAUTHORIZED,
             "cluster peer auth timestamp expired outside the allowed skew window",
         ));
-    }
-    let expected =
-        cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
-    if signature != expected {
-        record_cluster_peer_auth_failure(&node_id);
-        return Err(cluster_peer_auth_error());
     }
     clear_cluster_peer_auth_failures(&node_id);
     Ok(ClusterPeerAuthContext {
@@ -4184,7 +4208,13 @@ mod cluster_and_reports_tests {
         )
         .expect_err("invalid cluster peer signature should fail");
         assert_eq!(invalid_peer.status(), StatusCode::UNAUTHORIZED);
-        clear_cluster_peer_auth_failures("http://node-b");
+        clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
+            "http://node-b",
+            INTERNAL_CLUSTER_STATUS_PATH,
+            issued_at,
+            None,
+            "deadbeef",
+        ));
 
         let expired_issued_at = issued_at - (CLUSTER_AUTH_MAX_SKEW_SECS as i64) - 1;
         let expired_signature = cluster_peer_auth_signature(
@@ -4236,6 +4266,24 @@ mod cluster_and_reports_tests {
         )
         .expect_err("repeated failures should trip rate limit");
         assert_eq!(limited_peer.status(), StatusCode::TOO_MANY_REQUESTS);
+        headers.insert(
+            CLUSTER_AUTH_SIGNATURE_HEADER,
+            HeaderValue::from_str(&signature).expect("signature header"),
+        );
+        let peer_after_spoofed_failures = validate_cluster_peer_auth(
+            &headers,
+            &cluster_state.config,
+            INTERNAL_CLUSTER_STATUS_PATH,
+        )
+        .expect("spoofed invalid signatures must not rate limit the verified peer");
+        assert_eq!(peer_after_spoofed_failures.node_id, "http://node-b");
+        clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
+            "http://node-b",
+            INTERNAL_CLUSTER_STATUS_PATH,
+            issued_at,
+            None,
+            "deadbeef",
+        ));
         clear_cluster_peer_auth_failures("http://node-b");
 
         let mut request = MeteredBillingReconciliationUpdateRequest {

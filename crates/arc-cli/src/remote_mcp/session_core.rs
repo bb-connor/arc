@@ -1644,13 +1644,14 @@ fn derive_resume_record_integrity_seed(
             .map_err(|error| CliError::Other(error.to_string()))?;
         return Ok(Some(keypair.seed_bytes()));
     }
-    for seed_path in [
+    if let Some(seed_path) = [
         config.authority_seed_path.as_deref(),
         config.auth_server_seed_path.as_deref(),
         config.identity_federation_seed_path.as_deref(),
     ]
     .into_iter()
     .flatten()
+    .next()
     {
         let keypair = load_or_create_authority_keypair(seed_path)?;
         return Ok(Some(keypair.seed_bytes()));

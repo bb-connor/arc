@@ -87,20 +87,20 @@ impl ArcKernel {
                 oracle_evidence: None,
                 attempted_cost: Some(attempted_cost),
             };
+            let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
+            let deny_extra_metadata =
+                merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
             let request_metadata = request_receipt_metadata(
                 request,
                 self.attestation_trust_policy.as_ref(),
                 timestamp,
-                extra_metadata.as_ref(),
+                deny_extra_metadata.as_ref(),
             )?;
 
             let metadata = merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_attribution_metadata(cap, Some(mg.index)),
-                        Some(serde_json::json!({ "financial": financial_meta })),
-                    ),
-                    extra_metadata.clone(),
+                    receipt_attribution_metadata(cap, Some(mg.index)),
+                    deny_extra_metadata,
                 ),
                 request_metadata,
             );
@@ -197,11 +197,14 @@ impl ArcKernel {
             oracle_evidence: None,
             attempted_cost: Some(charge.cost_charged),
         };
+        let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
+        let deny_extra_metadata =
+            merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
         let request_metadata = request_receipt_metadata(
             request,
             self.attestation_trust_policy.as_ref(),
             timestamp,
-            extra_metadata.as_ref(),
+            deny_extra_metadata.as_ref(),
         )?;
 
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -221,11 +224,8 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    merge_metadata_objects(
-                        receipt_attribution_metadata(cap, Some(charge.grant_index)),
-                        Some(serde_json::json!({ "financial": financial_meta })),
-                    ),
-                    extra_metadata,
+                    receipt_attribution_metadata(cap, Some(charge.grant_index)),
+                    deny_extra_metadata,
                 ),
                 request_metadata,
             ),

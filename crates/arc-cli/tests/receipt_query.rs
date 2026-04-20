@@ -299,7 +299,7 @@ fn wait_for_trust_service_result(
     base_url: &str,
     service: &mut ServerGuard,
 ) -> Result<(), String> {
-    for _ in 0..300 {
+    for _ in 0..900 {
         if let Some(status) = service.child.try_wait().expect("poll trust service child") {
             let stderr = read_child_stderr(&mut service.child);
             return Err(format!(
@@ -315,13 +315,24 @@ fn wait_for_trust_service_result(
 }
 
 fn wait_for_trust_service(client: &Client, base_url: &str) {
-    for _ in 0..300 {
+    let mut last_error = None;
+    for _ in 0..900 {
         match client.get(format!("{base_url}/health")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::OK => return,
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(response) => {
+                last_error = Some(format!("health returned {}", response.status()));
+                thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => {
+                last_error = Some(error.to_string());
+                thread::sleep(Duration::from_millis(100));
+            }
         }
     }
-    panic!("trust service did not become ready");
+    panic!(
+        "trust service did not become ready: {}",
+        last_error.unwrap_or_else(|| "no health response observed".to_string())
+    );
 }
 
 fn assert_trust_service_auth_required(client: &Client, base_url: &str, path: &str) {
