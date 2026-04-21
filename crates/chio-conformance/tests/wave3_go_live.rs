@@ -43,12 +43,12 @@ fn python3_supports_arc_sdk() -> bool {
 }
 
 fn ensure_arc_binary(repo_root: &PathBuf) {
-    let chio_binary = repo_root.join("target/debug/arc");
+    let chio_binary = repo_root.join("target/debug/chio");
     if chio_binary.exists() {
         return;
     }
 
-    let chio_binary = repo_root.join("target/debug/arc");
+    let chio_binary = repo_root.join("target/debug/chio");
     if chio_binary.exists() {
         return;
     }

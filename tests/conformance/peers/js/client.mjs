@@ -1374,7 +1374,7 @@ function scenarioResult(scenario, durationMs, status, assertions) {
   return {
     scenarioId: scenario.id,
     peer: "js",
-    peerRole: "client_to_arc_server",
+    peerRole: "client_to_chio_server",
     deploymentMode: "remote_http",
     transport: "streamable-http",
     specVersion: scenario.specVersions?.[0] ?? "2025-11-25",

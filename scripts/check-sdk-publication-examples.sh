@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-chio_bin="${repo_root}/target/debug/arc"
+chio_bin="${repo_root}/target/debug/chio"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-sdk-examples.XXXXXX")"
 venv_dir="${work_dir}/python-venv"
 auth_token="demo-token"

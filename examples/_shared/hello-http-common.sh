@@ -56,7 +56,7 @@ PY
 }
 
 ensure_arc_bin() {
-  local chio_bin="${ROOT}/target/debug/arc"
+  local chio_bin="${ROOT}/target/debug/chio"
   if [[ ! -x "${chio_bin}" ]]; then
     (cd "${ROOT}" && cargo build --bin arc >/dev/null)
   fi

@@ -14,7 +14,7 @@ SDK_PYTHON_SRC = Path(__file__).resolve().parents[4] / "packages" / "sdk" / "chi
 if str(SDK_PYTHON_SRC) not in sys.path:
     sys.path.insert(0, str(SDK_PYTHON_SRC))
 
-from arc import (
+from chio import (
     NestedCallbackRouter,
     ChioClient,
     ChioSession,
@@ -24,8 +24,8 @@ from arc import (
     roots_list_result,
     sampling_text_result,
 )
-from arc.models import TransportResponse
-from arc.transport import (
+from chio.models import TransportResponse
+from chio.transport import (
     post_rpc as sdk_post_rpc,
     terminal_message as sdk_terminal_message,
 )
@@ -126,7 +126,7 @@ def scenario_result(scenario: dict, duration_ms: int, status: str, assertions: l
     return {
         "scenarioId": scenario["id"],
         "peer": "python",
-        "peerRole": "client_to_arc_server",
+        "peerRole": "client_to_chio_server",
         "deploymentMode": "remote_http",
         "transport": "streamable-http",
         "specVersion": scenario.get("specVersions", ["2025-11-25"])[0],

@@ -4,7 +4,7 @@ set -euo pipefail
 EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 
-CHIO_BIN="${ROOT}/target/debug/arc"
+CHIO_BIN="${ROOT}/target/debug/chio"
 if [[ ! -x "${CHIO_BIN}" ]]; then
   (cd "${ROOT}" && cargo build --bin arc >/dev/null)
 fi

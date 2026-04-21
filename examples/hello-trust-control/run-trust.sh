@@ -3,7 +3,7 @@ set -euo pipefail
 
 EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
-CHIO_BIN="${CHIO_BIN:-${ROOT}/target/debug/arc}"
+CHIO_BIN="${CHIO_BIN:-${ROOT}/target/debug/chio}"
 PORT="${HELLO_TRUST_CONTROL_PORT:-8051}"
 SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
 STATE_DIR="${HELLO_TRUST_CONTROL_STATE_DIR:-${EXAMPLE_ROOT}/.artifacts/manual-state}"

@@ -186,7 +186,7 @@ fn ensure_arc_executable(
     repo_root: &Path,
     cargo_binary: &OsString,
 ) -> Result<PathBuf, RunnerError> {
-    let chio_executable = repo_root.join("target/debug/arc");
+    let chio_executable = repo_root.join("target/debug/chio");
     if chio_executable.exists() {
         return Ok(chio_executable);
     }

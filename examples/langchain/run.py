@@ -4,7 +4,7 @@ import json
 import os
 
 import httpx
-from arc import ChioClient, ReceiptQueryClient
+from chio import ChioClient, ReceiptQueryClient
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 

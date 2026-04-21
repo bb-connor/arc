@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release --locked -p chio-cli --bin arc \
  && mkdir -p /out \
- && cp /build/target/release/arc /out/chio-sidecar
+ && cp /build/target/release/chio /out/chio-sidecar
 
 # -----------------------------------------------------------------------------
 # Stage 2: healthcheck helper (distroless has no shell or curl).
