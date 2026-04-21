@@ -71,11 +71,11 @@
       "witnesses": [
         "sdks/typescript/packages/node-http/src/interceptor.ts",
         "sdks/typescript/packages/express/src/middleware.ts",
-        "sdks/go/chio-go-http/arc.go",
+        "sdks/go/chio-go-http/chio.go",
         "sdks/python/chio-asgi/src/chio_asgi/middleware.py",
         "sdks/python/chio-django/src/chio_django/middleware.py",
         "sdks/python/chio-fastapi/src/chio_fastapi/dependencies.py",
-        "sdks/jvm/chio-spring-boot/src/main/kotlin/io/backbay/arc/ChioFilter.kt",
+        "sdks/jvm/chio-spring-boot/src/main/kotlin/io/backbay/chio/ChioFilter.kt",
         "sdks/dotnet/ChioMiddleware/src/ChioMiddlewareExtensions.cs"
       ]
     },
