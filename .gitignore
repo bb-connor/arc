@@ -52,3 +52,17 @@ crates/arc-cli/dashboard/dist/
 formal/lean4/**/.lake/
 **/.lake/build/
 *.egg-info/
+
+# Build outputs (flagged by scripts/check-release-inputs.sh)
+packages/sdk/chio-ts/dist/
+packages/sdk/chio-ts/node_modules/
+packages/sdk/chio-py/build/
+packages/sdk/chio-py/src/*.egg-info/
+crates/chio-cli/dashboard/dist/
+crates/chio-cli/dashboard/node_modules/
+tests/conformance/results/generated/
+tests/conformance/reports/generated/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
