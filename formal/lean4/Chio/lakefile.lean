@@ -9,6 +9,3 @@ package chio where
 @[default_target]
 lean_lib Chio where
   srcDir := "."
-
-lean_lib Pact where
-  srcDir := "."

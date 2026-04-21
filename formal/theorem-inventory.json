@@ -1,11 +1,11 @@
 {
   "schema": "chio.theorem-inventory.v1",
-  "rootModule": "formal/lean4/Pact/Chio.lean",
+  "rootModule": "formal/lean4/Chio/Chio.lean",
   "assumptions": [
     {
       "id": "assumption.crypto.verify_capability_signature",
       "leanName": "Chio.Core.verifyCapabilitySignature",
-      "file": "formal/lean4/Pact/Pact/Core/Revocation.lean",
+      "file": "formal/lean4/Chio/Chio/Core/Revocation.lean",
       "kind": "axiom",
       "rootImported": true,
       "claimClass": "audited_axiom",
@@ -16,7 +16,7 @@
     {
       "id": "core.scope.empty_isSubsetOf",
       "leanName": "Chio.Core.ChioScope.empty_isSubsetOf",
-      "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
+      "file": "formal/lean4/Chio/Chio/Core/Scope.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -26,7 +26,7 @@
     {
       "id": "core.tool_grant.isSubsetOf_refl",
       "leanName": "Chio.Core.ToolGrant.isSubsetOf_refl",
-      "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
+      "file": "formal/lean4/Chio/Chio/Core/Scope.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -36,7 +36,7 @@
     {
       "id": "spec.capability_monotonicity",
       "leanName": "Chio.Spec.capability_monotonicity",
-      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "file": "formal/lean4/Chio/Chio/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -46,7 +46,7 @@
     {
       "id": "spec.empty_scope_monotonicity",
       "leanName": "Chio.Spec.empty_scope_monotonicity",
-      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "file": "formal/lean4/Chio/Chio/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -56,7 +56,7 @@
     {
       "id": "spec.scope_budgets_nonnegative",
       "leanName": "Chio.Spec.scope_budgets_nonnegative",
-      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "file": "formal/lean4/Chio/Chio/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -66,7 +66,7 @@
     {
       "id": "proof.list_isSubsetOf_trans",
       "leanName": "Chio.Proofs.list_isSubsetOf_trans",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -76,7 +76,7 @@
     {
       "id": "proof.scope_subset_of_grants_subset",
       "leanName": "Chio.Proofs.scope_subset_of_grants_subset",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -86,7 +86,7 @@
     {
       "id": "proof.wildcard_subsumes",
       "leanName": "Chio.Proofs.wildcard_subsumes",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -96,7 +96,7 @@
     {
       "id": "proof.reduced_budget_is_subset",
       "leanName": "Chio.Proofs.reduced_budget_is_subset",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -106,7 +106,7 @@
     {
       "id": "proof.added_constraint_is_subset",
       "leanName": "Chio.Proofs.added_constraint_is_subset",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -116,7 +116,7 @@
     {
       "id": "proof.delegation_chain_integrity",
       "leanName": "Chio.Proofs.delegation_chain_integrity",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -126,7 +126,7 @@
     {
       "id": "proof.applyProof_append",
       "leanName": "Chio.Proofs.applyProof_append",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -136,7 +136,7 @@
     {
       "id": "proof.membership_proof_sound",
       "leanName": "Chio.Proofs.membership_proof_sound",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -146,7 +146,7 @@
     {
       "id": "proof.membership_proof_verifies",
       "leanName": "Chio.Proofs.membership_proof_verifies",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -156,7 +156,7 @@
     {
       "id": "proof.checkpoint_consistency",
       "leanName": "Chio.Proofs.checkpoint_consistency",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -166,7 +166,7 @@
     {
       "id": "proof.receipt_sign_then_verify",
       "leanName": "Chio.Proofs.receipt_sign_then_verify",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -176,7 +176,7 @@
     {
       "id": "proof.receipt_immutability",
       "leanName": "Chio.Proofs.receipt_immutability",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",

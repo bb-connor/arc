@@ -20,10 +20,8 @@ For new policy authoring, use HushSpec.
 
 - `examples/policies/canonical-hushspec.yaml` is the recommended starting point.
 - `examples/policies/hushspec-guard-heavy.yaml` exercises the full shipped guard surface.
-- the legacy PACT YAML format remains supported as a compatibility input for existing operators and tests, but it is no longer the recommended authoring path for new work
 
-Both inputs compile into the same runtime policy materialization inside `chio-cli`.
-The difference is product guidance, not an execution split.
+HushSpec is the only documented policy authoring path for new Chio deployments.
 
 ## Migration path: wrapped MCP to native Chio
 

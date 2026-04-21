@@ -299,8 +299,8 @@ phase 44 is allowed to rely on.
 | --- | --- | --- |
 | executable spec drift versus current `ChioScope` subset behavior | closed in phase 43 | `formal/diff-tests`, `cargo test -p chio-formal-diff-tests` |
 | protocol lacked an explicit distinction between formal, empirical, and qualification evidence | closed in phase 43 | `spec/PROTOCOL.md`, this audit, `docs/release/QUALIFICATION.md` |
-| Lean root and comments implied stronger proof closure than the repo actually ships | closed in phase 43 | `formal/lean4/Pact/Pact.lean`, `formal/lean4/Pact/Pact/Spec/Properties.lean` |
-| standalone Lean proof completion for every current Chio surface | consciously deferred | `formal/lean4/Pact/Pact/Proofs/Monotonicity.lean` still contains `sorry` and is not part of the release gate |
+| Lean root and comments implied stronger proof closure than the repo actually ships | closed in phase 43 | `formal/lean4/Chio/Chio.lean`, `formal/lean4/Chio/Chio/Spec/Properties.lean` |
+| standalone Lean proof completion for every current Chio surface | consciously deferred | `formal/lean4/Chio/Chio/Proofs/Monotonicity.lean` covers the bounded model only and is not a Rust refinement proof |
 | theorem-prover coverage for governed approvals, payment rails, federation maturity, and runtime assurance | consciously deferred | launch claims rely on runtime tests, integration tests, and qualification rather than Lean proofs |
 
 ### Accepted Launch Evidence Boundary

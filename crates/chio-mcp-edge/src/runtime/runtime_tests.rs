@@ -1000,11 +1000,6 @@ fn initialize_then_initialized_enters_ready_state() {
         true
     );
     assert_eq!(
-        initialize["result"]["capabilities"]["experimental"]
-            [LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY]["toolCallChunkNotifications"],
-        true
-    );
-    assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
             ["supportedProtocolVersions"],
         json!([MCP_PROTOCOL_VERSION])
@@ -1585,11 +1580,6 @@ fn tools_call_streams_chunks_via_experimental_notifications_when_negotiated() {
         response["result"]["structuredContent"][CHIO_TOOL_STREAM_KEY]["totalChunks"],
         2
     );
-    assert_eq!(
-        response["result"]["structuredContent"][LEGACY_PACT_TOOL_STREAM_KEY]["mode"],
-        "notification_stream"
-    );
-
     let notifications = edge.take_pending_notifications();
     assert_eq!(notifications.len(), 2);
     assert_eq!(
@@ -2024,49 +2014,6 @@ fn serve_stdio_emits_stream_chunk_notifications_before_final_tool_response() {
         responses[3]["result"]["structuredContent"][CHIO_TOOL_STREAM_KEY]["mode"],
         "notification_stream"
     );
-}
-
-#[test]
-fn tools_call_streams_chunks_when_legacy_extension_alias_is_negotiated() {
-    let mut edge = make_streaming_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {
-                "experimental": {
-                    "pactToolStreaming": {
-                        "toolCallChunkNotifications": true
-                    }
-                }
-            }
-        }
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
-
-    let response = edge
-        .handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": { "name": "stream_file", "arguments": {} }
-        }))
-        .unwrap();
-
-    assert_eq!(
-        response["result"]["structuredContent"][CHIO_TOOL_STREAM_KEY]["mode"],
-        "notification_stream"
-    );
-    assert_eq!(
-        response["result"]["structuredContent"][LEGACY_PACT_TOOL_STREAM_KEY]["mode"],
-        "notification_stream"
-    );
-    assert_eq!(edge.take_pending_notifications().len(), 2);
 }
 
 #[test]

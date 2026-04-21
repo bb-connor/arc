@@ -47,11 +47,9 @@ const CHIO_ERROR_PROTOCOL_VERSION_UNSUPPORTED: i64 = 1000;
 const CHIO_ERROR_INVALID_REQUEST_SHAPE: i64 = 1002;
 const CLIENT_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
-const LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY: &str = "pactToolStreaming";
 const CHIO_PROTOCOL_CAPABILITY_KEY: &str = "chioProtocol";
 const CHIO_ERROR_REGISTRY_SCHEMA: &str = "chio.error-registry.v1";
 const CHIO_TOOL_STREAM_KEY: &str = "chioToolStream";
-const LEGACY_PACT_TOOL_STREAM_KEY: &str = "pactToolStream";
 const CHIO_TOOL_STREAMING_NOTIFICATION_METHOD: &str = "notifications/chio/tool_call_chunk";
 const TASK_POLL_INTERVAL_MILLIS: u64 = 500;
 const MAX_BACKGROUND_TASKS_PER_TICK: usize = 8;
@@ -1042,12 +1040,6 @@ impl ChioMcpEdge {
         let mut experimental = serde_json::Map::new();
         experimental.insert(
             CHIO_TOOL_STREAMING_CAPABILITY_KEY.to_string(),
-            json!({
-                "toolCallChunkNotifications": true,
-            }),
-        );
-        experimental.insert(
-            LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY.to_string(),
             json!({
                 "toolCallChunkNotifications": true,
             }),

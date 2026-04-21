@@ -102,7 +102,6 @@ const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
 const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
 const CHIO_RESPONSE_MODE_HEADER: &str = "x-chio-mcp-response-mode";
 const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
-const LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY: &str = "pactToolStreaming";
 const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
 const DEFAULT_NOTIFICATION_STREAM_IDLE_MILLIS: u64 = 100;
 const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;

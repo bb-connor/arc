@@ -1009,11 +1009,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(Value::as_bool)
             .unwrap_or(false),
         supports_chio_tool_streaming: experimental
-            .and_then(|value| {
-                value
-                    .get(CHIO_TOOL_STREAMING_CAPABILITY_KEY)
-                    .or_else(|| value.get(LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY))
-            })
+            .and_then(|value| value.get(CHIO_TOOL_STREAMING_CAPABILITY_KEY))
             .and_then(|value| value.get("toolCallChunkNotifications"))
             .and_then(Value::as_bool)
             .unwrap_or(false),

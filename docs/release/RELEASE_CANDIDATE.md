@@ -500,7 +500,8 @@ The current Chio candidate does not claim:
   `arc trust serve`
 - new policy work should start from
   `examples/policies/canonical-hushspec.yaml`
-- existing deployments may keep using legacy PACT YAML as a compatibility input
+- existing deployments should migrate policy authoring to HushSpec before
+  adopting this candidate
 - Chio-branded schema issuance is now primary, while legacy `arc.*` artifacts
   remain verifiable/importable
 - `did:chio` remains the currently shipped canonical DID method and provenance

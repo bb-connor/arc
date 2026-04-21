@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.elan
-          key: ${{ runner.os }}-elan-${{ env.ARC_ELAN_VERSION }}-${{ env.ARC_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
+          key: ${{ runner.os }}-elan-${{ env.ARC_ELAN_VERSION }}-${{ env.ARC_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Chio/lean-toolchain') }}
 
       - name: Install Lean 4 toolchain
         if: steps.elan-cache.outputs.cache-hit != 'true'
@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
+          toolchain="$(tr -d '\r\n' < formal/lean4/Chio/lean-toolchain)"
           if ! "$HOME/.elan/bin/elan" toolchain list | tr -d '\r' | grep -Fq "$toolchain"; then
             for attempt in 1 2 3 4 5; do
               if "$HOME/.elan/bin/elan" toolchain install "$toolchain"; then
@@ -72,7 +72,7 @@ jobs:
             done
           fi
           (
-            cd formal/lean4/Pact
+            cd formal/lean4/Chio
             "$HOME/.elan/bin/lake" --version
           )
 

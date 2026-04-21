@@ -136,8 +136,7 @@ checkpoint, and evidence-export workflows continue to apply.
 Compatibility rule:
 
 - additive fields may appear in JSON responses and signed artifacts
-- unknown schema identifiers for schema-tagged artifacts must be rejected,
-  except for explicitly supported legacy Pact-era aliases
+- unknown schema identifiers for schema-tagged artifacts must be rejected
 - fail-closed behavior is part of the protocol contract, not an implementation
   detail
 

@@ -190,8 +190,7 @@ pub(super) fn collapsed_stream_tool_result(
 pub(super) fn tool_stream_structured_content(stream: serde_json::Map<String, Value>) -> Value {
     let stream_value = Value::Object(stream);
     let mut structured_content = serde_json::Map::new();
-    structured_content.insert(CHIO_TOOL_STREAM_KEY.to_string(), stream_value.clone());
-    structured_content.insert(LEGACY_PACT_TOOL_STREAM_KEY.to_string(), stream_value);
+    structured_content.insert(CHIO_TOOL_STREAM_KEY.to_string(), stream_value);
     Value::Object(structured_content)
 }
 
@@ -767,11 +766,7 @@ pub(super) fn parse_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(Value::as_bool)
             .unwrap_or(false),
         supports_chio_tool_streaming: experimental
-            .and_then(|value| {
-                value
-                    .get(CHIO_TOOL_STREAMING_CAPABILITY_KEY)
-                    .or_else(|| value.get(LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY))
-            })
+            .and_then(|value| value.get(CHIO_TOOL_STREAMING_CAPABILITY_KEY))
             .and_then(|value| value.get("toolCallChunkNotifications"))
             .and_then(Value::as_bool)
             .unwrap_or(false),

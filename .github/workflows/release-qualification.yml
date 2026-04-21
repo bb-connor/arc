@@ -64,10 +64,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
+          toolchain="$(tr -d '\r\n' < formal/lean4/Chio/lean-toolchain)"
           "$HOME/.elan/bin/elan" toolchain install "$toolchain"
           (
-            cd formal/lean4/Pact
+            cd formal/lean4/Chio
             "$HOME/.elan/bin/lake" --version
           )
 

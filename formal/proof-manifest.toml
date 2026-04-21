@@ -6,11 +6,11 @@ boundary_doc = "docs/architecture/CHIO_RUNTIME_BOUNDARIES.md"
 spec_anchor = "spec/PROTOCOL.md#55-verified-core-boundary"
 
 root_modules = [
-  "formal/lean4/Pact/Chio.lean",
-  "formal/lean4/Pact/Chio/Core/Capability.lean",
-  "formal/lean4/Pact/Chio/Core/Scope.lean",
-  "formal/lean4/Pact/Chio/Core/Receipt.lean",
-  "formal/lean4/Pact/Chio/Core/Revocation.lean",
+  "formal/lean4/Chio/Chio.lean",
+  "formal/lean4/Chio/Chio/Core/Capability.lean",
+  "formal/lean4/Chio/Chio/Core/Scope.lean",
+  "formal/lean4/Chio/Chio/Core/Receipt.lean",
+  "formal/lean4/Chio/Chio/Core/Revocation.lean",
 ]
 
 gate_commands = [
