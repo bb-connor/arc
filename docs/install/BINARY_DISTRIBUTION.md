@@ -18,7 +18,7 @@ Container images are published for `linux/amd64` and `linux/arm64`.
 ## Install via Homebrew
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
+curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/chio/releases/latest/download/arc.rb
 brew install --formula /tmp/arc.rb
 arc --version
 ```
@@ -61,14 +61,14 @@ case "$OS" in
   *) echo "unsupported OS: $OS"; exit 1 ;;
 esac
 
-ARCHIVE="arc-${VERSION}-${TRIPLE}.tar.gz"
-BASE="https://github.com/bb-connor/arc/releases/download/v${VERSION}"
+ARCHIVE="chio--${TRIPLE}.tar.gz"
+BASE="https://github.com/bb-connor/chio/releases/download/v${VERSION}"
 
 curl -fsSL "${BASE}/${ARCHIVE}"        -o "${ARCHIVE}"
 curl -fsSL "${BASE}/${ARCHIVE}.sha256" -o "${ARCHIVE}.sha256"
 shasum -a 256 -c "${ARCHIVE}.sha256"
 tar xf "${ARCHIVE}"
-sudo install -m 0755 "arc-${VERSION}-${TRIPLE}/arc" /usr/local/bin/arc
+sudo install -m 0755 "chio--${TRIPLE}/chio" /usr/local/bin/arc
 arc --version
 ```
 
@@ -86,7 +86,7 @@ Verify a downloaded archive with:
 shasum -a 256 -c arc-0.1.0-aarch64-apple-darwin.tar.gz.sha256
 
 # All archives at once
-curl -fsSL https://github.com/bb-connor/arc/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
+curl -fsSL https://github.com/bb-connor/chio/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
 shasum -a 256 -c SHA256SUMS
 ```
 

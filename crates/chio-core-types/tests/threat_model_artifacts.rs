@@ -120,13 +120,13 @@ fn threat_model_transport_requirements_cover_required_surfaces() {
     let expected_surfaces = BTreeSet::from([
         "hosted_mcp_http".to_string(),
         "kernel_to_tool_transport".to_string(),
-        "native_arc_direct".to_string(),
+        "native_chio_direct".to_string(),
         "trust_control_http".to_string(),
     ]);
     let seen_surfaces = profiles.keys().cloned().collect::<BTreeSet<_>>();
     assert_eq!(seen_surfaces, expected_surfaces);
 
-    let native = profiles.get("native_arc_direct").expect("native profile");
+    let native = profiles.get("native_chio_direct").expect("native profile");
     assert_eq!(native.tls, "required_on_cross_host_or_untrusted_networks");
     assert_eq!(
         native.dpop,

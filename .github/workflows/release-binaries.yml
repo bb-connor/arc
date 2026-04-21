@@ -255,12 +255,12 @@ jobs:
       - name: Render Homebrew formula
         shell: bash
         env:
-          ARC_GITHUB_REPO: ${{ github.repository }}
+          CHIO_GITHUB_REPO: ${{ github.repository }}
           ARC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           version="${ARC_VERSION}"
-          repo="${ARC_GITHUB_REPO}"
+          repo="${CHIO_GITHUB_REPO}"
           formula_src="Homebrew/arc.rb.tmpl"
           formula_out="release/arc.rb"
           if [[ ! -f "$formula_src" ]]; then
@@ -291,16 +291,16 @@ jobs:
           x86_mac=$(derive_sha256 "release/arc-${version}-x86_64-apple-darwin.tar.gz")
           arm_lin=$(derive_sha256 "release/arc-${version}-aarch64-unknown-linux-gnu.tar.gz")
           x86_lin=$(derive_sha256 "release/arc-${version}-x86_64-unknown-linux-gnu.tar.gz")
-          sed -e "s|__ARC_SHA256_DARWIN_ARM64__|${arm_mac}|" \
-              -e "s|__ARC_SHA256_DARWIN_AMD64__|${x86_mac}|" \
-              -e "s|__ARC_SHA256_LINUX_ARM64__|${arm_lin}|" \
-              -e "s|__ARC_SHA256_LINUX_AMD64__|${x86_lin}|" \
-              -e "s|__ARC_GITHUB_REPO__|${repo}|" \
-              -e "s|__ARC_VERSION__|${version}|" \
+          sed -e "s|__CHIO_SHA256_DARWIN_ARM64__|${arm_mac}|" \
+              -e "s|__CHIO_SHA256_DARWIN_AMD64__|${x86_mac}|" \
+              -e "s|__CHIO_SHA256_LINUX_ARM64__|${arm_lin}|" \
+              -e "s|__CHIO_SHA256_LINUX_AMD64__|${x86_lin}|" \
+              -e "s|__CHIO_GITHUB_REPO__|${repo}|" \
+              -e "s|__CHIO_VERSION__|${version}|" \
               "$formula_src" > "$formula_out"
-          if grep -q "__ARC_" "$formula_out"; then
+          if grep -q "__CHIO_" "$formula_out"; then
             echo "::error::rendered Homebrew formula still contains template placeholders" >&2
-            grep -n "__ARC_" "$formula_out" >&2
+            grep -n "__CHIO_" "$formula_out" >&2
             exit 1
           fi
           echo "updated formula at ${formula_out}:"
@@ -310,7 +310,7 @@ jobs:
         id: notes
         shell: bash
         env:
-          ARC_GITHUB_REPO: ${{ github.repository }}
+          CHIO_GITHUB_REPO: ${{ github.repository }}
           ARC_GITHUB_REPO_OWNER: ${{ github.repository_owner }}
           ARC_RELEASE_TAG: ${{ steps.version.outputs.tag }}
           ARC_VERSION: ${{ steps.version.outputs.version }}
@@ -325,7 +325,7 @@ jobs:
             echo "### Install"
             echo
             echo '```bash'
-            echo "curl -fsSL -o /tmp/arc.rb https://github.com/${ARC_GITHUB_REPO}/releases/latest/download/arc.rb"
+            echo "curl -fsSL -o /tmp/arc.rb https://github.com/${CHIO_GITHUB_REPO}/releases/latest/download/arc.rb"
             echo "brew install --formula /tmp/arc.rb"
             echo "docker pull ghcr.io/${arc_ghcr_owner}/arc-sidecar:${ARC_VERSION}"
             echo '```'

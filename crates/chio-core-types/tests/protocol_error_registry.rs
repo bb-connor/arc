@@ -45,7 +45,7 @@ struct NegotiationArtifact {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct NegotiationSurfaces {
-    native_arc: NativeNegotiationSurface,
+    native_chio: NativeNegotiationSurface,
     hosted_mcp: HostedNegotiationSurface,
     trust_control: TrustControlNegotiationSurface,
 }
@@ -153,14 +153,20 @@ fn protocol_error_registry_version_negotiation_artifact_is_consistent() {
         load_json("spec/versions/chio-protocol-negotiation.v1.json");
 
     assert_eq!(negotiation.schema, "chio.protocol-negotiation.v1");
-    assert_eq!(negotiation.surfaces.native_arc.wire_version, "chio-wire-v1");
     assert_eq!(
-        negotiation.surfaces.native_arc.exchange_format,
+        negotiation.surfaces.native_chio.wire_version,
+        "chio-wire-v1"
+    );
+    assert_eq!(
+        negotiation.surfaces.native_chio.exchange_format,
         "out_of_band"
     );
-    assert_eq!(negotiation.surfaces.native_arc.compatibility, "exact_match");
     assert_eq!(
-        negotiation.surfaces.native_arc.downgrade_behavior,
+        negotiation.surfaces.native_chio.compatibility,
+        "exact_match"
+    );
+    assert_eq!(
+        negotiation.surfaces.native_chio.downgrade_behavior,
         "not_supported"
     );
     assert_eq!(

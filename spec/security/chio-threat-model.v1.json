@@ -164,7 +164,7 @@
   "transportRequirements": {
     "profiles": [
       {
-        "surface": "native_arc_direct",
+        "surface": "native_chio_direct",
         "tls": "required_on_cross_host_or_untrusted_networks",
         "mtls": "required_when_peer_identity_is_part_of_the_authorization_trust_decision",
         "dpop": "required_when_matched_grant_sets_dpop_required",
