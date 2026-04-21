@@ -7,7 +7,7 @@
 This document specifies how Chio ingests OpenAPI specifications and enforces
 capability-based access control over HTTP APIs. It covers the OpenAPI-to-manifest
 pipeline (`chio-openapi`), the `x-chio-*` extension vocabulary, the default
-deny-by-method policy, and the `arc api protect` reverse proxy contract.
+deny-by-method policy, and the `chio api protect` reverse proxy contract.
 
 The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document.
 
@@ -174,7 +174,7 @@ The `ManifestGenerator` accepts a `GeneratorConfig` with the following options:
 
 Chio defines five vendor extension fields for OpenAPI operation objects. These
 fields provide per-route policy hints that the manifest generator and the
-`arc api protect` proxy consume.
+`chio api protect` proxy consume.
 
 All `x-chio-*` fields are optional. If absent, the system uses default behavior
 as specified below.
@@ -319,18 +319,18 @@ SessionAllow; side-effect methods receive DenyByDefault.
 
 ---
 
-## 4. `arc api protect` Contract (SPEC-09)
+## 4. `chio api protect` Contract (SPEC-09)
 
 ### 4.1 Purpose
 
-`arc api protect` is a zero-code reverse proxy that interposes Chio's
+`chio api protect` is a zero-code reverse proxy that interposes Chio's
 capability-based access control between callers and an existing HTTP API. It
 requires no code changes to the upstream API.
 
 ### 4.2 Command Interface
 
 ```text
-arc api protect --upstream <URL> [--spec <path>] [--listen <addr>]
+chio api protect --upstream <URL> [--spec <path>] [--listen <addr>]
 ```
 
 | Flag | Required | Default | Description |

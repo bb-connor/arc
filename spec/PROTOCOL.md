@@ -123,10 +123,10 @@ The `v3` contract extends the `v2` scope with:
 - an OpenAPI-to-manifest pipeline that derives `chio.manifest.v1` tool
   definitions from OpenAPI specifications with `x-chio-*` policy extensions (see
   [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md))
-- a reverse-proxy entrypoint (`arc api protect`) that combines OpenAPI
+- a reverse-proxy entrypoint (`chio api protect`) that combines OpenAPI
   ingestion, sidecar evaluation, and live traffic enforcement
-- certificate management CLI surfaces (`arc cert generate`, `arc cert verify`,
-  `arc cert inspect`) for operator-facing TLS and signing material
+- certificate management CLI surfaces (`chio cert generate`, `chio cert verify`,
+  `chio cert inspect`) for operator-facing TLS and signing material
 
 These surfaces share the same core receipt, capability, and policy primitives
 documented in v2 sections below. The HTTP substrate's `HttpReceipt` maps
@@ -151,7 +151,7 @@ Chio in this repository uses these roles:
 | Kernel | Trusted enforcement layer that validates capabilities, runs guards, dispatches calls, and signs receipts |
 | Tool server | Native or wrapped implementation of tools/resources/prompts |
 | Trust-control | Operator-facing authority, receipt, revocation, budget, federation, and certification service |
-| Hosted MCP edge | `arc mcp serve-http`, which exposes an MCP-compatible HTTP surface with remote session lifecycle and admin APIs |
+| Hosted MCP edge | `chio mcp serve-http`, which exposes an MCP-compatible HTTP surface with remote session lifecycle and admin APIs |
 | Operator stores | SQLite stores and file-backed registries for authoritative local state |
 
 The security boundary that matters is constant across these surfaces:
@@ -698,15 +698,15 @@ manifests.
 
 The repository ships these primary runtime entrypoints:
 
-- `arc check`
-- `arc run`
-- `arc mcp serve`
-- `arc mcp serve-http`
-- `arc trust serve`
-- `arc api protect` -- reverse proxy that enforces Chio policy over an HTTP API using an OpenAPI spec
-- `arc cert generate` -- generate TLS or signing certificates for Chio operator use
-- `arc cert verify` -- verify a certificate chain or signing material against Chio trust roots
-- `arc cert inspect` -- display certificate metadata, expiry, and key bindings
+- `chio check`
+- `chio run`
+- `chio mcp serve`
+- `chio mcp serve-http`
+- `chio trust serve`
+- `chio api protect` -- reverse proxy that enforces Chio policy over an HTTP API using an OpenAPI spec
+- `chio cert generate` -- generate TLS or signing certificates for Chio operator use
+- `chio cert verify` -- verify a certificate chain or signing material against Chio trust roots
+- `chio cert inspect` -- display certificate metadata, expiry, and key bindings
 
 These surfaces intentionally share the same core receipt, capability,
 revocation, and policy primitives rather than defining separate trust models.
@@ -731,7 +731,7 @@ and Python peers, and the release-qualification wave corpus.
 
 ### 8.3 Hosted Remote Admin
 
-`arc mcp serve-http` ships operator-facing admin APIs, including:
+`chio mcp serve-http` ships operator-facing admin APIs, including:
 
 - `/admin/health`
 - `/admin/authority`
@@ -746,7 +746,7 @@ the hosted edge.
 
 ## 9. Trust-Control Contract
 
-`arc trust serve` is the shipped trust-control HTTP service.
+`chio trust serve` is the shipped trust-control HTTP service.
 
 Core operator and cluster surfaces include:
 

@@ -223,7 +223,7 @@ Implementations SHOULD provide the following CLI commands:
 ### 6.1 Generate
 
 ```
-arc cert generate --session <session-id> [--output <path>]
+chio cert generate --session <session-id> [--output <path>]
 ```
 
 Walks the receipt log for the given session, runs the generation algorithm
@@ -233,7 +233,7 @@ stdout if omitted).
 ### 6.2 Verify
 
 ```
-arc cert verify --cert <path> [--receipts <path>] [--trusted-keys <path>]
+chio cert verify --cert <path> [--receipts <path>] [--trusted-keys <path>]
 ```
 
 Performs lightweight verification by default. When `--receipts` is provided,
@@ -251,7 +251,7 @@ Exit codes:
 ### 6.3 Inspect
 
 ```
-arc cert inspect --cert <path>
+chio cert inspect --cert <path>
 ```
 
 Prints the certificate body fields in human-readable format without

@@ -1,13 +1,13 @@
 name: Release PyPI
 
-# Publishes ARC Python SDKs to PyPI on git tag push using OIDC Trusted
+# Publishes Chio Python SDKs to PyPI on git tag push using OIDC Trusted
 # Publishing. See `docs/install/PUBLISHING.md` for tag format, trusted
 # publisher setup, and rollback procedures.
 #
 # Tag formats:
 #   py/v<X.Y.Z>                       -> publishes every Python package
 #   py/<package-slug>-v<X.Y.Z>        -> publishes only that package
-#                                        (e.g. py/arc-crewai-v1.2.0)
+#                                        (e.g. py/chio-crewai-v1.2.0)
 #
 # workflow_dispatch exposes a `dry_run` input that builds and smoke-tests
 # every matrix leg without uploading to PyPI. No stored API tokens are used
@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: "Package slug to publish (e.g. arc-crewai). Leave blank for all."
+        description: "Package slug to publish (e.g. chio-crewai). Leave blank for all."
         required: false
         type: string
         default: ""
@@ -63,25 +63,25 @@ jobs:
           # Canonical list of publishable Python packages. Order matters
           # only for human readability.
           all_packages=(
-            "sdks/python/arc-sdk-python"
-            "sdks/python/arc-asgi"
-            "sdks/python/arc-django"
-            "sdks/python/arc-fastapi"
-            "sdks/python/arc-langchain"
-            "sdks/python/arc-crewai"
-            "sdks/python/arc-autogen"
-            "sdks/python/arc-llamaindex"
-            "sdks/python/arc-temporal"
-            "sdks/python/arc-prefect"
-            "sdks/python/arc-dagster"
-            "sdks/python/arc-airflow"
-            "sdks/python/arc-ray"
-            "sdks/python/arc-streaming"
-            "sdks/python/arc-iac"
-            "sdks/python/arc-observability"
-            "sdks/python/arc-langgraph"
-            "sdks/python/arc-code-agent"
-            "sdks/lambda/arc-lambda-python"
+            "sdks/python/chio-sdk-python"
+            "sdks/python/chio-asgi"
+            "sdks/python/chio-django"
+            "sdks/python/chio-fastapi"
+            "sdks/python/chio-langchain"
+            "sdks/python/chio-crewai"
+            "sdks/python/chio-autogen"
+            "sdks/python/chio-llamaindex"
+            "sdks/python/chio-temporal"
+            "sdks/python/chio-prefect"
+            "sdks/python/chio-dagster"
+            "sdks/python/chio-airflow"
+            "sdks/python/chio-ray"
+            "sdks/python/chio-streaming"
+            "sdks/python/chio-iac"
+            "sdks/python/chio-observability"
+            "sdks/python/chio-langgraph"
+            "sdks/python/chio-code-agent"
+            "sdks/lambda/chio-lambda-python"
           )
 
           selected=()
@@ -118,7 +118,7 @@ jobs:
             # each candidate slug explicitly, rather than a greedy
             # `.+-v` capture -- a greedy regex would misparse slugs
             # that themselves contain `-v` (e.g. a hypothetical
-            # `arc-v2-client`), selecting the wrong package from
+            # `chio-v2-client`), selecting the wrong package from
             # `resolve_slug`.
             if [[ "$REF_NAME" =~ ^py/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
               selected=("${all_packages[@]}")
@@ -212,7 +212,7 @@ jobs:
           elif [[ "$REF_NAME" =~ ^py/$SLUG-v(.+)$ ]]; then
             # Anchor against the known package slug rather than
             # `^py/.+-v(.+)$`. Greedy `.+` on a valid semver prerelease
-            # that contains `-v` (e.g. `py/arc-crewai-v1.2.3-preview-v1`)
+            # that contains `-v` (e.g. `py/chio-crewai-v1.2.3-preview-v1`)
             # would otherwise consume through the suffix and capture
             # `1` instead of `1.2.3-preview-v1`.
             tag_version="${BASH_REMATCH[1]}"
@@ -251,23 +251,23 @@ jobs:
           source /tmp/smoke-venv/bin/activate
           pip install --quiet --upgrade pip
           # Install the wheel WITH its declared runtime deps: packages
-          # like arc-airflow / arc-temporal / arc-crewai import their
+          # like chio-airflow / chio-temporal / chio-crewai import their
           # third-party deps at load time, so `--no-deps` produced a
           # false ModuleNotFoundError even when the wheel itself was
           # perfectly valid and would install correctly in production.
           # Dependency resolution correctness is already covered by the
           # per-package test suite; this smoke test only needs to prove
           # the wheel imports cleanly in a fresh venv.
-          if [[ "$PKG_NAME" != "arc-sdk-python" ]]; then
-            pip install --quiet "${GITHUB_WORKSPACE}/sdks/python/arc-sdk-python"
+          if [[ "$PKG_NAME" != "chio-sdk-python" ]]; then
+            pip install --quiet "${GITHUB_WORKSPACE}/sdks/python/chio-sdk-python"
           fi
           pip install --quiet "$wheel"
-          # Derive import name: hyphens -> underscores, "arc-sdk-python" ->
-          # "arc_sdk", "arc-lambda-python" -> "arc_lambda".
+          # Derive import name: hyphens -> underscores, "chio-sdk-python" ->
+          # "chio_sdk", "chio-lambda-python" -> "chio_lambda".
           import_name=$(echo "$PKG_NAME" | tr '-' '_')
           case "$PKG_NAME" in
-            arc-sdk-python) import_name="arc_sdk" ;;
-            arc-lambda-python) import_name="arc_lambda" ;;
+            chio-sdk-python) import_name="chio_sdk" ;;
+            chio-lambda-python) import_name="chio_lambda" ;;
           esac
           python3 -c "import importlib, sys; m = importlib.import_module('$import_name'); print('imported', m.__name__, 'from', getattr(m, '__file__', '?'))"
           deactivate

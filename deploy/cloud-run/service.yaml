@@ -78,7 +78,7 @@ spec:
           # immediately. Override CMD (via `args`) with a long-running
           # Chio subcommand so the container stays up and serves /chio/health.
           # `command` is intentionally omitted so the image ENTRYPOINT
-          # (`/sbin/tini -- /usr/local/bin/arc`) is preserved. `api
+          # (`/sbin/tini -- /usr/local/bin/chio`) is preserved. `api
           # protect` reverse-proxies app traffic through the kernel;
           # swap to `mcp serve-http -- <wrapped server cmd>` when the
           # sidecar is fronting an MCP tool server instead of an app.
@@ -101,7 +101,7 @@ spec:
             - name: CHIO_POLICY_SOURCE
               value: "gs://PROJECT_ID-chio-config/policy.yaml"
             - name: CHIO_RECEIPT_SINK
-              value: "bigquery://PROJECT_ID.arc.receipts"
+              value: "bigquery://PROJECT_ID.chio.receipts"
             - name: CHIO_LOG_LEVEL
               value: "info"
             - name: CHIO_CAPABILITY_AUTHORITY_URL

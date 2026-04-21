@@ -5,7 +5,7 @@ use chio_acp_edge::{AcpEdgeConfig, AcpKernelExecutionContext, ChioAcpEdge};
 use chio_core::capability::{ChioScope, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
 use chio_kernel::{
-    ChioKernel, KernelError, KernelConfig, NestedFlowBridge, ToolCallChunk, ToolCallStream,
+    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream,
     ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
@@ -133,6 +133,7 @@ fn build_demo_state() -> (ChioAcpEdge, ChioKernel, AcpKernelExecutionContext) {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     (
@@ -163,10 +164,11 @@ fn serve() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mode = std::env::args().nth(1).unwrap_or_else(|| "serve".to_string());
+    let mode = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "serve".to_string());
     match mode.as_str() {
         "serve" => serve(),
         other => Err(format!("unknown mode: {other}").into()),
     }
 }
-

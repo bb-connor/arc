@@ -4,8 +4,9 @@ use std::io::{self, BufRead, Write};
 use chio_core::capability::{ChioScope, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
 use chio_kernel::{
-    ChioKernel, KernelError, KernelConfig, ToolCallOutput, ToolCallRequest, ToolServerConnection,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ChioKernel, KernelConfig, KernelError, ToolCallOutput, ToolCallRequest, ToolServerConnection,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_manifest::{ToolDefinition, ToolManifest};
 use chio_mcp_edge::{ChioMcpEdge, McpEdgeConfig};
@@ -89,7 +90,12 @@ fn demo_manifest() -> ToolManifest {
     }
 }
 
-fn build_demo_state() -> (ChioKernel, chio_core::capability::CapabilityToken, String, ToolManifest) {
+fn build_demo_state() -> (
+    ChioKernel,
+    chio_core::capability::CapabilityToken,
+    String,
+    ToolManifest,
+) {
     let authority = Keypair::generate();
     let mut kernel = ChioKernel::new(kernel_config(authority.clone()));
     kernel.register_tool_server(Box::new(HelloServer));
@@ -115,7 +121,12 @@ fn build_demo_state() -> (ChioKernel, chio_core::capability::CapabilityToken, St
         )
         .expect("issue capability");
 
-    (kernel, capability, agent.public_key().to_hex(), demo_manifest())
+    (
+        kernel,
+        capability,
+        agent.public_key().to_hex(),
+        demo_manifest(),
+    )
 }
 
 fn make_edge() -> ChioMcpEdge {
@@ -164,6 +175,8 @@ fn bridge_call() -> Result<(), Box<dyn Error>> {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         },
         None,
     )?;
@@ -193,7 +206,9 @@ fn bridge_call() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mode = std::env::args().nth(1).unwrap_or_else(|| "serve".to_string());
+    let mode = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "serve".to_string());
     match mode.as_str() {
         "serve" => serve(),
         "bridge-call" => bridge_call(),
