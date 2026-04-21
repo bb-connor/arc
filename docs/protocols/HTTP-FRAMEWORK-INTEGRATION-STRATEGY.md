@@ -5,7 +5,7 @@
 > to become the universal security kernel for any API surface.
 >
 > **Current-state note:** the repo now ships the core HTTP/kernel substrate:
-> `arc api protect`, `chio-openapi`, `chio-sdk-python`, `chio-asgi`,
+> `chio api protect`, `chio-openapi`, `chio-sdk-python`, `chio-asgi`,
 > `@chio-protocol/node-http`, `chio-go-http`, `chio-tower`,
 > `chio-spring-boot`, and `ChioMiddleware`, plus the thin FastAPI/Django and
 > Express/Fastify/Elysia wrappers. This document still mixes shipped packaging
@@ -105,7 +105,7 @@ Generate default policy:
     |
     v
 Developer overrides (optional):
-    - annotations, decorators, or arc.yaml sections
+    - annotations, decorators, or chio.yaml sections
     - only needed for exceptional cases
 ```
 
@@ -115,7 +115,7 @@ Developers add extra Chio metadata only where needed. These extend the OpenAPI
 spec via `x-chio-*` fields or standalone `chio.yaml` policy:
 
 ```yaml
-# In OpenAPI spec (x-arc extensions)
+# In OpenAPI spec (x-chio extensions)
 paths:
   /api/patients/{id}:
     get:
@@ -175,7 +175,7 @@ each adding depth without breaking the previous level.
 Current shipped CLI surface:
 
 ```bash
-arc api protect --upstream http://localhost:8000 --spec openapi.yaml
+chio api protect --upstream http://localhost:8000 --spec openapi.yaml
 ```
 
 What this does:
@@ -209,18 +209,18 @@ app.add_middleware(ChioMiddleware, config="chio.yaml")
 
 TypeScript (Elysia):
 ```typescript
-import { arc } from '@chio-protocol/elysia'
+import { chio } from '@chio-protocol/elysia'
 
 const app = new Elysia()
-  .use(arc({ config: 'arc.yaml' }))
+  .use(chio({ config: 'chio.yaml' }))
 ```
 
 Go (net/http):
 ```go
-import "github.com/backbay-labs/chio-go-http"
+import chio "github.com/backbay/chio/sdks/go/chio-go-http"
 
 mux := http.NewServeMux()
-handler := arc.Protect(mux, arc.ConfigFile("chio.yaml"))
+handler := chio.Protect(mux, chio.ConfigFile("chio.yaml"))
 ```
 
 What this adds over Level 0:
@@ -253,7 +253,7 @@ async def deploy(target: str):
 TypeScript:
 ```typescript
 app.delete('/api/patients/:id', {
-  arc: { scope: 'patients:delete', approval: true, sensitivity: 'high' }
+  chio: { scope: 'patients:delete', approval: true, sensitivity: 'high' }
 }, handler)
 ```
 
@@ -410,7 +410,7 @@ Proposed CLI / package names:
 
 ```bash
 # Protect any API with an OpenAPI spec
-arc api protect --upstream http://localhost:8000
+chio api protect --upstream http://localhost:8000
 
 # Or add one line of middleware
 pip install chio-fastapi
@@ -419,7 +419,7 @@ pip install chio-fastapi
 
 ### Auto-Discovery
 
-- `arc api protect` reads the OpenAPI spec from `/openapi.json`, `/docs`,
+- `chio api protect` reads the OpenAPI spec from `/openapi.json`, `/docs`,
   or a file path
 - Generates a default manifest and policy automatically
 - Developer only annotates the exceptional cases
@@ -429,7 +429,7 @@ pip install chio-fastapi
 - SQLite receipt store (no external dependencies)
 - Dev signing keys (auto-generated, clearly marked non-production)
 - Human-readable receipt log to stdout
-- `arc receipts tail` for live receipt streaming
+- `chio receipt list --limit 20` for receipt inspection
 
 ### Production Swap
 
@@ -450,7 +450,7 @@ the kernel reachable for most developers.
 |---------|---------|-------------|
 | `chio-http-core` | Normalized request/session/receipt model | `crates/chio-http-core` |
 | `chio-openapi` | Import/generate manifests from OpenAPI specs | `crates/chio-openapi` |
-| `arc api protect` | Reverse-proxy / sidecar entrypoint for any HTTP API | `crates/chio-cli` (`chio-api-protect` subcommand) |
+| `chio api protect` | Reverse-proxy / sidecar entrypoint for any HTTP API | `crates/chio-cli` (`chio-api-protect` subcommand) |
 
 ### Phase 2: First Substrates (Python, TypeScript, Go) [Shipped]
 
