@@ -75,11 +75,11 @@ async def run() -> None:
     producer = build_producer()
     consumer.subscribe(["research-tasks"])
 
-    async with ChioClient("http://127.0.0.1:9090") as arc:
+    async with ChioClient("http://127.0.0.1:9090") as chio:
         middleware = ChioConsumerMiddleware(
             consumer=consumer,
             producer=producer,
-            chio_client=arc,
+            chio_client=chio,
             dlq_router=DLQRouter(default_topic="chio-denied-events"),
             config=ChioConsumerConfig(
                 capability_id="cap-research-agents",

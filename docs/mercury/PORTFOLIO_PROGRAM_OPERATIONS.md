@@ -41,7 +41,7 @@ packaging.
 ## Export Command
 
 ```bash
-cargo run -p arc-mercury -- portfolio-program export --output target/mercury-portfolio-program-export
+cargo run -p chio-mercury -- portfolio-program export --output target/mercury-portfolio-program-export
 ```
 
 Expected top-level artifacts:
@@ -71,7 +71,7 @@ Program review stays inside Mercury and follows this order:
 5. issue `program-handoff.json`
 
 No claim may imply generic account management, customer success, revenue
-operations automation, forecasting, billing, or ARC commercial behavior.
+operations automation, forecasting, billing, or Chio commercial behavior.
 
 ---
 
@@ -83,6 +83,6 @@ Stop the lane if any of the following occurs:
 - the requested scope expands beyond one bounded portfolio program
 - revenue-operations guardrails are missing
 - the request implies generic account-management, customer-success, revenue
-  operations, forecasting, billing, channel, or ARC commercial behavior
+  operations, forecasting, billing, channel, or Chio commercial behavior
 
 The correct response is defer or stop, not scope drift.

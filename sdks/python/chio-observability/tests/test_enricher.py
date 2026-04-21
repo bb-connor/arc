@@ -25,9 +25,9 @@ class TestEnrichAllowReceipt:
 
     def test_verdict_tag_present(self, allow_receipt: ChioReceipt) -> None:
         payload = ReceiptEnricher().enrich(allow_receipt)
-        assert "arc.verdict:allow" in payload.tags
-        assert "arc.tool:search" in payload.tags
-        assert "arc.server:tools-srv" in payload.tags
+        assert "chio.verdict:allow" in payload.tags
+        assert "chio.tool:search" in payload.tags
+        assert "chio.server:tools-srv" in payload.tags
 
     def test_metadata_includes_receipt_id_and_capability(
         self, allow_receipt: ChioReceipt
@@ -61,10 +61,10 @@ class TestEnrichDenyReceipt:
 
     def test_tags_include_guard_and_evidence(self, deny_receipt: ChioReceipt) -> None:
         payload = ReceiptEnricher().enrich(deny_receipt)
-        assert "arc.verdict:deny" in payload.tags
-        assert "arc.guard:PathGuard" in payload.tags
-        assert "arc.evidence:PathGuard:deny" in payload.tags
-        assert "arc.evidence:PiiGuard:allow" in payload.tags
+        assert "chio.verdict:deny" in payload.tags
+        assert "chio.guard:PathGuard" in payload.tags
+        assert "chio.evidence:PathGuard:deny" in payload.tags
+        assert "chio.evidence:PiiGuard:allow" in payload.tags
 
     def test_evidence_is_copied_to_outputs(self, deny_receipt: ChioReceipt) -> None:
         payload = ReceiptEnricher().enrich(deny_receipt)
@@ -85,7 +85,7 @@ class TestEnrichDenyReceipt:
         payload = ReceiptEnricher().enrich(deny_receipt)
         assert payload.cost_metadata == {"units": 42, "currency": "USD"}
         assert payload.metadata["chio.cost"] == {"units": 42, "currency": "USD"}
-        assert "arc.cost:42USD" in payload.tags
+        assert "chio.cost:42USD" in payload.tags
 
     def test_extra_metadata_preserved(self, deny_receipt: ChioReceipt) -> None:
         payload = ReceiptEnricher().enrich(deny_receipt)
@@ -94,15 +94,15 @@ class TestEnrichDenyReceipt:
 
 class TestEnricherOptions:
     def test_default_tags_are_prepended(self, allow_receipt: ChioReceipt) -> None:
-        enricher = ReceiptEnricher(default_tags=["env:test", "service:arc"])
+        enricher = ReceiptEnricher(default_tags=["env:test", "service:chio"])
         payload = enricher.enrich(allow_receipt)
         assert payload.tags[0] == "env:test"
-        assert payload.tags[1] == "service:arc"
+        assert payload.tags[1] == "service:chio"
 
     def test_tags_are_deduplicated(self, allow_receipt: ChioReceipt) -> None:
-        enricher = ReceiptEnricher(default_tags=["arc.verdict:allow"])
+        enricher = ReceiptEnricher(default_tags=["chio.verdict:allow"])
         payload = enricher.enrich(allow_receipt)
-        assert payload.tags.count("arc.verdict:allow") == 1
+        assert payload.tags.count("chio.verdict:allow") == 1
 
     def test_include_parameters_false_yields_empty_inputs(
         self, allow_receipt: ChioReceipt

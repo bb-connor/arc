@@ -1,4 +1,4 @@
-# MERCURY and ARC-Wall Product Surface Boundaries
+# MERCURY and Chio-Wall Product Surface Boundaries
 
 **Date:** 2026-04-03  
 **Milestone:** `v2.52`
@@ -7,24 +7,24 @@
 
 ## Purpose
 
-The repo now has two validated product apps on ARC:
+The repo now has two validated product apps on Chio:
 
 - MERCURY for governed trading-workflow evidence
-- ARC-Wall for bounded information-domain control evidence
+- Chio-Wall for bounded information-domain control evidence
 
-This document freezes what remains shared in ARC versus what stays product-
+This document freezes what remains shared in Chio versus what stays product-
 owned so hardening execution does not silently collapse the products together.
 
 ---
 
-## Shared ARC Substrate
+## Shared Chio Substrate
 
-The following services stay ARC-owned and must remain generic:
+The following services stay Chio-owned and must remain generic:
 
-- `receipt_truth` via `crates/arc-core` and `crates/arc-kernel`
-- `checkpoint_publication` via `crates/arc-kernel` and `crates/arc-anchor`
-- `offline_evidence_export` via `crates/arc-control-plane` and `crates/arc-kernel`
-- `proof_verification` via `crates/arc-control-plane` and `crates/arc-cli`
+- `receipt_truth` via `crates/chio-core` and `crates/chio-kernel`
+- `checkpoint_publication` via `crates/chio-kernel` and `crates/chio-anchor`
+- `offline_evidence_export` via `crates/chio-control-plane` and `crates/chio-kernel`
+- `proof_verification` via `crates/chio-control-plane` and `crates/chio-cli`
 
 These services are shared because both product apps depend on the same receipt,
 checkpoint, export, and verification truth. Neither product is allowed to fork
@@ -37,8 +37,8 @@ those semantics locally.
 ### MERCURY
 
 - binary: `mercury`
-- app crate: `crates/arc-mercury`
-- core crate: `crates/arc-mercury-core`
+- app crate: `crates/chio-mercury`
+- core crate: `crates/chio-mercury-core`
 - docs root: `docs/mercury`
 - boundary: controlled release, rollback, and inquiry evidence for AI-assisted
   execution workflow changes
@@ -53,12 +53,12 @@ Owned surfaces:
 - embedded OEM export
 - trust-network export
 
-### ARC-Wall
+### Chio-Wall
 
-- binary: `arc-wall`
-- app crate: `crates/arc-wall`
-- core crate: `crates/arc-wall-core`
-- docs root: `docs/arc-wall`
+- binary: `chio-wall`
+- app crate: `crates/chio-wall`
+- core crate: `crates/chio-wall-core`
+- docs root: `docs/chio-wall`
 - boundary: tool-boundary control evidence for one bounded `research ->
   execution` information-domain barrier workflow
 
@@ -72,12 +72,12 @@ Owned surfaces:
 
 ## Ownership and Support
 
-- shared ARC release owner: `arc-release-control`
-- shared trust-material owner: `arc-key-custody`
+- shared Chio release owner: `chio-release-control`
+- shared trust-material owner: `chio-key-custody`
 - MERCURY release owner: `mercury-platform-owner`
 - MERCURY support owner: `mercury-product-ops`
-- ARC-Wall release owner: `barrier-control-room`
-- ARC-Wall support owner: `arc-wall-ops`
+- Chio-Wall release owner: `barrier-control-room`
+- Chio-Wall support owner: `chio-wall-ops`
 
 The release owners control product packaging. Shared receipt and checkpoint key
 custody remains outside both product apps.
@@ -89,13 +89,13 @@ custody remains outside both product apps.
 Export the current machine-readable boundary package:
 
 ```bash
-cargo run -p arc-cli -- product-surface export --output target/arc-product-surface-hardening-export
+cargo run -p chio-cli -- product-surface export --output target/chio-product-surface-hardening-export
 ```
 
 Validate the boundary package and write the explicit decision artifact:
 
 ```bash
-cargo run -p arc-cli -- product-surface validate --output target/arc-product-surface-hardening-validation
+cargo run -p chio-cli -- product-surface validate --output target/chio-product-surface-hardening-validation
 ```
 
 ---
@@ -105,7 +105,7 @@ cargo run -p arc-cli -- product-surface validate --output target/arc-product-sur
 This hardening lane does not authorize:
 
 - new MERCURY workflow lanes
-- additional ARC-Wall buyer motions
+- additional Chio-Wall buyer motions
 - a merged multi-product shell
 - a generic platform console
 - new companion products

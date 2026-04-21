@@ -267,7 +267,7 @@ fn run_certify_check(
     if let Some(tool_server_name) = tool_server_name {
         command.args(["--tool-server-name", tool_server_name]);
     }
-    let output = command.output().expect("run arc certify check");
+    let output = command.output().expect("run chio certify check");
     assert!(
         output.status.success(),
         "stdout={}\nstderr={}",
@@ -491,7 +491,7 @@ fn certify_check_emits_signed_pass_artifact_and_report() {
             seed_path.to_str().expect("seed path"),
         ])
         .output()
-        .expect("run arc certify check");
+        .expect("run chio certify check");
 
     assert!(
         output.status.success(),
@@ -568,7 +568,7 @@ fn certify_check_emits_signed_fail_artifact_with_findings() {
             seed_path.to_str().expect("seed path"),
         ])
         .output()
-        .expect("run arc certify check");
+        .expect("run chio certify check");
 
     assert!(
         output.status.success(),
@@ -630,7 +630,7 @@ fn certify_verify_accepts_signed_artifact() {
             output_path.to_str().expect("artifact path"),
         ])
         .output()
-        .expect("run arc certify verify");
+        .expect("run chio certify verify");
     assert!(
         verify.status.success(),
         "stdout={}\nstderr={}",

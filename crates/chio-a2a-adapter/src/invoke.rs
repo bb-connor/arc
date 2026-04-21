@@ -59,7 +59,7 @@ impl A2aAdapter {
         }
         let server_id = config
             .server_id
-            .unwrap_or_else(|| derive_arc_server_id(&agent_card_url));
+            .unwrap_or_else(|| derive_chio_server_id(&agent_card_url));
         let manifest = build_manifest(
             &server_id,
             &config.server_version,

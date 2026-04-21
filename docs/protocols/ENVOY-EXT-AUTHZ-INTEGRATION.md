@@ -858,7 +858,7 @@ use chio_http_core::{ChioHttpRequest, CallerIdentity, AuthMethod, HttpMethod};
 use crate::proto::envoy::service::auth::v3::CheckRequest;
 
 /// Convert an ext_authz CheckRequest to Chio's protocol-agnostic request model.
-pub fn check_request_to_arc_request(
+pub fn check_request_to_chio_request(
     check: &CheckRequest,
 ) -> Result<ChioHttpRequest, MappingError> {
     let attrs = check.attributes.as_ref()

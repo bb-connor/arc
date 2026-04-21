@@ -414,7 +414,7 @@ fn export_trust_network(output: &Path) -> Result<MercuryTrustNetworkExportSummar
             .as_str()
             .to_string(),
         anchor_scope:
-            "arc checkpoint signatures plus one bounded trust-network witness chain".to_string(),
+            "chio checkpoint signatures plus one bounded trust-network witness chain".to_string(),
         verification_material:
             "shared-proof-package publicationProfile binds witness and trust-anchor references."
                 .to_string(),

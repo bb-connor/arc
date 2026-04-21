@@ -81,9 +81,9 @@ class TestApprovedFlow:
             ran.append(dict(state))
             return {"value": "executed"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             node_scopes={"danger": _scope("danger")},
         )
         await cfg.provision()
@@ -115,9 +115,9 @@ class TestApprovedFlow:
         def body(_s: State) -> dict[str, Any]:
             return {"value": "done"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
         await cfg.provision()
 
@@ -135,9 +135,9 @@ class TestApprovedFlow:
         def body(_s: State) -> dict[str, Any]:
             return {"value": "done"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
         await cfg.provision()
 
@@ -164,9 +164,9 @@ class TestDeniedFlow:
             pytest.fail("body must not run on denied approval")
             return {}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             node_scopes={"danger": _scope("danger")},
         )
         await cfg.provision()
@@ -198,9 +198,9 @@ class TestDeniedFlow:
             pytest.fail("must not run")
             return {}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
         await cfg.provision()
 
@@ -228,9 +228,9 @@ class TestPolicySkip:
         def body(_s: State) -> dict[str, Any]:
             return {"value": "done"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
         await cfg.provision()
 
@@ -262,9 +262,9 @@ class TestDispatcherHook:
         def body(_s: State) -> dict[str, Any]:
             return {"value": "done"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
         await cfg.provision()
 
@@ -304,9 +304,9 @@ class TestSidecarDeny:
             pytest.fail("body must not run when sidecar denies")
             return {}
 
-        arc = deny_all(reason="scope mismatch", guard="ScopeGuard")
+        chio = deny_all(reason="scope mismatch", guard="ScopeGuard")
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
         await cfg.provision()
 
@@ -338,10 +338,10 @@ class TestMissingCapability:
             pytest.fail("must not run")
             return {}
 
-        arc = allow_all()
+        chio = allow_all()
         # No provision() -> no tokens minted.
         cfg = ChioGraphConfig(
-            chio_client=arc, node_scopes={"t": _scope("t")}
+            chio_client=chio, node_scopes={"t": _scope("t")}
         )
 
         interrupt_fn = FakeInterrupt(resume_value={"outcome": "approved"})

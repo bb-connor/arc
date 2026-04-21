@@ -73,7 +73,7 @@ func (router *Router) Register(method string, stepSuffix string, builder Builder
 func (router *Router) Handle(
 	ctx context.Context,
 	message map[string]any,
-	pactSession *session.Session,
+	chioSession *session.Session,
 	stepPrefix string,
 ) (*transport.RPCExchange, error) {
 	method, ok := message["method"].(string)
@@ -84,7 +84,7 @@ func (router *Router) Handle(
 	if !ok {
 		return nil, nil
 	}
-	response, err := pactSession.SendEnvelope(ctx, route.Builder(message, pactSession), nil)
+	response, err := chioSession.SendEnvelope(ctx, route.Builder(message, chioSession), nil)
 	if err != nil {
 		return nil, err
 	}

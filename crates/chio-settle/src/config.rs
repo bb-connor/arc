@@ -367,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn oracle_config_defaults_to_arc_link_receipt_evidence() {
+    fn oracle_config_defaults_to_chio_link_receipt_evidence() {
         let config = sample_chain_config();
         assert_eq!(
             config.oracle.authority,

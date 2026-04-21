@@ -375,7 +375,7 @@ impl ChioA2aEdge {
                         format!("{} #{}", skill_candidate.display_name, published_id_count);
                     skill_candidate
                         .tags
-                        .push("arc:ordinal-qualified".to_string());
+                        .push("chio:ordinal-qualified".to_string());
                     skill_candidate.description = format!(
                         "{} This published id is ordinal-qualified because multiple manifests expose the same server-qualified tool id.",
                         skill_candidate.description
@@ -1197,7 +1197,7 @@ fn build_skill_candidate(
             format!("{}::{}", manifest.server_id, tool.name),
             Some(tool.name.clone()),
             format!("{} ({})", tool.name, manifest.server_id),
-            vec!["arc:collision-qualified".to_string()],
+            vec!["chio:collision-qualified".to_string()],
             format!(
                 "{} Published under a server-qualified skill id because this tool name collides across manifests.",
                 tool.description
@@ -1214,10 +1214,10 @@ fn build_skill_candidate(
         };
 
     if !fidelity.published_by_default() {
-        tags.push("arc:publication-gated".to_string());
+        tags.push("chio:publication-gated".to_string());
     }
     if target_protocol != DiscoveryProtocol::Native {
-        tags.push(format!("arc:target-protocol:{target_protocol}"));
+        tags.push(format!("chio:target-protocol:{target_protocol}"));
     }
 
     Ok(SkillCandidate {

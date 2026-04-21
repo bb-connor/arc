@@ -345,7 +345,7 @@ Suggested status values:
 Suggested dimensions:
 
 - peer: `js`, `python`, `rust-reference`, `chio-self`
-- role: `client_to_arc_server`, `chio_client_to_server`
+- role: `client_to_chio_server`, `chio_client_to_server`
 - mode: `wrapped_stdio`, `native_stdio`, `remote_http`
 
 ## CI Structure

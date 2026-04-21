@@ -312,7 +312,7 @@ struct JsonRpcError {
     message: String,
 }
 
-pub fn scale_arc_amount_to_token_minor_units(
+pub fn scale_chio_amount_to_token_minor_units(
     amount: &MonetaryAmount,
     config: &SettlementChainConfig,
 ) -> Result<u128, SettlementError> {
@@ -344,7 +344,7 @@ pub fn scale_arc_amount_to_token_minor_units(
     }
 }
 
-pub(crate) fn scale_token_minor_units_to_arc_amount(
+pub(crate) fn scale_token_minor_units_to_chio_amount(
     units: u128,
     currency: &str,
     config: &SettlementChainConfig,
@@ -436,7 +436,7 @@ pub async fn prepare_web3_escrow_dispatch(
         .ok_or_else(|| {
             SettlementError::InvalidDispatch("capital instruction amount is required".to_string())
         })?;
-    let amount_minor_units = scale_arc_amount_to_token_minor_units(&settlement_amount, config)?;
+    let amount_minor_units = scale_chio_amount_to_token_minor_units(&settlement_amount, config)?;
     let operator_key_hash = keccak256(binding.certificate.chio_public_key.as_bytes());
     let terms = IChioEscrow::EscrowTerms {
         capabilityId: hash_string_id(&request.capability_id),
@@ -559,7 +559,7 @@ pub fn prepare_merkle_release(
         EscrowExecutionAmount::Full => dispatch.settlement_amount.clone(),
         EscrowExecutionAmount::Partial(amount) => amount,
     };
-    let amount_minor_units = scale_arc_amount_to_token_minor_units(&observed_amount, config)?;
+    let amount_minor_units = scale_chio_amount_to_token_minor_units(&observed_amount, config)?;
     let escrow_id = parse_b256_hex(&dispatch.escrow_id, "dispatch.escrow_id")?;
     let call = if observed_amount == dispatch.settlement_amount {
         IChioEscrow::releaseWithProofDetailedCall {
@@ -626,7 +626,8 @@ pub fn prepare_dual_sign_release(
                 .to_string(),
         ));
     }
-    let amount_minor_units = scale_arc_amount_to_token_minor_units(&input.observed_amount, config)?;
+    let amount_minor_units =
+        scale_chio_amount_to_token_minor_units(&input.observed_amount, config)?;
     let receipt_hash = keccak256(
         canonical_json_bytes(&receipt.body())
             .map_err(|error| SettlementError::Serialization(error.to_string()))?,
@@ -711,9 +712,9 @@ pub async fn prepare_bond_lock(
         SettlementError::InvalidDispatch("credit bond terms are required".to_string())
     })?;
     let collateral_minor_units =
-        scale_arc_amount_to_token_minor_units(&terms.collateral_amount, config)?;
+        scale_chio_amount_to_token_minor_units(&terms.collateral_amount, config)?;
     let reserve_requirement_minor_units =
-        scale_arc_amount_to_token_minor_units(&terms.reserve_requirement_amount, config)?;
+        scale_chio_amount_to_token_minor_units(&terms.reserve_requirement_amount, config)?;
     let bond_terms = IChioBondVault::BondTerms {
         bondId: hash_string_id(&request.bond.body.bond_id),
         facilityId: hash_string_id(&terms.facility_id),
@@ -806,11 +807,11 @@ pub fn prepare_bond_impair(
     }
     verify_anchor_inclusion_proof(anchor_proof)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
-    let slash_amount_minor_units = scale_arc_amount_to_token_minor_units(slash_amount, config)?;
+    let slash_amount_minor_units = scale_chio_amount_to_token_minor_units(slash_amount, config)?;
     let mut share_units = Vec::with_capacity(shares.len());
     let mut total = 0_u128;
     for share in shares {
-        let scaled = scale_arc_amount_to_token_minor_units(share, config)?;
+        let scaled = scale_chio_amount_to_token_minor_units(share, config)?;
         total = total
             .checked_add(scaled)
             .ok_or_else(|| SettlementError::InvalidInput("slash shares overflowed".to_string()))?;
@@ -2070,7 +2071,7 @@ mod tests {
     #[test]
     fn amount_scaling_matches_usdc_convention() {
         let config = sample_config();
-        let scaled = scale_arc_amount_to_token_minor_units(
+        let scaled = scale_chio_amount_to_token_minor_units(
             &MonetaryAmount {
                 units: 150,
                 currency: "USD".to_string(),
@@ -2079,7 +2080,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(scaled, 1_500_000);
-        let restored = scale_token_minor_units_to_arc_amount(scaled, "USD", &config).unwrap();
+        let restored = scale_token_minor_units_to_chio_amount(scaled, "USD", &config).unwrap();
         assert_eq!(restored.units, 150);
     }
 

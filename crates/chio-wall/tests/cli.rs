@@ -113,7 +113,7 @@ fn chio_wall_control_path_validate_writes_report_and_decision() {
     let report: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("parse validation report");
     assert_eq!(report["workflowId"], "workflow-information-domain-barrier");
-    assert_eq!(report["decision"], "proceed_arc_wall_only");
+    assert_eq!(report["decision"], "proceed_chio_wall_only");
     assert_eq!(report["buyerMotion"], "control_room_barrier_review");
     assert_eq!(report["controlSurface"], "tool_access_domain_boundary");
     assert_eq!(
@@ -139,7 +139,7 @@ fn chio_wall_control_path_validate_writes_report_and_decision() {
         &fs::read(output_dir.join("expansion-decision.json")).expect("read decision"),
     )
     .expect("parse decision");
-    assert_eq!(decision["decision"], "proceed_arc_wall_only");
+    assert_eq!(decision["decision"], "proceed_chio_wall_only");
     assert_eq!(
         decision["selectedBuyerMotion"],
         "control_room_barrier_review"

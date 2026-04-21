@@ -85,7 +85,7 @@ def _logging_fallback(event: str, payload: Mapping[str, Any]) -> None:
 def _receipt_resource(receipt: ChioReceipt) -> dict[str, str]:
     """Build the :class:`prefect.events.Resource` dict for a receipt."""
     return {
-        "prefect.resource.id": f"arc.receipt.{receipt.id}",
+        "prefect.resource.id": f"chio.receipt.{receipt.id}",
         "prefect.resource.role": "chio-receipt",
         "chio.capability_id": receipt.capability_id or "",
         "chio.tool_server": receipt.tool_server or "",
@@ -200,9 +200,9 @@ def emit_deny_event(
         resolved_tool_server = tool_server
         resource = {
             "prefect.resource.id": (
-                f"arc.receipt.{resolved_receipt_id}"
+                f"chio.receipt.{resolved_receipt_id}"
                 if resolved_receipt_id
-                else f"arc.receipt.denied.{task_name}"
+                else f"chio.receipt.denied.{task_name}"
             ),
             "prefect.resource.role": "chio-receipt",
             "chio.capability_id": resolved_capability_id or "",

@@ -96,7 +96,7 @@ FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 # Metadata.
 LABEL org.opencontainers.image.title="chio-sidecar" \
       org.opencontainers.image.description="Chio (Chio) kernel sidecar for multi-container platforms" \
-      org.opencontainers.image.source="https://github.com/backbay/arc" \
+      org.opencontainers.image.source="https://github.com/backbay/chio" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 # Runtime config defaults (overridable at deploy time).

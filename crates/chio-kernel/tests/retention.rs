@@ -143,13 +143,13 @@ mod retention {
         // Insert 10 receipts with timestamps below the cutoff (100-109).
         for i in 0..10usize {
             let receipt = receipt_with_ts(&format!("rcpt-old-{i}"), 100 + i as u64);
-            store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            store.append_chio_receipt_returning_seq(&receipt).unwrap();
         }
 
         // Insert 5 receipts with timestamps above the cutoff (200-204).
         for i in 0..5usize {
             let receipt = receipt_with_ts(&format!("rcpt-new-{i}"), 200 + i as u64);
-            store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            store.append_chio_receipt_returning_seq(&receipt).unwrap();
         }
 
         // Cutoff at timestamp 150: all receipts with timestamp < 150 should be archived.
@@ -184,13 +184,13 @@ mod retention {
 
         let mut store = SqliteReceiptStore::open(&live_path).unwrap();
         store
-            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-old", 100, "tenant-a"))
+            .append_chio_receipt_returning_seq(&receipt_with_tenant("rcpt-a-old", 100, "tenant-a"))
             .unwrap();
         store
-            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-b-old", 100, "tenant-b"))
+            .append_chio_receipt_returning_seq(&receipt_with_tenant("rcpt-b-old", 100, "tenant-b"))
             .unwrap();
         store
-            .append_arc_receipt_returning_seq(&receipt_with_tenant("rcpt-a-new", 200, "tenant-a"))
+            .append_chio_receipt_returning_seq(&receipt_with_tenant("rcpt-a-new", 200, "tenant-a"))
             .unwrap();
 
         let archived = store
@@ -221,10 +221,10 @@ mod retention {
         let tenant_a_child = child_receipt_with_ts("tenant-child-a", 100);
         let tenant_b_child = child_receipt_with_ts("tenant-child-b", 100);
         store
-            .append_arc_receipt_returning_seq(&tenant_a_parent)
+            .append_chio_receipt_returning_seq(&tenant_a_parent)
             .unwrap();
         store
-            .append_arc_receipt_returning_seq(&tenant_b_parent)
+            .append_chio_receipt_returning_seq(&tenant_b_parent)
             .unwrap();
         store.append_child_receipt(&tenant_a_child).unwrap();
         store.append_child_receipt(&tenant_b_child).unwrap();
@@ -320,7 +320,7 @@ mod retention {
         // Insert 100 receipts to accumulate some size.
         for i in 0..100usize {
             let receipt = receipt_with_ts(&format!("rcpt-sz-{i}"), 1000 + i as u64);
-            store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            store.append_chio_receipt_returning_seq(&receipt).unwrap();
         }
 
         // Measure current DB size.
@@ -366,7 +366,7 @@ mod retention {
         let mut seqs = Vec::new();
         for i in 0..10usize {
             let receipt = receipt_with_ts(&format!("rcpt-verify-{i}"), 100 + i as u64);
-            let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
             seqs.push(seq);
         }
 
@@ -437,7 +437,7 @@ mod retention {
         let mut batch1_seqs = Vec::new();
         for i in 0..10usize {
             let receipt = receipt_with_ts(&format!("rcpt-batch1-{i}"), 100 + i as u64);
-            let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
             batch1_seqs.push(seq);
         }
 
@@ -453,7 +453,7 @@ mod retention {
         let mut batch2_seqs = Vec::new();
         for i in 0..10usize {
             let receipt = receipt_with_ts(&format!("rcpt-batch2-{i}"), 200 + i as u64);
-            let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
             batch2_seqs.push(seq);
         }
 
@@ -525,7 +525,7 @@ mod retention {
         // Insert 5 receipts, but store NO checkpoints.
         for i in 0..5usize {
             let receipt = receipt_with_ts(&format!("rcpt-no-cp-{i}"), 100 + i as u64);
-            store.append_arc_receipt_returning_seq(&receipt).unwrap();
+            store.append_chio_receipt_returning_seq(&receipt).unwrap();
         }
 
         // Verify no checkpoints exist before archiving (seq 1 is absent).
@@ -571,7 +571,7 @@ mod retention {
 
         let mut store = SqliteReceiptStore::open(&live_path).unwrap();
         store
-            .append_arc_receipt(&receipt_with_ts("rcpt-parent", 100))
+            .append_chio_receipt(&receipt_with_ts("rcpt-parent", 100))
             .unwrap();
         store
             .append_child_receipt(&child_receipt_with_ts("child-parent", 100))
@@ -604,7 +604,7 @@ mod retention {
         let capability = capability_with_id("cap-retention-lineage", &subject, &issuer);
         store.record_capability_snapshot(&capability, None).unwrap();
         store
-            .append_arc_receipt(&receipt_with_capability_and_ts(
+            .append_chio_receipt(&receipt_with_capability_and_ts(
                 "rcpt-lineage",
                 &capability.id,
                 100,

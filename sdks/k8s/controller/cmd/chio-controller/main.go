@@ -47,14 +47,14 @@ func main() {
 
 func run() error {
 	var (
-		metricsAddr            string
-		probeAddr              string
-		leaderElect            bool
-		leaderNamespace        string
+		metricsAddr             string
+		probeAddr               string
+		leaderElect             bool
+		leaderNamespace         string
 		chioSidecarURL          string
 		chioSidecarControlToken string
 		chioRequestTimeout      time.Duration
-		reconcileConcurrency   int
+		reconcileConcurrency    int
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",

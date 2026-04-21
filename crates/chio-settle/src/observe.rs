@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::evm::{
     confirm_transaction, read_bond_snapshot, read_escrow_snapshot,
-    scale_token_minor_units_to_arc_amount, EscrowSnapshot, EvmBondSnapshot, EvmTransactionReceipt,
+    scale_token_minor_units_to_chio_amount, EscrowSnapshot, EvmBondSnapshot, EvmTransactionReceipt,
 };
 use crate::{SettlementChainConfig, SettlementError};
 
@@ -190,7 +190,7 @@ pub async fn project_escrow_execution_receipt(
     };
 
     let settled_amount = if lifecycle_state == Web3SettlementLifecycleState::TimedOut {
-        scale_token_minor_units_to_arc_amount(
+        scale_token_minor_units_to_chio_amount(
             escrow_snapshot.remaining_minor_units,
             &input.dispatch.settlement_amount.currency,
             config,

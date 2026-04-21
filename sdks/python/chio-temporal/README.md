@@ -48,7 +48,7 @@ class NotifyWorkflow:
 
 async def main() -> None:
     client = await Client.connect("localhost:7233")
-    async with ChioClient("http://127.0.0.1:9090") as arc:
+    async with ChioClient("http://127.0.0.1:9090") as chio:
         worker, interceptor, grant = await build_chio_worker(
             client,
             task_queue="notify",
@@ -56,7 +56,7 @@ async def main() -> None:
             workflows=[NotifyWorkflow],
             workflow_id="notify-wf-1",
             capability_id="",  # ignored when scope is supplied
-            chio_client=arc,
+            chio_client=chio,
             scope=ChioScope(
                 grants=[
                     ToolGrant(
@@ -114,7 +114,7 @@ child_scope = ChioScope(grants=[
         operations=[Operation.INVOKE],
     ),
 ])
-child_grant = await grant.attenuate_for_activity(arc, new_scope=child_scope)
+child_grant = await grant.attenuate_for_activity(chio, new_scope=child_scope)
 
 interceptor.register_activity_grant_override(
     "send_email", lambda _info: child_grant

@@ -129,7 +129,7 @@ Out of scope:
   - receipts now carry content hashes for all outcomes plus chunk-hash metadata for streamed output
   - the kernel now enforces stream duration and total-byte limits and preserves truncated partial output on incomplete limit breaches
 - shipped fourth slice:
-  - the MCP edge now advertises and honors an opt-in `capabilities.experimental.arcToolStreaming.toolCallChunkNotifications` extension
+  - the MCP edge now advertises and honors an opt-in `capabilities.experimental.chioToolStreaming.toolCallChunkNotifications` extension
   - negotiated clients receive `notifications/chio/tool_call_chunk` before the final `tools/call` response
   - non-negotiated clients still receive a collapsed final tool result
 - shipped fifth slice:
@@ -213,7 +213,7 @@ Out of scope:
 - partial or cancelled work reaches a terminal audited state
 - resource subscriptions and update notifications work on the MCP edge, including the wrapped subprocess path when the upstream server can actually source those events
 - wrapped tool/prompt catalog change notifications survive the wrapped subprocess path during active work and idle periods
-- native `arc run` sessions can now emit chunked tool frames before a terminal streamed response
+- native `chio run` sessions can now emit chunked tool frames before a terminal streamed response
 - negotiated MCP-edge clients can now receive multi-event streamed tool chunks for native Chio-backed tools
 - task-augmented server-side `tools/call` requests are now retrievable via `tasks/get` and `tasks/result`
 - idle stdio task execution can now complete and surface `notifications/tasks/status` without requiring a `tasks/result` waiter

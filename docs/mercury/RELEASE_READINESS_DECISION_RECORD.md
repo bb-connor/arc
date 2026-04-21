@@ -27,16 +27,16 @@ Launch one bounded Mercury release-readiness lane only.
 ## Deferred Scope
 
 - additional partner-delivery surfaces
-- a generic ARC release console or merged shell
+- a generic Chio release console or merged shell
 - new Mercury product-line claims
 - widened trust-network sponsor breadth
-- ARC-Wall or cross-product packaging unification
+- Chio-Wall or cross-product packaging unification
 
 ---
 
 ## Rationale
 
 The release-readiness lane now packages one bounded Mercury launch path over
-the existing Mercury evidence stack without pulling product logic back into ARC
+the existing Mercury evidence stack without pulling product logic back into Chio
 or broadening Mercury into a new shell or product line. The milestone
 therefore closes with one explicit launch decision and one narrow boundary.

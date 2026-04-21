@@ -8,7 +8,7 @@
 //! - Using `${VAR:-default}` to supply defaults.
 //! - Failing closed when a placeholder is undefined and has no default.
 //! - Capability intersection: rejecting requests for host functions that are
-//!   not in the policy-allowed allowlist, and rejecting modules whose `arc.*`
+//!   not in the policy-allowed allowlist, and rejecting modules whose `chio.*`
 //!   imports exceed the declared capabilities.
 //! - The `$$` escape producing a literal `$`.
 

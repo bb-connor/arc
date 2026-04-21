@@ -127,7 +127,7 @@ impl ChioKernel {
                 tenant_id: None,
             })?;
 
-            self.record_arc_receipt_with_federation(request, &receipt)?;
+            self.record_chio_receipt_with_federation(request, &receipt)?;
 
             return Ok(ToolCallResponse {
                 request_id: request.request_id.clone(),
@@ -234,7 +234,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt_with_federation(request, &receipt)?;
+        self.record_chio_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -841,7 +841,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt_with_federation(request, &receipt)?;
+        self.record_chio_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -913,7 +913,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt_with_federation(request, &receipt)?;
+        self.record_chio_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -1007,7 +1007,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt_with_federation(request, &receipt)?;
+        self.record_chio_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -1104,7 +1104,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt_with_federation(request, &receipt)?;
+        self.record_chio_receipt_with_federation(request, &receipt)?;
 
         info!(
             request_id = %request.request_id,
@@ -1324,19 +1324,19 @@ impl ChioKernel {
     /// Fail-closed: a co-sign failure aborts the record path so the
     /// receipt is never persisted without its paired remote signature.
     /// Non-federated requests (request.federated_origin_kernel_id is
-    /// `None`) behave identically to [`Self::record_arc_receipt`].
-    pub(crate) fn record_arc_receipt_with_federation(
+    /// `None`) behave identically to [`Self::record_chio_receipt`].
+    pub(crate) fn record_chio_receipt_with_federation(
         &self,
         request: &crate::runtime::ToolCallRequest,
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
         self.apply_federation_cosign(request, receipt)?;
-        self.record_arc_receipt(receipt)
+        self.record_chio_receipt(receipt)
     }
 
-    pub(crate) fn record_arc_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+    pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
         if let Some(seq) = self
-            .with_receipt_store(|store| Ok(store.append_arc_receipt_returning_seq(receipt)?))?
+            .with_receipt_store(|store| Ok(store.append_chio_receipt_returning_seq(receipt)?))?
             .flatten()
         {
             let last_checkpoint_seq = self.last_checkpoint_seq.load(Ordering::SeqCst);

@@ -15,7 +15,7 @@ Date: 2026-04-14
 3. [Component Model and WIT](#3-component-model-and-wit)
 4. [Guest SDK Patterns](#4-guest-sdk-patterns)
 5. [Security Considerations](#5-security-considerations)
-6. [Recommendations for Chio](#6-recommendations-for-arc)
+6. [Recommendations for Chio](#6-recommendations-for-chio)
 
 ---
 
@@ -424,7 +424,7 @@ WASM components:
 ```wit
 // guard.wit -- hypothetical Chio guard interface
 
-package arc:guard@0.1.0;
+package chio:guard@0.1.0;
 
 /// The verdict a guard returns.
 enum verdict {
@@ -469,7 +469,7 @@ world guard {
     export evaluator;
 
     /// Optional: host-provided logging.
-    import arc:guard/logging@0.1.0;
+    import chio:guard/logging@0.1.0;
 }
 ```
 
@@ -808,7 +808,7 @@ the right foundation.
 
 ### 6.3 v2 (Component Model Migration)
 
-1. **Define the guard WIT interface** (`arc:guard@0.1.0`).
+1. **Define the guard WIT interface** (`chio:guard@0.1.0`).
 2. **Implement Component Model host** using `wasmtime::component::bindgen!`.
 3. **Support dual mode:** Accept both core WASM modules (raw ABI) and
    Component Model components.

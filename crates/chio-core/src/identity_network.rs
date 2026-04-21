@@ -93,8 +93,8 @@ pub enum WalletTransportMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct IdentityBindingPolicy {
-    pub requires_arc_subject_provenance: bool,
-    pub requires_arc_issuer_provenance: bool,
+    pub requires_chio_subject_provenance: bool,
+    pub requires_chio_issuer_provenance: bool,
     pub requires_same_subject_across_credentials: bool,
     pub manual_subject_rebinding_required: bool,
     pub unsupported_mappings_fail_closed: bool,
@@ -103,8 +103,8 @@ pub struct IdentityBindingPolicy {
 impl Default for IdentityBindingPolicy {
     fn default() -> Self {
         Self {
-            requires_arc_subject_provenance: true,
-            requires_arc_issuer_provenance: true,
+            requires_chio_subject_provenance: true,
+            requires_chio_issuer_provenance: true,
             requires_same_subject_across_credentials: true,
             manual_subject_rebinding_required: true,
             unsupported_mappings_fail_closed: true,
@@ -324,8 +324,8 @@ pub fn validate_public_identity_profile(
             "public identity profiles must retain did:chio provenance in both subject and issuer support".to_string(),
         ));
     }
-    if !contains_non_arc_method(&profile.supported_subject_methods)
-        && !contains_non_arc_method(&profile.supported_issuer_methods)
+    if !contains_non_chio_method(&profile.supported_subject_methods)
+        && !contains_non_chio_method(&profile.supported_issuer_methods)
     {
         return Err(IdentityNetworkContractError::InvalidProfile(
             "public identity profiles must support at least one non-did:chio method".to_string(),
@@ -407,8 +407,8 @@ pub fn validate_public_wallet_directory_entry(
             "wallet directory profile_ref must point to a public identity profile".to_string(),
         ));
     }
-    if !contains_non_arc_method(&entry.supported_subject_methods)
-        || !contains_non_arc_method(&entry.supported_issuer_methods)
+    if !contains_non_chio_method(&entry.supported_subject_methods)
+        || !contains_non_chio_method(&entry.supported_issuer_methods)
     {
         return Err(IdentityNetworkContractError::InvalidDirectoryEntry(
             "wallet directory entries must advertise at least one broader subject and issuer method".to_string(),
@@ -553,12 +553,12 @@ fn validate_identity_artifact_reference(
 fn validate_identity_binding_policy(
     policy: &IdentityBindingPolicy,
 ) -> Result<(), IdentityNetworkContractError> {
-    if !policy.requires_arc_subject_provenance {
+    if !policy.requires_chio_subject_provenance {
         return Err(IdentityNetworkContractError::InvalidProfile(
             "public identity profiles must require Chio subject provenance".to_string(),
         ));
     }
-    if !policy.requires_arc_issuer_provenance {
+    if !policy.requires_chio_issuer_provenance {
         return Err(IdentityNetworkContractError::InvalidProfile(
             "public identity profiles must require Chio issuer provenance".to_string(),
         ));
@@ -662,7 +662,7 @@ fn validate_hex_digest(
     Ok(())
 }
 
-fn contains_non_arc_method(methods: &[IdentityDidMethod]) -> bool {
+fn contains_non_chio_method(methods: &[IdentityDidMethod]) -> bool {
     methods
         .iter()
         .any(|method| *method != IdentityDidMethod::DidChio)
@@ -1039,7 +1039,7 @@ mod tests {
         ));
 
         let mut profile = sample_profile();
-        profile.binding_policy.requires_arc_issuer_provenance = false;
+        profile.binding_policy.requires_chio_issuer_provenance = false;
         assert!(matches!(
             validate_public_identity_profile(&profile),
             Err(IdentityNetworkContractError::InvalidProfile(_))
@@ -1106,11 +1106,11 @@ mod tests {
     }
 
     #[test]
-    fn profile_requires_arc_anchor_and_broader_support() {
+    fn profile_requires_chio_anchor_and_broader_support() {
         let mut profile = sample_profile();
-        profile.binding_policy.requires_arc_subject_provenance = false;
-        let error =
-            validate_public_identity_profile(&profile).expect_err("missing arc subject provenance");
+        profile.binding_policy.requires_chio_subject_provenance = false;
+        let error = validate_public_identity_profile(&profile)
+            .expect_err("missing chio subject provenance");
         assert!(matches!(
             error,
             IdentityNetworkContractError::InvalidProfile(_)
@@ -1473,8 +1473,8 @@ mod tests {
             validate_hex_digest("zzzz", "reference.sha256"),
             Err(IdentityNetworkContractError::InvalidReference(_))
         ));
-        assert!(!contains_non_arc_method(&[IdentityDidMethod::DidChio]));
-        assert!(contains_non_arc_method(&[
+        assert!(!contains_non_chio_method(&[IdentityDidMethod::DidChio]));
+        assert!(contains_non_chio_method(&[
             IdentityDidMethod::DidChio,
             IdentityDidMethod::DidWeb,
         ]));

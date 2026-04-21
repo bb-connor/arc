@@ -15,7 +15,7 @@
 //!     consumed_at INTEGER NOT NULL,
 //!     expires_at  INTEGER NOT NULL
 //! );
-//! CREATE INDEX idx_arc_execution_nonces_expires_at
+//! CREATE INDEX idx_chio_execution_nonces_expires_at
 //!     ON chio_execution_nonces(expires_at);
 //! ```
 
@@ -112,7 +112,7 @@ impl SqliteExecutionNonceStore {
                 expires_at  INTEGER NOT NULL
             );
 
-            CREATE INDEX IF NOT EXISTS idx_arc_execution_nonces_expires_at
+            CREATE INDEX IF NOT EXISTS idx_chio_execution_nonces_expires_at
                 ON chio_execution_nonces(expires_at);
             "#,
         )?;

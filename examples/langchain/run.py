@@ -9,9 +9,9 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 
-DEFAULT_ARC_BASE_URL = "http://127.0.0.1:8931"
-DEFAULT_ARC_CONTROL_URL = "http://127.0.0.1:8940"
-DEFAULT_ARC_AUTH_TOKEN = "demo-token"
+DEFAULT_CHIO_BASE_URL = "http://127.0.0.1:8931"
+DEFAULT_CHIO_CONTROL_URL = "http://127.0.0.1:8940"
+DEFAULT_CHIO_AUTH_TOKEN = "demo-token"
 
 
 def session_capability_id(base_url: str, auth_token: str, session_id: str) -> str:
@@ -36,9 +36,9 @@ class EchoInput(BaseModel):
 
 
 def main() -> None:
-    base_url = os.environ.get("CHIO_BASE_URL", DEFAULT_ARC_BASE_URL)
-    control_url = os.environ.get("CHIO_CONTROL_URL", DEFAULT_ARC_CONTROL_URL)
-    auth_token = os.environ.get("CHIO_AUTH_TOKEN", DEFAULT_ARC_AUTH_TOKEN)
+    base_url = os.environ.get("CHIO_BASE_URL", DEFAULT_CHIO_BASE_URL)
+    control_url = os.environ.get("CHIO_CONTROL_URL", DEFAULT_CHIO_CONTROL_URL)
+    auth_token = os.environ.get("CHIO_AUTH_TOKEN", DEFAULT_CHIO_AUTH_TOKEN)
     client = ChioClient.with_static_bearer(base_url, auth_token)
     session = client.initialize(
         client_info={"name": "chio-langchain-example", "version": "0.2.0"}

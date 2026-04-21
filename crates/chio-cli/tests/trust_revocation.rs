@@ -108,7 +108,7 @@ fn trust_revoke_and_status_use_persisted_revocation_db() {
             capability_id,
         ])
         .output()
-        .expect("run arc trust revoke");
+        .expect("run chio trust revoke");
 
     assert!(
         revoke.status.success(),
@@ -129,7 +129,7 @@ fn trust_revoke_and_status_use_persisted_revocation_db() {
             capability_id,
         ])
         .output()
-        .expect("run arc trust status");
+        .expect("run chio trust status");
 
     assert!(
         status.status.success(),
@@ -182,7 +182,7 @@ fn trust_revoke_and_status_can_target_control_service() {
             capability_id,
         ])
         .output()
-        .expect("run arc trust revoke against control service");
+        .expect("run chio trust revoke against control service");
 
     assert!(
         revoke.status.success(),
@@ -205,7 +205,7 @@ fn trust_revoke_and_status_can_target_control_service() {
             capability_id,
         ])
         .output()
-        .expect("run arc trust status against control service");
+        .expect("run chio trust status against control service");
 
     assert!(
         status.status.success(),

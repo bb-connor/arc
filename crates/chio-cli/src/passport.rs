@@ -698,7 +698,7 @@ pub(crate) fn cmd_passport_generate(
 ) -> Result<(), CliError> {
     if agent.trim().is_empty() {
         return Err(CliError::Other(
-            "`arc passport generate` requires a non-empty --agent".to_string(),
+            "`chio passport generate` requires a non-empty --agent".to_string(),
         ));
     }
     let now = unix_now();

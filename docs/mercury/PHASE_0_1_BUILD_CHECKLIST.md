@@ -23,7 +23,7 @@ Phase 0 is complete when:
 
 - the first workflow sentence is frozen across product, GTM, pilot, and
   engineering docs
-- ARC reuse versus MERCURY net-new work is explicit
+- Chio reuse versus MERCURY net-new work is explicit
 - `receipt.metadata.mercury` structure is frozen
 - `Proof Package v1`, `Publication Profile v1`, and `Inquiry Package v1`
   contracts are defined at the document level
@@ -32,9 +32,9 @@ Phase 0 is complete when:
 ### Phase 0 Checklist
 
 - [x] `P0-01` Freeze the exact first workflow sentence and pilot boundary.
-- [x] `P0-02` Publish the ARC reuse memo for receipts, checkpoints, query,
+- [x] `P0-02` Publish the Chio reuse memo for receipts, checkpoints, query,
       export, storage, CLI, and publication.
-- [x] `P0-03` Freeze the MERCURY metadata namespace inside ARC receipts.
+- [x] `P0-03` Freeze the MERCURY metadata namespace inside Chio receipts.
       Output:
       `business_ids`, `decision_context`, `chronology`, `provenance`,
       `sensitivity`, `disclosure`, and `approval_state`.
@@ -44,9 +44,9 @@ Phase 0 is complete when:
       and redaction policy fields.
 - [x] `P0-05` Freeze the query model for workflow, account, desk, strategy,
       release ID, rollback ID, exception ID, and inquiry ID.
-- [x] `P0-06` Freeze `Proof Package v1` as a MERCURY wrapper over ARC evidence
+- [x] `P0-06` Freeze `Proof Package v1` as a MERCURY wrapper over Chio evidence
       export rather than a replacement for it.
-- [x] `P0-07` Freeze `Publication Profile v1` as the contract over ARC
+- [x] `P0-07` Freeze `Publication Profile v1` as the contract over Chio
       checkpoints, inclusion proofs, and witness or anchor expectations.
 - [x] `P0-08` Freeze `Inquiry Package v1` as a reviewed export derived from a
       specific proof package plus disclosure and approval state.
@@ -67,12 +67,12 @@ Phase 1 is complete when:
 
 ### Phase 1 Checklist
 
-- [x] `P1-01` Create `arc-mercury-core`.
+- [x] `P1-01` Create `chio-mercury-core`.
       Output:
       typed evidence schemas and fixtures only; no API surface yet.
 - [x] `P1-02` Implement typed MERCURY receipt metadata.
       Output:
-      typed structs plus serialization into `ArcReceipt.metadata.mercury`.
+      typed structs plus serialization into `ChioReceipt.metadata.mercury`.
 - [x] `P1-03` Implement evidence-bundle manifest and hashing.
       Output:
       stable artifact references, manifest hashing, and known-answer tests.
@@ -83,9 +83,9 @@ Phase 1 is complete when:
       Output:
       indexed lookup for workflow, account, desk, strategy, release, rollback,
       exception, and inquiry identifiers.
-- [x] `P1-06` Extend ARC receipt queries for MERCURY identifiers and approval
+- [x] `P1-06` Extend Chio receipt queries for MERCURY identifiers and approval
       state.
-- [x] `P1-07` Implement `Proof Package v1` assembly on top of ARC evidence
+- [x] `P1-07` Implement `Proof Package v1` assembly on top of Chio evidence
       export.
       Output:
       wrapper manifest, package validator, and fixture package.
@@ -99,7 +99,7 @@ Phase 1 is complete when:
 
 ## 4. Suggested Ownership
 
-- **Engineer 1:** `arc-mercury-core` schemas, serialization, and fixtures
+- **Engineer 1:** `chio-mercury-core` schemas, serialization, and fixtures
 - **Engineer 2:** SQLite indexing and query extensions
 - **Engineer 3:** proof package assembly and verifier command path
 - **Product / compliance:** workflow sentence, proof boundary, inquiry policy,
@@ -113,10 +113,10 @@ Build in this exact order:
 
 1. freeze the first workflow sentence
 2. freeze the MERCURY metadata contract
-3. build `arc-mercury-core`
+3. build `chio-mercury-core`
 4. add extracted SQLite indexes
 5. extend query surfaces
-6. wrap ARC evidence export into `Proof Package v1`
+6. wrap Chio evidence export into `Proof Package v1`
 7. add verifier command path
 8. generate the gold fixture package
 

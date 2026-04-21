@@ -38,17 +38,17 @@ impl SqliteReceiptStore {
                 raw_json TEXT NOT NULL
             );
 
-            CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_timestamp
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_timestamp
                 ON chio_tool_receipts(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_capability
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_capability
                 ON chio_tool_receipts(capability_id);
-            CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_subject
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_subject
                 ON chio_tool_receipts(subject_key);
-            CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_grant
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_grant
                 ON chio_tool_receipts(capability_id, grant_index);
-            CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_tool
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_tool
                 ON chio_tool_receipts(tool_server, tool_name);
-            CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_decision
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
                 ON chio_tool_receipts(decision_kind);
 
             CREATE TABLE IF NOT EXISTS settlement_reconciliations (
@@ -491,13 +491,13 @@ impl SqliteReceiptStore {
                 raw_json TEXT NOT NULL
             );
 
-            CREATE INDEX IF NOT EXISTS idx_arc_child_receipts_timestamp
+            CREATE INDEX IF NOT EXISTS idx_chio_child_receipts_timestamp
                 ON chio_child_receipts(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_arc_child_receipts_session
+            CREATE INDEX IF NOT EXISTS idx_chio_child_receipts_session
                 ON chio_child_receipts(session_id);
-            CREATE INDEX IF NOT EXISTS idx_arc_child_receipts_parent
+            CREATE INDEX IF NOT EXISTS idx_chio_child_receipts_parent
                 ON chio_child_receipts(parent_request_id);
-            CREATE INDEX IF NOT EXISTS idx_arc_child_receipts_request
+            CREATE INDEX IF NOT EXISTS idx_chio_child_receipts_request
                 ON chio_child_receipts(request_id);
 
             CREATE TABLE IF NOT EXISTS claim_receipt_log_entries (
@@ -994,7 +994,7 @@ impl SqliteReceiptStore {
 
         rows.map(|row| {
             let (seq, raw_json) = row?;
-            decode_verified_arc_receipt(
+            decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -1027,7 +1027,7 @@ impl SqliteReceiptStore {
 
         rows.map(|row| {
             let (seq, raw_json) = row?;
-            decode_verified_arc_receipt(
+            decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -1059,7 +1059,7 @@ impl SqliteReceiptStore {
             let seq = seq.max(0) as u64;
             Ok(StoredToolReceipt {
                 seq,
-                receipt: decode_verified_arc_receipt(
+                receipt: decode_verified_chio_receipt(
                     &raw_json,
                     "persisted tool receipt",
                     Some(seq),
@@ -1455,7 +1455,7 @@ impl SqliteReceiptStore {
                         let seq = row.get::<_, i64>(0)?.max(0) as u64;
                         Ok(StoredToolReceipt {
                             seq,
-                            receipt: decode_verified_arc_receipt(
+                            receipt: decode_verified_chio_receipt(
                                 &raw_json,
                                 "federated share tool receipt",
                                 Some(seq),

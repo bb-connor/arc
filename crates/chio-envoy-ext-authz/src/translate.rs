@@ -597,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_strips_arc_internal_response_headers() {
+    fn translate_strips_chio_internal_response_headers() {
         let check = mk_check(
             "GET",
             "/ping",

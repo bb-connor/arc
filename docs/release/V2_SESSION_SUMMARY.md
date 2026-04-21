@@ -39,7 +39,7 @@ Transformed Chio from a v1.0 security protocol into the economic infrastructure 
 ### Phase 10: Receipt Query API and TypeScript SDK 1.0
 - Receipt query API with 8-dimension filtering and cursor-based pagination
 - HTTP endpoint: `GET /v1/receipts/query` on trust-control axum server
-- CLI: `arc receipt list` with JSON Lines output and 10 filter flags
+- CLI: `chio receipt list` with JSON Lines output and 10 filter flags
 - TypeScript SDK hardened to `@chio-protocol/sdk@1.0.0`
 - `signDpopProof` with canonical JSON matching Rust `DpopProofBody` exactly
 - `ReceiptQueryClient` with `query()` and `paginate()` async generator

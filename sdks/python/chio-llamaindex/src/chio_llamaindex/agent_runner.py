@@ -67,7 +67,7 @@ class ChioAgentRunner:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=ChioScope(grants=[...]),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="analyst",
         )
         await chio_runner.provision_capability()

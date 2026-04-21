@@ -49,7 +49,7 @@ metadata:
 
 ```json
 {
-  "arc": {
+  "chio": {
     "targetSkillId": "research",
     "targetSkillName": "Research"
   }
@@ -99,7 +99,7 @@ When an A2A call is executed through Chio governed-transaction policy, upstream
 task lineage should be bound into `governed_intent.call_chain`, not attached as
 freeform operator notes. Chio preserves that delegated provenance in the signed
 receipt and projects it later through `/v1/reports/authorization-context` or
-`arc trust authorization-context list`, alongside derived authorization-detail
+`chio trust authorization-context list`, alongside derived authorization-detail
 scope for commerce and metered-billing context.
 
 ## Rust Example
@@ -130,7 +130,7 @@ let adapter = A2aAdapter::discover(
             .require_security_scheme("oauthAuth")
             .allow_interface_origin("https://agent.example.com"),
     )
-    .with_task_registry_file(".arc/a2a-task-registry.json")
+    .with_task_registry_file(".chio/a2a-task-registry.json")
 )?;
 
 let mut kernel = ChioKernel::new(/* ... */);
@@ -268,7 +268,7 @@ task notification config management through the same tool surface:
 {
   "create_push_notification_config": {
     "task_id": "task-1",
-    "url": "https://callbacks.example.com/arc",
+    "url": "https://callbacks.example.com/chio",
     "token": "notify-token",
     "authentication": {
       "scheme": "bearer",

@@ -42,8 +42,8 @@ Activity-level checks enforce it per step.
 |  |                              |  |                            | |
 |  |  @workflow.defn              |  |  @activity.defn            | |
 |  |  class AgentWorkflow:        |  |  async def call_tool():    | |
-|  |    await workflow.execute(   |  |    arc = ChioActivityCtx()  | |
-|  |      call_tool, ...)         |  |    result = await arc(     | |
+|  |    await workflow.execute(   |  |    chio = ChioActivityCtx()  | |
+|  |      call_tool, ...)         |  |    result = await chio(     | |
 |  |                              |  |      tool, args, cap)      | |
 |  +-----------------------------+  +-------------+--------------+ |
 |                                                  |                |
@@ -108,10 +108,10 @@ from chio_temporal import ChioActivityContext
 
 @activity.defn
 async def call_tool(tool_name: str, arguments: dict) -> dict:
-    arc = ChioActivityContext.from_current()
+    chio = ChioActivityContext.from_current()
 
     # Validates capability, runs guards, returns receipt
-    result = await arc.invoke(
+    result = await chio.invoke(
         tool=tool_name,
         arguments=arguments,
         scope="tools:invoke",
@@ -194,8 +194,8 @@ async def finalize_workflow_receipt(
     receipt_ids: list[str],
     workflow_id: str,
 ) -> str:
-    arc = ChioActivityContext.from_current()
-    workflow_receipt = await arc.finalize_workflow(
+    chio = ChioActivityContext.from_current()
+    workflow_receipt = await chio.finalize_workflow(
         step_receipt_ids=receipt_ids,
         workflow_id=workflow_id,
     )
@@ -277,10 +277,10 @@ Temporal's visibility API and Chio's receipt log should cross-reference:
 
 ```
 # Find all Chio receipts for a Temporal workflow
-arc receipt list --meta temporal.workflow_id=<wf-id>
+chio receipt list --meta temporal.workflow_id=<wf-id>
 
 # Find the Temporal workflow for an Chio receipt
-temporal workflow show --workflow-id $(arc receipt get <receipt-id> --field meta.temporal.workflow_id)
+temporal workflow show --workflow-id $(chio receipt get <receipt-id> --field meta.temporal.workflow_id)
 ```
 
 ## 7. Package Structure

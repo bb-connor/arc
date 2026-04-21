@@ -725,7 +725,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
 
     let policy: ChioPolicy = serde_yml::from_str(&contents)?;
     let default_capabilities = build_runtime_default_capabilities(&policy)?;
-    let runtime_hash = runtime_hash_for_arc_yaml(&policy, &default_capabilities)?;
+    let runtime_hash = runtime_hash_for_chio_yaml(&policy, &default_capabilities)?;
 
     Ok(LoadedPolicy {
         format: PolicyFormat::ChioYaml,
@@ -1771,7 +1771,7 @@ fn parse_operations(operations: &[String]) -> Result<Vec<Operation>, PolicyError
         .collect()
 }
 
-fn runtime_hash_for_arc_yaml(
+fn runtime_hash_for_chio_yaml(
     policy: &ChioPolicy,
     default_capabilities: &[DefaultCapability],
 ) -> Result<String, PolicyError> {
@@ -3004,8 +3004,8 @@ capabilities:
             build_default_capabilities(&policy_b.capabilities, policy_b.kernel.max_capability_ttl)
                 .unwrap();
 
-        let hash_a = runtime_hash_for_arc_yaml(&policy_a, &caps_a).unwrap();
-        let hash_b = runtime_hash_for_arc_yaml(&policy_b, &caps_b).unwrap();
+        let hash_a = runtime_hash_for_chio_yaml(&policy_a, &caps_a).unwrap();
+        let hash_b = runtime_hash_for_chio_yaml(&policy_b, &caps_b).unwrap();
         assert_eq!(hash_a, hash_b);
     }
 

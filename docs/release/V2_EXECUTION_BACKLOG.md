@@ -69,7 +69,7 @@ Completed:
   - added dashboard summary cards backed by the new report endpoint
   - verified with new kernel compliance tests, receipt-query HTTP tests, dashboard unit tests, dashboard production build, and full `cargo test --workspace`
 - `P2-05` completed on 2026-03-23
-  - added `arc certify check` as the first Chio Certify command surface
+  - added `chio certify check` as the first Chio Certify command surface
   - evaluates explicit fail-closed certification criteria over a conformance scenario/result corpus
   - emits a signed portable pass/fail JSON artifact plus an optional generated markdown report
   - verified with end-to-end CLI integration tests, targeted `chio-cli` unit tests, and full `cargo test --workspace`
@@ -94,43 +94,43 @@ Completed:
 - `P3-02` completed on 2026-03-23
   - extended HushSpec/runtime policy loading with `extensions.reputation` issuance materialization, probation configuration, and tier scope ceilings including monetary caps
   - added a shared issuance authority wrapper that computes local reputation from persisted receipts, lineage snapshots, and budget usage before signing capabilities
-  - wired the same enforcement path into local CLI issuance and `arc trust serve --policy ...`, with successful issuance persisting capability snapshots at the authority boundary
+  - wired the same enforcement path into local CLI issuance and `chio trust serve --policy ...`, with successful issuance persisting capability snapshots at the authority boundary
   - verified with policy unit tests, issuance unit tests, a trust-service HTTP integration test, `cargo test -p chio-cli`, and full `cargo test --workspace`
 - `P3-03` completed on 2026-03-23
   - added the new `crates/chio-did` workspace crate with self-certifying `did:chio` parsing, canonicalization, and DID Document resolution over Chio Ed25519 public keys
   - shipped stable `Ed25519VerificationKey2020` documents with optional validated `ChioReceiptLogService` endpoints
-  - exposed the resolver through `arc did resolve --did ...` and `arc did resolve --public-key ...`
+  - exposed the resolver through `chio did resolve --did ...` and `chio did resolve --public-key ...`
   - verified with crate unit tests, CLI integration tests, `cargo test -p chio-cli`, and full `cargo test --workspace`
 - `P3-04` completed on 2026-03-23
   - added the new `crates/chio-credentials` workspace crate with signed reputation credentials, passport bundling, offline verification, and filtered presentation helpers
-  - shipped `arc passport create`, `arc passport verify`, and `arc passport present` on top of local reputation scoring and `did:chio`
+  - shipped `chio passport create`, `chio passport verify`, and `chio passport present` on top of local reputation scoring and `did:chio`
   - enforced truthful alpha boundaries: single issuer only, optional checkpoint-required issuance, and no fake multi-issuer aggregation
   - verified with credential crate tests, CLI end-to-end passport tests, `cargo test -p chio-cli --test passport`, and full `cargo test --workspace`
 - `P3-05` completed on 2026-03-23
   - added the new `crates/chio-a2a-adapter` workspace crate with A2A v1.0.0 Agent Card discovery, preferred-interface selection, and blocking `SendMessage` mediation for both `JSONRPC` and `HTTP+JSON`
-  - exposed one Chio tool per advertised A2A skill and kept the protocol boundary honest by routing skill intent through the adapter-specific `metadata.arc.targetSkillId` convention rather than pretending A2A has a native `skillId` field
+  - exposed one Chio tool per advertised A2A skill and kept the protocol boundary honest by routing skill intent through the adapter-specific `metadata.chio.targetSkillId` convention rather than pretending A2A has a native `skillId` field
   - enforced secure transport defaults: HTTPS required in production, localhost HTTP only for local testing, bounded request timeouts, and optional bearer-auth propagation
   - verified with direct adapter tests, an end-to-end kernel receipt test, `cargo test -p chio-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-06` completed on 2026-03-23
-  - added `arc evidence verify --input <dir>` as an offline verifier for exported receipt/checkpoint/lineage packages
+  - added `chio evidence verify --input <dir>` as an offline verifier for exported receipt/checkpoint/lineage packages
   - verifies manifest hashes, query scope, receipt signatures, checkpoint signatures, lineage integrity, inclusion proofs, and policy attachment consistency without a running trust-control node
   - hardened the flaky `mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority` lane with bind-collision retry logic so full workspace runs are repeatable again
   - verified with `cargo test -p chio-cli --test evidence_export`, the repaired HTTP integration lane, and full `cargo test --workspace`
 - `P3-07` completed on 2026-03-23
-  - shipped the first identity-federation alpha for JWT-authenticated `arc mcp serve-http`
+  - shipped the first identity-federation alpha for JWT-authenticated `chio mcp serve-http`
   - canonicalizes federated principals as `oidc:<issuer>#sub:<sub>` or `oidc:<issuer>#client:<client_id>`
   - adds `--identity-federation-seed-file` so the edge derives a stable Chio subject key from the authenticated enterprise principal instead of minting a random subject per session
   - exposes `authContext` plus per-capability `subjectPublicKey` in the admin session APIs so operators can audit the mapping directly
   - verified with new `remote_mcp` unit tests, a JWT HTTP integration test proving same-principal convergence and different-principal separation, `cargo test -p chio-cli`, `git diff --check`, and full `cargo test --workspace`
 - `P3-08` completed on 2026-03-24
-  - added `arc reputation local --subject-public-key ...` as the first operator-facing CLI for inspecting local scorecards from persisted receipts, lineage snapshots, and budget state
+  - added `chio reputation local --subject-public-key ...` as the first operator-facing CLI for inspecting local scorecards from persisted receipts, lineage snapshots, and budget state
   - added `GET /v1/reputation/local/:subject_key` to trust-control so operators can query the same scorecard over HTTP using the service's configured issuance-policy scoring context
   - kept the logic single-sourced by reusing the same local corpus assembly, probationary evaluation, and tier resolution path already used for reputation-gated issuance
   - verified with dedicated CLI/HTTP integration tests, `cargo test -p chio-cli`, `git diff --check`, and full `cargo test --workspace`
 - `P3-09` completed on 2026-03-24
   - added the first portable relying-party verifier lane on top of shipped single-issuer passports
   - introduced `PassportVerifierPolicy` plus per-credential acceptance evaluation in `chio-credentials` for issuer allowlists, metric thresholds, checkpoint/log-url requirements, and attestation freshness
-  - exposed the verifier through `arc passport evaluate --input <passport> --policy <yaml-or-json>`
+  - exposed the verifier through `chio passport evaluate --input <passport> --policy <yaml-or-json>`
   - kept the semantics honest by evaluating each credential independently and accepting the passport only when at least one credential satisfies policy, without inventing multi-credential aggregation
   - verified with new credential crate policy tests, expanded CLI passport end-to-end coverage, `cargo test -p chio-credentials`, `cargo test -p chio-cli --test passport`, `cargo test -p chio-cli`, `git diff --check`, and full `cargo test --workspace`
 - `P3-10` completed on 2026-03-24
@@ -171,16 +171,16 @@ Completed:
   - kept the transport surface fail-closed: missing client identity still denies locally when the Agent Card requires mTLS, malformed PEM material is rejected at adapter construction, and local HTTPS handshake tests prove the real transport path instead of only config parsing
   - verified with direct mTLS discovery/invocation tests, a kernel end-to-end allow-receipt test for mTLS-backed invocation, `cargo test -p chio-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-17` completed on 2026-03-24
-  - deepened `arc mcp serve-http` identity federation with startup-time OIDC discovery, Ed25519 JWKS bootstrap, and provider-aware principal mapping for Generic/Auth0/Okta/Azure AD claim shapes
+  - deepened `chio mcp serve-http` identity federation with startup-time OIDC discovery, Ed25519 JWKS bootstrap, and provider-aware principal mapping for Generic/Auth0/Okta/Azure AD claim shapes
   - added fail-closed enterprise bootstrap semantics: discovery and discovered `jwks_uri` must use `https` or localhost-only `http`, issuer mismatches are rejected, and discovery without a compatible Ed25519 signing key fails at startup instead of silently admitting tokens
   - verified with direct unit coverage for Azure AD principal mapping and provider-profile discovery derivation, a full `mcp_serve_http` integration test for discovery-backed JWT admission plus stable subject derivation, `cargo test -p chio-cli remote_mcp::tests -- --nocapture`, `cargo test -p chio-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_jwt_and_uses_azure_ad_profile_mapping -- --nocapture`, and full `cargo test --workspace`
 - `P3-18` completed on 2026-03-24
-  - widened discovery-backed `arc mcp serve-http` JWT federation from Ed25519-only bootstrap into JWKS verification for `EdDSA`, RSA (`RS*`, `PS*`), and EC (`ES256`, `ES384`) signing keys
+  - widened discovery-backed `chio mcp serve-http` JWT federation from Ed25519-only bootstrap into JWKS verification for `EdDSA`, RSA (`RS*`, `PS*`), and EC (`ES256`, `ES384`) signing keys
   - kept the verifier fail-closed by resolving trusted keys through `kid` plus algorithm compatibility, denying tokens without `kid` whenever the JWKS exposes more than one compatible key
   - added end-to-end OIDC discovery coverage for `RS256` and `ES256`, focused verifier coverage for `PS256` and `ES384`, and hardened the revocation admin-path tests onto bind-retry startup handling after the workspace run exposed a readiness flake
   - verified with `cargo test -p chio-cli remote_mcp::tests -- --nocapture`, `cargo test -p chio-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_rs256_tokens -- --nocapture`, `cargo test -p chio-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_es256_tokens -- --nocapture`, targeted admin-revocation test reruns, `cargo test --workspace`, and `git diff --check`
 - `P3-19` completed on 2026-03-24
-  - added explicit OAuth2 token introspection for opaque bearer admission on `arc mcp serve-http`, including confidential-client authentication to the introspection endpoint and the same stable principal-to-subject derivation path used for JWT-backed federation
+  - added explicit OAuth2 token introspection for opaque bearer admission on `chio mcp serve-http`, including confidential-client authentication to the introspection endpoint and the same stable principal-to-subject derivation path used for JWT-backed federation
   - kept the non-JWT lane fail-closed: introspection endpoints must use `https` or localhost-only `http`, inactive tokens deny, issuer/audience/scope checks still apply, and introspection only accepts bearer-style token types when the provider returns one
   - added pure verifier coverage for active/inactive introspected tokens plus an end-to-end `mcp_serve_http` integration test proving opaque tokens map to stable federated subjects across sessions
   - verified with `cargo test -p chio-cli remote_mcp::tests -- --nocapture`, `cargo test -p chio-cli --test mcp_serve_http mcp_serve_http_token_introspection_verifies_opaque_tokens_and_derives_stable_subjects -- --nocapture`, `cargo test -p chio-cli`, `cargo test --workspace`, and `git diff --check`
@@ -200,7 +200,7 @@ Completed:
   - added direct validation tests for malformed task, status-update, and artifact-update payloads while preserving the existing good-path transport and kernel receipt coverage
   - verified with `cargo test -p chio-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
 - `P3-23` completed on 2026-03-24
-  - deepened `arc mcp serve-http` identity federation by propagating canonical enterprise identity metadata into `authContext.method.federatedClaims` instead of discarding it after principal derivation
+  - deepened `chio mcp serve-http` identity federation by propagating canonical enterprise identity metadata into `authContext.method.federatedClaims` instead of discarding it after principal derivation
   - the bearer-authenticated lane now preserves `clientId`, `objectId`, `tenantId`, `organizationId`, `groups`, and `roles` from verified JWT and introspection claims, with normalization and provider-aware client/object claim capture
   - added unit coverage for claim normalization plus end-to-end `mcp_serve_http` coverage proving the admin trust surface exposes federated claim context for direct JWT, Azure-profile OIDC discovery, and opaque-token introspection flows
   - verified with `cargo test -p chio-core -- --nocapture`, `cargo test -p chio-cli remote_mcp::tests -- --nocapture`, targeted `mcp_serve_http` federation integration tests, and `git diff --check`
@@ -212,17 +212,17 @@ Completed:
 - `P3-25` completed on 2026-03-24
   - added the first challenge-bound Agent Passport presentation protocol on top of the shipped single-issuer passport alpha
   - introduced portable presentation challenge documents with verifier identity, nonce, TTL, selective-disclosure hints, and optional embedded verifier policy, plus holder-signed responses bound to the passport subject DID
-  - exposed the full relying-party loop through `arc passport challenge create`, `arc passport challenge respond`, and `arc passport challenge verify`, while keeping the current alpha boundary honest by avoiding fake multi-issuer aggregation or wallet transport claims
+  - exposed the full relying-party loop through `chio passport challenge create`, `chio passport challenge respond`, and `chio passport challenge verify`, while keeping the current alpha boundary honest by avoiding fake multi-issuer aggregation or wallet transport claims
   - verified with new `chio-credentials` challenge/presentation tests, expanded CLI passport end-to-end coverage, `cargo test -p chio-credentials`, `cargo test -p chio-cli --test passport`, `cargo test --workspace`, and `git diff --check`
 - `P3-26` completed on 2026-03-24
-  - added the first operator-facing local-versus-portable reputation comparison surface through `arc reputation compare --subject-public-key ... --passport ...`
+  - added the first operator-facing local-versus-portable reputation comparison surface through `chio reputation compare --subject-public-key ... --passport ...`
   - kept the comparison truthful by reusing the exact existing local inspection path plus the exact existing passport verification/evaluation path, then computing explicit per-credential metric drift as `local_minus_portable` without inventing new scoring semantics
   - supports both direct `--receipt-db` / `--budget-db` operation and `--control-url` for trust-service-backed local inspection while still evaluating the portable artifact client-side
   - verified with new CLI integration coverage for both direct and trust-service-backed comparison flows, `cargo test -p chio-cli --test local_reputation`, full `cargo test --workspace`, and `git diff --check`
 - `P3-27` completed on 2026-03-24
-  - added signed bilateral receipt-sharing policy documents through `arc evidence federation-policy create`
-  - extended `arc evidence export --federation-policy ...` so the export query is constrained to the signed bilateral scope, proof requirements can be enforced by policy, and the resulting package carries the signed policy document for offline handoff
-  - extended `arc evidence verify` so it verifies the federation policy signature, package export timestamp, proof requirements, and query containment instead of treating the policy as an inert attachment
+  - added signed bilateral receipt-sharing policy documents through `chio evidence federation-policy create`
+  - extended `chio evidence export --federation-policy ...` so the export query is constrained to the signed bilateral scope, proof requirements can be enforced by policy, and the resulting package carries the signed policy document for offline handoff
+  - extended `chio evidence verify` so it verifies the federation policy signature, package export timestamp, proof requirements, and query containment instead of treating the policy as an inert attachment
   - verified with new `evidence_export` integration coverage for signed-policy roundtrip and out-of-scope denial, `cargo test -p chio-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
 - `P3-28` completed on 2026-03-24
   - extended local-versus-portable comparison from CLI into trust-control through `POST /v1/reputation/compare/:subject_key`
@@ -231,20 +231,20 @@ Completed:
   - verified with new trust-service HTTP integration coverage, dashboard API and component tests, `npm test`, `npm run build`, `cargo test -p chio-cli --test local_reputation`, full `cargo test --workspace`, and `git diff --check`
 - `P3-29` completed on 2026-03-24
   - extended trust-control with live remote evidence export through `POST /v1/evidence/export`
-  - moved `arc evidence export --control-url ...` onto the same prepared-query, signed federation-policy, and proof-requirement contract already used by local evidence export
+  - moved `chio evidence export --control-url ...` onto the same prepared-query, signed federation-policy, and proof-requirement contract already used by local evidence export
   - verified with new end-to-end remote `evidence_export` integration coverage, `cargo test -p chio-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
 - `P3-30` completed on 2026-03-24
-  - added the first live cross-org portable-trust issuance flow through `arc trust federated-issue` and `POST /v1/federation/capabilities/issue`
+  - added the first live cross-org portable-trust issuance flow through `chio trust federated-issue` and `POST /v1/federation/capabilities/issue`
   - trust-control now consumes an exact expected passport challenge plus a challenge-bound presentation response, requires an embedded verifier policy, derives the subject key from the presented `did:chio`, and issues exactly one locally signed capability from a supplied capability policy
   - kept the scope boundary honest by supporting one requested default capability per request instead of pretending multi-capability federated issuance is atomic
   - verified with new `federated_issue` integration coverage, `cargo test -p chio-cli --test federated_issue`, full `cargo test --workspace`, and `git diff --check`
 - `P3-31` completed on 2026-03-24
-  - added signed federated delegation-policy documents through `arc trust federated-delegation-policy-create`
-  - extended `arc trust federated-issue` and `POST /v1/federation/capabilities/issue` with an optional delegation-policy ceiling that enforces scope and TTL attenuation, requires a locally trusted signer, and persists a delegation anchor into capability lineage
+  - added signed federated delegation-policy documents through `chio trust federated-delegation-policy-create`
+  - extended `chio trust federated-issue` and `POST /v1/federation/capabilities/issue` with an optional delegation-policy ceiling that enforces scope and TTL attenuation, requires a locally trusted signer, and persists a delegation anchor into capability lineage
   - verified with expanded `federated_issue` integration coverage for successful anchored issuance plus fail-closed ceiling rejection, full `cargo test --workspace`, and `git diff --check`
 - `P3-32` completed on 2026-03-24
-  - added bilateral evidence consumption through `arc evidence import` and `POST /v1/evidence/import`, with full package verification before persistence plus imported federated-share indexing for upstream capability lookup
-  - extended `arc trust federated-issue` and `POST /v1/federation/capabilities/issue` with `--upstream-capability-id` and parent-bound delegation policies so a new local delegation anchor can bridge to an imported upstream capability and reconstruct a truthful multi-hop cross-org chain
+  - added bilateral evidence consumption through `chio evidence import` and `POST /v1/evidence/import`, with full package verification before persistence plus imported federated-share indexing for upstream capability lookup
+  - extended `chio trust federated-issue` and `POST /v1/federation/capabilities/issue` with `--upstream-capability-id` and parent-bound delegation policies so a new local delegation anchor can bridge to an imported upstream capability and reconstruct a truthful multi-hop cross-org chain
   - kept the boundary honest by preserving local lineage foreign keys and modeling the cross-org hop through explicit federated lineage bridges instead of pretending imported parents are native local issuers
   - verified with new multi-hop `federated_issue` integration coverage, `cargo test -p chio-cli --test federated_issue`, `cargo test -p chio-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
 

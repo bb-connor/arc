@@ -36,7 +36,7 @@
       "name": "Chio contract mismatch fails closed for custom receipt stores",
       "extension_point_id": "chio.kernel.receipt_store",
       "supported_component_id": "chio.remote-receipt-store",
-      "candidate_extension_id": "sample.pg-receipt-store@arc-3",
+      "candidate_extension_id": "sample.pg-receipt-store@chio-3",
       "mode": "official_to_custom",
       "expected_outcome": "fail_closed",
       "observed_outcome": "fail_closed",

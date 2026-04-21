@@ -2602,7 +2602,7 @@ mod tests {
                     latest_verifier_family: Some(
                         crate::appraisal::AttestationVerifierFamily::AzureMaa,
                     ),
-                    latest_verifier: Some("verifier.arc".to_string()),
+                    latest_verifier: Some("verifier.chio".to_string()),
                     latest_evidence_sha256: Some("sha256-runtime".to_string()),
                     observed_verifier_families: vec![
                         crate::appraisal::AttestationVerifierFamily::AzureMaa,
@@ -2810,7 +2810,7 @@ mod tests {
                 latest_verifier_family: Some(
                     crate::appraisal::AttestationVerifierFamily::EnterpriseVerifier,
                 ),
-                latest_verifier: Some("verifier.arc".to_string()),
+                latest_verifier: Some("verifier.chio".to_string()),
                 latest_evidence_sha256: Some("sha256-attest".to_string()),
                 observed_verifier_families: vec![
                     crate::appraisal::AttestationVerifierFamily::EnterpriseVerifier,
@@ -3160,7 +3160,7 @@ mod tests {
             adjudication_id: "cla-1".to_string(),
             issued_at: 1_700_010_800,
             dispute: claim_dispute.clone(),
-            adjudicator: "arbiter.arc".to_string(),
+            adjudicator: "arbiter.chio".to_string(),
             outcome: LiabilityClaimAdjudicationOutcome::PartialSettlement,
             awarded_amount: Some(usd(6_000)),
             note: Some("partial settlement ordered".to_string()),

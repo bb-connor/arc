@@ -318,7 +318,7 @@ Remote-edge SDK:
 
 ```text
 packages/sdk/chio-py/
-  src/arc/
+  src/chio/
     client/
     session/
     auth/

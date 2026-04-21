@@ -76,7 +76,7 @@ impl SqliteBatchApprovalStore {
                 used_total_units INTEGER NOT NULL DEFAULT 0,
                 revoked INTEGER NOT NULL DEFAULT 0
             );
-            CREATE INDEX IF NOT EXISTS idx_arc_hitl_batches_subject
+            CREATE INDEX IF NOT EXISTS idx_chio_hitl_batches_subject
                 ON chio_hitl_batches(subject_id, revoked);
             "#,
         )

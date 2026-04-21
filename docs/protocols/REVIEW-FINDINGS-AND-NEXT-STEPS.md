@@ -118,7 +118,7 @@ trust model).
 ### 2.5 Other DX Findings
 
 - Error messages lack "what to do next" guidance
-- Receipt dashboard exists but is buried (`arc trust serve`)
+- Receipt dashboard exists but is buried (`chio trust serve`)
 - Migration from MCP is possible but not documented as a guide
 - The "zero code change" sidecar story is genuinely strong but not the
   first thing developers see

@@ -89,14 +89,14 @@ class TestAllowVerdict:
             called.append({"q": q})
             return f"hit:{q}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioFunctionTool(
                 fn=search,
                 name="search",
                 description="search the index",
                 server_id="srv",
                 capability_id="cap-1",
-                chio_client=arc,
+                chio_client=chio,
             )
             output = await tool.acall(q="quantum")
 
@@ -110,14 +110,14 @@ class TestAllowVerdict:
         async def search(q: str) -> str:
             return f"async-hit:{q}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioFunctionTool(
                 async_fn=search,
                 name="search",
                 description="search the index",
                 server_id="srv",
                 capability_id="cap-1",
-                chio_client=arc,
+                chio_client=chio,
             )
             output = await tool.acall(q="relativity")
 
@@ -134,7 +134,7 @@ class TestAllowVerdict:
         def search(q: str, top_k: int = 5) -> str:
             return f"{q}@{top_k}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioFunctionTool(
                 fn=search,
                 name="search",
@@ -142,7 +142,7 @@ class TestAllowVerdict:
                 fn_schema=SearchArgs,
                 server_id="srv",
                 capability_id="cap-1",
-                chio_client=arc,
+                chio_client=chio,
             )
             assert tool.metadata.fn_schema is SearchArgs
             # Schema JSON schema must be serialisable (LlamaIndex relies on
@@ -157,28 +157,28 @@ class TestAllowVerdict:
         def add(a: int, b: int) -> int:
             return a + b
 
-        arc = allow_all()
+        chio = allow_all()
         tool = ChioFunctionTool(
             fn=add,
             name="add",
             description="add two ints",
             server_id="srv",
             capability_id="cap-1",
-            chio_client=arc,
+            chio_client=chio,
         )
         out = tool.call(a=2, b=3)
         assert isinstance(out, ToolOutput)
         assert "5" in out.content
 
     async def test_sync_call_inside_running_loop_raises(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         tool = ChioFunctionTool(
             fn=lambda a, b: a + b,
             name="add",
             description="add",
             server_id="srv",
             capability_id="cap-1",
-            chio_client=arc,
+            chio_client=chio,
         )
         with pytest.raises(RuntimeError):
             tool.call(a=1, b=2)
@@ -195,14 +195,14 @@ class TestDenyVerdict:
             pytest.fail("fn must not run on deny")
             return ""
 
-        async with deny_all(raise_on_deny=False) as arc:
+        async with deny_all(raise_on_deny=False) as chio:
             tool = ChioFunctionTool(
                 fn=executor,
                 name="write",
                 description="write a file",
                 server_id="srv",
                 capability_id="cap-x",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool.acall(path="/tmp/x")
@@ -215,14 +215,14 @@ class TestDenyVerdict:
         assert tool.last_chio_receipt.is_denied
 
     async def test_deny_from_403_raises_chio_tool_error(self) -> None:
-        async with deny_all(reason="no write perms", guard="ScopeGuard") as arc:
+        async with deny_all(reason="no write perms", guard="ScopeGuard") as chio:
             tool = ChioFunctionTool(
                 fn=lambda **_kw: "unreached",
                 name="write",
                 description="write a file",
                 server_id="srv",
                 capability_id="cap-x",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool.acall(path="/tmp/x")
@@ -232,14 +232,14 @@ class TestDenyVerdict:
         assert "no write perms" in (err.reason or "")
 
     async def test_missing_capability_id_denies(self) -> None:
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioFunctionTool(
                 fn=lambda **_kw: "unreached",
                 name="search",
                 description="search",
                 server_id="srv",
                 capability_id="",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool.acall(q="hi")
@@ -250,14 +250,14 @@ class TestDenyVerdict:
     ) -> None:
         """Some planners prefer deny-as-ToolOutput; exercise that path."""
 
-        async with deny_all(raise_on_deny=False) as arc:
+        async with deny_all(raise_on_deny=False) as chio:
             tool = ChioFunctionTool(
                 fn=lambda **_kw: "unreached",
                 name="write",
                 description="write",
                 server_id="srv",
                 capability_id="cap-x",
-                chio_client=arc,
+                chio_client=chio,
                 raise_on_deny=False,
             )
             output = await tool.acall(path="/tmp/x")
@@ -274,12 +274,12 @@ class TestDenyVerdict:
 
 class TestResearcherCannotWrite:
     async def test_researcher_write_is_denied(self) -> None:
-        arc = MockChioClient()
-        arc._tokens = {}  # type: ignore[attr-defined]
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio._tokens = {}  # type: ignore[attr-defined]
+        chio.set_policy(_scope_aware_policy(chio))
 
         researcher_token = await _mint_token(
-            arc,
+            chio,
             subject="agent:researcher",
             scope=_scope_for_tools("search", "browse"),
         )
@@ -290,7 +290,7 @@ class TestResearcherCannotWrite:
             description="write to disk",
             server_id="srv",
             capability_id=researcher_token.id,
-            chio_client=arc,
+            chio_client=chio,
         )
 
         with pytest.raises(ChioToolError) as exc_info:
@@ -300,12 +300,12 @@ class TestResearcherCannotWrite:
         assert "not in capability scope" in (exc_info.value.reason or "")
 
     async def test_writer_search_is_denied(self) -> None:
-        arc = MockChioClient()
-        arc._tokens = {}  # type: ignore[attr-defined]
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio._tokens = {}  # type: ignore[attr-defined]
+        chio.set_policy(_scope_aware_policy(chio))
 
         writer_token = await _mint_token(
-            arc,
+            chio,
             subject="agent:writer",
             scope=_scope_for_tools("write", "format"),
         )
@@ -316,7 +316,7 @@ class TestResearcherCannotWrite:
             description="search the web",
             server_id="srv",
             capability_id=writer_token.id,
-            chio_client=arc,
+            chio_client=chio,
         )
         with pytest.raises(ChioToolError) as exc_info:
             await search_tool.acall(q="secrets")
@@ -330,7 +330,7 @@ class TestResearcherCannotWrite:
 
 class TestRecordedInvocation:
     async def test_call_records_parameters_and_capability(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         def search(q: str, top_k: int = 5) -> str:
             return f"res:{q}:{top_k}"
@@ -341,11 +341,11 @@ class TestRecordedInvocation:
             description="search",
             server_id="srv",
             capability_id="cap-42",
-            chio_client=arc,
+            chio_client=chio,
         )
         await tool.acall(q="hi", top_k=3)
 
-        eval_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        eval_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(eval_calls) == 1
         recorded = eval_calls[0]
         assert recorded.tool_name == "search"

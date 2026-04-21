@@ -23,7 +23,7 @@ trait CustomGuardFactory: Send + Sync {
 }
 
 struct CustomGuardRegistry {
-    factories: HashMap<String, Arc<dyn CustomGuardFactory>>,
+    factories: HashMap<String, Chio<dyn CustomGuardFactory>>,
 }
 ```
 
@@ -38,7 +38,7 @@ binaries from plugin manifests:
 The async guard registry (`async_guards/registry.rs`) adds policy-driven
 instantiation: `build_async_guards()` reads the policy config, matches
 package names to guard constructors, resolves placeholder variables in
-config (`resolve_placeholders_in_json`), and returns `Vec<Arc<dyn AsyncGuard>>`.
+config (`resolve_placeholders_in_json`), and returns `Vec<Chio<dyn AsyncGuard>>`.
 
 ### 1.2 What Chio Has
 

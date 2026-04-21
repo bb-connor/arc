@@ -86,7 +86,7 @@ The following items that appear as planned work elsewhere in this document shipp
 
 ### Receipt query API (shipped in v2.0)
 
-`GET /v1/receipts/query` on the trust-control service supports eight filter dimensions and cursor-based pagination. The CLI exposes `arc receipt list` with equivalent filters. Capability lineage JOINs (`/v1/lineage/{capability_id}/chain`, `GET /v1/agents/{subject_key}/receipts`) are also available. See `crates/chio-kernel/src/receipt_query.rs` and `crates/chio-kernel/src/capability_lineage.rs`. Operator guide: [RECEIPT_QUERY_API.md](RECEIPT_QUERY_API.md).
+`GET /v1/receipts/query` on the trust-control service supports eight filter dimensions and cursor-based pagination. The CLI exposes `chio receipt list` with equivalent filters. Capability lineage JOINs (`/v1/lineage/{capability_id}/chain`, `GET /v1/agents/{subject_key}/receipts`) are also available. See `crates/chio-kernel/src/receipt_query.rs` and `crates/chio-kernel/src/capability_lineage.rs`. Operator guide: [RECEIPT_QUERY_API.md](RECEIPT_QUERY_API.md).
 
 ### Velocity guard (shipped in v2.0)
 
@@ -479,7 +479,7 @@ Implement non-tool server primitives.
 - resource listing, template listing, and reads work with policy and scope enforcement
 - prompt retrieval works without pretending prompts are tools
 - completion APIs return deterministic results for fixture providers
-- `arc mcp serve` exposes wrapped resources, prompts, and completion when the upstream server advertises them
+- `chio mcp serve` exposes wrapped resources, prompts, and completion when the upstream server advertises them
 
 ### Exit criteria
 
@@ -619,7 +619,7 @@ Replace local-only trust assumptions with service-backed trust.
 
 - SQLite backend first
 - append-only semantics at application layer
-- receipt query API for verification and ops -- **shipped in v2.0** as `GET /v1/receipts/query` on the trust-control service and `arc receipt list` CLI; see `crates/chio-kernel/src/receipt_query.rs`
+- receipt query API for verification and ops -- **shipped in v2.0** as `GET /v1/receipts/query` on the trust-control service and `chio receipt list` CLI; see `crates/chio-kernel/src/receipt_query.rs`
 
 #### `WP7.3` Remote runtime
 

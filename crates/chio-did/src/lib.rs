@@ -15,7 +15,7 @@ use chio_core::{crypto::SigningAlgorithm, PublicKey};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-const DID_ARC_PREFIX: &str = "did:chio:";
+const DID_CHIO_PREFIX: &str = "did:chio:";
 const DID_CONTEXT_V1: &str = "https://www.w3.org/ns/did/v1";
 const ED25519_VERIFICATION_KEY_2020: &str = "Ed25519VerificationKey2020";
 const ED25519_PUB_MULTICODEC_PREFIX: [u8; 2] = [0xed, 0x01];
@@ -66,7 +66,7 @@ impl DidChio {
 
     #[must_use]
     pub fn as_str(&self) -> String {
-        format!("{DID_ARC_PREFIX}{}", self.public_key.to_hex())
+        format!("{DID_CHIO_PREFIX}{}", self.public_key.to_hex())
     }
 
     #[must_use]
@@ -126,7 +126,7 @@ impl FromStr for DidChio {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let suffix = value
-            .strip_prefix(DID_ARC_PREFIX)
+            .strip_prefix(DID_CHIO_PREFIX)
             .ok_or(DidError::InvalidPrefix)?;
         if suffix.len() != 64
             || !suffix

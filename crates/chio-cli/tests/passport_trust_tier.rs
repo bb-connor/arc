@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-//! Phase 20.1: verify that `arc passport generate --agent <id>` emits a
+//! Phase 20.1: verify that `chio passport generate --agent <id>` emits a
 //! passport with a `trustTier` field derived from the kernel's
 //! compliance + behavioral scoring.
 
@@ -33,10 +33,10 @@ fn run_generate(args: &[&str]) -> serde_json::Value {
         .arg("--json")
         .args(args)
         .output()
-        .expect("spawn arc cli");
+        .expect("spawn chio cli");
     assert!(
         output.status.success(),
-        "`arc {}` failed: stderr={}, stdout={}",
+        "`chio {}` failed: stderr={}, stdout={}",
         args.join(" "),
         String::from_utf8_lossy(&output.stderr),
         String::from_utf8_lossy(&output.stdout),

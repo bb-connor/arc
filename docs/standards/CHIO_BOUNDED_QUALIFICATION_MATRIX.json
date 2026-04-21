@@ -1,8 +1,8 @@
 {
   "version": "2026-04-15",
-  "scope": "bounded_arc_release_qualification",
-  "status": "bounded_arc_release_candidate_qualified_locally",
-  "decision": "bounded_arc_release_qualified_stronger_claims_demoted_to_addenda",
+  "scope": "bounded_chio_release_qualification",
+  "status": "bounded_chio_release_candidate_qualified_locally",
+  "decision": "bounded_chio_release_qualified_stronger_claims_demoted_to_addenda",
   "qualifiedClaim": {
     "summary": "Chio ships a cryptographically signed, fail-closed governance and evidence control plane with bounded delegated-authority semantics, bounded hosted/auth profiles, explicit provenance classes, signed receipts and checkpoints, and explicit local or leader-local operational contracts for trust-control, budgets, and review surfaces.",
     "constraints": [

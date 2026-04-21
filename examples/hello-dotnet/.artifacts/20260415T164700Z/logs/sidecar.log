@@ -1,1 +1,0 @@
-2026-04-15T16:47:06.812062Z  WARN arc_kernel::kernel: guard denied request_id=d9841153-f14b-4ed1-b8fe-d7eac9628829 reason=guard denied the request: guard "http_projection_policy" error (fail-closed): guard denied the request: side-effect route requires a capability token

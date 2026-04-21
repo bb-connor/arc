@@ -2,14 +2,14 @@
 //
 // Provides commands for:
 //
-// - `arc run --policy <path> -- <command> [args...]`
+// - `chio run --policy <path> -- <command> [args...]`
 //   Spawn an agent subprocess, set up the length-prefixed transport over
 //   stdin/stdout pipes, and run the kernel message loop.
 //
-// - `arc check --policy <path> --tool <name> --params <json>`
+// - `chio check --policy <path> --tool <name> --params <json>`
 //   Load a policy, create a kernel, and evaluate a single tool call.
 //
-// - `arc mcp serve --policy <path> --server-id <id> -- <command> [args...]`
+// - `chio mcp serve --policy <path> --server-id <id> -- <command> [args...]`
 //   Wrap an MCP server subprocess with the Chio kernel and expose an
 //   MCP-compatible edge over stdio for stock MCP clients.
 

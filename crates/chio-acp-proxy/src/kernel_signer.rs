@@ -189,7 +189,7 @@ impl ReceiptSigner for KernelReceiptSigner {
             let mut store = self.store.lock().map_err(|e| {
                 ReceiptSignError::SigningFailed(format!("store lock poisoned: {e}"))
             })?;
-            store.append_arc_receipt(&receipt).map_err(|e| {
+            store.append_chio_receipt(&receipt).map_err(|e| {
                 ReceiptSignError::SigningFailed(format!("receipt store append failed: {e}"))
             })?;
         }

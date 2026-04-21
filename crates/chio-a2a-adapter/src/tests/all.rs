@@ -1100,7 +1100,7 @@ mod tests {
                 json!({
                     "create_push_notification_config": {
                         "task_id": "task-1",
-                        "url": "https://callbacks.example.com/arc",
+                        "url": "https://callbacks.example.com/chio",
                         "token": "notify-token",
                         "authentication": {
                             "scheme": "bearer",
@@ -1130,7 +1130,7 @@ mod tests {
             .expect("get push notification config");
         assert_eq!(
             fetched["push_notification_config"]["url"],
-            "https://callbacks.example.com/arc"
+            "https://callbacks.example.com/chio"
         );
 
         let listed = adapter
@@ -1196,7 +1196,7 @@ mod tests {
                 json!({
                     "create_push_notification_config": {
                         "task_id": "task-1",
-                        "url": "https://callbacks.example.com/arc",
+                        "url": "https://callbacks.example.com/chio",
                         "token": "notify-token",
                         "authentication": {
                             "scheme": "bearer",
@@ -3394,7 +3394,7 @@ mod tests {
         } else if request.contains("\"method\":\"CreateTaskPushNotificationConfig\"") {
             assert!(matches!(scenario, TestScenario::PushNotificationCrud));
             assert!(request.contains("\"taskId\":\"task-1\""));
-            assert!(request.contains("\"url\":\"https://callbacks.example.com/arc\""));
+            assert!(request.contains("\"url\":\"https://callbacks.example.com/chio\""));
             json!({
                 "jsonrpc": "2.0",
                 "id": 4,
@@ -3546,7 +3546,7 @@ mod tests {
     ) -> TestResponse {
         assert!(matches!(scenario, TestScenario::PushNotificationCrud));
         assert!(request.starts_with("POST /tasks/task-1/pushNotificationConfigs"));
-        assert!(request.contains("\"url\":\"https://callbacks.example.com/arc\""));
+        assert!(request.contains("\"url\":\"https://callbacks.example.com/chio\""));
         json!(push_notification_config_payload()).into()
     }
 
@@ -3811,7 +3811,7 @@ mod tests {
         json!({
             "id": "config-1",
             "taskId": "task-1",
-            "url": "https://callbacks.example.com/arc",
+            "url": "https://callbacks.example.com/chio",
             "token": "notify-token",
             "authentication": {
                 "scheme": "bearer",

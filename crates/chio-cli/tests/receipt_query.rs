@@ -1058,7 +1058,7 @@ fn make_governed_receipt(
                 settlement_mode: MeteredSettlementMode::AllowThenSettle,
                 quote: MeteredBillingQuote {
                     quote_id: "quote-ops-1".to_string(),
-                    provider: "billing.arc".to_string(),
+                    provider: "billing.chio".to_string(),
                     billing_unit: "1k_tokens".to_string(),
                     quoted_units: 12,
                     quoted_cost: MonetaryAmount {
@@ -1136,7 +1136,7 @@ fn make_governed_authorization_receipt_with_options(
         AZURE_MAA_ATTESTATION_SCHEMA,
         Some(chio_core::appraisal::AttestationVerifierFamily::AzureMaa),
         RuntimeAssuranceTier::Verified,
-        "verifier.arc",
+        "verifier.chio",
         "sha256-attestation-auth-1",
     )
 }
@@ -1202,7 +1202,7 @@ fn make_governed_authorization_receipt_with_runtime_profile(
                 settlement_mode: MeteredSettlementMode::AllowThenSettle,
                 quote: MeteredBillingQuote {
                     quote_id: "quote-auth-1".to_string(),
-                    provider: "billing.arc".to_string(),
+                    provider: "billing.chio".to_string(),
                     billing_unit: "1k_tokens".to_string(),
                     quoted_units: 12,
                     quoted_cost: MonetaryAmount {
@@ -1349,7 +1349,7 @@ fn make_credit_history_receipt(
                 schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
                 verifier_family: Some(chio_core::appraisal::AttestationVerifierFamily::AzureMaa),
                 tier: RuntimeAssuranceTier::Verified,
-                verifier: "verifier.arc".to_string(),
+                verifier: "verifier.chio".to_string(),
                 evidence_sha256: format!("sha256-{id}"),
                 workload_identity: None,
             }),
@@ -1511,7 +1511,7 @@ fn make_underwriting_simulation_receipt(
                 schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
                 verifier_family: Some(chio_core::appraisal::AttestationVerifierFamily::AzureMaa),
                 tier: runtime_tier,
-                verifier: "verifier.arc".to_string(),
+                verifier: "verifier.chio".to_string(),
                 evidence_sha256: format!("sha256-attestation-sim-{id}"),
                 workload_identity: None,
             }),
@@ -1731,7 +1731,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
 
         // 3 receipts with cap-1
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "shell",
@@ -1742,7 +1742,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "shell",
@@ -1753,7 +1753,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "files",
@@ -1766,7 +1766,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
 
         // 1 receipt with cap-2
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-4",
                 "cap-2",
                 "shell",
@@ -1779,7 +1779,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
 
         // 1 denied receipt with cap-1
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-5",
                 "cap-1",
                 "shell",
@@ -1929,7 +1929,7 @@ fn test_receipt_query_surfaces_governed_transaction_metadata() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_receipt(
+            .append_chio_receipt(&make_governed_receipt(
                 "r-governed-1",
                 "cap-governed-1",
                 "payments",
@@ -2014,7 +2014,7 @@ fn test_receipt_query_surfaces_x402_payment_metadata() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_x402_receipt(
+            .append_chio_receipt(&make_governed_x402_receipt(
                 "r-x402-1",
                 "cap-x402-1",
                 "payments",
@@ -2093,7 +2093,7 @@ fn test_receipt_query_surfaces_acp_payment_metadata() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_acp_receipt(
+            .append_chio_receipt(&make_governed_acp_receipt(
                 "r-acp-1",
                 "cap-acp-1",
                 "commerce",
@@ -2177,7 +2177,7 @@ fn receipt_query_surfaces_financial_hold_lineage_and_guarantee_level() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_financial_receipt_with_budget_authority(
+            .append_chio_receipt(&make_financial_receipt_with_budget_authority(
                 "r-budget-lineage-1",
                 "cap-budget-lineage-1",
                 "payments",
@@ -2631,7 +2631,7 @@ fn test_agent_subject_filter_via_http() {
 
         // 2 receipts for agent1, 1 for agent2
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "ra-1",
                 "cap-agent1",
                 "shell",
@@ -2642,7 +2642,7 @@ fn test_agent_subject_filter_via_http() {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "ra-2",
                 "cap-agent1",
                 "files",
@@ -2653,7 +2653,7 @@ fn test_agent_subject_filter_via_http() {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "ra-3",
                 "cap-agent2",
                 "shell",
@@ -2740,7 +2740,7 @@ fn test_agent_receipts_endpoint() {
             .expect("record cap2");
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "rb-1",
                 "cap-ar-agent1",
                 "shell",
@@ -2751,7 +2751,7 @@ fn test_agent_receipts_endpoint() {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "rb-2",
                 "cap-ar-agent1",
                 "files",
@@ -2762,7 +2762,7 @@ fn test_agent_receipts_endpoint() {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "rb-3",
                 "cap-ar-agent2",
                 "shell",
@@ -2897,7 +2897,7 @@ fn test_cost_attribution_report_endpoint() {
             .expect("record child");
 
         store
-            .append_arc_receipt(&make_financial_receipt(
+            .append_chio_receipt(&make_financial_receipt(
                 "rc-cost-1",
                 "cap-cost-child",
                 Some(&leaf_hex),
@@ -2913,7 +2913,7 @@ fn test_cost_attribution_report_endpoint() {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_financial_receipt(
+            .append_chio_receipt(&make_financial_receipt(
                 "rc-cost-2",
                 "cap-cost-child",
                 Some(&leaf_hex),
@@ -3081,7 +3081,7 @@ fn test_operator_report_endpoint() {
             .expect("record child lineage");
 
         let seq = store
-            .append_arc_receipt_returning_seq(&make_financial_receipt(
+            .append_chio_receipt_returning_seq(&make_financial_receipt(
                 "rc-op-1",
                 "cap-op-child",
                 Some(&leaf_hex),
@@ -3097,7 +3097,7 @@ fn test_operator_report_endpoint() {
             ))
             .expect("append checkpointed receipt");
         store
-            .append_arc_receipt(&make_financial_receipt(
+            .append_chio_receipt(&make_financial_receipt(
                 "rc-op-2",
                 "cap-op-child",
                 Some(&leaf_hex),
@@ -3285,7 +3285,7 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_financial_receipt_with_settlement_status(
+            .append_chio_receipt(&make_financial_receipt_with_settlement_status(
                 "rc-settle-pending",
                 "cap-settlement-1",
                 "payments",
@@ -3297,7 +3297,7 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
             ))
             .expect("append pending settlement receipt");
         store
-            .append_arc_receipt(&make_financial_receipt_with_settlement_status(
+            .append_chio_receipt(&make_financial_receipt_with_settlement_status(
                 "rc-settle-failed",
                 "cap-settlement-1",
                 "payments",
@@ -3309,7 +3309,7 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
             ))
             .expect("append failed settlement receipt");
         store
-            .append_arc_receipt(&make_financial_receipt_with_settlement_status(
+            .append_chio_receipt(&make_financial_receipt_with_settlement_status(
                 "rc-settle-settled",
                 "cap-settlement-1",
                 "payments",
@@ -3477,7 +3477,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
             Some(true),
         );
         store
-            .append_arc_receipt(&make_governed_receipt(
+            .append_chio_receipt(&make_governed_receipt(
                 "rc-metered-1",
                 "cap-metered-1",
                 "shell",
@@ -3486,7 +3486,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
             ))
             .expect("append first metered governed receipt");
         store
-            .append_arc_receipt(&make_governed_receipt(
+            .append_chio_receipt(&make_governed_receipt(
                 "rc-metered-2",
                 "cap-metered-1",
                 "shell",
@@ -3495,7 +3495,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
             ))
             .expect("append second metered governed receipt");
         store
-            .append_arc_receipt(&make_governed_x402_receipt(
+            .append_chio_receipt(&make_governed_x402_receipt(
                 "rc-metered-non-governed",
                 "cap-metered-2",
                 "shell",
@@ -3814,7 +3814,7 @@ fn test_authorization_context_report_and_cli() {
             Some(true),
         );
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-auth-1",
                 "cap-auth-1",
                 &subject_hex,
@@ -3825,7 +3825,7 @@ fn test_authorization_context_report_and_cli() {
             ))
             .expect("append authorization receipt");
         store
-            .append_arc_receipt(&make_governed_x402_receipt(
+            .append_chio_receipt(&make_governed_x402_receipt(
                 "rc-auth-2",
                 "cap-auth-1",
                 "shell",
@@ -4130,7 +4130,7 @@ fn authorization_context_report_does_not_mark_asserted_call_chain_as_sender_boun
             Some(true),
         );
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-auth-asserted",
                 "cap-auth-asserted",
                 &subject_hex,
@@ -4220,7 +4220,7 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
             Some(true),
         );
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-auth-pack-1",
                 "cap-auth-pack-1",
                 &subject_hex,
@@ -4231,7 +4231,7 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
             ))
             .expect("append authorization receipt");
         store
-            .append_arc_receipt(&make_governed_x402_receipt(
+            .append_chio_receipt(&make_governed_x402_receipt(
                 "rc-auth-pack-2",
                 "cap-auth-pack-1",
                 "shell",
@@ -4483,7 +4483,7 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
 }
 
 #[test]
-fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projection() {
+fn test_authorization_context_report_rejects_invalid_chio_oauth_profile_projection() {
     let dir = unique_dir("chio-authorization-context-invalid");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -4559,7 +4559,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
         .expect("sign invalid authorization receipt");
 
         store
-            .append_arc_receipt(&invalid_receipt)
+            .append_chio_receipt(&invalid_receipt)
             .expect("append invalid authorization receipt");
     }
 
@@ -4618,7 +4618,7 @@ fn test_authorization_context_report_rejects_missing_sender_binding_material() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_x402_receipt(
+            .append_chio_receipt(&make_governed_x402_receipt(
                 "rc-auth-no-sender",
                 "cap-auth-no-sender",
                 "shell",
@@ -4697,7 +4697,7 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
             Some(true),
         );
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-auth-no-issuer",
                 "cap-auth-no-issuer",
                 &subject_hex,
@@ -4851,7 +4851,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
         .expect("sign invalid assurance receipt");
 
         store
-            .append_arc_receipt(&invalid_receipt)
+            .append_chio_receipt(&invalid_receipt)
             .expect("append invalid assurance receipt");
     }
 
@@ -4983,7 +4983,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
         .expect("sign invalid delegated receipt");
 
         store
-            .append_arc_receipt(&invalid_receipt)
+            .append_chio_receipt(&invalid_receipt)
             .expect("append invalid delegated receipt");
     }
 
@@ -5171,7 +5171,7 @@ fn test_shared_evidence_reporting_surfaces() {
             .expect("record remote lineage bridge");
 
         let seq = store
-            .append_arc_receipt_returning_seq(&make_financial_receipt(
+            .append_chio_receipt_returning_seq(&make_financial_receipt(
                 "rc-local-1",
                 "cap-local-child",
                 Some(&local_leaf_hex),
@@ -5187,7 +5187,7 @@ fn test_shared_evidence_reporting_surfaces() {
             ))
             .expect("append shared-evidence receipt");
         store
-            .append_arc_receipt(&make_financial_receipt(
+            .append_chio_receipt(&make_financial_receipt(
                 "rc-local-2",
                 "cap-local-child",
                 Some(&local_leaf_hex),
@@ -5419,7 +5419,7 @@ fn test_behavioral_feed_export_surfaces() {
             .expect("record child lineage");
 
         let seq = store
-            .append_arc_receipt_returning_seq(&make_governed_financial_receipt(
+            .append_chio_receipt_returning_seq(&make_governed_financial_receipt(
                 "rc-risk-1",
                 "cap-risk-child",
                 &leaf_hex,
@@ -5432,7 +5432,7 @@ fn test_behavioral_feed_export_surfaces() {
             ))
             .expect("append governed receipt");
         store
-            .append_arc_receipt(&make_financial_receipt_with_settlement_status(
+            .append_chio_receipt(&make_financial_receipt_with_settlement_status(
                 "rc-risk-2",
                 "cap-risk-child",
                 "shell",
@@ -6394,7 +6394,7 @@ fn test_exposure_ledger_report_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-exposure-settled-1",
                 "cap-exposure-1",
                 subject_key,
@@ -6411,7 +6411,7 @@ fn test_exposure_ledger_report_surfaces() {
             ))
             .expect("append settled exposure receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-exposure-pending-1",
                 "cap-exposure-2",
                 subject_key,
@@ -6428,7 +6428,7 @@ fn test_exposure_ledger_report_surfaces() {
             ))
             .expect("append pending exposure receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-exposure-failed-1",
                 "cap-exposure-3",
                 subject_key,
@@ -6641,7 +6641,7 @@ fn test_exposure_ledger_rejects_contradictory_currency_row() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-exposure-conflict-1",
                 "cap-exposure-conflict-1",
                 subject_key,
@@ -6718,7 +6718,7 @@ fn test_credit_scorecard_report_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-credit-settled-1",
                 "cap-credit-1",
                 subject_key,
@@ -6735,7 +6735,7 @@ fn test_credit_scorecard_report_surfaces() {
             ))
             .expect("append settled credit receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-credit-pending-1",
                 "cap-credit-2",
                 subject_key,
@@ -6752,7 +6752,7 @@ fn test_credit_scorecard_report_surfaces() {
             ))
             .expect("append pending credit receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-credit-failed-1",
                 "cap-credit-3",
                 subject_key,
@@ -6987,7 +6987,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-facility-grant-{day}"),
                     &format!("cap-facility-grant-{day}"),
                     subject_key,
@@ -7468,7 +7468,7 @@ fn test_credit_facility_report_denies_missing_prerequisites() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(
+            .append_chio_receipt(
                 &make_governed_authorization_receipt_without_runtime_assurance(
                     "rc-facility-prereq-1",
                     "cap-facility-prereq-1",
@@ -7557,7 +7557,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..15_u64 {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-facility-mixed-usd-{day}"),
                     &format!("cap-facility-mixed-usd-{day}"),
                     subject_key,
@@ -7574,7 +7574,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
                 ))
                 .expect("append usd facility receipt");
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-facility-mixed-eur-{day}"),
                     &format!("cap-facility-mixed-eur-{day}"),
                     subject_key,
@@ -7668,7 +7668,7 @@ fn test_credit_facility_report_manual_review_for_mixed_runtime_assurance_provena
                 )
             };
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_runtime_profile(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_runtime_profile(
                     &format!("rc-facility-mixed-runtime-{day}"),
                     &format!("cap-facility-mixed-runtime-{day}"),
                     subject_key,
@@ -7751,7 +7751,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 46..=59_u64 {
             store
-                .append_arc_receipt(&make_credit_history_receipt(
+                .append_chio_receipt(&make_credit_history_receipt(
                     &format!("rc-backtest-good-{day}"),
                     &format!("cap-backtest-good-{day}"),
                     subject_key,
@@ -7768,7 +7768,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
                 .expect("append good backtest receipt");
         }
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-backtest-pending-no-runtime-1",
                 "cap-backtest-pending-no-runtime-1",
                 subject_key,
@@ -7784,7 +7784,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
             ))
             .expect("append first pending backtest receipt");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-backtest-pending-no-runtime-2",
                 "cap-backtest-pending-no-runtime-2",
                 subject_key,
@@ -7800,7 +7800,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
             ))
             .expect("append second pending backtest receipt");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-backtest-mixed-usd",
                 "cap-backtest-mixed-usd",
                 subject_key,
@@ -7816,7 +7816,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
             ))
             .expect("append mixed usd receipt");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-backtest-mixed-eur",
                 "cap-backtest-mixed-eur",
                 subject_key,
@@ -7832,7 +7832,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
             ))
             .expect("append mixed eur receipt");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-backtest-stale",
                 "cap-backtest-stale",
                 subject_key,
@@ -7952,7 +7952,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-lock-good-{day}"),
                     &format!("cap-bond-lock-good-{day}"),
                     subject_key,
@@ -8008,7 +8008,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-bond-lock-pending-1",
                 "cap-bond-lock-pending-1",
                 subject_key,
@@ -8189,7 +8189,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-hold-{day}"),
                     &format!("cap-bond-hold-{day}"),
                     hold_subject,
@@ -8206,7 +8206,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
                 ))
                 .expect("append hold history");
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-release-{day}"),
                     &format!("cap-bond-release-{day}"),
                     release_subject,
@@ -8325,7 +8325,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-impair-good-{day}"),
                     &format!("cap-bond-impair-good-{day}"),
                     impair_subject,
@@ -8344,7 +8344,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
         }
         for day in 0..15_u64 {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-mixed-usd-{day}"),
                     &format!("cap-bond-mixed-usd-{day}"),
                     mixed_subject,
@@ -8361,7 +8361,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
                 ))
                 .expect("append mixed usd history");
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bond-mixed-eur-{day}"),
                     &format!("cap-bond-mixed-eur-{day}"),
                     mixed_subject,
@@ -8414,7 +8414,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-bond-impair-failed-1",
                 "cap-bond-impair-failed-1",
                 impair_subject,
@@ -8503,7 +8503,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-good-{day}"),
                     &format!("cap-loss-good-{day}"),
                     subject_key,
@@ -8575,7 +8575,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-loss-failed-1",
                 "cap-loss-failed-1",
                 subject_key,
@@ -8742,7 +8742,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-release-good-{day}"),
                     &format!("cap-loss-release-good-{day}"),
                     subject_key,
@@ -8821,7 +8821,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-loss-release-failed-1",
                 "cap-loss-release-failed-1",
                 subject_key,
@@ -9116,7 +9116,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-loss-slash-good-{day}"),
                     &format!("cap-loss-slash-good-{day}"),
                     subject_key,
@@ -9188,7 +9188,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-loss-slash-failed-1",
                 "cap-loss-slash-failed-1",
                 subject_key,
@@ -9412,7 +9412,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-bonded-execution-good-{day}"),
                     &format!("cap-bonded-execution-good-{day}"),
                     subject_key,
@@ -9481,7 +9481,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-bonded-execution-pending-1",
                 "cap-bonded-execution-pending-1",
                 subject_key,
@@ -9607,7 +9607,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-bonded-execution-failed-1",
                 "cap-bonded-execution-failed-1",
                 subject_key,
@@ -9709,7 +9709,7 @@ fn test_provider_risk_package_export_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_credit_history_receipt(
+                .append_chio_receipt(&make_credit_history_receipt(
                     &format!("rc-risk-good-{day}"),
                     &format!("cap-risk-good-{day}"),
                     subject_key,
@@ -9764,7 +9764,7 @@ fn test_provider_risk_package_export_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-risk-loss-1",
                 "cap-risk-loss-1",
                 subject_key,
@@ -9896,7 +9896,7 @@ fn test_capital_book_report_export_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-good-{day}"),
                     &format!("cap-capital-good-{day}"),
                     subject_key,
@@ -9952,7 +9952,7 @@ fn test_capital_book_report_export_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-capital-pending-1",
                 "cap-capital-pending-1",
                 subject_key,
@@ -10209,7 +10209,7 @@ fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..15_u64 {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-negative-usd-{day}"),
                     &format!("cap-capital-negative-usd-{day}"),
                     subject_key,
@@ -10226,7 +10226,7 @@ fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
                 ))
                 .expect("append usd negative capital receipt");
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-negative-eur-{day}"),
                     &format!("cap-capital-negative-eur-{day}"),
                     subject_key,
@@ -10324,7 +10324,7 @@ fn test_capital_instruction_issue_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-instruction-good-{day}"),
                     &format!("cap-capital-instruction-good-{day}"),
                     subject_key,
@@ -10377,7 +10377,7 @@ fn test_capital_instruction_issue_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-capital-instruction-pending-1",
                 "cap-capital-instruction-pending-1",
                 subject_key,
@@ -10561,7 +10561,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-instruction-negative-{day}"),
                     &format!("cap-capital-instruction-negative-{day}"),
                     subject_key,
@@ -10614,7 +10614,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-capital-instruction-negative-pending-1",
                 "cap-capital-instruction-negative-pending-1",
                 subject_key,
@@ -10789,7 +10789,7 @@ fn test_capital_allocation_issue_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-good-{day}"),
                     &format!("cap-capital-allocation-good-{day}"),
                     subject_key,
@@ -10846,7 +10846,7 @@ fn test_capital_allocation_issue_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 governed_receipt_id,
                 "cap-capital-allocation-pending-1",
                 subject_key,
@@ -11020,7 +11020,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-manual-good-{day}"),
                     &format!("cap-capital-allocation-manual-good-{day}"),
                     manual_subject,
@@ -11037,7 +11037,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
                 ))
                 .expect("append manual allocation history");
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-queue-good-{day}"),
                     &format!("cap-capital-allocation-queue-good-{day}"),
                     queue_subject,
@@ -11058,7 +11058,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
         // for the full reserve-depth dataset.
         for day in LARGE_RECEIPT_HISTORY_LEN..CAPITAL_ALLOCATION_QUEUE_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-capital-allocation-queue-good-{day}"),
                     &format!("cap-capital-allocation-queue-good-{day}"),
                     queue_subject,
@@ -11113,7 +11113,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-capital-allocation-manual-pending-1",
                 "cap-capital-allocation-manual-pending-1",
                 manual_subject,
@@ -11130,7 +11130,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
             ))
             .expect("append manual pending governed receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-capital-allocation-queue-pending-1",
                 "cap-capital-allocation-queue-pending-1",
                 queue_subject,
@@ -11147,7 +11147,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
             ))
             .expect("append first queue pending receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-capital-allocation-queue-pending-2",
                 "cap-capital-allocation-queue-pending-2",
                 queue_subject,
@@ -11630,7 +11630,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_credit_history_receipt(
+                .append_chio_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-market-{day}"),
                     &format!("cap-liability-market-{day}"),
                     subject_key,
@@ -11945,7 +11945,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-autobind-{day}"),
                     &format!("cap-liability-autobind-{day}"),
                     subject_key,
@@ -12363,7 +12363,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             let exposure_units = if day < 10 { 100 } else { 5_000 };
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-autobind-negative-{day}"),
                     &format!("cap-liability-autobind-negative-{day}"),
                     subject_key,
@@ -12824,7 +12824,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_credit_history_receipt(
+                .append_chio_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-negative-{day}"),
                     &format!("cap-liability-negative-{day}"),
                     subject_key,
@@ -13250,7 +13250,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..LARGE_RECEIPT_HISTORY_LEN {
             store
-                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-claims-{day}"),
                     &format!("cap-liability-claims-{day}"),
                     subject_key,
@@ -13315,7 +13315,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-liability-claims-pending-1",
                 "cap-liability-claims-pending-1",
                 subject_key,
@@ -13371,7 +13371,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-liability-claims-failed-1",
                 "cap-liability-claims-failed-1",
                 subject_key,
@@ -13694,7 +13694,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 governed_receipt_id,
                 "cap-liability-claims-payout-1",
                 subject_key,
@@ -14114,7 +14114,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..100_u64 {
             store
-                .append_arc_receipt(&make_credit_history_receipt(
+                .append_chio_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-claims-negative-{day}"),
                     &format!("cap-liability-claims-negative-{day}"),
                     subject_key,
@@ -14166,7 +14166,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-liability-claims-negative-pending-1",
                 "cap-liability-claims-negative-pending-1",
                 subject_key,
@@ -14222,7 +14222,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
-            .append_arc_receipt(&make_credit_history_receipt(
+            .append_chio_receipt(&make_credit_history_receipt(
                 "rc-liability-claims-negative-failed-1",
                 "cap-liability-claims-negative-failed-1",
                 subject_key,
@@ -14508,7 +14508,7 @@ fn test_underwriting_policy_input_export_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-underwrite-1",
                 "cap-underwrite-1",
                 subject_key,
@@ -14674,7 +14674,7 @@ fn test_underwriting_decision_report_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-decision-1",
                 "cap-decision-1",
                 subject_key,
@@ -14887,7 +14887,7 @@ fn test_underwriting_decision_links_failed_settlement_evidence() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-failed-settlement-1",
                 "cap-failed-settlement-1",
                 "subject-failed-settlement-1",
@@ -14971,7 +14971,7 @@ fn test_underwriting_simulation_report_surfaces() {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         for day in 0..=14_u64 {
             store
-                .append_arc_receipt(&make_underwriting_simulation_receipt(
+                .append_chio_receipt(&make_underwriting_simulation_receipt(
                     &format!("rc-sim-{day}"),
                     "cap-sim-1",
                     subject_key,
@@ -15099,7 +15099,7 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-issue-1",
                 "cap-issue-1",
                 subject_key,
@@ -15280,7 +15280,7 @@ fn test_underwriting_decision_issue_with_mixed_currency_exposure_withholds_premi
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-mixed-usd-1",
                 "cap-mixed-1",
                 subject_key,
@@ -15297,7 +15297,7 @@ fn test_underwriting_decision_issue_with_mixed_currency_exposure_withholds_premi
             ))
             .expect("append USD governed receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-mixed-eur-1",
                 "cap-mixed-2",
                 subject_key,
@@ -15373,7 +15373,7 @@ fn test_underwriting_decision_list_partitions_premium_totals_by_currency() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-premium-usd-1",
                 "cap-premium-usd-1",
                 "subject-underwrite-usd-1",
@@ -15390,7 +15390,7 @@ fn test_underwriting_decision_list_partitions_premium_totals_by_currency() {
             ))
             .expect("append USD receipt");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+            .append_chio_receipt(&make_governed_authorization_receipt_with_options(
                 "rc-premium-eur-1",
                 "cap-premium-eur-1",
                 "subject-underwrite-eur-1",
@@ -15490,7 +15490,7 @@ fn test_underwriting_appeal_and_supersession_lifecycle() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-appeal-1",
                 "cap-appeal-1",
                 subject_key,
@@ -15671,7 +15671,7 @@ fn test_underwriting_rejected_appeal_cannot_link_replacement_decision() {
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
-            .append_arc_receipt(&make_governed_authorization_receipt(
+            .append_chio_receipt(&make_governed_authorization_receipt(
                 "rc-appeal-2",
                 "cap-appeal-2",
                 subject_key,

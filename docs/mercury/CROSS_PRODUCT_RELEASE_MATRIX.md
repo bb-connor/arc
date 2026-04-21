@@ -7,8 +7,8 @@
 
 ## Purpose
 
-This matrix distinguishes shared ARC substrate changes from MERCURY-only and
-ARC-Wall-only changes for the current product set.
+This matrix distinguishes shared Chio substrate changes from MERCURY-only and
+Chio-Wall-only changes for the current product set.
 
 ---
 
@@ -16,37 +16,37 @@ ARC-Wall-only changes for the current product set.
 
 ### `shared_substrate`
 
-- affected products: MERCURY, ARC-Wall
+- affected products: MERCURY, Chio-Wall
 - required approvers:
-  - `arc-release-control`
+  - `chio-release-control`
   - `mercury-platform-owner`
   - `barrier-control-room`
 - pause scope: both product lanes
-- rollback owner: `arc-release-control`
+- rollback owner: `chio-release-control`
 
 ### `mercury_only`
 
 - affected products: MERCURY
 - required approvers:
   - `mercury-platform-owner`
-  - `arc-release-control`
+  - `chio-release-control`
 - pause scope: MERCURY only
 - rollback owner: `mercury-platform-owner`
 
-### `arc_wall_only`
+### `chio_wall_only`
 
-- affected products: ARC-Wall
+- affected products: Chio-Wall
 - required approvers:
   - `barrier-control-room`
-  - `arc-release-control`
-- pause scope: ARC-Wall only
+  - `chio-release-control`
+- pause scope: Chio-Wall only
 - rollback owner: `barrier-control-room`
 
 ---
 
 ## Control Boundary
 
-Shared ARC changes require cross-product review because both apps consume the
+Shared Chio changes require cross-product review because both apps consume the
 same receipt, checkpoint, export, and verifier truth. Product-local changes
 can remain product-scoped only when the shared dependency map is unchanged.
 
@@ -55,7 +55,7 @@ can remain product-scoped only when the shared dependency map is unchanged.
 ## Canonical Command
 
 ```bash
-cargo run -p arc-cli -- product-surface export --output target/arc-product-surface-hardening-export
+cargo run -p chio-cli -- product-surface export --output target/chio-product-surface-hardening-export
 ```
 
 The export package writes `cross-product-release-matrix.json`.

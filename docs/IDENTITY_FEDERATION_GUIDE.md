@@ -1,7 +1,7 @@
 # Identity Federation Guide
 
 Chio now ships the next identity-federation alpha for bearer-authenticated
-`arc mcp serve-http` deployments, including both JWT verification and opaque
+`chio mcp serve-http` deployments, including both JWT verification and opaque
 bearer admission via token introspection.
 
 ## What It Does
@@ -38,10 +38,10 @@ same Chio subject and therefore the same receipt attribution path.
 
 ## CLI
 
-Use `arc mcp serve-http` with explicit JWT admission:
+Use `chio mcp serve-http` with explicit JWT admission:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
@@ -57,7 +57,7 @@ arc mcp serve-http \
 Or use OIDC discovery plus provider-aware mapping:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
@@ -73,7 +73,7 @@ arc mcp serve-http \
 Or use OAuth2 token introspection for opaque bearer tokens:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
@@ -91,7 +91,7 @@ arc mcp serve-http \
 To share an explicit provider-admin registry with the edge and trust-control:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --listen 127.0.0.1:8931 \
@@ -101,7 +101,7 @@ arc mcp serve-http \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
 
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json
@@ -111,7 +111,7 @@ The same trust-control process can also host portable-trust discovery surfaces
 that depend on explicit operator identity:
 
 ```bash
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json \
@@ -133,7 +133,7 @@ The supported flow is:
 
 1. one operator exports a bilateral evidence package with an attached
    federation policy
-2. the receiving operator imports that package with `arc evidence import`
+2. the receiving operator imports that package with `chio evidence import`
 3. local inspection and comparison surfaces report imported trust separately
    from native local reputation
 
@@ -144,12 +144,12 @@ local truth.
 Use the local CLI surfaces to inspect imported trust:
 
 ```bash
-arc --receipt-db receipts.sqlite3 evidence import --input ./upstream-package
+chio --receipt-db receipts.sqlite3 evidence import --input ./upstream-package
 
-arc --json --receipt-db receipts.sqlite3 reputation local \
+chio --json --receipt-db receipts.sqlite3 reputation local \
   --subject-public-key <agent-ed25519-hex>
 
-arc --json --receipt-db receipts.sqlite3 reputation compare \
+chio --json --receipt-db receipts.sqlite3 reputation compare \
   --subject-public-key <agent-ed25519-hex> \
   --passport passport.json
 ```
@@ -194,10 +194,10 @@ Each provider record is an explicit `oidc_jwks`, `oauth_introspection`,
 CLI surface:
 
 ```text
-arc trust provider list
-arc trust provider get --provider-id <id>
-arc trust provider upsert --input provider.json
-arc trust provider delete --provider-id <id>
+chio trust provider list
+chio trust provider get --provider-id <id>
+chio trust provider upsert --input provider.json
+chio trust provider delete --provider-id <id>
 ```
 
 HTTP surface on trust-control:
@@ -215,12 +215,12 @@ configs without guessing from logs.
 
 ## SCIM Lifecycle Automation
 
-When `arc trust serve` is started with both `--enterprise-providers-file` and
+When `chio trust serve` is started with both `--enterprise-providers-file` and
 `--scim-lifecycle-file`, trust-control exposes a bounded SCIM lifecycle
 surface for validated `scim` provider-admin records:
 
 ```bash
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json \
@@ -248,7 +248,7 @@ identity metadata.
 every tracked capability issued through the SCIM-governed federated-issue lane,
 and appends a signed deprovisioning receipt into the canonical receipt store.
 
-When the SCIM lifecycle registry is configured, `arc trust federated-issue`
+When the SCIM lifecycle registry is configured, `chio trust federated-issue`
 also changes behavior for validated `scim` providers: issuance requires a
 matching active SCIM identity, successful issuance binds the new capability ID
 back to that identity, and later issuance fails closed after deprovisioning.
@@ -291,7 +291,7 @@ Portable-trust admission now distinguishes two paths:
 
 - Legacy bearer-only path: bearer admission can still surface
   `enterpriseIdentity` for observability, but if no validated
-  provider-admin record is selected, `arc trust federated-issue` preserves
+  provider-admin record is selected, `chio trust federated-issue` preserves
   the legacy bearer admission behavior.
 - Enterprise-provider lane: this is active only when
   `enterpriseIdentity.providerRecordId` resolves to a validated provider-admin
@@ -311,10 +311,10 @@ When the enterprise-provider lane is active, allow responses expose
 - matched origin profile and decision reason
 
 Portable-trust issuance can now also project verified enterprise identity into
-passport artifacts. `arc passport create --enterprise-identity <file>` embeds
+passport artifacts. `chio passport create --enterprise-identity <file>` embeds
 typed `enterpriseIdentityProvenance` into the signed credential plus the
-passport bundle, `arc passport verify` / `evaluate` / `challenge verify`
-surface the same provenance back out, and `arc trust federated-issue`
+passport bundle, `chio passport verify` / `evaluate` / `challenge verify`
+surface the same provenance back out, and `chio trust federated-issue`
 includes a typed `enterpriseIdentityProvenance` object alongside the
 enterprise audit when enterprise context participates in admission.
 

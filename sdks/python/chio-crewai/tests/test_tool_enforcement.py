@@ -109,14 +109,14 @@ class TestAllowVerdict:
             called.append(kwargs)
             return f"result={kwargs.get('q')}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioBaseTool(
                 name="search",
                 description="search the web",
                 server_id="srv",
                 capability_id="cap-1",
                 executor=executor,
-                chio_client=arc,
+                chio_client=chio,
             )
             result = await tool._arun(q="hello")
 
@@ -129,14 +129,14 @@ class TestAllowVerdict:
         async def executor(**kwargs: Any) -> str:
             return f"async:{kwargs.get('q')}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioBaseTool(
                 name="search",
                 description="search the web",
                 server_id="srv",
                 capability_id="cap-1",
                 executor=executor,
-                chio_client=arc,
+                chio_client=chio,
             )
             result = await tool._arun(q="hi")
 
@@ -157,14 +157,14 @@ class TestDenyVerdict:
         # ``raise_on_deny=False`` forces the mock to return a deny
         # receipt that the tool then converts into ChioToolError itself,
         # exercising the receipt-based path.
-        async with deny_all(raise_on_deny=False) as arc:
+        async with deny_all(raise_on_deny=False) as chio:
             tool = ChioBaseTool(
                 name="write",
                 description="write a file",
                 server_id="srv",
                 capability_id="cap-x",
                 executor=executor,
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool._arun(path="/tmp/x")
@@ -180,14 +180,14 @@ class TestDenyVerdict:
     async def test_deny_from_403_raises_chio_tool_error(self) -> None:
         # ``raise_on_deny=True`` -> mock raises ChioDeniedError which the
         # tool translates to ChioToolError.
-        async with deny_all(reason="no write perms", guard="ScopeGuard") as arc:
+        async with deny_all(reason="no write perms", guard="ScopeGuard") as chio:
             tool = ChioBaseTool(
                 name="write",
                 description="write a file",
                 server_id="srv",
                 capability_id="cap-x",
                 executor=lambda **_kw: "unreached",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool._arun(path="/tmp/x")
@@ -197,14 +197,14 @@ class TestDenyVerdict:
         assert "no write perms" in err.reason if err.reason else False
 
     async def test_missing_capability_id_denies(self) -> None:
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioBaseTool(
                 name="search",
                 description="search",
                 server_id="srv",
                 capability_id="",
                 executor=lambda **_kw: "unreached",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool._arun(q="hi")
@@ -218,11 +218,11 @@ class TestDenyVerdict:
 
 class TestResearcherCannotWrite:
     async def test_researcher_write_is_denied(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         researcher_token = await _mint_token(
-            arc,
+            chio,
             subject="agent:researcher",
             scope=_scope_for_tools("search", "browse"),
         )
@@ -233,7 +233,7 @@ class TestResearcherCannotWrite:
             server_id="srv",
             capability_id=researcher_token.id,
             executor=lambda **_kw: "unreached",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         with pytest.raises(ChioToolError) as exc_info:
@@ -250,11 +250,11 @@ class TestResearcherCannotWrite:
 
 class TestWriterCannotSearch:
     async def test_writer_search_is_denied(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         writer_token = await _mint_token(
-            arc,
+            chio,
             subject="agent:writer",
             scope=_scope_for_tools("write", "format"),
         )
@@ -265,7 +265,7 @@ class TestWriterCannotSearch:
             server_id="srv",
             capability_id=writer_token.id,
             executor=lambda **_kw: "unreached",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         with pytest.raises(ChioToolError) as exc_info:
@@ -281,19 +281,19 @@ class TestWriterCannotSearch:
 
 class TestAttenuatedDelegation:
     async def test_child_cannot_escalate_beyond_parent(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         # Parent has search + browse; child should be a subset.
         parent = await _mint_token(
-            arc,
+            chio,
             subject="agent:parent",
             scope=_scope_for_tools("search", "browse"),
         )
         child_scope = _scope_for_tools("search")
-        child = await arc.attenuate_capability(parent, new_scope=child_scope)
+        child = await chio.attenuate_capability(parent, new_scope=child_scope)
         # Index the child token for the policy as well.
-        arc._tokens[child.id] = child  # type: ignore[attr-defined]
+        chio._tokens[child.id] = child  # type: ignore[attr-defined]
 
         # The child tries to invoke a tool the parent did not have.
         escalate_tool = ChioBaseTool(
@@ -302,7 +302,7 @@ class TestAttenuatedDelegation:
             server_id="srv",
             capability_id=child.id,
             executor=lambda **_kw: "unreached",
-            chio_client=arc,
+            chio_client=chio,
         )
         with pytest.raises(ChioToolError):
             await escalate_tool._arun(path="/out")
@@ -312,4 +312,4 @@ class TestAttenuatedDelegation:
 
         broader = _scope_for_tools("search", "browse", "write")
         with pytest.raises(ChioValidationError):
-            await arc.attenuate_capability(parent, new_scope=broader)
+            await chio.attenuate_capability(parent, new_scope=broader)

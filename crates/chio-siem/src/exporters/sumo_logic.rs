@@ -43,7 +43,7 @@ pub struct SumoLogicConfig {
     /// Must start with `https://`. HTTP is rejected because the URL carries
     /// the collector's secret token.
     pub http_source_url: String,
-    /// `X-Sumo-Category` header. Default: `"security/arc"`.
+    /// `X-Sumo-Category` header. Default: `"security/chio"`.
     pub source_category: String,
     /// `X-Sumo-Name` header. Default: `"chio"`.
     pub source_name: String,
@@ -60,7 +60,7 @@ impl Default for SumoLogicConfig {
     fn default() -> Self {
         Self {
             http_source_url: String::new(),
-            source_category: "security/arc".to_string(),
+            source_category: "security/chio".to_string(),
             source_name: "chio".to_string(),
             source_host: None,
             format: SumoLogicFormat::Json,

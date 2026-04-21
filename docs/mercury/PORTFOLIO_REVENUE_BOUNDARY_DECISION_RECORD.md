@@ -26,4 +26,4 @@ Proceed with one bounded Mercury portfolio-revenue-boundary lane only.
 
 - generic revenue platforms, billing systems, or forecasting tooling
 - channel-program automation or marketplaces
-- ARC-side commercial control surfaces
+- Chio-side commercial control surfaces

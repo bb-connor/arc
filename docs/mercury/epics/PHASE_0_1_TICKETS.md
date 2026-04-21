@@ -7,16 +7,16 @@
 
 ## Phase 0
 
-### E-001: ARC Reuse Inventory
+### E-001: Chio Reuse Inventory
 
 #### T-001: Receipt and checkpoint reuse map
 
-- Identify ARC components reused directly for signing, receipt storage, and
+- Identify Chio components reused directly for signing, receipt storage, and
   verification.
 
 #### T-002: Gap list for MERCURY-specific logic
 
-- Separate net-new MERCURY work from ARC infrastructure already available.
+- Separate net-new MERCURY work from Chio infrastructure already available.
 
 #### T-003: Reuse sign-off memo
 
@@ -89,7 +89,7 @@
 
 ## Phase 1
 
-### E-005: `arc-mercury-core`
+### E-005: `chio-mercury-core`
 
 #### T-013: Core crate scaffold
 

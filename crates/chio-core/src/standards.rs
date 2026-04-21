@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 pub const CHIO_PORTABLE_CLAIM_CATALOG_SCHEMA: &str = "chio.portable-claim-catalog.v1";
 pub const CHIO_PORTABLE_IDENTITY_BINDING_SCHEMA: &str = "chio.portable-identity-binding.v1";
 pub const CHIO_GOVERNED_AUTH_BINDING_SCHEMA: &str = "chio.governed-auth-binding.v1";
-pub const CHIO_PORTABLE_SUBJECT_BINDING_DID_ARC_SUBJECT_KEY_THUMBPRINT: &str =
+pub const CHIO_PORTABLE_SUBJECT_BINDING_DID_CHIO_SUBJECT_KEY_THUMBPRINT: &str =
     "did:chio-subject-key-thumbprint";
 pub const CHIO_PORTABLE_ISSUER_IDENTITY_HTTPS_JWKS: &str = "https-url+jwks";
-pub const CHIO_PROVENANCE_ANCHOR_DID_ARC: &str = "did:chio";
+pub const CHIO_PROVENANCE_ANCHOR_DID_CHIO: &str = "did:chio";
 pub const CHIO_GOVERNED_AUTH_AUTHORITATIVE_SOURCE: &str = "metadata.governed_transaction";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -105,7 +105,7 @@ impl Default for ChioPortableIdentityBinding {
     fn default() -> Self {
         Self {
             schema: CHIO_PORTABLE_IDENTITY_BINDING_SCHEMA.to_string(),
-            subject_binding: CHIO_PORTABLE_SUBJECT_BINDING_DID_ARC_SUBJECT_KEY_THUMBPRINT
+            subject_binding: CHIO_PORTABLE_SUBJECT_BINDING_DID_CHIO_SUBJECT_KEY_THUMBPRINT
                 .to_string(),
             portable_subject_claim: "sub".to_string(),
             subject_confirmation_claim: "cnf.jwk".to_string(),
@@ -114,7 +114,7 @@ impl Default for ChioPortableIdentityBinding {
             portable_issuer_claim: "iss".to_string(),
             chio_issuer_provenance_claim: "chio_issuer_dids".to_string(),
             enterprise_provenance_claim: "chio_enterprise_identity_provenance".to_string(),
-            chio_provenance_anchor: CHIO_PROVENANCE_ANCHOR_DID_ARC.to_string(),
+            chio_provenance_anchor: CHIO_PROVENANCE_ANCHOR_DID_CHIO.to_string(),
             unsupported_mappings_fail_closed: true,
         }
     }

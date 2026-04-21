@@ -132,7 +132,7 @@ impl RequestEvaluator {
     }
 
     /// Evaluate a fully normalized sidecar request.
-    pub fn evaluate_arc_request(
+    pub fn evaluate_chio_request(
         &self,
         request: ChioHttpRequest,
         presented_capability: Option<&str>,
@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_arc_request_denies_capability_for_different_tool_identity() {
+    fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
@@ -439,7 +439,7 @@ mod tests {
         request.body_length = 1;
 
         let result = evaluator
-            .evaluate_arc_request(request, Some(&capability))
+            .evaluate_chio_request(request, Some(&capability))
             .unwrap();
 
         assert!(result.verdict.is_denied());
@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_arc_request_allows_model_constrained_capability_when_metadata_matches() {
+    fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
@@ -494,7 +494,7 @@ mod tests {
         request.body_length = 1;
 
         let result = evaluator
-            .evaluate_arc_request(request, Some(&capability))
+            .evaluate_chio_request(request, Some(&capability))
             .unwrap();
 
         assert!(result.verdict.is_allowed());
@@ -505,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_arc_request_allows_capability_from_configured_external_issuer() {
+    fn evaluate_chio_request_allows_capability_from_configured_external_issuer() {
         let signer = Keypair::generate();
         let external_issuer = Keypair::generate();
         let evaluator = RequestEvaluator::new_with_trusted_capability_issuers(
@@ -527,7 +527,7 @@ mod tests {
         request.body_length = 1;
 
         let result = evaluator
-            .evaluate_arc_request(request, Some(&capability))
+            .evaluate_chio_request(request, Some(&capability))
             .unwrap();
 
         assert!(result.verdict.is_allowed());

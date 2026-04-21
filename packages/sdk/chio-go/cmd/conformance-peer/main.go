@@ -78,9 +78,9 @@ func run() error {
 		}
 		return writeOutputs(args.resultsOutput, args.artifactsDir, transcript, results)
 	}
-	pactClient := client.WithStaticBearer(args.baseURL, args.authToken, nil)
+	chioClient := client.WithStaticBearer(args.baseURL, args.authToken, nil)
 	if authContext.AccessToken != "" {
-		pactClient = client.WithStaticBearer(args.baseURL, authContext.AccessToken, nil)
+		chioClient = client.WithStaticBearer(args.baseURL, authContext.AccessToken, nil)
 	}
 	var sharedSession *session.Session
 
@@ -91,7 +91,7 @@ func run() error {
 		if dedicatedSession {
 			scenarioSession, err = initializeSession(
 				ctx,
-				pactClient,
+				chioClient,
 				&transcript,
 				descriptor.ID+"/",
 				conformanceClientCapabilities(),
@@ -101,7 +101,7 @@ func run() error {
 				continue
 			}
 		} else if sharedSession == nil {
-			sharedSession, err = initializeSession(ctx, pactClient, &transcript, "", nil)
+			sharedSession, err = initializeSession(ctx, chioClient, &transcript, "", nil)
 			if err != nil {
 				results = append(results, exceptionResult(descriptor, err.Error(), 0))
 				continue
@@ -196,7 +196,7 @@ func runScenario(
 	descriptor scenario,
 	args cliArgs,
 	authContext authContext,
-	pactSession *session.Session,
+	chioSession *session.Session,
 	transcript *[]map[string]any,
 ) map[string]any {
 	started := time.Now()
@@ -205,7 +205,7 @@ func runScenario(
 	case "initialize":
 		return passedResult(descriptor, time.Since(started), "initialize_succeeds")
 	case "tools-list":
-		exchange, terminal, err := requestResult(ctx, pactSession, "tools/list", map[string]any{}, "tools/list")
+		exchange, terminal, err := requestResult(ctx, chioSession, "tools/list", map[string]any{}, "tools/list")
 		if err != nil {
 			return exceptionResult(descriptor, err.Error(), time.Since(started).Milliseconds())
 		}
@@ -219,7 +219,7 @@ func runScenario(
 		}
 		return failedResult(descriptor, time.Since(started), "tools_list_contains_echo_text", "tools/list did not include echo_text")
 	case "tools-call-simple-text":
-		exchange, terminal, err := requestResult(ctx, pactSession, "tools/call", map[string]any{
+		exchange, terminal, err := requestResult(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "echo_text",
 			"arguments": map[string]any{"message": "hello from go peer"},
 		}, "tools/call")
@@ -236,7 +236,7 @@ func runScenario(
 		}
 		return failedResult(descriptor, time.Since(started), "tool_result_matches_input_text", "unexpected tool text result")
 	case "resources-list":
-		exchange, terminal, err := requestResult(ctx, pactSession, "resources/list", map[string]any{}, "resources/list")
+		exchange, terminal, err := requestResult(ctx, chioSession, "resources/list", map[string]any{}, "resources/list")
 		if err != nil {
 			return exceptionResult(descriptor, err.Error(), time.Since(started).Milliseconds())
 		}
@@ -250,7 +250,7 @@ func runScenario(
 		}
 		return failedResult(descriptor, time.Since(started), "resources_list_contains_fixture_uri", "resources/list did not include fixture://docs/alpha")
 	case "prompts-list":
-		exchange, terminal, err := requestResult(ctx, pactSession, "prompts/list", map[string]any{}, "prompts/list")
+		exchange, terminal, err := requestResult(ctx, chioSession, "prompts/list", map[string]any{}, "prompts/list")
 		if err != nil {
 			return exceptionResult(descriptor, err.Error(), time.Since(started).Milliseconds())
 		}
@@ -387,7 +387,7 @@ func runScenario(
 		return passedResult(descriptor, time.Since(started), "token_exchange_access_token_initializes_session")
 	case "resources-subscribe-updated-notification":
 		subscribedURI := "fixture://docs/alpha"
-		subscribeExchange, _, err := requestResult(ctx, pactSession, "resources/subscribe", map[string]any{
+		subscribeExchange, _, err := requestResult(ctx, chioSession, "resources/subscribe", map[string]any{
 			"uri": subscribedURI,
 		}, "resources/subscribe")
 		if err != nil {
@@ -403,7 +403,7 @@ func runScenario(
 			)
 		}
 
-		triggerExchange, _, err := requestResult(ctx, pactSession, "tools/call", map[string]any{
+		triggerExchange, _, err := requestResult(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "emit_fixture_notifications",
 			"arguments": map[string]any{"uri": subscribedURI},
 		}, "notifications/trigger-updated")
@@ -441,7 +441,7 @@ func runScenario(
 			},
 		)
 	case "catalog-list-changed-notifications":
-		triggerExchange, _, err := requestResult(ctx, pactSession, "tools/call", map[string]any{
+		triggerExchange, _, err := requestResult(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "emit_fixture_notifications",
 			"arguments": map[string]any{"uri": "fixture://docs/alpha"},
 		}, "notifications/trigger-catalog")
@@ -474,7 +474,7 @@ func runScenario(
 			"catalog_list_changed_notifications_are_forwarded",
 		)
 	case "tasks-call-get-result":
-		createExchange, createResult, err := requestResult(ctx, pactSession, "tools/call", map[string]any{
+		createExchange, createResult, err := requestResult(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "echo_text",
 			"arguments": map[string]any{"message": "hello from go task peer"},
 			"task":      map[string]any{},
@@ -493,7 +493,7 @@ func runScenario(
 			)
 		}
 
-		getExchange, getResult, err := requestResult(ctx, pactSession, "tasks/get", map[string]any{
+		getExchange, getResult, err := requestResult(ctx, chioSession, "tasks/get", map[string]any{
 			"taskId": taskID,
 		}, "tasks/get")
 		if err != nil {
@@ -510,7 +510,7 @@ func runScenario(
 			)
 		}
 
-		resultExchange, taskResult, err := requestResult(ctx, pactSession, "tasks/result", map[string]any{
+		resultExchange, taskResult, err := requestResult(ctx, chioSession, "tasks/result", map[string]any{
 			"taskId": taskID,
 		}, "tasks/result")
 		if err != nil {
@@ -539,7 +539,7 @@ func runScenario(
 			},
 		)
 	case "tasks-cancel":
-		createExchange, createResult, err := requestResult(ctx, pactSession, "tools/call", map[string]any{
+		createExchange, createResult, err := requestResult(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "slow_echo",
 			"arguments": map[string]any{"message": "hello from go cancel peer"},
 			"task":      map[string]any{},
@@ -558,7 +558,7 @@ func runScenario(
 			)
 		}
 
-		cancelExchange, err := pactSession.Request(ctx, "tasks/cancel", map[string]any{
+		cancelExchange, err := chioSession.Request(ctx, "tasks/cancel", map[string]any{
 			"taskId": taskID,
 		}, nil)
 		if err != nil {
@@ -600,7 +600,7 @@ func runScenario(
 			)
 		}
 
-		resultExchange, taskResult, err := requestResult(ctx, pactSession, "tasks/result", map[string]any{
+		resultExchange, taskResult, err := requestResult(ctx, chioSession, "tasks/result", map[string]any{
 			"taskId": taskID,
 		}, "tasks/cancel-result")
 		if err != nil {
@@ -629,11 +629,11 @@ func runScenario(
 			},
 		)
 	case "nested-sampling-create-message":
-		response, terminal, err := requestResultWithHandler(ctx, pactSession, "tools/call", map[string]any{
+		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "sampled_echo",
 			"arguments": map[string]any{"message": "wave5 sampling request"},
 		}, "nested/sampling/tool-call", func(ctx context.Context, message map[string]any) error {
-			_, err := nestedRouter.Handle(ctx, message, pactSession, "nested/sampling")
+			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/sampling")
 			return err
 		})
 		if err != nil {
@@ -651,11 +651,11 @@ func runScenario(
 		}
 		return passedResult(descriptor, time.Since(started), "nested_sampling_request_roundtrips")
 	case "nested-elicitation-form-create":
-		response, terminal, err := requestResultWithHandler(ctx, pactSession, "tools/call", map[string]any{
+		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "elicited_echo",
 			"arguments": map[string]any{"message": "wave5 form elicitation request"},
 		}, "nested/elicitation-form/tool-call", func(ctx context.Context, message map[string]any) error {
-			_, err := nestedRouter.Handle(ctx, message, pactSession, "nested/elicitation-form")
+			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/elicitation-form")
 			return err
 		})
 		if err != nil {
@@ -674,11 +674,11 @@ func runScenario(
 		}
 		return passedResult(descriptor, time.Since(started), "nested_form_elicitation_roundtrips")
 	case "nested-elicitation-url-create":
-		response, terminal, err := requestResultWithHandler(ctx, pactSession, "tools/call", map[string]any{
+		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "url_elicited_echo",
 			"arguments": map[string]any{"message": "wave5 url elicitation request"},
 		}, "nested/elicitation-url/tool-call", func(ctx context.Context, message map[string]any) error {
-			_, err := nestedRouter.Handle(ctx, message, pactSession, "nested/elicitation-url")
+			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/elicitation-url")
 			return err
 		})
 		if err != nil {
@@ -704,11 +704,11 @@ func runScenario(
 		}
 		return passedResult(descriptor, time.Since(started), "nested_url_elicitation_roundtrips_and_completes")
 	case "nested-roots-list":
-		response, terminal, err := requestResultWithHandler(ctx, pactSession, "tools/call", map[string]any{
+		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "roots_echo",
 			"arguments": map[string]any{"message": "wave5 roots request"},
 		}, "nested/roots/tool-call", func(ctx context.Context, message map[string]any) error {
-			_, err := nestedRouter.Handle(ctx, message, pactSession, "nested/roots")
+			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/roots")
 			return err
 		})
 		if err != nil {
@@ -745,23 +745,23 @@ func runScenario(
 
 func requestResult(
 	ctx context.Context,
-	pactSession *session.Session,
+	chioSession *session.Session,
 	method string,
 	params map[string]any,
 	step string,
 ) (map[string]any, map[string]any, error) {
-	return requestResultWithHandler(ctx, pactSession, method, params, step, nil)
+	return requestResultWithHandler(ctx, chioSession, method, params, step, nil)
 }
 
 func requestResultWithHandler(
 	ctx context.Context,
-	pactSession *session.Session,
+	chioSession *session.Session,
 	method string,
 	params map[string]any,
 	step string,
 	onMessage session.MessageHandler,
 ) (map[string]any, map[string]any, error) {
-	exchange, err := pactSession.Request(ctx, method, params, onMessage)
+	exchange, err := chioSession.Request(ctx, method, params, onMessage)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -783,12 +783,12 @@ func requestResultWithHandler(
 
 func initializeSession(
 	ctx context.Context,
-	pactClient *client.Client,
+	chioClient *client.Client,
 	transcript *[]map[string]any,
 	stepPrefix string,
 	capabilities map[string]any,
 ) (*session.Session, error) {
-	pactSession, err := pactClient.Initialize(ctx, client.InitializeOptions{
+	chioSession, err := chioClient.Initialize(ctx, client.InitializeOptions{
 		Capabilities: capabilities,
 		ClientInfo: client.ClientInfo{
 			Name:    "chio-conformance-go",
@@ -801,27 +801,27 @@ func initializeSession(
 
 	*transcript = append(*transcript, map[string]any{
 		"step":       stepPrefix + "initialize",
-		"request":    pactSession.Handshake.InitializeResponse.Request,
-		"httpStatus": pactSession.Handshake.InitializeResponse.Status,
-		"headers":    pactSession.Handshake.InitializeResponse.Headers,
-		"messages":   pactSession.Handshake.InitializeResponse.Messages,
+		"request":    chioSession.Handshake.InitializeResponse.Request,
+		"httpStatus": chioSession.Handshake.InitializeResponse.Status,
+		"headers":    chioSession.Handshake.InitializeResponse.Headers,
+		"messages":   chioSession.Handshake.InitializeResponse.Messages,
 	})
 	*transcript = append(*transcript, map[string]any{
 		"step":       stepPrefix + "notifications/initialized",
-		"request":    pactSession.Handshake.InitializedResponse.Request,
-		"httpStatus": pactSession.Handshake.InitializedResponse.Status,
-		"messages":   pactSession.Handshake.InitializedResponse.Messages,
+		"request":    chioSession.Handshake.InitializedResponse.Request,
+		"httpStatus": chioSession.Handshake.InitializedResponse.Status,
+		"messages":   chioSession.Handshake.InitializedResponse.Messages,
 	})
-	return pactSession, nil
+	return chioSession, nil
 }
 
 func closeSession(
 	ctx context.Context,
-	pactSession *session.Session,
+	chioSession *session.Session,
 	transcript *[]map[string]any,
 	stepPrefix string,
 ) {
-	if status, err := pactSession.Close(ctx); err == nil {
+	if status, err := chioSession.Close(ctx); err == nil {
 		*transcript = append(*transcript, map[string]any{
 			"step":       stepPrefix + "delete-session",
 			"httpStatus": status.Status,

@@ -57,7 +57,7 @@ impl Oid4vpRequestedCredential {
         }
         let mut seen = BTreeSet::new();
         for claim in &self.claims {
-            if !is_supported_arc_sd_jwt_claim(claim) {
+            if !is_supported_chio_sd_jwt_claim(claim) {
                 return Err(CredentialError::InvalidOid4vpRequest(format!(
                     "Chio OID4VP does not support disclosure claim `{claim}`"
                 )));
@@ -711,7 +711,7 @@ pub fn build_wallet_exchange_descriptor_for_oid4vp(
     Ok(descriptor)
 }
 
-pub fn inspect_arc_passport_sd_jwt_vc_unverified(
+pub fn inspect_chio_passport_sd_jwt_vc_unverified(
     compact: &str,
 ) -> Result<ChioPassportSdJwtVcUnverified, CredentialError> {
     let segments = compact.split('~').collect::<Vec<_>>();
@@ -825,7 +825,7 @@ pub fn respond_to_oid4vp_request(
 ) -> Result<String, CredentialError> {
     request.validate(now)?;
     let requested = &request.dcql_query.credentials[0];
-    let inspected = inspect_arc_passport_sd_jwt_vc_unverified(portable_credential)?;
+    let inspected = inspect_chio_passport_sd_jwt_vc_unverified(portable_credential)?;
     let holder_did = DidChio::from_public_key(holder_keypair.public_key())?;
     if holder_did.to_string() != inspected.subject_did {
         return Err(CredentialError::InvalidOid4vpResponse(
@@ -952,7 +952,7 @@ pub fn verify_oid4vp_direct_post_response(
     }
 
     let credential_verification =
-        verify_arc_passport_sd_jwt_vc(&response.vp_token, issuer_public_key, now)?;
+        verify_chio_passport_sd_jwt_vc(&response.vp_token, issuer_public_key, now)?;
     if !expected_credential.issuer_allowlist.is_empty()
         && !expected_credential
             .issuer_allowlist
@@ -1030,7 +1030,7 @@ pub fn verify_oid4vp_direct_post_response_with_any_issuer_key(
     }))
 }
 
-fn is_supported_arc_sd_jwt_claim(claim: &str) -> bool {
+fn is_supported_chio_sd_jwt_claim(claim: &str) -> bool {
     ChioPortableClaimCatalog::default().supports_selective_disclosure(claim)
 }
 

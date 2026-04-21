@@ -90,7 +90,7 @@ CronJob (schedule: "0 */6 * * *")
 Extends the existing `ChioPolicy` CRD with job-specific fields:
 
 ```yaml
-apiVersion: arc.protocol/v1alpha1
+apiVersion: chio.protocol/v1alpha1
 kind: ChioJobGrant
 metadata:
   name: etl-pipeline-grant
@@ -100,7 +100,7 @@ spec:
   jobSelector:
     matchLabels:
       app: etl-pipeline
-      arc.protocol/governed: "true"
+      chio.protocol/governed: "true"
 
   # Capability scope for the Job
   capability:
@@ -153,7 +153,7 @@ import (
     "sigs.k8s.io/controller-runtime/pkg/client"
     "sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-    arcv1 "github.com/backbay/arc/sdks/k8s/api/v1alpha1"
+    arcv1 "github.com/backbay/chio/sdks/k8s/api/v1alpha1"
 )
 
 type JobReconciler struct {
@@ -231,8 +231,8 @@ func (r *JobReconciler) handleJobCreated(
     }
 
     // Annotate Job with grant info
-    job.Annotations["arc.protocol/grant-token-secret"] = secret.Name
-    job.Annotations["arc.protocol/grant-scopes"] = fmt.Sprintf("%v", grantSpec.Spec.Capability.Scopes)
+    job.Annotations["chio.protocol/grant-token-secret"] = secret.Name
+    job.Annotations["chio.protocol/grant-scopes"] = fmt.Sprintf("%v", grantSpec.Spec.Capability.Scopes)
     return reconcile.Result{}, r.Update(ctx, job)
 }
 ```
@@ -283,7 +283,7 @@ func (r *JobReconciler) handleJobCompleted(
     job *batchv1.Job,
     grantSpec *arcv1.ChioJobGrant,
 ) (reconcile.Result, error) {
-    tokenSecret := job.Annotations["arc.protocol/grant-token-secret"]
+    tokenSecret := job.Annotations["chio.protocol/grant-token-secret"]
 
     // Aggregate receipts from all pods in the Job
     pods, err := r.getJobPods(ctx, job)
@@ -293,7 +293,7 @@ func (r *JobReconciler) handleJobCompleted(
 
     var receiptIDs []string
     for _, pod := range pods {
-        if rid, ok := pod.Annotations["arc.protocol/receipt-ids"]; ok {
+        if rid, ok := pod.Annotations["chio.protocol/receipt-ids"]; ok {
             receiptIDs = append(receiptIDs, splitReceiptIDs(rid)...)
         }
     }
@@ -307,7 +307,7 @@ func (r *JobReconciler) handleJobCompleted(
         if err != nil {
             return reconcile.Result{}, err
         }
-        job.Annotations["arc.protocol/workflow-receipt"] = workflowReceipt.ReceiptID
+        job.Annotations["chio.protocol/workflow-receipt"] = workflowReceipt.ReceiptID
     }
 
     // Release the grant
@@ -316,8 +316,8 @@ func (r *JobReconciler) handleJobCompleted(
     }
 
     // Annotate Job with completion status
-    job.Annotations["arc.protocol/grant-released"] = "true"
-    job.Annotations["arc.protocol/receipt-count"] = fmt.Sprintf("%d", len(receiptIDs))
+    job.Annotations["chio.protocol/grant-released"] = "true"
+    job.Annotations["chio.protocol/receipt-count"] = fmt.Sprintf("%d", len(receiptIDs))
 
     return reconcile.Result{}, r.Update(ctx, job)
 }
@@ -333,16 +333,16 @@ kind: CronJob
 metadata:
   name: agent-etl
   labels:
-    arc.protocol/governed: "true"
+    chio.protocol/governed: "true"
   annotations:
-    arc.protocol/scope: "tools:etl"
-    arc.protocol/guards: "data-residency,business-hours"
+    chio.protocol/scope: "tools:etl"
+    chio.protocol/guards: "data-residency,business-hours"
 spec:
   schedule: "0 */6 * * *"
   jobTemplate:
     metadata:
       labels:
-        arc.protocol/governed: "true"
+        chio.protocol/governed: "true"
     spec:
       template:
         spec:
@@ -358,16 +358,16 @@ during approved hours, even if Kubernetes fires the schedule at other times.
 
 ```bash
 # List active Job grants
-arc k8s grants list --namespace data-team
+chio k8s grants list --namespace data-team
 
 # Inspect a Job's grant and receipts
-arc k8s job inspect etl-job-12345 --namespace data-team
+chio k8s job inspect etl-job-12345 --namespace data-team
 
 # Revoke a Job's grant (terminates the Job)
-arc k8s grant revoke --job etl-job-12345 --namespace data-team
+chio k8s grant revoke --job etl-job-12345 --namespace data-team
 
 # View receipt chain for a completed Job
-arc k8s job receipts etl-job-12345 --namespace data-team
+chio k8s job receipts etl-job-12345 --namespace data-team
 ```
 
 ## 7. Package Structure

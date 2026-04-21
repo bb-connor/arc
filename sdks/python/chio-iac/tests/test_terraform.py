@@ -131,7 +131,7 @@ class TestPlanPhase:
         fake_terraform_binary: str,
         tmp_path: Path,
     ) -> None:
-        arc = allow_all()
+        chio = allow_all()
         recorder.show_json = _tf_plan(
             ("aws_db_instance", ["create"], "aws_db_instance.primary"),
         )
@@ -140,11 +140,11 @@ class TestPlanPhase:
             "plan",
             capability_id="cap-plan",
             working_dir=tmp_path,
-            chio_client=arc,
+            chio_client=chio,
         )
 
         # Sidecar evaluated with plan tool-name.
-        calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(calls) == 1
         assert calls[0].tool_name == "terraform:plan"
         assert calls[0].capability_id == "cap-plan"
@@ -173,14 +173,14 @@ class TestPlanPhase:
         fake_terraform_binary: str,
         tmp_path: Path,
     ) -> None:
-        arc = deny_all(reason="missing plan scope", guard="CapabilityGuard")
+        chio = deny_all(reason="missing plan scope", guard="CapabilityGuard")
 
         with pytest.raises(ChioIACError) as exc_info:
             await run_terraform(
                 "plan",
                 capability_id="cap-no-plan",
                 working_dir=tmp_path,
-                chio_client=arc,
+                chio_client=chio,
             )
         assert exc_info.value.subcommand == "plan"
         assert exc_info.value.guard == "CapabilityGuard"
@@ -194,7 +194,7 @@ class TestPlanPhase:
         fake_terraform_binary: str,
         tmp_path: Path,
     ) -> None:
-        arc = deny_all(
+        chio = deny_all(
             reason="tight policy",
             guard="PolicyGuard",
             raise_on_deny=False,
@@ -205,7 +205,7 @@ class TestPlanPhase:
                 "plan",
                 capability_id="cap-rx",
                 working_dir=tmp_path,
-                chio_client=arc,
+                chio_client=chio,
             )
         assert exc_info.value.receipt_id is not None
         assert exc_info.value.guard == "PolicyGuard"
@@ -230,18 +230,18 @@ class TestApplyPhase:
         (tmp_path / "tfplan").write_text("binary-ish", encoding="utf-8")
         (tmp_path / "tfplan.json").write_text(json.dumps(plan_json), encoding="utf-8")
 
-        arc = allow_all()
+        chio = allow_all()
 
         result = await run_terraform(
             "apply",
             capability_id="cap-apply",
             working_dir=tmp_path,
             allowlist=ResourceTypeAllowlist(patterns=["aws_db_*"]),
-            chio_client=arc,
+            chio_client=chio,
         )
 
         # Sidecar evaluated with apply tool-name AND the resource types.
-        calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(calls) == 1
         assert calls[0].tool_name == "terraform:apply"
         assert calls[0].parameters["resource_types"] == ["aws_db_instance"]
@@ -265,7 +265,7 @@ class TestApplyPhase:
         (tmp_path / "tfplan").write_text("binary-ish", encoding="utf-8")
         (tmp_path / "tfplan.json").write_text(json.dumps(plan_json), encoding="utf-8")
 
-        arc = allow_all()
+        chio = allow_all()
 
         with pytest.raises(ChioIACPlanReviewError) as exc_info:
             await run_terraform(
@@ -273,7 +273,7 @@ class TestApplyPhase:
                 capability_id="cap-apply",
                 working_dir=tmp_path,
                 allowlist=ResourceTypeAllowlist(patterns=["aws_db_*"]),
-                chio_client=arc,
+                chio_client=chio,
             )
 
         # Violation list names the out-of-scope resource.
@@ -281,7 +281,7 @@ class TestApplyPhase:
         assert "aws_iam_role" in types
         assert "aws_db_instance" not in types
         # Sidecar was never consulted -- plan-review denies first.
-        assert not arc.calls
+        assert not chio.calls
         # Terraform apply was never dispatched.
         assert not any(c["command"][1] == "apply" for c in recorder.calls)
 
@@ -297,7 +297,7 @@ class TestApplyPhase:
         (tmp_path / "tfplan").write_text("binary-ish", encoding="utf-8")
         (tmp_path / "tfplan.json").write_text(json.dumps(plan_json), encoding="utf-8")
 
-        arc = allow_all()
+        chio = allow_all()
 
         with pytest.raises(ChioIACPlanReviewError) as exc_info:
             await run_terraform(
@@ -306,7 +306,7 @@ class TestApplyPhase:
                 working_dir=tmp_path,
                 allowlist=ResourceTypeAllowlist(patterns=["aws_*"]),
                 denylist=ResourceTypeDenylist(patterns=["aws_iam_*"]),
-                chio_client=arc,
+                chio_client=chio,
             )
         assert any(
             "denylist" in v["reason"] for v in exc_info.value.violations
@@ -371,13 +371,13 @@ class TestApplyPhase:
             ("aws_db_instance", ["create"], "aws_db_instance.primary"),
         )
 
-        arc = allow_all()
+        chio = allow_all()
         result = await run_terraform(
             "apply",
             capability_id="cap-apply",
             working_dir=tmp_path,
             allowlist=ResourceTypeAllowlist(patterns=["aws_db_*"]),
-            chio_client=arc,
+            chio_client=chio,
         )
         # We saw a ``terraform show -json tfplan`` call before apply.
         show_calls = [c for c in recorder.calls if c["command"][1:3] == ["show", "-json"]]
@@ -403,15 +403,15 @@ class TestDestroyPhase:
         (tmp_path / "tfplan").write_text("binary-ish", encoding="utf-8")
         (tmp_path / "tfplan.json").write_text(json.dumps(plan_json), encoding="utf-8")
 
-        arc = allow_all()
+        chio = allow_all()
         result = await run_terraform(
             "destroy",
             capability_id="cap-destroy",
             working_dir=tmp_path,
             allowlist=ResourceTypeAllowlist(patterns=["aws_db_*"]),
-            chio_client=arc,
+            chio_client=chio,
         )
-        calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(calls) == 1
         assert calls[0].tool_name == "terraform:destroy"
         # The kernel receives infra:apply scope.
@@ -442,7 +442,7 @@ class TestScopeSplit:
                 "apply scope not granted", guard="CapabilityGuard"
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
 
         # Plan works.
         recorder.show_json = _tf_plan(
@@ -452,7 +452,7 @@ class TestScopeSplit:
             "plan",
             capability_id="cap-plan-only",
             working_dir=tmp_path,
-            chio_client=arc,
+            chio_client=chio,
         )
         assert plan_result.returncode == 0
         assert plan_result.receipt is not None
@@ -464,7 +464,7 @@ class TestScopeSplit:
                 capability_id="cap-plan-only",
                 working_dir=tmp_path,
                 allowlist=ResourceTypeAllowlist(patterns=["aws_*"]),
-                chio_client=arc,
+                chio_client=chio,
             )
         assert exc_info.value.subcommand == "apply"
         assert exc_info.value.guard == "CapabilityGuard"
@@ -523,12 +523,12 @@ class TestInputValidation:
             allowlist=ResourceTypeAllowlist(patterns=["aws_s3_*"]),
         )
 
-        arc = allow_all()
+        chio = allow_all()
         result = await run_terraform(
             "apply",
             capability_id="cap",
             working_dir=tmp_path,
             plan_review_guard=guard,
-            chio_client=arc,
+            chio_client=chio,
         )
         assert result.resource_types == ["aws_s3_bucket"]

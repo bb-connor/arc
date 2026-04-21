@@ -491,7 +491,7 @@ impl SqliteReceiptStore {
 
         for (seq, raw_json) in rows {
             let receipt =
-                decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
+                decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
             let Some(financial) = extract_financial_metadata(&receipt) else {
                 continue;
             };
@@ -1011,7 +1011,7 @@ impl SqliteReceiptStore {
             .ok_or_else(|| {
                 ReceiptStoreError::NotFound(format!("receipt {receipt_id} does not exist"))
             })?;
-        let receipt = decode_verified_arc_receipt(
+        let receipt = decode_verified_chio_receipt(
             &raw_json,
             "persisted tool receipt",
             Some(seq.max(0) as u64),
@@ -1190,7 +1190,7 @@ impl SqliteReceiptStore {
                 note,
                 updated_at,
             ) = row?;
-            let receipt = decode_verified_arc_receipt(
+            let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -1422,7 +1422,7 @@ impl SqliteReceiptStore {
                 recorded_at,
                 raw_json,
             ) = row?;
-            let receipt = decode_verified_arc_receipt(
+            let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -1818,7 +1818,7 @@ impl SqliteReceiptStore {
                 updated_at,
                 raw_json,
             ) = row?;
-            let receipt = decode_verified_arc_receipt(
+            let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -2041,7 +2041,7 @@ impl SqliteReceiptStore {
                 persisted_statement_id,
                 persisted_session_anchor_id,
             ) = row?;
-            let receipt = decode_verified_arc_receipt(
+            let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -2095,7 +2095,7 @@ impl SqliteReceiptStore {
                 governed_transaction_diagnostics: projection.diagnostics.clone(),
                 sender_constraint,
             };
-            validate_arc_oauth_authorization_row(&authorization_row)?;
+            validate_chio_oauth_authorization_row(&authorization_row)?;
             if let Some(evidence_class) = call_chain_evidence_class(&projection) {
                 call_chain_receipts += 1;
                 match evidence_class {
@@ -2239,7 +2239,7 @@ impl SqliteReceiptStore {
                 params![row.receipt_id.as_str()],
                 |db_row| Ok((db_row.get::<_, i64>(0)?, db_row.get::<_, String>(1)?)),
             )?;
-            let signed_receipt = decode_verified_arc_receipt(
+            let signed_receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -2499,7 +2499,7 @@ impl SqliteReceiptStore {
         let mut receipts = Vec::with_capacity(row_limit);
         for row in rows {
             let (seq, raw_json) = row?;
-            let receipt = decode_verified_arc_receipt(
+            let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),
@@ -2608,7 +2608,7 @@ impl SqliteReceiptStore {
         let mut receipts = Vec::new();
         for row in rows {
             let (seq, raw_json) = row?;
-            let receipt = decode_verified_arc_receipt(
+            let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
                 Some(seq.max(0) as u64),

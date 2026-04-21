@@ -39,7 +39,7 @@ def _scope(*tools: str) -> ChioScope:
     )
 
 
-def _capability_aware_policy(arc: MockChioClient) -> Any:
+def _capability_aware_policy(chio: MockChioClient) -> Any:
     """Policy that denies when the tool isn't in the token's scope."""
 
     def policy(
@@ -48,7 +48,7 @@ def _capability_aware_policy(arc: MockChioClient) -> Any:
         context: dict[str, Any],
     ) -> MockVerdict:
         cap_id = context.get("capability_id")
-        token = getattr(arc, "_tokens", {}).get(cap_id)
+        token = getattr(chio, "_tokens", {}).get(cap_id)
         if token is None:
             return MockVerdict.deny_verdict(
                 f"unknown capability {cap_id!r}", guard="CapabilityGuard"
@@ -67,30 +67,30 @@ def _capability_aware_policy(arc: MockChioClient) -> Any:
 def _instrumented_client() -> MockChioClient:
     """MockChioClient that records minted tokens for policy lookup."""
 
-    arc = MockChioClient()
-    arc._tokens = {}  # type: ignore[attr-defined]
+    chio = MockChioClient()
+    chio._tokens = {}  # type: ignore[attr-defined]
 
-    original_create = arc.create_capability
-    original_attenuate = arc.attenuate_capability
+    original_create = chio.create_capability
+    original_attenuate = chio.attenuate_capability
 
     async def create_capability(**kwargs: Any) -> Any:
         token = await original_create(**kwargs)
-        arc._tokens[token.id] = token  # type: ignore[attr-defined]
+        chio._tokens[token.id] = token  # type: ignore[attr-defined]
         return token
 
     async def attenuate_capability(parent: Any, **kwargs: Any) -> Any:
         child = await original_attenuate(parent, **kwargs)
-        arc._tokens[child.id] = child  # type: ignore[attr-defined]
+        chio._tokens[child.id] = child  # type: ignore[attr-defined]
         return child
 
-    arc.create_capability = create_capability  # type: ignore[method-assign]
-    arc.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
-    arc.set_policy(_capability_aware_policy(arc))
-    return arc
+    chio.create_capability = create_capability  # type: ignore[method-assign]
+    chio.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
+    chio.set_policy(_capability_aware_policy(chio))
+    return chio
 
 
 def _make_tools(
-    arc: MockChioClient,
+    chio: MockChioClient,
 ) -> tuple[ChioBaseTool, ChioBaseTool]:
     """Return an (search, write) pair of ChioBaseTools."""
     search_calls: list[dict[str, Any]] = []
@@ -109,7 +109,7 @@ def _make_tools(
         description="search the web",
         server_id=SERVER_ID,
         executor=do_search,
-        chio_client=arc,
+        chio_client=chio,
     )
     search_tool.scope = _scope("search")
     search_tool._search_calls = search_calls  # type: ignore[attr-defined]
@@ -119,7 +119,7 @@ def _make_tools(
         description="write to disk",
         server_id=SERVER_ID,
         executor=do_write,
-        chio_client=arc,
+        chio_client=chio,
     )
     write_tool.scope = _scope("write")
     write_tool._write_calls = write_calls  # type: ignore[attr-defined]
@@ -145,9 +145,9 @@ def _make_agent(role: str, goal: str, tools: list[Any]) -> Agent:
 
 class TestResearcherWriterScoping:
     async def test_researcher_can_search_not_write(self) -> None:
-        arc = _instrumented_client()
-        search_tool_r, write_tool_r = _make_tools(arc)
-        search_tool_w, write_tool_w = _make_tools(arc)
+        chio = _instrumented_client()
+        search_tool_r, write_tool_r = _make_tools(chio)
+        search_tool_w, write_tool_w = _make_tools(chio)
 
         researcher = _make_agent(
             "researcher",
@@ -171,7 +171,7 @@ class TestResearcherWriterScoping:
                 "researcher": _scope("search"),
                 "writer": _scope("write"),
             },
-            chio_client=arc,
+            chio_client=chio,
             agents=[researcher, writer],
             tasks=[task],
         )
@@ -195,13 +195,13 @@ class TestResearcherWriterScoping:
         assert exc_info.value.guard == "ScopeGuard"
 
     async def test_unknown_role_raises_config_error(self) -> None:
-        arc = _instrumented_client()
-        search_tool, _ = _make_tools(arc)
+        chio = _instrumented_client()
+        search_tool, _ = _make_tools(chio)
         rogue = _make_agent("rogue", "cause trouble", [search_tool])
 
         crew = ChioCrew(
             capability_scope={"researcher": _scope("search")},
-            chio_client=arc,
+            chio_client=chio,
             agents=[rogue],
             tasks=[
                 Task(
@@ -215,14 +215,14 @@ class TestResearcherWriterScoping:
             crew.scope_for("rogue")
 
     async def test_empty_scope_mapping_rejected(self) -> None:
-        arc = _instrumented_client()
-        search_tool, _ = _make_tools(arc)
+        chio = _instrumented_client()
+        search_tool, _ = _make_tools(chio)
         agent = _make_agent("r", "research", [search_tool])
         task = Task(description="x", expected_output="y", agent=agent)
         with pytest.raises(ChioCrewConfigError):
             ChioCrew(
                 capability_scope={},
-                chio_client=arc,
+                chio_client=chio,
                 agents=[agent],
                 tasks=[task],
             )
@@ -235,8 +235,8 @@ class TestResearcherWriterScoping:
 
 class TestDelegationAttenuation:
     async def test_child_capability_is_subset_of_parent(self) -> None:
-        arc = _instrumented_client()
-        search_tool, write_tool = _make_tools(arc)
+        chio = _instrumented_client()
+        search_tool, write_tool = _make_tools(chio)
         lead = _make_agent(
             "lead",
             "lead the crew",
@@ -249,7 +249,7 @@ class TestDelegationAttenuation:
                 "lead": _scope("search", "write"),
                 "junior": _scope("search"),
             },
-            chio_client=arc,
+            chio_client=chio,
             agents=[lead, junior],
             tasks=[
                 Task(
@@ -273,13 +273,13 @@ class TestDelegationAttenuation:
         assert not parent.scope.is_subset_of(child.scope)
 
     async def test_child_cannot_escalate(self) -> None:
-        arc = _instrumented_client()
-        search_tool, write_tool = _make_tools(arc)
+        chio = _instrumented_client()
+        search_tool, write_tool = _make_tools(chio)
         lead = _make_agent("lead", "lead", [search_tool, write_tool])
 
         crew = ChioCrew(
             capability_scope={"lead": _scope("search")},
-            chio_client=arc,
+            chio_client=chio,
             agents=[lead],
             tasks=[
                 Task(

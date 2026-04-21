@@ -30,7 +30,7 @@ configurable in `KernelConfig::checkpoint_batch_size`.
 
 Setting `checkpoint_batch_size = 0` disables automatic checkpointing entirely.
 
-The trigger logic in `ChioKernel::record_arc_receipt`:
+The trigger logic in `ChioKernel::record_chio_receipt`:
 
 ```rust
 if seq > 0

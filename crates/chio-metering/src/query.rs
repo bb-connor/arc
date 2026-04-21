@@ -1,6 +1,6 @@
 //! CLI-style cost queries for cumulative cost by session, agent, tool, or time range.
 //!
-//! This module powers the `arc receipts cost` CLI command, allowing operators
+//! This module powers the `chio receipts cost` CLI command, allowing operators
 //! to query cost data across multiple dimensions.
 
 use chio_core::capability::MonetaryAmount;

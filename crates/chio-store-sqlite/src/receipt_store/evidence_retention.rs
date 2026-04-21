@@ -1,17 +1,17 @@
 use super::support::{
-    checkpoint_error_to_receipt_store, ensure_arc_receipt_verified,
-    ensure_checkpoint_transparency_guards, load_claim_tree_canonical_bytes_range,
+    checkpoint_error_to_receipt_store, ensure_checkpoint_transparency_guards,
+    ensure_chio_receipt_verified, load_claim_tree_canonical_bytes_range,
     load_persisted_checkpoint_row, parse_persisted_checkpoint_row,
     verify_checkpoint_chain_integrity,
 };
 use super::*;
 
 impl SqliteReceiptStore {
-    pub fn append_arc_receipt_returning_seq(
+    pub fn append_chio_receipt_returning_seq(
         &self,
         receipt: &ChioReceipt,
     ) -> Result<u64, ReceiptStoreError> {
-        ensure_arc_receipt_verified(receipt)?;
+        ensure_chio_receipt_verified(receipt)?;
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
         let mut connection = self.connection()?;
@@ -760,7 +760,7 @@ impl SqliteReceiptStore {
             let (seq, raw_json) = row?;
             let seq = seq.max(0) as u64;
             let receipt =
-                decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
+                decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
             receipts.push(StoredToolReceipt { seq, receipt });
         }
 

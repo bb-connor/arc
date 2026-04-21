@@ -234,8 +234,8 @@ impl SqliteReceiptStore {
 }
 
 impl ReceiptStore for SqliteReceiptStore {
-    fn append_arc_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
-        self.append_arc_receipt_returning_seq(receipt)?;
+    fn append_chio_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.append_chio_receipt_returning_seq(receipt)?;
         Ok(())
     }
 
@@ -243,7 +243,7 @@ impl ReceiptStore for SqliteReceiptStore {
         true
     }
 
-    fn append_arc_receipt_returning_seq(
+    fn append_chio_receipt_returning_seq(
         &mut self,
         receipt: &ChioReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
@@ -1241,7 +1241,7 @@ impl ResourceProvider for DocsResourceProvider {
 struct AppendOnlyReceiptStore;
 
 impl ReceiptStore for AppendOnlyReceiptStore {
-    fn append_arc_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
@@ -1257,7 +1257,7 @@ impl ReceiptStore for AppendOnlyReceiptStore {
 struct FailingSessionAnchorReceiptStore;
 
 impl ReceiptStore for FailingSessionAnchorReceiptStore {
-    fn append_arc_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
@@ -5696,7 +5696,7 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
     );
     intent.metered_billing = Some(make_metered_billing_context(
         "quote-governed-1",
-        "billing.arc",
+        "billing.chio",
         12,
         "USD",
     ));
@@ -5735,7 +5735,7 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
     );
     assert_eq!(
         governed["metered_billing"]["quote"]["provider"],
-        serde_json::Value::String("billing.arc".to_string())
+        serde_json::Value::String("billing.chio".to_string())
     );
     assert_eq!(
         governed["metered_billing"]["settlementMode"],
@@ -6689,7 +6689,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
     let parent_receipt_hash = chio_core::crypto::sha256_hex(
         &chio_core::canonical::canonical_json_bytes(&parent_receipt).unwrap(),
     );
-    child_kernel.record_arc_receipt(&parent_receipt).unwrap();
+    child_kernel.record_chio_receipt(&parent_receipt).unwrap();
 
     let call_chain = GovernedCallChainContext {
         chain_id: "chain-cross-kernel-continuation".to_string(),

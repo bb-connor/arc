@@ -21,7 +21,7 @@ The next live execution slice is now shipped:
 
 - `tests/conformance/fixtures/wave1/` contains a reusable upstream MCP fixture and policy
 - the JS and Python peers now execute real Wave 1 Streamable HTTP client scenarios
-- `chio-conformance-runner` boots `arc mcp serve-http`, runs both peers, collects JSON artifacts, and generates a Markdown matrix
+- `chio-conformance-runner` boots `chio mcp serve-http`, runs both peers, collects JSON artifacts, and generates a Markdown matrix
 - `crates/chio-conformance/tests/wave1_live.rs` validates the end-to-end harness against a live local Chio edge
 
 The next compatibility-expansion slice is now underway:

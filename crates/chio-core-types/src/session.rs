@@ -1696,14 +1696,14 @@ mod tests {
     #[test]
     fn normalizes_windows_style_file_roots_for_runtime() {
         let root = RootDefinition {
-            uri: "file:///C:/Workspace/Chio/../arc".to_string(),
+            uri: "file:///C:/Workspace/Chio/../project".to_string(),
             name: None,
         };
 
         let normalized = root.normalize_for_runtime();
         assert_eq!(
             normalized.normalized_filesystem_path(),
-            Some("C:/Workspace/arc")
+            Some("C:/Workspace/project")
         );
     }
 
@@ -1768,13 +1768,13 @@ mod tests {
             Some("/workspace/docs".to_string())
         );
         assert_eq!(
-            normalize_absolute_filesystem_path("C:\\Workspace\\Chio\\..\\arc"),
-            Some("C:/Workspace/arc".to_string())
+            normalize_absolute_filesystem_path("C:\\Workspace\\Chio\\..\\project"),
+            Some("C:/Workspace/project".to_string())
         );
         assert_eq!(normalize_absolute_filesystem_path("relative/path"), None);
         assert_eq!(
-            split_windows_drive("c:/Workspace/arc"),
-            Some(('C', "Workspace/arc"))
+            split_windows_drive("c:/Workspace/project"),
+            Some(('C', "Workspace/project"))
         );
         assert_eq!(split_windows_drive("D:"), Some(('D', "")));
         assert_eq!(split_windows_drive("1:/not-a-drive"), None);

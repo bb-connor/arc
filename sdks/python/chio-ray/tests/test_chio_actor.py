@@ -91,12 +91,12 @@ class TestRoadmapAcceptance:
     def test_search_method_allowed_when_standing_grant_authorises_search(
         self,
     ) -> None:
-        arc = MockChioClient()
+        chio = MockChioClient()
         search_token = _local_token(
             _scope_for_tools("search"), token_id="tok-search"
         )
-        arc.set_policy(
-            _scope_aware_policy(arc, {"tok-search": {"search"}})
+        chio.set_policy(
+            _scope_aware_policy(chio, {"tok-search": {"search"}})
         )
 
         class ResearchAgent(ChioActor):
@@ -115,7 +115,7 @@ class TestRoadmapAcceptance:
         # roadmap snippet: `ActorClass.remote(...)` to instantiate,
         # `handle.method.remote(...)` to call.
         remote_cls = ray.remote(ResearchAgent)
-        handle = remote_cls.remote(chio_client=arc, token=search_token)
+        handle = remote_cls.remote(chio_client=chio, token=search_token)
 
         ref = handle.search.remote("quantum")
         assert ray.get(ref) == ["hit:quantum"]
@@ -123,7 +123,7 @@ class TestRoadmapAcceptance:
         # The sidecar was evaluated exactly once, under the standing
         # grant's capability id, with ``tool_name="search"``.
         eval_calls = [
-            c for c in arc.calls if c.method == "evaluate_tool_call"
+            c for c in chio.calls if c.method == "evaluate_tool_call"
         ]
         assert len(eval_calls) == 1
         assert eval_calls[0].tool_name == "search"
@@ -131,12 +131,12 @@ class TestRoadmapAcceptance:
 
     def test_out_of_scope_method_call_is_denied(self) -> None:
         """The acceptance case -- a method whose scope exceeds the grant is denied."""
-        arc = MockChioClient()
+        chio = MockChioClient()
         search_only = _local_token(
             _scope_for_tools("search"), token_id="tok-search"
         )
-        arc.set_policy(
-            _scope_aware_policy(arc, {"tok-search": {"search"}})
+        chio.set_policy(
+            _scope_aware_policy(chio, {"tok-search": {"search"}})
         )
 
         class ResearchAgent(ChioActor):
@@ -156,7 +156,7 @@ class TestRoadmapAcceptance:
                 pytest.fail("write must not execute without capability")
 
         remote_cls = ray.remote(ResearchAgent)
-        handle = remote_cls.remote(chio_client=arc, token=search_only)
+        handle = remote_cls.remote(chio_client=chio, token=search_only)
 
         # In-scope call still works as a control.
         assert ray.get(handle.search.remote("alpha")) == ["hit:alpha"]
@@ -186,14 +186,14 @@ class TestSidecarDeny:
         # ``raise_on_deny=False`` forces the mock to return a deny
         # receipt (so the ChioRayError carries ``receipt_id``) rather
         # than raising :class:`ChioDeniedError` off the HTTP-403 path.
-        arc = MockChioClient(raise_on_deny=False)
+        chio = MockChioClient(raise_on_deny=False)
         token = _local_token(
             _scope_for_tools("search", "write"), token_id="tok-rw"
         )
         # Sidecar denies write even though the standing grant admits
         # it -- simulates a narrower runtime policy (e.g. a read-only
         # session override) layered on top of the token's scope.
-        arc.set_policy(_scope_aware_policy(arc, {"tok-rw": {"search"}}))
+        chio.set_policy(_scope_aware_policy(chio, {"tok-rw": {"search"}}))
 
         class Agent(ChioActor):
             def __init__(self, *, chio_client: Any, token: CapabilityToken) -> None:
@@ -206,7 +206,7 @@ class TestSidecarDeny:
                 pytest.fail("body must not run on deny")
 
         remote_cls = ray.remote(Agent)
-        handle = remote_cls.remote(chio_client=arc, token=token)
+        handle = remote_cls.remote(chio_client=chio, token=token)
 
         with pytest.raises(PermissionError) as exc_info:
             ray.get(handle.write.remote("/tmp/x"))
@@ -225,12 +225,12 @@ class TestSidecarDeny:
 
 class TestStandingGrantIntrospection:
     def test_chio_grant_exposed_on_actor(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         token = _local_token(_scope_for_tools("search"), token_id="tok-i")
 
         class Agent(ChioActor):
             def __init__(self) -> None:
-                super().__init__(token=token, tool_server="srv", chio_client=arc)
+                super().__init__(token=token, tool_server="srv", chio_client=chio)
 
             @ChioActor.requires("tools:search")
             def search(self, q: str) -> str:
@@ -335,21 +335,21 @@ class TestConstruction:
 
 class TestAttenuation:
     async def test_attenuate_child_grant_is_subset_of_parent(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         parent_token = _local_token(
             _scope_for_tools("search", "browse"), token_id="tok-parent"
         )
         parent_grant = StandingGrant(token=parent_token, tool_server="srv")
 
         child_scope = _scope_for_tools("search")
-        child_grant = await parent_grant.attenuate(arc, new_scope=child_scope)
+        child_grant = await parent_grant.attenuate(chio, new_scope=child_scope)
 
         assert child_grant.scope.is_subset_of(parent_grant.scope)
         assert child_grant.metadata["parent_capability_id"] == parent_grant.capability_id
         assert child_grant.tool_server == "srv"
 
     async def test_attenuate_broader_scope_rejected(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         parent_token = _local_token(
             _scope_for_tools("search"), token_id="tok-parent"
         )
@@ -359,4 +359,4 @@ class TestAttenuation:
         from chio_sdk.errors import ChioValidationError
 
         with pytest.raises(ChioValidationError):
-            await parent_grant.attenuate(arc, new_scope=broader)
+            await parent_grant.attenuate(chio, new_scope=broader)

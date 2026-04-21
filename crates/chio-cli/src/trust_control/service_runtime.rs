@@ -3021,7 +3021,7 @@ impl RevocationStore for RemoteRevocationStore {
 }
 
 impl ReceiptStore for RemoteReceiptStore {
-    fn append_arc_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.client
             .append_tool_receipt(receipt)
             .map_err(into_receipt_store_error)

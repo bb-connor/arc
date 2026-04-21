@@ -170,7 +170,7 @@ exceeded (per-agent or per-session) and the current token count.
 
 Session-aware deterministic guards consult the session journal to make
 decisions based on cumulative session history. They require an
-`Arc<SessionJournal>` reference and produce deterministic verdicts given
+`Chio<SessionJournal>` reference and produce deterministic verdicts given
 the same journal state.
 
 ### 3.1 DataFlowGuard
@@ -607,7 +607,7 @@ append-only, hash-chained log of request records within a single session.
 - **Thread-safe:** The journal **MUST** be safe for concurrent access from
   multiple guards. The implementation uses a `Mutex` around the inner state.
 - **Per-session scope:** Each session creates one journal. The journal is
-  shared via `Arc<SessionJournal>` with all guards that need it.
+  shared via `Chio<SessionJournal>` with all guards that need it.
 
 ### 7.2 Journal Entry
 
@@ -699,7 +699,7 @@ though this adds latency and is not required for normal operation.
 
 ## 8. Configuration Reference
 
-### 8.1 arc.yaml Guard Section
+### 8.1 chio.yaml Guard Section
 
 ```yaml
 guards:

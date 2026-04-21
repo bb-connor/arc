@@ -20,7 +20,7 @@ The lane is intentionally narrow:
 
 It reuses the validated program-family chain and does not authorize generic
 revenue platforms, billing systems, channel-program automation, merged
-shells, or ARC commercial consoles.
+shells, or Chio commercial consoles.
 
 ## Frozen Program Motion
 
@@ -53,14 +53,14 @@ Not supported in `v2.65`:
 
 - generic revenue-platform, billing, or forecasting tooling
 - channel-program automation or marketplaces
-- ARC-side commercial control surfaces
+- Chio-side commercial control surfaces
 
 ## Canonical Commands
 
 ```bash
-cargo run -p arc-mercury -- portfolio-revenue-boundary export --output target/mercury-portfolio-revenue-boundary-export
+cargo run -p chio-mercury -- portfolio-revenue-boundary export --output target/mercury-portfolio-revenue-boundary-export
 ```
 
 ```bash
-cargo run -p arc-mercury -- portfolio-revenue-boundary validate --output target/mercury-portfolio-revenue-boundary-validation
+cargo run -p chio-mercury -- portfolio-revenue-boundary validate --output target/mercury-portfolio-revenue-boundary-validation
 ```

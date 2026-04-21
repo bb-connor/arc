@@ -39,7 +39,7 @@ pub enum WasmGuardError {
     #[error("host function error: {0}")]
     HostFunction(String),
 
-    /// The module imports from a forbidden (non-arc) namespace.
+    /// The module imports from a forbidden (non-chio) namespace.
     #[error("module imports from forbidden namespace \"{module}\": import \"{name}\"")]
     ImportViolation { module: String, name: String },
 

@@ -83,8 +83,8 @@ class TestPublishAllow:
         fake = FakeLangSmithClient()
         bridge = LangSmithBridge(client=fake, project="demo")
         request = bridge.publish(allow_receipt)
-        assert "arc.verdict:allow" in request["tags"]
-        assert "arc.tool:search" in request["tags"]
+        assert "chio.verdict:allow" in request["tags"]
+        assert "chio.tool:search" in request["tags"]
 
     def test_project_name_propagates(self, allow_receipt: ChioReceipt) -> None:
         fake = FakeLangSmithClient()
@@ -112,8 +112,8 @@ class TestPublishDeny:
         fake = FakeLangSmithClient()
         bridge = LangSmithBridge(client=fake, project="demo")
         request = bridge.publish(deny_receipt)
-        assert "arc.verdict:deny" in request["tags"]
-        assert "arc.guard:PathGuard" in request["tags"]
+        assert "chio.verdict:deny" in request["tags"]
+        assert "chio.guard:PathGuard" in request["tags"]
 
     def test_deny_attaches_evidence_in_extra(self, deny_receipt: ChioReceipt) -> None:
         fake = FakeLangSmithClient()
@@ -128,7 +128,7 @@ class TestPublishDeny:
         bridge = LangSmithBridge(client=fake, project="demo")
         request = bridge.publish(deny_receipt)
         assert request["extra"]["cost"] == {"units": 42, "currency": "USD"}
-        assert "arc.cost:42USD" in request["tags"]
+        assert "chio.cost:42USD" in request["tags"]
 
     def test_parent_run_id_used_from_trace_context(
         self, deny_receipt: ChioReceipt

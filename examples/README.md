@@ -18,7 +18,7 @@ For web backends, the supported order is:
 1. [`hello-openapi-sidecar/`](./hello-openapi-sidecar/)
 2. [`hello-fastapi/`](./hello-fastapi/)
 
-See [`docs/guides/WEB_BACKEND_QUICKSTART.md`](/Users/connor/Medica/backbay/standalone/arc/docs/guides/WEB_BACKEND_QUICKSTART.md) for the shared verification flow.
+See [`docs/guides/WEB_BACKEND_QUICKSTART.md`](../docs/guides/WEB_BACKEND_QUICKSTART.md) for the shared verification flow.
 
 ## Current Flagship Examples
 

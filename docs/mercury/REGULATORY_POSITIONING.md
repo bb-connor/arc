@@ -171,7 +171,7 @@ cleanly classified as high-risk under Annex III.
 ### Information barriers
 
 MERCURY can record evidence of tool-boundary controls and denials where those
-controls exist. ARC-Wall extends this further as a companion product. Neither
+controls exist. Chio-Wall extends this further as a companion product. Neither
 product replaces barrier operations, restricted-list management, or broader
 MNPI compliance programs.
 

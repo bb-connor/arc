@@ -2,7 +2,7 @@
   "schema": "chio.federation-quorum-report.v1",
   "reportId": "fqr-1",
   "generatedAt": 1743552060,
-  "namespace": "registry.arc.example/liability",
+  "namespace": "registry.chio.example/liability",
   "listingId": "listing-liability-provider-1",
   "originOperatorId": "origin-operator",
   "quorumThreshold": 2,
@@ -13,7 +13,7 @@
         "role": "origin",
         "operatorId": "origin-operator",
         "operatorName": "Origin Operator",
-        "registryUrl": "https://origin.arc.example/registry",
+        "registryUrl": "https://origin.chio.example/registry",
         "upstreamRegistryUrls": []
       },
       "reportRef": {
@@ -22,7 +22,7 @@
         "artifactId": "report-origin-1",
         "operatorId": "origin-operator",
         "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "uri": "https://origin-operator.arc.example/artifacts/report-origin-1"
+        "uri": "https://origin-operator.chio.example/artifacts/report-origin-1"
       },
       "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "freshness": {
@@ -40,9 +40,9 @@
         "role": "mirror",
         "operatorId": "mirror-operator-a",
         "operatorName": "Mirror Operator A",
-        "registryUrl": "https://mirror-a.arc.example/registry",
+        "registryUrl": "https://mirror-a.chio.example/registry",
         "upstreamRegistryUrls": [
-          "https://origin.arc.example/registry"
+          "https://origin.chio.example/registry"
         ]
       },
       "reportRef": {
@@ -51,7 +51,7 @@
         "artifactId": "report-mirror-a-1",
         "operatorId": "mirror-operator-a",
         "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "uri": "https://mirror-operator-a.arc.example/artifacts/report-mirror-a-1"
+        "uri": "https://mirror-operator-a.chio.example/artifacts/report-mirror-a-1"
       },
       "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "freshness": {
@@ -69,9 +69,9 @@
         "role": "indexer",
         "operatorId": "indexer-operator-a",
         "operatorName": "Indexer Operator A",
-        "registryUrl": "https://indexer-a.arc.example/registry",
+        "registryUrl": "https://indexer-a.chio.example/registry",
         "upstreamRegistryUrls": [
-          "https://origin.arc.example/registry"
+          "https://origin.chio.example/registry"
         ]
       },
       "reportRef": {
@@ -80,7 +80,7 @@
         "artifactId": "report-indexer-a-1",
         "operatorId": "indexer-operator-a",
         "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "uri": "https://indexer-operator-a.arc.example/artifacts/report-indexer-a-1"
+        "uri": "https://indexer-operator-a.chio.example/artifacts/report-indexer-a-1"
       },
       "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "freshness": {

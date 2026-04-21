@@ -40,7 +40,7 @@ The lane reuses already validated Mercury artifacts:
 - one reviewer package plus qualification report
 
 It does not authorize a generic customer-success suite, CRM workflow,
-account-management platform, channel marketplace, merged shell, ARC
+account-management platform, channel marketplace, merged shell, Chio
 commercial console, or broader Mercury customer-platform claim.
 
 ---
@@ -79,8 +79,8 @@ remains unchanged:
 - review owner: `mercury-outcome-review`
 - expansion owner: `mercury-expansion-boundary`
 
-Renewal qualification ownership stays inside Mercury. ARC remains the generic
-substrate that Mercury consumes; ARC does not become a customer-success,
+Renewal qualification ownership stays inside Mercury. Chio remains the generic
+substrate that Mercury consumes; Chio does not become a customer-success,
 account-management, or commercial renewal console.
 
 ---
@@ -107,8 +107,8 @@ Not supported in `v2.59`:
 - a generic customer-success suite, CRM workflow, or account-management
   platform
 - channel marketplaces or multi-account renewal programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury product-family or universal renewal claims
 
 ---
@@ -118,14 +118,14 @@ Not supported in `v2.59`:
 Export the bounded renewal-qualification package and outcome-review bundle:
 
 ```bash
-cargo run -p arc-mercury -- renewal-qualification export --output target/mercury-renewal-qualification-export
+cargo run -p chio-mercury -- renewal-qualification export --output target/mercury-renewal-qualification-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- renewal-qualification validate --output target/mercury-renewal-qualification-validation
+cargo run -p chio-mercury -- renewal-qualification validate --output target/mercury-renewal-qualification-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

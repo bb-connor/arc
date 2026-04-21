@@ -63,7 +63,7 @@ The lane reuses already validated Mercury artifacts:
 
 It does not authorize a generic portfolio-management suite, account-management
 platform, customer-success workflow, revenue operations system, forecasting
-stack, billing platform, channel program, merged shell, ARC commercial
+stack, billing platform, channel program, merged shell, Chio commercial
 console, or broader Mercury multi-program claim.
 
 ---
@@ -102,8 +102,8 @@ unchanged:
 - review owner: `mercury-portfolio-reuse-review`
 - revenue-boundary guardrails owner: `mercury-revenue-boundary-guardrails`
 
-Second-portfolio-program ownership stays inside Mercury. ARC remains the
-generic substrate that Mercury consumes; ARC does not become a portfolio-
+Second-portfolio-program ownership stays inside Mercury. Chio remains the
+generic substrate that Mercury consumes; Chio does not become a portfolio-
 management, account-management, revenue operations, forecasting, billing, or
 commercial expansion console.
 
@@ -132,8 +132,8 @@ Not supported in `v2.62`:
 - a generic portfolio-management suite, account-management platform,
   customer-success workflow, or revenue operations system
 - forecasting stacks, billing platforms, or channel programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury multi-program or universal portfolio claims
 
 ---
@@ -144,14 +144,14 @@ Export the bounded second-portfolio-program package and portfolio-reuse
 bundle:
 
 ```bash
-cargo run -p arc-mercury -- second-portfolio-program export --output target/mercury-second-portfolio-program-export
+cargo run -p chio-mercury -- second-portfolio-program export --output target/mercury-second-portfolio-program-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- second-portfolio-program validate --output target/mercury-second-portfolio-program-validation
+cargo run -p chio-mercury -- second-portfolio-program validate --output target/mercury-second-portfolio-program-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

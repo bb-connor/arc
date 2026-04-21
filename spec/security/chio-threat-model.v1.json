@@ -4,7 +4,7 @@
   "boundary": {
     "focus": "agent-kernel-tool trust boundary",
     "surfaces": [
-      "native_arc",
+      "native_chio",
       "hosted_mcp",
       "trust_control",
       "kernel_to_tool"
@@ -26,7 +26,7 @@
       "surfaces": [
         "trust_control",
         "hosted_mcp",
-        "native_arc"
+        "native_chio"
       ],
       "mitigations": [
         {
@@ -49,7 +49,7 @@
       "name": "Kernel impersonation",
       "surfaces": [
         "hosted_mcp",
-        "native_arc"
+        "native_chio"
       ],
       "mitigations": [
         {
@@ -93,7 +93,7 @@
       "id": "native_channel_replay",
       "name": "Replay attacks on the native channel",
       "surfaces": [
-        "native_arc"
+        "native_chio"
       ],
       "mitigations": [
         {
@@ -115,7 +115,7 @@
       "id": "resource_exhaustion_dos",
       "name": "Resource exhaustion denial of service",
       "surfaces": [
-        "native_arc",
+        "native_chio",
         "hosted_mcp",
         "trust_control",
         "kernel_to_tool"
@@ -141,7 +141,7 @@
       "name": "Delegation chain abuse",
       "surfaces": [
         "trust_control",
-        "native_arc",
+        "native_chio",
         "hosted_mcp"
       ],
       "mitigations": [

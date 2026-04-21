@@ -1287,7 +1287,7 @@ mod tests {
                 highest_tier: Some(RuntimeAssuranceTier::Verified),
                 latest_schema: Some("chio.runtime-attestation.azure-maa.jwt.v1".to_string()),
                 latest_verifier_family: Some(AttestationVerifierFamily::AzureMaa),
-                latest_verifier: Some("verifier.arc".to_string()),
+                latest_verifier: Some("verifier.chio".to_string()),
                 latest_evidence_sha256: Some("sha256-runtime".to_string()),
                 observed_verifier_families: vec![AttestationVerifierFamily::AzureMaa],
             }),

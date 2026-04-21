@@ -4,7 +4,7 @@ Mirrors the Rust tool-gate example (examples/guards/tool-gate/src/lib.rs)
 and the TypeScript SDK equivalent. Allows all tools except those on a
 deny list.
 
-This file is the componentize-py entry point for the ``arc:guard/guard``
+This file is the componentize-py entry point for the ``chio:guard/guard``
 world. Import paths come from the generated bindings produced by
 ``componentize-py --world-module guard bindings``.
 """

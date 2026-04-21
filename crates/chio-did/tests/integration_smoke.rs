@@ -2,7 +2,7 @@ use chio_core::Keypair;
 use chio_did::{resolve_did_arc, DidChio, DidService, ResolveOptions, RECEIPT_LOG_SERVICE_TYPE};
 
 #[test]
-fn did_arc_resolves_with_public_service_metadata() {
+fn did_chio_resolves_with_public_service_metadata() {
     let did =
         DidChio::from_public_key(Keypair::from_seed(&[9u8; 32]).public_key()).expect("ed25519 key");
     let options = ResolveOptions::default().with_service(

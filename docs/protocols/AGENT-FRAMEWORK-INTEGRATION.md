@@ -93,9 +93,9 @@ chio-sdk-python                  (base HTTP client to sidecar)
     |
     +-- @chio-protocol/ai-sdk    (Vercel AI SDK provider wrapping)
 
-Arc.Protocol.Sdk                (base .NET client to sidecar)
+Chio.Protocol.Sdk                (base .NET client to sidecar)
     |
-    +-- Arc.Protocol.SemanticKernel  (Semantic Kernel plugin wrapping)
+    +-- Chio.Protocol.SemanticKernel  (Semantic Kernel plugin wrapping)
 ```
 
 All Python integrations depend on `chio-sdk-python` which provides the
@@ -173,9 +173,9 @@ class ChioCrewTool(CrewAIBaseTool):
     def _run(self, **kwargs) -> str:
         """Synchronous tool execution with Chio evaluate/record."""
         import asyncio
-        return asyncio.run(self._arc_run(**kwargs))
+        return asyncio.run(self._chio_run(**kwargs))
 
-    async def _arc_run(self, **kwargs) -> str:
+    async def _chio_run(self, **kwargs) -> str:
         async with ChioClient(self.sidecar_url) as client:
             receipt = await client.evaluate_tool_call(
                 capability_id=self.capability_id,
@@ -241,11 +241,11 @@ class ChioDelegationCallback:
     """CrewAI callback that attenuates capabilities on delegation."""
 
     async def on_delegation(self, delegator, delegate, task):
-        arc = ChioClient(self.sidecar_url)
+        chio = ChioClient(self.sidecar_url)
         parent_token = delegator.chio_capability
 
         # Child token is strictly narrower than parent
-        child_token = await arc.attenuate_capability(
+        child_token = await chio.attenuate_capability(
             parent_token,
             new_scope=delegate.chio_scope,
         )
@@ -556,10 +556,10 @@ The Vercel AI SDK defines tools with `tool()`. Each tool has a `schema`
 ```typescript
 import { tool } from "ai";
 import { z } from "zod";
-import { arcTool } from "@chio-protocol/ai-sdk";
+import { chioTool } from "@chio-protocol/ai-sdk";
 
 // Standard Vercel AI SDK tool, wrapped with Chio
-const searchTool = arcTool(
+const searchTool = chioTool(
   tool({
     description: "Search the web",
     parameters: z.object({
@@ -578,7 +578,7 @@ const searchTool = arcTool(
 );
 ```
 
-The `arcTool` wrapper:
+The `chioTool` wrapper:
 
 ```typescript
 import { ChioClient } from "@chio-protocol/sdk";
@@ -590,7 +590,7 @@ interface ChioToolConfig {
   sidecarUrl?: string; // default http://127.0.0.1:9090
 }
 
-function arcTool<T>(innerTool: T, config: ChioToolConfig): T {
+function chioTool<T>(innerTool: T, config: ChioToolConfig): T {
   const client = new ChioClient(config.sidecarUrl);
   const originalExecute = innerTool.execute;
 
@@ -647,9 +647,9 @@ For applications with many tools, `@chio-protocol/ai-sdk` can wrap an
 entire tool set:
 
 ```typescript
-import { arcTools } from "@chio-protocol/ai-sdk";
+import { chioTools } from "@chio-protocol/ai-sdk";
 
-const tools = arcTools(
+const tools = chioTools(
   {
     search: searchTool,
     browse: browseTool,
@@ -677,8 +677,8 @@ sdks/typescript/packages/ai-sdk/
   package.json              # deps: @chio-protocol/sdk, ai
   src/
     index.ts
-    tool.ts                 # arcTool -- single tool wrapper
-    tools.ts                # arcTools -- batch tool wrapper
+    tool.ts                 # chioTool -- single tool wrapper
+    tools.ts                # chioTools -- batch tool wrapper
     client.ts               # re-export from @chio-protocol/sdk
   tests/
     tool.test.ts
@@ -710,7 +710,7 @@ Kernel
 ### 9.2 Intercept Point 1: KernelFunction Invocation
 
 ```csharp
-using Arc.Protocol.SemanticKernel;
+using Chio.Protocol.SemanticKernel;
 using Microsoft.SemanticKernel;
 
 var kernel = Kernel.CreateBuilder()
@@ -816,8 +816,8 @@ budget or require unauthorized tools, before any side effects occur.
 ### 9.4 Package Structure
 
 ```
-sdks/dotnet/Arc.Protocol.SemanticKernel/
-  Arc.Protocol.SemanticKernel.csproj
+sdks/dotnet/Chio.Protocol.SemanticKernel/
+  Chio.Protocol.SemanticKernel.csproj
   src/
     ChioFunctionFilter.cs     # IFunctionInvocationFilter implementation
     ChioPlanFilter.cs          # Plan-level evaluation
@@ -1116,7 +1116,7 @@ reference implementation. To add a new framework:
 4. **Map delegation.** If the framework has multi-agent handoff,
    map it to `chio_client.attenuate_capability()`.
 
-5. **Package it.** Create `sdks/python/arc-<framework>/` (or
+5. **Package it.** Create `sdks/python/chio-<framework>/` (or
    `sdks/typescript/packages/<framework>/`) with a dependency on
    `chio-sdk-python` (or `@chio-protocol/sdk`).
 

@@ -629,10 +629,10 @@ fn passport_create_verify_and_present_roundtrip() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-passport", 101))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-passport", 101))
             .expect("append receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-passport", 102))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-passport", 102))
             .expect("append receipt");
         let canonical = store
             .receipts_canonical_bytes_range(seq1, seq2)
@@ -967,7 +967,7 @@ fn passport_create_and_verify_surface_enterprise_identity_provenance() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-enterprise-1",
                 "cap-passport-enterprise",
                 101,
@@ -1461,7 +1461,7 @@ fn passport_create_require_checkpoints_fails_for_uncheckpointed_receipts() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-uncheckpointed",
                 "cap-passport-no-checkpoint",
                 101,
@@ -1524,14 +1524,14 @@ fn passport_policy_reference_flow_is_replay_safe_locally() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-ref-1",
                 "cap-passport-ref",
                 101,
             ))
             .expect("append receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-ref-2",
                 "cap-passport-ref",
                 102,
@@ -3678,7 +3678,7 @@ fn passport_portable_jwt_vc_json_metadata_and_issuance_roundtrip() {
         .portable_claim_catalog
         .always_disclosed_claims
         .iter()
-        .any(|claim| claim == "vc.credentialSubject.arcPassportId"));
+        .any(|claim| claim == "vc.credentialSubject.chioPassportId"));
 
     let offer_response: serde_json::Value = client
         .post(format!("{base_url}/v1/passport/issuance/offers"))
@@ -4755,7 +4755,7 @@ fn passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revo
         metadata
             .chio_profile
             .as_ref()
-            .expect("arc profile")
+            .expect("chio profile")
             .passport_status_distribution
             .resolve_urls[0],
         format!("{base_url}/v1/public/passport/statuses/resolve")

@@ -126,7 +126,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         let result = store
@@ -153,7 +153,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-A",
                 "s",
@@ -164,7 +164,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-B",
                 "s",
@@ -175,7 +175,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-A",
                 "s",
@@ -209,7 +209,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "shell",
@@ -220,7 +220,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "files",
@@ -231,7 +231,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "shell",
@@ -265,7 +265,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "shell",
@@ -276,7 +276,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "shell",
@@ -287,7 +287,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "shell",
@@ -321,7 +321,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -332,7 +332,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -346,7 +346,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -380,7 +380,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -391,7 +391,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -402,7 +402,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -440,7 +440,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -451,7 +451,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -462,7 +462,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -500,7 +500,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -511,7 +511,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -522,7 +522,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -533,7 +533,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-4",
                 "cap-1",
                 "s",
@@ -569,7 +569,7 @@ mod tests {
 
         // No cost (no financial metadata).
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -581,7 +581,7 @@ mod tests {
             .unwrap();
         // cost = 50
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -593,7 +593,7 @@ mod tests {
             .unwrap();
         // cost = 150
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -630,7 +630,7 @@ mod tests {
 
         // No cost (no financial metadata).
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -642,7 +642,7 @@ mod tests {
             .unwrap();
         // cost = 50
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -654,7 +654,7 @@ mod tests {
             .unwrap();
         // cost = 150
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -690,7 +690,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -701,7 +701,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-1",
                 "s",
@@ -712,7 +712,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-1",
                 "s",
@@ -723,7 +723,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-4",
                 "cap-1",
                 "s",
@@ -769,7 +769,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         // Get first 2 receipts.
@@ -821,7 +821,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         // Paginate through all 7 receipts with page size 3.
@@ -876,7 +876,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         let result = store
@@ -912,7 +912,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         let result = store
@@ -947,7 +947,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         // Fetch only 3 receipts but total_count should reflect all 10.
@@ -983,7 +983,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         // Request more than MAX_QUERY_LIMIT -- should be capped.
@@ -1055,7 +1055,7 @@ mod tests {
 
         // 2 receipts for agent1, 1 for agent2
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-agent1",
                 "s",
@@ -1066,7 +1066,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-agent1",
                 "s",
@@ -1077,7 +1077,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-agent2",
                 "s",
@@ -1157,7 +1157,7 @@ mod tests {
         store.record_capability_snapshot(&token2, None).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-none-1",
                 "s",
@@ -1168,7 +1168,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-none-2",
                 "s",
@@ -1179,7 +1179,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-none-1",
                 "s",
@@ -1215,7 +1215,7 @@ mod tests {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
 
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-1",
                 "s",
@@ -1281,7 +1281,7 @@ mod tests {
 
         // 1 allow + 1 deny for the same agent capability
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-outcome-1",
                 "s",
@@ -1292,7 +1292,7 @@ mod tests {
             ))
             .unwrap();
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-outcome-1",
                 "s",
@@ -1369,7 +1369,7 @@ mod tests {
         // Insert 7 receipts for cap-page-1
         for i in 0..7usize {
             store
-                .append_arc_receipt(&make_receipt(
+                .append_chio_receipt(&make_receipt(
                     &format!("r-page-{i}"),
                     "cap-page-1",
                     "s",
@@ -1439,7 +1439,7 @@ mod tests {
                 100 + i as u64,
                 None,
             );
-            store.append_arc_receipt(&r).unwrap();
+            store.append_chio_receipt(&r).unwrap();
         }
 
         let result = store
@@ -1470,7 +1470,7 @@ mod tests {
 
         // cap-A, allow, ts=200
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-1",
                 "cap-A",
                 "s",
@@ -1482,7 +1482,7 @@ mod tests {
             .unwrap();
         // cap-A, deny, ts=300
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-2",
                 "cap-A",
                 "s",
@@ -1497,7 +1497,7 @@ mod tests {
             .unwrap();
         // cap-B, allow, ts=200
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-3",
                 "cap-B",
                 "s",
@@ -1509,7 +1509,7 @@ mod tests {
             .unwrap();
         // cap-A, allow, ts=100 (before since)
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-4",
                 "cap-A",
                 "s",
@@ -1521,7 +1521,7 @@ mod tests {
             .unwrap();
         // cap-A, allow, ts=250 -- matches all 3 filters
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "r-5",
                 "cap-A",
                 "s",

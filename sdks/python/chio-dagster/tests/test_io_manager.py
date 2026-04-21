@@ -131,20 +131,20 @@ class TestConfig:
 
 class TestAllowPath:
     def test_handle_output_evaluates_then_delegates(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         inner = _FakeInnerManager()
         manager = ChioIOManager(
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
         context = _FakeOutputContext(asset_key=_FakeAssetKey("my_asset"))
 
         manager.handle_output(context, {"hello": "world"})
 
         assert inner.written == [(context, {"hello": "world"})]
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         call = evaluate_calls[0]
         assert call.tool_name == "io:write"
@@ -154,13 +154,13 @@ class TestAllowPath:
         assert call.parameters["destination"] == "_FakeInnerManager"
 
     def test_load_input_evaluates_then_delegates(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         inner = _FakeInnerManager()
         manager = ChioIOManager(
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
         context = _FakeInputContext(asset_key=_FakeAssetKey("my_asset"))
 
@@ -168,7 +168,7 @@ class TestAllowPath:
 
         assert value == "loaded-value"
         assert inner.load_calls == [context]
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].tool_name == "io:read"
         assert evaluate_calls[0].parameters["operation"] == "read"
@@ -181,7 +181,7 @@ class TestAllowPath:
 
 class TestDenyPath:
     def test_handle_output_denies_before_delegating(self) -> None:
-        arc = deny_all(
+        chio = deny_all(
             reason="destination not allowed",
             guard="DataResidencyGuard",
             raise_on_deny=False,
@@ -191,7 +191,7 @@ class TestDenyPath:
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
         context = _FakeOutputContext(asset_key=_FakeAssetKey("my_asset"))
 
@@ -209,13 +209,13 @@ class TestDenyPath:
     def test_handle_output_denies_via_http_403_path(self) -> None:
         # Default raise_on_deny=True: the mock raises ChioDeniedError;
         # the manager translates it to PermissionError.
-        arc = deny_all(reason="no write perms", guard="CapabilityGuard")
+        chio = deny_all(reason="no write perms", guard="CapabilityGuard")
         inner = _FakeInnerManager()
         manager = ChioIOManager(
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
         context = _FakeOutputContext(asset_key=_FakeAssetKey("my_asset"))
 
@@ -224,7 +224,7 @@ class TestDenyPath:
         assert inner.written == []
 
     def test_load_input_denies_before_delegating(self) -> None:
-        arc = deny_all(
+        chio = deny_all(
             reason="read denied",
             guard="ScopeGuard",
             raise_on_deny=False,
@@ -234,7 +234,7 @@ class TestDenyPath:
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
         context = _FakeInputContext(asset_key=_FakeAssetKey("my_asset"))
 
@@ -250,13 +250,13 @@ class TestDenyPath:
 
 class TestPartitionScoping:
     def test_partition_key_reaches_capability_payload(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         inner = _FakeInnerManager()
         manager = ChioIOManager(
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
         context = _FakeOutputContext(
             asset_key=_FakeAssetKey("regional_analytics"),
@@ -265,7 +265,7 @@ class TestPartitionScoping:
 
         manager.handle_output(context, {"rows": 10})
 
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         params = evaluate_calls[0].parameters
         assert params["partition_key"] == "eu-west"
@@ -287,13 +287,13 @@ class TestPartitionScoping:
                 guard="DataResidencyGuard",
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
         inner = _FakeInnerManager()
         manager = ChioIOManager(
             inner,
             capability_id="cap-1",
             tool_server="chio_data",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         # Allowed partition

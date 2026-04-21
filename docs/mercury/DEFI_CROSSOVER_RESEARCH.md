@@ -16,7 +16,7 @@ trading workflows also matter in on-chain or hybrid workflows:
 - independent verification
 
 That makes DeFi and hybrid-market workflows a credible long-term adjacency for
-the MERCURY and ARC stack.
+the MERCURY and Chio stack.
 
 ---
 

@@ -1,1 +1,0 @@
-{"error":"chio_access_denied","message":"side-effect route requires a capability token","receipt_id":"019d9209-ddc8-7ac1-a5b3-19f082697010","suggestion":"provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter"}

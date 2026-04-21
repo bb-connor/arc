@@ -1290,7 +1290,7 @@ mod tests {
             payer: EconomicPayerReceiptMetadata {
                 party_id: "payer-001".to_string(),
                 funding_source_ref: "wallet-001".to_string(),
-                custody_provider: Some("custody.arc".to_string()),
+                custody_provider: Some("custody.chio".to_string()),
                 obligor_ref: Some("obligor-001".to_string()),
             },
             merchant: EconomicMerchantReceiptMetadata {
@@ -1329,7 +1329,7 @@ mod tests {
                 quote_expiry: Some(1_710_000_600),
             }),
             metering: Some(EconomicMeteringReceiptMetadata {
-                provider: "meter.arc".to_string(),
+                provider: "meter.chio".to_string(),
                 meter_profile_hash: "meter-profile-hash-001".to_string(),
                 max_billable_units: Some(12),
                 billing_unit: Some("1k_tokens".to_string()),
@@ -1811,7 +1811,7 @@ mod tests {
                 settlement_mode: MeteredSettlementMode::AllowThenSettle,
                 quote: MeteredBillingQuote {
                     quote_id: "quote-1".to_string(),
-                    provider: "meter.arc".to_string(),
+                    provider: "meter.chio".to_string(),
                     billing_unit: "1k_tokens".to_string(),
                     quoted_units: 10,
                     quoted_cost: MonetaryAmount {
@@ -1838,7 +1838,7 @@ mod tests {
                 schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
                 verifier_family: Some(AttestationVerifierFamily::AzureMaa),
                 tier: RuntimeAssuranceTier::Attested,
-                verifier: "verifier.arc".to_string(),
+                verifier: "verifier.chio".to_string(),
                 evidence_sha256: "attestation-digest".to_string(),
                 workload_identity: None,
             }),

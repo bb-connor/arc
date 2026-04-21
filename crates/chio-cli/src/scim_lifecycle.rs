@@ -353,7 +353,7 @@ pub fn build_enterprise_identity_context_from_scim(
 ) -> Result<EnterpriseIdentityContext, CliError> {
     ensure_scim_provider(provider)?;
     let principal = derive_scim_principal(provider, user, user_id)?;
-    let extension = required_arc_extension(user)?;
+    let extension = required_chio_extension(user)?;
 
     let mut attribute_sources = BTreeMap::new();
     attribute_sources.insert(
@@ -458,7 +458,9 @@ pub fn derive_enterprise_subject_key(provider_scope: &str, canonical_principal: 
     sha256_hex(digest.as_slice())
 }
 
-pub fn required_arc_extension(user: &ScimUserResource) -> Result<&ChioScimUserExtension, CliError> {
+pub fn required_chio_extension(
+    user: &ScimUserResource,
+) -> Result<&ChioScimUserExtension, CliError> {
     let Some(extension) = user.chio.as_ref() else {
         return Err(CliError::Other(format!(
             "scim user requires the `{CHIO_SCIM_USER_EXTENSION_SCHEMA}` extension"
@@ -466,7 +468,7 @@ pub fn required_arc_extension(user: &ScimUserResource) -> Result<&ChioScimUserEx
     };
     if extension.provider_id.trim().is_empty() {
         return Err(CliError::Other(
-            "scim user arc extension requires provider_id".to_string(),
+            "scim user chio extension requires provider_id".to_string(),
         ));
     }
     Ok(extension)
@@ -498,7 +500,7 @@ pub fn validate_scim_user_request(user: &ScimUserResource) -> Result<(), CliErro
             "scim user requires a non-empty userName".to_string(),
         ));
     }
-    let _ = required_arc_extension(user)?;
+    let _ = required_chio_extension(user)?;
     Ok(())
 }
 
@@ -552,7 +554,7 @@ fn derive_scim_principal(
                     .to_string(),
             )
         }),
-        "clientId" => required_arc_extension(user)?
+        "clientId" => required_chio_extension(user)?
             .client_id
             .clone()
             .filter(|value| !value.trim().is_empty())
@@ -561,7 +563,7 @@ fn derive_scim_principal(
                     "scim provider principal_source `clientId` requires clientId".to_string(),
                 )
             }),
-        "objectId" => required_arc_extension(user)?
+        "objectId" => required_chio_extension(user)?
             .object_id
             .clone()
             .filter(|value| !value.trim().is_empty())

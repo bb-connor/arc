@@ -60,7 +60,7 @@ from chio_sdk.models import ChioScope, Operation, ToolGrant
 
 
 async def mint_search_grant() -> StandingGrant:
-    arc = ChioClient()
+    chio = ChioClient()
     scope = ChioScope(
         grants=[
             ToolGrant(
@@ -70,7 +70,7 @@ async def mint_search_grant() -> StandingGrant:
             ),
         ],
     )
-    token = await arc.create_capability(
+    token = await chio.create_capability(
         subject="agent:researcher", scope=scope, ttl_seconds=3600
     )
     return StandingGrant(token=token, tool_server="tools-srv")

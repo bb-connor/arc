@@ -107,9 +107,9 @@ def chio_remote(scope: str, guards: list[str] | None = None, budget: dict | None
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             from chio_sdk import ChioClient
-            arc = ChioClient()  # connects to node-local sidecar
+            chio = ChioClient()  # connects to node-local sidecar
 
-            verdict = arc.evaluate_sync(
+            verdict = chio.evaluate_sync(
                 tool=fn.__name__,
                 scope=scope,
                 guards=guards,
@@ -120,11 +120,11 @@ def chio_remote(scope: str, guards: list[str] | None = None, budget: dict | None
                 raise PermissionError(f"Chio denied {fn.__name__}: {verdict.reason}")
 
             result = fn(*args, **kwargs)
-            arc.record_sync(verdict=verdict)
+            chio.record_sync(verdict=verdict)
             return result
 
         # Preserve ray.remote interface
-        wrapper._arc_scope = scope
+        wrapper._chio_scope = scope
         return wrapper
 
     return decorator
@@ -291,14 +291,14 @@ class ReceiptAggregator:
     """Collects receipts from distributed tasks into a workflow receipt."""
 
     def __init__(self):
-        self.arc = ChioClient()
+        self.chio = ChioClient()
         self.receipt_ids = []
 
     def add(self, receipt_id: str):
         self.receipt_ids.append(receipt_id)
 
     def finalize(self, workflow_id: str) -> str:
-        return self.arc.finalize_workflow_sync(
+        return self.chio.finalize_workflow_sync(
             step_receipt_ids=self.receipt_ids,
             workflow_id=workflow_id,
         ).receipt_id

@@ -13,10 +13,10 @@ and attestation trust.
 - canonical runtime-attestation appraisal artifacts that separate evidence
   identity, normalized assertions, and vendor-scoped claims
 - signed runtime-attestation appraisal reports through
-  `arc trust appraisal export` and `POST /v1/reports/runtime-attestation-appraisal`
+  `chio trust appraisal export` and `POST /v1/reports/runtime-attestation-appraisal`
 - signed runtime-attestation appraisal results plus explicit local import
-  evaluation through `arc trust appraisal export-result`,
-  `arc trust appraisal import`,
+  evaluation through `chio trust appraisal export-result`,
+  `chio trust appraisal import`,
   `POST /v1/reports/runtime-attestation-appraisal-result`, and
   `POST /v1/reports/runtime-attestation-appraisal/import`
 - signed verifier descriptors, signed reference-value sets, and signed trust
@@ -43,7 +43,7 @@ can defend across verifier families.
 Operators can export one signed appraisal report over that contract either
 locally with:
 
-- `arc trust appraisal export --input <runtime-attestation.json> --policy-file <policy.yaml>`
+- `chio trust appraisal export --input <runtime-attestation.json> --policy-file <policy.yaml>`
 
 or remotely through:
 

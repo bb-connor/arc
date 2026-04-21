@@ -41,7 +41,7 @@ cargo run -p chio-conformance --bin chio-conformance-runner --
 
 By default that command:
 
-- boots `arc mcp serve-http` against `fixtures/wave1/mock_mcp_server.py`
+- boots `chio mcp serve-http` against `fixtures/wave1/mock_mcp_server.py`
 - runs the JS and Python client peers against the remote edge
 - writes JSON result artifacts under `tests/conformance/results/generated/wave1-live/`
 - writes a generated report to `tests/conformance/reports/generated/wave1-live.md`

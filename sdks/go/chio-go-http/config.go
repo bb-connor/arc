@@ -1,4 +1,4 @@
-package arc
+package chio
 
 import (
 	"net/http"
@@ -11,7 +11,7 @@ type Config struct {
 	// Defaults to CHIO_SIDECAR_URL env var or "http://127.0.0.1:9090".
 	SidecarURL string
 
-	// ConfigFile is the path to the arc.yaml configuration file.
+	// ConfigFile is the path to the chio.yaml configuration file.
 	// The sidecar reads route patterns and policies from this file.
 	ConfigFile string
 
@@ -61,7 +61,7 @@ func defaultRouteResolver(_method, path string) string {
 	return path
 }
 
-// ConfigFile sets the path to the arc.yaml configuration file.
+// ConfigFile sets the path to the chio.yaml configuration file.
 func ConfigFile(path string) Option {
 	return func(c *Config) {
 		c.ConfigFile = path

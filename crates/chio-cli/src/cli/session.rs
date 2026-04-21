@@ -442,7 +442,7 @@ fn print_summary(stats: &SessionStats, exit_code: Option<i32>, json_output: bool
         );
     } else {
         eprintln!();
-        eprintln!("--- arc session summary ---");
+        eprintln!("--- chio session summary ---");
         eprintln!("requests: {}", stats.requests);
         eprintln!("allowed:  {}", stats.allowed);
         eprintln!("denied:   {}", stats.denied);

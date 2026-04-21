@@ -1,6 +1,6 @@
 //! Typed host function bindings for the Chio WASM guard runtime.
 //!
-//! The host runtime registers three functions under the `arc` import module:
+//! The host runtime registers three functions under the `chio` import module:
 //!
 //! - `chio.log(level, ptr, len)` -- structured logging
 //! - `chio.get_config(key_ptr, key_len, val_out_ptr, val_out_len) -> i32` -- config lookup

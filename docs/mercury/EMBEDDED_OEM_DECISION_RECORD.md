@@ -29,7 +29,7 @@ Proceed with one bounded embedded OEM path only.
 - multi-partner OEM breadth
 - generic SDK platform or multi-language client breadth
 - trust-network services
-- ARC-Wall and companion-product work
+- Chio-Wall and companion-product work
 
 ---
 

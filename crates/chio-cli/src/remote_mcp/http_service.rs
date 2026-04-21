@@ -140,7 +140,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         protected_resource_metadata.as_ref(),
         authorization_server_metadata.as_ref(),
     ) {
-        validate_arc_oauth_discovery_metadata_pair(
+        validate_chio_oauth_discovery_metadata_pair(
             protected_resource_metadata,
             authorization_server_metadata,
         )?;
@@ -1223,7 +1223,7 @@ fn build_remote_auth_state(
     Ok((auth_mode, admin_token))
 }
 
-fn build_arc_oauth_authorization_profile_metadata() -> Result<Value, CliError> {
+fn build_chio_oauth_authorization_profile_metadata() -> Result<Value, CliError> {
     let mut value =
         serde_json::to_value(ChioOAuthAuthorizationProfile::default()).map_err(|error| {
             CliError::Other(format!(
@@ -1234,7 +1234,7 @@ fn build_arc_oauth_authorization_profile_metadata() -> Result<Value, CliError> {
     Ok(value)
 }
 
-fn validate_arc_oauth_authorization_profile_metadata(
+fn validate_chio_oauth_authorization_profile_metadata(
     value: &Value,
     source: &str,
 ) -> Result<(), CliError> {
@@ -1264,10 +1264,10 @@ fn validate_arc_oauth_authorization_profile_metadata(
         .sender_constraints
         .proof_types_supported
         .iter()
-        .any(|proof| proof == CHIO_OAUTH_SENDER_PROOF_ARC_DPOP)
+        .any(|proof| proof == CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP)
     {
         return Err(CliError::Other(format!(
-            "{source} must advertise Chio sender proof type `{CHIO_OAUTH_SENDER_PROOF_ARC_DPOP}`"
+            "{source} must advertise Chio sender proof type `{CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP}`"
         )));
     }
     if profile.portable_claim_catalog != expected_profile.portable_claim_catalog {
@@ -1303,11 +1303,11 @@ fn validate_arc_oauth_authorization_profile_metadata(
     Ok(())
 }
 
-fn validate_arc_oauth_discovery_metadata_pair(
+fn validate_chio_oauth_discovery_metadata_pair(
     protected_resource_metadata: &ProtectedResourceMetadata,
     authorization_server_metadata: &AuthorizationServerMetadata,
 ) -> Result<(), CliError> {
-    validate_arc_oauth_authorization_profile_metadata(
+    validate_chio_oauth_authorization_profile_metadata(
         &protected_resource_metadata.chio_authorization_profile,
         "protected-resource metadata",
     )?;
@@ -1319,7 +1319,7 @@ fn validate_arc_oauth_discovery_metadata_pair(
                 "authorization-server metadata must publish chio_authorization_profile".to_string(),
             )
         })?;
-    validate_arc_oauth_authorization_profile_metadata(
+    validate_chio_oauth_authorization_profile_metadata(
         authorization_profile,
         "authorization-server metadata",
     )?;
@@ -1378,7 +1378,7 @@ fn build_protected_resource_metadata(
     };
 
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
-    let chio_authorization_profile = build_arc_oauth_authorization_profile_metadata()?;
+    let chio_authorization_profile = build_chio_oauth_authorization_profile_metadata()?;
     Ok(Some(ProtectedResourceMetadata {
         resource: effective_resource_indicator(config, &base_url),
         resource_metadata_url: format!("{base_url}{PROTECTED_RESOURCE_METADATA_MCP_PATH}"),
@@ -1405,7 +1405,7 @@ fn build_authorization_server_metadata(
             .map_err(|error| CliError::Other(format!("invalid local auth issuer: {error}")))?;
         let metadata_path = metadata_path_for_issuer(&issuer);
         let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
-        let chio_authorization_profile = build_arc_oauth_authorization_profile_metadata()?;
+        let chio_authorization_profile = build_chio_oauth_authorization_profile_metadata()?;
         let mut document = json!({
             "issuer": issuer.as_str(),
             "authorization_endpoint": format!("{base_url}{LOCAL_AUTHORIZATION_PATH}"),
@@ -1478,7 +1478,7 @@ fn build_authorization_server_metadata(
     }
 
     let metadata_path = metadata_path_for_issuer(&issuer);
-    let chio_authorization_profile = build_arc_oauth_authorization_profile_metadata()?;
+    let chio_authorization_profile = build_chio_oauth_authorization_profile_metadata()?;
     let mut document = json!({
         "issuer": issuer.as_str(),
         "authorization_endpoint": authorization_endpoint,
@@ -2269,7 +2269,7 @@ fn validate_sender_constraint_runtime(
             .ok_or_else(|| "missing DPoP proof header".to_string())
             .and_then(decode_sender_dpop_proof)?;
         let sender_key = PublicKey::from_hex(sender_key)
-            .map_err(|error| format!("token cnf.arcSenderKey is invalid: {error}"))?;
+            .map_err(|error| format!("token cnf.chioSenderKey is invalid: {error}"))?;
         verify_sender_dpop_proof(
             &proof,
             binding_id,

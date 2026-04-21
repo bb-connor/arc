@@ -36,8 +36,8 @@ Proceed with one bounded Mercury renewal-qualification lane only.
 - a generic customer-success suite, CRM workflow, account-management platform,
   or commercial console
 - channel marketplaces or multi-account renewal programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury customer-platform or universal renewal claims
 
 ---
@@ -47,6 +47,6 @@ Proceed with one bounded Mercury renewal-qualification lane only.
 The renewal-qualification lane now packages one bounded outcome-review path,
 one renewal approval, one reference-reuse discipline, and one explicit
 expansion-boundary handoff over the existing Mercury evidence stack without
-pulling product logic back into ARC or broadening Mercury into a generic
+pulling product logic back into Chio or broadening Mercury into a generic
 customer-success, account-management, or commercial platform. The milestone
 therefore closes with one explicit proceed decision and one narrow boundary.

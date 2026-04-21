@@ -31,8 +31,8 @@ pub(crate) fn sqlite_bool(value: bool) -> i64 {
     }
 }
 
-pub(crate) fn ensure_arc_receipt_verified(receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
-    ensure_arc_receipt_verified_with_context(receipt, "tool receipt", None)
+pub(crate) fn ensure_chio_receipt_verified(receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    ensure_chio_receipt_verified_with_context(receipt, "tool receipt", None)
 }
 
 pub(crate) fn ensure_child_receipt_verified(
@@ -62,12 +62,12 @@ fn format_receipt_context(
     context
 }
 
-pub(crate) fn ensure_arc_receipt_verified_with_context(
+pub(crate) fn ensure_chio_receipt_verified_with_context(
     receipt: &ChioReceipt,
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
-    ensure_arc_receipt_verified_with_context_and_action_hash_policy(
+    ensure_chio_receipt_verified_with_context_and_action_hash_policy(
         receipt,
         receipt_kind,
         seq,
@@ -75,7 +75,7 @@ pub(crate) fn ensure_arc_receipt_verified_with_context(
     )
 }
 
-fn ensure_arc_receipt_verified_with_context_and_action_hash_policy(
+fn ensure_chio_receipt_verified_with_context_and_action_hash_policy(
     receipt: &ChioReceipt,
     receipt_kind: &str,
     seq: Option<u64>,
@@ -126,7 +126,7 @@ pub(crate) fn ensure_child_receipt_verified_with_context(
     Ok(())
 }
 
-pub(crate) fn decode_verified_arc_receipt(
+pub(crate) fn decode_verified_chio_receipt(
     raw_json: &str,
     receipt_kind: &str,
     seq: Option<u64>,
@@ -147,7 +147,7 @@ pub(crate) fn decode_verified_arc_receipt(
             format_receipt_context(receipt_kind, receipt_id.as_deref(), seq)
         ))
     })?;
-    ensure_arc_receipt_verified_with_context_and_action_hash_policy(
+    ensure_chio_receipt_verified_with_context_and_action_hash_policy(
         &receipt,
         receipt_kind,
         seq,
@@ -846,7 +846,7 @@ fn canonical_bytes_from_claim_log_row(
     match receipt_kind {
         "tool_receipt" => {
             let receipt =
-                decode_verified_arc_receipt(raw_json, "claim-log tool receipt", Some(entry_seq))?;
+                decode_verified_chio_receipt(raw_json, "claim-log tool receipt", Some(entry_seq))?;
             chio_core::canonical::canonical_json_bytes(&receipt)
                 .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
         }
@@ -2421,7 +2421,7 @@ pub(crate) fn resolve_sender_constraint_subject_key(
             ensure_non_empty_profile_value(receipt_id, "senderConstraint.subjectKey", receipt_key)?;
             ensure_non_empty_profile_value(receipt_id, "capabilitySnapshot.subjectKey", lineage_key)?;
             if receipt_key != lineage_key {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     format!(
                         "senderConstraint.subjectKey `{receipt_key}` does not match capability snapshot subject `{lineage_key}`"
@@ -2438,7 +2438,7 @@ pub(crate) fn resolve_sender_constraint_subject_key(
             ensure_non_empty_profile_value(receipt_id, "senderConstraint.subjectKey", lineage_key)?;
             Ok((lineage_key.to_string(), "capability_snapshot".to_string()))
         }
-        (None, None) => Err(invalid_arc_oauth_authorization_profile(
+        (None, None) => Err(invalid_chio_oauth_authorization_profile(
             receipt_id,
             "sender-constrained profile requires a bound subjectKey from receipt attribution or capability snapshot",
         )),
@@ -2455,7 +2455,7 @@ pub(crate) fn resolve_sender_constraint_issuer_key(
             ensure_non_empty_profile_value(receipt_id, "senderConstraint.issuerKey", receipt_key)?;
             ensure_non_empty_profile_value(receipt_id, "capabilitySnapshot.issuerKey", lineage_key)?;
             if receipt_key != lineage_key {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     format!(
                         "senderConstraint.issuerKey `{receipt_key}` does not match capability snapshot issuer `{lineage_key}`"
@@ -2472,7 +2472,7 @@ pub(crate) fn resolve_sender_constraint_issuer_key(
             ensure_non_empty_profile_value(receipt_id, "senderConstraint.issuerKey", lineage_key)?;
             Ok((lineage_key.to_string(), "capability_snapshot".to_string()))
         }
-        (None, None) => Err(invalid_arc_oauth_authorization_profile(
+        (None, None) => Err(invalid_chio_oauth_authorization_profile(
             receipt_id,
             "sender-constrained profile requires a bound issuerKey from receipt attribution or capability snapshot",
         )),
@@ -2487,13 +2487,13 @@ pub(crate) fn resolve_sender_constraint_grant(
     grants_json: Option<&str>,
 ) -> Result<(u32, bool), ReceiptStoreError> {
     let grants_json = grants_json.ok_or_else(|| {
-        invalid_arc_oauth_authorization_profile(
+        invalid_chio_oauth_authorization_profile(
             receipt_id,
             "sender-constrained profile requires capability snapshot grants_json",
         )
     })?;
     let scope: ChioScope = serde_json::from_str(grants_json).map_err(|error| {
-        invalid_arc_oauth_authorization_profile(
+        invalid_chio_oauth_authorization_profile(
             receipt_id,
             format!("invalid capability snapshot grants_json: {error}"),
         )
@@ -2501,13 +2501,13 @@ pub(crate) fn resolve_sender_constraint_grant(
 
     if let Some(index) = grant_index {
         let grant = scope.grants.get(index as usize).ok_or_else(|| {
-            invalid_arc_oauth_authorization_profile(
+            invalid_chio_oauth_authorization_profile(
                 receipt_id,
                 format!("matched grant_index `{index}` is outside the capability scope"),
             )
         })?;
         if grant.server_id != tool_server || grant.tool_name != tool_name {
-            return Err(invalid_arc_oauth_authorization_profile(
+            return Err(invalid_chio_oauth_authorization_profile(
                 receipt_id,
                 format!(
                     "grant_index `{index}` resolves to {}/{} instead of {tool_server}/{tool_name}",
@@ -2524,13 +2524,13 @@ pub(crate) fn resolve_sender_constraint_grant(
         .enumerate()
         .filter(|(_, grant)| grant.server_id == tool_server && grant.tool_name == tool_name);
     let Some((index, grant)) = matches.next() else {
-        return Err(invalid_arc_oauth_authorization_profile(
+        return Err(invalid_chio_oauth_authorization_profile(
             receipt_id,
             format!("capability snapshot does not contain a grant for {tool_server}/{tool_name}"),
         ));
     };
     if matches.next().is_some() {
-        return Err(invalid_arc_oauth_authorization_profile(
+        return Err(invalid_chio_oauth_authorization_profile(
             receipt_id,
             format!(
                 "capability snapshot contains multiple grants for {tool_server}/{tool_name}; grant_index is required"
@@ -2588,7 +2588,7 @@ pub(crate) fn derive_authorization_sender_constraint(
         issuer_key_source,
         matched_grant_index,
         proof_required,
-        proof_type: proof_required.then(|| CHIO_OAUTH_SENDER_PROOF_ARC_DPOP.to_string()),
+        proof_type: proof_required.then(|| CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP.to_string()),
         proof_schema: proof_required.then(|| DPOP_SCHEMA.to_string()),
         runtime_assurance_bound: transaction_context.runtime_assurance_tier.is_some(),
         delegated_call_chain_bound: delegated_call_chain_is_sender_bound(
@@ -2597,7 +2597,7 @@ pub(crate) fn derive_authorization_sender_constraint(
     })
 }
 
-pub(crate) fn invalid_arc_oauth_authorization_profile(
+pub(crate) fn invalid_chio_oauth_authorization_profile(
     receipt_id: &str,
     detail: impl AsRef<str>,
 ) -> ReceiptStoreError {
@@ -2613,7 +2613,7 @@ pub(crate) fn ensure_non_empty_profile_value(
     value: &str,
 ) -> Result<(), ReceiptStoreError> {
     if value.trim().is_empty() {
-        return Err(invalid_arc_oauth_authorization_profile(
+        return Err(invalid_chio_oauth_authorization_profile(
             receipt_id,
             format!("{field} must not be empty"),
         ));
@@ -2621,20 +2621,20 @@ pub(crate) fn ensure_non_empty_profile_value(
     Ok(())
 }
 
-pub(crate) fn validate_arc_oauth_authorization_detail(
+pub(crate) fn validate_chio_oauth_authorization_detail(
     receipt_id: &str,
     detail: &GovernedAuthorizationDetail,
 ) -> Result<bool, ReceiptStoreError> {
     match detail.detail_type.as_str() {
         CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE => {
             if detail.locations.is_empty() {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_tool must include at least one location",
                 ));
             }
             if detail.actions.is_empty() {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_tool must include at least one action",
                 ));
@@ -2654,7 +2654,7 @@ pub(crate) fn validate_arc_oauth_authorization_detail(
                 )?;
             }
             if detail.commerce.is_some() || detail.metered_billing.is_some() {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_tool must not carry commerce or meteredBilling sidecars",
                 ));
@@ -2663,7 +2663,7 @@ pub(crate) fn validate_arc_oauth_authorization_detail(
         }
         CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE => {
             let Some(commerce) = detail.commerce.as_ref() else {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_commerce must include commerce detail",
                 ));
@@ -2679,7 +2679,7 @@ pub(crate) fn validate_arc_oauth_authorization_detail(
                 &commerce.shared_payment_token_id,
             )?;
             if detail.metered_billing.is_some() {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_commerce must not carry meteredBilling detail",
                 ));
@@ -2688,7 +2688,7 @@ pub(crate) fn validate_arc_oauth_authorization_detail(
         }
         CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE => {
             let Some(metered) = detail.metered_billing.as_ref() else {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_metered_billing must include meteredBilling detail",
                 ));
@@ -2709,21 +2709,21 @@ pub(crate) fn validate_arc_oauth_authorization_detail(
                 &metered.billing_unit,
             )?;
             if detail.commerce.is_some() {
-                return Err(invalid_arc_oauth_authorization_profile(
+                return Err(invalid_chio_oauth_authorization_profile(
                     receipt_id,
                     "chio_governed_metered_billing must not carry commerce detail",
                 ));
             }
             Ok(false)
         }
-        unsupported => Err(invalid_arc_oauth_authorization_profile(
+        unsupported => Err(invalid_chio_oauth_authorization_profile(
             receipt_id,
             format!("unsupported authorizationDetails.type `{unsupported}`"),
         )),
     }
 }
 
-pub(crate) fn validate_arc_oauth_authorization_row(
+pub(crate) fn validate_chio_oauth_authorization_row(
     row: &AuthorizationContextRow,
 ) -> Result<(), ReceiptStoreError> {
     ensure_non_empty_profile_value(
@@ -2739,12 +2739,12 @@ pub(crate) fn validate_arc_oauth_authorization_row(
 
     let mut saw_tool_detail = false;
     for detail in &row.authorization_details {
-        if validate_arc_oauth_authorization_detail(&row.receipt_id, detail)? {
+        if validate_chio_oauth_authorization_detail(&row.receipt_id, detail)? {
             saw_tool_detail = true;
         }
     }
     if !saw_tool_detail {
-        return Err(invalid_arc_oauth_authorization_profile(
+        return Err(invalid_chio_oauth_authorization_profile(
             &row.receipt_id,
             "report must include one chio_governed_tool authorization detail",
         ));
@@ -2761,7 +2761,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
             .approver_key
             .as_deref()
             .ok_or_else(|| {
-                invalid_arc_oauth_authorization_profile(
+                invalid_chio_oauth_authorization_profile(
                     &row.receipt_id,
                     "approvalTokenId requires approverKey",
                 )
@@ -2772,7 +2772,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
             approver_key,
         )?;
         if row.transaction_context.approval_approved.is_none() {
-            return Err(invalid_arc_oauth_authorization_profile(
+            return Err(invalid_chio_oauth_authorization_profile(
                 &row.receipt_id,
                 "approvalTokenId requires approvalApproved",
             ));
@@ -2810,7 +2810,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
         if row.sender_constraint.delegated_call_chain_bound
             && !delegated_call_chain_is_sender_bound(Some(call_chain))
         {
-            return Err(invalid_arc_oauth_authorization_profile(
+            return Err(invalid_chio_oauth_authorization_profile(
                 &row.receipt_id,
                 "senderConstraint.delegatedCallChainBound requires corroborated call-chain provenance",
             ));
@@ -2823,7 +2823,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
             .runtime_assurance_schema
             .as_deref()
             .ok_or_else(|| {
-                invalid_arc_oauth_authorization_profile(
+                invalid_chio_oauth_authorization_profile(
                     &row.receipt_id,
                     "runtimeAssuranceTier requires runtimeAssuranceSchema",
                 )
@@ -2836,7 +2836,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
         row.transaction_context
             .runtime_assurance_verifier_family
             .ok_or_else(|| {
-                invalid_arc_oauth_authorization_profile(
+                invalid_chio_oauth_authorization_profile(
                     &row.receipt_id,
                     "runtimeAssuranceTier requires runtimeAssuranceVerifierFamily",
                 )
@@ -2846,7 +2846,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
             .runtime_assurance_verifier
             .as_deref()
             .ok_or_else(|| {
-                invalid_arc_oauth_authorization_profile(
+                invalid_chio_oauth_authorization_profile(
                     &row.receipt_id,
                     "runtimeAssuranceTier requires runtimeAssuranceVerifier",
                 )
@@ -2861,7 +2861,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
             .runtime_assurance_evidence_sha256
             .as_deref()
             .ok_or_else(|| {
-                invalid_arc_oauth_authorization_profile(
+                invalid_chio_oauth_authorization_profile(
                     &row.receipt_id,
                     "runtimeAssuranceTier requires runtimeAssuranceEvidenceSha256",
                 )
@@ -2879,7 +2879,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
         &row.sender_constraint.subject_key,
     )?;
     if row.subject_key.as_deref() != Some(row.sender_constraint.subject_key.as_str()) {
-        return Err(invalid_arc_oauth_authorization_profile(
+        return Err(invalid_chio_oauth_authorization_profile(
             &row.receipt_id,
             "row subjectKey must match senderConstraint.subjectKey",
         ));
@@ -2901,7 +2901,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
     )?;
     if row.sender_constraint.proof_required {
         let proof_type = row.sender_constraint.proof_type.as_deref().ok_or_else(|| {
-            invalid_arc_oauth_authorization_profile(
+            invalid_chio_oauth_authorization_profile(
                 &row.receipt_id,
                 "proofRequired requires senderConstraint.proofType",
             )
@@ -2912,7 +2912,7 @@ pub(crate) fn validate_arc_oauth_authorization_row(
             .proof_schema
             .as_deref()
             .ok_or_else(|| {
-                invalid_arc_oauth_authorization_profile(
+                invalid_chio_oauth_authorization_profile(
                     &row.receipt_id,
                     "proofRequired requires senderConstraint.proofSchema",
                 )
@@ -3045,15 +3045,15 @@ pub(crate) fn ensure_tool_receipt_attribution_columns(
     }
 
     connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_subject ON chio_tool_receipts(subject_key)",
+        "CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_subject ON chio_tool_receipts(subject_key)",
         [],
     )?;
     connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_grant ON chio_tool_receipts(capability_id, grant_index)",
+        "CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_grant ON chio_tool_receipts(capability_id, grant_index)",
         [],
     )?;
     connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_tenant ON chio_tool_receipts(tenant_id)",
+        "CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_tenant ON chio_tool_receipts(tenant_id)",
         [],
     )?;
     Ok(())
@@ -4020,7 +4020,7 @@ fn ensure_receipt_lineage_statement_for_receipt_id_tx(
         return Ok(());
     };
     let receipt =
-        decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq.max(0) as u64))?;
+        decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq.max(0) as u64))?;
     let Some(governed) = extract_governed_transaction_metadata(&receipt) else {
         refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
         return Ok(());
@@ -4345,18 +4345,18 @@ impl SqliteReceiptStore {
 }
 
 impl ReceiptStore for SqliteReceiptStore {
-    fn append_arc_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
-        self.append_arc_receipt_returning_seq(receipt).map(|_| ())
+    fn append_chio_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
-    fn append_arc_receipt_returning_seq(
+    fn append_chio_receipt_returning_seq(
         &mut self,
         receipt: &ChioReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
         verify_latest_checkpoint_integrity(&connection)?;
-        let seq = SqliteReceiptStore::append_arc_receipt_returning_seq(self, receipt)?;
+        let seq = SqliteReceiptStore::append_chio_receipt_returning_seq(self, receipt)?;
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;

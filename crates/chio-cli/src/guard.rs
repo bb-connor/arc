@@ -56,7 +56,7 @@ const MANIFEST_YAML_TEMPLATE: &str = r#"name: {{PACKAGE_NAME}}
 version: "0.1.0"
 abi_version: "1"
 wasm_path: "target/wasm32-unknown-unknown/release/{{UNDERSCORED_NAME}}.wasm"
-wasm_sha256: "TODO: run `arc guard build` and update this hash"
+wasm_sha256: "TODO: run `chio guard build` and update this hash"
 "#;
 
 // ---------------------------------------------------------------------------
@@ -101,9 +101,9 @@ pub(crate) fn cmd_guard_new(name: &str) -> Result<(), CliError> {
     println!();
     println!("Next steps:");
     println!("  cd {name}");
-    println!("  arc guard build");
+    println!("  chio guard build");
     println!(
-        "  arc guard inspect target/wasm32-unknown-unknown/release/{underscored_name}.wasm"
+        "  chio guard inspect target/wasm32-unknown-unknown/release/{underscored_name}.wasm"
     );
 
     Ok(())

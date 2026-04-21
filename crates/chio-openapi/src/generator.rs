@@ -498,7 +498,7 @@ mod tests {
     }
 
     #[test]
-    fn x_arc_publish_false_excludes_operation() {
+    fn x_chio_publish_false_excludes_operation() {
         let input = r##"{
             "openapi": "3.0.3",
             "info": { "title": "T", "version": "1" },

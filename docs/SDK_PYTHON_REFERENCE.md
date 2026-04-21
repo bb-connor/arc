@@ -9,10 +9,10 @@ sessions, receipt queries, auth discovery helpers, and invariant verification.
 pip install chio-sdk
 ```
 
-Import the package as `arc`:
+Import the package as `chio`:
 
 ```python
-from arc import ChioClient, ReceiptQueryClient
+from chio import ChioClient, ReceiptQueryClient
 ```
 
 ## Public API
@@ -28,7 +28,7 @@ from arc import ChioClient, ReceiptQueryClient
 ### ChioClient
 
 ```python
-from arc import ChioClient
+from chio import ChioClient
 
 client = ChioClient.with_static_bearer("http://localhost:8931", "token")
 session = client.initialize()
@@ -62,7 +62,7 @@ It also exposes `request()`, `request_result()`, `notification()`, and
 token automatically.
 
 ```python
-from arc import ReceiptQueryClient
+from chio import ReceiptQueryClient
 
 client = ReceiptQueryClient("http://localhost:8940", "token")
 response = client.query({"toolServer": "wrapped-http-mock", "limit": 5})

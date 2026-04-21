@@ -19,7 +19,7 @@ The product is differentiated by the combination of:
 - trading-specific workflow and reconciliation context
 
 The market is adjacent to several established categories, but none of them is
-built around that full evidence contract plus ARC's portable trust substrate.
+built around that full evidence contract plus Chio's portable trust substrate.
 
 ---
 
@@ -153,7 +153,7 @@ and credible pilot outcomes to overcome that.
 
 MERCURY's defensibility comes from:
 
-- reuse of ARC's trust and verification substrate
+- reuse of Chio's trust and verification substrate
 - trading-specific causal evidence and reconciliation
 - practical verifier and inquiry packaging
 - credibility created by explicit proof boundaries

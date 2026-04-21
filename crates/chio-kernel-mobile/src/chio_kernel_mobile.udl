@@ -1,4 +1,4 @@
-// UDL interface for arc-kernel-mobile.
+// UDL interface for chio-kernel-mobile.
 //
 // This file is the single source of truth for the Swift + Kotlin
 // bindings emitted by `uniffi-bindgen`. Every exported symbol below
@@ -9,7 +9,7 @@
 // Design notes:
 //
 //  - Every public entry point is JSON-in / JSON-out. Mobile callers
-//    serialize an Chio type (CapabilityToken, PortableToolCallRequest,
+//    serialize a Chio type (CapabilityToken, PortableToolCallRequest,
 //    ChioReceiptBody, PortablePassportEnvelope) to JSON using the
 //    host-side Chio SDK, hand the string to us, and receive a JSON
 //    string back. This keeps the UDL surface small and avoids having
@@ -46,7 +46,7 @@ namespace chio_kernel_mobile {
 
     // Sign a receipt body with the given Ed25519 signing seed.
     //
-    // `body_json` is the canonical JSON of an ChioReceiptBody. The
+    // `body_json` is the canonical JSON of a ChioReceiptBody. The
     // receipt body MUST set `kernel_key` to the public key that
     // corresponds to `signing_seed_hex`; otherwise the signing pipeline
     // fails fast with ChioMobileError.KernelKeyMismatch.

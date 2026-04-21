@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented for the kernel, in-process MCP edge, and wrapped-subprocess `arc mcp serve` path.
+Implemented for the kernel, in-process MCP edge, and wrapped-subprocess `chio mcp serve` path.
 
 Delivered:
 
@@ -157,7 +157,7 @@ Requirements:
 - an MCP client can list and fetch prompts through Chio
 - completion requests are routed without abusing tool semantics
 - logging notifications can be emitted without corrupting request/response flow
-- `arc mcp serve` exposes wrapped resources, prompts, and completion when the upstream MCP server supports them
+- `chio mcp serve` exposes wrapped resources, prompts, and completion when the upstream MCP server supports them
 
 ## Definition of done
 

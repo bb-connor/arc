@@ -116,7 +116,7 @@ automations:
     trigger:
       type: event
       match:
-        event: arc.receipt.deny
+        event: chio.receipt.deny
       threshold: 5
       within: 300
     actions:

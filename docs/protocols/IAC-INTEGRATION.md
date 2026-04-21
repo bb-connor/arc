@@ -133,12 +133,12 @@ class ChioTerraform:
     """Wraps terraform CLI with Chio capability enforcement."""
 
     def __init__(self, sidecar_url: str = "http://127.0.0.1:9090"):
-        self.arc = ChioClient(base_url=sidecar_url)
+        self.chio = ChioClient(base_url=sidecar_url)
 
     def plan(self, working_dir: str, var_file: str | None = None) -> dict:
         """Run terraform plan with Chio evaluation."""
         # Evaluate plan capability (low privilege)
-        verdict = self.arc.evaluate_sync(
+        verdict = self.chio.evaluate_sync(
             tool="terraform:plan",
             scope="infra:plan",
             arguments={
@@ -169,7 +169,7 @@ class ChioTerraform:
         plan_data = json.loads(plan_show.stdout)
 
         # Record plan receipt
-        self.arc.record_sync(
+        self.chio.record_sync(
             verdict=verdict,
             result_hash=self._hash_plan(plan_data),
         )
@@ -187,7 +187,7 @@ class ChioTerraform:
         resource_scopes = self._plan_to_scopes(plan_data)
 
         # Evaluate apply capability (high privilege, per-resource-type)
-        verdict = self.arc.evaluate_sync(
+        verdict = self.chio.evaluate_sync(
             tool="terraform:apply",
             scope="infra:apply",
             arguments={
@@ -204,7 +204,7 @@ class ChioTerraform:
 
         # Check each resource type against granted scopes
         for scope in resource_scopes:
-            resource_verdict = self.arc.evaluate_sync(
+            resource_verdict = self.chio.evaluate_sync(
                 tool=f"terraform:apply:{scope}",
                 scope=f"infra:{scope}",
             )
@@ -224,7 +224,7 @@ class ChioTerraform:
         )
 
         # Record apply receipt with full state change attestation
-        receipt = self.arc.record_sync(
+        receipt = self.chio.record_sync(
             verdict=verdict,
             result_hash=self._hash_state(working_dir),
         )
@@ -325,14 +325,14 @@ capabilities before delegating to the real provider:
 # main.tf
 terraform {
   required_providers {
-    arc = {
-      source = "backbay/arc"
+    chio = {
+      source = "backbay/chio"
       version = "~> 0.1"
     }
   }
 }
 
-provider "arc" {
+provider "chio" {
   sidecar_url = "http://127.0.0.1:9090"
 }
 
@@ -394,7 +394,7 @@ class ChioDriftDetector:
 
             for resource in drift_resources:
                 # Check if this change has an Chio receipt
-                receipts = await self.arc.find_receipts(
+                receipts = await self.chio.find_receipts(
                     meta={
                         "tf_resource_id": resource["id"],
                         "tf_resource_type": resource["type"],
@@ -478,9 +478,9 @@ def chio_resource(scope: str, guards: list[str] | None = None):
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            arc = ChioClient()
+            chio = ChioClient()
 
-            verdict = arc.evaluate_sync(
+            verdict = chio.evaluate_sync(
                 tool=f"pulumi:resource:{fn.__name__}",
                 scope=scope,
                 arguments={
@@ -499,7 +499,7 @@ def chio_resource(scope: str, guards: list[str] | None = None):
             resource = fn(*args, **kwargs)
 
             # Record receipt after resource is registered with Pulumi
-            receipt = arc.record_sync(verdict=verdict)
+            receipt = chio.record_sync(verdict=verdict)
 
             # Tag the resource with the receipt ID
             # (if the cloud provider supports tags)
@@ -517,15 +517,15 @@ def chio_stack(scope: str):
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            arc = ChioClient()
+            chio = ChioClient()
 
-            grant = arc.acquire_grant_sync(scope=scope)
+            grant = chio.acquire_grant_sync(scope=scope)
             pulumi.log.info(f"Chio grant acquired: {grant.token[:16]}...")
 
             try:
                 result = fn(*args, **kwargs)
             finally:
-                arc.release_grant_sync(grant)
+                chio.release_grant_sync(grant)
                 pulumi.log.info("Chio grant released")
 
             return result
@@ -574,7 +574,7 @@ directly to the existing K8s integration:
 
 ```yaml
 # ChioJobGrant for a Crossplane Composition
-apiVersion: arc.protocol/v1alpha1
+apiVersion: chio.protocol/v1alpha1
 kind: ChioJobGrant
 metadata:
   name: crossplane-database-grant
@@ -584,7 +584,7 @@ spec:
   jobSelector:
     matchLabels:
       crossplane.io/claim-name: agent-database
-      arc.protocol/governed: "true"
+      chio.protocol/governed: "true"
 
   capability:
     scopes:
@@ -654,8 +654,8 @@ func (v *ChioValidator) handleCrossplaneClaim(
 
     // Mutate: inject receipt ID as annotation
     claim.SetAnnotations(mergeMaps(claim.GetAnnotations(), map[string]string{
-        "arc.protocol/receipt-id": verdict.ReceiptID,
-        "arc.protocol/grant":     grant.Name,
+        "chio.protocol/receipt-id": verdict.ReceiptID,
+        "chio.protocol/grant":     grant.Name,
     }))
 
     return admission.Patched("Chio approved", claim)
@@ -737,22 +737,22 @@ for traceability:
 ```python
 # Standard Chio tags applied to all provisioned resources
 CHIO_TAGS = {
-    "arc:receipt-id": receipt.receipt_id,
-    "arc:agent-id": identity.agent_id,
-    "arc:capability-scope": scope,
-    "arc:provisioned-by": "chio-protocol",
-    "arc:grant-authority": grant.authority,
-    "arc:timestamp": receipt.timestamp,
+    "chio:receipt-id": receipt.receipt_id,
+    "chio:agent-id": identity.agent_id,
+    "chio:capability-scope": scope,
+    "chio:provisioned-by": "chio-protocol",
+    "chio:grant-authority": grant.authority,
+    "chio:timestamp": receipt.timestamp,
 }
 
 # In Terraform
 resource "aws_db_instance" "agent_db" {
   # ... configuration ...
   tags = merge(var.common_tags, {
-    "arc:receipt-id"       = var.chio_receipt_id
-    "arc:agent-id"         = var.chio_agent_id
-    "arc:capability-scope" = "infra:database:rds"
-    "arc:provisioned-by"   = "chio-protocol"
+    "chio:receipt-id"       = var.chio_receipt_id
+    "chio:agent-id"         = var.chio_agent_id
+    "chio:capability-scope" = "infra:database:rds"
+    "chio:provisioned-by"   = "chio-protocol"
   })
 }
 
@@ -765,14 +765,14 @@ resource "aws_db_instance" "agent_db" {
 ```bash
 # Find all infrastructure provisioned by a specific agent
 aws resourcegroupstaggingapi get-resources \
-  --tag-filters Key=arc:agent-id,Values=agent-42
+  --tag-filters Key=chio:agent-id,Values=agent-42
 
 # Find all infrastructure provisioned under a specific capability
 aws resourcegroupstaggingapi get-resources \
-  --tag-filters Key=arc:capability-scope,Values=infra:database:rds
+  --tag-filters Key=chio:capability-scope,Values=infra:database:rds
 
 # Correlate cloud resources with Chio receipts
-arc receipt list --meta tf_resource_type=aws_db_instance
+chio receipt list --meta tf_resource_type=aws_db_instance
 ```
 
 ## 9. CI/CD Pipeline Integration

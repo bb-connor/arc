@@ -182,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn new_passport_artifacts_use_arc_schema_ids() {
+    fn new_passport_artifacts_use_chio_schema_ids() {
         let signer = Keypair::from_seed(&[1u8; 32]);
         let holder = Keypair::from_seed(&[7u8; 32]);
         let credential = issue_reputation_credential(
@@ -1320,7 +1320,7 @@ mod tests {
                 CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID.to_string(),
             ),
             format: Some("wrong-format".to_string()),
-            subject: "did:example:not-arc".to_string(),
+            subject: "did:example:not-chio".to_string(),
         };
 
         let error = request
@@ -1364,7 +1364,7 @@ mod tests {
             metadata
                 .chio_profile
                 .as_ref()
-                .expect("arc profile")
+                .expect("chio profile")
                 .passport_status_distribution,
             distribution
         );
@@ -1454,10 +1454,10 @@ mod tests {
             .portable_claim_catalog
             .always_disclosed_claims
             .iter()
-            .any(|claim| claim == "vc.credentialSubject.arcPassportId"));
+            .any(|claim| claim == "vc.credentialSubject.chioPassportId"));
 
         let type_metadata =
-            build_arc_passport_sd_jwt_type_metadata("https://trust.example.com")
+            build_chio_passport_sd_jwt_type_metadata("https://trust.example.com")
                 .expect("type metadata");
         assert_eq!(type_metadata.format, CHIO_PASSPORT_SD_JWT_VC_FORMAT);
         assert_eq!(
@@ -1479,7 +1479,7 @@ mod tests {
             .any(|claim| claim == "chio_passport_status"));
 
         let jwt_vc_type_metadata =
-            build_arc_passport_jwt_vc_json_type_metadata("https://trust.example.com")
+            build_chio_passport_jwt_vc_json_type_metadata("https://trust.example.com")
                 .expect("jwt vc type metadata");
         assert_eq!(jwt_vc_type_metadata.format, CHIO_PASSPORT_JWT_VC_JSON_FORMAT);
         assert_eq!(
@@ -1492,7 +1492,7 @@ mod tests {
             .portable_claim_catalog
             .always_disclosed_claims
             .iter()
-            .any(|claim| claim == "vc.credentialSubject.arcIssuerDids"));
+            .any(|claim| claim == "vc.credentialSubject.chioIssuerDids"));
 
         let jwks = build_portable_issuer_jwks("https://trust.example.com", &issuer.public_key())
             .expect("jwks");
@@ -1517,7 +1517,7 @@ mod tests {
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let passport_id = passport_artifact_id(&passport).expect("passport id");
 
-        let envelope = issue_arc_passport_sd_jwt_vc(
+        let envelope = issue_chio_passport_sd_jwt_vc(
             &passport,
             "https://trust.example.com",
             &issuer,
@@ -1525,7 +1525,7 @@ mod tests {
             None,
         )
         .expect("portable envelope");
-        let verification = verify_arc_passport_sd_jwt_vc(
+        let verification = verify_chio_passport_sd_jwt_vc(
             &envelope.compact,
             &issuer.public_key(),
             1_710_000_200,
@@ -1579,7 +1579,7 @@ mod tests {
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let passport_id = passport_artifact_id(&passport).expect("passport id");
 
-        let envelope = issue_arc_passport_jwt_vc_json(
+        let envelope = issue_chio_passport_jwt_vc_json(
             &passport,
             "https://trust.example.com",
             &issuer,
@@ -1587,7 +1587,7 @@ mod tests {
             None,
         )
         .expect("portable jwt vc envelope");
-        let verification = verify_arc_passport_jwt_vc_json(
+        let verification = verify_chio_passport_jwt_vc_json(
             &envelope.compact,
             &issuer.public_key(),
             1_710_000_200,
@@ -1632,7 +1632,7 @@ mod tests {
         let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
-        let envelope = issue_arc_passport_sd_jwt_vc(
+        let envelope = issue_chio_passport_sd_jwt_vc(
             &passport,
             "https://trust.example.com",
             &issuer,
@@ -1680,7 +1680,7 @@ mod tests {
         let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
-        let envelope = issue_arc_passport_sd_jwt_vc(
+        let envelope = issue_chio_passport_sd_jwt_vc(
             &passport,
             "https://trust.example.com",
             &issuer,
@@ -1692,7 +1692,7 @@ mod tests {
             payload.remove("cnf");
         });
 
-        let error = verify_arc_passport_sd_jwt_vc(&compact, &issuer.public_key(), 1_710_000_200)
+        let error = verify_chio_passport_sd_jwt_vc(&compact, &issuer.public_key(), 1_710_000_200)
             .expect_err("missing holder binding should fail");
         match error {
             CredentialError::InvalidOid4vciCredentialResponse(message) => {
@@ -1717,7 +1717,7 @@ mod tests {
         let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
-        let envelope = issue_arc_passport_sd_jwt_vc(
+        let envelope = issue_chio_passport_sd_jwt_vc(
             &passport,
             "https://trust.example.com",
             &issuer,
@@ -1742,7 +1742,7 @@ mod tests {
             );
         });
 
-        let error = verify_arc_passport_sd_jwt_vc(&compact, &issuer.public_key(), 1_710_000_200)
+        let error = verify_chio_passport_sd_jwt_vc(&compact, &issuer.public_key(), 1_710_000_200)
             .expect_err("unknown disclosure claim should fail");
         match error {
             CredentialError::InvalidOid4vciCredentialResponse(message) => {
@@ -1767,7 +1767,7 @@ mod tests {
         let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
-        let envelope = issue_arc_passport_sd_jwt_vc(
+        let envelope = issue_chio_passport_sd_jwt_vc(
             &passport,
             "https://trust.example.com",
             &issuer,
@@ -1777,7 +1777,7 @@ mod tests {
         .expect("portable envelope");
         let segments = envelope.compact.split('~').collect::<Vec<_>>();
         let filtered = format!("{}~{}~", segments[0], segments[1]);
-        let verification = verify_arc_passport_sd_jwt_vc(&filtered, &issuer.public_key(), 1_710_000_200)
+        let verification = verify_chio_passport_sd_jwt_vc(&filtered, &issuer.public_key(), 1_710_000_200)
             .expect("subset disclosure verification");
         assert_eq!(verification.disclosure_claims, vec!["chio_issuer_dids"]);
     }
@@ -1798,7 +1798,7 @@ mod tests {
         let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
-        let envelope = issue_arc_passport_sd_jwt_vc(
+        let envelope = issue_chio_passport_sd_jwt_vc(
             &passport,
             "https://trust.example.com",
             &issuer,

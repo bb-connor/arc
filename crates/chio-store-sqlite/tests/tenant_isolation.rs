@@ -91,7 +91,7 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
             Some("tenant-A"),
         );
         store
-            .append_arc_receipt_returning_seq(&r)
+            .append_chio_receipt_returning_seq(&r)
             .expect("append tenant-A receipt");
     }
     // 3 receipts for tenant B.
@@ -102,7 +102,7 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
             Some("tenant-B"),
         );
         store
-            .append_arc_receipt_returning_seq(&r)
+            .append_chio_receipt_returning_seq(&r)
             .expect("append tenant-B receipt");
     }
     // 2 pre-migration legacy receipts without a tenant_id. These land in
@@ -114,7 +114,7 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
             None,
         );
         store
-            .append_arc_receipt_returning_seq(&r)
+            .append_chio_receipt_returning_seq(&r)
             .expect("append legacy receipt");
     }
 
@@ -213,7 +213,7 @@ fn tenant_filter_none_returns_all_rows_regardless_of_tags() {
             let capability_id = format!("cap-{id}");
             let r = signed_receipt(&id, &capability_id, tenant);
             store
-                .append_arc_receipt_returning_seq(&r)
+                .append_chio_receipt_returning_seq(&r)
                 .expect("append receipt");
         }
     }
@@ -246,8 +246,8 @@ fn tenant_a_queries_never_return_tenant_b_rows() {
 
     let a = signed_receipt("rcpt-secret-a", "cap-a", Some("tenant-A"));
     let b = signed_receipt("rcpt-secret-b", "cap-b", Some("tenant-B"));
-    store.append_arc_receipt_returning_seq(&a).unwrap();
-    store.append_arc_receipt_returning_seq(&b).unwrap();
+    store.append_chio_receipt_returning_seq(&a).unwrap();
+    store.append_chio_receipt_returning_seq(&b).unwrap();
 
     store.with_strict_tenant_isolation(true);
 

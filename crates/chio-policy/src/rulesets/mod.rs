@@ -2,7 +2,7 @@
 //!
 //! Each ruleset is a YAML document shipped as a `&'static str` via
 //! `include_str!()`. The rulesets provide curated starting points operators
-//! can extend from (e.g. `extends: arc:strict`) without shipping YAML files
+//! can extend from (e.g. `extends: chio:strict`) without shipping YAML files
 //! alongside their deployment.
 //!
 //! The set is ported from ClawdStrike's `vendor/hushspec/rulesets/` directory
@@ -126,11 +126,11 @@ impl From<RulesetError> for CompileError {
 
 /// Return the embedded YAML source for a built-in ruleset, if one exists.
 ///
-/// Accepts both the raw name (e.g. `"default"`) and the `arc:` or `hushspec:`
-/// prefixed form (`"arc:default"`, `"hushspec:default"`).
+/// Accepts both the raw name (e.g. `"default"`) and the `chio:` or `hushspec:`
+/// prefixed form (`"chio:default"`, `"hushspec:default"`).
 pub fn builtin_yaml(name: &str) -> Option<&'static str> {
     let key = name
-        .strip_prefix("arc:")
+        .strip_prefix("chio:")
         .or_else(|| name.strip_prefix("hushspec:"))
         .unwrap_or(name);
     BUILTIN_RULESETS

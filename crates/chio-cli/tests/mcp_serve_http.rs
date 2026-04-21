@@ -667,7 +667,7 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http");
+        .expect("spawn chio mcp serve-http");
 
     ServerGuard { child }
 }
@@ -729,7 +729,7 @@ fn spawn_http_server_with_policy_path_and_jwt_auth(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http with jwt auth");
+        .expect("spawn chio mcp serve-http with jwt auth");
 
     ServerGuard { child }
 }
@@ -779,7 +779,7 @@ fn spawn_http_server_with_shared_owner(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http");
+        .expect("spawn chio mcp serve-http");
 
     ServerGuard { child }
 }
@@ -823,7 +823,7 @@ fn spawn_http_server_with_authority_db(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http");
+        .expect("spawn chio mcp serve-http");
 
     ServerGuard { child }
 }
@@ -898,7 +898,7 @@ fn spawn_http_server_with_shared_owner_and_jwt_auth(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http with shared-owner jwt auth");
+        .expect("spawn chio mcp serve-http with shared-owner jwt auth");
 
     ServerGuard { child }
 }
@@ -959,7 +959,7 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http");
+        .expect("spawn chio mcp serve-http");
 
     ServerGuard { child }
 }
@@ -1025,7 +1025,7 @@ fn spawn_http_server_with_jwt_auth_and_local_discovery(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http");
+        .expect("spawn chio mcp serve-http");
 
     ServerGuard { child }
 }
@@ -1266,7 +1266,7 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http with oidc discovery");
+        .expect("spawn chio mcp serve-http with oidc discovery");
 
     ServerGuard { child }
 }
@@ -1333,7 +1333,7 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http with token introspection");
+        .expect("spawn chio mcp serve-http with token introspection");
 
     ServerGuard { child }
 }
@@ -1367,7 +1367,7 @@ fn spawn_trust_control_service(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc trust control service");
+        .expect("spawn chio trust control service");
 
     ServerGuard { child }
 }
@@ -1408,7 +1408,7 @@ fn spawn_http_server_with_control_plane(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn control-backed arc mcp serve-http");
+        .expect("spawn control-backed chio mcp serve-http");
 
     ServerGuard { child }
 }

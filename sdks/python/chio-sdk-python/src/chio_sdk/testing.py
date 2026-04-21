@@ -19,8 +19,8 @@ Example
     from chio_sdk.errors import ChioDeniedError
 
     async def test_mytool() -> None:
-        async with allow_all() as arc:
-            receipt = await arc.evaluate_tool_call(
+        async with allow_all() as chio:
+            receipt = await chio.evaluate_tool_call(
                 capability_id="cap-1",
                 tool_server="srv",
                 tool_name="read",
@@ -186,7 +186,7 @@ class MockChioClient:
         checked.
     """
 
-    DEFAULT_BASE_URL = "http://mock.arc.local"
+    DEFAULT_BASE_URL = "http://mock.chio.local"
 
     def __init__(
         self,

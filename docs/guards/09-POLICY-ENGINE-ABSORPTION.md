@@ -300,7 +300,7 @@ It also derives an `ChioScope` from tool_access rules.
    input_injection) are defined in the schema but not compiled to guards.
 
 2. **Built-in rulesets**: operators should be able to write
-   `extends: arc:strict` without shipping YAML files.
+   `extends: chio:strict` without shipping YAML files.
 
 3. **Schema versioning**: Chio needs its own versioned schema so policies
    can be forward-compatible and feature-gated.
@@ -394,7 +394,7 @@ impl BuiltinRuleset {
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
-        let id = name.strip_prefix("arc:").unwrap_or(name);
+        let id = name.strip_prefix("chio:").unwrap_or(name);
         match id {
             "default" => Some(Self::Default),
             // ...
@@ -487,7 +487,7 @@ Add a `custom_guards` section to HushSpec (gated behind version 0.2.0):
 hushspec: "0.2.0"
 name: acme-production
 
-extends: arc:ai-agent
+extends: chio:ai-agent
 
 rules:
   # ... standard rules ...
@@ -641,13 +641,13 @@ Key differences:
 
 ### 6.3 Namespace
 
-Built-in rulesets are referenced with an `arc:` prefix:
+Built-in rulesets are referenced with an `chio:` prefix:
 
 ```yaml
-extends: arc:ai-agent
+extends: chio:ai-agent
 ```
 
-The prefix is optional (bare names check builtins first). The `arc:` prefix
+The prefix is optional (bare names check builtins first). The `chio:` prefix
 is for clarity when mixing with filesystem paths.
 
 ---

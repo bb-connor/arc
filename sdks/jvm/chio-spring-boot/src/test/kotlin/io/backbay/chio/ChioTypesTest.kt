@@ -73,7 +73,7 @@ class ChioTypesTest {
     }
 
     @Test
-    fun `arc http request serialization`() {
+    fun `chio http request serialization`() {
         val request = ChioHttpRequest(
             requestId = "req-001",
             method = "GET",

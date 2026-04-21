@@ -70,24 +70,24 @@ def _scope_for_tools(*tool_names: str, server_id: str = "srv") -> ChioScope:
 def _instrumented_client() -> MockChioClient:
     """MockChioClient that records minted tokens for policy lookup."""
 
-    arc = MockChioClient()
-    arc._tokens = {}  # type: ignore[attr-defined]
+    chio = MockChioClient()
+    chio._tokens = {}  # type: ignore[attr-defined]
 
-    original_create = arc.create_capability
-    original_attenuate = arc.attenuate_capability
+    original_create = chio.create_capability
+    original_attenuate = chio.attenuate_capability
 
     async def create_capability(**kwargs: Any) -> Any:
         token = await original_create(**kwargs)
-        arc._tokens[token.id] = token  # type: ignore[attr-defined]
+        chio._tokens[token.id] = token  # type: ignore[attr-defined]
         return token
 
     async def attenuate_capability(parent: Any, **kwargs: Any) -> Any:
         child = await original_attenuate(parent, **kwargs)
-        arc._tokens[child.id] = child  # type: ignore[attr-defined]
+        chio._tokens[child.id] = child  # type: ignore[attr-defined]
         return child
 
-    arc.create_capability = create_capability  # type: ignore[method-assign]
-    arc.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
+    chio.create_capability = create_capability  # type: ignore[method-assign]
+    chio.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
 
     def policy(
         tool_name: str,
@@ -95,7 +95,7 @@ def _instrumented_client() -> MockChioClient:
         context: dict[str, Any],
     ) -> MockVerdict:
         cap_id = context.get("capability_id")
-        token = arc._tokens.get(cap_id)  # type: ignore[attr-defined]
+        token = chio._tokens.get(cap_id)  # type: ignore[attr-defined]
         if token is None:
             return MockVerdict.deny_verdict(
                 f"unknown capability {cap_id!r}",
@@ -109,8 +109,8 @@ def _instrumented_client() -> MockChioClient:
             guard="ScopeGuard",
         )
 
-    arc.set_policy(policy)
-    return arc
+    chio.set_policy(policy)
+    return chio
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ def _instrumented_client() -> MockChioClient:
 
 class TestProvisionCapability:
     async def test_binds_to_function_tools(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         search = ChioFunctionTool(
             fn=lambda q: f"hit:{q}",
             name="search",
@@ -138,7 +138,7 @@ class TestProvisionCapability:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="analyst",
         )
         token = await chio_runner.provision_capability()
@@ -153,7 +153,7 @@ class TestProvisionCapability:
     async def test_acceptance_allows_in_scope_denies_out_of_scope(self) -> None:
         """Roadmap acceptance: an AgentRunner with ChioFunctionTool evaluates
         each tool dispatch through the sidecar."""
-        arc = _instrumented_client()
+        chio = _instrumented_client()
 
         search = ChioFunctionTool(
             fn=lambda q: f"hit:{q}",
@@ -172,7 +172,7 @@ class TestProvisionCapability:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="analyst",
         )
         await chio_runner.provision_capability()
@@ -188,7 +188,7 @@ class TestProvisionCapability:
         assert exc_info.value.guard == "ScopeGuard"
 
     async def test_picks_up_top_level_tools_attribute(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         tool = ChioFunctionTool(
             fn=lambda q: q,
             name="search",
@@ -199,7 +199,7 @@ class TestProvisionCapability:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="a",
         )
         token = await chio_runner.provision_capability()
@@ -207,7 +207,7 @@ class TestProvisionCapability:
 
     async def test_non_chio_tools_are_ignored(self) -> None:
         """Plain LlamaIndex tools must be left alone."""
-        arc = _instrumented_client()
+        chio = _instrumented_client()
 
         class _Plain:
             capability_id = "untouched"
@@ -223,7 +223,7 @@ class TestProvisionCapability:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="a",
         )
         token = await chio_runner.provision_capability()
@@ -232,7 +232,7 @@ class TestProvisionCapability:
         assert chio_tool.capability_id == token.id
 
     async def test_extra_tools_are_bound_too(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         registered = ChioFunctionTool(
             fn=lambda q: q,
             name="search",
@@ -250,7 +250,7 @@ class TestProvisionCapability:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="a",
         )
         await chio_runner.provision_capability(extra_tools=[ad_hoc])
@@ -265,7 +265,7 @@ class TestProvisionCapability:
 
 class TestQueryEngineBinding:
     async def test_query_engine_tool_receives_scope(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
 
         from llama_index.core.base.base_query_engine import BaseQueryEngine
         from llama_index.core.base.response.schema import Response
@@ -311,7 +311,7 @@ class TestQueryEngineBinding:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=scope,
-            chio_client=arc,
+            chio_client=chio,
             agent_name="analyst",
         )
         token = await chio_runner.provision_capability()
@@ -330,7 +330,7 @@ class TestQueryEngineBinding:
 
 class TestAttenuation:
     async def test_attenuate_narrows_scope(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         tool = ChioFunctionTool(
             fn=lambda q: q,
             name="search",
@@ -341,7 +341,7 @@ class TestAttenuation:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search", "write"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="lead",
         )
         parent = await chio_runner.provision_capability()
@@ -350,7 +350,7 @@ class TestAttenuation:
         assert not parent.scope.is_subset_of(child.scope)
 
     async def test_attenuate_rejects_broader_scope(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         tool = ChioFunctionTool(
             fn=lambda q: q,
             name="search",
@@ -361,7 +361,7 @@ class TestAttenuation:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="lead",
         )
         await chio_runner.provision_capability()
@@ -371,12 +371,12 @@ class TestAttenuation:
             )
 
     async def test_attenuate_before_provisioning_raises(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         runner = _FakeAgentRunner(tools=[])
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="lead",
         )
         with pytest.raises(ChioLlamaIndexConfigError):
@@ -390,22 +390,22 @@ class TestAttenuation:
 
 class TestConfig:
     def test_none_runner_rejected(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         with pytest.raises(ChioLlamaIndexConfigError):
             ChioAgentRunner(
                 runner=None,
                 capability_scope=_scope_for_tools("search"),
-                chio_client=arc,
+                chio_client=chio,
                 agent_name="a",
             )
 
     async def test_bind_tools_without_provision_raises(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         runner = _FakeAgentRunner(tools=[])
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="a",
         )
         tool = ChioFunctionTool(

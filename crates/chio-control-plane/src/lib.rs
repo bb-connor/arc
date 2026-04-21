@@ -341,7 +341,7 @@ pub fn configure_capability_authority(
     if let Some(url) = control_url {
         if issuance_policy.is_some() || runtime_assurance_policy.is_some() {
             return Err(CliError::Other(
-                "policy-gated issuance must be enforced by the trust-control service itself; start `arc trust serve --policy <path>` instead of relying on client-side --control-url issuance".to_string(),
+                "policy-gated issuance must be enforced by the trust-control service itself; start `chio trust serve --policy <path>` instead of relying on client-side --control-url issuance".to_string(),
             ));
         }
         let token = require_control_token(control_token)?;

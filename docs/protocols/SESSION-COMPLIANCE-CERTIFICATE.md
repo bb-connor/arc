@@ -376,9 +376,9 @@ impl ChioKernel {
 ### 8.2 CLI
 
 ```
-arc cert generate --session <session-id> [--output <path>]
-arc cert verify   --cert <path> [--receipts <path>] [--trusted-keys <path>]
-arc cert inspect  --cert <path>
+chio cert generate --session <session-id> [--output <path>]
+chio cert verify   --cert <path> [--receipts <path>] [--trusted-keys <path>]
+chio cert inspect  --cert <path>
 ```
 
 ### 8.3 SIEM Export

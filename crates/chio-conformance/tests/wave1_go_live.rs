@@ -15,7 +15,7 @@ fn command_available(program: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn python3_supports_arc_sdk() -> bool {
+fn python3_supports_chio_sdk() -> bool {
     let Ok(output) = Command::new("python3")
         .arg("-c")
         .arg("import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')")
@@ -63,7 +63,7 @@ fn ensure_chio_binary(repo_root: &PathBuf) {
 
 #[test]
 fn wave1_remote_http_harness_runs_against_live_go_peer() {
-    if !command_available("go") || !python3_supports_arc_sdk() {
+    if !command_available("go") || !python3_supports_chio_sdk() {
         return;
     }
 

@@ -234,7 +234,7 @@ fn seed_subject_history(
     let subject_key = subject_kp.public_key().to_hex();
     let issuer_key = authority.authority_public_key().to_hex();
     receipt_store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "rep-1",
             &capability.id,
             &subject_key,
@@ -243,7 +243,7 @@ fn seed_subject_history(
         ))
         .expect("append first receipt");
     receipt_store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "rep-2",
             &capability.id,
             &subject_key,
@@ -315,7 +315,7 @@ fn create_passport_with_enterprise_identity(
     let output = command.output().expect("run passport create");
     assert!(
         output.status.success(),
-        "arc passport create failed\nstdout:\n{}\nstderr:\n{}",
+        "chio passport create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -341,7 +341,7 @@ fn create_challenge(output_path: &PathBuf, verifier: &str, verifier_policy_path:
     let output = command.output().expect("run passport challenge create");
     assert!(
         output.status.success(),
-        "arc passport challenge create failed\nstdout:\n{}\nstderr:\n{}",
+        "chio passport challenge create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -375,7 +375,7 @@ fn create_remote_challenge(
         .expect("run remote passport challenge create");
     assert!(
         output.status.success(),
-        "remote arc passport challenge create failed\nstdout:\n{}\nstderr:\n{}",
+        "remote chio passport challenge create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -416,7 +416,7 @@ fn create_signed_verifier_policy(
         .expect("run passport policy create");
     assert!(
         output.status.success(),
-        "arc passport policy create failed\nstdout:\n{}\nstderr:\n{}",
+        "chio passport policy create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -447,7 +447,7 @@ fn create_challenge_response(
         .expect("run passport challenge respond");
     assert!(
         output.status.success(),
-        "arc passport challenge respond failed\nstdout:\n{}\nstderr:\n{}",
+        "chio passport challenge respond failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -880,7 +880,7 @@ fn create_federated_delegation_policy(
         .expect("run federated delegation policy create");
     assert!(
         output.status.success(),
-        "arc trust federated-delegation-policy-create failed\nstdout:\n{}\nstderr:\n{}",
+        "chio trust federated-delegation-policy-create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -916,7 +916,7 @@ fn create_evidence_federation_policy(
         .expect("run evidence federation policy create");
     assert!(
         output.status.success(),
-        "arc evidence federation-policy create failed\nstdout:\n{}\nstderr:\n{}",
+        "chio evidence federation-policy create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -1042,7 +1042,7 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
 
     assert!(
         output.status.success(),
-        "arc trust federated-issue failed\nstdout:\n{}\nstderr:\n{}",
+        "chio trust federated-issue failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -1220,7 +1220,7 @@ fn trust_service_federated_issue_supports_stored_verifier_policy_references_and_
 
     assert!(
         output.status.success(),
-        "arc trust federated-issue failed\nstdout:\n{}\nstderr:\n{}",
+        "chio trust federated-issue failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -1653,7 +1653,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     {
         let mut store = SqliteReceiptStore::open(&a_receipt_db_path).expect("open a receipt store");
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 "fed-hop-a-1",
                 &first_capability_id,
                 &subject_hex,

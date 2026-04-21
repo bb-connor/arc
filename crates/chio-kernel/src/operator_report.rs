@@ -68,11 +68,11 @@ pub const CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE: &str =
 /// Stable label for Chio's capability-subject sender binding.
 pub const CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT: &str = "capability_subject";
 /// Stable label for Chio's Chio-native DPoP proof requirement.
-pub const CHIO_OAUTH_SENDER_PROOF_ARC_DPOP: &str = "chio_dpop_v1";
+pub const CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP: &str = "chio_dpop_v1";
 /// Stable label for Chio's bounded mTLS-thumbprint sender adapter.
-pub const CHIO_OAUTH_SENDER_PROOF_ARC_MTLS: &str = "chio_mtls_thumbprint_v1";
+pub const CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS: &str = "chio_mtls_thumbprint_v1";
 /// Stable label for Chio's bounded attestation-bound sender adapter.
-pub const CHIO_OAUTH_SENDER_PROOF_ARC_ATTESTATION: &str = "chio_attestation_binding_v1";
+pub const CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION: &str = "chio_attestation_binding_v1";
 /// Stable request-time parameter for Chio governed authorization details.
 pub const CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER: &str = "authorization_details";
 /// Stable request-time parameter for Chio governed transaction context.
@@ -797,7 +797,7 @@ fn default_authorization_context_report_schema() -> String {
     CHIO_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA.to_string()
 }
 
-fn default_arc_oauth_authorization_profile() -> ChioOAuthAuthorizationProfile {
+fn default_chio_oauth_authorization_profile() -> ChioOAuthAuthorizationProfile {
     ChioOAuthAuthorizationProfile::default()
 }
 
@@ -919,9 +919,9 @@ impl Default for ChioOAuthSenderConstraintProfile {
             schema: CHIO_OAUTH_SENDER_CONSTRAINT_SCHEMA.to_string(),
             subject_binding: CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT.to_string(),
             proof_types_supported: vec![
-                CHIO_OAUTH_SENDER_PROOF_ARC_DPOP.to_string(),
-                CHIO_OAUTH_SENDER_PROOF_ARC_MTLS.to_string(),
-                CHIO_OAUTH_SENDER_PROOF_ARC_ATTESTATION.to_string(),
+                CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP.to_string(),
+                CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS.to_string(),
+                CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION.to_string(),
             ],
             proof_required_when: "matchedGrant.dpopRequired == true".to_string(),
             runtime_assurance_binding_fields: vec![
@@ -1041,7 +1041,7 @@ pub struct AuthorizationContextRow {
 pub struct AuthorizationContextReport {
     #[serde(default = "default_authorization_context_report_schema")]
     pub schema: String,
-    #[serde(default = "default_arc_oauth_authorization_profile")]
+    #[serde(default = "default_chio_oauth_authorization_profile")]
     pub profile: ChioOAuthAuthorizationProfile,
     pub summary: AuthorizationContextSummary,
     pub receipts: Vec<AuthorizationContextRow>,

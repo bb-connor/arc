@@ -328,7 +328,7 @@ pub struct InputInjectionRule {
 
 /// Token-bucket rate and spend limiting, compiled to `VelocityGuard` +
 /// `AgentVelocityGuard`. Wave 1.6: first-class variant restored in Wave 5.0.1
-/// after the `arc` -> `chio` rename.
+/// after the Chio rename.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VelocityRule {
@@ -398,7 +398,7 @@ pub struct Extensions {
     pub runtime_assurance: Option<RuntimeAssuranceExtension>,
     /// Chio-specific extension slot. The kernel does not interpret this
     /// block; it is carried verbatim for chio-bridge consumers. Restored in
-    /// Wave 5.0.1 after the `arc` -> `chio` rename.
+    /// Wave 5.0.1 after the Chio rename.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chio: Option<ChioExtension>,
 }

@@ -47,10 +47,10 @@ fn main() -> Result<(), chio_control_plane::CliError> {
     match cli.command {
         Commands::ControlPath { command } => match command {
             ControlPathCommands::Export { output } => {
-                commands::cmd_arc_wall_control_path_export(&output, cli.json)
+                commands::cmd_chio_wall_control_path_export(&output, cli.json)
             }
             ControlPathCommands::Validate { output } => {
-                commands::cmd_arc_wall_control_path_validate(&output, cli.json)
+                commands::cmd_chio_wall_control_path_validate(&output, cli.json)
             }
         },
     }

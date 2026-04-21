@@ -485,7 +485,7 @@ A receipt-derived reputation attestation maps to a W3C Verifiable Credential
 
 | VC Field | Chio Source |
 |----------|-----------------|
-| `@context` | `["https://www.w3.org/2018/credentials/v1", "https://arc.dev/credentials/v1"]` |
+| `@context` | `["https://www.w3.org/2018/credentials/v1", "https://chio.dev/credentials/v1"]` |
 | `type` | `["VerifiableCredential", "ChioReputationAttestation"]` |
 | `issuer` | Kernel or authority key that computed the attestation |
 | `issuanceDate` | Attestation issuance time |
@@ -520,8 +520,8 @@ party can:
 4. Weight credentials by the trust it places in each issuing Kernel
 
 This alpha now ships in `crates/chio-credentials` and via the CLI commands
-`arc passport create`, `arc passport evaluate`, `arc passport verify`, and
-`arc passport present`. The current implementation is intentionally
+`chio passport create`, `chio passport evaluate`, `chio passport verify`, and
+`chio passport present`. The current implementation is intentionally
 single-issuer: each passport is a bundle of one or more independently
 verifiable reputation credentials from the same issuing operator.
 
@@ -568,7 +568,7 @@ resolution (service endpoints, delegation metadata) can be published to
 a Chio receipt log as a special `did:chio:update` receipt type.
 
 This basic resolver now ships in `crates/chio-did` and is exposed via
-`arc did resolve`. The current shipped service type is
+`chio did resolve`. The current shipped service type is
 `ChioReceiptLogService`, which allows an operator-local resolver to attach one
 or more receipt-log URLs without changing the self-certifying base identity.
 
@@ -843,7 +843,7 @@ and denies issuance when the requested TTL or grant scope exceeds the current
 tier ceiling.
 
 Operators can now inspect the exact same local evaluation path without bespoke
-SQLite queries or Rust glue. `arc reputation local --subject-public-key ...`
+SQLite queries or Rust glue. `chio reputation local --subject-public-key ...`
 computes the scorecard directly from persisted state, and trust-control exposes
 the same report over `GET /v1/reputation/local/:subject_key` when running with
 service auth. Those operator surfaces reuse the issuance-time corpus assembly,
@@ -1067,8 +1067,8 @@ capability lineage index and receipt attribution path described in Section 1.
 - HushSpec `extensions.reputation` schema in `chio-policy`
 - Integration with `chio-kernel` for reputation-gated capability issuance
 - Verification checklist showing the required local joins exist
-- CLI commands: `arc reputation score <agent-id>`,
-  `arc reputation history <agent-id>`
+- CLI commands: `chio reputation score <agent-id>`,
+  `chio reputation history <agent-id>`
 - Unit tests for all metric computations and tier transitions
 
 **Non-goals for Phase 1:**
@@ -1096,9 +1096,9 @@ distribution flows remain open.
 - `did:chio` method specification document
 - `chio-did` crate with self-certifying DID parsing and DID Document resolution
 - `chio-credentials` crate with VC creation, serialization, verification, and single-issuer passport bundling
-- CLI command: `arc did resolve`
-- Agent Passport CLI: `arc passport create`, `arc passport evaluate`, `arc passport verify`, `arc passport present`, `arc passport challenge ...`
-- Operator comparison surfaces: `arc reputation compare`, `POST /v1/reputation/compare/:subject_key`, and dashboard portable-comparison panel
+- CLI command: `chio did resolve`
+- Agent Passport CLI: `chio passport create`, `chio passport evaluate`, `chio passport verify`, `chio passport present`, `chio passport challenge ...`
+- Operator comparison surfaces: `chio reputation compare`, `POST /v1/reputation/compare/:subject_key`, and dashboard portable-comparison panel
 - VC verification library for relying parties
 
 **Dependencies:**

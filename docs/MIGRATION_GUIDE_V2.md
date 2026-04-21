@@ -190,7 +190,7 @@ use chio_siem::{
 };
 
 let config = SiemConfig {
-    db_path: "/var/lib/arc/receipts.sqlite3".into(),
+    db_path: "/var/lib/chio/receipts.sqlite3".into(),
     poll_interval: Duration::from_secs(5),
     batch_size: 100,
     max_retries: 3,
@@ -207,7 +207,7 @@ let mut manager = ExporterManager::new(config)?;
 manager.add_exporter(Box::new(SplunkHecExporter::new(SplunkConfig {
     endpoint: "https://splunk.example.com:8088".to_string(),
     hec_token: "your-hec-token".to_string(),
-    sourcetype: "arc:receipt".to_string(),
+    sourcetype: "chio:receipt".to_string(),
     index: None,
     host: None,
 })?));

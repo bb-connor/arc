@@ -13,7 +13,7 @@ claim could be honest.
 
 ## Supported Operator Plane
 
-The current operator-facing control plane is centered on `arc trust serve` and
+The current operator-facing control plane is centered on `chio trust serve` and
 its trust-control HTTP surface.
 
 Representative governed endpoints already exposed by the service include:
@@ -70,7 +70,7 @@ Additional deployment inputs depend on the lanes exercised:
 
 ## Review Flow
 
-1. Bring up `arc trust serve` with persistent receipt, budget, and authority
+1. Bring up `chio trust serve` with persistent receipt, budget, and authority
    state.
 2. Confirm the operator report endpoints respond under service auth.
 3. Confirm settlement and metered-billing reconciliation actions mutate only

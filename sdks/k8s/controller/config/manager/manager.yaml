@@ -4,7 +4,7 @@ kind: Namespace
 metadata:
   name: chio-system
   labels:
-    app.kubernetes.io/name: arc
+    app.kubernetes.io/name: chio
     app.kubernetes.io/component: platform
 ---
 apiVersion: v1

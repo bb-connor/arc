@@ -1,9 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ChioClient, ReceiptQueryClient } from "@chio-protocol/sdk";
 
-const DEFAULT_ARC_BASE_URL = "http://127.0.0.1:8931";
-const DEFAULT_ARC_CONTROL_URL = "http://127.0.0.1:8940";
-const DEFAULT_ARC_AUTH_TOKEN = "demo-token";
+const DEFAULT_CHIO_BASE_URL = "http://127.0.0.1:8931";
+const DEFAULT_CHIO_CONTROL_URL = "http://127.0.0.1:8940";
+const DEFAULT_CHIO_AUTH_TOKEN = "demo-token";
 const livePrompt =
   process.argv.filter((arg) => !arg.startsWith("--")).slice(2).join(" ") ||
   "Use the echo_text tool to send back a short hello from Claude.";
@@ -12,9 +12,9 @@ const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-20250514";
 
 function arcConfig() {
   return {
-    baseUrl: process.env.CHIO_BASE_URL ?? DEFAULT_ARC_BASE_URL,
-    controlUrl: process.env.CHIO_CONTROL_URL ?? DEFAULT_ARC_CONTROL_URL,
-    authToken: process.env.CHIO_AUTH_TOKEN ?? DEFAULT_ARC_AUTH_TOKEN,
+    baseUrl: process.env.CHIO_BASE_URL ?? DEFAULT_CHIO_BASE_URL,
+    controlUrl: process.env.CHIO_CONTROL_URL ?? DEFAULT_CHIO_CONTROL_URL,
+    authToken: process.env.CHIO_AUTH_TOKEN ?? DEFAULT_CHIO_AUTH_TOKEN,
   };
 }
 

@@ -532,7 +532,7 @@ fn next_message_id(counter: &AtomicU64, server_id: &str, skill_id: &str) -> Stri
     format!("chio-a2a-{server_id}-{skill_id}-{nanos}-{seq}")
 }
 
-fn derive_arc_server_id(agent_card_url: &Url) -> String {
+fn derive_chio_server_id(agent_card_url: &Url) -> String {
     let host = agent_card_url
         .host_str()
         .unwrap_or("a2a")

@@ -1,10 +1,10 @@
-// Package arc provides data structures and an HTTP client for interacting
+// Package chio provides data structures and an HTTP client for interacting
 // with the Chio sidecar from the Kubernetes Job controller.
 //
 // The controller talks to the Chio sidecar over HTTP to mint capability
 // grants at Job creation, release them at Job completion, and submit
 // aggregated JobReceipts to the Chio receipt store.
-package arc
+package chio
 
 import (
 	"bytes"

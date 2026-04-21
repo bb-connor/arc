@@ -18,7 +18,7 @@ or replaying raw traffic by hand.
 
 ### Trust-Control
 
-`arc trust serve` exposes:
+`chio trust serve` exposes:
 
 - `GET /health`
 - `GET /v1/authority`
@@ -46,7 +46,7 @@ leader visibility rather than general service health.
 
 ### Hosted MCP Edge
 
-`arc mcp serve-http` exposes:
+`chio mcp serve-http` exposes:
 
 - `GET /admin/health`
 - `GET /admin/authority`

@@ -186,7 +186,7 @@ fn spawn_trust_service(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc trust serve");
+        .expect("spawn chio trust serve");
 
     ServerGuard { child }
 }
@@ -1576,7 +1576,7 @@ extensions:
     let runtime_attestation =
         serde_json::to_value(chio_core::capability::RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: chio_core::capability::RuntimeAssuranceTier::Attested,
             issued_at: 1,
             expires_at: 4_102_444_800u64,

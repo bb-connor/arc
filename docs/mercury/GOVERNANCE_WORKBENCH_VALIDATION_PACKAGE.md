@@ -8,13 +8,13 @@
 ## Purpose
 
 The governance validation package proves that MERCURY can package one bounded
-governance-workbench workflow over the same ARC and MERCURY truth artifacts
+governance-workbench workflow over the same Chio and MERCURY truth artifacts
 already used for supervised-live qualification.
 
 The canonical command is:
 
 ```bash
-cargo run -p arc-mercury -- governance-workbench validate --output target/mercury-governance-workbench-validation
+cargo run -p chio-mercury -- governance-workbench validate --output target/mercury-governance-workbench-validation
 ```
 
 ---
@@ -43,7 +43,7 @@ The generated validation directory contains:
 The validation package supports one narrow claim:
 
 > MERCURY can package one bounded governance-workbench change-review and
-> release-control workflow without redefining ARC truth or widening into
+> release-control workflow without redefining Chio truth or widening into
 > generic orchestration.
 
 It does not approve additional governance workflow breadth, additional

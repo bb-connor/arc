@@ -98,7 +98,7 @@ fn sqlite_receipt_store_persists_across_reopen() {
     let path = unique_db_path("chio-receipts");
     {
         let mut store = SqliteReceiptStore::open(&path).unwrap();
-        store.append_arc_receipt(&sample_receipt()).unwrap();
+        store.append_chio_receipt(&sample_receipt()).unwrap();
         store.append_child_receipt(&sample_child_receipt()).unwrap();
         assert_eq!(store.tool_receipt_count().unwrap(), 1);
         assert_eq!(store.child_receipt_count().unwrap(), 1);
@@ -116,7 +116,7 @@ fn sqlite_receipt_store_lists_filtered_receipts() {
     let path = unique_db_path("chio-receipts-filtered");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
 
-    store.append_arc_receipt(&sample_receipt()).unwrap();
+    store.append_chio_receipt(&sample_receipt()).unwrap();
     store.append_child_receipt(&sample_child_receipt()).unwrap();
 
     let tool_receipts = store
@@ -717,23 +717,23 @@ fn open_creates_checkpoint_publication_metadata_table() {
 }
 
 #[test]
-fn append_arc_receipt_returning_seq_returns_seq() {
+fn append_chio_receipt_returning_seq_returns_seq() {
     let path = unique_db_path("chio-receipts-seq");
     let store = SqliteReceiptStore::open(&path).unwrap();
     let receipt = sample_receipt_with_id("rcpt-seq-001");
-    let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+    let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
     assert!(seq > 0, "seq should be non-zero for a new insert");
     let _ = fs::remove_file(path);
 }
 
 #[test]
-fn append_arc_receipt_rejects_invalid_signature() {
+fn append_chio_receipt_rejects_invalid_signature() {
     let path = unique_db_path("chio-receipts-invalid-signature");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
     let mut receipt = sample_receipt_with_id("rcpt-invalid-signature");
     receipt.tool_name = "sh".to_string();
 
-    let error = store.append_arc_receipt(&receipt).unwrap_err();
+    let error = store.append_chio_receipt(&receipt).unwrap_err();
     assert!(matches!(
         error,
         chio_kernel::ReceiptStoreError::Conflict(message)
@@ -744,7 +744,7 @@ fn append_arc_receipt_rejects_invalid_signature() {
 }
 
 #[test]
-fn append_arc_receipt_rejects_mismatched_parameter_hash() {
+fn append_chio_receipt_rejects_mismatched_parameter_hash() {
     let path = unique_db_path("chio-receipts-invalid-parameter-hash");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
     let keypair = Keypair::generate();
@@ -772,7 +772,7 @@ fn append_arc_receipt_rejects_mismatched_parameter_hash() {
     )
     .unwrap();
 
-    let error = store.append_arc_receipt(&receipt).unwrap_err();
+    let error = store.append_chio_receipt(&receipt).unwrap_err();
     assert!(matches!(
         error,
         chio_kernel::ReceiptStoreError::Conflict(message)
@@ -783,12 +783,12 @@ fn append_arc_receipt_rejects_mismatched_parameter_hash() {
 }
 
 #[test]
-fn decode_verified_arc_receipt_preserves_legacy_mismatched_parameter_hash() {
+fn decode_verified_chio_receipt_preserves_legacy_mismatched_parameter_hash() {
     let receipt = legacy_receipt_with_mismatched_parameter_hash("rcpt-legacy-parameter-hash");
     let raw_json = serde_json::to_string(&receipt).unwrap();
 
     let decoded =
-        decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(1)).unwrap();
+        decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(1)).unwrap();
 
     assert_eq!(decoded.id, receipt.id);
     assert!(!decoded.action.verify_hash().unwrap());
@@ -858,7 +858,7 @@ fn evidence_export_rejects_tampered_persisted_tool_receipt() {
     let path = unique_db_path("chio-evidence-export-tamper");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
     let receipt = sample_receipt_with_id("tampered-export-receipt");
-    store.append_arc_receipt(&receipt).unwrap();
+    store.append_chio_receipt(&receipt).unwrap();
     tamper_persisted_tool_receipt(&store, &receipt.id, |receipt| {
         receipt.tool_name = "sh".to_string();
     });
@@ -879,7 +879,7 @@ fn behavioral_feed_report_rejects_tampered_persisted_tool_receipt() {
     let path = unique_db_path("chio-behavioral-feed-tamper");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
     let receipt = sample_receipt_with_id("tampered-report-receipt");
-    store.append_arc_receipt(&receipt).unwrap();
+    store.append_chio_receipt(&receipt).unwrap();
     tamper_persisted_tool_receipt(&store, &receipt.id, |receipt| {
         receipt.tool_name = "sh".to_string();
     });
@@ -900,7 +900,7 @@ fn claim_log_replay_rejects_tampered_persisted_tool_receipt() {
     let path = unique_db_path("chio-claim-log-tamper");
     let store = SqliteReceiptStore::open(&path).unwrap();
     let receipt = sample_receipt_with_id("tampered-claim-log-receipt");
-    let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+    let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
     tamper_claim_log_tool_receipt(&store, &receipt.id, |receipt| {
         receipt.tool_name = "sh".to_string();
     });
@@ -987,7 +987,7 @@ fn claim_log_projection_uses_capability_lineage_when_receipt_lacks_attribution()
     )
     .unwrap();
 
-    store.append_arc_receipt(&receipt).unwrap();
+    store.append_chio_receipt(&receipt).unwrap();
     drop(store);
 
     let reopened = SqliteReceiptStore::open(&path).unwrap();
@@ -1006,7 +1006,7 @@ fn append_100_receipts_seqs_span_1_to_100() {
     let mut seqs = Vec::new();
     for i in 0..100usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-{i:04}"));
-        let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+        let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
         seqs.push(seq);
     }
     assert_eq!(seqs[0], 1);
@@ -1015,7 +1015,7 @@ fn append_100_receipts_seqs_span_1_to_100() {
 }
 
 #[test]
-fn append_arc_receipt_returning_seq_supports_concurrent_writers() {
+fn append_chio_receipt_returning_seq_supports_concurrent_writers() {
     let path = unique_db_path("chio-receipts-concurrent");
     let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
     let thread_count = 8usize;
@@ -1032,7 +1032,7 @@ fn append_arc_receipt_returning_seq_supports_concurrent_writers() {
             for receipt_index in 0..receipts_per_thread {
                 let receipt =
                     sample_receipt_with_id(&format!("rcpt-concurrent-{worker}-{receipt_index}"));
-                seqs.push(store.append_arc_receipt_returning_seq(&receipt).unwrap());
+                seqs.push(store.append_chio_receipt_returning_seq(&receipt).unwrap());
             }
             seqs
         }));
@@ -1064,7 +1064,7 @@ fn store_and_load_checkpoint_by_seq() {
     let mut seqs = Vec::new();
     for i in 0..5usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-store-{i}"));
-        let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+        let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
         seqs.push(seq);
     }
 
@@ -1110,7 +1110,7 @@ fn trait_store_checkpoint_enforces_predecessor_continuity() {
     let mut seqs = Vec::new();
     for i in 0..4usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-predecessor-{i}"));
-        seqs.push(store.append_arc_receipt_returning_seq(&receipt).unwrap());
+        seqs.push(store.append_chio_receipt_returning_seq(&receipt).unwrap());
     }
 
     let checkpoint_kp = Keypair::generate();
@@ -1179,7 +1179,7 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
     insert_checkpoint_row(&store, &second, second.body.batch_end_seq);
     insert_checkpoint_row(&store, &third, third.body.batch_end_seq);
 
-    let error = ReceiptStore::append_arc_receipt_returning_seq(
+    let error = ReceiptStore::append_chio_receipt_returning_seq(
         &mut store,
         &sample_receipt_with_id("rcpt-fail-closed"),
     )
@@ -1198,7 +1198,7 @@ fn trait_store_checkpoint_installs_immutable_checkpoint_triggers() {
     let mut store = SqliteReceiptStore::open(&path).unwrap();
 
     let receipt = sample_receipt_with_id("rcpt-immutable-1");
-    let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+    let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
     let checkpoint_kp = Keypair::generate();
     let checkpoint = build_checkpoint(
         1,
@@ -1236,7 +1236,7 @@ fn trait_store_checkpoint_rejects_conflicting_rewritten_checkpoint_rows() {
     let mut seqs = Vec::new();
     for i in 0..4usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-rewrite-{i}"));
-        seqs.push(store.append_arc_receipt_returning_seq(&receipt).unwrap());
+        seqs.push(store.append_chio_receipt_returning_seq(&receipt).unwrap());
     }
 
     let checkpoint_kp = Keypair::generate();
@@ -1348,7 +1348,7 @@ fn receipts_canonical_bytes_range_returns_correct_count() {
 
     for i in 0..10usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-canon-{i}"));
-        store.append_arc_receipt_returning_seq(&receipt).unwrap();
+        store.append_chio_receipt_returning_seq(&receipt).unwrap();
     }
 
     // Fetch seqs 3..=7 (5 receipts).
@@ -1373,7 +1373,7 @@ fn receipt_log_includes_child_receipts_in_unified_surface() {
     let mut store = SqliteReceiptStore::open(&path).unwrap();
 
     store
-        .append_arc_receipt(&sample_receipt_with_id_and_timestamp("claim-tool-1", 10))
+        .append_chio_receipt(&sample_receipt_with_id_and_timestamp("claim-tool-1", 10))
         .unwrap();
     store
         .append_child_receipt(&sample_child_receipt_with_id_and_timestamp(
@@ -1382,7 +1382,7 @@ fn receipt_log_includes_child_receipts_in_unified_surface() {
         ))
         .unwrap();
     store
-        .append_arc_receipt(&sample_receipt_with_id_and_timestamp("claim-tool-2", 12))
+        .append_chio_receipt(&sample_receipt_with_id_and_timestamp("claim-tool-2", 12))
         .unwrap();
 
     let rows = load_claim_log_rows(&store);
@@ -1428,9 +1428,9 @@ fn receipt_log_includes_child_receipts_in_tree() {
     let child = sample_child_receipt_with_id_and_timestamp("claim-tree-child-1", 11);
     let tool_after = sample_receipt_with_id_and_timestamp("claim-tree-tool-2", 12);
 
-    store.append_arc_receipt(&tool_before).unwrap();
+    store.append_chio_receipt(&tool_before).unwrap();
     store.append_child_receipt(&child).unwrap();
-    store.append_arc_receipt(&tool_after).unwrap();
+    store.append_chio_receipt(&tool_after).unwrap();
 
     let claim_rows = load_claim_log_rows(&store);
     assert_eq!(
@@ -1522,7 +1522,7 @@ fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
     for i in 0..4usize {
         let receipt =
             sample_receipt_with_id_and_timestamp(&format!("tree-head-{i}"), 100 + i as u64);
-        seqs.push(store.append_arc_receipt_returning_seq(&receipt).unwrap());
+        seqs.push(store.append_chio_receipt_returning_seq(&receipt).unwrap());
     }
 
     let checkpoint_kp = Keypair::generate();
@@ -1849,7 +1849,7 @@ fn receipt_analytics_groups_by_agent_tool_and_time() {
     };
 
     store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "analytics-1",
             "agent-a",
             "shell",
@@ -1861,7 +1861,7 @@ fn receipt_analytics_groups_by_agent_tool_and_time() {
         ))
         .unwrap();
     store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "analytics-2",
             "agent-a",
             "shell",
@@ -1876,7 +1876,7 @@ fn receipt_analytics_groups_by_agent_tool_and_time() {
         ))
         .unwrap();
     store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "analytics-3",
             "agent-b",
             "files",
@@ -2039,7 +2039,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
     };
 
     store
-        .append_arc_receipt(&make_financial_receipt(
+        .append_chio_receipt(&make_financial_receipt(
             "cost-1",
             "cap-child",
             Some(leaf_hex.clone()),
@@ -2052,7 +2052,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
         ))
         .unwrap();
     store
-        .append_arc_receipt(&make_financial_receipt(
+        .append_chio_receipt(&make_financial_receipt(
             "cost-2",
             "cap-child",
             Some(leaf_hex.clone()),
@@ -2068,7 +2068,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
         ))
         .unwrap();
     store
-        .append_arc_receipt(&make_financial_receipt(
+        .append_chio_receipt(&make_financial_receipt(
             "cost-3",
             "cap-orphan",
             None,
@@ -2319,7 +2319,7 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
     )
     .unwrap();
     let receipt_id = receipt.id.clone();
-    store.append_arc_receipt(&receipt).unwrap();
+    store.append_chio_receipt(&receipt).unwrap();
     store
         .upsert_settlement_reconciliation(
             &receipt_id,
@@ -2563,7 +2563,7 @@ fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_arti
     )
     .unwrap();
     let receipt_id = receipt.id.clone();
-    store.append_arc_receipt(&receipt).unwrap();
+    store.append_chio_receipt(&receipt).unwrap();
     store
         .upsert_settlement_reconciliation(
             &receipt_id,
@@ -2759,7 +2759,7 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
     };
 
     let seq = store
-        .append_arc_receipt_returning_seq(&make_receipt(
+        .append_chio_receipt_returning_seq(&make_receipt(
             "compliance-1",
             2_000,
             Decision::Allow,
@@ -2768,7 +2768,7 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
         ))
         .unwrap();
     store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "compliance-2",
             2_001,
             Decision::Deny {
@@ -2926,7 +2926,7 @@ fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_
         &receipt_kp,
     )
     .unwrap();
-    store.append_arc_receipt(&receipt).unwrap();
+    store.append_chio_receipt(&receipt).unwrap();
 
     let report = store
         .query_authorization_context_report(&OperatorReportQuery {
@@ -3016,7 +3016,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
         &parent_receipt_kp,
     )
     .unwrap();
-    store.append_arc_receipt(&parent_receipt).unwrap();
+    store.append_chio_receipt(&parent_receipt).unwrap();
 
     let child_receipt = ChioReceipt::sign(
         ChioReceiptBody {
@@ -3075,7 +3075,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
         &child_receipt_kp,
     )
     .unwrap();
-    store.append_arc_receipt(&child_receipt).unwrap();
+    store.append_chio_receipt(&child_receipt).unwrap();
 
     store
         .record_session_anchor_record(
@@ -3280,7 +3280,7 @@ fn receipt_lineage_statement_links_parent_and_child_receipts() {
         &receipt_kp,
     )
     .unwrap();
-    store.append_arc_receipt(&parent).unwrap();
+    store.append_chio_receipt(&parent).unwrap();
 
     let child = ChioReceipt::sign(
         ChioReceiptBody {
@@ -3326,7 +3326,7 @@ fn receipt_lineage_statement_links_parent_and_child_receipts() {
         &receipt_kp,
     )
     .unwrap();
-    store.append_arc_receipt(&child).unwrap();
+    store.append_chio_receipt(&child).unwrap();
 
     let verification = store
         .receipt_lineage_verification(&child.id)
@@ -3586,7 +3586,7 @@ fn sample_risk_package(subject_key: &str) -> chio_kernel::SignedCreditProviderRi
                 highest_tier: Some(chio_core::capability::RuntimeAssuranceTier::Verified),
                 latest_schema: Some("chio.runtime-attestation.azure-maa.jwt.v1".to_string()),
                 latest_verifier_family: Some(chio_core::AttestationVerifierFamily::AzureMaa),
-                latest_verifier: Some("verifier.arc".to_string()),
+                latest_verifier: Some("verifier.chio".to_string()),
                 latest_evidence_sha256: Some("sha256-runtime".to_string()),
                 observed_verifier_families: vec![chio_core::AttestationVerifierFamily::AzureMaa],
                 stale: false,
@@ -3751,7 +3751,7 @@ fn sample_underwriting_input(subject_key: &str) -> chio_kernel::UnderwritingPoli
             highest_tier: Some(chio_core::capability::RuntimeAssuranceTier::Verified),
             latest_schema: Some("chio.runtime-attestation.enterprise.v1".to_string()),
             latest_verifier_family: Some(chio_core::AttestationVerifierFamily::EnterpriseVerifier),
-            latest_verifier: Some("verifier.arc".to_string()),
+            latest_verifier: Some("verifier.chio".to_string()),
             latest_evidence_sha256: Some("sha256-attest".to_string()),
             observed_verifier_families: vec![
                 chio_core::AttestationVerifierFamily::EnterpriseVerifier,
@@ -4980,10 +4980,10 @@ fn liability_claim_lifecycle_persists_package_through_payout_receipt() {
             store.record_credit_loss_lifecycle(&loss_event).unwrap();
 
             store
-                .append_arc_receipt(&sample_receipt_with_id("claim-rcpt-1"))
+                .append_chio_receipt(&sample_receipt_with_id("claim-rcpt-1"))
                 .unwrap();
             store
-                .append_arc_receipt(&sample_receipt_with_id("claim-rcpt-2"))
+                .append_chio_receipt(&sample_receipt_with_id("claim-rcpt-2"))
                 .unwrap();
 
             let missing_receipt_claim = signed_liability_claim_package_fixture(

@@ -65,12 +65,12 @@ pub enum ReceiptStoreError {
 }
 
 pub trait ReceiptStore: Send {
-    fn append_arc_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
-    fn append_arc_receipt_returning_seq(
+    fn append_chio_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    fn append_chio_receipt_returning_seq(
         &mut self,
         receipt: &ChioReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
-        self.append_arc_receipt(receipt)?;
+        self.append_chio_receipt(receipt)?;
         Ok(None)
     }
     fn append_child_receipt(

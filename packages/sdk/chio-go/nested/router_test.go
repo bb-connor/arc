@@ -23,7 +23,7 @@ func TestRouterDispatchesAndEmitsTranscript(t *testing.T) {
 	}))
 	defer server.Close()
 
-	pactSession := session.New(session.Options{
+	chioSession := session.New(session.Options{
 		AuthToken:       "token",
 		BaseURL:         server.URL,
 		HTTPClient:      server.Client(),
@@ -47,7 +47,7 @@ func TestRouterDispatchesAndEmitsTranscript(t *testing.T) {
 			"id":      42,
 			"method":  "sampling/createMessage",
 		},
-		pactSession,
+		chioSession,
 		"nested/sampling",
 	)
 	if err != nil {

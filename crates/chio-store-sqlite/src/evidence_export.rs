@@ -526,10 +526,10 @@ mod tests {
             .unwrap();
 
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-child", 100))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-child", 100))
             .unwrap();
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-child", 101))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-child", 101))
             .unwrap();
         store
             .append_child_receipt(&child_receipt_with_ts("child-1", 100))
@@ -582,7 +582,7 @@ mod tests {
         let capability = capability_with_id("cap-scoped", &subject, &issuer, None);
         store.record_capability_snapshot(&capability, None).unwrap();
         store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-scoped", 100))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-scoped", 100))
             .unwrap();
         store
             .append_child_receipt(&child_receipt_with_ts("child-1", 100))

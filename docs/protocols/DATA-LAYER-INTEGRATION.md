@@ -1070,18 +1070,18 @@ Tool servers declare their database access pattern in the Chio manifest:
         "required": ["query"]
       },
       "annotations": {
-        "arc:data_layer": "sql",
-        "arc:engine": "postgres",
-        "arc:default_operation_class": "read_only",
-        "arc:supports_dry_run": false,
-        "arc:tables": ["users", "orders", "products", "sessions"]
+        "chio:data_layer": "sql",
+        "chio:engine": "postgres",
+        "chio:default_operation_class": "read_only",
+        "chio:supports_dry_run": false,
+        "chio:tables": ["users", "orders", "products", "sessions"]
       }
     }
   ]
 }
 ```
 
-The `arc:*` annotations inform the kernel which guards to activate and
+The `chio:*` annotations inform the kernel which guards to activate and
 what constraints are meaningful for this tool.
 
 ## 8. Python SDK Integration
@@ -1199,16 +1199,16 @@ Every data layer operation produces a receipt with data-specific metadata:
   "server_id": "analytics-db",
   "verdict": "allow",
   "metadata": {
-    "arc:data_layer": "sql",
-    "arc:engine": "postgres",
-    "arc:operation_class": "read_only",
-    "arc:tables_accessed": ["users"],
-    "arc:columns_returned": ["name", "email", "created_at"],
-    "arc:rows_returned": 47,
-    "arc:query_hash": "sha256:a1b2c3d4...",
-    "arc:had_limit": true,
-    "arc:had_tenant_filter": true,
-    "arc:tenant_id": "acme"
+    "chio:data_layer": "sql",
+    "chio:engine": "postgres",
+    "chio:operation_class": "read_only",
+    "chio:tables_accessed": ["users"],
+    "chio:columns_returned": ["name", "email", "created_at"],
+    "chio:rows_returned": 47,
+    "chio:query_hash": "sha256:a1b2c3d4...",
+    "chio:had_limit": true,
+    "chio:had_tenant_filter": true,
+    "chio:tenant_id": "acme"
   },
   "cost": {
     "dimensions": [

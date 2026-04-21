@@ -1,4 +1,4 @@
-package arc
+package chio
 
 import (
 	"bytes"
@@ -47,7 +47,7 @@ func NewClient(baseURL, controlToken string, httpClient *http.Client) *Client {
 //
 // The reconciler uses this sentinel to distinguish transient transport
 // failures (worth requeuing) from logical errors (bad request, etc.).
-var ErrSidecarUnreachable = errors.New("arc: sidecar unreachable")
+var ErrSidecarUnreachable = errors.New("chio: sidecar unreachable")
 
 // Mint requests a capability grant for a governed Job.
 func (c *Client) Mint(ctx context.Context, req MintRequest) (*CapabilityToken, error) {
@@ -65,7 +65,7 @@ func (c *Client) Release(ctx context.Context, req ReleaseRequest) error {
 		return err
 	}
 	if !resp.Released {
-		return fmt.Errorf("arc: sidecar refused release of capability %q", req.CapabilityID)
+		return fmt.Errorf("chio: sidecar refused release of capability %q", req.CapabilityID)
 	}
 	return nil
 }
@@ -77,7 +77,7 @@ func (c *Client) SubmitReceipt(ctx context.Context, receipt JobReceipt) (string,
 		return "", err
 	}
 	if !resp.Accepted {
-		return "", fmt.Errorf("arc: sidecar rejected receipt for job %q", receipt.JobName)
+		return "", fmt.Errorf("chio: sidecar rejected receipt for job %q", receipt.JobName)
 	}
 	return resp.ReceiptID, nil
 }
@@ -88,13 +88,13 @@ func (c *Client) SubmitReceipt(ctx context.Context, receipt JobReceipt) (string,
 func (c *Client) doJSON(ctx context.Context, method, path string, body, out any) error {
 	buf, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("arc: marshal %s body: %w", path, err)
+		return fmt.Errorf("chio: marshal %s body: %w", path, err)
 	}
 
 	url := c.baseURL + path
 	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(buf))
 	if err != nil {
-		return fmt.Errorf("arc: build request %s: %w", url, err)
+		return fmt.Errorf("chio: build request %s: %w", url, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -110,7 +110,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body, out any)
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return fmt.Errorf("arc: read response from %s: %w", url, err)
+		return fmt.Errorf("chio: read response from %s: %w", url, err)
 	}
 
 	if resp.StatusCode >= 500 {
@@ -118,14 +118,14 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body, out any)
 		return fmt.Errorf("%w: status=%d body=%s", ErrSidecarUnreachable, resp.StatusCode, string(respBody))
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("arc: %s returned %d: %s", url, resp.StatusCode, string(respBody))
+		return fmt.Errorf("chio: %s returned %d: %s", url, resp.StatusCode, string(respBody))
 	}
 
 	if out == nil || len(respBody) == 0 {
 		return nil
 	}
 	if err := json.Unmarshal(respBody, out); err != nil {
-		return fmt.Errorf("arc: decode response from %s: %w", url, err)
+		return fmt.Errorf("chio: decode response from %s: %w", url, err)
 	}
 	return nil
 }

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair};
 use chio_credentials::{
     build_oid4vci_passport_offer, ensure_signed_passport_verifier_policy_active,
-    issue_arc_passport_jwt_vc_json, issue_arc_passport_sd_jwt_vc, verify_agent_passport,
+    issue_chio_passport_jwt_vc_json, issue_chio_passport_sd_jwt_vc, verify_agent_passport,
     verify_passport_presentation_challenge, verify_signed_passport_verifier_policy, AgentPassport,
     Oid4vciChioPassportStatusReference, Oid4vciCredentialIssuerMetadata, Oid4vciCredentialOffer,
     Oid4vciCredentialRequest, Oid4vciCredentialResponse, Oid4vciTokenRequest, Oid4vciTokenResponse,
@@ -677,7 +677,7 @@ impl PassportIssuanceOfferRegistry {
                 )
             })?;
             let status_reference = portable_status_reference.clone();
-            let envelope = issue_arc_passport_sd_jwt_vc(
+            let envelope = issue_chio_passport_sd_jwt_vc(
                 &record.passport,
                 &metadata.credential_issuer,
                 keypair,
@@ -701,7 +701,7 @@ impl PassportIssuanceOfferRegistry {
                 )
             })?;
             let status_reference = portable_status_reference.clone();
-            let envelope = issue_arc_passport_jwt_vc_json(
+            let envelope = issue_chio_passport_jwt_vc_json(
                 &record.passport,
                 &metadata.credential_issuer,
                 keypair,

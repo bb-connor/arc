@@ -109,7 +109,7 @@ a Trusted Publisher:
 2. Under **Publishing** -> **Add a new pending publisher**, set:
    - PyPI Project Name: e.g. `chio-crewai`
    - Owner: `backbay-industries`
-   - Repository name: `arc`
+   - Repository name: `chio`
    - Workflow name: `release-pypi.yml`
    - Environment name: `pypi`
 3. Save.
@@ -131,7 +131,7 @@ for the npm package to opt in to Trusted Publishing:
    `ai-sdk`), go to **Settings** -> **Trusted Publishers** -> **Add**
    and register:
    - GitHub org: `backbay-industries`
-   - Repository: `arc`
+   - Repository: `chio`
    - Workflow path: `.github/workflows/release-npm.yml`
    - Environment name: `npm`
 3. Confirm the org-level 2FA policy is set to "Publishing and

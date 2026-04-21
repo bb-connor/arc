@@ -38,9 +38,9 @@ Lambda Execution Environment
 |  | Function Handler |     | Chio Extension             |  |
 |  |                  |     |                           |  |
 |  | async def handler|---->| HTTP :9090 (internal)     |  |
-|  |   arc.evaluate() |     | Capability | Guard | Rcpt |  |
+|  |   chio.evaluate() |     | Capability | Guard | Rcpt |  |
 |  |   ... do work ...|     |                           |  |
-|  |   arc.receipt()  |     | Lifecycle hooks:          |  |
+|  |   chio.receipt()  |     | Lifecycle hooks:          |  |
 |  +------------------+     |   INVOKE -> pre-evaluate  |  |
 |                           |   SHUTDOWN -> flush rcpts |  |
 |                           +---------------------------+  |
@@ -125,11 +125,11 @@ The handler calls Chio explicitly for fine-grained control:
 ```python
 from chio_lambda import ChioLambda
 
-arc = ChioLambda()  # connects to extension on :9090
+chio = ChioLambda()  # connects to extension on :9090
 
 async def handler(event, context):
     # Evaluate capability before executing tool logic
-    verdict = await arc.evaluate(
+    verdict = await chio.evaluate(
         tool="database-query",
         scope="db:read",
         arguments=event["body"],
@@ -150,7 +150,7 @@ async def handler(event, context):
     result = execute_query(event["body"])
 
     # Record successful execution receipt
-    receipt = await arc.record(
+    receipt = await chio.record(
         verdict=verdict,
         result_hash=sha256(json.dumps(result)),
     )
@@ -167,10 +167,10 @@ async def handler(event, context):
 ```typescript
 import { ChioLambda } from "@chio-protocol/lambda";
 
-const arc = new ChioLambda();
+const chio = new ChioLambda();
 
 export const handler = async (event: APIGatewayProxyEvent) => {
-  const verdict = await arc.evaluate({
+  const verdict = await chio.evaluate({
     tool: "database-query",
     scope: "db:read",
     arguments: JSON.parse(event.body ?? "{}"),
@@ -183,7 +183,7 @@ export const handler = async (event: APIGatewayProxyEvent) => {
 
   const result = await executeQuery(event.body);
 
-  const receipt = await arc.record({
+  const receipt = await chio.record({
     verdict,
     resultHash: sha256(JSON.stringify(result)),
   });

@@ -133,20 +133,20 @@ for backward compatibility.
 
 ### 3.3 Host Functions (imported by the guest)
 
-The WASM linker should provide these host imports under the `arc` namespace:
+The WASM linker should provide these host imports under the `chio` namespace:
 
 ```text
-arc.log(level: i32, msg_ptr: i32, msg_len: i32)
+chio.log(level: i32, msg_ptr: i32, msg_len: i32)
                 -- Emit a tracing log line at the given level.
                    0=trace, 1=debug, 2=info, 3=warn, 4=error.
 
-arc.get_config(key_ptr: i32, key_len: i32, val_out_ptr: i32, val_out_len: i32) -> i32
+chio.get_config(key_ptr: i32, key_len: i32, val_out_ptr: i32, val_out_len: i32) -> i32
                 -- Read a guard-specific config value. Returns the
                    actual length, or -1 if the key does not exist.
                    The config values come from the guard manifest's
                    `config` block.
 
-arc.get_time_unix_secs() -> i64
+chio.get_time_unix_secs() -> i64
                 -- Current wall-clock time. Deterministic in replay mode.
 ```
 
@@ -218,18 +218,18 @@ wasmtime module instantiation is ~50us, well within the guard evaluation budget.
 
 Each `WasmGuard` holds its own `Mutex<Box<dyn WasmGuardAbi>>`. This means each
 guard has its own compiled module. The wasmtime `Engine` (which holds the
-compiler/JIT) can be shared across guards via an `Arc<Engine>`:
+compiler/JIT) can be shared across guards via an `Chio<Engine>`:
 
 ```rust
 pub struct WasmtimeBackend {
-    engine: Arc<Engine>,       // Shared across all guards
+    engine: Chio<Engine>,       // Shared across all guards
     module: Option<Module>,    // Per-guard compiled module
     fuel_limit: u64,
 }
 ```
 
 The current code creates a new `Engine` per backend. This should be changed to
-accept an `Arc<Engine>` in the constructor.
+accept an `Chio<Engine>` in the constructor.
 
 ### 4.4 Startup Wiring: `chio.yaml` -> Kernel
 
@@ -281,7 +281,7 @@ The `WasmGuardConfig` currently supports a filesystem `path`. Future options:
 | Source | Config field | Notes |
 |--------|-------------|-------|
 | Local file | `path: /etc/chio/guards/pii.wasm` | Current |
-| HTTP URL | `url: https://registry.arc.dev/guards/pii/1.0.0` | Download + cache |
+| HTTP URL | `url: https://registry.chio.dev/guards/pii/1.0.0` | Download + cache |
 | Inline base64 | `wasm_base64: AGFzbQEA...` | Embedded in config (small guards only) |
 | OCI registry | `oci: ghcr.io/org/pii-guard:1.0` | Pull from container registry |
 
@@ -384,11 +384,11 @@ import "github.com/backbay/chio-guard-sdk-go"
 
 //export evaluate
 func evaluate(ptr, len int32) int32 {
-    req := arc.ParseRequest(ptr, len)
+    req := chio.ParseRequest(ptr, len)
     if req.ToolName == "delete_file" {
-        return arc.Deny("blocked")
+        return chio.Deny("blocked")
     }
-    return arc.Allow()
+    return chio.Allow()
 }
 ```
 
@@ -451,8 +451,8 @@ pii-guard-1.2.0/
 Or a single `.arcguard` file (gzipped tar):
 
 ```bash
-arc guard pack ./pii-guard/    # produces pii-guard-1.2.0.arcguard
-arc guard install pii-guard-1.2.0.arcguard
+chio guard pack ./pii-guard/    # produces pii-guard-1.2.0.arcguard
+chio guard install pii-guard-1.2.0.arcguard
 ```
 
 ### 6.3 Manifest Verification
@@ -472,24 +472,24 @@ concerns (the guest does not read its own manifest).
 
 ## 7. CLI Integration
 
-### 7.1 New Subcommands for `arc` CLI
+### 7.1 New Subcommands for `chio` CLI
 
 ```
-arc guard new <name>           # Scaffold a new guard project
-arc guard build                # Compile to wasm32-unknown-unknown
-arc guard test                 # Run the guard against test fixtures
-arc guard pack                 # Package into .arcguard
-arc guard install <path|url>   # Install into /etc/chio/guards/
-arc guard list                 # List installed guards
-arc guard inspect <path>       # Print manifest + ABI info
-arc guard bench <path>         # Measure fuel consumption on sample inputs
+chio guard new <name>           # Scaffold a new guard project
+chio guard build                # Compile to wasm32-unknown-unknown
+chio guard test                 # Run the guard against test fixtures
+chio guard pack                 # Package into .arcguard
+chio guard install <path|url>   # Install into /etc/chio/guards/
+chio guard list                 # List installed guards
+chio guard inspect <path>       # Print manifest + ABI info
+chio guard bench <path>         # Measure fuel consumption on sample inputs
 ```
 
 These subcommands live in `chio-cli/src/cli/guard.rs` (new module).
 
 ### 7.2 Test Fixtures
 
-`arc guard test` loads the compiled `.wasm` and runs it against fixture files:
+`chio guard test` loads the compiled `.wasm` and runs it against fixture files:
 
 ```yaml
 # tests/block_passwd.yaml
@@ -513,7 +513,7 @@ expected_reason_contains: "passwd"
 
 The current wasmtime backend works but needs:
 
-1. **Shared `Arc<Engine>`** -- avoid creating one engine per guard
+1. **Shared `Chio<Engine>`** -- avoid creating one engine per guard
 2. **`chio_alloc` support** -- check for the export, use it if present
 3. **Host function registration** -- `chio.log`, `chio.get_config`, `chio.get_time_unix_secs`
 4. **`WasmHostState` instead of `()`** -- carry config + log buffer in the Store
@@ -547,12 +547,12 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 ### 8.4 Security Hardening
 
 - **WASI disabled** -- do not link WASI imports. Guards must not have filesystem
-  or network access. The only imports are the `arc.*` host functions.
+  or network access. The only imports are the `chio.*` host functions.
 - **Memory limits** -- cap guest linear memory growth (e.g., 16 MiB max).
 - **Epoch interruption** -- as a secondary timeout mechanism alongside fuel metering,
   configure wasmtime epoch interruption to hard-kill guards that somehow evade
   fuel accounting.
-- **Module validation** -- reject modules that import anything outside the `arc`
+- **Module validation** -- reject modules that import anything outside the `chio`
   namespace.
 
 
@@ -563,14 +563,14 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 
 ### Phase 1: Host-side completion -- v1 (see 05-V1-DECISION.md)
 
-- Add `Arc<Engine>` sharing across guards
+- Add `Chio<Engine>` sharing across guards
 - Add `WasmHostState` with config + log buffer
 - Register `chio.log`, `chio.get_config`, `chio.get_time_unix_secs` host functions
 - Add `chio_alloc` / `chio_deny_reason` protocol support
 - Add guard manifest parsing + SHA-256 verification
 - Wire `chio-config` `wasm_guards` entries into kernel startup
 - Add memory limit enforcement
-- Add module import validation (reject non-`arc` imports)
+- Add module import validation (reject non-`chio` imports)
 - Enrich `GuardRequest` with host-extracted action context
 - Fix priority sorting (sort externally before loading)
 - Benchmark spike (load time, instantiation, latency, fuel, memory)
@@ -581,17 +581,17 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 - Create `chio-guard-sdk-macros` crate (proc-macro for `#[chio_guard]`)
 - Implement guest-side allocator
 - Implement `GuardRequest` deserialization + `GuardVerdict` encoding
-- Add host function bindings (`arc::log`, `arc::get_config`)
+- Add host function bindings (`chio::log`, `chio::get_config`)
 - Create example guard using the SDK
 - Add integration test: compile example guard -> load in WasmtimeBackend -> evaluate
 
 ### Phase 3: CLI tooling -- v2
 
-- Add `arc guard new` scaffolding
-- Add `arc guard build` (wraps `cargo build --target wasm32-unknown-unknown`)
-- Add `arc guard test` with fixture format
-- Add `arc guard inspect` and `arc guard bench`
-- Add `arc guard pack` / `arc guard install`
+- Add `chio guard new` scaffolding
+- Add `chio guard build` (wraps `cargo build --target wasm32-unknown-unknown`)
+- Add `chio guard test` with fixture format
+- Add `chio guard inspect` and `chio guard bench`
+- Add `chio guard pack` / `chio guard install`
 
 ### Phase 4: Non-Rust guest SDKs + WIT migration -- v2+
 
@@ -621,7 +621,7 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 | Config source | Guard manifest file | v1 | `chio.yaml` schema needs change for `config` field |
 | Config source | `chio.yaml` `wasm_guards[].config` | v1.1 | Requires `WasmGuardEntry` schema change |
 | Guard packaging | `guard-manifest.yaml` + `.wasm` binary | v1 | Inspectable, integrity-verified |
-| CLI integration | `arc guard` subcommand family | v2 | Follows existing `arc` CLI patterns |
+| CLI integration | `chio guard` subcommand family | v2 | Follows existing `chio` CLI patterns |
 | Non-Rust SDKs | TypeScript, Python, Go | v2+ | After WIT migration |
 
 

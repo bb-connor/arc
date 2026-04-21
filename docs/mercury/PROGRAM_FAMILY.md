@@ -20,7 +20,7 @@ The lane is intentionally narrow:
 
 It reuses the validated third-program chain and does not authorize generic
 portfolio management, revenue-platform tooling, channel programs, merged
-shells, or ARC commercial consoles.
+shells, or Chio commercial consoles.
 
 ## Frozen Program Motion
 
@@ -54,14 +54,14 @@ Not supported in `v2.64`:
 - universal multi-program portfolio claims
 - generic portfolio-management tooling
 - revenue-platform or channel-program breadth
-- ARC-side commercial control surfaces
+- Chio-side commercial control surfaces
 
 ## Canonical Commands
 
 ```bash
-cargo run -p arc-mercury -- program-family export --output target/mercury-program-family-export
+cargo run -p chio-mercury -- program-family export --output target/mercury-program-family-export
 ```
 
 ```bash
-cargo run -p arc-mercury -- program-family validate --output target/mercury-program-family-validation
+cargo run -p chio-mercury -- program-family validate --output target/mercury-program-family-validation
 ```

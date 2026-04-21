@@ -775,12 +775,12 @@ Framework integrations wrap memory operations in tool calls:
 # Python SDK example: wrapping a Chroma upsert
 from chio_sdk import ChioClient, MemoryWriteAction
 
-arc = ChioClient()
+chio = ChioClient()
 
 # Instead of:
 #   collection.upsert(ids=["doc1"], documents=["..."])
 # Do:
-result = arc.governed_memory_write(
+result = chio.governed_memory_write(
     store_type="vector_db",
     collection="agent-context",
     key="doc1",
@@ -911,7 +911,7 @@ fn load_module(
 A CLI command signs WASM modules:
 
 ```
-arc guard sign \
+chio guard sign \
     --module path/to/guard.wasm \
     --name "pii-detector" \
     --version "1.2.0" \

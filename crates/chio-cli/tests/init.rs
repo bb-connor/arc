@@ -27,11 +27,11 @@ fn init_creates_expected_project_files() {
         .arg("init")
         .arg(&project_dir)
         .output()
-        .expect("run arc init");
+        .expect("run chio init");
 
     assert!(
         output.status.success(),
-        "arc init failed: {}",
+        "chio init failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 
@@ -63,10 +63,10 @@ fn scaffolded_demo_runs_governed_hello_flow() {
         .arg("init")
         .arg(&project_dir)
         .output()
-        .expect("run arc init");
+        .expect("run chio init");
     assert!(
         init.status.success(),
-        "arc init failed: {}",
+        "chio init failed: {}",
         String::from_utf8_lossy(&init.stderr)
     );
 

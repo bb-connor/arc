@@ -14,7 +14,7 @@ fn make_payload() -> serde_json::Value {
         "parameters": {
             "merchantId": "m-2026-04",
             "amount": { "units": 1299, "currency": "USD" },
-            "memo": "arc benchmark coverage",
+            "memo": "chio benchmark coverage",
             "items": [
                 { "sku": "sku-1", "qty": 1, "price": 499 },
                 { "sku": "sku-2", "qty": 2, "price": 400 },

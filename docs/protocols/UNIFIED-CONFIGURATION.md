@@ -13,7 +13,7 @@ Normative spec: `spec/CONFIGURATION.md`
 >   shipped schema. The current loader uses flat Vec sections. See
 >   `crates/chio-config/src/schema.rs` for the actual schema.
 > - `kernel.keypair` is NOT shipped. The current field is `kernel.signing_key`.
-> - `arc start --config arc.yaml` does NOT exist. The CLI uses per-command
+> - `chio start --config chio.yaml` does NOT exist. The CLI uses per-command
 >   `--config` flags on individual subcommands.
 >
 > For the current, normative config contract, read `spec/CONFIGURATION.md`.
@@ -63,12 +63,12 @@ remaining honest about trust-boundary complexity in larger deployments.
 YAML. Nested structures (auth blocks, partner policies, exporter lists) are more
 readable in YAML than in TOML's table syntax. The file is named `chio.yaml` by
 convention and, in the proposed runtime flow, would be loaded via
-`arc start --config arc.yaml`.
+`chio start --config chio.yaml`.
 
 ### Full Annotated Example
 
 ```yaml
-# arc.yaml -- unified Chio configuration
+# chio.yaml -- unified Chio configuration
 
 kernel:
   # Path to an Ed25519 keypair file (PEM or raw 64-byte seed+pubkey).
@@ -616,11 +616,11 @@ versions.
 Proposed CLI integration:
 
 ```
-arc start --config arc.yaml
+chio start --config chio.yaml
 ```
 
-Status note: `arc start` is not a current command in the repo. The shipped CLI
-today exposes `arc mcp serve`, `arc mcp serve-http`, `arc run`, and related
+Status note: `chio start` is not a current command in the repo. The shipped CLI
+today exposes `chio mcp serve`, `chio mcp serve-http`, `chio run`, and related
 trust/receipt commands. This section specifies the intended future entry point.
 
 ### Startup sequence

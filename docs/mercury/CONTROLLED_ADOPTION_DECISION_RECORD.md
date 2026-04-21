@@ -28,7 +28,7 @@ Scale one bounded Mercury controlled-adoption lane only.
 ## Deferred Scope
 
 - additional adoption cohorts or renewal surfaces
-- a generic ARC renewal console or merged shell
+- a generic Chio renewal console or merged shell
 - broader Mercury product-family claims
 - cross-product packaging unification
 - new runtime coupling or generic customer-success tooling
@@ -39,6 +39,6 @@ Scale one bounded Mercury controlled-adoption lane only.
 
 The controlled-adoption lane now packages one bounded Mercury renewal and
 reference-readiness path over the existing Mercury evidence stack without
-pulling product logic back into ARC or broadening Mercury into a new shell,
+pulling product logic back into Chio or broadening Mercury into a new shell,
 surface family, or product line. The milestone therefore closes with one
 explicit scale decision and one narrow boundary.

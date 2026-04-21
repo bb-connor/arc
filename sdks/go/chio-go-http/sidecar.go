@@ -1,4 +1,4 @@
-package arc
+package chio
 
 import (
 	"bytes"
@@ -41,9 +41,9 @@ type SidecarError struct {
 
 func (e *SidecarError) Error() string {
 	if e.StatusCode > 0 {
-		return fmt.Sprintf("arc sidecar %s (HTTP %d): %s", e.Code, e.StatusCode, e.Message)
+		return fmt.Sprintf("chio sidecar %s (HTTP %d): %s", e.Code, e.StatusCode, e.Message)
 	}
-	return fmt.Sprintf("arc sidecar %s: %s", e.Code, e.Message)
+	return fmt.Sprintf("chio sidecar %s: %s", e.Code, e.Message)
 }
 
 // Evaluate sends an HTTP request to the Chio sidecar for evaluation.

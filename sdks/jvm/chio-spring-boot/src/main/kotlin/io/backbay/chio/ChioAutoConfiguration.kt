@@ -3,12 +3,12 @@
  *
  * Automatically registers the Chio servlet filter as a bean when the
  * spring-boot-starter is on the classpath. Configuration is read from
- * application.properties/yaml under the `arc` prefix.
+ * application.properties/yaml under the `chio` prefix.
  *
  * Usage in application.properties:
- *   arc.sidecar-url=http://127.0.0.1:9090
- *   arc.timeout-seconds=5
- *   arc.on-sidecar-error=deny
+ *   chio.sidecar-url=http://127.0.0.1:9090
+ *   chio.timeout-seconds=5
+ *   chio.on-sidecar-error=deny
  */
 package io.backbay.chio
 

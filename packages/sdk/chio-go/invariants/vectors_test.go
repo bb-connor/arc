@@ -147,7 +147,7 @@ func TestSigningVectors(t *testing.T) {
 			}
 		})
 	}
-	signedUTF8, err := invariants.SignUTF8MessageEd25519("hello arc", vectors.SigningKeySeedHex)
+	signedUTF8, err := invariants.SignUTF8MessageEd25519("hello chio", vectors.SigningKeySeedHex)
 	if err != nil {
 		t.Fatalf("SignUTF8MessageEd25519 returned error: %v", err)
 	}

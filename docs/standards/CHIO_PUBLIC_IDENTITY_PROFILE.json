@@ -32,9 +32,9 @@
       "kind": "portable_trust_profile",
       "schema": "chio.portable-trust-profile.v1",
       "artifactId": "ptp-1",
-      "operatorId": "arc",
+      "operatorId": "chio",
       "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "uri": "https://arc.dev/standards/portable-trust-profile"
+      "uri": "https://chio.dev/standards/portable-trust-profile"
     },
     {
       "kind": "oid4vci_issuer_metadata",

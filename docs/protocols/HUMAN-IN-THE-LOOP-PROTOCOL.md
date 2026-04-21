@@ -486,7 +486,7 @@ impl ApprovalChannel for WebhookChannel {
 ### Channel Configuration
 
 ```toml
-# arc.toml -- approval channel configuration
+# chio.toml -- approval channel configuration
 [approval.channels.slack]
 type = "slack"
 webhook_url = "https://hooks.slack.com/services/T.../B.../..."
@@ -495,7 +495,7 @@ mention_group = "@agent-reviewers"
 
 [approval.channels.webhook]
 type = "webhook"
-endpoint = "https://internal.example.com/arc/approvals"
+endpoint = "https://internal.example.com/chio/approvals"
 signing_key_ref = "approval-webhook-signing"
 
 [approval.channels.dashboard]
@@ -942,16 +942,16 @@ Receipt 2: Deny
 
 ```bash
 # All approval requests in the last 24 hours
-arc receipt list --decision pending_approval --since 24h
+chio receipt list --decision pending_approval --since 24h
 
 # All human-denied calls
-arc receipt list --decision human_denied
+chio receipt list --decision human_denied
 
 # Average approval latency by approver
-arc receipt stats --decision approved_and_executed --group-by metadata.approver_display_name
+chio receipt stats --decision approved_and_executed --group-by metadata.approver_display_name
 
 # Calls auto-approved due to timeout
-arc receipt list --decision approved_and_executed --meta auto_approved=true
+chio receipt list --decision approved_and_executed --meta auto_approved=true
 ```
 
 ---
@@ -1106,9 +1106,9 @@ The kernel ships a built-in guard that evaluates approval constraints:
 
 ```rust
 pub struct ApprovalGuard {
-    approval_store: Arc<dyn ApprovalStore>,
-    batch_store: Arc<dyn BatchApprovalStore>,
-    channels: Vec<Arc<dyn ApprovalChannel>>,
+    approval_store: Chio<dyn ApprovalStore>,
+    batch_store: Chio<dyn BatchApprovalStore>,
+    channels: Vec<Chio<dyn ApprovalChannel>>,
     escalation_config: Option<EscalationChain>,
 }
 

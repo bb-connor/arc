@@ -42,9 +42,9 @@ Managed Container Platform
 |  | Container           |    | Container                 | |
 |  |                     |    |                           | |
 |  | app --HTTP-->       |--->| :9090 (localhost)         | |
-|  |   arc.evaluate()    |    | Capability | Guard | Rcpt | |
+|  |   chio.evaluate()    |    | Capability | Guard | Rcpt | |
 |  |   ... do work ...   |    |                           | |
-|  |   arc.record()      |    | Startup: load policy      | |
+|  |   chio.record()      |    | Startup: load policy      | |
 |  +---------------------+    | Shutdown: flush receipts  | |
 |                              +---------------------------+ |
 |                                                           |
@@ -394,7 +394,7 @@ request arrives after a cold start:
 # Reference Terraform module for deploying Chio-governed services
 
 module "chio_cloud_run" {
-  source = "github.com/backbay/arc//terraform/modules/cloud-run-sidecar"
+  source = "github.com/backbay/chio//terraform/modules/cloud-run-sidecar"
 
   project_id    = var.project_id
   region        = var.region
@@ -410,7 +410,7 @@ module "chio_cloud_run" {
   chio_memory    = "64Mi"
 
   policy_source = "gs://${var.policy_bucket}/chio-policy.yaml"
-  receipt_sink  = "bigquery://${var.project_id}.arc.receipts"
+  receipt_sink  = "bigquery://${var.project_id}.chio.receipts"
 
   min_instances = 1
   max_instances = 100

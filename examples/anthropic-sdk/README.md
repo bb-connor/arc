@@ -60,5 +60,5 @@ Optional environment variables:
 
 See also:
 
-- [docs/PROGRESSIVE_TUTORIAL.md](/Users/connor/Medica/backbay/standalone/arc/docs/PROGRESSIVE_TUTORIAL.md)
-- [examples/docker/README.md](/Users/connor/Medica/backbay/standalone/arc/examples/docker/README.md)
+- [docs/PROGRESSIVE_TUTORIAL.md](../../docs/PROGRESSIVE_TUTORIAL.md)
+- [examples/docker/README.md](../docker/README.md)

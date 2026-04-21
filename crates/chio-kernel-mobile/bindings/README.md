@@ -86,7 +86,7 @@ uniffi-bindgen generate \
 `out/swift/chio_kernel_mobile.swift` is the module file to drop into
 Xcode. `out/swift/chio_kernel_mobileFFI.h` is the matching C header;
 package it together with a `.xcframework` that lipos the three
-static libraries (`libarc_kernel_mobile.a`) from step 1.
+static libraries (`libchio_kernel_mobile.a`) from step 1.
 
 ### Linking in Xcode
 
@@ -120,7 +120,7 @@ uniffi-bindgen generate \
 
 `out/kotlin/uniffi/chio_kernel_mobile/chio_kernel_mobile.kt` is the
 module file to drop into the `src/main/java` tree of your Android
-Gradle module. `android/jniLibs/<abi>/libarc_kernel_mobile.so` goes
+Gradle module. `android/jniLibs/<abi>/libchio_kernel_mobile.so` goes
 into `src/main/jniLibs/<abi>/` alongside the module's resources.
 
 ### Linking in Gradle

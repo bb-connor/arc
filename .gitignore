@@ -24,6 +24,10 @@ Thumbs.db
 # Generated conformance artifacts
 /tests/conformance/results/generated/
 /tests/conformance/reports/generated/
+examples/**/artifacts/live/
+examples/**/.artifacts/
+examples/internet-of-agents-incident-network/workspaces/provider-lab/operations/
+output/playwright/
 
 # Generated Python packaging and cache artifacts
 __pycache__/
@@ -32,6 +36,8 @@ examples/anthropic-sdk/node_modules/
 examples/openai-compatible/node_modules/
 examples/langchain/*.egg-info/
 examples/langchain/.venv/
+sdks/python/**/.venv/
+packages/sdk/**/.venv/
 
 # Generated JVM and .NET build artifacts
 examples/**/.gradle/

@@ -51,10 +51,10 @@ writer = ConversableAgent(name="writer", llm_config=False)
 
 
 async def main() -> None:
-    async with ChioClient("http://127.0.0.1:9090") as arc:
+    async with ChioClient("http://127.0.0.1:9090") as chio:
         # Register Chio-governed functions on each agent.
         r_registry = ChioFunctionRegistry(
-            agent=researcher, chio_client=arc, server_id="tools-srv"
+            agent=researcher, chio_client=chio, server_id="tools-srv"
         )
 
         @r_registry.as_decorator()
@@ -65,7 +65,7 @@ async def main() -> None:
         attach_registry(researcher, r_registry)
 
         w_registry = ChioFunctionRegistry(
-            agent=writer, chio_client=arc, server_id="tools-srv"
+            agent=writer, chio_client=chio, server_id="tools-srv"
         )
 
         @w_registry.as_decorator()
@@ -87,7 +87,7 @@ async def main() -> None:
         )
         manager = ChioGroupChatManager(
             groupchat=groupchat,
-            chio_client=arc,
+            chio_client=chio,
             llm_config=False,
         )
         await manager.provision_capabilities()
@@ -117,7 +117,7 @@ child_token = await register_nested_chats_with_attenuation(
     ],
     parent_capability=manager.token_for("researcher"),
     child_scope=ChioScope(grants=[grant("search")]),  # strict subset
-    chio_client=arc,
+    chio_client=chio,
 )
 ```
 

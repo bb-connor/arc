@@ -230,7 +230,7 @@ compatibility concern.
 ### 6. Additional Reconciliation Notes
 
 **Config schema drift**: `UNIFIED-CONFIGURATION.md` describes a config
-schema (nested `adapters.mcp/a2a/acp`, `kernel.keypair`, `arc start`)
+schema (nested `adapters.mcp/a2a/acp`, `kernel.keypair`, `chio start`)
 that does not match the implemented loader in `chio-config/src/schema.rs`
 (flat Vec sections, `kernel.signing_key`, no `start` command). The
 UNIFIED-CONFIGURATION doc is aspirational, not current. The code in

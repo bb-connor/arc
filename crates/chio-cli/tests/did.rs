@@ -29,7 +29,7 @@ fn did_resolve_from_public_key_emits_self_certifying_document() {
         .current_dir(workspace_root())
         .args(["did", "resolve", "--public-key", &public_key])
         .output()
-        .expect("run arc did resolve");
+        .expect("run chio did resolve");
 
     assert!(
         output.status.success(),
@@ -68,7 +68,7 @@ fn did_resolve_with_receipt_log_urls_emits_service_entries() {
             "https://mirror.example.com/v1/receipts",
         ])
         .output()
-        .expect("run arc did resolve");
+        .expect("run chio did resolve");
 
     assert!(
         output.status.success(),
@@ -102,7 +102,7 @@ fn did_resolve_with_passport_status_urls_emits_service_entries() {
             "https://mirror.example.com/v1/passport/statuses/resolve",
         ])
         .output()
-        .expect("run arc did resolve");
+        .expect("run chio did resolve");
 
     assert!(
         output.status.success(),
@@ -126,7 +126,7 @@ fn did_resolve_rejects_invalid_identifier() {
         .current_dir(workspace_root())
         .args(["did", "resolve", "--did", "did:chio:not-hex"])
         .output()
-        .expect("run arc did resolve");
+        .expect("run chio did resolve");
 
     assert!(
         !output.status.success(),

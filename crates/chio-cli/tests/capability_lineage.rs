@@ -45,7 +45,7 @@ fn conflicting_runtime_attestation() -> RuntimeAttestationEvidence {
         .as_secs();
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.v1".to_string(),
-        verifier: "verifier.arc".to_string(),
+        verifier: "verifier.chio".to_string(),
         tier: RuntimeAssuranceTier::Attested,
         issued_at: now.saturating_sub(5),
         expires_at: now + 300,
@@ -55,7 +55,7 @@ fn conflicting_runtime_attestation() -> RuntimeAttestationEvidence {
             scheme: WorkloadIdentityScheme::Spiffe,
             credential_kind: WorkloadCredentialKind::X509Svid,
             uri: "spiffe://dev.chio/payments/worker".to_string(),
-            trust_domain: "dev.arc".to_string(),
+            trust_domain: "dev.chio".to_string(),
             path: "/payments/worker".to_string(),
         }),
         claims: None,

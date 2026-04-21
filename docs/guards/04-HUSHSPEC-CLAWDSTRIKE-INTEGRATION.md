@@ -186,7 +186,7 @@ function. This lets a WASM guard author say "use whatever prompt injection
 detection is configured" without reimplementing it:
 
 ```
-arc.evaluate_hushspec_detection(input_ptr, input_len, category: i32) -> i32
+chio.evaluate_hushspec_detection(input_ptr, input_len, category: i32) -> i32
     -- Returns the detection score (0-100) for the given input using the
        HushSpec detection configuration. Category: 0=prompt_injection,
        1=jailbreak, 2=threat_intel.
@@ -272,7 +272,7 @@ In v1, guard-specific configuration lives in `guard-manifest.yaml` shipped
 alongside the `.wasm` binary. The `chio.yaml` schema (`WasmGuardEntry`)
 currently only allows `name`, `path`, `fuel_limit`, `priority`, and
 `advisory` with `deny_unknown_fields` -- it has no `config` field. The
-guard reads manifest config at load time via `arc.get_config(key)`.
+guard reads manifest config at load time via `chio.get_config(key)`.
 
 ### Option B: `chio.yaml` config field (v1.1 -- not yet implemented)
 
@@ -302,7 +302,7 @@ This is deferred to v1.1 per `05-V1-DECISION.md` Section 4.
 ### Option C: Host function for policy query (future)
 
 ```
-arc.query_hushspec(rule_type: i32, target_ptr: i32, target_len: i32) -> i32
+chio.query_hushspec(rule_type: i32, target_ptr: i32, target_len: i32) -> i32
     -- Returns 0=allow, 1=deny for the given rule type and target
        according to the loaded HushSpec policy.
 ```
@@ -401,7 +401,7 @@ The `chio.yaml` configuration should support referencing both in a single
 policy bundle:
 
 ```yaml
-# arc.yaml (current schema -- no config field yet)
+# chio.yaml (current schema -- no config field yet)
 wasm_guards:
   - name: compliance
     path: ./acme-security-policy/guards/compliance.wasm

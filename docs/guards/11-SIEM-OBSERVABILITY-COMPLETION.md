@@ -79,7 +79,7 @@ and by guard name, enabling Datadog dashboards and monitors out of the box.
 - Adapt from ClawdStrike's `SecurityEvent` to Chio's `SiemEvent`.
 - Replace `async_trait` with `Pin<Box<dyn Future>>` to match chio-siem's
   dyn-compatible `Exporter` trait.
-- Change the default service/source from `clawdstrike` to `arc`.
+- Change the default service/source from `clawdstrike` to `chio`.
 - Map Chio `Decision` (Allow/Deny) and `GuardEvidence` to Datadog tags.
 - Metric prefix becomes `chio.siem` instead of `clawdstrike`.
 - Retain configurable DD site, API key, tags, and TLS settings.
@@ -95,7 +95,7 @@ configurable format (JSON, plaintext, key-value). Supports gzip compression
 
 - Adapt from `SecurityEvent` to `SiemEvent`.
 - Change default source category from `security/clawdstrike` to
-  `security/arc`.
+  `security/chio`.
 - Preserve the three format modes. JSON is the default and should serialize
   the full `ChioReceipt` payload.
 - Keep gzip compression. The `flate2` dependency is lightweight and
@@ -263,7 +263,7 @@ CloudTrail supports custom event ingestion via CloudTrail Lake.
 Cloud Audit Logs accepts custom audit log entries via the Cloud Logging API.
 
 - Write entries with `logName` =
-  `projects/{project}/logs/arc.googleapis.com%2Fguard_audit`.
+  `projects/{project}/logs/chio.googleapis.com%2Fguard_audit`.
 - Use the `AuditLog` protobuf structure: `service_name` = `chio.kernel`,
   `method_name` = tool_name, `authorization_info[]` maps from guard
   evidence.
@@ -309,7 +309,7 @@ tool call trace includes its guard evaluation result.
 **LangSmith bridge.** Use LangSmith's Run API (`POST /runs`) to create a
 child run for each receipt:
 - `run_type` = `chain`
-- `name` = `arc.guard.{tool_name}`
+- `name` = `chio.guard.{tool_name}`
 - `inputs` = action.parameters
 - `outputs` = `{ decision, evidence[] }`
 - `extra.metadata` = `{ capability_id, policy_hash, receipt_id }`
@@ -319,7 +319,7 @@ child run for each receipt:
 **LangFuse bridge.** Use LangFuse's Ingestion API (`POST /api/public/ingestion`)
 to create a span:
 - `type` = `span`
-- `name` = `arc.guard.{tool_name}`
+- `name` = `chio.guard.{tool_name}`
 - `input` = action.parameters
 - `output` = `{ decision, evidence[] }`
 - `metadata` = `{ capability_id, policy_hash, receipt_id, guard_names }`

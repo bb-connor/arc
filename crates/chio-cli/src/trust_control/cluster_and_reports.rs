@@ -578,7 +578,7 @@ fn sync_peer_tool_receipts(
         let mut last_seq = after_seq;
         for record in response.records {
             let receipt: ChioReceipt = serde_json::from_value(record.receipt)?;
-            store.append_arc_receipt(&receipt)?;
+            store.append_chio_receipt(&receipt)?;
             last_seq = record.seq;
             applied = applied.saturating_add(1);
         }
@@ -1751,7 +1751,7 @@ fn apply_cluster_snapshot(
         let mut store = SqliteReceiptStore::open(path)?;
         for record in &tool_receipts {
             let receipt: ChioReceipt = serde_json::from_value(record.receipt.clone())?;
-            store.append_arc_receipt(&receipt)?;
+            store.append_chio_receipt(&receipt)?;
         }
         for record in &child_receipts {
             let receipt: ChildRequestReceipt = serde_json::from_value(record.receipt.clone())?;
@@ -4572,7 +4572,7 @@ mod cluster_and_reports_tests {
             let mut receipt_store =
                 SqliteReceiptStore::open(&source_receipt_db).expect("open source receipt db");
             receipt_store
-                .append_arc_receipt(&sample_tool_receipt("tool-1", "cap-1"))
+                .append_chio_receipt(&sample_tool_receipt("tool-1", "cap-1"))
                 .expect("append tool receipt");
             receipt_store
                 .append_child_receipt(&sample_child_receipt("child-1", "alpha"))

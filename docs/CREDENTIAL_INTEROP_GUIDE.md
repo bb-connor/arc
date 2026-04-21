@@ -88,7 +88,7 @@ from the portable `JWKS` and portable type-metadata endpoints.
 
 ## Portable Lifecycle Semantics
 
-When a delivered credential carries `arcCredentialContext.passportStatus`,
+When a delivered credential carries `chioCredentialContext.passportStatus`,
 that sidecar points at mutable operator lifecycle truth instead of copying
 lifecycle state into the credential itself.
 
@@ -282,7 +282,7 @@ For the projected `jwt_vc_json` lane:
 - Chio keeps the same portable subject and issuer binding model:
   `sub` plus `cnf.jwk` for subject binding, `iss` for issuer binding, and
   `did:chio` provenance anchored through `vc.credentialSubject.id` and
-  `vc.credentialSubject.arcIssuerDids`
+  `vc.credentialSubject.chioIssuerDids`
 - the Chio passport projection is carried in `vc.type` and
   `vc.credentialSubject.*` fields instead of `vct` and SD disclosures
 - Chio publishes the same Chio portable claim catalog, but the profile declares

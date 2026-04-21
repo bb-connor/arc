@@ -32,11 +32,11 @@ def _scope_for_tools(*tool_names: str, server_id: str = "srv") -> ChioScope:
 
 class TestFlowScopeBounds:
     def test_subset_task_scope_is_accepted(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("search"),
-            chio_client=arc,
+            chio_client=chio,
         )
         def search() -> str:
             return "hits"
@@ -45,7 +45,7 @@ class TestFlowScopeBounds:
             scope=_scope_for_tools("search", "analyze"),
             capability_id="cap-flow",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline() -> str:
             return search()
@@ -54,11 +54,11 @@ class TestFlowScopeBounds:
 
     def test_broader_task_scope_is_rejected(self) -> None:
         """A task that widens the flow scope fails before evaluation."""
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("search", "write"),
-            chio_client=arc,
+            chio_client=chio,
         )
         def rogue_task() -> str:
             return "should-not-run"
@@ -67,7 +67,7 @@ class TestFlowScopeBounds:
             scope=_scope_for_tools("search"),
             capability_id="cap-flow",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline() -> str:
             return rogue_task()
@@ -80,13 +80,13 @@ class TestFlowScopeBounds:
 
         assert "not a subset" in str(exc_info.value)
         # No sidecar evaluation should have happened for the rogue task.
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert evaluate_calls == []
 
     def test_task_without_scope_inherits_flow_scope(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
-        @chio_task(chio_client=arc)
+        @chio_task(chio_client=chio)
         def inherits() -> str:
             return "ok"
 
@@ -94,13 +94,13 @@ class TestFlowScopeBounds:
             scope=_scope_for_tools("inherits"),
             capability_id="cap-flow",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline() -> str:
             return inherits()
 
         assert pipeline() == "ok"
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         # The flow's capability_id and tool_server are used when the
         # task leaves them unset.
@@ -108,12 +108,12 @@ class TestFlowScopeBounds:
         assert evaluate_calls[0].tool_server == "srv"
 
     def test_task_tool_server_override_beats_flow_tool_server(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("fetch"),
             tool_server="override-srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def fetch() -> str:
             return "ok"
@@ -122,13 +122,13 @@ class TestFlowScopeBounds:
             scope=_scope_for_tools("fetch"),
             capability_id="cap-flow",
             tool_server="flow-srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline() -> str:
             return fetch()
 
         pipeline()
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].tool_server == "override-srv"
 
@@ -144,25 +144,25 @@ class TestFlowScopeBounds:
 
 class TestFlowScopeComposition:
     def test_multiple_tasks_all_evaluate_under_flow_grant(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("a"),
-            chio_client=arc,
+            chio_client=chio,
         )
         def a() -> str:
             return "a"
 
         @chio_task(
             scope=_scope_for_tools("b"),
-            chio_client=arc,
+            chio_client=chio,
         )
         def b() -> str:
             return "b"
 
         @chio_task(
             scope=_scope_for_tools("c"),
-            chio_client=arc,
+            chio_client=chio,
         )
         def c() -> str:
             return "c"
@@ -171,23 +171,23 @@ class TestFlowScopeComposition:
             scope=_scope_for_tools("a", "b", "c"),
             capability_id="cap-compose",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline() -> list[str]:
             return [a(), b(), c()]
 
         assert pipeline() == ["a", "b", "c"]
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert [c.tool_name for c in evaluate_calls] == ["a", "b", "c"]
         # All evaluated under the flow's capability id.
         assert {c.capability_id for c in evaluate_calls} == {"cap-compose"}
 
     async def test_async_flow_bounds_async_tasks(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("step"),
-            chio_client=arc,
+            chio_client=chio,
         )
         async def step(x: int) -> int:
             return x + 1
@@ -196,7 +196,7 @@ class TestFlowScopeComposition:
             scope=_scope_for_tools("step"),
             capability_id="cap-async",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         async def pipeline(n: int) -> int:
             v = 0
@@ -206,7 +206,7 @@ class TestFlowScopeComposition:
 
         result = await pipeline(3)
         assert result == 3
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 3
         assert {c.capability_id for c in evaluate_calls} == {"cap-async"}
 
@@ -215,9 +215,9 @@ class TestFlowScopeIsolation:
     def test_flow_context_does_not_leak_across_runs(self) -> None:
         """After a flow returns, a subsequent standalone task call must not
         see the previous flow's capability_id."""
-        arc = allow_all()
+        chio = allow_all()
 
-        @chio_task(chio_client=arc)
+        @chio_task(chio_client=chio)
         def inherits() -> str:
             return "ok"
 
@@ -225,7 +225,7 @@ class TestFlowScopeIsolation:
             scope=_scope_for_tools("inherits"),
             capability_id="cap-first",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline() -> str:
             return inherits()
@@ -238,14 +238,14 @@ class TestFlowScopeIsolation:
             scope=_scope_for_tools("inherits"),
             capability_id="cap-second",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def pipeline_two() -> str:
             return inherits()
 
         pipeline_two()
         evaluate_calls: list[Any] = [
-            c for c in arc.calls if c.method == "evaluate_tool_call"
+            c for c in chio.calls if c.method == "evaluate_tool_call"
         ]
         assert len(evaluate_calls) == 2
         assert evaluate_calls[0].capability_id == "cap-first"

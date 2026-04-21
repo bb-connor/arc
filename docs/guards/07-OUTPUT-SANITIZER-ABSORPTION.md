@@ -490,7 +490,7 @@ pub struct ReceiptLinkedWatermarkPayload {
   primitives, different crate path)
 - Replace `hush_core::canonical` with `chio_core::canonical` for JCS
   serialization
-- Replace `<!--hushclaw.watermark:v1:` prefix with `<!--arc.watermark:v1:`
+- Replace `<!--hushclaw.watermark:v1:` prefix with `<!--chio.watermark:v1:`
 - Add the receipt ID to the watermark payload as a required field
 - Keep the `WatermarkExtractor` and `WatermarkVerifierConfig` for downstream
   consumers that need to verify content provenance
@@ -658,7 +658,7 @@ pub struct OutputSanitizer {
     config: OutputSanitizerConfig,
     allowlist_patterns: Vec<Regex>,
     denylist_patterns: Vec<(String, Regex)>,
-    entity_recognizer: Option<Arc<dyn EntityRecognizer>>,
+    entity_recognizer: Option<Chio<dyn EntityRecognizer>>,
 }
 
 impl OutputSanitizer {
@@ -840,7 +840,7 @@ goes through `chio_core::crypto` and `chio_core::canonical`.
    the default implementation? Options: no default (callers bring their own),
    a WASM-based NER module, or a simple keyword list for common entity types.
 
-3. **Watermark format** -- should `<!--arc.watermark:v1:` be the only
+3. **Watermark format** -- should `<!--chio.watermark:v1:` be the only
    encoding, or should Chio also support a non-HTML format for non-text
    payloads (JSON metadata field, binary trailer)?
 

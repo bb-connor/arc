@@ -176,7 +176,7 @@ fn cmd_api_protect(
         ProtectProxy::new(config)
             .run()
             .await
-            .map_err(|error| CliError::Other(format!("failed to start arc api protect: {error}")))
+            .map_err(|error| CliError::Other(format!("failed to start chio api protect: {error}")))
     })
 }
 

@@ -55,7 +55,7 @@ The lane reuses already validated Mercury artifacts:
 
 It does not authorize a generic account-management suite, CRM workflow,
 customer-success platform, revenue operations system, forecasting stack,
-billing platform, channel program, merged shell, ARC commercial console, or
+billing platform, channel program, merged shell, Chio commercial console, or
 broader Mercury portfolio-management claim.
 
 ---
@@ -93,8 +93,8 @@ portfolio-program decision only. The workflow sentence remains unchanged:
 - review owner: `mercury-program-review`
 - revenue-operations guardrails owner: `mercury-revenue-ops-guardrails`
 
-Portfolio-program ownership stays inside Mercury. ARC remains the generic
-substrate that Mercury consumes; ARC does not become an account-management,
+Portfolio-program ownership stays inside Mercury. Chio remains the generic
+substrate that Mercury consumes; Chio does not become an account-management,
 revenue operations, forecasting, billing, or commercial expansion console.
 
 ---
@@ -121,8 +121,8 @@ Not supported in `v2.61`:
 - a generic account-management suite, CRM workflow, customer-success platform,
   or revenue operations system
 - forecasting stacks, billing platforms, or channel programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury portfolio-management or universal multi-account claims
 
 ---
@@ -132,14 +132,14 @@ Not supported in `v2.61`:
 Export the bounded portfolio-program package and program-review bundle:
 
 ```bash
-cargo run -p arc-mercury -- portfolio-program export --output target/mercury-portfolio-program-export
+cargo run -p chio-mercury -- portfolio-program export --output target/mercury-portfolio-program-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- portfolio-program validate --output target/mercury-portfolio-program-validation
+cargo run -p chio-mercury -- portfolio-program validate --output target/mercury-portfolio-program-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

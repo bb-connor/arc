@@ -34,7 +34,7 @@ The lane reuses already validated Mercury artifacts:
 
 It does not authorize a generic portfolio-management suite, revenue
 operations system, forecasting stack, billing platform, channel program,
-merged shell, ARC commercial console, or broader Mercury multi-program claim.
+merged shell, Chio commercial console, or broader Mercury multi-program claim.
 
 ## Frozen Program Motion
 
@@ -63,7 +63,7 @@ adjacent-program reuse decision only. The workflow sentence remains unchanged:
 - review owner: `mercury-multi-program-review`
 - guardrails owner: `mercury-multi-program-guardrails`
 
-Third-program ownership stays inside Mercury. ARC remains the generic
+Third-program ownership stays inside Mercury. Chio remains the generic
 substrate that Mercury consumes.
 
 ## Supported Scope
@@ -84,18 +84,18 @@ Not supported in `v2.63`:
 - multiple program motions or review surfaces
 - generic portfolio-management tooling
 - revenue operations systems, forecasting stacks, billing platforms, or channel programs
-- ARC-side commercial control surfaces
+- Chio-side commercial control surfaces
 
 ## Canonical Commands
 
 Export the bounded third-program package and repeated portfolio-reuse bundle:
 
 ```bash
-cargo run -p arc-mercury -- third-program export --output target/mercury-third-program-export
+cargo run -p chio-mercury -- third-program export --output target/mercury-third-program-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- third-program validate --output target/mercury-third-program-validation
+cargo run -p chio-mercury -- third-program validate --output target/mercury-third-program-validation
 ```

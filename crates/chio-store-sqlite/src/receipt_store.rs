@@ -41,7 +41,7 @@ use chio_kernel::operator_report::{
     CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA,
     CHIO_OAUTH_AUTHORIZATION_METADATA_SCHEMA, CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE,
     CHIO_OAUTH_AUTHORIZATION_REVIEW_PACK_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
-    CHIO_OAUTH_SENDER_PROOF_ARC_DPOP, ECONOMIC_COMPLETION_FLOW_SCHEMA,
+    CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP, ECONOMIC_COMPLETION_FLOW_SCHEMA,
 };
 use chio_kernel::receipt_analytics::{
     AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,
@@ -121,7 +121,7 @@ mod tests;
 mod underwriting_credit;
 
 use support::*;
-pub(crate) use support::{decode_verified_arc_receipt, decode_verified_child_receipt};
+pub(crate) use support::{decode_verified_child_receipt, decode_verified_chio_receipt};
 
 impl SqliteReceiptStore {
     pub(crate) fn connection(&self) -> Result<SqliteStoreConnection, ReceiptStoreError> {

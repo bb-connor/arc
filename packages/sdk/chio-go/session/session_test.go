@@ -93,7 +93,7 @@ func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {
 	}))
 	defer server.Close()
 
-	pactSession := session.New(session.Options{
+	chioSession := session.New(session.Options{
 		AuthToken:       "token",
 		BaseURL:         server.URL,
 		HTTPClient:      server.Client(),
@@ -101,15 +101,15 @@ func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {
 		SessionID:       "sess-123",
 	})
 
-	subscribed, err := pactSession.SubscribeResource(context.Background(), "fixture://docs/alpha")
+	subscribed, err := chioSession.SubscribeResource(context.Background(), "fixture://docs/alpha")
 	if err != nil || subscribed["subscribed"] != true {
 		t.Fatalf("SubscribeResource failed: %#v %v", subscribed, err)
 	}
-	unsubscribed, err := pactSession.UnsubscribeResource(context.Background(), "fixture://docs/alpha")
+	unsubscribed, err := chioSession.UnsubscribeResource(context.Background(), "fixture://docs/alpha")
 	if err != nil || unsubscribed["unsubscribed"] != true {
 		t.Fatalf("UnsubscribeResource failed: %#v %v", unsubscribed, err)
 	}
-	templates, err := pactSession.ListResourceTemplates(context.Background())
+	templates, err := chioSession.ListResourceTemplates(context.Background())
 	if err != nil {
 		t.Fatalf("ListResourceTemplates failed: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {
 	if !ok || len(templateEntries) != 1 {
 		t.Fatalf("unexpected resource templates payload: %#v", templates)
 	}
-	completion, err := pactSession.Complete(context.Background(), map[string]any{"argument": "fi"})
+	completion, err := chioSession.Complete(context.Background(), map[string]any{"argument": "fi"})
 	if err != nil {
 		t.Fatalf("Complete failed: %v", err)
 	}
@@ -125,11 +125,11 @@ func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {
 	if !ok || len(completionValues) != 1 {
 		t.Fatalf("unexpected completion payload: %#v", completion)
 	}
-	logLevel, err := pactSession.SetLogLevel(context.Background(), "debug")
+	logLevel, err := chioSession.SetLogLevel(context.Background(), "debug")
 	if err != nil || logLevel["level"] != "debug" {
 		t.Fatalf("SetLogLevel failed: %#v %v", logLevel, err)
 	}
-	taskList, err := pactSession.ListTasks(context.Background())
+	taskList, err := chioSession.ListTasks(context.Background())
 	if err != nil {
 		t.Fatalf("ListTasks failed: %v", err)
 	}
@@ -137,11 +137,11 @@ func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {
 	if !ok || len(taskEntries) != 1 {
 		t.Fatalf("unexpected task list payload: %#v", taskList)
 	}
-	task, err := pactSession.GetTask(context.Background(), "task-1")
+	task, err := chioSession.GetTask(context.Background(), "task-1")
 	if err != nil || task["status"] != "working" {
 		t.Fatalf("GetTask failed: %#v %v", task, err)
 	}
-	taskResult, err := pactSession.GetTaskResult(context.Background(), "task-1")
+	taskResult, err := chioSession.GetTaskResult(context.Background(), "task-1")
 	if err != nil {
 		t.Fatalf("GetTaskResult failed: %v", err)
 	}
@@ -149,13 +149,13 @@ func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {
 	if !ok || len(taskContent) != 1 {
 		t.Fatalf("unexpected task result payload: %#v", taskResult)
 	}
-	cancelled, err := pactSession.CancelTask(context.Background(), "task-1")
+	cancelled, err := chioSession.CancelTask(context.Background(), "task-1")
 	if err != nil || cancelled["cancelled"] != true {
 		t.Fatalf("CancelTask failed: %#v %v", cancelled, err)
 	}
 
 	notifications := 0
-	exchange, err := pactSession.Request(
+	exchange, err := chioSession.Request(
 		context.Background(),
 		"tools/call",
 		map[string]any{

@@ -257,7 +257,7 @@ Chio's controls reduce the PCI DSS scope for the agent layer.
 | **Req 7: Restrict access by business need** | Strong. Capability tokens scope access to specific tools, servers, and operations. Grants are time-bounded and revocable. Delegation chains enforce monotonic attenuation. | Need to document the mapping: capability tokens = logical access control, grants = role-based permissions, constraints = conditional access. |
 | **Req 8: Identify users and authenticate access** | Strong. DPoP proof-of-possession binds agent identity to every invocation. Capability tokens identify the subject (agent). `WorkloadIdentity` provides agent metadata. | Agent identity is cryptographic (Ed25519 keypairs), not user-credential-based. Need to document how Chio agent identity maps to PCI's "user identification" concept. |
 | **Req 9: Restrict physical access** | Out of scope. Chio is software infrastructure. | N/A |
-| **Req 10: Log and monitor all access** | Strong. Every tool invocation produces a signed receipt. Merkle-committed checkpoints provide tamper evidence. Configurable retention with verifiable archival. Receipt dashboard (`arc trust serve`) provides monitoring. | Need real-time alerting integration (SIEM export). Receipt store supports reporting queries but no push-based alerting. |
+| **Req 10: Log and monitor all access** | Strong. Every tool invocation produces a signed receipt. Merkle-committed checkpoints provide tamper evidence. Configurable retention with verifiable archival. Receipt dashboard (`chio trust serve`) provides monitoring. | Need real-time alerting integration (SIEM export). Receipt store supports reporting queries but no push-based alerting. |
 | **Req 11: Test security regularly** | Partial. `cargo test --workspace` covers functional tests. Guard integration tests cover policy enforcement. | No penetration testing program documented. No vulnerability scanning pipeline. |
 | **Req 12: Support information security with policies** | Out of scope for Chio as a protocol. This is an organizational requirement for the deploying entity. | Chio can provide evidence for the deployer's security program but cannot satisfy organizational policy requirements. |
 
@@ -311,7 +311,7 @@ Map, partially to Govern and Manage, and weakly to Measure.
 |----------|---------------|---------------|
 | MS-1: Appropriate metrics identified | Weak. Chio produces raw data but no risk metrics. | Receipt store has reporting queries (counts, rates, budget utilization). No risk scoring. |
 | MS-2: AI systems evaluated | Weak. Chio evaluates per-invocation but not system-level risk. | Per-invocation guard evaluation. No aggregate behavioral risk assessment. |
-| MS-3: Risks and impacts tracked | Partial. Denial rates and budget consumption are tracked. | Receipt store supports time-series queries. `arc trust serve` dashboard. |
+| MS-3: Risks and impacts tracked | Partial. Denial rates and budget consumption are tracked. | Receipt store supports time-series queries. `chio trust serve` dashboard. |
 | MS-4: Feedback integrated | Weak. No feedback loop from risk measurement to policy adjustment. | Manual policy file updates. No automated policy tightening based on risk signals. |
 
 #### Manage (risk response and monitoring)
@@ -416,7 +416,7 @@ controls that the organization's AI management system requires.
 | 6.1.4 -- AI risk assessment | Assess AI risks systematically | Partial. Chio records risk-relevant data. | Receipt store, denial rates, budget utilization. `chio-risk` scoring (proposed) closes the gap. |
 | 7.5 -- Documented information | Maintain documented information required by AIMS | Strong. Chio produces signed, retained, verifiable documentation. | Receipts, checkpoints, compliance certificates, evidence export bundles. All signed and Merkle-committed. |
 | 8.4 -- AI system lifecycle | Manage AI system development, deployment, monitoring | Partial. Chio governs the operational phase. | Guard pipeline, capability lifecycle (issue, delegate, revoke, expire). |
-| 9.1 -- Monitoring, measurement, analysis | Monitor and measure AIMS performance | Partial. Chio monitors tool invocations. | Receipt store with reporting queries. Dashboard (`arc trust serve`). Compliance certificates. |
+| 9.1 -- Monitoring, measurement, analysis | Monitor and measure AIMS performance | Partial. Chio monitors tool invocations. | Receipt store with reporting queries. Dashboard (`chio trust serve`). Compliance certificates. |
 | 9.2 -- Internal audit | Conduct internal audits of AIMS | Partial. Chio provides audit evidence. | Evidence export bundles, compliance certificates, Merkle inclusion proofs. |
 | 10.1 -- Continual improvement | Improve AIMS continually | Weak. Chio does not drive improvement. | Receipt data can inform improvement but Chio does not automate policy evolution. |
 | Annex A -- AI controls reference | Reference set of AI-specific controls | Strong. Chio implements many Annex A controls. | See section 5.3 below. |
@@ -512,7 +512,7 @@ from section 2).
 |-----------|--------|----------|
 | SOC 2 Type II control mapping document | Medium | P1 |
 | "Chio Controls for SOC 2" customer-facing guide (what Chio does vs. what you do) | Medium | P2 |
-| Evidence export format for SOC 2 auditors | Small | P2 (depends on `arc certify` work in section 10) |
+| Evidence export format for SOC 2 auditors | Small | P2 (depends on `chio certify` work in section 10) |
 
 ---
 
@@ -669,7 +669,7 @@ the model layer. However, Chio contributes to several SB 1047 objectives:
 | Safety testing | Chio's test suite verifies governance controls. Guard pipeline tests confirm policy enforcement. | Chio does not test model safety. Model safety testing is the model developer's responsibility. |
 | Kill switch | Chio supports capability revocation (immediate, per-agent, per-token). An emergency kill switch (global circuit breaker) is proposed but not yet implemented. | Global kill switch is P1 in REVIEW-FINDINGS. Once implemented, Chio can immediately revoke all agent capabilities across a deployment. |
 | Safety incident reporting | Chio receipt store provides a complete audit trail for incident investigation. Evidence export bundles can be generated for incident reports. | Chio does not automate incident detection or reporting. Need automated anomaly detection with configurable alert thresholds. |
-| Third-party audits | Chio compliance certificates and evidence export bundles are designed for third-party verification. Merkle inclusion proofs enable selective disclosure without exposing the full receipt log. | No formal audit API for third-party auditors. `arc certify` and evidence export exist but need auditor-facing documentation. |
+| Third-party audits | Chio compliance certificates and evidence export bundles are designed for third-party verification. Merkle inclusion proofs enable selective disclosure without exposing the full receipt log. | No formal audit API for third-party auditors. `chio certify` and evidence export exist but need auditor-facing documentation. |
 | Reasonable care | Chio's capability scoping, guard pipeline, budget enforcement, and signed audit trail constitute "reasonable care" for the tool-governance layer. | "Reasonable care" is a legal standard, not a technical one. Chio provides technical evidence that reasonable care was exercised. |
 
 ### 9.3 Required Work
@@ -692,30 +692,30 @@ AI RMF audits does not scale. Chio already produces the raw evidence (receipts,
 checkpoints, compliance certificates, evidence export bundles). The missing
 piece is framework-specific packaging.
 
-### 10.2 `arc certify` Command
+### 10.2 `chio certify` Command
 
-The `arc certify` CLI command already exists and generates session compliance
+The `chio certify` CLI command already exists and generates session compliance
 certificates. This section proposes extending it to produce framework-specific
 compliance evidence packages.
 
 **Proposed subcommands:**
 
 ```
-arc certify session          # (existing) Generate session compliance certificate
-arc certify evidence-export  # (existing) Export evidence bundle
-arc certify framework <fw>   # (new) Generate framework-specific compliance package
+chio certify session          # (existing) Generate session compliance certificate
+chio certify evidence-export  # (existing) Export evidence bundle
+chio certify framework <fw>   # (new) Generate framework-specific compliance package
 ```
 
 **Supported frameworks:**
 
 ```
-arc certify framework eu-ai-act     # EU AI Act Article 19 evidence package
-arc certify framework pci-dss       # PCI DSS v4.0 evidence package
-arc certify framework hipaa         # HIPAA technical safeguard evidence
-arc certify framework nist-ai-rmf   # NIST AI RMF evidence package
-arc certify framework iso-42001     # ISO 42001 evidence package
-arc certify framework soc2          # SOC 2 trust service criteria evidence
-arc certify framework all           # Generate all framework packages
+chio certify framework eu-ai-act     # EU AI Act Article 19 evidence package
+chio certify framework pci-dss       # PCI DSS v4.0 evidence package
+chio certify framework hipaa         # HIPAA technical safeguard evidence
+chio certify framework nist-ai-rmf   # NIST AI RMF evidence package
+chio certify framework iso-42001     # ISO 42001 evidence package
+chio certify framework soc2          # SOC 2 trust service criteria evidence
+chio certify framework all           # Generate all framework packages
 ```
 
 ### 10.3 Evidence Package Structure
@@ -813,7 +813,7 @@ compliance monitoring:
 
 | Work Item | Effort | Priority |
 |-----------|--------|----------|
-| `arc certify framework` subcommand scaffolding | Medium | P2 |
+| `chio certify framework` subcommand scaffolding | Medium | P2 |
 | EU AI Act evidence package format (first framework) | Medium | P2 |
 | Framework-agnostic `ComplianceEvidencePackage` types in `chio-core-types` | Small | P2 |
 | Additional framework packages (PCI DSS, HIPAA, SOC 2, NIST AI RMF, ISO 42001) | Medium each | P3 |
@@ -855,7 +855,7 @@ These items close gaps identified in the mappings and add automation.
 | SIEM export adapter | 3.3 | Medium | None |
 | Break-glass capability workflow | 7.5 | Small | None |
 | Idle-timeout revocation trigger | 7.5 | Small | None |
-| `arc certify framework` command | 10.6 | Medium | None |
+| `chio certify framework` command | 10.6 | Medium | None |
 | SB 1047 mapping document | 9.3 | Small | Legislative outcome |
 | Anomaly detection with alert thresholds | 9.3 | Medium | `chio-risk` crate |
 
@@ -863,7 +863,7 @@ These items close gaps identified in the mappings and add automation.
 
 | Work Item | Section | Effort | Dependencies |
 |-----------|---------|--------|--------------|
-| Framework-specific evidence packages (all) | 10.6 | Large | `arc certify framework` |
+| Framework-specific evidence packages (all) | 10.6 | Large | `chio certify framework` |
 | Continuous compliance monitoring | 10.5 | Large | `chio-risk`, evidence packages |
 | Risk-to-policy feedback loop | 4.4 | Medium | `chio-risk` |
 | ISO 42001 Statement of Applicability template | 5.4 | Small | ISO 42001 mapping |
@@ -888,7 +888,7 @@ Phase 2 (mapping documents, parallel):
 Phase 3 (scoring and automation):
   chio-risk crate
   SIEM export adapter
-  arc certify framework command
+  chio certify framework command
   P-256/P-384 algorithm support
   HSM backends (Vault, AWS KMS)
 
@@ -910,7 +910,7 @@ This roadmap is complete when:
 2. Formal mapping documents exist for all nine frameworks listed in section
    1.3, each with the same structure as the existing EU AI Act and Colorado
    SB 24-205 mapping documents.
-3. `arc certify framework <fw>` generates signed, framework-specific evidence
+3. `chio certify framework <fw>` generates signed, framework-specific evidence
    packages for at least EU AI Act, SOC 2, and HIPAA.
 4. `chio-risk` produces per-session risk scores that close the NIST AI RMF
    Measure function gap.

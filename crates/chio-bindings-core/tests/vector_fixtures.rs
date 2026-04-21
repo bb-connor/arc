@@ -304,8 +304,8 @@ fn hashing_vector_fixture() -> Value {
             {
                 "id": "unicode_utf8",
                 "description": "SHA-256 operates on UTF-8 bytes for non-ASCII strings too.",
-                "input_utf8": "arc 🔐",
-                "sha256_hex": sha256_hex_utf8("arc 🔐")
+                "input_utf8": "chio 🔐",
+                "sha256_hex": sha256_hex_utf8("chio 🔐")
             }
         ]
     })
@@ -351,7 +351,8 @@ fn signing_json_case_value(
 
 fn signing_vector_fixture() -> Value {
     let seed_hex = "09".repeat(32);
-    let signed_utf8 = sign_utf8_message_ed25519("hello arc", &seed_hex).expect("sign utf8 message");
+    let signed_utf8 =
+        sign_utf8_message_ed25519("hello chio", &seed_hex).expect("sign utf8 message");
     let signed_json =
         sign_json_str_ed25519("{\"z\":1,\"a\":2}", &seed_hex).expect("sign json string");
 
@@ -363,7 +364,7 @@ fn signing_vector_fixture() -> Value {
             signing_utf8_case_value(
                 "valid_utf8_message",
                 "A UTF-8 message signs and verifies with a deterministic Ed25519 seed.",
-                "hello arc",
+                "hello chio",
                 &signed_utf8.public_key_hex,
                 &signed_utf8.signature_hex,
                 true,
@@ -371,7 +372,7 @@ fn signing_vector_fixture() -> Value {
             signing_utf8_case_value(
                 "tampered_utf8_message",
                 "The same signature fails if the UTF-8 message bytes change.",
-                "hello arc!",
+                "hello chio!",
                 &signed_utf8.public_key_hex,
                 &signed_utf8.signature_hex,
                 false,

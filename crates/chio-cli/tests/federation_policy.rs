@@ -283,7 +283,7 @@ fn seed_subject_history(
     let subject_key = subject_kp.public_key().to_hex();
     let issuer_key = authority.authority_public_key().to_hex();
     receipt_store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "rep-1",
             &capability.id,
             &subject_key,
@@ -292,7 +292,7 @@ fn seed_subject_history(
         ))
         .expect("append first receipt");
     receipt_store
-        .append_arc_receipt(&make_receipt(
+        .append_chio_receipt(&make_receipt(
             "rep-2",
             &capability.id,
             &subject_key,

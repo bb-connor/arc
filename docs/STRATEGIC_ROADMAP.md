@@ -90,7 +90,8 @@ search-and-replace exercise.
 
 - Chio-first package, CLI, SDK, and release identity
 - Chio-primary schema issuance where implemented
-- explicit compatibility rules for legacy `arc.*` artifacts and `did:chio`
+- explicit rejection of legacy pre-Chio artifacts and canonical `did:chio`
+  identity
 - one coherent migration and qualification story
 
 ### v2.6 Governed Transactions and Payment Rails

@@ -42,7 +42,7 @@ packaging.
 ## Export Command
 
 ```bash
-cargo run -p arc-mercury -- second-portfolio-program export --output target/mercury-second-portfolio-program-export
+cargo run -p chio-mercury -- second-portfolio-program export --output target/mercury-second-portfolio-program-export
 ```
 
 Expected top-level artifacts:
@@ -74,7 +74,7 @@ Portfolio reuse review stays inside Mercury and follows this order:
 
 No claim may imply generic portfolio management, account management,
 customer-success automation, revenue operations, forecasting, billing, channel
-programs, or ARC commercial behavior.
+programs, or Chio commercial behavior.
 
 ---
 
@@ -87,7 +87,7 @@ Stop the lane if any of the following occurs:
   program
 - revenue-boundary guardrails are missing
 - the request implies generic portfolio management, account management,
-  customer success, revenue operations, forecasting, billing, channel, or ARC
+  customer success, revenue operations, forecasting, billing, channel, or Chio
   commercial behavior
 
 The correct response is defer or stop, not scope drift.

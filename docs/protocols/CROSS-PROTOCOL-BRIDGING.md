@@ -115,7 +115,7 @@ fn mcp_tool_to_a2a_skill(tool: &ToolDefinition, server_id: &str) -> A2aSkill {
 }
 ```
 
-**Invocation (A2A -> MCP):** Extract `arc.targetSkillId` from metadata,
+**Invocation (A2A -> MCP):** Extract `chio.targetSkillId` from metadata,
 parse `DataPart` as MCP arguments, forward as `tools/call`, wrap result as
 A2A `Task` with `DataPart` artifact.
 
@@ -142,7 +142,7 @@ fn mcp_tool_to_acp_capability(tool: &ToolDefinition) -> AcpCapability {
 Skill `inputModes`/`outputModes` are recorded in adapter metadata.
 
 **Invocation (ACP -> A2A):** ACP `tool_calls` repackaged as A2A
-`SendMessage` with `DataPart` arguments and `arc.targetSkillId` metadata.
+`SendMessage` with `DataPart` arguments and `chio.targetSkillId` metadata.
 
 ### 2.5 Type Mapping
 
@@ -428,7 +428,7 @@ instances in federated deployments.
 pub struct CrossProtocolOrchestrator {
     registry: Box<dyn ToolRegistry>,
     bridges: HashMap<DiscoveryProtocol, Box<dyn CapabilityBridge>>,
-    kernel: Arc<ChioKernel>,
+    kernel: Chio<ChioKernel>,
     active_traces: HashMap<String, CrossProtocolTraceContext>,
 }
 ```

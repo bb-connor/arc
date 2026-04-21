@@ -699,7 +699,7 @@ The EVM module provides typed functions for:
 - **Merkle release:** `prepare_merkle_release` for batch settlement using
   Merkle proof verification
 - **ERC-20 integration:** `prepare_erc20_approval` for token approvals,
-  `scale_arc_amount_to_token_minor_units` for denomination conversion
+  `scale_chio_amount_to_token_minor_units` for denomination conversion
 
 Each function produces a `PreparedEvmCall` with gas estimation and static
 validation before any on-chain submission occurs.

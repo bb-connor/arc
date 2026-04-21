@@ -48,7 +48,7 @@ The lane reuses already validated Mercury artifacts:
 
 It does not authorize a generic customer-success suite, CRM workflow,
 account-management platform, revenue operations system, channel marketplace,
-merged shell, ARC commercial console, or broader Mercury account-portfolio
+merged shell, Chio commercial console, or broader Mercury account-portfolio
 claim.
 
 ---
@@ -87,8 +87,8 @@ unchanged:
 - review owner: `mercury-portfolio-review`
 - reuse governance owner: `mercury-reuse-governance`
 
-Second-account expansion ownership stays inside Mercury. ARC remains the
-generic substrate that Mercury consumes; ARC does not become a customer-
+Second-account expansion ownership stays inside Mercury. Chio remains the
+generic substrate that Mercury consumes; Chio does not become a customer-
 success, account-management, revenue operations, or commercial expansion
 console.
 
@@ -116,8 +116,8 @@ Not supported in `v2.60`:
 - a generic customer-success suite, CRM workflow, account-management
   platform, or revenue operations system
 - multi-account portfolio programs or channel marketplaces
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury portfolio-management or universal expansion claims
 
 ---
@@ -128,14 +128,14 @@ Export the bounded second-account-expansion package and portfolio-review
 bundle:
 
 ```bash
-cargo run -p arc-mercury -- second-account-expansion export --output target/mercury-second-account-expansion-export
+cargo run -p chio-mercury -- second-account-expansion export --output target/mercury-second-account-expansion-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- second-account-expansion validate --output target/mercury-second-account-expansion-validation
+cargo run -p chio-mercury -- second-account-expansion validate --output target/mercury-second-account-expansion-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

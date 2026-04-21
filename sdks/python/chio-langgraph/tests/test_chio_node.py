@@ -50,14 +50,14 @@ def _scope(*tools: str) -> ChioScope:
 
 
 async def _build_config(
-    arc: MockChioClient,
+    chio: MockChioClient,
     *,
     node_name: str,
     scope: ChioScope,
     workflow_scope: ChioScope | None = None,
 ) -> ChioGraphConfig:
     cfg = ChioGraphConfig(
-        chio_client=arc,
+        chio_client=chio,
         workflow_scope=workflow_scope,
         node_scopes={node_name: scope},
     )
@@ -78,9 +78,9 @@ class TestAllowInvokesBody:
             calls.append(dict(state))
             return {"value": f"searched:{state.get('value', '')}"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = await _build_config(
-            arc, node_name="search", scope=_scope("search")
+            chio, node_name="search", scope=_scope("search")
         )
 
         wrapped = chio_node(
@@ -95,7 +95,7 @@ class TestAllowInvokesBody:
         assert update == {"value": "searched:quantum"}
         assert calls == [{"value": "quantum"}]
         # Evaluate call was recorded.
-        eval_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        eval_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(eval_calls) == 1
         assert eval_calls[0].tool_name == "search"
         assert eval_calls[0].tool_server == "langgraph"
@@ -104,9 +104,9 @@ class TestAllowInvokesBody:
         async def async_node(state: State) -> dict[str, Any]:
             return {"value": f"async:{state.get('value', '')}"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = await _build_config(
-            arc, node_name="async_node", scope=_scope("async_node")
+            chio, node_name="async_node", scope=_scope("async_node")
         )
         wrapped = chio_node(
             async_node,
@@ -125,9 +125,9 @@ class TestAllowInvokesBody:
             seen.append(runtime_cfg)
             return {"value": "ok"}
 
-        arc = allow_all()
+        chio = allow_all()
         cfg = await _build_config(
-            arc, node_name="with_cfg", scope=_scope("with_cfg")
+            chio, node_name="with_cfg", scope=_scope("with_cfg")
         )
         wrapped = chio_node(
             node_with_cfg,
@@ -153,9 +153,9 @@ class TestDenyRaises:
             pytest.fail("body must not run on deny")
             return {}
 
-        arc = deny_all(reason="out of scope", guard="ScopeGuard")
+        chio = deny_all(reason="out of scope", guard="ScopeGuard")
         cfg = await _build_config(
-            arc, node_name="write", scope=_scope("write")
+            chio, node_name="write", scope=_scope("write")
         )
         wrapped = chio_node(
             forbidden_node,
@@ -178,13 +178,13 @@ class TestDenyRaises:
             pytest.fail("body must not run on deny")
             return {}
 
-        arc = deny_all(
+        chio = deny_all(
             reason="scope mismatch",
             guard="ScopeGuard",
             raise_on_deny=False,
         )
         cfg = await _build_config(
-            arc, node_name="write", scope=_scope("write")
+            chio, node_name="write", scope=_scope("write")
         )
         wrapped = chio_node(
             node, scope=_scope("write"), config=cfg, name="write"
@@ -200,11 +200,11 @@ class TestDenyRaises:
             pytest.fail("body must not run when no capability is bound")
             return {}
 
-        arc = allow_all()
+        chio = allow_all()
         # Build a config *without* calling provision() so no tokens are
         # minted; the wrapper must refuse to dispatch.
         cfg = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             node_scopes={"write": _scope("write")},
         )
         wrapped = chio_node(
@@ -221,14 +221,14 @@ class TestDenyRaises:
 # ---------------------------------------------------------------------------
 
 
-def _scope_aware_policy(arc: MockChioClient) -> Any:
+def _scope_aware_policy(chio: MockChioClient) -> Any:
     def policy(
         tool_name: str,
         _scope_hint: dict[str, Any],
         context: dict[str, Any],
     ) -> MockVerdict:
         cap_id = context.get("capability_id")
-        token = getattr(arc, "_tokens", {}).get(cap_id)
+        token = getattr(chio, "_tokens", {}).get(cap_id)
         if token is None:
             return MockVerdict.deny_verdict(
                 f"unknown capability {cap_id!r}", guard="CapabilityGuard"
@@ -245,25 +245,25 @@ def _scope_aware_policy(arc: MockChioClient) -> Any:
 
 
 def _instrumented_client() -> MockChioClient:
-    arc = MockChioClient()
-    arc._tokens = {}  # type: ignore[attr-defined]
-    orig = arc.create_capability
+    chio = MockChioClient()
+    chio._tokens = {}  # type: ignore[attr-defined]
+    orig = chio.create_capability
 
     async def create_capability(**kwargs: Any) -> Any:
         tok = await orig(**kwargs)
-        arc._tokens[tok.id] = tok  # type: ignore[attr-defined]
+        chio._tokens[tok.id] = tok  # type: ignore[attr-defined]
         return tok
 
-    arc.create_capability = create_capability  # type: ignore[method-assign]
-    arc.set_policy(_scope_aware_policy(arc))
-    return arc
+    chio.create_capability = create_capability  # type: ignore[method-assign]
+    chio.set_policy(_scope_aware_policy(chio))
+    return chio
 
 
 class TestPerNodeScope:
     async def test_writer_node_cannot_search(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         cfg = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             node_scopes={
                 "search": _scope("search"),
                 "write": _scope("write"),

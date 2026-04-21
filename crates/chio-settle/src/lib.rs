@@ -39,7 +39,7 @@ pub use evm::{
     finalize_bond_lock, finalize_escrow_dispatch, prepare_bond_expiry, prepare_bond_impair,
     prepare_bond_lock, prepare_bond_release, prepare_dual_sign_release, prepare_erc20_approval,
     prepare_escrow_refund, prepare_merkle_release, prepare_web3_escrow_dispatch,
-    read_bond_snapshot, read_escrow_snapshot, scale_arc_amount_to_token_minor_units,
+    read_bond_snapshot, read_escrow_snapshot, scale_chio_amount_to_token_minor_units,
     static_validate_call, submit_call, BondLockRequest, DualSignReleaseInput,
     EscrowDispatchRequest, EscrowExecutionAmount, EscrowSnapshot, EvmBondSnapshot, EvmLogEntry,
     EvmSignature, EvmTransactionReceipt, PreparedBondExpiry, PreparedBondImpair, PreparedBondLock,

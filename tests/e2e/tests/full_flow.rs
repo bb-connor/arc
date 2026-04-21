@@ -31,7 +31,7 @@ impl InMemoryReceiptStore {
 }
 
 impl ReceiptStore for InMemoryReceiptStore {
-    fn append_arc_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
@@ -227,7 +227,7 @@ async fn full_flow_allowed_tool_call() {
         "req-happy",
         &cap,
         "echo",
-        serde_json::json!({"message": "hello arc"}),
+        serde_json::json!({"message": "hello chio"}),
     );
 
     let resp = kernel.evaluate_tool_call(&req).await.unwrap();
@@ -241,7 +241,7 @@ async fn full_flow_allowed_tool_call() {
     match resp.output.unwrap() {
         ToolCallOutput::Value(result) => {
             assert_eq!(result["tool"], "echo");
-            assert_eq!(result["echo"]["message"], "hello arc");
+            assert_eq!(result["echo"]["message"], "hello chio");
         }
         other => panic!("unexpected tool output: {other:?}"),
     }

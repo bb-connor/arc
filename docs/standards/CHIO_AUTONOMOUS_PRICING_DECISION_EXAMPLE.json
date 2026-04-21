@@ -68,7 +68,7 @@
     "note": "Feeds one bounded autonomous pricing decision over Chio truth."
   },
   "model": {
-    "model_id": "pricing-model-arc-1",
+    "model_id": "pricing-model-chio-1",
     "model_version": "2026.03.31",
     "engine_family": "gradient_boosted_policy",
     "published_at": 1743379000,

@@ -58,14 +58,14 @@ def _make_agent(name: str) -> ConversableAgent:
     )
 
 
-def _capability_aware_policy(arc: MockChioClient) -> Any:
+def _capability_aware_policy(chio: MockChioClient) -> Any:
     def policy(
         tool_name: str,
         _scope_hint: dict[str, Any],
         context: dict[str, Any],
     ) -> MockVerdict:
         cap_id = context.get("capability_id")
-        token = getattr(arc, "_tokens", {}).get(cap_id)
+        token = getattr(chio, "_tokens", {}).get(cap_id)
         if token is None:
             return MockVerdict.deny_verdict(
                 f"unknown capability {cap_id!r}", guard="CapabilityGuard"
@@ -84,38 +84,38 @@ def _capability_aware_policy(arc: MockChioClient) -> Any:
 def _instrumented_client() -> MockChioClient:
     """MockChioClient that indexes minted tokens for policy lookup."""
 
-    arc = MockChioClient()
-    arc._tokens = {}  # type: ignore[attr-defined]
+    chio = MockChioClient()
+    chio._tokens = {}  # type: ignore[attr-defined]
 
-    original_create = arc.create_capability
-    original_attenuate = arc.attenuate_capability
+    original_create = chio.create_capability
+    original_attenuate = chio.attenuate_capability
 
     async def create_capability(**kwargs: Any) -> Any:
         token = await original_create(**kwargs)
-        arc._tokens[token.id] = token  # type: ignore[attr-defined]
+        chio._tokens[token.id] = token  # type: ignore[attr-defined]
         return token
 
     async def attenuate_capability(parent: Any, **kwargs: Any) -> Any:
         child = await original_attenuate(parent, **kwargs)
-        arc._tokens[child.id] = child  # type: ignore[attr-defined]
+        chio._tokens[child.id] = child  # type: ignore[attr-defined]
         return child
 
-    arc.create_capability = create_capability  # type: ignore[method-assign]
-    arc.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
-    arc.set_policy(_capability_aware_policy(arc))
-    return arc
+    chio.create_capability = create_capability  # type: ignore[method-assign]
+    chio.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
+    chio.set_policy(_capability_aware_policy(chio))
+    return chio
 
 
 def _attach_registry(
     agent: ConversableAgent,
     *,
-    arc: MockChioClient,
+    chio: MockChioClient,
     functions: dict[str, Any],
 ) -> ChioFunctionRegistry:
     """Attach a new registry to an agent and register the given functions."""
     registry = ChioFunctionRegistry(
         agent=agent,
-        chio_client=arc,
+        chio_client=chio,
         server_id=SERVER_ID,
     )
     for name, fn in functions.items():
@@ -131,7 +131,7 @@ def _attach_registry(
 
 class TestResearcherWriterScoping:
     async def test_researcher_can_search_not_write(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
 
         researcher = _make_agent("researcher")
         writer = _make_agent("writer")
@@ -144,12 +144,12 @@ class TestResearcherWriterScoping:
 
         researcher_reg = _attach_registry(
             researcher,
-            arc=arc,
+            chio=chio,
             functions={"search": do_search, "write": do_write},
         )
         writer_reg = _attach_registry(
             writer,
-            arc=arc,
+            chio=chio,
             functions={"search": do_search, "write": do_write},
         )
 
@@ -164,7 +164,7 @@ class TestResearcherWriterScoping:
         )
         manager = ChioGroupChatManager(
             groupchat=groupchat,
-            chio_client=arc,
+            chio_client=chio,
             llm_config=False,
         )
         await manager.provision_capabilities()
@@ -201,10 +201,10 @@ class TestResearcherWriterScoping:
         assert exc_info.value.guard == "ScopeGuard"
 
     async def test_ensure_function_in_scope_blocks_offline(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         agent = _make_agent("researcher")
         _attach_registry(
-            agent, arc=arc, functions={"search": lambda **_kw: "ok"}
+            agent, chio=chio, functions={"search": lambda **_kw: "ok"}
         )
         groupchat = ChioGroupChat(
             capability_scope={"researcher": _scope("search")},
@@ -213,7 +213,7 @@ class TestResearcherWriterScoping:
             max_round=1,
         )
         manager = ChioGroupChatManager(
-            groupchat=groupchat, chio_client=arc, llm_config=False
+            groupchat=groupchat, chio_client=chio, llm_config=False
         )
         await manager.provision_capabilities()
 
@@ -225,10 +225,10 @@ class TestResearcherWriterScoping:
             manager.ensure_function_in_scope("researcher", "write")
 
     async def test_unknown_role_raises_config_error(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         rogue = _make_agent("rogue")
         _attach_registry(
-            rogue, arc=arc, functions={"search": lambda **_kw: "ok"}
+            rogue, chio=chio, functions={"search": lambda **_kw: "ok"}
         )
         groupchat = ChioGroupChat(
             capability_scope={"researcher": _scope("search")},
@@ -269,14 +269,14 @@ class TestResearcherWriterScoping:
 
 class TestNestedChatAttenuation:
     async def test_nested_spawn_gets_attenuated_token(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
 
         parent = _make_agent("lead")
         child_recipient = _make_agent("junior")
 
         parent_reg = _attach_registry(
             parent,
-            arc=arc,
+            chio=chio,
             functions={
                 "search": lambda **_kw: "parent-search",
                 "write": lambda **_kw: "parent-write",
@@ -284,7 +284,7 @@ class TestNestedChatAttenuation:
         )
         child_reg = _attach_registry(
             child_recipient,
-            arc=arc,
+            chio=chio,
             functions={
                 "search": lambda **_kw: "child-search",
                 "write": lambda **_kw: "child-write",
@@ -301,7 +301,7 @@ class TestNestedChatAttenuation:
             max_round=3,
         )
         manager = ChioGroupChatManager(
-            groupchat=groupchat, chio_client=arc, llm_config=False
+            groupchat=groupchat, chio_client=chio, llm_config=False
         )
         await manager.provision_capabilities()
 
@@ -323,7 +323,7 @@ class TestNestedChatAttenuation:
             ],
             parent_capability=parent_token,
             child_scope=_scope("search"),
-            chio_client=arc,
+            chio_client=chio,
         )
 
         # Strict subset of the parent capability.
@@ -348,16 +348,16 @@ class TestNestedChatAttenuation:
         assert parent_reg.capability_id == parent_token.id
 
     async def test_nested_cannot_escalate_beyond_parent(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
 
         parent = _make_agent("lead")
         child_recipient = _make_agent("junior")
         _attach_registry(
-            parent, arc=arc, functions={"search": lambda **_kw: "ok"}
+            parent, chio=chio, functions={"search": lambda **_kw: "ok"}
         )
         _attach_registry(
             child_recipient,
-            arc=arc,
+            chio=chio,
             functions={"search": lambda **_kw: "ok"},
         )
 
@@ -371,7 +371,7 @@ class TestNestedChatAttenuation:
             max_round=2,
         )
         manager = ChioGroupChatManager(
-            groupchat=groupchat, chio_client=arc, llm_config=False
+            groupchat=groupchat, chio_client=chio, llm_config=False
         )
         await manager.provision_capabilities()
         parent_token = manager.token_for("lead")
@@ -386,17 +386,17 @@ class TestNestedChatAttenuation:
                 ],
                 parent_capability=parent_token,
                 child_scope=_scope("search", "write"),
-                chio_client=arc,
+                chio_client=chio,
             )
 
     async def test_attenuate_for_handoff_narrows_role(self) -> None:
-        arc = _instrumented_client()
+        chio = _instrumented_client()
         lead = _make_agent("lead")
         junior = _make_agent("junior")
 
         _attach_registry(
             lead,
-            arc=arc,
+            chio=chio,
             functions={
                 "search": lambda **_kw: "ok",
                 "write": lambda **_kw: "ok",
@@ -404,7 +404,7 @@ class TestNestedChatAttenuation:
         )
         _attach_registry(
             junior,
-            arc=arc,
+            chio=chio,
             functions={
                 "search": lambda **_kw: "ok",
                 "write": lambda **_kw: "ok",
@@ -421,7 +421,7 @@ class TestNestedChatAttenuation:
             max_round=2,
         )
         manager = ChioGroupChatManager(
-            groupchat=groupchat, chio_client=arc, llm_config=False
+            groupchat=groupchat, chio_client=chio, llm_config=False
         )
         await manager.provision_capabilities()
 

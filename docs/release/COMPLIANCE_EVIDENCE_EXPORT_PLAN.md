@@ -36,7 +36,7 @@ It still explicitly defers:
 ## Proposed CLI
 
 ```sh
-arc evidence export \
+chio evidence export \
   --receipt-db receipts.sqlite3 \
   --output ./evidence-package \
   --since 1700000000 \
@@ -157,6 +157,6 @@ evidence-package/
 ## Immediate Follow-On After First Implementation
 
 1. Add remote trust-control export over authenticated HTTP.
-2. Add package verification tooling (`arc evidence verify`).
+2. Add package verification tooling (`chio evidence verify`).
 3. Add signed package manifests for chain-of-custody workflows.
 4. Add compliance-specific report views on top of the exported package.

@@ -30,7 +30,7 @@ The layer exists to answer five developer-facing questions:
    a verifier policy.
 
 Each question maps to a small set of signed artifacts and a small set of CLI
-subcommands under the unified `arc` binary (with `chio-mercury` for
+subcommands under the unified `chio` binary (with `chio-mercury` for
 partner-facing evidence bundles). You do not need to understand the full
 stack to use any one piece: metering works without settlement, reputation
 works without passports, passports work without on-chain anchoring.
@@ -106,13 +106,13 @@ reviewer can:
 - Replay every signature offline with the issuer's public key.
 - Sum `cost_charged` by `(capability, tool_server, period)` to produce an
   invoice without trusting any backend service.
-- Export a verifiable package (see `arc evidence export`) that a partner can
+- Export a verifiable package (see `chio evidence export`) that a partner can
   independently re-verify.
 
 Query receipts:
 
 ```
-arc receipt list --capability <cap-id> --tool-server <server-id> \
+chio receipt list --capability <cap-id> --tool-server <server-id> \
   --since <unix-ts> --until <unix-ts> --min-cost <minor-units>
 ```
 
@@ -217,7 +217,7 @@ Primary entry points (`crates/chio-settle/src/evm.rs`):
   `prepare_bond_expiry`
 - `prepare_dual_sign_release` -- operator + counterparty sign-off
 - `prepare_merkle_release` -- batch settlement via Merkle proof
-- `prepare_erc20_approval` + `scale_arc_amount_to_token_minor_units`
+- `prepare_erc20_approval` + `scale_chio_amount_to_token_minor_units`
 - `static_validate_call` (runs before every submission)
 - `submit_call` + `confirm_transaction`
 
@@ -271,7 +271,7 @@ state drift, and recovery opportunities.
 
 ### 5.6 Recipe: query settlement status
 
-1. Pull the receipt(s) you care about with `arc receipt list`.
+1. Pull the receipt(s) you care about with `chio receipt list`.
 2. Read `financial.settlement_status` and `financial.payment_reference`.
 3. For `pending` settlements backed by on-chain rails, call
    `inspect_finality_for_receipt` with the transaction reference.
@@ -326,7 +326,7 @@ producing a verifiable trust signal.
 ### 6.3 Recipe: compute a reputation score
 
 ```
-arc reputation local \
+chio reputation local \
   --subject-public-key <hex> \
   --since <unix-ts> --until <unix-ts> \
   --policy <optional-policy-yaml>
@@ -336,7 +336,7 @@ See `crates/chio-cli/src/cli/types.rs:2727`. To compare live state against a
 portable passport:
 
 ```
-arc reputation compare \
+chio reputation compare \
   --subject-public-key <hex> \
   --passport passport.json \
   --verifier-policy policy.json
@@ -365,15 +365,15 @@ An `AgentPassport` (`crates/chio-credentials/src/...`) typically contains:
   checking.
 - Zero or more additional credentials (certifications, runtime assurance).
 
-Passports are selectively disclosable: `arc passport present` filters the
+Passports are selectively disclosable: `chio passport present` filters the
 bundle down to what the relying party asked for without invalidating
 signatures on the remaining credentials.
 
 ### 7.2 Evaluation vs. verification
 
-- **Verify** (`arc passport verify`) -- signature checks on every embedded
+- **Verify** (`chio passport verify`) -- signature checks on every embedded
   credential. No relying-party policy required.
-- **Evaluate** (`arc passport evaluate --policy <file>`) -- applies a
+- **Evaluate** (`chio passport evaluate --policy <file>`) -- applies a
   `PassportVerifierPolicy` (allow-lists, minimum scores, maximum age,
   required issuers) and produces a pass/fail resolution.
 
@@ -394,21 +394,21 @@ itself does not force a policy.
 
 For replay-safe flows, use the challenge protocol:
 
-1. Verifier creates a challenge with `arc passport challenge create`.
-2. Holder responds with `arc passport challenge respond`
+1. Verifier creates a challenge with `chio passport challenge create`.
+2. Holder responds with `chio passport challenge respond`
    (`--holder-seed-file` signs the response with the subject key).
-3. Holder submits to the verifier transport via `arc passport challenge submit`.
-4. Verifier confirms with `arc passport challenge verify`, resolving the
+3. Holder submits to the verifier transport via `chio passport challenge submit`.
+4. Verifier confirms with `chio passport challenge verify`, resolving the
    challenge from a local SQLite database or a trust-control service.
 
 OID4VCI issuance and OID4VP request flows are wired under
-`arc passport issuance ...` and `arc passport oid4vp ...` respectively.
+`chio passport issuance ...` and `chio passport oid4vp ...` respectively.
 
 ### 7.5 Recipe: issue and present a passport
 
 ```
 # Create a passport from local receipts and lineage
-arc passport create \
+chio passport create \
   --subject-public-key <hex> \
   --output passport.json \
   --signing-seed-file ./authority.seed \
@@ -416,13 +416,13 @@ arc passport create \
   --since <unix-ts> --until <unix-ts>
 
 # Verify signatures on every embedded credential
-arc passport verify --input passport.json
+chio passport verify --input passport.json
 
 # Evaluate against a relying-party policy
-arc passport evaluate --input passport.json --policy verifier-policy.yaml
+chio passport evaluate --input passport.json --policy verifier-policy.yaml
 
 # Present a filtered bundle to a specific verifier
-arc passport present \
+chio passport present \
   --input passport.json \
   --output presented.json \
   --issuer did:chio:... \
@@ -441,40 +441,40 @@ economic layer into a marketplace.
 
 ### 8.1 Exposure and scorecard
 
-`arc trust exposure-ledger ...` produces a `ExposureLedgerReport` (per-
-currency settlement position). `arc trust credit-scorecard ...` produces a
+`chio trust exposure-ledger ...` produces a `ExposureLedgerReport` (per-
+currency settlement position). `chio trust credit-scorecard ...` produces a
 `CreditScorecardReport` over the exposure ledger plus reputation
 inspection. Both are signed and can be fed to underwriting or insurance
 workflows.
 
 ### 8.2 Underwriting
 
-Pipeline is: `arc trust underwriting-input` builds a signed
-`UnderwritingPolicyInput`; `arc trust underwriting-decision` runs the pure
+Pipeline is: `chio trust underwriting-input` builds a signed
+`UnderwritingPolicyInput`; `chio trust underwriting-decision` runs the pure
 `evaluate_underwriting_policy_input` and emits an
 `UnderwritingDecisionArtifact` with risk class, budget recommendation, and
-premium quote. Appeals go through `arc trust underwriting-appeal`.
+premium quote. Appeals go through `chio trust underwriting-appeal`.
 
 ### 8.3 Facilities and bonds
 
-`arc trust facility ...` issues bounded credit facilities; `arc trust bond
-...` manages reserve locks; `arc trust loss ...` captures delinquency,
+`chio trust facility ...` issues bounded credit facilities; `chio trust bond
+...` manages reserve locks; `chio trust loss ...` captures delinquency,
 recovery, reserve-release, reserve-slash, and write-off events with strict
 accounting invariants (see section 1.3 of the economic overview).
 
 ### 8.4 Capital execution
 
-`arc trust capital-instruction ...` produces custody-neutral instructions;
-`arc trust capital-allocation ...` emits simulation-first allocation
-decisions; `arc trust capital-book ...` exports the live capital book
+`chio trust capital-instruction ...` produces custody-neutral instructions;
+`chio trust capital-allocation ...` emits simulation-first allocation
+decisions; `chio trust capital-book ...` exports the live capital book
 tying facilities, bonds, and losses to one source-of-funds view.
 
 ### 8.5 Liability marketplace
 
-`arc trust liability-provider ...` manages provider registry entries;
-`arc trust liability-market ...` drives quote, placement, and bound-
+`chio trust liability-provider ...` manages provider registry entries;
+`chio trust liability-market ...` drives quote, placement, and bound-
 coverage workflows. The provider-risk package exported via
-`arc trust provider-risk-package ...` is the signed evidence bundle sent
+`chio trust provider-risk-package ...` is the signed evidence bundle sent
 to underwriters.
 
 ### 8.6 Mercury evidence bundles
@@ -511,7 +511,7 @@ evidence so that partner reviews never lose the verifiable substrate.
 4. Query cumulative cost:
 
 ```
-arc receipt list --capability <cap-id> --min-cost 0
+chio receipt list --capability <cap-id> --min-cost 0
 ```
 
 Pipe the JSON-Lines output into any analytics pipeline.
@@ -522,13 +522,13 @@ Use `BillingExport` from `chio-metering` inside a Rust program, or drive it
 via an evidence export:
 
 ```
-arc evidence export \
+chio evidence export \
   --output ./billing-2026-04 \
   --since <month-start> --until <month-end> \
   --capability <cap-id>
 ```
 
-The exported directory is signature-checkable end-to-end with `arc evidence
+The exported directory is signature-checkable end-to-end with `chio evidence
 verify --input ./billing-2026-04`.
 
 ### 9.3 Anchor a batch
@@ -561,23 +561,23 @@ See section 5.6.
 
 ```
 # Local score
-arc reputation local --subject-public-key <hex>
+chio reputation local --subject-public-key <hex>
 
 # Signed reputation credential embedded in a passport
-arc passport create \
+chio passport create \
   --subject-public-key <hex> \
   --output passport.json \
   --signing-seed-file authority.seed
 
 # Share passport; verifier evaluates:
-arc passport evaluate --input passport.json --policy policy.yaml
+chio passport evaluate --input passport.json --policy policy.yaml
 ```
 
 ### 9.6 Issue federated delegation after a portable presentation
 
 ```
 # Verifier side: issue one local capability after validating a presentation
-arc trust federated-issue \
+chio trust federated-issue \
   --presentation-response response.json \
   --challenge challenge.json \
   --capability-policy policy.yaml \
@@ -590,59 +590,59 @@ See `crates/chio-cli/src/cli/types.rs:667` for the full option set.
 
 ## 10. CLI Reference
 
-The economic layer surfaces through three binaries: `arc` (core CLI),
+The economic layer surfaces through three binaries: `chio` (core CLI),
 `chio-mercury` (partner evidence bundles), and programmatic access via the
 Rust crates for code paths that are not yet wrapped.
 
-### 10.1 `arc` core economic subcommands
+### 10.1 `chio` core economic subcommands
 
 | Subcommand | Purpose | Source |
 |-----------|---------|--------|
-| `arc receipt list` | Filter and page receipts, including by cost range. | `crates/chio-cli/src/cli/types.rs:1883` |
-| `arc evidence export` | Create a verifiable offline evidence package. | `crates/chio-cli/src/cli/types.rs:1920` |
-| `arc evidence verify` | Verify an exported evidence package. | `crates/chio-cli/src/cli/types.rs:1948` |
-| `arc evidence import` | Import a bilateral package for later federation. | `crates/chio-cli/src/cli/types.rs:1954` |
-| `arc evidence federation-policy create` | Sign a bilateral receipt-sharing policy. | `crates/chio-cli/src/cli/types.rs:1967` |
-| `arc certify check` / `verify` / `registry ...` | Conformance certifications feeding trust tiers. | `crates/chio-cli/src/cli/types.rs:2007` |
-| `arc passport create / verify / evaluate / present` | Passport bundle lifecycle. | `crates/chio-cli/src/cli/types.rs:2222` |
-| `arc passport policy ...` | Signed verifier-policy artifacts. | `crates/chio-cli/src/cli/types.rs:2300` |
-| `arc passport challenge create / respond / submit / verify` | Challenge-bound presentations. | `crates/chio-cli/src/cli/types.rs:2331` |
-| `arc passport status ...` | Publish, resolve, and revoke lifecycle state. | `crates/chio-cli/src/cli/types.rs:2312` |
-| `arc passport issuance ...` | OID4VCI-style pre-authorized issuance flows. | `crates/chio-cli/src/cli/types.rs:2318` |
-| `arc passport oid4vp ...` | OID4VP request and verification flow. | `crates/chio-cli/src/cli/types.rs:2324` |
-| `arc reputation local` | Compute a local scorecard. | `crates/chio-cli/src/cli/types.rs:2727` |
-| `arc reputation compare` | Compare local corpus against a passport. | `crates/chio-cli/src/cli/types.rs:2744` |
-| `arc cert generate / verify / inspect` | ACP session compliance certificates. | `crates/chio-cli/src/cli/types.rs:2767` |
+| `chio receipt list` | Filter and page receipts, including by cost range. | `crates/chio-cli/src/cli/types.rs:1883` |
+| `chio evidence export` | Create a verifiable offline evidence package. | `crates/chio-cli/src/cli/types.rs:1920` |
+| `chio evidence verify` | Verify an exported evidence package. | `crates/chio-cli/src/cli/types.rs:1948` |
+| `chio evidence import` | Import a bilateral package for later federation. | `crates/chio-cli/src/cli/types.rs:1954` |
+| `chio evidence federation-policy create` | Sign a bilateral receipt-sharing policy. | `crates/chio-cli/src/cli/types.rs:1967` |
+| `chio certify check` / `verify` / `registry ...` | Conformance certifications feeding trust tiers. | `crates/chio-cli/src/cli/types.rs:2007` |
+| `chio passport create / verify / evaluate / present` | Passport bundle lifecycle. | `crates/chio-cli/src/cli/types.rs:2222` |
+| `chio passport policy ...` | Signed verifier-policy artifacts. | `crates/chio-cli/src/cli/types.rs:2300` |
+| `chio passport challenge create / respond / submit / verify` | Challenge-bound presentations. | `crates/chio-cli/src/cli/types.rs:2331` |
+| `chio passport status ...` | Publish, resolve, and revoke lifecycle state. | `crates/chio-cli/src/cli/types.rs:2312` |
+| `chio passport issuance ...` | OID4VCI-style pre-authorized issuance flows. | `crates/chio-cli/src/cli/types.rs:2318` |
+| `chio passport oid4vp ...` | OID4VP request and verification flow. | `crates/chio-cli/src/cli/types.rs:2324` |
+| `chio reputation local` | Compute a local scorecard. | `crates/chio-cli/src/cli/types.rs:2727` |
+| `chio reputation compare` | Compare local corpus against a passport. | `crates/chio-cli/src/cli/types.rs:2744` |
+| `chio cert generate / verify / inspect` | ACP session compliance certificates. | `crates/chio-cli/src/cli/types.rs:2767` |
 
-### 10.2 `arc trust` economic export subcommands
+### 10.2 `chio trust` economic export subcommands
 
 | Subcommand | Produces | Source |
 |-----------|----------|--------|
-| `arc trust behavioral-feed ...` | Signed insurer-facing behavioral feed. | `crates/chio-cli/src/cli/types.rs:962` |
-| `arc trust exposure-ledger ...` | Signed `ExposureLedgerReport`. | `crates/chio-cli/src/cli/types.rs:990` |
-| `arc trust credit-scorecard ...` | Signed `CreditScorecardReport`. | `crates/chio-cli/src/cli/types.rs:1021` |
-| `arc trust capital-book ...` | Signed live capital book. | `crates/chio-cli/src/cli/types.rs:1052` |
-| `arc trust capital-instruction ...` | Custody-neutral instruction artifact. | `crates/chio-cli/src/cli/types.rs:588` |
-| `arc trust capital-allocation ...` | Simulation-first allocation decision. | `crates/chio-cli/src/cli/types.rs:594` |
-| `arc trust facility ...` | Credit facility artifacts. | `crates/chio-cli/src/cli/types.rs:600` |
-| `arc trust bond ...` | Credit bond artifacts. | `crates/chio-cli/src/cli/types.rs:606` |
-| `arc trust loss ...` | Loss-lifecycle artifacts. | `crates/chio-cli/src/cli/types.rs:612` |
-| `arc trust credit-backtest ...` | Deterministic backtests over evidence. | `crates/chio-cli/src/cli/types.rs:618` |
-| `arc trust provider-risk-package ...` | Signed insurer-facing risk bundle. | `crates/chio-cli/src/cli/types.rs:624` |
-| `arc trust liability-provider ...` | Provider registry lifecycle. | `crates/chio-cli/src/cli/types.rs:630` |
-| `arc trust liability-market ...` | Quote / placement / bound-coverage flow. | `crates/chio-cli/src/cli/types.rs:636` |
-| `arc trust underwriting-input ...` | Signed `UnderwritingPolicyInput`. | `crates/chio-cli/src/cli/types.rs:642` |
-| `arc trust underwriting-decision ...` | Evaluated `UnderwritingDecisionArtifact`. | `crates/chio-cli/src/cli/types.rs:648` |
-| `arc trust underwriting-appeal ...` | Appeal lifecycle. | `crates/chio-cli/src/cli/types.rs:654` |
-| `arc trust appraisal ...` | Signed runtime-attestation appraisal report. | `crates/chio-cli/src/cli/types.rs:558` |
-| `arc trust authorization-context ...` | Derived external authorization context. | `crates/chio-cli/src/cli/types.rs:552` |
-| `arc trust evidence-share ...` | Shared evidence references. | `crates/chio-cli/src/cli/types.rs:546` |
-| `arc trust provider ...` | Enterprise federation provider records. | `crates/chio-cli/src/cli/types.rs:534` |
-| `arc trust federation-policy ...` | Permissionless admission policies. | `crates/chio-cli/src/cli/types.rs:540` |
-| `arc trust revoke` / `status` | Capability revocation lifecycle. | `crates/chio-cli/src/cli/types.rs:660` |
-| `arc trust federated-issue` | Issue after verifying portable presentation. | `crates/chio-cli/src/cli/types.rs:667` |
-| `arc trust federated-delegation-policy-create` | Signed federated delegation policy. | `crates/chio-cli/src/cli/types.rs:694` |
-| `arc trust serve` | Shared trust-control HTTP service. | `crates/chio-cli/src/cli/types.rs:467` |
+| `chio trust behavioral-feed ...` | Signed insurer-facing behavioral feed. | `crates/chio-cli/src/cli/types.rs:962` |
+| `chio trust exposure-ledger ...` | Signed `ExposureLedgerReport`. | `crates/chio-cli/src/cli/types.rs:990` |
+| `chio trust credit-scorecard ...` | Signed `CreditScorecardReport`. | `crates/chio-cli/src/cli/types.rs:1021` |
+| `chio trust capital-book ...` | Signed live capital book. | `crates/chio-cli/src/cli/types.rs:1052` |
+| `chio trust capital-instruction ...` | Custody-neutral instruction artifact. | `crates/chio-cli/src/cli/types.rs:588` |
+| `chio trust capital-allocation ...` | Simulation-first allocation decision. | `crates/chio-cli/src/cli/types.rs:594` |
+| `chio trust facility ...` | Credit facility artifacts. | `crates/chio-cli/src/cli/types.rs:600` |
+| `chio trust bond ...` | Credit bond artifacts. | `crates/chio-cli/src/cli/types.rs:606` |
+| `chio trust loss ...` | Loss-lifecycle artifacts. | `crates/chio-cli/src/cli/types.rs:612` |
+| `chio trust credit-backtest ...` | Deterministic backtests over evidence. | `crates/chio-cli/src/cli/types.rs:618` |
+| `chio trust provider-risk-package ...` | Signed insurer-facing risk bundle. | `crates/chio-cli/src/cli/types.rs:624` |
+| `chio trust liability-provider ...` | Provider registry lifecycle. | `crates/chio-cli/src/cli/types.rs:630` |
+| `chio trust liability-market ...` | Quote / placement / bound-coverage flow. | `crates/chio-cli/src/cli/types.rs:636` |
+| `chio trust underwriting-input ...` | Signed `UnderwritingPolicyInput`. | `crates/chio-cli/src/cli/types.rs:642` |
+| `chio trust underwriting-decision ...` | Evaluated `UnderwritingDecisionArtifact`. | `crates/chio-cli/src/cli/types.rs:648` |
+| `chio trust underwriting-appeal ...` | Appeal lifecycle. | `crates/chio-cli/src/cli/types.rs:654` |
+| `chio trust appraisal ...` | Signed runtime-attestation appraisal report. | `crates/chio-cli/src/cli/types.rs:558` |
+| `chio trust authorization-context ...` | Derived external authorization context. | `crates/chio-cli/src/cli/types.rs:552` |
+| `chio trust evidence-share ...` | Shared evidence references. | `crates/chio-cli/src/cli/types.rs:546` |
+| `chio trust provider ...` | Enterprise federation provider records. | `crates/chio-cli/src/cli/types.rs:534` |
+| `chio trust federation-policy ...` | Permissionless admission policies. | `crates/chio-cli/src/cli/types.rs:540` |
+| `chio trust revoke` / `status` | Capability revocation lifecycle. | `crates/chio-cli/src/cli/types.rs:660` |
+| `chio trust federated-issue` | Issue after verifying portable presentation. | `crates/chio-cli/src/cli/types.rs:667` |
+| `chio trust federated-delegation-policy-create` | Signed federated delegation policy. | `crates/chio-cli/src/cli/types.rs:694` |
+| `chio trust serve` | Shared trust-control HTTP service. | `crates/chio-cli/src/cli/types.rs:467` |
 
 ### 10.3 `chio-mercury` partner evidence subcommands
 
@@ -668,7 +668,7 @@ See `crates/chio-mercury/src/main.rs:19` for the enum and
 ### 10.4 Anchor and settle surfaces
 
 Anchoring and settlement currently expose programmatic APIs rather than
-first-class `arc` subcommands. The relevant entry points:
+first-class `chio` subcommands. The relevant entry points:
 
 - `chio-anchor::prepare_root_publication` (EVM) -- `crates/chio-anchor/src/evm.rs`
 - `chio-anchor::prepare_ots_submission` (Bitcoin) -- `crates/chio-anchor/src/bitcoin.rs`

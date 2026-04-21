@@ -9,7 +9,7 @@ what MERCURY actually is right now
 ## Why This Exists
 
 MERCURY grew by repeatedly adding new bounded `export` and `validate` lanes on
-top of ARC. That preserved ARC purity, but it also created a misleading shape:
+top of Chio. That preserved Chio purity, but it also created a misleading shape:
 the repo now contains many lane-specific package surfaces that look like equal
 product capabilities even when they are mostly variations on the same bundle-
 generation pattern.
@@ -25,13 +25,13 @@ every post-launch document as a distinct long-term product surface.
 
 At its core, MERCURY is:
 
-- a product-specific evidence layer on top of ARC
+- a product-specific evidence layer on top of Chio
 - one dedicated CLI and schema family for regulated trading workflow evidence
 - one packaging system for proof, inquiry, review, and decision artifacts
 
 The most real parts of MERCURY today are:
 
-- proof and inquiry packaging over ARC evidence
+- proof and inquiry packaging over Chio evidence
 - pilot and supervised-live capture for the core controlled change workflow
 - reviewer-facing package generation for bounded audiences
 
@@ -43,11 +43,11 @@ Those are durable product primitives.
 
 As of this audit:
 
-- [commands.rs](../../crates/arc-mercury/src/commands.rs) is `13,478` lines
-- [main.rs](../../crates/arc-mercury/src/main.rs) is `740` lines
-- [arc-mercury-core lib](../../crates/arc-mercury-core/src/lib.rs) exposes `25`
+- [commands.rs](../../crates/chio-mercury/src/commands.rs) is `13,478` lines
+- [main.rs](../../crates/chio-mercury/src/main.rs) is `740` lines
+- [chio-mercury-core lib](../../crates/chio-mercury-core/src/lib.rs) exposes `25`
   core modules
-- [commands.rs](../../crates/arc-mercury/src/commands.rs) exposes `42` public
+- [commands.rs](../../crates/chio-mercury/src/commands.rs) exposes `42` public
   CLI handlers
 
 That is too much surface for a product that still fundamentally centers on one
@@ -76,9 +76,9 @@ These are the stable foundations:
 
 Primary files:
 
-- [proof_package.rs](../../crates/arc-mercury-core/src/proof_package.rs)
-- [bundle.rs](../../crates/arc-mercury-core/src/bundle.rs)
-- [receipt_metadata.rs](../../crates/arc-mercury-core/src/receipt_metadata.rs)
+- [proof_package.rs](../../crates/chio-mercury-core/src/proof_package.rs)
+- [bundle.rs](../../crates/chio-mercury-core/src/bundle.rs)
+- [receipt_metadata.rs](../../crates/chio-mercury-core/src/receipt_metadata.rs)
 
 This is real product substrate, not accidental scaffolding.
 
@@ -92,8 +92,8 @@ surfaces:
 
 Primary files:
 
-- [pilot.rs](../../crates/arc-mercury-core/src/pilot.rs)
-- [supervised_live.rs](../../crates/arc-mercury-core/src/supervised_live.rs)
+- [pilot.rs](../../crates/chio-mercury-core/src/pilot.rs)
+- [supervised_live.rs](../../crates/chio-mercury-core/src/supervised_live.rs)
 
 This is still real product work.
 
@@ -147,9 +147,9 @@ fundamentally new runtime capabilities.
 
 The early Mercury milestones were useful because they:
 
-- separated Mercury from ARC generic crates
+- separated Mercury from Chio generic crates
 - established a typed Mercury package surface
-- proved export and validation over the ARC substrate
+- proved export and validation over the Chio substrate
 
 The later Mercury milestones increasingly optimized for continuing the lane
 pattern rather than re-evaluating the product shape.
@@ -173,7 +173,7 @@ The best way to describe the current state is:
 - Do not add another MERCURY lane until the CLI surface is reduced.
 - Do not treat every post-launch lane document as a permanent independent
   product capability.
-- Keep ARC generic and Mercury opinionated.
+- Keep Chio generic and Mercury opinionated.
 
 ### Engineering cleanup
 
@@ -181,7 +181,7 @@ The next engineering work should be a refactor, not another expansion lane.
 
 Priority order:
 
-1. Split [commands.rs](../../crates/arc-mercury/src/commands.rs) by concern:
+1. Split [commands.rs](../../crates/chio-mercury/src/commands.rs) by concern:
    core packaging, capture modes, reviewer distribution, and commercial-stage
    lanes.
 2. Introduce reusable lane scaffolding so `export` and `validate` stop being

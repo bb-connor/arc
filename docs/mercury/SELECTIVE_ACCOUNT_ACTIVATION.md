@@ -37,7 +37,7 @@ The lane reuses already validated Mercury artifacts:
 - one reviewer package plus qualification report
 
 It does not authorize a generic onboarding suite, CRM workflow, channel
-marketplace, merged shell, ARC commercial console, or broader Mercury product-
+marketplace, merged shell, Chio commercial console, or broader Mercury product-
 family claim.
 
 ---
@@ -74,8 +74,8 @@ selective-account activation motion. The workflow sentence remains unchanged:
 - approval owner: `mercury-activation-approval`
 - delivery owner: `mercury-controlled-delivery`
 
-Delivery ownership stays inside Mercury. ARC remains the generic substrate
-that Mercury consumes; ARC does not become an onboarding or commercial
+Delivery ownership stays inside Mercury. Chio remains the generic substrate
+that Mercury consumes; Chio does not become an onboarding or commercial
 activation console.
 
 ---
@@ -99,8 +99,8 @@ Not supported in `v2.57`:
 - multiple activation motions or delivery surfaces
 - a generic onboarding suite, CRM workflow, or channel marketplace
 - partner marketplaces or multi-segment activation programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury product-family or universal rollout claims
 
 ---
@@ -111,14 +111,14 @@ Export the bounded selective-account-activation package and controlled delivery
 bundle:
 
 ```bash
-cargo run -p arc-mercury -- selective-account-activation export --output target/mercury-selective-account-activation-export
+cargo run -p chio-mercury -- selective-account-activation export --output target/mercury-selective-account-activation-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- selective-account-activation validate --output target/mercury-selective-account-activation-validation
+cargo run -p chio-mercury -- selective-account-activation validate --output target/mercury-selective-account-activation-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

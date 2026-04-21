@@ -38,8 +38,8 @@ bridge = LangSmithBridge(
 
 
 async def publish_recent() -> None:
-    async with ChioClient("http://127.0.0.1:9090") as arc:
-        receipts = await fetch_new_receipts(arc)  # your receipt source
+    async with ChioClient("http://127.0.0.1:9090") as chio:
+        receipts = await fetch_new_receipts(chio)  # your receipt source
         for receipt in receipts:
             bridge.publish(receipt)
 ```
@@ -50,7 +50,7 @@ Each Chio receipt becomes one LangSmith `Run`:
 * `run_type = "tool"`
 * `inputs = receipt.action.parameters`
 * `outputs = {decision, evidence, result?}`
-* `tags = ["arc.verdict:allow", "arc.tool:search", "arc.guard:PathGuard", "arc.cost:42USD", ...]`
+* `tags = ["chio.verdict:allow", "chio.tool:search", "chio.guard:PathGuard", "chio.cost:42USD", ...]`
 * `extra.metadata` carries capability id, receipt id, policy hash,
   kernel key, and any additional kernel metadata.
 
@@ -87,7 +87,7 @@ from chio_observability import LangFuseBridge, LangSmithBridge, ReceiptPoller
 async def fetch_new_receipts() -> list:
     # Replace with your kernel-specific receipt tail (SQLite cursor,
     # kernel receipt-stream API, Kafka consumer, etc.).
-    return await arc.list_receipts(since=last_cursor)
+    return await chio.list_receipts(since=last_cursor)
 
 
 async def main() -> None:

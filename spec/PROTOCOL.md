@@ -892,9 +892,9 @@ same hosted authorization path. The request may carry:
 If Chio approves the request, the resulting sender constraint is persisted on
 the authorization code and then projected into access tokens through `cnf`:
 
-- `cnf.arcSenderKey`
+- `cnf.chioSenderKey`
 - `cnf["x5t#S256"]`
-- `cnf.arcAttestationSha256`
+- `cnf.chioAttestationSha256`
 
 Runtime admission then enforces the same bound sender proof continuity:
 
@@ -1805,8 +1805,7 @@ surface, or theorem-prover completion beyond the boundary defined in Section
 
 ### 10.1 Agent Passport
 
-Chio now issues these primary portable-trust schema identifiers while still
-accepting legacy `arc.*` artifacts:
+Chio issues these portable-trust schema identifiers:
 
 | Artifact | Schema |
 | --- | --- |
@@ -1839,8 +1838,8 @@ The current shipped semantics are:
 - Chio may expose one public holder transport over stored challenge state:
   `GET /v1/public/passport/challenges/{challenge_id}` and
   `POST /v1/public/passport/challenges/verify`
-- legacy `arc.*` passport, verifier-policy, challenge, and response documents
-  remain valid for verification
+- non-Chio schema identifiers are rejected instead of treated as compatibility
+  aliases
 
 ### 10.1.1 OID4VCI-Compatible Passport Issuance
 
@@ -1866,7 +1865,7 @@ The profile is intentionally narrow:
   `GET /.well-known/jwks.json`,
   `GET /.well-known/chio-passport-sd-jwt-vc`, and
   `GET /.well-known/chio-passport-jwt-vc-json`
-- issuer metadata may advertise `arcProfile.passportStatusDistribution` when
+- issuer metadata may advertise `chioProfile.passportStatusDistribution` when
   the operator has configured a public read-only lifecycle resolve plane
 - the native delivered credential remains the existing Chio `AgentPassport`
   artifact, so issuer and subject identities inside the credential stay
@@ -1880,16 +1879,16 @@ The profile is intentionally narrow:
   disclosures
 - the projected `jwt_vc_json` profile keeps `iss`, `sub`, `cnf.jwk`,
   `vc.type`, `vc.credentialSubject.id`,
-  `vc.credentialSubject.arcPassportId`,
-  `vc.credentialSubject.arcCredentialCount`,
-  `vc.credentialSubject.arcIssuerDids`,
-  `vc.credentialSubject.arcMerkleRoots`, and
-  `vc.credentialSubject.arcEnterpriseIdentityProvenance` anchored in the
+  `vc.credentialSubject.chioPassportId`,
+  `vc.credentialSubject.chioCredentialCount`,
+  `vc.credentialSubject.chioIssuerDids`,
+  `vc.credentialSubject.chioMerkleRoots`, and
+  `vc.credentialSubject.chioEnterpriseIdentityProvenance` anchored in the
   signed JWT VC payload, and it declares the same Chio claim catalog with
   `supportsSelectiveDisclosure=false` so those Chio claims are always disclosed
   in this profile
 - credential delivery may include an
-  `arcCredentialContext.passportStatus` sidecar that binds the delivered
+  `chioCredentialContext.passportStatus` sidecar that binds the delivered
   passport id to one or more lifecycle resolve URLs plus a cache hint
 - the HTTPS `credential_issuer` is a transport and discovery identifier; it is
   not a new trust root
@@ -2045,7 +2044,7 @@ The profile is intentionally narrow:
   `response_mode=direct_post.jwt`
 - Chio currently supports exactly one requested credential with format
   `application/dc+sd-jwt` and type
-  `https://arc.dev/credentials/types/chio-passport-sd-jwt-vc/v1`
+  `https://chio.dev/credentials/types/chio-passport-sd-jwt-vc/v1`
 - verifier trust bootstrap is one Chio verifier metadata document plus one
   verifier `JWKS`
 - verifier or issuer key rotation may preserve active request and credential
@@ -2167,8 +2166,8 @@ The supported contract includes:
   receipts
 - parent-bound continuation from an imported upstream capability into a new
   local delegation anchor
-- legacy `arc.*` evidence and delegation artifacts remain valid for import and
-  verification
+- non-Chio evidence and delegation schema identifiers are rejected instead of
+  treated as compatibility aliases
 
 ### 10.3 Enterprise Identity Federation
 
@@ -2210,7 +2209,7 @@ skill:
 
 ```json
 {
-  "arc": {
+  "chio": {
     "targetSkillId": "research",
     "targetSkillName": "Research"
   }
@@ -2224,19 +2223,19 @@ That convention is explicit and is not presented as a core A2A protocol field.
 Chio ships signed certification checks with primary schema:
 
 ```text
-arc.certify.check.v1
+chio.certify.check.v1
 ```
 
 The local or trust-control-backed registry uses:
 
 ```text
-arc.certify.registry.v1
+chio.certify.registry.v1
 ```
 
 The multi-operator discovery network uses:
 
 ```text
-arc.certify.discovery-network.v1
+chio.certify.discovery-network.v1
 ```
 
 The certification contract covers:

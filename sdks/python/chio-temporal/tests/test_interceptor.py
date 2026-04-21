@@ -137,20 +137,20 @@ def _make_input(*args: Any) -> Any:
 
 
 async def _mint_token(
-    arc: MockChioClient,
+    chio: MockChioClient,
     *,
     subject: str,
     scope: ChioScope,
 ) -> CapabilityToken:
     """Mint a capability via the mock and index it for policy lookups."""
-    token = await arc.create_capability(subject=subject, scope=scope)
-    store: dict[str, Any] = getattr(arc, "_tokens", {})
+    token = await chio.create_capability(subject=subject, scope=scope)
+    store: dict[str, Any] = getattr(chio, "_tokens", {})
     store[token.id] = token
-    arc._tokens = store  # type: ignore[attr-defined]
+    chio._tokens = store  # type: ignore[attr-defined]
     return token
 
 
-def _scope_aware_policy(arc: MockChioClient) -> Any:
+def _scope_aware_policy(chio: MockChioClient) -> Any:
     """Policy that enforces the scope bound to the capability_id."""
 
     def policy(
@@ -159,7 +159,7 @@ def _scope_aware_policy(arc: MockChioClient) -> Any:
         context: dict[str, Any],
     ) -> MockVerdict:
         cap_id = context.get("capability_id")
-        token = getattr(arc, "_tokens", {}).get(cap_id)
+        token = getattr(chio, "_tokens", {}).get(cap_id)
         if token is None:
             return MockVerdict.deny_verdict(
                 f"unknown capability {cap_id!r}",
@@ -183,9 +183,9 @@ def _scope_aware_policy(arc: MockChioClient) -> Any:
 
 class TestAllowVerdict:
     async def test_allow_runs_next_interceptor(self) -> None:
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             token = await _mint_token(
-                arc,
+                chio,
                 subject="agent:alice",
                 scope=_scope_for_tools("send_email"),
             )
@@ -194,7 +194,7 @@ class TestAllowVerdict:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=arc)
+            interceptor = ChioActivityInterceptor(chio_client=chio)
             interceptor.register_workflow_grant(grant)
 
             next_interceptor = _NextInterceptor(result="delivered")
@@ -217,9 +217,9 @@ class TestAllowVerdict:
         assert receipt.steps[0].receipt.is_allowed
 
     async def test_allow_respects_activity_tool_server_map(self) -> None:
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             token = await _mint_token(
-                arc,
+                chio,
                 subject="agent:alice",
                 scope=_scope_for_tools("send_email", server_id="srv"),
             )
@@ -229,7 +229,7 @@ class TestAllowVerdict:
                 tool_server="unused",
             )
             interceptor = ChioActivityInterceptor(
-                chio_client=arc,
+                chio_client=chio,
                 activity_tool_server_map={"send_email": "email-srv"},
             )
             interceptor.register_workflow_grant(grant)
@@ -241,7 +241,7 @@ class TestAllowVerdict:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input())
 
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].tool_server == "email-srv"
 
@@ -254,9 +254,9 @@ class TestAllowVerdict:
 class TestDenyVerdict:
     async def test_deny_raises_non_retryable_application_error(self) -> None:
         # raise_on_deny=False -> receipt-based deny path
-        async with deny_all(raise_on_deny=False) as arc:
+        async with deny_all(raise_on_deny=False) as chio:
             token = await _mint_token(
-                arc,
+                chio,
                 subject="agent:alice",
                 scope=_scope_for_tools("send_email"),
             )
@@ -265,7 +265,7 @@ class TestDenyVerdict:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=arc)
+            interceptor = ChioActivityInterceptor(chio_client=chio)
             interceptor.register_workflow_grant(grant)
 
             next_interceptor = _NextInterceptor()
@@ -292,9 +292,9 @@ class TestDenyVerdict:
     async def test_deny_from_403_raises_non_retryable(self) -> None:
         # raise_on_deny=True -> mock raises ChioDeniedError that the
         # interceptor translates to a non-retryable ApplicationError.
-        async with deny_all(reason="no write perms", guard="ScopeGuard") as arc:
+        async with deny_all(reason="no write perms", guard="ScopeGuard") as chio:
             token = await _mint_token(
-                arc,
+                chio,
                 subject="agent:alice",
                 scope=_scope_for_tools("send_email"),
             )
@@ -303,7 +303,7 @@ class TestDenyVerdict:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=arc)
+            interceptor = ChioActivityInterceptor(chio_client=chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -334,8 +334,8 @@ class TestDenyVerdict:
         """
         from chio_temporal import ChioTemporalConfigError
 
-        async with allow_all() as arc:
-            interceptor = ChioActivityInterceptor(chio_client=arc)
+        async with allow_all() as chio:
+            interceptor = ChioActivityInterceptor(chio_client=chio)
             # Deliberately no register_workflow_grant.
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -352,11 +352,11 @@ class TestDenyVerdict:
 
 class TestAttenuatedGrant:
     async def test_activity_override_narrows_scope_and_is_enforced(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         parent = await _mint_token(
-            arc,
+            chio,
             subject="agent:parent",
             scope=_scope_for_tools("search", "write"),
         )
@@ -371,12 +371,12 @@ class TestAttenuatedGrant:
         # ``write`` activity type.
         child_scope = _scope_for_tools("search")
         child_grant = await parent_grant.attenuate_for_activity(
-            arc, new_scope=child_scope
+            chio, new_scope=child_scope
         )
         # Index child token for the policy.
-        arc._tokens[child_grant.token.id] = child_grant.token  # type: ignore[attr-defined]
+        chio._tokens[child_grant.token.id] = child_grant.token  # type: ignore[attr-defined]
 
-        interceptor = ChioActivityInterceptor(chio_client=arc)
+        interceptor = ChioActivityInterceptor(chio_client=chio)
         interceptor.register_workflow_grant(parent_grant)
         interceptor.register_activity_grant_override(
             "write", lambda _info: child_grant
@@ -396,9 +396,9 @@ class TestAttenuatedGrant:
         assert err.type == DENIED_ERROR_TYPE
 
     async def test_attenuation_rejects_broader_scope(self) -> None:
-        arc = MockChioClient()
+        chio = MockChioClient()
         parent = await _mint_token(
-            arc,
+            chio,
             subject="agent:parent",
             scope=_scope_for_tools("search"),
         )
@@ -413,7 +413,7 @@ class TestAttenuatedGrant:
 
         broader = _scope_for_tools("search", "write")
         with pytest.raises(ChioValidationError):
-            await parent_grant.attenuate_for_activity(arc, new_scope=broader)
+            await parent_grant.attenuate_for_activity(chio, new_scope=broader)
 
     async def test_activity_override_rejects_scope_outside_parent(self) -> None:
         """Override hooks that return a non-subset grant must be refused.
@@ -422,11 +422,11 @@ class TestAttenuatedGrant:
         bypassing attenuate_for_activity) is caught by the interceptor's
         subset check before any evaluation occurs.
         """
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         parent = await _mint_token(
-            arc,
+            chio,
             subject="agent:parent",
             scope=_scope_for_tools("search"),
         )
@@ -448,7 +448,7 @@ class TestAttenuatedGrant:
             tool_server="srv",
         )
 
-        interceptor = ChioActivityInterceptor(chio_client=arc)
+        interceptor = ChioActivityInterceptor(chio_client=chio)
         interceptor.register_workflow_grant(parent_grant)
         interceptor.register_activity_grant_override(
             "write", lambda _info: rogue_grant

@@ -1,4 +1,4 @@
-package arc
+package chio
 
 // Core types for the Chio HTTP substrate.
 // These types mirror the Rust chio-http-core crate and define the contract

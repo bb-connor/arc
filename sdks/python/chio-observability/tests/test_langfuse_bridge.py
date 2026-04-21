@@ -156,8 +156,8 @@ class TestPublishDeny:
         bridge = LangFuseBridge(client=fake)
         span_kwargs = bridge.publish(deny_receipt)
         tags = set(span_kwargs["tags"])
-        assert {"arc.verdict:deny", "arc.tool:write", "arc.guard:PathGuard"} <= tags
-        assert "arc.cost:42USD" in tags
+        assert {"chio.verdict:deny", "chio.tool:write", "chio.guard:PathGuard"} <= tags
+        assert "chio.cost:42USD" in tags
 
 
 # ---------------------------------------------------------------------------

@@ -92,13 +92,13 @@ def _wrapped_function(decorator_output: Any) -> Any:
 
 class TestAllowPath:
     def test_sync_allow_pushes_receipt_to_xcom(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("double"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def double(x: int) -> int:
             return x * 2
@@ -110,7 +110,7 @@ class TestAllowPath:
             result = body(21)
 
         assert result == 42
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].tool_name == "double"
         assert evaluate_calls[0].parameters == {"args": [21], "kwargs": {}}
@@ -121,13 +121,13 @@ class TestAllowPath:
         assert pushed[XCOM_SCOPE_KEY] is not None
 
     async def test_async_allow_runs_body(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("fetch"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         async def fetch(path: str) -> str:
             return f"fetched:{path}"
@@ -139,7 +139,7 @@ class TestAllowPath:
             result = await body("/tmp/data")
 
         assert result == "fetched:/tmp/data"
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].parameters == {
             "args": ["/tmp/data"],
@@ -156,7 +156,7 @@ class TestDenyPath:
     def test_deny_receipt_raises_airflow_exception_with_permission_cause(
         self,
     ) -> None:
-        arc = deny_all(
+        chio = deny_all(
             reason="tool not in scope",
             guard="ScopeGuard",
             raise_on_deny=False,
@@ -166,7 +166,7 @@ class TestDenyPath:
             scope=_scope_for_tools("write"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write_something() -> str:
             return "wrote"
@@ -194,13 +194,13 @@ class TestDenyPath:
         assert XCOM_RECEIPT_ID_KEY not in pushed
 
     def test_deny_403_raises_airflow_exception_with_permission_cause(self) -> None:
-        arc = deny_all(reason="no write perms", guard="CapabilityGuard")
+        chio = deny_all(reason="no write perms", guard="CapabilityGuard")
 
         @chio_task(
             scope=_scope_for_tools("delete"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def delete_something() -> None:
             return None
@@ -250,13 +250,13 @@ class TestPolicyEnforcement:
                 guard="ScopeGuard",
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
 
         @chio_task(
             scope=_scope_for_tools("search"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def search() -> str:
             return "ok"
@@ -265,7 +265,7 @@ class TestPolicyEnforcement:
             scope=_scope_for_tools("write"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write() -> str:
             return "ok"

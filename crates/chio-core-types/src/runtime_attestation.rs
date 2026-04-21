@@ -238,7 +238,7 @@ mod tests {
             scheme: WorkloadIdentityScheme::Spiffe,
             credential_kind: WorkloadCredentialKind::Uri,
             uri: "spiffe://prod.chio/payments/worker".to_string(),
-            trust_domain: "prod.arc".to_string(),
+            trust_domain: "prod.chio".to_string(),
             path: "/payments/worker".to_string(),
         }
     }
@@ -246,7 +246,7 @@ mod tests {
     fn sample_evidence(schema: &str, claims: serde_json::Value) -> RuntimeAttestationEvidence {
         RuntimeAttestationEvidence {
             schema: schema.to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,

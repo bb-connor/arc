@@ -1,6 +1,6 @@
 name: Release npm
 
-# Publishes ARC TypeScript SDKs to npm on git tag push, using OIDC-backed
+# Publishes Chio TypeScript SDKs to npm on git tag push, using OIDC-backed
 # `npm publish --provenance`. See `docs/install/PUBLISHING.md` for tag
 # format, npm org trust setup, and rollback procedures.
 #

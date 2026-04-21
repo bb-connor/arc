@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn chio_oauth_discovery_profile_metadata_advertises_sender_constraints() {
         let metadata =
-            build_arc_oauth_authorization_profile_metadata().expect("build Chio auth profile");
+            build_chio_oauth_authorization_profile_metadata().expect("build Chio auth profile");
         let profile: ChioOAuthAuthorizationProfile =
             serde_json::from_value(metadata.clone()).expect("parse Chio auth profile");
         assert_eq!(profile.id, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID);
@@ -697,18 +697,18 @@ mod tests {
             .sender_constraints
             .proof_types_supported
             .iter()
-            .any(|proof| proof == CHIO_OAUTH_SENDER_PROOF_ARC_DPOP));
+            .any(|proof| proof == CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP));
         assert!(profile
             .sender_constraints
             .proof_types_supported
             .iter()
-            .any(|proof| proof == chio_kernel::operator_report::CHIO_OAUTH_SENDER_PROOF_ARC_MTLS));
+            .any(|proof| proof == chio_kernel::operator_report::CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS));
         assert!(profile
             .sender_constraints
             .proof_types_supported
             .iter()
             .any(|proof| proof
-                == chio_kernel::operator_report::CHIO_OAUTH_SENDER_PROOF_ARC_ATTESTATION));
+                == chio_kernel::operator_report::CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION));
         assert_eq!(
             profile
                 .request_time_contract
@@ -737,7 +737,7 @@ mod tests {
                 .to_string(),
             authorization_servers: vec!["https://edge.example/oauth".to_string()],
             scopes_supported: vec!["mcp:invoke".to_string()],
-            chio_authorization_profile: build_arc_oauth_authorization_profile_metadata()
+            chio_authorization_profile: build_chio_oauth_authorization_profile_metadata()
                 .expect("build protected Chio auth profile"),
         };
         let authorization_server_metadata = AuthorizationServerMetadata {
@@ -753,7 +753,7 @@ mod tests {
                     "senderConstraints": {
                         "schema": "chio.oauth.sender-constraint.v1",
                         "subjectBinding": CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT,
-                        "proofTypesSupported": [CHIO_OAUTH_SENDER_PROOF_ARC_DPOP],
+                        "proofTypesSupported": [CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP],
                         "proofRequiredWhen": "matchedGrant.dpopRequired == true",
                         "runtimeAssuranceBindingFields": ["runtimeAssuranceTier"],
                         "delegatedCallChainField": "callChain",
@@ -764,7 +764,7 @@ mod tests {
             }),
         };
 
-        let error = validate_arc_oauth_discovery_metadata_pair(
+        let error = validate_chio_oauth_discovery_metadata_pair(
             &protected_resource_metadata,
             &authorization_server_metadata,
         )

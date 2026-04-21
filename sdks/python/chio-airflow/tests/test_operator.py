@@ -127,14 +127,14 @@ def _context(
 
 class TestAllowPath:
     def test_allow_runs_inner_and_pushes_receipt_to_xcom(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         inner = _EchoOperator(value={"hello": "world"})
         op = ChioOperator(
             inner_operator=inner,
             scope=_scope_for_tools("echo"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         ctx = _context()
@@ -142,7 +142,7 @@ class TestAllowPath:
 
         assert result == {"hello": "world"}
 
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].tool_name == "echo"
         assert evaluate_calls[0].tool_server == "srv"
@@ -157,23 +157,23 @@ class TestAllowPath:
         assert pushed[XCOM_SCOPE_KEY] is not None
 
     def test_default_task_id_prefixes_inner(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         inner = _EchoOperator(value=1, task_id="inner-t")
         op = ChioOperator(
             inner_operator=inner,
             capability_id="cap-1",
-            chio_client=arc,
+            chio_client=chio,
         )
         assert op.task_id == "chio_inner-t"
 
     def test_inner_operator_exception_propagates(self) -> None:
         """Allow-path inner operator exceptions are not translated."""
-        arc = allow_all()
+        chio = allow_all()
         inner = _ExplodingOperator()
         op = ChioOperator(
             inner_operator=inner,
             capability_id="cap-1",
-            chio_client=arc,
+            chio_client=chio,
         )
         with pytest.raises(RuntimeError, match="inner blew up"):
             op.execute(_context())
@@ -188,7 +188,7 @@ class TestDenyPath:
     def test_deny_receipt_raises_airflow_exception_with_permission_cause(
         self,
     ) -> None:
-        arc = deny_all(
+        chio = deny_all(
             reason="tool not in scope",
             guard="ScopeGuard",
             raise_on_deny=False,
@@ -198,7 +198,7 @@ class TestDenyPath:
             inner_operator=inner,
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         ctx = _context()
@@ -221,13 +221,13 @@ class TestDenyPath:
         assert XCOM_RECEIPT_ID_KEY not in dict(ti.pushed)
 
     def test_deny_403_raises_airflow_exception_with_permission_cause(self) -> None:
-        arc = deny_all(reason="no write perms", guard="CapabilityGuard")
+        chio = deny_all(reason="no write perms", guard="CapabilityGuard")
         inner = _EchoOperator(value="never-runs")
         op = ChioOperator(
             inner_operator=inner,
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         with pytest.raises(AirflowException) as exc_info:
@@ -273,7 +273,7 @@ class TestPolicyEnforcement:
                 guard="ScopeGuard",
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
 
         search_inner = _EchoOperator(value="hits", task_id="search")
         write_inner = _EchoOperator(value="bytes", task_id="write")
@@ -281,12 +281,12 @@ class TestPolicyEnforcement:
         search_op = ChioOperator(
             inner_operator=search_inner,
             capability_id="cap-1",
-            chio_client=arc,
+            chio_client=chio,
         )
         write_op = ChioOperator(
             inner_operator=write_inner,
             capability_id="cap-1",
-            chio_client=arc,
+            chio_client=chio,
         )
 
         assert search_op.execute(_context(task_id="search")) == "hits"

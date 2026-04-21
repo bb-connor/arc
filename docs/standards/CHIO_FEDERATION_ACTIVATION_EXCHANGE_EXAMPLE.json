@@ -12,7 +12,7 @@
     "artifactId": "activation-1",
     "operatorId": "origin-operator",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "uri": "https://origin-operator.arc.example/artifacts/activation-1"
+    "uri": "https://origin-operator.chio.example/artifacts/activation-1"
   },
   "listingRef": {
     "kind": "listing",
@@ -20,7 +20,7 @@
     "artifactId": "listing-liability-provider-1",
     "operatorId": "origin-operator",
     "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "uri": "https://origin-operator.arc.example/artifacts/listing-liability-provider-1"
+    "uri": "https://origin-operator.chio.example/artifacts/listing-liability-provider-1"
   },
   "governingCharterRef": {
     "kind": "governance_charter",
@@ -28,10 +28,10 @@
     "artifactId": "charter-1",
     "operatorId": "origin-operator",
     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-    "uri": "https://origin-operator.arc.example/artifacts/charter-1"
+    "uri": "https://origin-operator.chio.example/artifacts/charter-1"
   },
   "scope": {
-    "namespace": "registry.arc.example/liability",
+    "namespace": "registry.chio.example/liability",
     "subjectOperatorId": "origin-operator",
     "allowedActorKinds": [
       "liability_provider"

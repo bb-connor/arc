@@ -849,7 +849,7 @@ pub mod wasmtime_backend {
     use crate::placeholders::{resolve_placeholders_in_json, PlaceholderEnv, PlaceholderError};
     use sha2::Digest;
 
-    /// Names of `arc.*` host functions Chio currently exposes to guests.
+    /// Names of `chio.*` host functions Chio currently exposes to guests.
     ///
     /// Operators can pass a subset of this list as `policy_allowed_host_fns`
     /// to [`load_guards_from_policy`] to restrict which capabilities any
@@ -989,7 +989,7 @@ pub mod wasmtime_backend {
             capability: String,
         },
 
-        /// The guard's WASM module imports a host function from the `arc`
+        /// The guard's WASM module imports a host function from the `chio`
         /// namespace that was not declared in its `capabilities` list.
         #[error("guard {guard:?} module imports {import:?} which is not declared in capabilities")]
         UndeclaredHostImport {
@@ -1092,7 +1092,7 @@ pub mod wasmtime_backend {
     ///    accepted (there is no sidecar to check).
     ///
     /// 4. **Import check.** The module is compiled and its imports are
-    ///    inspected: any `arc.*` import not in the guard's `capabilities`
+    ///    inspected: any `chio.*` import not in the guard's `capabilities`
     ///    list is rejected ([`LoadError::UndeclaredHostImport`]). This
     ///    enforces capability intersection at the module boundary, not just
     ///    at the policy layer.
@@ -1281,7 +1281,7 @@ pub mod wasmtime_backend {
         }
     }
 
-    /// Compile the module and ensure every `arc.*` import is in the granted
+    /// Compile the module and ensure every `chio.*` import is in the granted
     /// capabilities list.
     ///
     /// Modules loaded as components (WIT) are exempt from this check because
@@ -1379,7 +1379,7 @@ pub mod wasmtime_backend {
         }
 
         #[test]
-        fn no_arc_alloc_uses_offset_zero() {
+        fn no_chio_alloc_uses_offset_zero() {
             // WAT module WITHOUT chio_alloc.
             // evaluate checks that ptr == 0 and returns ALLOW only if so.
             let wat = r#"
@@ -1678,7 +1678,7 @@ pub mod wasmtime_backend {
         }
 
         #[test]
-        fn import_validation_accepts_arc_only() {
+        fn import_validation_accepts_chio_only() {
             // WAT module that imports only from "chio" namespace
             let wat = r#"
                 (module

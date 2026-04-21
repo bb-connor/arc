@@ -103,7 +103,7 @@ async fn splunk_hec_sends_correct_envelope() {
     let config = SplunkConfig {
         endpoint: server.uri(),
         hec_token: "test-token".to_string(),
-        sourcetype: "arc:receipt".to_string(),
+        sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
     };
@@ -141,8 +141,8 @@ async fn splunk_hec_sends_correct_envelope() {
     );
     assert_eq!(
         obj0.get("sourcetype").and_then(|v| v.as_str()),
-        Some("arc:receipt"),
-        "sourcetype must be arc:receipt"
+        Some("chio:receipt"),
+        "sourcetype must be chio:receipt"
     );
     let event0 = obj0.get("event").expect("event field must exist");
     assert_eq!(
@@ -184,7 +184,7 @@ async fn splunk_hec_returns_error_on_401() {
     let config = SplunkConfig {
         endpoint: server.uri(),
         hec_token: "bad-token".to_string(),
-        sourcetype: "arc:receipt".to_string(),
+        sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
     };
@@ -223,7 +223,7 @@ async fn splunk_hec_returns_error_on_400() {
     let config = SplunkConfig {
         endpoint: server.uri(),
         hec_token: "test-token".to_string(),
-        sourcetype: "arc:receipt".to_string(),
+        sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
     };
@@ -261,7 +261,7 @@ async fn splunk_hec_returns_error_on_503() {
     let config = SplunkConfig {
         endpoint: server.uri(),
         hec_token: "test-token".to_string(),
-        sourcetype: "arc:receipt".to_string(),
+        sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
     };
@@ -288,7 +288,7 @@ fn splunk_hec_rejects_plaintext_http_endpoint() {
     let config = SplunkConfig {
         endpoint: "http://splunk.example.com:8088".to_string(),
         hec_token: "secret-token".to_string(),
-        sourcetype: "arc:receipt".to_string(),
+        sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
     };
@@ -314,7 +314,7 @@ fn splunk_hec_accepts_https_endpoint() {
     let config = SplunkConfig {
         endpoint: "https://splunk.example.com:8088".to_string(),
         hec_token: "secret-token".to_string(),
-        sourcetype: "arc:receipt".to_string(),
+        sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
     };

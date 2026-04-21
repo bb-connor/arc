@@ -175,7 +175,7 @@ kernel/browser/mobile qualification lanes.
   trust-control health and registry surfaces
 - portable trust ships as `did:chio`, Chio-primary passport and verifier-policy
   schemas, challenge/response presentation, evidence export/import, and
-  parent-bound federated delegation continuation, with legacy `arc.*`
+  parent-bound federated delegation continuation, with legacy pre-Chio schemas rejected
   artifacts still accepted
 - Chio now ships one qualified portable credential family over
   OID4VCI-compatible issuer metadata, with a native `AgentPassport` response,
@@ -493,16 +493,16 @@ The current Chio candidate does not claim:
 
 ## Migration Story
 
-- existing wrapped MCP servers can be hosted through `arc mcp serve` and
-  `arc mcp serve-http`
+- existing wrapped MCP servers can be hosted through `chio mcp serve` and
+  `chio mcp serve-http`
 - trust-control-backed deployments can centralize authority, revocation,
   receipts, budgets, federation registries, and certification state through
-  `arc trust serve`
+  `chio trust serve`
 - new policy work should start from
   `examples/policies/canonical-hushspec.yaml`
 - existing deployments should migrate policy authoring to HushSpec before
   adopting this candidate
-- Chio-branded schema issuance is now primary, while legacy `arc.*` artifacts
+- Chio-branded schema issuance is now primary, while legacy pre-Chio artifacts
   remain verifiable/importable
 - `did:chio` remains the currently shipped canonical DID method and provenance
   anchor, while the bounded public identity profile may also name `did:web`,
@@ -520,8 +520,8 @@ The current Chio candidate does not claim:
 - use [QUALIFICATION.md](QUALIFICATION.md) as the release-proof matrix
 - use [ECONOMIC_INTEROP_GUIDE.md](../ECONOMIC_INTEROP_GUIDE.md) when IAM,
   finance, or partner reviewers need the focused economic-context walkthrough
-- use `arc trust credit-backtest export` and
-  `arc trust provider-risk-package export` when capital reviewers need replay
+- use `chio trust credit-backtest export` and
+  `chio trust provider-risk-package export` when capital reviewers need replay
   evidence or one signed provider-facing credit package
 - use [CREDENTIAL_INTEROP_GUIDE.md](../CREDENTIAL_INTEROP_GUIDE.md) when a
   verifier, wallet, or standards reviewer needs the focused portable
@@ -530,8 +530,8 @@ The current Chio candidate does not claim:
 - use [CHIO_PUBLIC_IDENTITY_PROFILE.md](../standards/CHIO_PUBLIC_IDENTITY_PROFILE.md)
   when a reviewer needs the bounded public identity-profile, wallet-directory,
   routing, and multi-wallet qualification contract
-- use `arc trust appraisal export`, `arc trust appraisal export-result`, and
-  `arc trust appraisal import` when an operator needs one signed multi-cloud
+- use `chio trust appraisal export`, `chio trust appraisal export-result`, and
+  `chio trust appraisal import` when an operator needs one signed multi-cloud
   runtime-attestation appraisal artifact, one signed portable appraisal
   result, or one explicit local import-policy decision over foreign appraisal
   evidence
@@ -545,7 +545,7 @@ The current Chio candidate does not claim:
   `/v1/registry/market/penalties/evaluate` endpoints when an operator needs
   one explicit fee schedule, bond requirement, or market-penalty evaluation
   over listing, activation, and governance truth
-- use `arc trust underwriting-decision simulate` when an operator needs to
+- use `chio trust underwriting-decision simulate` when an operator needs to
   inspect policy deltas before issuing a new signed underwriting decision
 - use [PARTNER_PROOF.md](PARTNER_PROOF.md) when a partner, insurer, or
   standards reviewer needs the compact evidence package instead of raw build

@@ -2,7 +2,7 @@
   "schema": "chio.federation-open-admission-policy.v1",
   "policyId": "foap-1",
   "issuedAt": 1743552120,
-  "namespace": "registry.arc.example/liability",
+  "namespace": "registry.chio.example/liability",
   "governingOperatorId": "origin-operator",
   "allowedAdmissionClasses": [
     "public_untrusted",
@@ -27,7 +27,7 @@
     "artifactId": "charter-1",
     "operatorId": "origin-operator",
     "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-    "uri": "https://origin-operator.arc.example/artifacts/charter-1"
+    "uri": "https://origin-operator.chio.example/artifacts/charter-1"
   },
   "feeScheduleRef": {
     "kind": "open_market_fee_schedule",
@@ -35,7 +35,7 @@
     "artifactId": "fee-schedule-1",
     "operatorId": "origin-operator",
     "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-    "uri": "https://origin-operator.arc.example/artifacts/fee-schedule-1"
+    "uri": "https://origin-operator.chio.example/artifacts/fee-schedule-1"
   },
   "explicitLocalReviewRequired": true,
   "visibilityOnlyWithoutActivation": true,

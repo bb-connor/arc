@@ -62,7 +62,7 @@ use chio_siem::exporters::splunk::{SplunkConfig, SplunkHecExporter};
 let config = SplunkConfig {
     endpoint: "https://splunk.example.com:8088".to_string(),
     hec_token: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx".to_string(),
-    sourcetype: "arc:receipt".to_string(),  // default
+    sourcetype: "chio:receipt".to_string(),  // default
     index: Some("chio_audit".to_string()),   // omit to use HEC token default
     host: Some("chio-node-01".to_string()),  // optional
 };
@@ -117,6 +117,6 @@ The `financial` field is extracted from `receipt.metadata["financial"]`. It prov
 In Splunk you can search for denied-budget events with:
 
 ```
-sourcetype="arc:receipt" event.decision.deny.guard="monetary_budget"
+sourcetype="chio:receipt" event.decision.deny.guard="monetary_budget"
   | stats sum(event.metadata.financial.attempted_cost) as total_attempted by event.capability_id
 ```

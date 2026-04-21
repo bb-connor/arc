@@ -16,7 +16,7 @@ to:
 
 As shipped before this rewrite:
 
-- `arc trust serve` centralized authority, revocations, and receipts behind one HTTP service
+- `chio trust serve` centralized authority, revocations, and receipts behind one HTTP service
 - hosted MCP edges could use that service through `--control-url` and `--control-token`
 - hosted MCP edges could advertise protected-resource and auth-server metadata
 - hosted MCP edges could verify JWT bearer tokens
@@ -88,7 +88,7 @@ Rules:
 
 ### 5. Hosted auth-server behavior
 
-`arc mcp serve-http` gains a hosted OAuth authorization server when configured with a local auth signing seed.
+`chio mcp serve-http` gains a hosted OAuth authorization server when configured with a local auth signing seed.
 
 Supported flows:
 
@@ -184,7 +184,7 @@ Deliverables:
 
 Acceptance:
 
-- `arc check` and hosted MCP nodes enforce one shared budget across nodes
+- `chio check` and hosted MCP nodes enforce one shared budget across nodes
 - the same CLI invocation can survive a dead first control URL
 
 ### D. Hosted authorization server
@@ -224,7 +224,7 @@ Acceptance:
 
 Recommended deployment shape:
 
-- two or more `arc trust serve` nodes
+- two or more `chio trust serve` nodes
 - one local SQLite dataset per control node
 - short peer replication interval
 - hosted MCP nodes configured with a cluster `--control-url` list

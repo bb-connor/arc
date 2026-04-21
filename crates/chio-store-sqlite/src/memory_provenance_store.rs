@@ -20,7 +20,7 @@
 //!     prev_hash     TEXT NOT NULL,
 //!     hash          TEXT NOT NULL
 //! );
-//! CREATE INDEX idx_arc_memory_provenance_key
+//! CREATE INDEX idx_chio_memory_provenance_key
 //!     ON chio_memory_provenance(store, entry_key, seq);
 //! ```
 //!
@@ -130,7 +130,7 @@ impl SqliteMemoryProvenanceStore {
                 hash          TEXT NOT NULL
             );
 
-            CREATE INDEX IF NOT EXISTS idx_arc_memory_provenance_key
+            CREATE INDEX IF NOT EXISTS idx_chio_memory_provenance_key
                 ON chio_memory_provenance(store, entry_key, seq);
             "#,
         )?;

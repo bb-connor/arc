@@ -37,8 +37,8 @@ Proceed with one bounded Mercury portfolio-program lane only.
   platform, revenue operations system, forecasting stack, billing platform, or
   commercial console
 - channel programs or universal multi-account portfolio automation
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury portfolio-management claims
 
 ---
@@ -48,7 +48,7 @@ Proceed with one bounded Mercury portfolio-program lane only.
 The portfolio-program lane now packages one bounded program-review path, one
 portfolio approval, one revenue-operations-guardrails artifact, and one
 explicit program handoff over the existing second-account-expansion evidence
-stack without pulling product logic back into ARC or broadening Mercury into a
+stack without pulling product logic back into Chio or broadening Mercury into a
 generic account-management, revenue operations, or commercial platform. The
 milestone therefore closes with one explicit proceed decision and one narrow
 boundary.

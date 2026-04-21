@@ -132,7 +132,7 @@ authoritative budget semantics.
 - `docs/release/QUALIFICATION.md`
 - `docs/release/RELEASE_AUDIT.md`
 - `scripts/qualify-release.sh`
-- `scripts/qualify-bounded-arc.sh`
+- `scripts/qualify-bounded-chio.sh`
 
 **Acceptance**:
 - one qualification command proves authority fencing, stale-leader rejection,
@@ -326,7 +326,7 @@ reconciliation surfaces.
 **Current repo baseline**:
 - [`docs/release/QUALIFICATION.md`](release/QUALIFICATION.md),
   [`docs/release/RELEASE_AUDIT.md`](release/RELEASE_AUDIT.md),
-  [`scripts/qualify-bounded-arc.sh`](../scripts/qualify-bounded-arc.sh), and
+  [`scripts/qualify-bounded-chio.sh`](../scripts/qualify-bounded-chio.sh), and
   [`scripts/qualify-release.sh`](../scripts/qualify-release.sh) already define
   a real bounded-release qualification surface. Phase 24 is mainly about claim
   synchronization and gate enforcement.
@@ -437,7 +437,7 @@ the enriched Rust contract is visible to users.
 
 **Files**:
 - `crates/chio-http-core/src/verdict.rs`
-- `packages/sdk/chio-py/src/arc/errors.py`
+- `packages/sdk/chio-py/src/chio/errors.py`
 - `packages/sdk/chio-py/tests/test_errors.py`
 - `packages/sdk/chio-ts/src/errors.ts`
 - `packages/sdk/chio-ts/src/types.ts`

@@ -110,13 +110,13 @@ class _EventCapture:
 
 class TestAllowPath:
     def test_sync_task_runs_under_allow_verdict(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("double"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def double(x: int) -> int:
             return x * 2
@@ -125,7 +125,7 @@ class TestAllowPath:
             scope=_scope_for_tools("double"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def myflow() -> int:
             return double(21)
@@ -134,7 +134,7 @@ class TestAllowPath:
             result = myflow()
 
         assert result == 42
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].tool_name == "double"
         assert evaluate_calls[0].tool_server == "srv"
@@ -147,13 +147,13 @@ class TestAllowPath:
         assert allows[0].payload["receipt_id"].startswith("mock-r-")
 
     async def test_async_task_runs_under_allow_verdict(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("fetch"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         async def fetch(path: str) -> str:
             return f"fetched:{path}"
@@ -162,7 +162,7 @@ class TestAllowPath:
             scope=_scope_for_tools("fetch"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         async def myflow() -> str:
             return await fetch("/tmp/data")
@@ -171,7 +171,7 @@ class TestAllowPath:
             result = await myflow()
 
         assert result == "fetched:/tmp/data"
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         assert evaluate_calls[0].parameters == {"args": ["/tmp/data"], "kwargs": {}}
         assert capture.of(EVENT_ALLOW)
@@ -180,11 +180,11 @@ class TestAllowPath:
         """A task with no ``capability_id`` invoked outside an ``chio_flow`` must
         surface ``ChioPrefectConfigError`` (a configuration problem, not a
         capability denial)."""
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_task(
             scope=_scope_for_tools("no_flow"),
-            chio_client=arc,
+            chio_client=chio,
         )
         def no_flow() -> int:
             return 1
@@ -204,7 +204,7 @@ class TestDenyPath:
     def test_deny_receipt_path_raises_permission_error(self) -> None:
         # raise_on_deny=False: the mock returns a deny receipt instead
         # of raising ChioDeniedError. This covers the receipt-path deny.
-        arc = deny_all(
+        chio = deny_all(
             reason="tool not in scope",
             guard="ScopeGuard",
             raise_on_deny=False,
@@ -214,7 +214,7 @@ class TestDenyPath:
             scope=_scope_for_tools("write"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write_something() -> str:
             return "wrote"
@@ -223,7 +223,7 @@ class TestDenyPath:
             scope=_scope_for_tools("write"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def myflow() -> str:
             return write_something()
@@ -251,13 +251,13 @@ class TestDenyPath:
         # Default raise_on_deny=True: the mock raises ChioDeniedError
         # (the HTTP-403 path). The decorator translates it to
         # PermissionError and synthesises the deny event.
-        arc = deny_all(reason="no write perms", guard="CapabilityGuard")
+        chio = deny_all(reason="no write perms", guard="CapabilityGuard")
 
         @chio_task(
             scope=_scope_for_tools("delete"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def delete_something() -> None:
             return None
@@ -266,7 +266,7 @@ class TestDenyPath:
             scope=_scope_for_tools("delete"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def myflow() -> None:
             delete_something()
@@ -282,13 +282,13 @@ class TestDenyPath:
         assert denies[0].payload["guard"] == "CapabilityGuard"
 
     def test_deny_event_carries_flow_run_id(self) -> None:
-        arc = deny_all(reason="nope", guard="g", raise_on_deny=False)
+        chio = deny_all(reason="nope", guard="g", raise_on_deny=False)
 
         @chio_task(
             scope=_scope_for_tools("t"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def t() -> None:
             return None
@@ -297,7 +297,7 @@ class TestDenyPath:
             scope=_scope_for_tools("t"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def myflow() -> None:
             t()
@@ -335,13 +335,13 @@ class TestPolicyEnforcement:
                 guard="ScopeGuard",
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
 
         @chio_task(
             scope=_scope_for_tools("search"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def search() -> str:
             return "ok"
@@ -350,7 +350,7 @@ class TestPolicyEnforcement:
             scope=_scope_for_tools("write"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write() -> str:
             return "ok"
@@ -359,7 +359,7 @@ class TestPolicyEnforcement:
             scope=_scope_for_tools("search", "write"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def myflow() -> tuple[str, Any]:
             a = search()
@@ -390,13 +390,13 @@ class TestPolicyEnforcement:
 
 
 def test_task_parameters_include_kwargs_and_args() -> None:
-    arc = allow_all()
+    chio = allow_all()
 
     @chio_task(
         scope=_scope_for_tools("hello"),
         capability_id="cap-1",
         tool_server="srv",
-        chio_client=arc,
+        chio_client=chio,
     )
     def hello(name: str, *, excited: bool = False) -> str:
         return f"hi {name}{'!' if excited else ''}"
@@ -405,14 +405,14 @@ def test_task_parameters_include_kwargs_and_args() -> None:
         scope=_scope_for_tools("hello"),
         capability_id="cap-1",
         tool_server="srv",
-        chio_client=arc,
+        chio_client=chio,
     )
     def myflow() -> str:
         return hello("ada", excited=True)
 
     result = myflow()
     assert result == "hi ada!"
-    evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+    evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
     assert len(evaluate_calls) == 1
     assert evaluate_calls[0].parameters == {
         "args": ["ada"],

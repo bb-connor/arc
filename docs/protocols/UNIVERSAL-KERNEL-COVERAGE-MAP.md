@@ -356,7 +356,7 @@ patterns. Any new integration should identify which pattern it uses:
   data layer (SQL, vector DB), code execution (E2B, Modal)
 **How:** Wrap the framework's tool/function execution with an Chio
   `evaluate()` call before and `record()` call after.
-**Chio artifact:** `arc-{framework}` SDK package.
+**Chio artifact:** `chio-{framework}` SDK package.
 
 ### Pattern 2: Middleware / Interceptor
 **Used by:** HTTP frameworks (FastAPI, Express), gRPC, API gateways,

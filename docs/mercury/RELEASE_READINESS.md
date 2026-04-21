@@ -28,8 +28,8 @@ The package reuses already validated Mercury artifacts:
 - one trust-network package
 - one reviewer package plus qualification report
 
-It does not authorize a generic ARC release console, a merged Mercury and
-ARC-Wall shell, additional partner-delivery surfaces, or a new Mercury product
+It does not authorize a generic Chio release console, a merged Mercury and
+Chio-Wall shell, additional partner-delivery surfaces, or a new Mercury product
 line.
 
 ---
@@ -68,8 +68,8 @@ remains unchanged:
 - partner owner: `mercury-partner-delivery`
 - support owner: `mercury-release-ops`
 
-Release ownership stays inside Mercury. ARC remains the generic substrate that
-Mercury consumes; ARC does not become the release-readiness console.
+Release ownership stays inside Mercury. Chio remains the generic substrate that
+Mercury consumes; Chio does not become the release-readiness console.
 
 ---
 
@@ -88,10 +88,10 @@ Supported in `v2.53`:
 Not supported in `v2.53`:
 
 - additional partner-delivery surfaces
-- a generic ARC release console or merged shell
+- a generic Chio release console or merged shell
 - new Mercury feature lanes or product lines
 - widened trust-network sponsor breadth
-- ARC-Wall or cross-product packaging unification
+- Chio-Wall or cross-product packaging unification
 
 ---
 
@@ -100,14 +100,14 @@ Not supported in `v2.53`:
 Export the bounded release-readiness package and partner-delivery bundle:
 
 ```bash
-cargo run -p arc-mercury -- release-readiness export --output target/mercury-release-readiness-export
+cargo run -p chio-mercury -- release-readiness export --output target/mercury-release-readiness-export
 ```
 
 Generate the validation package and explicit launch decision:
 
 ```bash
-cargo run -p arc-mercury -- release-readiness validate --output target/mercury-release-readiness-validation
+cargo run -p chio-mercury -- release-readiness validate --output target/mercury-release-readiness-validation
 ```
 
 These commands must remain Mercury-owned wrappers over existing Mercury
-artifacts. ARC stays generic; Mercury stays opinionated.
+artifacts. Chio stays generic; Mercury stays opinionated.

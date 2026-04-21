@@ -223,7 +223,7 @@ pub fn build_portable_issuer_jwks(
     Ok(jwks)
 }
 
-pub fn build_arc_passport_sd_jwt_type_metadata(
+pub fn build_chio_passport_sd_jwt_type_metadata(
     credential_issuer: &str,
 ) -> Result<ChioPassportSdJwtVcTypeMetadata, CredentialError> {
     let credential_issuer = normalize_credential_issuer(credential_issuer)?;
@@ -244,7 +244,7 @@ pub fn build_arc_passport_sd_jwt_type_metadata(
     })
 }
 
-pub fn build_arc_passport_portable_projection(
+pub fn build_chio_passport_portable_projection(
     passport: &AgentPassport,
     now: u64,
 ) -> Result<ChioPassportPortableProjection, CredentialError> {
@@ -260,7 +260,7 @@ pub fn build_arc_passport_portable_projection(
     })
 }
 
-pub fn issue_arc_passport_sd_jwt_vc(
+pub fn issue_chio_passport_sd_jwt_vc(
     passport: &AgentPassport,
     credential_issuer: &str,
     issuer_keypair: &Keypair,
@@ -268,7 +268,7 @@ pub fn issue_arc_passport_sd_jwt_vc(
     passport_status: Option<Oid4vciChioPassportStatusReference>,
 ) -> Result<ChioPassportSdJwtVcEnvelope, CredentialError> {
     let credential_issuer = normalize_credential_issuer(credential_issuer)?;
-    let projection = build_arc_passport_portable_projection(passport, now)?;
+    let projection = build_chio_passport_portable_projection(passport, now)?;
     let subject_did = DidChio::from_str(&projection.subject_did).map_err(CredentialError::Did)?;
     let holder_jwk = PortableEd25519Jwk::from_public_key(subject_did.public_key());
     let holder_thumbprint = holder_jwk.thumbprint()?;
@@ -372,7 +372,7 @@ pub fn issue_arc_passport_sd_jwt_vc(
     })
 }
 
-pub fn verify_arc_passport_sd_jwt_vc(
+pub fn verify_chio_passport_sd_jwt_vc(
     compact: &str,
     issuer_public_key: &PublicKey,
     now: u64,

@@ -29,43 +29,43 @@ silently implies the other.
 ## Command
 
 ```bash
-arc certify check \
+chio certify check \
   --scenarios-dir tests/conformance/scenarios/wave1 \
   --results-dir target/release-qualification/conformance/wave1/results \
   --output target/release-qualification/conformance/wave1/certification.json \
   --report-output target/release-qualification/conformance/wave1/certification-report.md \
   --tool-server-id demo-server \
   --tool-server-name "Demo Server" \
-  --signing-seed-file .arc/certify-ed25519.seed
+  --signing-seed-file .chio/certify-ed25519.seed
 ```
 
 Verify one artifact:
 
 ```bash
-arc certify verify \
+chio certify verify \
   --input target/release-qualification/conformance/wave1/certification.json
 ```
 
 Publish into a local registry:
 
 ```bash
-arc certify registry publish \
+chio certify registry publish \
   --input target/release-qualification/conformance/wave1/certification.json \
-  --certification-registry-file .arc/certifications.json
+  --certification-registry-file .chio/certifications.json
 ```
 
 Resolve the current certification state for one tool server:
 
 ```bash
-arc certify registry resolve \
+chio certify registry resolve \
   --tool-server-id demo-server \
-  --certification-registry-file .arc/certifications.json
+  --certification-registry-file .chio/certifications.json
 ```
 
 Use the trust-control service instead of a local file:
 
 ```bash
-arc --control-url http://127.0.0.1:8940 \
+chio --control-url http://127.0.0.1:8940 \
   --control-token "$CHIO_CONTROL_TOKEN" \
   certify registry list
 ```
@@ -73,17 +73,17 @@ arc --control-url http://127.0.0.1:8940 \
 Publish across a configured discovery network:
 
 ```bash
-arc certify registry publish-network \
+chio certify registry publish-network \
   --input target/release-qualification/conformance/wave1/certification.json \
-  --certification-discovery-file .arc/certification-network.json
+  --certification-discovery-file .chio/certification-network.json
 ```
 
 Discover one tool server across multiple operators:
 
 ```bash
-arc certify registry discover \
+chio certify registry discover \
   --tool-server-id demo-server \
-  --certification-discovery-file .arc/certification-network.json
+  --certification-discovery-file .chio/certification-network.json
 ```
 
 ## Criteria Profile
@@ -162,7 +162,7 @@ Each operator record names:
 - optional `controlToken` for authenticated publish fan-out
 - `allowPublish` to opt an operator into multi-publish flows
 
-`arc certify registry discover` queries the public read-only endpoint
+`chio certify registry discover` queries the public read-only endpoint
 `/v1/public/certifications/resolve/{tool_server_id}` on each configured
 operator and returns:
 
@@ -170,18 +170,18 @@ operator and returns:
 - per-operator `active` / `superseded` / `revoked` / `not-found` state
 - the operator-scoped current artifact payload when one exists
 
-`arc certify registry publish-network` fans one signed artifact out to all
+`chio certify registry publish-network` fans one signed artifact out to all
 selected operators that explicitly allow publication and have a configured
 service token.
 
 Trust-control can host the same discovery behavior:
 
 ```bash
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token "$CHIO_CONTROL_TOKEN" \
-  --certification-registry-file .arc/certifications.json \
-  --certification-discovery-file .arc/certification-network.json
+  --certification-registry-file .chio/certifications.json \
+  --certification-discovery-file .chio/certification-network.json
 ```
 
 The authenticated aggregator surface is:
@@ -199,7 +199,7 @@ This mirrors the passport lifecycle contract intentionally:
   operator status beside them
 - both registries expose `active` / `superseded` / `revoked` / `not-found`
   resolution instead of deleting history
-- both registries can be surfaced locally or through `arc trust serve`
+- both registries can be surfaced locally or through `chio trust serve`
 
 What differs is the identity key:
 
@@ -223,7 +223,7 @@ Treat that file as an operator trust root:
 - restrict it to the certification operator
 - rotate it deliberately, not per run
 
-If you expose registry operations through `arc trust serve`, configure a
+If you expose registry operations through `chio trust serve`, configure a
 dedicated `--certification-registry-file` on that service and keep the bearer
 token explicit with `--service-token`. The same trust-control process can also
 host `--passport-statuses-file` when operators want both portable identity
@@ -236,8 +236,8 @@ pipeline. A typical flow is:
 
 1. run `./scripts/qualify-release.sh`
 2. inspect the generated compatibility report and raw results
-3. run `arc certify check` against the selected wave corpus
-4. optionally run `arc certify verify` as a local integrity gate
+3. run `chio certify check` against the selected wave corpus
+4. optionally run `chio certify verify` as a local integrity gate
 5. publish the signed artifact into the local or remote certification registry
-6. use `arc certify registry resolve` to surface the current operator-facing
+6. use `chio certify registry resolve` to surface the current operator-facing
    status for that tool server

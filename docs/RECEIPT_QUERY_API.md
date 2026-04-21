@@ -264,12 +264,12 @@ Response shape:
 
 This endpoint is the stable operator workflow surface. It packages the existing analytics, cost-attribution, and evidence-export substrate into one response so dashboards and back-office tooling do not need to reconstruct the report client-side.
 
-## CLI Usage: arc receipt list
+## CLI Usage: chio receipt list
 
-The `arc receipt list` subcommand wraps the HTTP endpoint.
+The `chio receipt list` subcommand wraps the HTTP endpoint.
 
 ```
-arc receipt list [OPTIONS]
+chio receipt list [OPTIONS]
 
 Options:
   --capability <ID>      Filter by capability ID
@@ -290,7 +290,7 @@ Options:
 Each matching receipt is printed as a JSON object on its own line (NDJSON). Example:
 
 ```bash
-arc receipt list \
+chio receipt list \
   --outcome deny \
   --since 1700000000 \
   --control-url http://localhost:7391 \

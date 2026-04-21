@@ -75,7 +75,7 @@ fn load_builtin_accepts_raw_and_prefixed_names() {
     for (name, _) in BUILTIN_RULESETS {
         load_builtin(name).unwrap_or_else(|e| panic!("load_builtin({name:?}) should succeed: {e}"));
 
-        let prefixed = format!("arc:{name}");
+        let prefixed = format!("chio:{name}");
         load_builtin(&prefixed)
             .unwrap_or_else(|e| panic!("load_builtin({prefixed:?}) should succeed: {e}"));
 

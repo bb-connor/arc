@@ -312,7 +312,7 @@ impl ProtectProxy {
             })?;
 
         info!(
-            "arc api protect: proxying {} routes to {} on {}",
+            "chio api protect: proxying {} routes to {} on {}",
             route_count, self.config.upstream, self.config.listen_addr
         );
 
@@ -650,7 +650,7 @@ async fn sidecar_evaluate_handler(
 
     let result = match state
         .evaluator
-        .evaluate_arc_request(chio_request, presented_capability.as_deref())
+        .evaluate_chio_request(chio_request, presented_capability.as_deref())
     {
         Ok(result) => result,
         Err(error) => {
@@ -2243,7 +2243,7 @@ paths:
     }
 
     #[test]
-    fn x_arc_side_effects_true_overrides_safe_method() {
+    fn x_chio_side_effects_true_overrides_safe_method() {
         let spec = r#"
 openapi: 3.1.0
 info:
@@ -2269,7 +2269,7 @@ paths:
     }
 
     #[test]
-    fn x_arc_side_effects_false_overrides_mutating_method() {
+    fn x_chio_side_effects_false_overrides_mutating_method() {
         let spec = r#"
 openapi: 3.1.0
 info:
@@ -2295,7 +2295,7 @@ paths:
     }
 
     #[test]
-    fn x_arc_approval_required_forces_deny() {
+    fn x_chio_approval_required_forces_deny() {
         let spec = r#"
 openapi: 3.1.0
 info:
@@ -2322,7 +2322,7 @@ paths:
     }
 
     #[test]
-    fn forwarded_query_string_strips_arc_capability() {
+    fn forwarded_query_string_strips_chio_capability() {
         let token = signed_capability_token_json(&Keypair::generate(), "cap-query");
         let query = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("source", "test")

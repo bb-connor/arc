@@ -105,6 +105,5 @@ Attach `proof` to the `ToolCallRequest.dpop_proof` field before sending.
 ## Generating Proofs (TypeScript SDK)
 
 See `docs/SDK_TYPESCRIPT_REFERENCE.md` for the `signDpopProof` function. The
-TypeScript implementation now emits the Chio-primary schema identifier while
-remaining interoperable with verifiers that still accept legacy `arc.*`
-proofs.
+TypeScript implementation emits Chio schema identifiers. Verifiers reject legacy
+legacy pre-Chio proof schemas instead of treating them as aliases.

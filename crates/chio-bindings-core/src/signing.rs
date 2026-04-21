@@ -88,15 +88,15 @@ mod tests {
 
     #[test]
     fn sign_and_verify_utf8_message() {
-        let signed = sign_utf8_message_ed25519("hello arc", &"09".repeat(32)).unwrap();
+        let signed = sign_utf8_message_ed25519("hello chio", &"09".repeat(32)).unwrap();
         assert!(verify_utf8_message_ed25519(
-            "hello arc",
+            "hello chio",
             &signed.public_key_hex,
             &signed.signature_hex,
         )
         .unwrap());
         assert!(!verify_utf8_message_ed25519(
-            "hello arc!",
+            "hello chio!",
             &signed.public_key_hex,
             &signed.signature_hex,
         )

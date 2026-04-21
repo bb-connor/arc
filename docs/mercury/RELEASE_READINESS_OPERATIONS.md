@@ -77,8 +77,8 @@ Recovery posture:
 This runbook does not authorize:
 
 - multiple partner-delivery surfaces
-- a generic ARC release console
-- a merged Mercury and ARC-Wall release shell
+- a generic Chio release console
+- a merged Mercury and Chio-Wall release shell
 - new Mercury product-line claims
 - multi-product packaging unification
 

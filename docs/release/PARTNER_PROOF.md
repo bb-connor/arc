@@ -183,7 +183,7 @@ target-chain factory, and rollout environment explicitly.
 - `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`
 - `cargo test -p chio-cli --test receipt_query test_authorization_context_report_and_cli -- --exact --nocapture`
 - `cargo test -p chio-cli --test receipt_query test_authorization_metadata_and_review_pack_surfaces -- --exact --nocapture`
-- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_invalid_arc_oauth_profile_projection -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_invalid_chio_oauth_profile_projection -- --exact --nocapture`
 - `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_missing_sender_binding_material -- --exact --nocapture`
 - `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_incomplete_runtime_assurance_projection -- --exact --nocapture`
 - `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_invalid_delegated_call_chain_projection -- --exact --nocapture`

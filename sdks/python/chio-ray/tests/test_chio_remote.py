@@ -44,13 +44,13 @@ def _scope_for_tools(*tool_names: str, server_id: str = "srv") -> ChioScope:
 
 class TestAllowPath:
     def test_sync_remote_runs_under_allow_verdict(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_remote(
             scope="tools:search",
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def search(query: str) -> list[str]:
             return [f"hit:{query}"]
@@ -59,7 +59,7 @@ class TestAllowPath:
         assert ray.get(ref) == ["hit:hello"]
 
         # One evaluation recorded on the mock client.
-        eval_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        eval_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(eval_calls) == 1
         assert eval_calls[0].tool_name == "search"
         assert eval_calls[0].capability_id == "cap-1"
@@ -72,13 +72,13 @@ class TestAllowPath:
         }
 
     def test_async_remote_runs_under_allow_verdict(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_remote(
             scope="tools:search",
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         async def search(query: str) -> list[str]:
             return [f"async:{query}"]
@@ -87,13 +87,13 @@ class TestAllowPath:
         assert ray.get(ref) == ["async:hi"]
 
     def test_decorator_metadata_preserved(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_remote(
             scope="tools:search",
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
             tool_name="custom_search",
         )
         def search(query: str) -> str:
@@ -114,7 +114,7 @@ class TestAllowPath:
 
 class TestDenyPath:
     def test_deny_raises_permission_error_via_ray_get(self) -> None:
-        arc = deny_all(reason="out of scope", guard="ScopeGuard")
+        chio = deny_all(reason="out of scope", guard="ScopeGuard")
 
         def _body(q: str) -> str:
             pytest.fail("body must not run on deny")
@@ -124,7 +124,7 @@ class TestDenyPath:
             scope="tools:search",
             capability_id="cap-x",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )(_body)
 
         ref = decorated.remote("hello")
@@ -139,7 +139,7 @@ class TestDenyPath:
 
     def test_deny_from_receipt_path_raises_permission_error(self) -> None:
         """``raise_on_deny=False`` -- the sidecar returns a deny receipt."""
-        arc = deny_all(
+        chio = deny_all(
             reason="not allowed",
             guard="ScopeGuard",
             raise_on_deny=False,
@@ -149,7 +149,7 @@ class TestDenyPath:
             scope="tools:search",
             capability_id="cap-x",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def search(q: str) -> str:
             pytest.fail("body must not run on deny")
@@ -165,7 +165,7 @@ class TestDenyPath:
         assert inner.reason == "not allowed"
 
     def test_missing_capability_id_is_config_error(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         with pytest.raises(ChioRayConfigError):
 
@@ -173,7 +173,7 @@ class TestDenyPath:
                 scope="tools:search",
                 capability_id="",
                 tool_server="srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             def search(q: str) -> str:
                 return q
@@ -186,7 +186,7 @@ class TestDenyPath:
 
 class TestScopeAwarePolicy:
     def test_policy_allows_in_scope_denies_out_of_scope(self) -> None:
-        arc = MockChioClient()
+        chio = MockChioClient()
         # Policy: allow anything whose ``tool_name`` matches the
         # capability ``cap-search``'s authorised tools, deny otherwise.
         allowed_tools = {"cap-search": {"search", "browse"}}
@@ -205,13 +205,13 @@ class TestScopeAwarePolicy:
                 guard="ScopeGuard",
             )
 
-        arc.set_policy(policy)
+        chio.set_policy(policy)
 
         @chio_remote(
             scope="tools:search",
             capability_id="cap-search",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def search(q: str) -> str:
             return f"result:{q}"
@@ -220,7 +220,7 @@ class TestScopeAwarePolicy:
             scope="tools:write",
             capability_id="cap-search",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write(path: str) -> str:
             pytest.fail("write must not run for cap-search")

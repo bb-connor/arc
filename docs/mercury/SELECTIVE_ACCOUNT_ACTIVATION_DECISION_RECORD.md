@@ -34,8 +34,8 @@ Proceed with one bounded Mercury selective-account-activation lane only.
 - a generic onboarding suite, CRM workflow, channel marketplace, or
   commercial console
 - partner marketplaces or multi-segment activation programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury product-family or universal rollout claims
 
 ---
@@ -44,6 +44,6 @@ Proceed with one bounded Mercury selective-account-activation lane only.
 
 The selective-account-activation lane now packages one controlled delivery
 path over the existing Mercury evidence stack without pulling product logic
-back into ARC or broadening Mercury into a generic onboarding platform,
+back into Chio or broadening Mercury into a generic onboarding platform,
 channel system, merged shell, or new product line. The milestone therefore
 closes with one explicit proceed decision and one narrow boundary.

@@ -1,7 +1,7 @@
 //! Example guard: enriched field inspection + host functions.
 //!
 //! Demonstrates GEXM-02 (reading action_type and extracted_path)
-//! and GEXM-03 (calling arc::log and arc::get_config host functions).
+//! and GEXM-03 (calling chio::log and chio::get_config host functions).
 //!
 //! Policy: blocks file_write actions to /etc (or a configurable
 //! blocked_path from guard config). Allows everything else.

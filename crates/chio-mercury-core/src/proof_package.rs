@@ -368,7 +368,7 @@ impl MercuryProofPackage {
         verified_at: u64,
     ) -> Result<MercuryVerificationReport, MercuryContractError> {
         self.validate()?;
-        verify_arc_bundle(
+        verify_chio_bundle(
             &self.chio_bundle,
             &self.publication_profile,
             self.checkpoint_transparency.as_ref(),
@@ -544,7 +544,7 @@ pub struct MercuryVerificationReport {
     pub steps: Vec<MercuryVerificationStep>,
 }
 
-fn verify_arc_bundle(
+fn verify_chio_bundle(
     bundle: &EvidenceExportBundle,
     publication_profile: &MercuryPublicationProfile,
     checkpoint_transparency: Option<&CheckpointTransparencySummary>,

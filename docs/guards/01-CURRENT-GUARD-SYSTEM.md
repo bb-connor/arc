@@ -522,7 +522,7 @@ Cross-capability rate limiting keyed by agent identity and session.
 **File:** `crates/chio-guards/src/data_flow.rs`
 
 Enforces cumulative bytes-read/written limits via session journal.
-Requires an `Arc<SessionJournal>`.
+Requires an `Chio<SessionJournal>`.
 
 - Configurable max bytes read, written, and total.
 - Fails closed if journal is unavailable.

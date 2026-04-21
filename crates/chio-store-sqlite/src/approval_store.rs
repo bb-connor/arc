@@ -86,9 +86,9 @@ impl SqliteApprovalStore {
                 created_at INTEGER NOT NULL,
                 payload TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_arc_hitl_pending_subject
+            CREATE INDEX IF NOT EXISTS idx_chio_hitl_pending_subject
                 ON chio_hitl_pending(subject_id);
-            CREATE INDEX IF NOT EXISTS idx_arc_hitl_pending_expires
+            CREATE INDEX IF NOT EXISTS idx_chio_hitl_pending_expires
                 ON chio_hitl_pending(expires_at);
 
             CREATE TABLE IF NOT EXISTS chio_hitl_resolved (
@@ -100,7 +100,7 @@ impl SqliteApprovalStore {
                 approver_hex TEXT NOT NULL,
                 token_id TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_arc_hitl_resolved_counts
+            CREATE INDEX IF NOT EXISTS idx_chio_hitl_resolved_counts
                 ON chio_hitl_resolved(subject_id, policy_id, outcome);
 
             CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (

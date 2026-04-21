@@ -40,9 +40,9 @@ Dagster Instance
 |                                                          |
 |  Definitions                                             |
 |  +---------------------------------------------------+  |
-|  |  @asset(resource_defs={"arc": chio_resource})       |  |
+|  |  @asset(resource_defs={"chio": chio_resource})       |  |
 |  |  def customer_embeddings(raw_data):                |  |
-|  |      arc.evaluate("tools:embed", scope="ml:embed") |  |
+|  |      chio.evaluate("tools:embed", scope="ml:embed") |  |
 |  |      return embed(raw_data)                        |  |
 |  +---------------------------------------------------+  |
 |                                                          |
@@ -110,9 +110,9 @@ def chio_asset(scope: str, guards: list[str] | None = None, budget: dict | None 
         @asset(**asset_kwargs)
         @functools.wraps(fn)
         def wrapper(context: AssetExecutionContext, **kwargs):
-            arc: ChioResource = context.resources.arc
+            chio: ChioResource = context.resources.chio
 
-            verdict = arc.evaluate(
+            verdict = chio.evaluate(
                 tool=fn.__name__,
                 scope=scope,
                 arguments={"asset": fn.__name__, "partition": context.partition_key if context.has_partition_key else None},
@@ -124,7 +124,7 @@ def chio_asset(scope: str, guards: list[str] | None = None, budget: dict | None 
 
             result = fn(context, **kwargs)
 
-            receipt = arc.record(verdict=verdict)
+            receipt = chio.record(verdict=verdict)
             context.log.info(f"Chio receipt: {receipt.receipt_id}")
 
             # Attach receipt as asset metadata
@@ -177,7 +177,7 @@ def query_database(context, query: str) -> dict:
 def transform_data(context, raw: dict) -> dict:
     return transform(raw)
 
-@job(resource_defs={"arc": ChioResource()})
+@job(resource_defs={"chio": ChioResource()})
 def analysis_job():
     raw = query_database()
     transform_data(raw)
@@ -213,13 +213,13 @@ from dagster import IOManager, io_manager
 class ChioGovernedIOManager(IOManager):
     """IO Manager that checks Chio data governance policy before writing."""
 
-    def __init__(self, inner: IOManager, arc: ChioResource):
+    def __init__(self, inner: IOManager, chio: ChioResource):
         self.inner = inner
-        self.arc = arc
+        self.chio = chio
 
     def handle_output(self, context, obj):
         # Check if this output is allowed to be written to this destination
-        verdict = self.arc.evaluate(
+        verdict = self.chio.evaluate(
             tool="io:write",
             scope=f"data:write:{context.asset_key.to_user_string()}",
             arguments={
@@ -235,7 +235,7 @@ class ChioGovernedIOManager(IOManager):
             )
 
         self.inner.handle_output(context, obj)
-        self.arc.record(verdict=verdict)
+        self.chio.record(verdict=verdict)
 
     def load_input(self, context):
         return self.inner.load_input(context)
@@ -267,7 +267,7 @@ sdks/python/chio-dagster/
     io_manager.py           # ChioGovernedIOManager
     metadata.py             # Receipt-to-metadata formatting
   tests/
-    test_arc_asset.py
+    test_chio_asset.py
     test_partition_scope.py
     test_io_manager.py
 ```

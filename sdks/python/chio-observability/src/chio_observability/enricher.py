@@ -250,21 +250,21 @@ class ReceiptEnricher:
         cost_metadata: dict[str, Any],
     ) -> list[str]:
         tags: list[str] = list(self._default_tags)
-        tags.append(f"arc.verdict:{receipt.decision.verdict}")
-        tags.append(f"arc.tool:{receipt.tool_name}")
-        tags.append(f"arc.server:{receipt.tool_server}")
+        tags.append(f"chio.verdict:{receipt.decision.verdict}")
+        tags.append(f"chio.tool:{receipt.tool_name}")
+        tags.append(f"chio.server:{receipt.tool_server}")
         if receipt.decision.guard:
-            tags.append(f"arc.guard:{receipt.decision.guard}")
+            tags.append(f"chio.guard:{receipt.decision.guard}")
         for evidence in receipt.evidence:
             # Guard evidence may list multiple guards; add each as a tag.
             tags.append(
-                f"arc.evidence:{evidence.guard_name}:"
+                f"chio.evidence:{evidence.guard_name}:"
                 f"{'allow' if evidence.verdict else 'deny'}"
             )
         currency = cost_metadata.get("currency")
         units = cost_metadata.get("units")
         if currency is not None and units is not None:
-            tags.append(f"arc.cost:{units}{currency}")
+            tags.append(f"chio.cost:{units}{currency}")
         # Deduplicate while preserving order.
         seen: set[str] = set()
         unique: list[str] = []
@@ -306,7 +306,7 @@ class ReceiptEnricher:
         for key, value in (receipt.metadata or {}).items():
             if key in ("trace", "cost"):
                 continue
-            metadata[f"arc.extra.{key}"] = value
+            metadata[f"chio.extra.{key}"] = value
         return metadata
 
     @staticmethod

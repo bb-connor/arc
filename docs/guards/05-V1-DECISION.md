@@ -153,7 +153,7 @@ hard-coded defaults, ignoring the HushSpec policy. The real bridge is
 
 **In scope:**
 
-- [ ] Shared `Arc<Engine>` across all WASM guards (currently one per guard)
+- [ ] Shared `Chio<Engine>` across all WASM guards (currently one per guard)
 - [ ] `WasmHostState` instead of `()` in Store (carries config + log buffer)
 - [ ] Host functions: `chio.log`, `chio.get_config`, `chio.get_time_unix_secs`
 - [ ] `chio_alloc` support (check for export, use it, fall back to offset 0)
@@ -161,7 +161,7 @@ hard-coded defaults, ignoring the HushSpec policy. The real bridge is
 - [ ] Guard manifest format (`guard-manifest.yaml`) with SHA-256 verification
 - [ ] Enriched `GuardRequest` with host-extracted action context
 - [ ] Memory limit enforcement (`ResourceLimiter`)
-- [ ] Module import validation (reject non-`arc` imports)
+- [ ] Module import validation (reject non-`chio` imports)
 - [ ] Wiring: `chio-config` `wasm_guards` entries to kernel startup via
       `chio_policy::compiler` + `WasmGuardRuntime`
 - [ ] Fix: sort WASM guards by priority in startup code
@@ -175,7 +175,7 @@ hard-coded defaults, ignoring the HushSpec policy. The real bridge is
 - WIT / Component Model ABI (v2)
 - Guest-side Rust SDK / proc macro (v2 -- after ABI is stable)
 - Non-Rust guest SDKs (TypeScript, Python, Go) (v2)
-- CLI tooling (`arc guard new/build/test/pack`) (v2)
+- CLI tooling (`chio guard new/build/test/pack`) (v2)
 - Guard registry / marketplace / OCI distribution (v2+)
 - Persistent per-guard state across invocations (v2)
 - Async host functions / network access (v2)
@@ -210,7 +210,7 @@ revisit the per-call fresh-Store model (consider instance pooling).
 |------|--------|
 | `crates/chio-wasm-guards/src/abi.rs` | Add `action_type`, `extracted_path`, `extracted_target`, `filesystem_roots`, `matched_grant_index` to `GuardRequest`. Remove `session_metadata`. |
 | `crates/chio-wasm-guards/src/runtime.rs` | Update `build_request` to call `extract_action()` and populate new fields. Fix doc-comment on `WasmGuardRuntime` (does not sort). |
-| `crates/chio-wasm-guards/src/runtime.rs` | `WasmtimeBackend`: accept `Arc<Engine>`, add `WasmHostState`, register `arc.*` host functions, add `chio_alloc`/`chio_deny_reason` support, add `ResourceLimiter`. |
+| `crates/chio-wasm-guards/src/runtime.rs` | `WasmtimeBackend`: accept `Chio<Engine>`, add `WasmHostState`, register `chio.*` host functions, add `chio_alloc`/`chio_deny_reason` support, add `ResourceLimiter`. |
 | `crates/chio-wasm-guards/Cargo.toml` | Add dep on `chio-guards` (for `extract_action`). |
 | `crates/chio-config/src/schema.rs` | No change in v1. Add `config: HashMap` in v1.1. |
 | Startup code (proxy/CLI) | Wire `compile_policy()` + sorted WASM entries + advisory pipeline in correct order. |

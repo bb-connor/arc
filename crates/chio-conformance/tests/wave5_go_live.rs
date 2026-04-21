@@ -16,7 +16,7 @@ fn command_available(program: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn python3_supports_arc_sdk() -> bool {
+fn python3_supports_chio_sdk() -> bool {
     let Ok(output) = Command::new("python3")
         .arg("-c")
         .arg("import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')")
@@ -74,7 +74,7 @@ fn scenario_passed(results_json: &str, scenario_id: &str) -> bool {
 
 #[test]
 fn wave5_nested_flow_harness_runs_against_live_go_peer() {
-    if !command_available("go") || !python3_supports_arc_sdk() {
+    if !command_available("go") || !python3_supports_chio_sdk() {
         return;
     }
 

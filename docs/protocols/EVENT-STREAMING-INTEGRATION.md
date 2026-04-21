@@ -131,7 +131,7 @@ Kafka's exactly-once semantics allow atomic commit of offset + receipt:
 ```
 Kafka Transaction:
   1. consume(event, offset=42)
-  2. arc.evaluate(tool, scope) -> receipt_id
+  2. chio.evaluate(tool, scope) -> receipt_id
   3. process(event) -> result
   4. produce(result_event, headers={"X-Chio-Receipt": receipt_id})
   5. commit(offset=42)  // atomic with produce
@@ -234,7 +234,7 @@ async def handle_order(event, ctx):
     order = json.loads(event.value())
 
     # Tool call -- separately Chio-evaluated
-    inventory = await ctx.arc.invoke(
+    inventory = await ctx.chio.invoke(
         tool="check-inventory",
         scope="tools:inventory:read",
         arguments={"sku": order["sku"]},
@@ -601,14 +601,14 @@ view. Any receipt can be traced forward and backward through the chain.
 
 ```python
 # Querying the choreography chain
-arc receipt chain rcpt_001 --direction forward
+chio receipt chain rcpt_001 --direction forward
 # rcpt_001 (order.placed produced by order-service)
 #   -> rcpt_002 (order.placed consumed by payment-service)
 #     -> rcpt_003 (charge_payment tool call)
 #       -> rcpt_004 (payment.charged produced by payment-service)
 #         -> rcpt_005 (payment.charged consumed by order-service)
 
-arc receipt chain rcpt_005 --direction backward
+chio receipt chain rcpt_005 --direction backward
 # Traces back to the original order.placed event
 ```
 

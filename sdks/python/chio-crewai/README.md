@@ -79,13 +79,13 @@ task = Task(
 
 
 async def main() -> None:
-    async with ChioClient("http://127.0.0.1:9090") as arc:
+    async with ChioClient("http://127.0.0.1:9090") as chio:
         crew = ChioCrew(
             capability_scope={
                 "researcher": ChioScope(grants=[search_grant()]),
                 "writer": ChioScope(grants=[write_grant()]),
             },
-            chio_client=arc,
+            chio_client=chio,
             agents=[researcher, writer],
             tasks=[task],
         )

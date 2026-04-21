@@ -314,7 +314,7 @@ of manifests.
 | A2A | `GET /.well-known/agent-card.json` | `chio-a2a-edge` |
 | ACP | `initialize` response | `chio-acp-edge` |
 
-An optional unified `GET /arc/discover` endpoint (outside the edge crates)
+An optional unified `GET /chio/discover` endpoint (outside the edge crates)
 can aggregate all surfaces into a single JSON response listing each tool
 and its MCP, A2A, and ACP endpoints.
 
@@ -336,7 +336,7 @@ ACP Editor <--stdio-->      chio-acp-edge --+              +-- chio-acp-proxy   
 Request flow (same pattern for all three edges):
 
 ```
-Protocol Client          arc-*-edge               Chio Kernel           Tool Server
+Protocol Client          chio-*-edge               Chio Kernel           Tool Server
     |                        |                        |                     |
     |-- protocol request --->|                        |                     |
     |                        |-- resolve binding      |                     |

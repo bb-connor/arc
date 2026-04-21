@@ -22,7 +22,7 @@ The supported claim is narrow:
 ## Generation Command
 
 ```bash
-cargo run -p arc-mercury -- second-portfolio-program validate --output target/mercury-second-portfolio-program-validation
+cargo run -p chio-mercury -- second-portfolio-program validate --output target/mercury-second-portfolio-program-validation
 ```
 
 ---
@@ -53,7 +53,7 @@ Proceed only if all of the following are true:
 - one review surface only: `portfolio_reuse_bundle`
 - one Mercury-owned approval and revenue-boundary-guardrails path only
 - no implication of generic portfolio management, account management, customer
-  success, revenue operations, forecasting, billing, channel tooling, or ARC
+  success, revenue operations, forecasting, billing, channel tooling, or Chio
   commercial behavior
 
 Anything broader requires a new milestone.

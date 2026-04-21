@@ -8,7 +8,7 @@ client. Each receipt becomes one run with:
 * ``run_type`` = ``"tool"``
 * ``inputs`` = ``receipt.action.parameters`` (optionally truncated)
 * ``outputs`` = ``{decision, evidence, result?}``
-* ``tags`` = ``[arc.verdict:*, arc.tool:*, arc.guard:*, arc.cost:*]``
+* ``tags`` = ``[chio.verdict:*, chio.tool:*, chio.guard:*, chio.cost:*]``
 * ``extra.metadata`` = capability id, receipt id, policy hash, cost,
   guard evidence (via :class:`chio_observability.enricher.ReceiptEnricher`).
 

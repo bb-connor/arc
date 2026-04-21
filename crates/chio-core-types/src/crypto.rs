@@ -889,7 +889,7 @@ mod tests {
     #[test]
     fn sign_and_verify() {
         let kp = Keypair::generate();
-        let msg = b"hello arc";
+        let msg = b"hello chio";
         let sig = kp.sign(msg);
         assert!(kp.public_key().verify(msg, &sig));
     }
@@ -897,7 +897,7 @@ mod tests {
     #[test]
     fn wrong_message_fails() {
         let kp = Keypair::generate();
-        let sig = kp.sign(b"hello arc");
+        let sig = kp.sign(b"hello chio");
         assert!(!kp.public_key().verify(b"wrong", &sig));
     }
 
@@ -905,8 +905,8 @@ mod tests {
     fn wrong_key_fails() {
         let kp1 = Keypair::generate();
         let kp2 = Keypair::generate();
-        let sig = kp1.sign(b"hello arc");
-        assert!(!kp2.public_key().verify(b"hello arc", &sig));
+        let sig = kp1.sign(b"hello chio");
+        assert!(!kp2.public_key().verify(b"hello chio", &sig));
     }
 
     #[test]
@@ -1000,7 +1000,7 @@ mod tests {
     fn ed25519_backend_round_trip() {
         let backend = Ed25519Backend::generate();
         assert_eq!(backend.algorithm(), SigningAlgorithm::Ed25519);
-        let msg = b"hello arc";
+        let msg = b"hello chio";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
         assert!(backend.public_key().verify(msg, &sig));

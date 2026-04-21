@@ -83,14 +83,14 @@ Not supported in `v2.46`:
 Export the bounded governance-workbench package:
 
 ```bash
-cargo run -p arc-mercury -- governance-workbench export --output target/mercury-governance-workbench-export
+cargo run -p chio-mercury -- governance-workbench export --output target/mercury-governance-workbench-export
 ```
 
 Generate the validation package and explicit next-step decision:
 
 ```bash
-cargo run -p arc-mercury -- governance-workbench validate --output target/mercury-governance-workbench-validation
+cargo run -p chio-mercury -- governance-workbench validate --output target/mercury-governance-workbench-validation
 ```
 
-These commands must remain wrappers over the existing ARC evidence export plus
+These commands must remain wrappers over the existing Chio evidence export plus
 MERCURY proof, inquiry, reviewer, and supervised-live qualification artifacts.

@@ -35,8 +35,8 @@ Proceed with one bounded Mercury delivery-continuity lane only.
 - a generic onboarding suite, CRM workflow, support desk, or commercial
   console
 - channel marketplaces or multi-account continuity programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury customer-platform or universal renewal claims
 
 ---
@@ -45,6 +45,6 @@ Proceed with one bounded Mercury delivery-continuity lane only.
 
 The delivery-continuity lane now packages one bounded outcome-evidence path
 and one renewal gate over the existing Mercury evidence stack without pulling
-product logic back into ARC or broadening Mercury into a generic onboarding,
+product logic back into Chio or broadening Mercury into a generic onboarding,
 support, or customer platform. The milestone therefore closes with one
 explicit proceed decision and one narrow boundary.

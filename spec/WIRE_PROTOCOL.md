@@ -280,14 +280,14 @@ Hosted MCP negotiation rules:
   versions are rejected rather than silently downgraded.
 - On success, the selected version is echoed in `result.protocolVersion` and
   exposed again under
-  `result.capabilities.experimental.arcProtocol.selectedProtocolVersion`.
+  `result.capabilities.experimental.chioProtocol.selectedProtocolVersion`.
 - On failure, initialize is rejected with JSON-RPC `-32600` plus a structured
-  Chio protocol error descriptor in `error.data.arcError`.
+  Chio protocol error descriptor in `error.data.chioError`.
 
 ### 3.5 Model Metadata Admission
 
 - Hosted `tools/call` requests **MAY** carry model metadata under either
-  `_meta.modelMetadata` or `_meta.arcModelMetadata`.
+  `_meta.modelMetadata` or `_meta.chioModelMetadata`.
 - The hosted edge normalizes that payload into Chio request `model_metadata`.
 - Caller-supplied metadata **MUST** be treated as `asserted` provenance at
   admission time even if the caller marks it `verified`.
@@ -439,7 +439,7 @@ Surface mapping rules:
   `capability_revoked`, `guard_denied`, `tool_server_error`, and
   `internal_error`.
 - Hosted MCP initialize-time protocol rejection communicates the numeric Chio
-  protocol code under JSON-RPC `error.data.arcError.code`.
+  protocol code under JSON-RPC `error.data.chioError.code`.
 - Trust-control remains HTTP-status-driven, but registry codes define the
   stable cross-surface classification and retry semantics for future
   conformance and SDK work.

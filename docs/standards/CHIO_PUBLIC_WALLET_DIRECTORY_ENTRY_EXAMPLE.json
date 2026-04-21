@@ -34,9 +34,9 @@
     "kind": "public_identity_profile",
     "schema": "chio.public-identity-profile.v1",
     "artifactId": "pip-1",
-    "operatorId": "arc",
+    "operatorId": "chio",
     "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "uri": "https://arc.dev/standards/public-identity-profile"
+    "uri": "https://chio.dev/standards/public-identity-profile"
   },
   "metadataUrl": "https://wallet.example/.well-known/openid-credential-wallet",
   "requestUriPrefix": "https://wallet.example/wallet-exchanges/",

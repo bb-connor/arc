@@ -36,8 +36,8 @@ Proceed with one bounded Mercury second-account-expansion lane only.
 - a generic customer-success suite, CRM workflow, account-management
   platform, revenue operations system, or commercial console
 - multi-account portfolio programs or channel marketplaces
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury portfolio-management or universal expansion claims
 
 ---
@@ -47,6 +47,6 @@ Proceed with one bounded Mercury second-account-expansion lane only.
 The second-account-expansion lane now packages one bounded portfolio-review
 path, one expansion approval, one reuse-governance artifact, and one explicit
 second-account handoff over the existing Mercury evidence stack without
-pulling product logic back into ARC or broadening Mercury into a generic
+pulling product logic back into Chio or broadening Mercury into a generic
 account-management, revenue operations, or commercial platform. The milestone
 therefore closes with one explicit proceed decision and one narrow boundary.

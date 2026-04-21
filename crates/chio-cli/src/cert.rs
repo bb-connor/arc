@@ -1,4 +1,4 @@
-// CLI handlers for `arc cert` commands.
+// CLI handlers for `chio cert` commands.
 
 use std::path::Path;
 
@@ -9,7 +9,7 @@ use chio_acp_proxy::{
 
 use crate::CliError;
 
-/// `arc cert generate` -- walk the receipt store for a session and produce
+/// `chio cert generate` -- walk the receipt store for a session and produce
 /// a signed compliance certificate.
 pub fn cmd_cert_generate(
     session_id: &str,
@@ -62,7 +62,7 @@ pub fn cmd_cert_generate(
     Ok(())
 }
 
-/// `arc cert verify` -- verify a compliance certificate.
+/// `chio cert verify` -- verify a compliance certificate.
 pub fn cmd_cert_verify(
     certificate_path: &Path,
     full: bool,
@@ -115,7 +115,7 @@ pub fn cmd_cert_verify(
     Ok(())
 }
 
-/// `arc cert inspect` -- display certificate contents.
+/// `chio cert inspect` -- display certificate contents.
 pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<(), CliError> {
     let cert_text = std::fs::read_to_string(certificate_path)
         .map_err(|e| CliError::Other(format!("failed to read certificate: {e}")))?;

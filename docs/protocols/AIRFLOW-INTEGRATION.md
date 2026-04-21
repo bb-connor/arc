@@ -96,9 +96,9 @@ class ChioOperator(BaseOperator):
         self.sidecar_url = sidecar_url
 
     def execute(self, context):
-        arc = ChioClient(base_url=self.sidecar_url)
+        chio = ChioClient(base_url=self.sidecar_url)
 
-        verdict = arc.evaluate_sync(
+        verdict = chio.evaluate_sync(
             tool=self.tool_name,
             scope=self.scope,
             arguments={
@@ -119,7 +119,7 @@ class ChioOperator(BaseOperator):
         result = self.inner_operator.execute(context)
 
         # Record receipt and push to XCom
-        receipt = arc.record_sync(verdict=verdict)
+        receipt = chio.record_sync(verdict=verdict)
         context["ti"].xcom_push(key="chio_receipt_id", value=receipt.receipt_id)
         context["ti"].xcom_push(key="chio_scope", value=self.scope)
 
@@ -200,9 +200,9 @@ def chio_task(scope: str, guards: list[str] | None = None, budget: dict | None =
         @airflow_task(task_id=fn.__name__)
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            arc = ChioClient()
+            chio = ChioClient()
 
-            verdict = arc.evaluate_sync(
+            verdict = chio.evaluate_sync(
                 tool=fn.__name__,
                 scope=scope,
                 guards=guards,
@@ -214,7 +214,7 @@ def chio_task(scope: str, guards: list[str] | None = None, budget: dict | None =
 
             result = fn(*args, **kwargs)
 
-            receipt = arc.record_sync(verdict=verdict)
+            receipt = chio.record_sync(verdict=verdict)
             # Push receipt to XCom via return metadata
             return result
 
@@ -237,8 +237,8 @@ class ChioDagListener:
 
     @hookimpl
     def on_dag_run_running(self, dag_run, msg):
-        arc = ChioClient()
-        verdict = arc.evaluate_sync(
+        chio = ChioClient()
+        verdict = chio.evaluate_sync(
             tool=f"dag:{dag_run.dag_id}",
             scope="automation:dag-run",
             arguments={
@@ -284,7 +284,7 @@ these into a workflow receipt:
 @chio_task(scope="receipts:aggregate")
 def aggregate_receipts(**context):
     """Collect all Chio receipts from the DAG run into a workflow receipt."""
-    arc = ChioClient()
+    chio = ChioClient()
     ti = context["ti"]
 
     # Pull receipt IDs from all upstream tasks
@@ -295,7 +295,7 @@ def aggregate_receipts(**context):
             receipt_ids.append(rid)
 
     if receipt_ids:
-        workflow_receipt = arc.finalize_workflow_sync(
+        workflow_receipt = chio.finalize_workflow_sync(
             step_receipt_ids=receipt_ids,
             workflow_id=context["run_id"],
         )
@@ -311,7 +311,7 @@ from airflow.hooks.base import BaseHook
 class ChioHook(BaseHook):
     conn_name_attr = "chio_conn_id"
     default_conn_name = "chio_default"
-    conn_type = "arc"
+    conn_type = "chio"
     hook_name = "Chio Protocol"
 
     def __init__(self, chio_conn_id: str = default_conn_name):
@@ -335,7 +335,7 @@ sdks/python/chio-airflow/
     hooks.py                # ChioHook (connection type)
     listeners.py            # ChioDagListener (DAG-level grants)
   tests/
-    test_arc_operator.py
+    test_chio_operator.py
     test_taskflow.py
     test_dag_listener.py
 ```

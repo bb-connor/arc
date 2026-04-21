@@ -26,7 +26,7 @@ use chio_core::receipt::{
 use chio_core::session::{ChioIdentityAssertion, EnterpriseIdentityContext, OperationTerminalState};
 use chio_core::{canonical_json_bytes, sha256_hex, Signature};
 use chio_credentials::{
-    build_arc_passport_jwt_vc_json_type_metadata, build_arc_passport_sd_jwt_type_metadata,
+    build_chio_passport_jwt_vc_json_type_metadata, build_chio_passport_sd_jwt_type_metadata,
     build_oid4vp_request_transport, build_portable_jwks, build_portable_negative_event_artifact,
     build_portable_reputation_summary_artifact, build_wallet_exchange_descriptor_for_oid4vp,
     create_passport_presentation_challenge_with_reference,
@@ -34,7 +34,7 @@ use chio_credentials::{
     create_signed_public_verifier_discovery,
     default_oid4vci_passport_issuer_metadata_with_signing_key,
     ensure_signed_passport_verifier_policy_active, evaluate_portable_reputation,
-    inspect_arc_passport_sd_jwt_vc_unverified, inspect_oid4vp_direct_post_response,
+    inspect_chio_passport_sd_jwt_vc_unverified, inspect_oid4vp_direct_post_response,
     verify_oid4vp_direct_post_response_with_any_issuer_key,
     verify_passport_presentation_response_with_policy,
     verify_signed_oid4vp_request_object_with_any_key, verify_signed_passport_verifier_policy,
@@ -246,7 +246,7 @@ use crate::{
     },
     reputation, rotate_authority_keypair,
     scim_lifecycle::{
-        build_scim_error, build_scim_user_record, ensure_scim_provider, required_arc_extension,
+        build_scim_error, build_scim_user_record, ensure_scim_provider, required_chio_extension,
         ScimLifecycleRegistry, ScimUserResource,
     },
     CliError,

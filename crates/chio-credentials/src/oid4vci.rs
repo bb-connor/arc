@@ -737,10 +737,10 @@ impl Oid4vciCredentialResponse {
                 })?;
                 let verification = if self.format == CHIO_PASSPORT_SD_JWT_VC_FORMAT {
                     let verification =
-                        verify_arc_passport_sd_jwt_vc(compact, &issuer_jwk.to_public_key()?, now)?;
+                        verify_chio_passport_sd_jwt_vc(compact, &issuer_jwk.to_public_key()?, now)?;
                     (verification.passport_id, verification.subject_did)
                 } else if self.format == CHIO_PASSPORT_JWT_VC_JSON_FORMAT {
-                    let verification = verify_arc_passport_jwt_vc_json(
+                    let verification = verify_chio_passport_jwt_vc_json(
                         compact,
                         &issuer_jwk.to_public_key()?,
                         now,

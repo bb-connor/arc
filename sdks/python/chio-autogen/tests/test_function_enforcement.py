@@ -101,11 +101,11 @@ class TestAllowVerdict:
             called.append(kwargs)
             return f"result={kwargs.get('q')}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             agent = _make_agent("researcher")
             registry = ChioFunctionRegistry(
                 agent=agent,
-                chio_client=arc,
+                chio_client=chio,
                 server_id="srv",
                 capability_id="cap-1",
             )
@@ -123,11 +123,11 @@ class TestAllowVerdict:
         async def do_search(**kwargs: Any) -> str:
             return f"async:{kwargs.get('q')}"
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             agent = _make_agent("researcher")
             registry = ChioFunctionRegistry(
                 agent=agent,
-                chio_client=arc,
+                chio_client=chio,
                 server_id="srv",
                 capability_id="cap-1",
             )
@@ -155,11 +155,11 @@ class TestDenyVerdict:
             pytest.fail("executor must not run on deny")
             return ""
 
-        async with deny_all(raise_on_deny=False) as arc:
+        async with deny_all(raise_on_deny=False) as chio:
             agent = _make_agent("writer")
             registry = ChioFunctionRegistry(
                 agent=agent,
-                chio_client=arc,
+                chio_client=chio,
                 server_id="srv",
                 capability_id="cap-x",
             )
@@ -178,11 +178,11 @@ class TestDenyVerdict:
         assert registry.last_receipt("write").is_denied  # type: ignore[union-attr]
 
     async def test_deny_via_raise_raises_chio_tool_error(self) -> None:
-        async with deny_all(reason="no write perms", guard="ScopeGuard") as arc:
+        async with deny_all(reason="no write perms", guard="ScopeGuard") as chio:
             agent = _make_agent("writer")
             registry = ChioFunctionRegistry(
                 agent=agent,
-                chio_client=arc,
+                chio_client=chio,
                 server_id="srv",
                 capability_id="cap-x",
             )
@@ -196,11 +196,11 @@ class TestDenyVerdict:
         assert "no write perms" in (err.reason or "")
 
     async def test_missing_capability_denies(self) -> None:
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             agent = _make_agent("researcher")
             registry = ChioFunctionRegistry(
                 agent=agent,
-                chio_client=arc,
+                chio_client=chio,
                 server_id="srv",
                 capability_id="",
             )
@@ -232,11 +232,11 @@ class TestDenyVerdict:
 
 class TestRoleScopedFunctions:
     async def test_researcher_cannot_write(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         researcher_token = await _mint_token(
-            arc,
+            chio,
             subject="agent:researcher",
             scope=_scope_for_tools("search", "browse"),
         )
@@ -244,7 +244,7 @@ class TestRoleScopedFunctions:
         agent = _make_agent("researcher")
         registry = ChioFunctionRegistry(
             agent=agent,
-            chio_client=arc,
+            chio_client=chio,
             server_id="srv",
             capability_id=researcher_token.id,
         )
@@ -258,11 +258,11 @@ class TestRoleScopedFunctions:
         assert "not in capability scope" in (exc_info.value.reason or "")
 
     async def test_writer_cannot_search(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
 
         writer_token = await _mint_token(
-            arc,
+            chio,
             subject="agent:writer",
             scope=_scope_for_tools("write", "format"),
         )
@@ -270,7 +270,7 @@ class TestRoleScopedFunctions:
         agent = _make_agent("writer")
         registry = ChioFunctionRegistry(
             agent=agent,
-            chio_client=arc,
+            chio_client=chio,
             server_id="srv",
             capability_id=writer_token.id,
         )
@@ -288,11 +288,11 @@ class TestRoleScopedFunctions:
 
 class TestDecoratorRegistration:
     async def test_as_decorator_uses_function_name_and_docstring(self) -> None:
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             agent = _make_agent("researcher")
             registry = ChioFunctionRegistry(
                 agent=agent,
-                chio_client=arc,
+                chio_client=chio,
                 server_id="srv",
                 capability_id="cap-1",
             )
@@ -314,22 +314,22 @@ class TestDecoratorRegistration:
 
 class TestCapabilityRebind:
     async def test_bind_capability_switches_token(self) -> None:
-        arc = MockChioClient()
-        arc.set_policy(_scope_aware_policy(arc))
+        chio = MockChioClient()
+        chio.set_policy(_scope_aware_policy(chio))
         broad = await _mint_token(
-            arc,
+            chio,
             subject="agent:lead",
             scope=_scope_for_tools("search", "write"),
         )
-        narrow = await arc.attenuate_capability(
+        narrow = await chio.attenuate_capability(
             broad, new_scope=_scope_for_tools("search")
         )
-        arc._tokens[narrow.id] = narrow  # type: ignore[attr-defined]
+        chio._tokens[narrow.id] = narrow  # type: ignore[attr-defined]
 
         agent = _make_agent("lead")
         registry = ChioFunctionRegistry(
             agent=agent,
-            chio_client=arc,
+            chio_client=chio,
             server_id="srv",
             capability_id=broad.id,
         )

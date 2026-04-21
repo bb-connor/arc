@@ -72,14 +72,14 @@ Not yet qualified:
 
 Primary bounded-ship evidence commands:
 
-- `./scripts/qualify-bounded-arc.sh`
+- `./scripts/qualify-bounded-chio.sh`
 - `./scripts/qualify-release.sh`
 - `./scripts/check-formal-proofs.sh`
 - `cargo test -p chio-formal-diff-tests`
 
 Primary bounded-ship machine-readable gate:
 
-- [CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json](../standards/CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json)
+- [CHIO_BOUNDED_QUALIFICATION_MATRIX.json](../standards/CHIO_BOUNDED_QUALIFICATION_MATRIX.json)
 
 Formal boundary artifacts:
 

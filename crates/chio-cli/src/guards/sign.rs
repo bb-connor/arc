@@ -1,4 +1,4 @@
-//! Implementation of `arc guard sign` and `arc guard verify`.
+//! Implementation of `chio guard sign` and `chio guard verify`.
 //!
 //! `sign` reads a `.wasm` file, loads an Ed25519 signing seed from a file,
 //! and writes a JSON `.wasm.sig` sidecar next to the WASM binary.
@@ -22,7 +22,7 @@ use sha2::{Digest, Sha256};
 
 use crate::CliError;
 
-/// `arc guard sign` -- sign a `.wasm` module and write a `.sig` sidecar.
+/// `chio guard sign` -- sign a `.wasm` module and write a `.sig` sidecar.
 ///
 /// - `wasm_path`: path to the `.wasm` binary.
 /// - `key_path`: path to a file containing a hex-encoded 32-byte Ed25519 seed.
@@ -70,7 +70,7 @@ pub fn cmd_guard_sign(
     Ok(())
 }
 
-/// `arc guard verify` -- verify the `.sig` sidecar for a `.wasm` module.
+/// `chio guard verify` -- verify the `.sig` sidecar for a `.wasm` module.
 ///
 /// Returns `Ok(())` (exit code 0) on success and `Err(CliError)` (exit code 1)
 /// on any failure: missing sidecar, hash mismatch, untrusted signer, or bad

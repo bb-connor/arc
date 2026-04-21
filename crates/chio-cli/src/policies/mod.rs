@@ -1,4 +1,4 @@
-//! Bundled policy presets for `arc mcp serve --preset <name>`.
+//! Bundled policy presets for `chio mcp serve --preset <name>`.
 //!
 //! Each preset is a YAML document embedded at compile time via
 //! [`include_str!`]. The string is materialized to a temp file when
@@ -76,7 +76,7 @@ impl McpPreset {
 /// RAII holder for a preset YAML materialized to disk.
 ///
 /// The policy file is removed when this value is dropped so long-lived
-/// `arc mcp serve` processes do not accumulate temp files. Callers
+/// `chio mcp serve` processes do not accumulate temp files. Callers
 /// keep the holder alive for the entire duration they need the
 /// `.path()` to remain valid.
 pub struct MaterializedPreset {

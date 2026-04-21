@@ -70,6 +70,6 @@ This runbook does not authorize:
 - multiple partner-specific delivery modes
 - broad client-library maintenance
 - trust-network witness or publication services
-- ARC-Wall companion-product operations
+- Chio-Wall companion-product operations
 
 Those remain separate milestones, not hidden responsibilities inside `v2.48`.

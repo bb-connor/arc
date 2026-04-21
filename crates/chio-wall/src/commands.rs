@@ -28,7 +28,7 @@ use serde::Serialize;
 const CHIO_WALL_WORKFLOW_ID: &str = "workflow-information-domain-barrier";
 const CHIO_WALL_WORKFLOW_BOUNDARY: &str =
     "Information-domain tool access evidence for one bounded barrier-control workflow.";
-const CHIO_WALL_DECISION: &str = "proceed_arc_wall_only";
+const CHIO_WALL_DECISION: &str = "proceed_chio_wall_only";
 const CHIO_WALL_CONTROL_OWNER: &str = "barrier-control-room";
 const CHIO_WALL_SUPPORT_OWNER: &str = "chio-wall-ops";
 const CHIO_WALL_POLICY_ID: &str = "chio.wall.research_execution_barrier.v1";
@@ -141,7 +141,7 @@ fn relative_display(root: &Path, path: &Path) -> Result<String, CliError> {
 
 fn chio_wall_doc_refs() -> ChioWallDocRefs {
     ChioWallDocRefs {
-        brief_file: "docs/mercury/ARC_WALL_BRIEF.md".to_string(),
+        brief_file: "docs/mercury/CHIO_WALL_BRIEF.md".to_string(),
         readme_file: "docs/chio-wall/README.md".to_string(),
         control_path_file: "docs/chio-wall/CONTROL_PATH.md".to_string(),
         operations_file: "docs/chio-wall/OPERATIONS.md".to_string(),
@@ -355,7 +355,7 @@ fn chio_wall_receipt(
     .map_err(CliError::from)
 }
 
-fn create_arc_wall_receipt_db(
+fn create_chio_wall_receipt_db(
     receipt_db_path: &Path,
     authorization_context: &ChioWallAuthorizationContext,
     guard_outcome: &ChioWallGuardOutcome,
@@ -375,7 +375,7 @@ fn create_arc_wall_receipt_db(
         &capability.body().id,
         &kernel,
     )?;
-    let seq = store.append_arc_receipt_returning_seq(&receipt)?;
+    let seq = store.append_chio_receipt_returning_seq(&receipt)?;
     let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
     let checkpoint = build_checkpoint(
         1,
@@ -391,7 +391,7 @@ fn create_arc_wall_receipt_db(
     Ok(())
 }
 
-fn write_arc_evidence_package(
+fn write_chio_evidence_package(
     output: &Path,
     authorization_context: &ChioWallAuthorizationContext,
     guard_outcome: &ChioWallGuardOutcome,
@@ -401,7 +401,7 @@ fn write_arc_evidence_package(
     let receipt_db_path = output.join(".chio-wall-receipts.sqlite3");
     let chio_evidence_dir = output.join("chio-evidence");
 
-    create_arc_wall_receipt_db(
+    create_chio_wall_receipt_db(
         &receipt_db_path,
         authorization_context,
         guard_outcome,
@@ -464,7 +464,7 @@ fn export_control_path(output: &Path) -> Result<ChioWallExportSummary, CliError>
     write_json_file(&guard_outcome_path, &guard_outcome)?;
     write_json_file(&denied_access_record_path, &denied_access_record)?;
 
-    write_arc_evidence_package(
+    write_chio_evidence_package(
         output,
         &authorization_context,
         &guard_outcome,
@@ -573,7 +573,7 @@ fn export_control_path(output: &Path) -> Result<ChioWallExportSummary, CliError>
     Ok(summary)
 }
 
-pub fn cmd_arc_wall_control_path_export(output: &Path, json: bool) -> Result<(), CliError> {
+pub fn cmd_chio_wall_control_path_export(output: &Path, json: bool) -> Result<(), CliError> {
     let summary = export_control_path(output)?;
     if json {
         println!("{}", serde_json::to_string_pretty(&summary)?);
@@ -602,7 +602,7 @@ pub fn cmd_arc_wall_control_path_export(output: &Path, json: bool) -> Result<(),
     Ok(())
 }
 
-pub fn cmd_arc_wall_control_path_validate(output: &Path, json: bool) -> Result<(), CliError> {
+pub fn cmd_chio_wall_control_path_validate(output: &Path, json: bool) -> Result<(), CliError> {
     ensure_empty_directory(output)?;
     let control_path_dir = output.join("control-path");
     let summary = export_control_path(&control_path_dir)?;
@@ -758,7 +758,7 @@ mod tests {
     fn validate_pipeline_emits_bounded_control_room_decision() {
         let output = unique_test_dir("chio-wall-validate-unit");
 
-        cmd_arc_wall_control_path_validate(&output, false).expect("validate pipeline succeeds");
+        cmd_chio_wall_control_path_validate(&output, false).expect("validate pipeline succeeds");
 
         let report: serde_json::Value =
             serde_json::from_slice(&fs::read(output.join("validation-report.json")).expect("read"))
@@ -792,7 +792,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chio_wall_denied_receipt_exports_through_arc_siem() {
+    async fn chio_wall_denied_receipt_exports_through_chio_siem() {
         let output = unique_test_dir("chio-wall-siem");
         fs::create_dir_all(&output).expect("create temp dir");
 
@@ -805,7 +805,7 @@ mod tests {
             build_denied_access_record(&authorization_context, &guard_outcome)
                 .expect("deny outcome should build record");
         let receipt_db_path = output.join("chio-wall-integration.sqlite3");
-        create_arc_wall_receipt_db(
+        create_chio_wall_receipt_db(
             &receipt_db_path,
             &authorization_context,
             &guard_outcome,

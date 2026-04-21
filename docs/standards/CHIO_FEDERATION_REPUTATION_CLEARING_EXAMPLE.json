@@ -3,7 +3,7 @@
   "clearingId": "frc-1",
   "generatedAt": 1743552180,
   "subjectKey": "subject-1",
-  "namespace": "registry.arc.example/liability",
+  "namespace": "registry.chio.example/liability",
   "participatingOperatorIds": [
     "origin-operator",
     "mirror-operator-a",
@@ -21,7 +21,7 @@
         "artifactId": "summary-origin-1",
         "operatorId": "origin-operator",
         "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
-        "uri": "https://origin-operator.arc.example/artifacts/summary-origin-1"
+        "uri": "https://origin-operator.chio.example/artifacts/summary-origin-1"
       },
       "subjectKey": "subject-1",
       "issuerOperatorId": "origin-operator",
@@ -39,7 +39,7 @@
         "artifactId": "summary-mirror-a-1",
         "operatorId": "mirror-operator-a",
         "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-        "uri": "https://mirror-operator-a.arc.example/artifacts/summary-mirror-a-1"
+        "uri": "https://mirror-operator-a.chio.example/artifacts/summary-mirror-a-1"
       },
       "subjectKey": "subject-1",
       "issuerOperatorId": "mirror-operator-a",
@@ -57,7 +57,7 @@
         "artifactId": "negative-indexer-a-1",
         "operatorId": "indexer-operator-a",
         "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-        "uri": "https://indexer-operator-a.arc.example/artifacts/negative-indexer-a-1"
+        "uri": "https://indexer-operator-a.chio.example/artifacts/negative-indexer-a-1"
       },
       "subjectKey": "subject-1",
       "issuerOperatorId": "indexer-operator-a",
@@ -75,7 +75,7 @@
         "artifactId": "negative-origin-1",
         "operatorId": "origin-operator",
         "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-        "uri": "https://origin-operator.arc.example/artifacts/negative-origin-1"
+        "uri": "https://origin-operator.chio.example/artifacts/negative-origin-1"
       },
       "subjectKey": "subject-1",
       "issuerOperatorId": "origin-operator",

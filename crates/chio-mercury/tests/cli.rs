@@ -126,7 +126,7 @@ fn mercury_proof_and_inquiry_packages_export_and_verify() {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
         let issuer = Keypair::generate();
         let seq = store
-            .append_arc_receipt_returning_seq(&mercury_receipt_with_ts(
+            .append_chio_receipt_returning_seq(&mercury_receipt_with_ts(
                 "rcpt-mercury-1",
                 "cap-mercury-proof",
                 100,

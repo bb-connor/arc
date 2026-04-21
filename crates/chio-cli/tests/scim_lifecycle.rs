@@ -240,7 +240,7 @@ fn scim_user_payload(provider_id: &str) -> Value {
         ],
         "entitlements": [
             {
-                "value": "arc:trust:issue"
+                "value": "chio:trust:issue"
             }
         ],
         CHIO_SCIM_USER_EXTENSION_SCHEMA: {
@@ -254,7 +254,7 @@ fn scim_user_payload(provider_id: &str) -> Value {
 }
 
 #[test]
-fn trust_service_scim_post_users_creates_arc_identity_with_attributes_and_entitlements() {
+fn trust_service_scim_post_users_creates_chio_identity_with_attributes_and_entitlements() {
     let dir = unique_dir("chio-cli-scim-create");
     fs::create_dir_all(&dir).expect("create temp dir");
     let providers_path = dir.join("enterprise-providers.json");
@@ -283,7 +283,7 @@ fn trust_service_scim_post_users_creates_arc_identity_with_attributes_and_entitl
     assert_eq!(body["userName"], "alice@example.com");
     assert_eq!(body["active"], true);
     assert_eq!(body["roles"][0]["value"], "operator");
-    assert_eq!(body["entitlements"][0]["value"], "arc:trust:issue");
+    assert_eq!(body["entitlements"][0]["value"], "chio:trust:issue");
     assert_eq!(
         body[CHIO_SCIM_USER_EXTENSION_SCHEMA]["providerId"],
         "scim-corp"
@@ -311,7 +311,7 @@ fn trust_service_scim_post_users_creates_arc_identity_with_attributes_and_entitl
         record.enterprise_identity.roles,
         vec!["operator".to_string()]
     );
-    assert_eq!(record.scim_user.entitlements[0].value, "arc:trust:issue");
+    assert_eq!(record.scim_user.entitlements[0].value, "chio:trust:issue");
 
     let health: Value = client
         .get(format!("{base_url}/health"))

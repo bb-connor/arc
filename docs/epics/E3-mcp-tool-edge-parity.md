@@ -115,7 +115,7 @@ Requirements:
 
 ### `T3.5` Add a user-facing MCP serve path
 
-- add `arc mcp serve`
+- add `chio mcp serve`
 - wrap an MCP server subprocess through the adapter and kernel
 - add an integration test that initializes, lists tools, and calls tools through the binary
 
@@ -142,7 +142,7 @@ Requirements:
 - `tools/list` returns paginated tool descriptors
 - `tools/call` flows through the kernel session path
 - denied tool calls return MCP tool errors instead of transport failures
-- a stock client can use `arc mcp serve` as a secured MCP proxy
+- a stock client can use `chio mcp serve` as a secured MCP proxy
 
 ## Definition of done
 

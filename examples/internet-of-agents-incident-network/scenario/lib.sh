@@ -78,7 +78,7 @@ start_live_topology() {
       --server-id "${sid}" --listen "127.0.0.1:${port}" \
       --auth-token "${CHIO_AUTH_TOKEN}" --shared-hosted-owner \
       -- python "${EXAMPLE_ROOT}/${script}" \
-      >"${LOG_DIR}/arc-${sid}.log" 2>&1 &
+      >"${LOG_DIR}/chio-${sid}.log" 2>&1 &
   done
 
   # Raw services

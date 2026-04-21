@@ -338,7 +338,7 @@ mod tests {
                 runtime_attestation: Some(RuntimeAttestationContext {
                     tier: RuntimeAssuranceTier::Basic,
                     valid: true,
-                    verifier: Some("verifier.arc".to_string()),
+                    verifier: Some("verifier.chio".to_string()),
                     workload_identity: None,
                 }),
             },
@@ -395,7 +395,7 @@ mod tests {
                 runtime_attestation: Some(RuntimeAttestationContext {
                     tier: RuntimeAssuranceTier::Verified,
                     valid: true,
-                    verifier: Some("verifier.arc".to_string()),
+                    verifier: Some("verifier.chio".to_string()),
                     workload_identity: None,
                 }),
             },
@@ -506,7 +506,7 @@ mod tests {
                     prefer_runtime_assurance_tier: None,
                     require_workload_identity: Some(WorkloadIdentityMatch {
                         scheme: Some(WorkloadIdentityScheme::Spiffe),
-                        trust_domain: Some("prod.arc".to_string()),
+                        trust_domain: Some("prod.chio".to_string()),
                         path_prefixes: vec!["/payments".to_string()],
                         credential_kinds: vec![WorkloadCredentialKind::X509Svid],
                     }),
@@ -530,12 +530,12 @@ mod tests {
                 runtime_attestation: Some(RuntimeAttestationContext {
                     tier: RuntimeAssuranceTier::Verified,
                     valid: true,
-                    verifier: Some("verifier.arc".to_string()),
+                    verifier: Some("verifier.chio".to_string()),
                     workload_identity: Some(WorkloadIdentity {
                         scheme: WorkloadIdentityScheme::Spiffe,
                         credential_kind: WorkloadCredentialKind::X509Svid,
                         uri: "spiffe://dev.chio/payments/worker".to_string(),
-                        trust_domain: "dev.arc".to_string(),
+                        trust_domain: "dev.chio".to_string(),
                         path: "/payments/worker".to_string(),
                     }),
                 }),
@@ -573,7 +573,7 @@ mod tests {
                     require_workload_identity: None,
                     prefer_workload_identity: Some(WorkloadIdentityMatch {
                         scheme: Some(WorkloadIdentityScheme::Spiffe),
-                        trust_domain: Some("prod.arc".to_string()),
+                        trust_domain: Some("prod.chio".to_string()),
                         path_prefixes: vec!["/payments".to_string()],
                         credential_kinds: Vec::new(),
                     }),
@@ -596,7 +596,7 @@ mod tests {
                 runtime_attestation: Some(RuntimeAttestationContext {
                     tier: RuntimeAssuranceTier::Verified,
                     valid: true,
-                    verifier: Some("verifier.arc".to_string()),
+                    verifier: Some("verifier.chio".to_string()),
                     workload_identity: None,
                 }),
             },

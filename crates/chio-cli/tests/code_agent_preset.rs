@@ -1,4 +1,4 @@
-//! Integration tests for the `arc mcp serve --preset code-agent` bundle.
+//! Integration tests for the `chio mcp serve --preset code-agent` bundle.
 //!
 //! The preset is the Rust-side counterpart to the `chio-code-agent`
 //! Python SDK and must:
@@ -60,7 +60,7 @@ fn preset_yaml_is_shipped_in_crate_source() {
 #[test]
 fn preset_yaml_matches_python_sdk() {
     // Regression guard: the Rust preset and the Python SDK's
-    // default_policy.yaml must remain byte-identical so `arc mcp
+    // default_policy.yaml must remain byte-identical so `chio mcp
     // serve --preset code-agent` evaluates the same rules as the
     // `chio-code-agent` Python package.
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -88,7 +88,7 @@ fn preset_yaml_matches_python_sdk() {
 
 #[test]
 fn mcp_serve_rejects_unknown_preset() {
-    // `arc mcp serve --preset nope` should fail fast with a clear
+    // `chio mcp serve --preset nope` should fail fast with a clear
     // error rather than launching and crashing partway through.
     let output = Command::new(chio_cli_binary())
         .args([
@@ -102,7 +102,7 @@ fn mcp_serve_rejects_unknown_preset() {
             "/bin/true",
         ])
         .output()
-        .expect("spawn arc");
+        .expect("spawn chio");
     assert!(
         !output.status.success(),
         "unknown preset unexpectedly succeeded"
@@ -121,7 +121,7 @@ fn mcp_serve_requires_policy_or_preset() {
     let output = Command::new(chio_cli_binary())
         .args(["mcp", "serve", "--server-id", "test", "--", "/bin/true"])
         .output()
-        .expect("spawn arc");
+        .expect("spawn chio");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -149,11 +149,11 @@ fn mcp_serve_rejects_policy_and_preset_together() {
             "/bin/true",
         ])
         .output()
-        .expect("spawn arc");
+        .expect("spawn chio");
     assert!(!output.status.success());
 }
 
-/// Helper: copy the bundled preset YAML to a tempfile so `arc check`
+/// Helper: copy the bundled preset YAML to a tempfile so `chio check`
 /// can load it.
 fn write_preset_to_temp() -> tempfile::NamedTempFile {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -169,13 +169,13 @@ fn write_preset_to_temp() -> tempfile::NamedTempFile {
 
 /// Roadmap 4.2 acceptance: the preset denies a `.env` write.
 ///
-/// We pipe the bundled YAML through `arc check` and assert the guard
+/// We pipe the bundled YAML through `chio check` and assert the guard
 /// pipeline returns DENY for an `fs/write_file` call whose path is
 /// `.env`. That proves the preset's forbidden_path guard is live and
-/// matches the wire-level behaviour `arc mcp serve --preset
+/// matches the wire-level behaviour `chio mcp serve --preset
 /// code-agent` would produce for the same call.
 #[test]
-fn preset_denies_dotenv_write_via_arc_check() {
+fn preset_denies_dotenv_write_via_chio_check() {
     let preset = write_preset_to_temp();
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
@@ -189,11 +189,11 @@ fn preset_denies_dotenv_write_via_arc_check() {
             "{\"path\":\"/workspace/project/.env\",\"content\":\"BAD=1\"}",
         ])
         .output()
-        .expect("spawn arc check");
+        .expect("spawn chio check");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // `arc check` exits with code 2 on deny.
+    // `chio check` exits with code 2 on deny.
     assert!(
         !output.status.success(),
         "expected DENY exit but stdout={stdout}\nstderr={stderr}"
@@ -212,7 +212,7 @@ fn preset_denies_dotenv_write_via_arc_check() {
 /// non-forbidden path should pass the guard pipeline even though the
 /// preset's shell_command and secret_patterns guards are enabled.
 #[test]
-fn preset_allows_safe_file_read_via_arc_check() {
+fn preset_allows_safe_file_read_via_chio_check() {
     let preset = write_preset_to_temp();
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
@@ -226,7 +226,7 @@ fn preset_allows_safe_file_read_via_arc_check() {
             "{\"path\":\"README.md\"}",
         ])
         .output()
-        .expect("spawn arc check");
+        .expect("spawn chio check");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);

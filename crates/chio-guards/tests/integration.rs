@@ -249,7 +249,7 @@ fn pipeline_all_allow_means_overall_allow() {
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
-// Regression: `arc check --tool filesystem --params '{"path": "/etc/shadow"}'`
+// Regression: `chio check --tool filesystem --params '{"path": "/etc/shadow"}'`
 // previously returned ALLOW because "filesystem" was not recognized as a file
 // tool, so the action fell through to McpTool and the ForbiddenPathGuard
 // did not fire.

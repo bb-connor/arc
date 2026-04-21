@@ -259,7 +259,7 @@ fn populate_mercury_receipt_store(
     let mut end_seq = None;
     for step in steps {
         let receipt = pilot_receipt(step, capability_id, &kernel_keypair)?;
-        let seq = store.append_arc_receipt_returning_seq(&receipt)?;
+        let seq = store.append_chio_receipt_returning_seq(&receipt)?;
         if start_seq.is_none() {
             start_seq = Some(seq);
         }

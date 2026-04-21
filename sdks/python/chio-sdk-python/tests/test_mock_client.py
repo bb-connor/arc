@@ -61,8 +61,8 @@ def test_top_level_chio_sdk_reexports_testing_symbols() -> None:
 
 
 async def test_allow_all_permits_every_tool_call() -> None:
-    async with allow_all() as arc:
-        receipt = await arc.evaluate_tool_call(
+    async with allow_all() as chio:
+        receipt = await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="read",
@@ -74,8 +74,8 @@ async def test_allow_all_permits_every_tool_call() -> None:
 
 
 async def test_allow_all_permits_http_request() -> None:
-    async with allow_all() as arc:
-        result = await arc.evaluate_http_request(
+    async with allow_all() as chio:
+        result = await chio.evaluate_http_request(
             request_id="req-1",
             method="GET",
             route_pattern="/pets/{petId}",
@@ -92,9 +92,9 @@ async def test_allow_all_permits_http_request() -> None:
 
 
 async def test_deny_all_raises_chio_denied_error() -> None:
-    arc = deny_all(reason="session is read-only", guard="ReadOnlyGuard")
+    chio = deny_all(reason="session is read-only", guard="ReadOnlyGuard")
     with pytest.raises(ChioDeniedError) as exc_info:
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
@@ -108,8 +108,8 @@ async def test_deny_all_raises_chio_denied_error() -> None:
 
 
 async def test_deny_all_returns_deny_receipt_when_not_raising() -> None:
-    arc = deny_all(raise_on_deny=False)
-    receipt = await arc.evaluate_tool_call(
+    chio = deny_all(raise_on_deny=False)
+    receipt = await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="write",
@@ -121,9 +121,9 @@ async def test_deny_all_returns_deny_receipt_when_not_raising() -> None:
 
 
 async def test_deny_all_blocks_http_request() -> None:
-    arc = deny_all(reason="nope", guard="HttpGuard")
+    chio = deny_all(reason="nope", guard="HttpGuard")
     with pytest.raises(ChioDeniedError) as exc_info:
-        await arc.evaluate_http_request(
+        await chio.evaluate_http_request(
             request_id="req-1",
             method="POST",
             route_pattern="/pets",
@@ -151,9 +151,9 @@ async def test_with_policy_callable_applies_allow_deny_rules() -> None:
             guard="TestGuard",
         )
 
-    arc = with_policy(policy)
+    chio = with_policy(policy)
 
-    allowed = await arc.evaluate_tool_call(
+    allowed = await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
@@ -162,7 +162,7 @@ async def test_with_policy_callable_applies_allow_deny_rules() -> None:
     assert allowed.is_allowed
 
     with pytest.raises(ChioDeniedError) as exc_info:
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
@@ -173,8 +173,8 @@ async def test_with_policy_callable_applies_allow_deny_rules() -> None:
 
 
 async def test_with_policy_callable_accepts_bool_shorthand() -> None:
-    arc = with_policy(lambda tool, _s, _c: tool == "ok")
-    allowed = await arc.evaluate_tool_call(
+    chio = with_policy(lambda tool, _s, _c: tool == "ok")
+    allowed = await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="ok",
@@ -182,7 +182,7 @@ async def test_with_policy_callable_accepts_bool_shorthand() -> None:
     )
     assert allowed.is_allowed
     with pytest.raises(ChioDeniedError):
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="nope",
@@ -196,8 +196,8 @@ async def test_with_policy_callable_accepts_bool_shorthand() -> None:
 
 
 async def test_with_policy_dict_default_deny() -> None:
-    arc = with_policy({"default": "deny", "allow": ["read", "list"]})
-    ok = await arc.evaluate_tool_call(
+    chio = with_policy({"default": "deny", "allow": ["read", "list"]})
+    ok = await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
@@ -206,7 +206,7 @@ async def test_with_policy_dict_default_deny() -> None:
     assert ok.is_allowed
 
     with pytest.raises(ChioDeniedError) as exc_info:
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
@@ -216,14 +216,14 @@ async def test_with_policy_dict_default_deny() -> None:
 
 
 async def test_with_policy_dict_deny_takes_precedence() -> None:
-    arc = with_policy(
+    chio = with_policy(
         {
             "default": "allow",
             "deny": {"write": "read-only session"},
         },
     )
     with pytest.raises(ChioDeniedError) as exc_info:
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
@@ -248,24 +248,24 @@ def test_with_policy_rejects_invalid_default() -> None:
 
 
 async def test_call_history_records_each_evaluation() -> None:
-    arc = allow_all()
-    await arc.evaluate_tool_call(
+    chio = allow_all()
+    await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
         parameters={"path": "/etc"},
     )
-    await arc.evaluate_tool_call(
+    await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="list",
         parameters={"prefix": "/etc"},
     )
 
-    assert len(arc.calls) == 2
-    assert [c.tool_name for c in arc.calls] == ["read", "list"]
+    assert len(chio.calls) == 2
+    assert [c.tool_name for c in chio.calls] == ["read", "list"]
 
-    read_calls = arc.calls_for("read")
+    read_calls = chio.calls_for("read")
     assert len(read_calls) == 1
     call = read_calls[0]
     assert call.method == "evaluate_tool_call"
@@ -277,16 +277,16 @@ async def test_call_history_records_each_evaluation() -> None:
 
 
 async def test_call_history_records_denies_too() -> None:
-    arc = deny_all(reason="no")
+    chio = deny_all(reason="no")
     with pytest.raises(ChioDeniedError):
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
             parameters={},
         )
-    assert len(arc.calls) == 1
-    recorded = arc.calls[0]
+    assert len(chio.calls) == 1
+    recorded = chio.calls[0]
     assert recorded.tool_name == "write"
     assert recorded.verdict is not None
     assert recorded.verdict.allow is False
@@ -294,11 +294,11 @@ async def test_call_history_records_denies_too() -> None:
 
 
 async def test_reset_clears_history() -> None:
-    arc = allow_all()
-    await arc.health()
-    assert arc.calls
-    arc.reset()
-    assert arc.calls == []
+    chio = allow_all()
+    await chio.health()
+    assert chio.calls
+    chio.reset()
+    assert chio.calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -307,15 +307,15 @@ async def test_reset_clears_history() -> None:
 
 
 async def test_lifecycle_tracks_closed_flag() -> None:
-    arc = allow_all()
-    assert not arc.closed
-    async with arc as ctx:
-        assert ctx is arc
-    assert arc.closed
+    chio = allow_all()
+    assert not chio.closed
+    async with chio as ctx:
+        assert ctx is chio
+    assert chio.closed
 
 
 async def test_create_and_validate_capability_round_trip() -> None:
-    arc = allow_all()
+    chio = allow_all()
     scope = ChioScope(
         grants=[
             ToolGrant(
@@ -325,13 +325,13 @@ async def test_create_and_validate_capability_round_trip() -> None:
             )
         ]
     )
-    token = await arc.create_capability(subject="bb", scope=scope)
+    token = await chio.create_capability(subject="bb", scope=scope)
     assert token.id.startswith("mock-tok-")
-    assert await arc.validate_capability(token) is True
+    assert await chio.validate_capability(token) is True
 
 
 async def test_attenuate_capability_rejects_superset() -> None:
-    arc = allow_all()
+    chio = allow_all()
     scope = ChioScope(
         grants=[
             ToolGrant(
@@ -341,7 +341,7 @@ async def test_attenuate_capability_rejects_superset() -> None:
             )
         ]
     )
-    token = await arc.create_capability(subject="bb", scope=scope)
+    token = await chio.create_capability(subject="bb", scope=scope)
     wider = ChioScope(
         grants=[
             ToolGrant(
@@ -352,12 +352,12 @@ async def test_attenuate_capability_rejects_superset() -> None:
         ]
     )
     with pytest.raises(ChioValidationError):
-        await arc.attenuate_capability(token, new_scope=wider)
+        await chio.attenuate_capability(token, new_scope=wider)
 
 
 async def test_set_policy_swaps_behaviour_midstream() -> None:
-    arc = MockChioClient()
-    first = await arc.evaluate_tool_call(
+    chio = MockChioClient()
+    first = await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
@@ -365,11 +365,11 @@ async def test_set_policy_swaps_behaviour_midstream() -> None:
     )
     assert first.is_allowed
 
-    arc.set_policy(
+    chio.set_policy(
         lambda _t, _s, _c: MockVerdict.deny_verdict("now denied")
     )
     with pytest.raises(ChioDeniedError) as exc_info:
-        await arc.evaluate_tool_call(
+        await chio.evaluate_tool_call(
             capability_id="cap-1",
             tool_server="srv",
             tool_name="read",
@@ -388,8 +388,8 @@ async def test_evidence_flows_through_to_receipt() -> None:
             allow=True, guard="MockGuard", evidence=evidence
         )
 
-    arc = with_policy(policy)
-    receipt = await arc.evaluate_tool_call(
+    chio = with_policy(policy)
+    receipt = await chio.evaluate_tool_call(
         capability_id="cap-1",
         tool_server="srv",
         tool_name="read",

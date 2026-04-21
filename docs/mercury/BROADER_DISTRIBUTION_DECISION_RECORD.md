@@ -34,8 +34,8 @@ Proceed with one bounded Mercury broader-distribution lane only.
 - a generic sales platform, CRM workflow, channel console, or commercial
   console
 - partner marketplaces or multi-segment account programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury product-family or universal rollout claims
 
 ---
@@ -44,6 +44,6 @@ Proceed with one bounded Mercury broader-distribution lane only.
 
 The broader-distribution lane now packages one governed selective account-
 qualification path over the existing Mercury evidence stack without pulling
-product logic back into ARC or broadening Mercury into a generic commercial
+product logic back into Chio or broadening Mercury into a generic commercial
 platform, channel console, merged shell, or new product line. The milestone
 therefore closes with one explicit proceed decision and one narrow boundary.

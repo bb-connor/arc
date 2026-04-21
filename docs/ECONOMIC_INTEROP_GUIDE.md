@@ -53,7 +53,7 @@ The hosted edge now uses the same profile at request time:
 IAM-facing authorization-context projection:
 
 ```bash
-arc --json --receipt-db receipts.sqlite3 \
+chio --json --receipt-db receipts.sqlite3 \
   trust authorization-context list \
   --capability cap-123 \
   --limit 20
@@ -82,7 +82,7 @@ curl -G "https://edge.example/oauth/authorize" \
 Machine-readable profile metadata for enterprise reviewers:
 
 ```bash
-arc --json --receipt-db receipts.sqlite3 \
+chio --json --receipt-db receipts.sqlite3 \
   trust authorization-context metadata
 ```
 
@@ -94,7 +94,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 Reviewer pack tying one governed flow back to signed receipt truth:
 
 ```bash
-arc --json --receipt-db receipts.sqlite3 \
+chio --json --receipt-db receipts.sqlite3 \
   trust authorization-context review-pack \
   --capability cap-123 \
   --limit 20
@@ -108,7 +108,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 Finance-facing metered reconciliation:
 
 ```bash
-arc --json --receipt-db receipts.sqlite3 \
+chio --json --receipt-db receipts.sqlite3 \
   trust behavioral-feed export \
   --capability cap-123 \
   --receipt-limit 20
@@ -224,7 +224,7 @@ represented truthfully.
       "type": "chio_governed_metered_billing",
       "meteredBilling": {
         "settlementMode": "allow_then_settle",
-        "provider": "billing.arc",
+        "provider": "billing.chio",
         "quoteId": "quote-auth-1",
         "billingUnit": "1k_tokens",
         "quotedUnits": 12,

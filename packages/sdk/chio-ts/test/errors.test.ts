@@ -18,7 +18,7 @@ import {
 
 // --- Existing invariant error tests ---
 
-test("invalid JSON surfaces a stable arc invariant error", () => {
+test("invalid JSON surfaces a stable chio invariant error", () => {
   assert.throws(
     () => canonicalizeJsonString("{"),
     (error: unknown) =>

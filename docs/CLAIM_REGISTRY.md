@@ -28,7 +28,7 @@ The source-of-truth inputs are:
 | `ASSUME-SIG-CHECK` | approved_with_scope | The bounded Lean revocation or evaluation model assumes a trusted capability-signature check oracle. | `audited_axiom` |
 
 That assumption is machine-readably enumerated as
-`Arc.Core.verifyCapabilitySignature` in `formal/theorem-inventory.json` and
+`Chio.Core.verifyCapabilitySignature` in `formal/theorem-inventory.json` and
 must remain allowlisted in `formal/proof-manifest.toml`.
 
 ## Approved Claims

@@ -47,7 +47,7 @@ pub struct ChioPassportJwtVcJsonVerification {
     pub passport_status: Option<Oid4vciChioPassportStatusReference>,
 }
 
-pub fn build_arc_passport_jwt_vc_json_type_metadata(
+pub fn build_chio_passport_jwt_vc_json_type_metadata(
     credential_issuer: &str,
 ) -> Result<ChioPassportJwtVcJsonTypeMetadata, CredentialError> {
     let credential_issuer = normalize_credential_issuer(credential_issuer)?;
@@ -70,7 +70,7 @@ pub fn build_arc_passport_jwt_vc_json_type_metadata(
     })
 }
 
-pub fn issue_arc_passport_jwt_vc_json(
+pub fn issue_chio_passport_jwt_vc_json(
     passport: &AgentPassport,
     credential_issuer: &str,
     issuer_keypair: &Keypair,
@@ -78,7 +78,7 @@ pub fn issue_arc_passport_jwt_vc_json(
     passport_status: Option<Oid4vciChioPassportStatusReference>,
 ) -> Result<ChioPassportJwtVcJsonEnvelope, CredentialError> {
     let credential_issuer = normalize_credential_issuer(credential_issuer)?;
-    let projection = build_arc_passport_portable_projection(passport, now)?;
+    let projection = build_chio_passport_portable_projection(passport, now)?;
     let subject_did = DidChio::from_str(&projection.subject_did).map_err(CredentialError::Did)?;
     let holder_jwk = PortableEd25519Jwk::from_public_key(subject_did.public_key());
     let holder_thumbprint = holder_jwk.thumbprint()?;
@@ -103,7 +103,7 @@ pub fn issue_arc_passport_jwt_vc_json(
     })
 }
 
-pub fn verify_arc_passport_jwt_vc_json(
+pub fn verify_chio_passport_jwt_vc_json(
     compact: &str,
     issuer_public_key: &PublicKey,
     now: u64,
@@ -269,7 +269,7 @@ pub fn verify_arc_passport_jwt_vc_json(
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| {
             CredentialError::InvalidOid4vciCredentialResponse(
-                "portable jwt vc must include vc.credentialSubject.arcPassportId".to_string(),
+                "portable jwt vc must include vc.credentialSubject.chioPassportId".to_string(),
             )
         })?;
     if payload_object
@@ -278,7 +278,7 @@ pub fn verify_arc_passport_jwt_vc_json(
         .is_some_and(|value| value != passport_id)
     {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
-            "portable jwt vc jti must match vc.credentialSubject.arcPassportId".to_string(),
+            "portable jwt vc jti must match vc.credentialSubject.chioPassportId".to_string(),
         ));
     }
     let credential_count = subject
@@ -286,7 +286,7 @@ pub fn verify_arc_passport_jwt_vc_json(
         .and_then(Value::as_u64)
         .ok_or_else(|| {
             CredentialError::InvalidOid4vciCredentialResponse(
-                "portable jwt vc must include vc.credentialSubject.arcCredentialCount"
+                "portable jwt vc must include vc.credentialSubject.chioCredentialCount"
                     .to_string(),
             )
         })?;
@@ -300,7 +300,7 @@ pub fn verify_arc_passport_jwt_vc_json(
         .transpose()
         .map_err(|error| {
             CredentialError::InvalidOid4vciCredentialResponse(format!(
-                "portable jwt vc arcPassportStatus is invalid: {error}"
+                "portable jwt vc chioPassportStatus is invalid: {error}"
             ))
         })?;
 
@@ -367,14 +367,14 @@ fn jwt_vc_json_claim_catalog() -> ChioPortableClaimCatalog {
             "cnf.jwk".to_string(),
             "vc.type".to_string(),
             "vc.credentialSubject.id".to_string(),
-            "vc.credentialSubject.arcPassportId".to_string(),
-            "vc.credentialSubject.arcCredentialCount".to_string(),
-            "vc.credentialSubject.arcIssuerDids".to_string(),
-            "vc.credentialSubject.arcMerkleRoots".to_string(),
-            "vc.credentialSubject.arcEnterpriseIdentityProvenance".to_string(),
+            "vc.credentialSubject.chioPassportId".to_string(),
+            "vc.credentialSubject.chioCredentialCount".to_string(),
+            "vc.credentialSubject.chioIssuerDids".to_string(),
+            "vc.credentialSubject.chioMerkleRoots".to_string(),
+            "vc.credentialSubject.chioEnterpriseIdentityProvenance".to_string(),
         ],
         selectively_disclosable_claims: default_catalog.selectively_disclosable_claims,
-        optional_claims: vec!["vc.credentialSubject.arcPassportStatus".to_string()],
+        optional_claims: vec!["vc.credentialSubject.chioPassportStatus".to_string()],
         status_reference_kind: default_catalog.status_reference_kind,
         schema: default_catalog.schema,
         unsupported_claims_fail_closed: default_catalog.unsupported_claims_fail_closed,
@@ -387,8 +387,8 @@ fn jwt_vc_json_identity_binding() -> ChioPortableIdentityBinding {
         subject_confirmation_claim: "cnf.jwk".to_string(),
         chio_subject_provenance_claim: "vc.credentialSubject.id".to_string(),
         portable_issuer_claim: "iss".to_string(),
-        chio_issuer_provenance_claim: "vc.credentialSubject.arcIssuerDids".to_string(),
-        enterprise_provenance_claim: "vc.credentialSubject.arcEnterpriseIdentityProvenance"
+        chio_issuer_provenance_claim: "vc.credentialSubject.chioIssuerDids".to_string(),
+        enterprise_provenance_claim: "vc.credentialSubject.chioEnterpriseIdentityProvenance"
             .to_string(),
         ..ChioPortableIdentityBinding::default()
     }

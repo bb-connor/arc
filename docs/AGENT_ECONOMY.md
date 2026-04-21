@@ -556,11 +556,11 @@ ALTER TABLE chio_tool_receipts
 ALTER TABLE chio_tool_receipts
     ADD COLUMN cost_currency TEXT;
 
-CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_cost
+CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_cost
     ON chio_tool_receipts(cost_currency, cost_charged);
 ```
 
-The `SqliteReceiptStore::append_arc_receipt` method extracts `financial.cost_charged` and `financial.currency` from the receipt metadata at insert time. This enables efficient billing queries without full-JSON scanning.
+The `SqliteReceiptStore::append_chio_receipt` method extracts `financial.cost_charged` and `financial.currency` from the receipt metadata at insert time. This enables efficient billing queries without full-JSON scanning.
 
 ### 3.6 Payment Rail Integration
 
@@ -806,55 +806,55 @@ Spending analytics and anomaly detection.
 - `GET /v1/reports/operator` composes receipt analytics, cost attribution,
   budget utilization, settlement reconciliation, and evidence-export readiness
   into one operator-facing workflow surface.
-- `arc trust behavioral-feed export` and `GET /v1/reports/behavioral-feed`
+- `chio trust behavioral-feed export` and `GET /v1/reports/behavioral-feed`
   produce a signed insurer-facing behavioral feed from the same canonical
   receipt, settlement, governed-action, reputation, and shared-evidence data.
-- `arc trust underwriting-input export` and `GET /v1/reports/underwriting-input`
+- `chio trust underwriting-input export` and `GET /v1/reports/underwriting-input`
   produce a signed underwriting policy-input snapshot with explicit receipt,
   reputation, certification, runtime-assurance, and shared-evidence references.
-- `arc trust underwriting-decision evaluate` and
+- `chio trust underwriting-decision evaluate` and
   `GET /v1/reports/underwriting-decision` evaluate that same canonical
   evidence package into one bounded outcome: `approve`, `reduce_ceiling`,
   `step_up`, or `deny`.
-- `arc trust underwriting-decision simulate` and
+- `chio trust underwriting-decision simulate` and
   `POST /v1/reports/underwriting-simulation` compare Chio's default decision
   policy with an operator-supplied simulation policy over the same canonical
   evidence without persisting a new decision.
-- `arc trust exposure-ledger export` and `GET /v1/reports/exposure-ledger`
+- `chio trust exposure-ledger export` and `GET /v1/reports/exposure-ledger`
   produce a signed economic-position ledger over governed receipts and
   persisted underwriting decisions, with per-currency totals and concrete
   evidence references for receipt-side reserve, settlement, and loss posture.
-- `arc trust credit-scorecard export` and `GET /v1/reports/credit-scorecard`
+- `chio trust credit-scorecard export` and `GET /v1/reports/credit-scorecard`
   produce a signed, subject-scoped credit posture over that same exposure
   ledger plus local reputation inspection, with explicit dimensions,
   probation, confidence, and anomaly semantics.
-- `arc trust credit-backtest export` and `GET /v1/reports/credit-backtest`
+- `chio trust credit-backtest export` and `GET /v1/reports/credit-backtest`
   replay the current credit and facility logic over bounded historical windows
   so drift, stale evidence, mixed-currency books, and prerequisite failures
   are qualification-visible instead of inferred.
-- `arc trust provider-risk-package export` and
+- `chio trust provider-risk-package export` and
   `GET /v1/reports/provider-risk-package` produce one signed provider-facing
   review package containing signed exposure and scorecard artifacts, current
   facility posture, latest facility snapshot, runtime-assurance and
   certification state, and recent-loss history.
-- `arc trust liability-provider issue|list|resolve` plus the matching
+- `chio trust liability-provider issue|list|resolve` plus the matching
   trust-control routes keep carrier policy, jurisdiction, coverage-class,
   currency, and evidence-requirement truth curated and supersession-aware
   before any quote or bind step can proceed.
-- `arc trust liability-market quote-request-issue|quote-response-issue|
+- `chio trust liability-market quote-request-issue|quote-response-issue|
   placement-issue|bound-coverage-issue|list` plus the matching trust-control
   routes now model one provider-neutral quote and bind workflow over that
   signed provider-risk package, preserving provider provenance and failing
   closed on stale provider records, expired quotes, coverage mismatches, or
   unsupported bound-coverage policy.
-- `arc trust underwriting-decision issue` and
+- `chio trust underwriting-decision issue` and
   `POST /v1/underwriting/decisions/issue` persist a signed underwriting
   decision artifact with explicit review state, budget action, premium quote
   state, and optional supersession linkage.
-- `arc trust underwriting-decision list` and
+- `chio trust underwriting-decision list` and
   `GET /v1/reports/underwriting-decisions` return persisted signed decisions
   together with the current lifecycle projection and latest appeal status.
-- `arc trust underwriting-appeal create|resolve` plus
+- `chio trust underwriting-appeal create|resolve` plus
   `POST /v1/underwriting/appeals` and
   `POST /v1/underwriting/appeals/resolve` keep appeal state explicit without
   editing execution receipts or re-signing prior decisions.

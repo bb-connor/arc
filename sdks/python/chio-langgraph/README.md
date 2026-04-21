@@ -55,9 +55,9 @@ def write_node(state: AgentState) -> dict:
 
 
 async def main() -> None:
-    async with ChioClient("http://127.0.0.1:9090") as arc:
+    async with ChioClient("http://127.0.0.1:9090") as chio:
         cfg = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search", "write"),
             node_scopes={
                 "search": _scope("search"),
@@ -113,7 +113,7 @@ async def run_dangerous(state: AgentState) -> dict:
 
 
 async def main() -> None:
-    cfg = ChioGraphConfig(chio_client=arc, node_scopes={"danger": _scope("danger")})
+    cfg = ChioGraphConfig(chio_client=chio, node_scopes={"danger": _scope("danger")})
     await cfg.provision()
 
     wrapped = chio_approval_node(
@@ -162,7 +162,7 @@ inside the subgraph must attenuate the ceiling, never widen it.
 `parent_ceiling` is the parent's effective ceiling:
 
 ```python
-outer = ChioGraphConfig(chio_client=arc, workflow_scope=_scope("search", "browse"))
+outer = ChioGraphConfig(chio_client=chio, workflow_scope=_scope("search", "browse"))
 inner = outer.subgraph_config(workflow_scope=_scope("search"))
 inner.register_node_scope("search", _scope("search"))  # ok
 inner.register_node_scope("write",  _scope("write"))   # ChioLangGraphConfigError
@@ -180,7 +180,7 @@ different token id through LangGraph's `configurable` dict:
 
 ```python
 async def supervisor(state, runtime_config):
-    narrow = await arc.attenuate_capability(
+    narrow = await chio.attenuate_capability(
         parent_token, new_scope=_scope("search"),
     )
     # LangGraph propagates `configurable` to downstream nodes.

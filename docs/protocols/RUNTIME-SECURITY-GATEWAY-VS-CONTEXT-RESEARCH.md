@@ -173,7 +173,7 @@ that every risk can be solved through intent inference.
 
 ## 5. Key Architecture Questions
 
-### 5.1 Is `arc mcp serve` the Product or the Wedge?
+### 5.1 Is `chio mcp serve` the Product or the Wedge?
 
 Working answer:
 

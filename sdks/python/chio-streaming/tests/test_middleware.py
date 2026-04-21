@@ -265,8 +265,8 @@ def _build_middleware(
 
 
 async def test_allow_path_runs_handler_publishes_receipt_and_commits() -> None:
-    arc = allow_all()
-    mw, consumer, producer = _build_middleware(chio_client=arc)
+    chio = allow_all()
+    mw, consumer, producer = _build_middleware(chio_client=chio)
     consumer.enqueue(_fake_message())
 
     handled: list[tuple[str, int]] = []
@@ -298,8 +298,8 @@ async def test_allow_path_runs_handler_publishes_receipt_and_commits() -> None:
 
 
 async def test_allow_path_sync_handler_is_awaited() -> None:
-    arc = allow_all()
-    mw, consumer, producer = _build_middleware(chio_client=arc)
+    chio = allow_all()
+    mw, consumer, producer = _build_middleware(chio_client=chio)
     consumer.enqueue(_fake_message(offset=11))
 
     called: list[int] = []
@@ -314,8 +314,8 @@ async def test_allow_path_sync_handler_is_awaited() -> None:
 
 
 async def test_allow_path_handler_error_aborts_transaction() -> None:
-    arc = allow_all()
-    mw, consumer, producer = _build_middleware(chio_client=arc)
+    chio = allow_all()
+    mw, consumer, producer = _build_middleware(chio_client=chio)
     consumer.enqueue(_fake_message(offset=21))
 
     def handler(_msg: Any, _receipt: Any) -> None:
@@ -340,8 +340,8 @@ async def test_allow_path_handler_error_aborts_transaction() -> None:
 
 
 async def test_deny_path_routes_to_dlq_and_commits_atomically() -> None:
-    arc = deny_all("missing scope", guard="scope-guard", raise_on_deny=False)
-    mw, consumer, producer = _build_middleware(chio_client=arc, dlq_topic="chio-dlq")
+    chio = deny_all("missing scope", guard="scope-guard", raise_on_deny=False)
+    mw, consumer, producer = _build_middleware(chio_client=chio, dlq_topic="chio-dlq")
     consumer.enqueue(_fake_message(offset=17))
 
     async def handler(_msg: Any, _receipt: Any) -> None:  # pragma: no cover
@@ -375,8 +375,8 @@ async def test_deny_path_routes_to_dlq_and_commits_atomically() -> None:
 async def test_deny_path_handles_chio_sidecar_403() -> None:
     # The real sidecar raises ChioDeniedError on HTTP 403 rather than
     # returning a deny receipt; the middleware should synthesise one.
-    arc = deny_all("forbidden", guard="kernel", raise_on_deny=True)
-    mw, consumer, producer = _build_middleware(chio_client=arc, dlq_topic="chio-dlq")
+    chio = deny_all("forbidden", guard="kernel", raise_on_deny=True)
+    mw, consumer, producer = _build_middleware(chio_client=chio, dlq_topic="chio-dlq")
     consumer.enqueue(_fake_message(offset=31))
 
     async def handler(_msg: Any, _receipt: Any) -> None:  # pragma: no cover
@@ -404,10 +404,10 @@ async def test_transaction_failure_rolls_back_offset_and_produce() -> None:
     the caller can back off / restart; we assert the producer's state
     shows no committed records/offsets.
     """
-    arc = deny_all("nope", raise_on_deny=False)
+    chio = deny_all("nope", raise_on_deny=False)
     producer = FakeProducer(fail_on_commit=True)
     mw, consumer, producer = _build_middleware(
-        chio_client=arc, producer=producer, dlq_topic="chio-dlq"
+        chio_client=chio, producer=producer, dlq_topic="chio-dlq"
     )
     consumer.enqueue(_fake_message(offset=99))
 
@@ -459,14 +459,14 @@ async def test_sidecar_error_raises_and_does_not_commit() -> None:
 
 
 async def test_non_transactional_commit_uses_consumer_commit() -> None:
-    arc = allow_all()
+    chio = allow_all()
     cfg = _cfg(transactional=False, receipt_topic=None, consumer_group_id=None)
     # Revalidate cfg since post_init enforces both fields only when
     # transactional=True. Re-run the dataclass constructor with the
     # overrides to confirm it accepts this combination.
     assert cfg.transactional is False
 
-    mw, consumer, producer = _build_middleware(chio_client=arc, config=cfg)
+    mw, consumer, producer = _build_middleware(chio_client=chio, config=cfg)
     consumer.enqueue(_fake_message(offset=5))
 
     called: list[int] = []
@@ -495,7 +495,7 @@ async def test_non_transactional_commit_uses_consumer_commit() -> None:
 async def test_backpressure_blocks_when_max_in_flight_reached() -> None:
     """When ``max_in_flight`` is 1, a second poll_and_process must wait
     for the first to release its slot before proceeding."""
-    arc = allow_all()
+    chio = allow_all()
 
     release = asyncio.Event()
     started_count = 0
@@ -508,7 +508,7 @@ async def test_backpressure_blocks_when_max_in_flight_reached() -> None:
         await release.wait()
 
     cfg = _cfg(max_in_flight=1)
-    mw, consumer, producer = _build_middleware(chio_client=arc, config=cfg)
+    mw, consumer, producer = _build_middleware(chio_client=chio, config=cfg)
     consumer.enqueue(_fake_message(offset=1))
     consumer.enqueue(_fake_message(offset=2))
 
@@ -577,23 +577,23 @@ def test_config_rejects_zero_in_flight() -> None:
 
 
 def test_build_middleware_requires_router_or_topic() -> None:
-    arc = allow_all()
+    chio = allow_all()
     with pytest.raises(ChioStreamingConfigError):
         build_middleware(
             consumer=FakeConsumer(),
             producer=FakeProducer(),
-            chio_client=arc,
+            chio_client=chio,
             config=_cfg(),
         )
 
 
 def test_build_middleware_with_explicit_router() -> None:
-    arc = allow_all()
+    chio = allow_all()
     router = DLQRouter(default_topic="dlq-explicit")
     mw = build_middleware(
         consumer=FakeConsumer(),
         producer=FakeProducer(),
-        chio_client=arc,
+        chio_client=chio,
         dlq_router=router,
         config=_cfg(),
     )
@@ -613,9 +613,9 @@ async def test_scope_map_hit_uses_custom_tool_name() -> None:
         recorded.append(tool_name)
         return MockVerdict.allow_verdict()
 
-    arc = MockChioClient(policy=policy)
+    chio = MockChioClient(policy=policy)
     cfg = _cfg(scope_map={"orders": "events:consume:orders-custom"})
-    mw, consumer, _producer = _build_middleware(chio_client=arc, config=cfg)
+    mw, consumer, _producer = _build_middleware(chio_client=chio, config=cfg)
     consumer.enqueue(_fake_message())
 
     async def handler(_msg: Any, _r: Any) -> None:
@@ -634,9 +634,9 @@ async def test_scope_map_miss_falls_back_to_default_prefix() -> None:
         recorded.append(tool_name)
         return MockVerdict.allow_verdict()
 
-    arc = MockChioClient(policy=policy)
+    chio = MockChioClient(policy=policy)
     cfg = _cfg(scope_map={})
-    mw, consumer, _producer = _build_middleware(chio_client=arc, config=cfg)
+    mw, consumer, _producer = _build_middleware(chio_client=chio, config=cfg)
     consumer.enqueue(_fake_message(topic="payments"))
 
     async def handler(_msg: Any, _r: Any) -> None:
@@ -654,8 +654,8 @@ async def test_parameters_omit_body_but_carry_hash() -> None:
         captured.append(ctx["parameters"])
         return MockVerdict.allow_verdict()
 
-    arc = MockChioClient(policy=policy)
-    mw, consumer, _producer = _build_middleware(chio_client=arc)
+    chio = MockChioClient(policy=policy)
+    mw, consumer, _producer = _build_middleware(chio_client=chio)
     consumer.enqueue(
         _fake_message(
             value=b'{"payload":"secret"}',
@@ -683,8 +683,8 @@ async def test_parameters_omit_body_but_carry_hash() -> None:
 
 
 def test_close_is_idempotent() -> None:
-    arc = allow_all()
-    mw, consumer, _producer = _build_middleware(chio_client=arc)
+    chio = allow_all()
+    mw, consumer, _producer = _build_middleware(chio_client=chio)
     mw.close()
     mw.close()
     assert consumer.closed is True

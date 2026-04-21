@@ -81,8 +81,8 @@ This runbook does not authorize:
 
 - multiple landed-account motions
 - a generic sales platform or CRM workflow
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broad rollout or universal performance claims
 
 Those remain separate decisions, not hidden responsibilities inside `v2.55`.

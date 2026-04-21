@@ -200,7 +200,7 @@ class LangFuseBridge:
         trace_id = _new_observation_id()
         trace_kwargs: dict[str, Any] = {
             "id": trace_id,
-            "name": f"arc.receipt.{receipt.tool_name}",
+            "name": f"chio.receipt.{receipt.tool_name}",
             "metadata": dict(payload.metadata),
             "tags": list(payload.tags),
         }

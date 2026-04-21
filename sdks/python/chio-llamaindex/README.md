@@ -69,7 +69,7 @@ rag_tool = ChioQueryEngineTool(
 
 
 async def main() -> None:
-    async with ChioClient("http://127.0.0.1:9090") as arc:
+    async with ChioClient("http://127.0.0.1:9090") as chio:
         worker = OpenAIAgentWorker.from_tools(
             [search_tool, rag_tool],
             llm=MockLLM(),
@@ -79,7 +79,7 @@ async def main() -> None:
         chio_runner = ChioAgentRunner(
             runner=runner,
             capability_scope=ChioScope(grants=[search_grant(), rag_grant()]),
-            chio_client=arc,
+            chio_client=chio,
             agent_name="analyst",
         )
         await chio_runner.provision_capability()
@@ -138,7 +138,7 @@ an agent as a whole and binds it to every `ChioFunctionTool` /
 chio_runner = ChioAgentRunner(
     runner=runner,
     capability_scope=ChioScope(grants=[search_grant()]),
-    chio_client=arc,
+    chio_client=chio,
     agent_name="analyst",
 )
 token = await chio_runner.provision_capability()

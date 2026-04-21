@@ -41,7 +41,7 @@ async fn sumo_json_posts_ndjson_with_sumo_headers() {
     Mock::given(method("POST"))
         .and(path("/receiver"))
         .and(header("Content-Type", "application/json"))
-        .and(header("X-Sumo-Category", "security/arc"))
+        .and(header("X-Sumo-Category", "security/chio"))
         .and(header("X-Sumo-Name", "chio"))
         .respond_with(ResponseTemplate::new(200))
         .expect(1)
@@ -50,7 +50,7 @@ async fn sumo_json_posts_ndjson_with_sumo_headers() {
 
     let config = SumoLogicConfig {
         http_source_url: format!("{}/receiver", server.uri()),
-        source_category: "security/arc".to_string(),
+        source_category: "security/chio".to_string(),
         source_name: "chio".to_string(),
         source_host: Some("test-host".to_string()),
         format: SumoLogicFormat::Json,

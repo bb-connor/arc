@@ -1562,14 +1562,14 @@ fn validated_scim_provider_for_request(
     config: &TrustServiceConfig,
     user: &ScimUserResource,
 ) -> Result<EnterpriseProviderRecord, CliError> {
-    let extension = required_arc_extension(user)?;
+    let extension = required_chio_extension(user)?;
     if extension
         .provider_record_id
         .as_deref()
         .is_some_and(|value| value != extension.provider_id)
     {
         return Err(CliError::Other(
-            "scim user arc extension providerRecordId must match providerId when present"
+            "scim user chio extension providerRecordId must match providerId when present"
                 .to_string(),
         ));
     }

@@ -10,7 +10,7 @@
 From the repository root:
 
 ```bash
-cargo run -p arc-mercury -- pilot export --output target/mercury-pilot
+cargo run -p chio-mercury -- pilot export --output target/mercury-pilot
 ```
 
 This creates the primary and rollback corpus described in
@@ -21,7 +21,7 @@ This creates the primary and rollback corpus described in
 ## 2. Verify The Primary Proof Package
 
 ```bash
-cargo run -p arc-mercury -- --json verify \
+cargo run -p chio-mercury -- --json verify \
   --input target/mercury-pilot/primary/proof-package.json
 ```
 
@@ -36,7 +36,7 @@ Expected signals:
 ## 3. Verify The Primary Inquiry Package
 
 ```bash
-cargo run -p arc-mercury -- --json verify \
+cargo run -p chio-mercury -- --json verify \
   --input target/mercury-pilot/primary/inquiry-package.json
 ```
 
@@ -54,7 +54,7 @@ bundle.
 ## 4. Verify The Rollback Variant
 
 ```bash
-cargo run -p arc-mercury -- --json verify \
+cargo run -p chio-mercury -- --json verify \
   --input target/mercury-pilot/rollback/proof-package.json
 ```
 
@@ -73,7 +73,7 @@ This shows rollback remains inside the same proof contract family.
 For human-readable step output:
 
 ```bash
-cargo run -p arc-mercury -- verify \
+cargo run -p chio-mercury -- verify \
   --input target/mercury-pilot/primary/proof-package.json \
   --explain
 ```
@@ -86,7 +86,7 @@ Use this when walking a reviewer through why the package passes.
 
 Treat the corpus as invalid if any of these are false:
 
-- the proof package does not bind to a verified ARC evidence export
+- the proof package does not bind to a verified Chio evidence export
 - the inquiry package verifies as proof-equivalent when it should be a reviewed
   export
 - the rollback variant requires a separate contract or separate verification

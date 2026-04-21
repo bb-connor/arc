@@ -4,9 +4,9 @@
     "kind": "public_identity_profile",
     "schema": "chio.public-identity-profile.v1",
     "artifactId": "pip-1",
-    "operatorId": "arc",
+    "operatorId": "chio",
     "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-    "uri": "https://arc.dev/standards/public-identity-profile"
+    "uri": "https://chio.dev/standards/public-identity-profile"
   },
   "directoryEntryRef": {
     "kind": "public_wallet_directory_entry",

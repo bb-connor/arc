@@ -94,10 +94,10 @@ def chio_task(scope: str, guards: list[str] | None = None, budget: dict | None =
         @task(name=fn.__name__)
         @functools.wraps(fn)
         async def wrapper(*args, **kwargs):
-            arc = ChioClient()
+            chio = ChioClient()
             logger = get_run_logger()
 
-            verdict = await arc.evaluate(
+            verdict = await chio.evaluate(
                 tool=fn.__name__,
                 scope=scope,
                 arguments={"args": args, "kwargs": kwargs},
@@ -121,7 +121,7 @@ def chio_task(scope: str, guards: list[str] | None = None, budget: dict | None =
             result = fn(*args, **kwargs)
 
             # Record receipt as Prefect artifact
-            receipt = await arc.record(verdict=verdict)
+            receipt = await chio.record(verdict=verdict)
             await create_markdown_artifact(
                 key=f"chio-receipt-{fn.__name__}",
                 markdown=f"## Chio Receipt\n\n"
@@ -146,18 +146,18 @@ def chio_flow(scope: str):
         @flow(name=fn.__name__)
         @functools.wraps(fn)
         async def wrapper(*args, **kwargs):
-            arc = ChioClient()
+            chio = ChioClient()
 
-            grant = await arc.acquire_grant(scope=scope)
+            grant = await chio.acquire_grant(scope=scope)
             # Store grant in Prefect runtime context for tasks to access
             from prefect.context import get_run_context
             ctx = get_run_context()
-            ctx.task_run.tags.add(f"arc:grant:{grant.token}")
+            ctx.task_run.tags.add(f"chio:grant:{grant.token}")
 
             try:
                 result = await fn(*args, **kwargs)
             finally:
-                await arc.release_grant(grant)
+                await chio.release_grant(grant)
 
             return result
 
@@ -193,7 +193,7 @@ from prefect.events import emit_event
 # Inside chio_task wrapper, after recording receipt:
 emit_event(
     event="chio.receipt.created",
-    resource={"prefect.resource.id": f"arc.receipt.{receipt.receipt_id}"},
+    resource={"prefect.resource.id": f"chio.receipt.{receipt.receipt_id}"},
     payload={
         "receipt_id": receipt.receipt_id,
         "tool": fn.__name__,
@@ -205,7 +205,7 @@ emit_event(
 # Denial events:
 emit_event(
     event="chio.capability.denied",
-    resource={"prefect.resource.id": f"arc.denial.{verdict.receipt_id}"},
+    resource={"prefect.resource.id": f"chio.denial.{verdict.receipt_id}"},
     payload={
         "tool": fn.__name__,
         "scope": scope,
@@ -223,7 +223,7 @@ automations:
     trigger:
       type: event
       match:
-        event: arc.capability.denied
+        event: chio.capability.denied
       threshold: 5
       within: 300  # 5 denials in 5 minutes
     actions:
@@ -262,7 +262,7 @@ sdks/python/chio-prefect/
     blocks.py               # ChioConfig block
     artifacts.py            # Receipt artifact formatting
   tests/
-    test_arc_task.py
+    test_chio_task.py
     test_flow_grant.py
     test_retry.py
 ```

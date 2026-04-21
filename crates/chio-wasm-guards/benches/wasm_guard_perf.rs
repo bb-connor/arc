@@ -25,7 +25,7 @@ use chio_wasm_guards::host::{create_shared_engine, register_host_functions, Wasm
 // WAT module builder helpers
 // ---------------------------------------------------------------------------
 
-/// Returns a minimal WAT module that imports all three arc.* host functions,
+/// Returns a minimal WAT module that imports all three chio.* host functions,
 /// exports memory (1 page) and `evaluate` returning VERDICT_ALLOW (0).
 /// Approximately 200 bytes compiled. Used for instantiation benchmarks.
 fn build_trivial_guard_wat() -> &'static str {

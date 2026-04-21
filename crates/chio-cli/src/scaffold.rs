@@ -45,7 +45,7 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     let chio_bin_hint = std::env::current_exe()
         .ok()
         .map(|path| path.display().to_string())
-        .unwrap_or_else(|| "/path/to/arc".to_string());
+        .unwrap_or_else(|| "/path/to/chio".to_string());
 
     println!("created Chio scaffold at {}", absolute.display());
     println!();

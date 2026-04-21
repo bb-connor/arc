@@ -202,7 +202,7 @@ async fn handle_scim_delete_user(
         Ok(receipt) => receipt,
         Err(error) => return scim_error_response(StatusCode::CONFLICT, &error.to_string()),
     };
-    if let Err(error) = receipt_store.append_arc_receipt(&receipt) {
+    if let Err(error) = receipt_store.append_chio_receipt(&receipt) {
         return scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
     let updated =
@@ -767,7 +767,7 @@ async fn handle_passport_sd_jwt_type_metadata(State(state): State<TrustServiceSt
             "portable credential type metadata is unavailable because no authority signing key is configured",
         );
     }
-    match build_arc_passport_sd_jwt_type_metadata(advertise_url) {
+    match build_chio_passport_sd_jwt_type_metadata(advertise_url) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
@@ -788,7 +788,7 @@ async fn handle_passport_jwt_vc_json_type_metadata(
             "portable credential type metadata is unavailable because no authority signing key is configured",
         );
     }
-    match build_arc_passport_jwt_vc_json_type_metadata(advertise_url) {
+    match build_chio_passport_jwt_vc_json_type_metadata(advertise_url) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
@@ -1750,7 +1750,7 @@ async fn handle_public_submit_oid4vp_response(
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let credential = match inspect_arc_passport_sd_jwt_vc_unverified(&unverified_response.vp_token)
+    let credential = match inspect_chio_passport_sd_jwt_vc_unverified(&unverified_response.vp_token)
     {
         Ok(credential) => credential,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -2384,7 +2384,7 @@ async fn handle_append_tool_receipt(
         Ok(store) => store,
         Err(response) => return response,
     };
-    match store.append_arc_receipt(&receipt) {
+    match store.append_chio_receipt(&receipt) {
         Ok(()) => respond_after_leader_visible_write(
             &state,
             "tool receipt was not visible on the leader after write",

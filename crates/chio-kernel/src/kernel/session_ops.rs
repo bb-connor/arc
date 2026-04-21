@@ -263,7 +263,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_chio_receipt(&receipt)?;
         Ok(receipt)
     }
 

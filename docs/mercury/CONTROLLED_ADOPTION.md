@@ -28,8 +28,8 @@ The lane reuses already validated Mercury artifacts:
 - one inquiry package plus verification report
 - one reviewer package plus qualification report
 
-It does not authorize a generic ARC renewal console, a merged Mercury and
-ARC-Wall shell, additional adoption cohorts, or a new Mercury product line.
+It does not authorize a generic Chio renewal console, a merged Mercury and
+Chio-Wall shell, additional adoption cohorts, or a new Mercury product line.
 
 ---
 
@@ -66,8 +66,8 @@ unchanged:
 - reference owner: `mercury-reference-program`
 - support owner: `mercury-adoption-ops`
 
-Adoption ownership stays inside Mercury. ARC remains the generic substrate
-that Mercury consumes; ARC does not become the renewal or reference-readiness
+Adoption ownership stays inside Mercury. Chio remains the generic substrate
+that Mercury consumes; Chio does not become the renewal or reference-readiness
 console.
 
 ---
@@ -87,7 +87,7 @@ Supported in `v2.54`:
 Not supported in `v2.54`:
 
 - additional adoption cohorts or renewal surfaces
-- a generic ARC renewal console or merged shell
+- a generic Chio renewal console or merged shell
 - broader Mercury product-family claims
 - cross-product packaging unification
 - new runtime coupling or generic customer-success tooling
@@ -99,14 +99,14 @@ Not supported in `v2.54`:
 Export the bounded controlled-adoption package and renewal evidence bundle:
 
 ```bash
-cargo run -p arc-mercury -- controlled-adoption export --output target/mercury-controlled-adoption-export
+cargo run -p chio-mercury -- controlled-adoption export --output target/mercury-controlled-adoption-export
 ```
 
 Generate the validation package and explicit scale decision:
 
 ```bash
-cargo run -p arc-mercury -- controlled-adoption validate --output target/mercury-controlled-adoption-validation
+cargo run -p chio-mercury -- controlled-adoption validate --output target/mercury-controlled-adoption-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

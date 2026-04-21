@@ -172,7 +172,7 @@ Objective:
 Deliverables:
 
 - `packages/sdk/chio-py/pyproject.toml`
-- `packages/sdk/chio-py/src/arc/`
+- `packages/sdk/chio-py/src/chio/`
 - Python errors, models, invariants, transport, and session modules
 - vector tests for Python invariant helpers
 

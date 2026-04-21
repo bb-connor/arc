@@ -89,7 +89,7 @@ The profile does not cover:
   also publish one `JWKS` document plus the matching Chio passport SD-JWT VC
   and/or Chio passport JWT VC JSON type metadata documents rooted at the same
   `credential_issuer`
-- when an issuer advertises `arcProfile.passportStatusDistribution`, it is
+- when an issuer advertises `chioProfile.passportStatusDistribution`, it is
   advertising an operator-scoped read-only lifecycle resolve plane, not a new
   trust root or public registry
 - the projected `application/dc+sd-jwt` credential is derived from a verified
@@ -101,15 +101,15 @@ The profile does not cover:
   and `chio_enterprise_identity_provenance` as supported disclosures
 - the current projected JWT VC JSON claim contract keeps `iss`, `sub`,
   `cnf.jwk`, `vc.type`, `vc.credentialSubject.id`,
-  `vc.credentialSubject.arcPassportId`,
-  `vc.credentialSubject.arcCredentialCount`,
-  `vc.credentialSubject.arcIssuerDids`,
-  `vc.credentialSubject.arcMerkleRoots`, and
-  `vc.credentialSubject.arcEnterpriseIdentityProvenance` anchored in the
+  `vc.credentialSubject.chioPassportId`,
+  `vc.credentialSubject.chioCredentialCount`,
+  `vc.credentialSubject.chioIssuerDids`,
+  `vc.credentialSubject.chioMerkleRoots`, and
+  `vc.credentialSubject.chioEnterpriseIdentityProvenance` anchored in the
   signed JWT VC payload, and declares the Chio claim catalog with
   `supportsSelectiveDisclosure=false`
 - when a delivered credential response includes
-  `arcCredentialContext.passportStatus`, that sidecar is only a reference to
+  `chioCredentialContext.passportStatus`, that sidecar is only a reference to
   mutable lifecycle truth; it does not mutate the signed passport artifact
 - portable lifecycle resolution is read-only and may be exposed publicly at an
   operator URL, but publication and revocation remain explicit operator
@@ -264,8 +264,8 @@ The profile does not cover:
 ## Compatibility Rules
 
 - unknown schema identifiers must be rejected
-- legacy `arc.*` passport, verifier-policy, challenge, response, evidence, and
-  delegation schemas remain valid compatibility inputs
+- pre-Chio passport, verifier-policy, challenge, response, evidence, and
+  delegation schemas are rejected instead of treated as compatibility aliases
 - `chio.certify.check.v1`, `chio.certify.registry.v1`, and
   `chio.certify.discovery-network.v1` remain the supported certification
   compatibility inputs

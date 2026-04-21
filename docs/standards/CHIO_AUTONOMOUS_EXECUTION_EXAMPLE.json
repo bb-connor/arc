@@ -29,7 +29,7 @@
   "rollback_control": {
     "rollback_plan_ref": "arp-1",
     "interruptible": true,
-    "human_interrupt_contact": "ops@arc.example"
+    "human_interrupt_contact": "ops@chio.example"
   },
   "note": "Executes one bounded autonomous bind over the official web3 lane."
 }

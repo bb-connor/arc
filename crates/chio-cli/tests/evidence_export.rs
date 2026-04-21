@@ -181,7 +181,7 @@ fn export_fixture_package(receipt_db_path: &PathBuf, output_dir: &PathBuf) {
         .arg("--output")
         .arg(output_dir)
         .output()
-        .expect("run arc evidence export");
+        .expect("run chio evidence export");
 
     assert!(
         output.status.success(),
@@ -264,10 +264,10 @@ capabilities:
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-evidence", 100))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-evidence", 100))
             .expect("append receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-evidence", 101))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-evidence", 101))
             .expect("append receipt");
         store
             .append_child_receipt(&child_receipt_with_ts("child-1", 100))
@@ -302,7 +302,7 @@ capabilities:
         .arg("--policy-file")
         .arg(&policy_file)
         .output()
-        .expect("run arc evidence export");
+        .expect("run chio evidence export");
 
     assert!(
         output.status.success(),
@@ -348,7 +348,7 @@ capabilities:
         .arg("--input")
         .arg(&output_dir)
         .output()
-        .expect("run arc evidence verify");
+        .expect("run chio evidence verify");
 
     assert!(
         verify.status.success(),
@@ -377,7 +377,7 @@ fn evidence_export_require_proofs_fails_when_receipts_are_uncheckpointed() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-uncheckpointed",
                 "cap-require-proofs",
                 100,
@@ -395,7 +395,7 @@ fn evidence_export_require_proofs_fails_when_receipts_are_uncheckpointed() {
         .arg(&output_dir)
         .arg("--require-proofs")
         .output()
-        .expect("run arc evidence export");
+        .expect("run chio evidence export");
 
     assert!(!output.status.success(), "export should fail");
     assert!(
@@ -424,10 +424,10 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-federated", 100))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-federated", 100))
             .expect("append receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-federated", 101))
+            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-federated", 101))
             .expect("append receipt");
         let canonical = store
             .receipts_canonical_bytes_range(seq1, seq2)
@@ -468,7 +468,7 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         .arg("--federation-policy")
         .arg(&federation_policy_path)
         .output()
-        .expect("run arc evidence export with federation policy");
+        .expect("run chio evidence export with federation policy");
 
     assert!(
         output.status.success(),
@@ -492,7 +492,7 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         .arg("--input")
         .arg(&output_dir)
         .output()
-        .expect("run arc evidence verify");
+        .expect("run chio evidence verify");
 
     assert!(
         verify.status.success(),
@@ -523,14 +523,14 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-imported-1",
                 "cap-federated-reputation",
                 100,
             ))
             .expect("append first receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-imported-2",
                 "cap-federated-reputation",
                 101,
@@ -575,7 +575,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
         .arg("--federation-policy")
         .arg(&federation_policy_path)
         .output()
-        .expect("run arc evidence export");
+        .expect("run chio evidence export");
     assert!(
         export.status.success(),
         "stdout={}\nstderr={}",
@@ -597,7 +597,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
             output_dir.to_str().expect("evidence output path"),
         ])
         .output()
-        .expect("run arc evidence import");
+        .expect("run chio evidence import");
     assert!(
         import.status.success(),
         "stdout={}\nstderr={}",
@@ -696,7 +696,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
         .arg("--capability")
         .arg("cap-two")
         .output()
-        .expect("run arc evidence export with mismatched federation policy");
+        .expect("run chio evidence export with mismatched federation policy");
 
     assert!(!output.status.success(), "export should fail");
     assert!(
@@ -728,14 +728,14 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-1",
                 "cap-remote-federated",
                 100,
             ))
             .expect("append receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-2",
                 "cap-remote-federated",
                 101,
@@ -801,7 +801,7 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
                 .expect("federation policy path"),
         ])
         .output()
-        .expect("run remote arc evidence export");
+        .expect("run remote chio evidence export");
 
     assert!(
         output.status.success(),
@@ -820,7 +820,7 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         .arg("--input")
         .arg(&output_dir)
         .output()
-        .expect("run arc evidence verify");
+        .expect("run chio evidence verify");
 
     assert!(
         verify.status.success(),
@@ -844,14 +844,14 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-1",
                 "cap-evidence-verify",
                 100,
             ))
             .expect("append receipt");
         let seq2 = store
-            .append_arc_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_ts(
                 "rcpt-2",
                 "cap-evidence-verify",
                 101,
@@ -909,7 +909,7 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
         .arg("--input")
         .arg(&output_dir)
         .output()
-        .expect("run arc evidence verify");
+        .expect("run chio evidence verify");
 
     assert!(
         !verify.status.success(),

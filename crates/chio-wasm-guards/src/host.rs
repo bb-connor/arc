@@ -93,7 +93,7 @@ pub fn create_shared_engine() -> Result<Arc<Engine>, WasmGuardError> {
 // Host function registration
 // ---------------------------------------------------------------------------
 
-/// Register the `arc.*` host functions on the given [`Linker`].
+/// Register the `chio.*` host functions on the given [`Linker`].
 ///
 /// Registers:
 /// - `chio.log(level: i32, ptr: i32, len: i32)` -- guest logging

@@ -61,7 +61,7 @@ const (
 	FinalizerName = "chio.protocol/capability-finalizer"
 )
 
-// ChioClient is the subset of arc.Client methods the reconciler needs.
+// ChioClient is the subset of chio.Client methods the reconciler needs.
 //
 // Declared as an interface so tests can inject a stub without taking a
 // dependency on net/http.
@@ -97,7 +97,7 @@ type JobReconciler struct {
 	client.Client
 
 	Scheme   *runtime.Scheme
-	Arc      ChioClient
+	Chio     ChioClient
 	Recorder record.EventRecorder
 	Retry    RetryPolicy
 
@@ -135,11 +135,11 @@ const (
 )
 
 // NewJobReconciler constructs a JobReconciler with default state.
-func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ChioClient, recorder record.EventRecorder) *JobReconciler {
+func NewJobReconciler(c client.Client, scheme *runtime.Scheme, chio ChioClient, recorder record.EventRecorder) *JobReconciler {
 	return &JobReconciler{
 		Client:   c,
 		Scheme:   scheme,
-		Arc:      arc,
+		Chio:     chio,
 		Recorder: recorder,
 		Retry:    DefaultRetryPolicy(),
 		attempts: make(map[attemptKey]int),
@@ -266,7 +266,7 @@ func (r *JobReconciler) mintGrant(ctx context.Context, logger logr.Logger, job *
 		JobUID:  string(job.UID),
 	}
 
-	token, err := r.Arc.Mint(ctx, req)
+	token, err := r.Chio.Mint(ctx, req)
 	if err != nil {
 		if errors.Is(err, chioapi.ErrSidecarUnreachable) {
 			r.event(job, corev1.EventTypeWarning, "ChioSidecarUnreachable",
@@ -305,7 +305,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 
 	// Release capability if still outstanding.
 	if capID != "" && job.Annotations[AnnotationReleased] == "" {
-		err := r.Arc.Release(ctx, chioapi.ReleaseRequest{
+		err := r.Chio.Release(ctx, chioapi.ReleaseRequest{
 			CapabilityID: capID,
 			JobUID:       string(job.UID),
 			Reason:       outcome,
@@ -351,7 +351,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 			Steps:        steps,
 		}
 
-		id, err := r.Arc.SubmitReceipt(ctx, receipt)
+		id, err := r.Chio.SubmitReceipt(ctx, receipt)
 		if err != nil {
 			if errors.Is(err, chioapi.ErrSidecarUnreachable) {
 				// Increment attempts first, THEN check the cap. Otherwise
@@ -409,7 +409,7 @@ func (r *JobReconciler) handleDeletion(ctx context.Context, logger logr.Logger, 
 
 	capID := job.Annotations[AnnotationCapabilityID]
 	if capID != "" && job.Annotations[AnnotationReleased] == "" {
-		err := r.Arc.Release(ctx, chioapi.ReleaseRequest{
+		err := r.Chio.Release(ctx, chioapi.ReleaseRequest{
 			CapabilityID: capID,
 			JobUID:       string(job.UID),
 			Reason:       "deleted",

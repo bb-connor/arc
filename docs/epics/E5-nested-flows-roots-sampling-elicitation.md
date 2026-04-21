@@ -26,7 +26,7 @@ Implemented in the third slice:
 - kernel-owned nested-flow bridge for wrapped tool calls
 - wrapped-server propagation of `roots/list` and `sampling/createMessage` through the adapted MCP transport
 - proxy client capability advertisement to wrapped MCP servers during adapter initialization
-- end-to-end `arc mcp serve` coverage for wrapped sampling and roots roundtrips
+- end-to-end `chio mcp serve` coverage for wrapped sampling and roots roundtrips
 
 Still pending:
 
@@ -126,7 +126,7 @@ Out of scope:
 Status:
 
 - implemented through session lineage fields and kernel child-request helpers
-- implemented for the wrapped transport path used by `arc mcp serve`
+- implemented for the wrapped transport path used by `chio mcp serve`
 - follow-on still needed for elicitation and receipt lineage
 
 ### `T5.3` Sampling

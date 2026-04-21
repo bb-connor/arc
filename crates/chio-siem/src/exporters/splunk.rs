@@ -14,7 +14,7 @@ pub struct SplunkConfig {
     pub endpoint: String,
     /// HEC authentication token.
     pub hec_token: String,
-    /// Splunk sourcetype for all exported events. Default: "arc:receipt".
+    /// Splunk sourcetype for all exported events. Default: "chio:receipt".
     pub sourcetype: String,
     /// Optional Splunk index name. Omit to use the default index configured for the HEC token.
     pub index: Option<String>,
@@ -27,7 +27,7 @@ impl Default for SplunkConfig {
         Self {
             endpoint: String::new(),
             hec_token: String::new(),
-            sourcetype: "arc:receipt".to_string(),
+            sourcetype: "chio:receipt".to_string(),
             index: None,
             host: None,
         }

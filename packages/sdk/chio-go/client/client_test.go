@@ -85,8 +85,8 @@ func TestClientInitializeReturnsSessionAndWave1Helpers(t *testing.T) {
 	}))
 	defer server.Close()
 
-	pactClient := client.WithStaticBearer(server.URL, "token", server.Client())
-	session, err := pactClient.Initialize(context.Background(), client.InitializeOptions{})
+	chioClient := client.WithStaticBearer(server.URL, "token", server.Client())
+	session, err := chioClient.Initialize(context.Background(), client.InitializeOptions{})
 	if err != nil {
 		t.Fatalf("Initialize returned error: %v", err)
 	}

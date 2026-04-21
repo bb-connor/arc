@@ -7,7 +7,7 @@
 
 ## Decision
 
-`proceed_arc_wall_only`
+`proceed_chio_wall_only`
 
 Proceed with one bounded Chio-Wall companion-product lane only.
 

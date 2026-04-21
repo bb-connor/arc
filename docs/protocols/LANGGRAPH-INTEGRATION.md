@@ -118,7 +118,7 @@ graph.add_edge(START, "supervisor")
 app = graph.compile(
     checkpointer=MemorySaver(),
     # Chio configuration applied to the compiled graph
-    arc=ChioGraphConfig(
+    chio=ChioGraphConfig(
         sidecar_url="http://127.0.0.1:9090",
         # Workflow-level grant acquired on graph start
         workflow_scope="agent:full-pipeline",
@@ -186,7 +186,7 @@ async def dangerous_action(state: AgentState, config: RunnableConfig):
 
 Under the hood, `chio_approval_node` does:
 
-1. Calls `arc.evaluate()` with the `human-approval` guard
+1. Calls `chio.evaluate()` with the `human-approval` guard
 2. If the guard returns `pending`, calls `interrupt()` to pause the graph
 3. When the graph resumes (human approved), re-evaluates -- guard now passes
 4. If the guard returns `denied` (human rejected or timeout), raises `NodeInterrupt`
@@ -253,7 +253,7 @@ class ChioCheckpointAdapter:
 
     def __init__(self, inner_checkpointer, chio_client):
         self.inner = inner_checkpointer
-        self.arc = chio_client
+        self.chio = chio_client
 
     async def aput(self, config, checkpoint, metadata):
         # Attach receipt IDs to checkpoint metadata
@@ -267,13 +267,13 @@ class ChioCheckpointAdapter:
 
 ```
 # Find all Chio receipts for a LangGraph thread
-arc receipt list --meta langgraph.thread_id=<thread-id>
+chio receipt list --meta langgraph.thread_id=<thread-id>
 
 # Find receipts for a specific node execution
-arc receipt list --meta langgraph.thread_id=<thread-id> --meta langgraph.node=researcher
+chio receipt list --meta langgraph.thread_id=<thread-id> --meta langgraph.node=researcher
 
 # Replay graph execution from receipt chain
-arc receipt chain <head-receipt-id> --format langgraph
+chio receipt chain <head-receipt-id> --format langgraph
 ```
 
 ## 5. Tool Binding

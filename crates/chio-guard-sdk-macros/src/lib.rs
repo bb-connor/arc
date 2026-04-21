@@ -54,7 +54,7 @@ pub fn chio_guard(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_attrs = &input_fn.attrs;
     let fn_vis = &input_fn.vis;
 
-    let internal_name = format_ident!("__arc_guard_user_{}", fn_name);
+    let internal_name = format_ident!("__chio_guard_user_{}", fn_name);
 
     let expanded = quote! {
         // Re-export allocator functions so the WASM binary has chio_alloc and

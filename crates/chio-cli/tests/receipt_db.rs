@@ -112,7 +112,7 @@ fn check_command_persists_receipt_to_sqlite() {
             r#"{"command":"echo durable receipt"}"#,
         ])
         .output()
-        .expect("run arc check");
+        .expect("run chio check");
 
     assert!(
         output.status.success(),
@@ -184,7 +184,7 @@ fn check_command_persists_receipt_via_control_service() {
             r#"{"command":"echo control receipt"}"#,
         ])
         .output()
-        .expect("run arc check via control service");
+        .expect("run chio check via control service");
 
     assert!(
         output.status.success(),

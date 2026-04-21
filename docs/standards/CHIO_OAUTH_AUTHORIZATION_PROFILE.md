@@ -127,9 +127,9 @@ The same request may also opt into one bounded sender-constrained contract:
 When Chio issues a token from that request, it carries the accepted sender
 binding forward through `cnf`:
 
-- `cnf.arcSenderKey`
+- `cnf.chioSenderKey`
 - `cnf["x5t#S256"]`
-- `cnf.arcAttestationSha256`
+- `cnf.chioAttestationSha256`
 
 ## Resource Binding
 

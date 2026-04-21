@@ -3,9 +3,9 @@
 //! Phase 1.3 (WASM Guard Module Signing): requires Ed25519 signatures on
 //! `.wasm` guard binaries. This module provides:
 //!
-//! - `arc guard sign <wasm> --key <seed-file>` -- produce a `.wasm.sig` sidecar
+//! - `chio guard sign <wasm> --key <seed-file>` -- produce a `.wasm.sig` sidecar
 //!   alongside the given WASM file.
-//! - `arc guard verify <wasm>` -- verify the sidecar signature for the guard
+//! - `chio guard verify <wasm>` -- verify the sidecar signature for the guard
 //!   (returns exit code 0 on success, 1 on any failure).
 //!
 //! The signing key is loaded from a hex-encoded 32-byte seed file, matching

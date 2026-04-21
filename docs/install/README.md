@@ -7,14 +7,14 @@ Use one of these supported install paths:
 Use the published binaries when you want the fastest local install.
 
 - Guide: [BINARY_DISTRIBUTION.md](./BINARY_DISTRIBUTION.md)
-- Verify with `arc --help`
+- Verify with `chio --help`
 
 ## Homebrew
 
 Use Homebrew when you want a managed macOS install path.
 
 - Guide: [homebrew.md](./homebrew.md)
-- Verify with `arc --help`
+- Verify with `chio --help`
 
 ## Container And Docker Paths
 

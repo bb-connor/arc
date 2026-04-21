@@ -123,12 +123,12 @@ don't need the Rust toolchain.
 
 **Files**:
 - `.github/workflows/release-binaries.yml` (new: cross-compile for linux-x86_64, linux-aarch64, darwin-x86_64, darwin-aarch64, windows-x86_64)
-- `Homebrew/arc.rb.tmpl` release formula template (new)
+- `Homebrew/chio.rb.tmpl` release formula template (new)
 - `Dockerfile.sidecar` (public image, no GHCR auth required)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 3
 
-**Acceptance**: `brew install arc` or `docker run ghcr.io/backbay/chio-sidecar:latest` works without Rust installed.
+**Acceptance**: `brew install chio` or `docker run ghcr.io/backbay/chio-sidecar:latest` works without Rust installed.
 
 ### 0.5 Error Message Improvements [SHIPPED 224a05c]
 
@@ -193,12 +193,12 @@ at load time. Reject unsigned modules unless explicitly opted out.
 **Files**:
 - `crates/chio-wasm-guards/src/manifest.rs` (add signature field)
 - `crates/chio-wasm-guards/src/runtime.rs` (verify before compilation)
-- `crates/chio-cli/src/guards/sign.rs` (new: `arc guard sign` command)
+- `crates/chio-cli/src/guards/sign.rs` (new: `chio guard sign` command)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 4
 
 **Acceptance**: Loading an unsigned WASM guard fails with a clear error.
-`arc guard sign` produces a signed module that loads successfully.
+`chio guard sign` produces a signed module that loads successfully.
 
 ### 1.4 Emergency Kill Switch [SHIPPED 225193d]
 
@@ -445,7 +445,7 @@ demonstrates safe file reads allowed and `.env` writes denied.
 
 ### 4.2 MCP Sidecar Wrapper for Coding Agents [SHIPPED e38d41b]
 
-**What**: `arc mcp serve` with the default code-agent policy. One command
+**What**: `chio mcp serve` with the default code-agent policy. One command
 wraps any MCP filesystem server with Chio.
 
 **Files**:
@@ -454,7 +454,7 @@ wraps any MCP filesystem server with Chio.
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 4.4
 
-**Acceptance**: `arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .`
+**Acceptance**: `chio mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .`
 wraps the MCP server with Chio. File reads allowed, `.env` writes denied.
 
 ### 4.3 Migration Guide: MCP to Chio [SHIPPED e38d41b]
@@ -622,14 +622,14 @@ scoped to specific vector collections.
 
 ### 6.4 @chio-protocol/ai-sdk (Vercel AI SDK) [SHIPPED 9c973fe]
 
-**What**: `arcTool()` wrapper preserving streaming. Published to npm.
+**What**: `chioTool()` wrapper preserving streaming. Published to npm.
 
 **Files**:
 - `sdks/typescript/packages/ai-sdk/` (new package)
 
 **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md` section 4
 
-**Acceptance**: `arcTool()` wrapping a Vercel AI SDK `tool()` evaluates
+**Acceptance**: `chioTool()` wrapping a Vercel AI SDK `tool()` evaluates
 via sidecar without breaking `ReadableStream` / SSE streaming.
 
 ---
@@ -1260,7 +1260,7 @@ methods. Calls outside granted scope are denied.
 **Files**: `sdks/k8s/controller/job_reconciler.go` (new)
 **Refs**: `docs/protocols/K8S-JOBS-INTEGRATION.md`
 
-**Acceptance**: A K8s Job with `arc.protocol/governed: "true"` label gets
+**Acceptance**: A K8s Job with `chio.protocol/governed: "true"` label gets
 a capability grant at creation and release on completion.
 
 ### 17.6 Cloud Run / ECS Sidecar Reference Patterns [SHIPPED 8a0b933]
@@ -1349,7 +1349,7 @@ model (0-1000 range, weighted factors) and the CLI/HTTP surface.
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 1
 
-**Acceptance**: `arc compliance score --agent <id>` returns a 0-1000 score.
+**Acceptance**: `chio compliance score --agent <id>` returns a 0-1000 score.
 An agent with zero denials in 1000 calls scores above 900. An agent with
 a revoked capability scores below 500.
 
@@ -1416,7 +1416,7 @@ browser/mobile agents). It is NOT creating passport support from scratch.
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 4
 
-**Acceptance**: `arc passport generate --agent <id>` includes a `trust_tier`
+**Acceptance**: `chio passport generate --agent <id>` includes a `trust_tier`
 field computed from compliance score and behavioral profile. A WASM-compiled
 kernel verifies the passport and reads the tier.
 

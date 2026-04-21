@@ -30,7 +30,7 @@ packaging, and one supported verifier surface.
 | 3 | Pilot Readiness and Proof Distribution | 17-24 | 5 | Proof Package API, inquiry package, entitlements, publication, runbooks, pilot package |
 | 3.5 | Supervised-Live Productionization | Contingent | 1 | The first governed workflow moves into controlled production |
 | 4 | Governance, Downstream Consumers, and Assurance | Contingent | 3 | Governed workflows, connectors, and reviewer-facing products |
-| 5 | Embedded OEM, Trust Network, and ARC-Wall | Contingent | 4 | Partner packaging, shared trust services, and companion-product foundations |
+| 5 | Embedded OEM, Trust Network, and Chio-Wall | Contingent | 4 | Partner packaging, shared trust services, and companion-product foundations |
 
 **Total epics:** 28
 
@@ -40,9 +40,9 @@ packaging, and one supported verifier surface.
 
 ### Phase 0
 
-#### E-001: ARC Reuse Inventory
+#### E-001: Chio Reuse Inventory
 
-- Map ARC components reused for receipts, signing, storage, and verification.
+- Map Chio components reused for receipts, signing, storage, and verification.
 
 #### E-002: Canonical Evidence Object
 
@@ -61,9 +61,9 @@ packaging, and one supported verifier surface.
 
 ### Phase 1
 
-#### E-005: `arc-mercury-core`
+#### E-005: `chio-mercury-core`
 
-- Build trading-specific evidence types on top of ARC.
+- Build trading-specific evidence types on top of Chio.
 
 #### E-006: Evidence Bundle Schema
 
@@ -168,9 +168,9 @@ packaging, and one supported verifier surface.
 
 - Add shared publication, witness, trust-anchor, and interoperability services.
 
-#### E-025: ARC-Wall Core and Buyer Motion
+#### E-025: Chio-Wall Core and Buyer Motion
 
-- Build the companion information-domain control product on shared ARC
+- Build the companion information-domain control product on shared Chio
   foundations.
 
 #### E-026: Platform Hardening for Multi-Product Operation

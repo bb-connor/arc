@@ -52,13 +52,13 @@ def _ephemeral_instance() -> DagsterInstance:
 
 class TestAllowPath:
     def test_unpartitioned_asset_materializes_under_allow(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_asset(
             scope=_scope_for_tools("customer_embeddings"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def customer_embeddings(context: AssetExecutionContext) -> int:
             return 42
@@ -69,7 +69,7 @@ class TestAllowPath:
         )
         assert result.success
 
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         call = evaluate_calls[0]
         assert call.tool_name == "customer_embeddings"
@@ -89,14 +89,14 @@ class TestAllowPath:
         assert metadata["chio_tool_server"].value == "srv"
 
     def test_asset_body_receives_its_context(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         captured: dict[str, Any] = {}
 
         @chio_asset(
             scope=_scope_for_tools("observed"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def observed(context: AssetExecutionContext) -> int:
             captured["run_id"] = context.run.run_id
@@ -116,14 +116,14 @@ class TestPartitionScoping:
     """The partition key MUST appear in the capability evaluation payload."""
 
     def test_partition_key_flows_into_capability_evaluation(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         regions = StaticPartitionsDefinition(["us-east", "eu-west", "ap-south"])
 
         @chio_asset(
             scope=_scope_for_tools("regional_analytics"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
             partitions_def=regions,
         )
         def regional_analytics(context: AssetExecutionContext) -> str:
@@ -136,7 +136,7 @@ class TestPartitionScoping:
         )
         assert result.success
 
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(evaluate_calls) == 1
         params = evaluate_calls[0].parameters
         # Primary mirror field the guards documented in DAGSTER-INTEGRATION.md
@@ -165,14 +165,14 @@ class TestPartitionScoping:
                 guard="DataResidencyGuard",
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
         regions = StaticPartitionsDefinition(["us-east", "eu-west"])
 
         @chio_asset(
             scope=_scope_for_tools("regional_analytics"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
             partitions_def=regions,
         )
         def regional_analytics(context: AssetExecutionContext) -> str:
@@ -206,7 +206,7 @@ class TestPartitionScoping:
         error_chain = _error_chain_class_names(failure_info)
         assert "PermissionError" in error_chain
 
-        evaluate_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         allowed_partitions = [
             c.parameters["partition_key"]
             for c in evaluate_calls
@@ -228,7 +228,7 @@ class TestPartitionScoping:
 
 class TestDenyPath:
     def test_deny_receipt_path_fails_the_materialization(self) -> None:
-        arc = deny_all(
+        chio = deny_all(
             reason="tool not in scope",
             guard="ScopeGuard",
             raise_on_deny=False,
@@ -238,7 +238,7 @@ class TestDenyPath:
             scope=_scope_for_tools("write_output"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write_output(context: AssetExecutionContext) -> str:
             return "wrote"
@@ -261,13 +261,13 @@ class TestDenyPath:
         assert "PermissionError" in error_chain
 
     def test_deny_403_path_fails_the_materialization(self) -> None:
-        arc = deny_all(reason="no write perms", guard="CapabilityGuard")
+        chio = deny_all(reason="no write perms", guard="CapabilityGuard")
 
         @chio_asset(
             scope=_scope_for_tools("delete_something"),
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def delete_something(context: AssetExecutionContext) -> None:
             return None
@@ -297,12 +297,12 @@ class TestDenyPath:
 
 class TestConfigErrors:
     def test_missing_capability_id_raises_config_error(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
 
         @chio_asset(
             scope=_scope_for_tools("no_cap"),
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def no_cap(context: AssetExecutionContext) -> int:
             return 1
@@ -344,12 +344,12 @@ class TestPolicyEnforcement:
                 guard="ScopeGuard",
             )
 
-        arc = MockChioClient(policy=policy, raise_on_deny=False)
+        chio = MockChioClient(policy=policy, raise_on_deny=False)
 
         @chio_asset(
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def embedding_asset(context: AssetExecutionContext) -> int:
             return 1
@@ -357,7 +357,7 @@ class TestPolicyEnforcement:
         @chio_asset(
             capability_id="cap-1",
             tool_server="srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         def write_asset(context: AssetExecutionContext) -> int:
             return 2

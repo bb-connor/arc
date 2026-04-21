@@ -164,7 +164,7 @@ fn spawn_http_server_with_local_auth(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve-http");
+        .expect("spawn chio mcp serve-http");
 
     ServerGuard { child }
 }

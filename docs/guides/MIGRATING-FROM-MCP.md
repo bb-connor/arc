@@ -112,7 +112,7 @@ contract literal:
 - use `GET /mcp` for live notifications and replay, with `Last-Event-ID` as the replay cursor
 - expect late notifications and task handles to stay scoped to the session that created them, even when a shared hosted owner reuses one upstream subprocess
 
-If your client sends `_meta.modelMetadata` or `_meta.arcModelMetadata`, Chio
+If your client sends `_meta.modelMetadata` or `_meta.chioModelMetadata`, Chio
 preserves that data on the request and receipt path, but the incoming
 provenance is treated as `asserted` until a trusted subsystem upgrades it.
 

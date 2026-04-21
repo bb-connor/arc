@@ -20,9 +20,9 @@ they have the same epistemic weight:
   evidence by themselves.
 
 Where a surface is only proposed, this document now labels it explicitly. In
-particular: `arc mcp serve`, `arc mcp serve-http`, `arc api protect`, the
+particular: `chio mcp serve`, `chio mcp serve-http`, `chio api protect`, the
 HTTP/framework substrate packages, ACP live-path cryptographic receipts, and
-the receipt dashboard ship today. `arc start --config arc.yaml` and the
+the receipt dashboard ship today. `chio start --config chio.yaml` and the
 stronger market-position claims remain strategic or proposed rather than
 current runtime fact. The shared `CrossProtocolOrchestrator` substrate is no
 longer purely proposed; the stronger technical control-plane thesis is now
@@ -242,7 +242,7 @@ shipping surface.
 | Item | Rationale | Crate | Status |
 |------|-----------|-------|--------|
 | ACP kernel integration | Promote chio-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `chio-acp-proxy` | [Shipped] |
-| MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `chio-cli` | |
+| MCP proxy DX polish | The repo already ships `chio mcp serve` and `chio mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `chio proxy` alias | `chio-cli` | |
 | Unified runtime config | Single `chio.yaml` that configures MCP, A2A, and ACP edges with shared policy | `chio-cli` | [Partial -- flat schema shipped, nested schema proposed. See spec/CONFIGURATION.md] |
 | Symlink fix | Workspace symlink resolution for monorepo consumers | `chio-cli` | |
 
@@ -506,19 +506,19 @@ explicitly distinguish shipped surfaces from proposed next steps.
 Current shipped surface:
 
 ```
-arc mcp serve --policy <policy.yaml> --server-id <id> <command>...
+chio mcp serve --policy <policy.yaml> --server-id <id> <command>...
 ```
 
 and, for hosted HTTP:
 
 ```bash
-arc mcp serve-http --policy <policy.yaml> --server-id <id> --listen <addr> <command>...
+chio mcp serve-http --policy <policy.yaml> --server-id <id> --listen <addr> <command>...
 ```
 
 These commands already wrap an MCP server subprocess, interpose the Chio
 kernel, and produce signed receipts for every tool call. The next DX step is
 to simplify naming, defaults, and documentation further, potentially including
-an `arc proxy` alias.
+an `chio proxy` alias.
 
 This is the **adoption wedge**, not the architectural boundary. Chio should win
 initial deployment through wrapped MCP edges while building toward broader
@@ -550,7 +550,7 @@ receipts:
 ```
 
 Status note: this is a design proposal. The repo currently supports `chio_yaml`
-as a policy format, but does not currently ship an `arc start --config arc.yaml`
+as a policy format, but does not currently ship an `chio start --config chio.yaml`
 runtime command.
 
 ### Phase 3: Guard SDK
@@ -602,9 +602,9 @@ presented here as externally validated market research.
 
 ### Ring 1: Open-Source Adoption (Developers)
 
-Chio is open source and free. Developers adopt it because `arc mcp serve` /
-`arc mcp serve-http` are the fastest current way to add authorization and audit
-to an MCP server. A future `arc proxy` alias may compress that further. The
+Chio is open source and free. Developers adopt it because `chio mcp serve` /
+`chio mcp serve-http` are the fastest current way to add authorization and audit
+to an MCP server. A future `chio proxy` alias may compress that further. The
 receipt log is local SQLite. No account, no sign-up, no cloud dependency.
 
 ### Ring 2: Enterprise SIEM Integration (Security Teams)

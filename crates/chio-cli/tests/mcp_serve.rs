@@ -1764,7 +1764,7 @@ fn mcp_serve_wraps_mcp_server_with_policy_filtered_edge() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -1858,7 +1858,7 @@ fn mcp_serve_wraps_mcp_server_with_policy_filtered_edge() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -1866,7 +1866,7 @@ fn mcp_serve_wraps_mcp_server_with_policy_filtered_edge() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -1898,7 +1898,7 @@ fn mcp_serve_wraps_resources_prompts_and_completion() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2066,7 +2066,7 @@ fn mcp_serve_wraps_resources_prompts_and_completion() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2074,7 +2074,7 @@ fn mcp_serve_wraps_resources_prompts_and_completion() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2107,7 +2107,7 @@ fn mcp_serve_enforces_filesystem_resource_roots_with_signed_evidence() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2212,7 +2212,7 @@ fn mcp_serve_enforces_filesystem_resource_roots_with_signed_evidence() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2220,7 +2220,7 @@ fn mcp_serve_enforces_filesystem_resource_roots_with_signed_evidence() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2253,7 +2253,7 @@ fn mcp_serve_denies_filesystem_resources_when_roots_are_missing() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2323,7 +2323,7 @@ fn mcp_serve_denies_filesystem_resources_when_roots_are_missing() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2331,7 +2331,7 @@ fn mcp_serve_denies_filesystem_resources_when_roots_are_missing() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2363,7 +2363,7 @@ fn mcp_serve_propagates_wrapped_resource_notifications_for_subscribed_uris() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2444,7 +2444,7 @@ fn mcp_serve_propagates_wrapped_resource_notifications_for_subscribed_uris() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2452,7 +2452,7 @@ fn mcp_serve_propagates_wrapped_resource_notifications_for_subscribed_uris() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2484,7 +2484,7 @@ fn mcp_serve_propagates_wrapped_background_resource_notifications_while_idle() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2567,7 +2567,7 @@ fn mcp_serve_propagates_wrapped_background_resource_notifications_while_idle() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2575,7 +2575,7 @@ fn mcp_serve_propagates_wrapped_background_resource_notifications_while_idle() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2607,7 +2607,7 @@ fn mcp_serve_propagates_wrapped_catalog_change_notifications_while_idle() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2674,7 +2674,7 @@ fn mcp_serve_propagates_wrapped_catalog_change_notifications_while_idle() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2682,7 +2682,7 @@ fn mcp_serve_propagates_wrapped_catalog_change_notifications_while_idle() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2714,7 +2714,7 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2770,7 +2770,7 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2778,7 +2778,7 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2810,7 +2810,7 @@ fn mcp_serve_proxies_wrapped_sampling_and_roots_requests() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2935,7 +2935,7 @@ fn mcp_serve_proxies_wrapped_sampling_and_roots_requests() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -2943,7 +2943,7 @@ fn mcp_serve_proxies_wrapped_sampling_and_roots_requests() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -2975,7 +2975,7 @@ fn mcp_serve_supports_task_augmented_wrapped_sampling_requests() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3051,7 +3051,7 @@ fn mcp_serve_supports_task_augmented_wrapped_sampling_requests() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3059,7 +3059,7 @@ fn mcp_serve_supports_task_augmented_wrapped_sampling_requests() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3091,7 +3091,7 @@ fn mcp_serve_supports_task_augmented_wrapped_elicitation_requests() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3171,7 +3171,7 @@ fn mcp_serve_supports_task_augmented_wrapped_elicitation_requests() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3179,7 +3179,7 @@ fn mcp_serve_supports_task_augmented_wrapped_elicitation_requests() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3211,7 +3211,7 @@ fn mcp_serve_forwards_wrapped_url_elicitation_completion_notifications() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3298,7 +3298,7 @@ fn mcp_serve_forwards_wrapped_url_elicitation_completion_notifications() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3306,7 +3306,7 @@ fn mcp_serve_forwards_wrapped_url_elicitation_completion_notifications() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3338,7 +3338,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3410,7 +3410,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3418,7 +3418,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3450,7 +3450,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3526,7 +3526,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3534,7 +3534,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3566,7 +3566,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3634,7 +3634,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3642,7 +3642,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3674,7 +3674,7 @@ fn mcp_serve_completes_task_in_background_and_emits_status_notification() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3776,7 +3776,7 @@ fn mcp_serve_completes_task_in_background_and_emits_status_notification() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3784,7 +3784,7 @@ fn mcp_serve_completes_task_in_background_and_emits_status_notification() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3816,7 +3816,7 @@ fn mcp_serve_progresses_background_tasks_while_client_keeps_sending_requests() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3912,7 +3912,7 @@ fn mcp_serve_progresses_background_tasks_while_client_keeps_sending_requests() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -3920,7 +3920,7 @@ fn mcp_serve_progresses_background_tasks_while_client_keeps_sending_requests() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -3952,7 +3952,7 @@ fn mcp_serve_tags_nested_task_messages_with_related_task_metadata() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -4058,7 +4058,7 @@ fn mcp_serve_tags_nested_task_messages_with_related_task_metadata() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -4066,7 +4066,7 @@ fn mcp_serve_tags_nested_task_messages_with_related_task_metadata() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -4098,7 +4098,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -4209,7 +4209,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -4217,7 +4217,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -4249,7 +4249,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -4357,7 +4357,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -4365,7 +4365,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);
@@ -4397,7 +4397,7 @@ fn mcp_serve_progresses_wrapped_sampling_tasks_while_upstream_keeps_talking() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn arc mcp serve");
+        .expect("spawn chio mcp serve");
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -4474,7 +4474,7 @@ fn mcp_serve_progresses_wrapped_sampling_tasks_while_upstream_keeps_talking() {
 
     drop(stdin);
 
-    let status = child.wait().expect("wait for arc process");
+    let status = child.wait().expect("wait for chio process");
     let mut stderr = String::new();
     child
         .stderr
@@ -4482,7 +4482,7 @@ fn mcp_serve_progresses_wrapped_sampling_tasks_while_upstream_keeps_talking() {
         .expect("child stderr")
         .read_to_string(&mut stderr)
         .expect("read stderr");
-    assert!(status.success(), "arc stderr:\n{stderr}");
+    assert!(status.success(), "chio stderr:\n{stderr}");
 
     let _ = fs::remove_file(policy_path);
     let _ = fs::remove_file(script_path);

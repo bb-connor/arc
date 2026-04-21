@@ -2653,7 +2653,7 @@ mod tests {
                 settlement_mode: MeteredSettlementMode::AllowThenSettle,
                 quote: MeteredBillingQuote {
                     quote_id: "quote-1".to_string(),
-                    provider: "meter.arc".to_string(),
+                    provider: "meter.chio".to_string(),
                     billing_unit: "1k_tokens".to_string(),
                     quoted_units: 12,
                     quoted_cost: MonetaryAmount {
@@ -2706,7 +2706,7 @@ mod tests {
     fn metered_billing_quote_validity_window_respects_optional_expiry() {
         let quote = MeteredBillingQuote {
             quote_id: "quote-1".to_string(),
-            provider: "meter.arc".to_string(),
+            provider: "meter.chio".to_string(),
             billing_unit: "1k_tokens".to_string(),
             quoted_units: 8,
             quoted_cost: MonetaryAmount {

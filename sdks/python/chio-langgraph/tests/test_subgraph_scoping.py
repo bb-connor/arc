@@ -56,9 +56,9 @@ def _scope(*tools: str) -> ChioScope:
 
 class TestSubgraphWithinCeiling:
     async def test_nodes_within_ceiling_dispatch_successfully(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         outer = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search", "browse", "analyze"),
             node_scopes={"research": _scope("search", "browse", "analyze")},
         )
@@ -91,9 +91,9 @@ class TestSubgraphWithinCeiling:
 
 class TestRegisterRefusesBroaderScope:
     async def test_register_node_scope_raises_when_broader(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         outer = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search", "browse"),
         )
         inner = outer.subgraph_config()
@@ -104,9 +104,9 @@ class TestRegisterRefusesBroaderScope:
             )
 
     async def test_chio_node_refuses_broader_scope(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         outer = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search"),
         )
 
@@ -129,9 +129,9 @@ class TestRegisterRefusesBroaderScope:
 
 class TestSubgraphConstructorValidates:
     async def test_constructor_rejects_broader_node_scope(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         outer = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search"),
         )
         with pytest.raises(ChioLangGraphConfigError):
@@ -140,9 +140,9 @@ class TestSubgraphConstructorValidates:
             )
 
     async def test_constructor_accepts_exact_subset(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         outer = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search", "browse"),
         )
         inner = outer.subgraph_config(
@@ -158,15 +158,15 @@ class TestSubgraphConstructorValidates:
 
 class TestStandaloneCeilingCheck:
     def test_no_ceiling_is_noop(self) -> None:
-        arc = allow_all()
-        cfg = ChioGraphConfig(chio_client=arc)
+        chio = allow_all()
+        cfg = ChioGraphConfig(chio_client=chio)
         # Should not raise.
         enforce_subgraph_ceiling(cfg, "anything", _scope("anything"))
 
     def test_with_ceiling_rejects_broader(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         cfg = ChioGraphConfig(
-            chio_client=arc, workflow_scope=_scope("search")
+            chio_client=chio, workflow_scope=_scope("search")
         )
         with pytest.raises(ChioLangGraphConfigError):
             enforce_subgraph_ceiling(
@@ -174,15 +174,15 @@ class TestStandaloneCeilingCheck:
             )
 
     def test_parent_ceiling_is_stricter_than_workflow_scope(self) -> None:
-        arc = allow_all()
+        chio = allow_all()
         outer = ChioGraphConfig(
-            chio_client=arc, workflow_scope=_scope("search")
+            chio_client=chio, workflow_scope=_scope("search")
         )
         # The subgraph claims a broader workflow_scope, but its
         # parent_ceiling (propagated from outer) is narrower. The
         # effective ceiling is parent_ceiling.
         inner = ChioGraphConfig(
-            chio_client=arc,
+            chio_client=chio,
             workflow_scope=_scope("search", "write"),
             parent_ceiling=outer.effective_ceiling(),
         )

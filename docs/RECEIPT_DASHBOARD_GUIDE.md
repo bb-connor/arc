@@ -79,7 +79,7 @@ The panel renders:
   remote capability IDs, local anchor capability IDs, and local receipt counts
 
 This keeps the browser on the same comparison contract already used by
-`arc reputation compare --control-url ...`; the dashboard does not invent a
+`chio reputation compare --control-url ...`; the dashboard does not invent a
 second local scoring path.
 
 ## Shared Evidence API Surface
@@ -89,7 +89,7 @@ returns the same shared-evidence report shape used inside operator reports and
 portable reputation comparison. The CLI wrapper is:
 
 ```bash
-arc trust evidence-share list --agent-subject <subject-hex> --json
+chio trust evidence-share list --agent-subject <subject-hex> --json
 ```
 
 This surfaces imported remote evidence references directly without merging

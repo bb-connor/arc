@@ -1,4 +1,4 @@
-// Package arc provides HTTP middleware for the Chio protocol.
+// Package chio provides HTTP middleware for the Chio protocol.
 //
 // Chio (Chio) secures HTTP APIs with
 // cryptographic receipts and capability-based access control. This package
@@ -10,9 +10,9 @@
 //
 //	mux := http.NewServeMux()
 //	mux.HandleFunc("/pets", handlePets)
-//	protected := arc.Protect(mux, arc.ConfigFile("chio.yaml"))
+//	protected := chio.Protect(mux, chio.ConfigFile("chio.yaml"))
 //	http.ListenAndServe(":8080", protected)
-package arc
+package chio
 
 import (
 	"net/http"

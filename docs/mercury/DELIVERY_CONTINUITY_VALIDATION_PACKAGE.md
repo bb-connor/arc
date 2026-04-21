@@ -11,14 +11,14 @@
 bounded Mercury delivery-continuity lane. It generates the outcome-evidence
 bundle, writes the validation report, and emits one explicit proceed decision
 instead of implying a generic onboarding suite, CRM workflow, support desk,
-channel marketplace, merged shell, or ARC commercial surface.
+channel marketplace, merged shell, or Chio commercial surface.
 
 ---
 
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- delivery-continuity validate --output target/mercury-delivery-continuity-validation
+cargo run -p chio-mercury -- delivery-continuity validate --output target/mercury-delivery-continuity-validation
 ```
 
 ---
@@ -74,7 +74,7 @@ This package supports one bounded claim only:
 > outcome-evidence bundle and one renewal gate rooted in the validated
 > selective-account-activation, broader-distribution, reference-distribution,
 > controlled-adoption, release-readiness, trust-network, assurance, proof, and
-> inquiry stack without widening ARC or creating a generic customer platform.
+> inquiry stack without widening Chio or creating a generic customer platform.
 
 ---
 
@@ -85,5 +85,5 @@ This package does not claim:
 - multiple continuity motions or surfaces
 - a generic onboarding suite, CRM workflow, or support desk
 - channel marketplaces or multi-account continuity programs
-- a merged Mercury and ARC-Wall shell
+- a merged Mercury and Chio-Wall shell
 - universal renewal readiness or broad business-performance guarantees

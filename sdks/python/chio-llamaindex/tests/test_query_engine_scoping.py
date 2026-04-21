@@ -138,7 +138,7 @@ class TestClientSideCollectionScoping:
     async def test_allowed_collection_passes_and_queries_engine(self) -> None:
         engine = _FakeQueryEngine(label="prod")
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioQueryEngineTool(
                 query_engine=engine,
                 collection="prod-docs",
@@ -147,7 +147,7 @@ class TestClientSideCollectionScoping:
                 ),
                 capability_id="cap-analyst",
                 server_id="rag-srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             output = await tool.acall("quarterly earnings")
 
@@ -159,7 +159,7 @@ class TestClientSideCollectionScoping:
         """Acceptance check: scope for 'public-docs' cannot touch 'finance-private'."""
         engine = _FakeQueryEngine()
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioQueryEngineTool(
                 query_engine=engine,
                 collection="finance-private",
@@ -168,7 +168,7 @@ class TestClientSideCollectionScoping:
                 ),
                 capability_id="cap-analyst",
                 server_id="rag-srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool.acall("leak secrets")
@@ -180,20 +180,20 @@ class TestClientSideCollectionScoping:
         assert engine.queries == []
         # The sidecar must not have been hit either (client-side denial is
         # the very first gate).
-        eval_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        eval_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert eval_calls == []
 
     async def test_empty_allowlist_is_fail_closed(self) -> None:
         engine = _FakeQueryEngine()
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioQueryEngineTool(
                 query_engine=engine,
                 collection="prod-docs",
                 capability_scope=ChioScope(),  # no grants at all
                 capability_id="cap-analyst",
                 server_id="rag-srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool.acall("list invoices")
@@ -203,14 +203,14 @@ class TestClientSideCollectionScoping:
     async def test_allowed_collections_override(self) -> None:
         engine = _FakeQueryEngine()
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioQueryEngineTool(
                 query_engine=engine,
                 collection="prod-docs",
                 allowed_collections=["prod-docs", "qa-docs"],
                 capability_id="cap",
                 server_id="rag-srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             assert tool.allowed_collections() == frozenset(
                 {"prod-docs", "qa-docs"}
@@ -223,13 +223,13 @@ class TestClientSideCollectionScoping:
         and the sidecar's policy is the only gate."""
         engine = _FakeQueryEngine()
 
-        async with allow_all() as arc:
+        async with allow_all() as chio:
             tool = ChioQueryEngineTool(
                 query_engine=engine,
                 collection="prod-docs",
                 capability_id="cap",
                 server_id="rag-srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             output = await tool.acall("anything")
         assert isinstance(output, ToolOutput)
@@ -244,14 +244,14 @@ class TestSidecarEnforcement:
     async def test_sidecar_deny_raises(self) -> None:
         engine = _FakeQueryEngine()
 
-        async with deny_all(reason="policy block", guard="RagPolicyGuard") as arc:
+        async with deny_all(reason="policy block", guard="RagPolicyGuard") as chio:
             tool = ChioQueryEngineTool(
                 query_engine=engine,
                 collection="prod-docs",
                 allowed_collections=["prod-docs"],  # passes client-side
                 capability_id="cap",
                 server_id="rag-srv",
-                chio_client=arc,
+                chio_client=chio,
             )
             with pytest.raises(ChioToolError) as exc_info:
                 await tool.acall("top secret question")
@@ -263,20 +263,20 @@ class TestSidecarEnforcement:
         """The sidecar sees the collection so policy can inspect it."""
         engine = _FakeQueryEngine()
 
-        arc = MockChioClient()
-        arc.set_policy(_collection_policy({"prod-docs"}))
+        chio = MockChioClient()
+        chio.set_policy(_collection_policy({"prod-docs"}))
         tool = ChioQueryEngineTool(
             query_engine=engine,
             collection="prod-docs",
             allowed_collections=["prod-docs"],
             capability_id="cap",
             server_id="rag-srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         output = await tool.acall("how many widgets")
         assert isinstance(output, ToolOutput)
 
-        eval_calls = [c for c in arc.calls if c.method == "evaluate_tool_call"]
+        eval_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
         assert len(eval_calls) == 1
         params = eval_calls[0].parameters
         assert params["collection"] == "prod-docs"
@@ -291,14 +291,14 @@ class TestSidecarEnforcement:
 class TestBindCapability:
     async def test_bind_capability_updates_scope(self) -> None:
         engine = _FakeQueryEngine()
-        arc = allow_all()
+        chio = allow_all()
 
         tool = ChioQueryEngineTool(
             query_engine=engine,
             collection="prod-docs",
             capability_id="old",
             server_id="rag-srv",
-            chio_client=arc,
+            chio_client=chio,
         )
         new_scope = _scope_with_memory_allowlist("prod-docs")
         tool.bind_capability("new-cap", scope=new_scope)

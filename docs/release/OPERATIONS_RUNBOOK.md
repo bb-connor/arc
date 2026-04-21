@@ -184,7 +184,7 @@ Run the production qualification lane from the repo root:
 For the ship-facing bounded release gate specifically:
 
 ```bash
-./scripts/qualify-bounded-arc.sh
+./scripts/qualify-bounded-chio.sh
 ./scripts/qualify-trust-control.sh
 ```
 

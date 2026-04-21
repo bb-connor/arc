@@ -103,7 +103,7 @@ func (client *Client) Initialize(ctx context.Context, options InitializeOptions)
 		return nil, fmt.Errorf("initialize response did not include protocolVersion")
 	}
 
-	pactSession := session.New(session.Options{
+	chioSession := session.New(session.Options{
 		AuthToken:       client.AuthToken,
 		BaseURL:         client.BaseURL,
 		HTTPClient:      client.HTTPClient,
@@ -111,23 +111,23 @@ func (client *Client) Initialize(ctx context.Context, options InitializeOptions)
 		SessionID:       sessionID,
 	})
 	if options.OnMessage != nil {
-		pactSession.SetMessageHandler(func(ctx context.Context, message map[string]any) error {
-			return options.OnMessage(ctx, message, pactSession)
+		chioSession.SetMessageHandler(func(ctx context.Context, message map[string]any) error {
+			return options.OnMessage(ctx, message, chioSession)
 		})
 	}
 
-	initializedResponse, err := pactSession.Notification(ctx, "notifications/initialized", nil, nil)
+	initializedResponse, err := chioSession.Notification(ctx, "notifications/initialized", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 	if initializedResponse.Status != http.StatusOK && initializedResponse.Status != http.StatusAccepted {
 		return nil, fmt.Errorf("notifications/initialized returned HTTP %d", initializedResponse.Status)
 	}
-	pactSession.Handshake = &session.SessionHandshake{
+	chioSession.Handshake = &session.SessionHandshake{
 		InitializeResponse:  initializeResponse,
 		InitializedResponse: initializedResponse,
 	}
-	return pactSession, nil
+	return chioSession, nil
 }
 
 func coalesceMap(input map[string]any) map[string]any {

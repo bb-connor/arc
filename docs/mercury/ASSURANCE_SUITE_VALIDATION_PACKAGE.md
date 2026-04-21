@@ -8,13 +8,13 @@
 ## Purpose
 
 The assurance validation package proves that MERCURY can package one bounded
-assurance-suite lane over the same ARC and MERCURY truth artifacts already
+assurance-suite lane over the same Chio and MERCURY truth artifacts already
 used for supervised-live qualification and governance review.
 
 The canonical command is:
 
 ```bash
-cargo run -p arc-mercury -- assurance-suite validate --output target/mercury-assurance-suite-validation
+cargo run -p chio-mercury -- assurance-suite validate --output target/mercury-assurance-suite-validation
 ```
 
 ---
@@ -46,7 +46,7 @@ The generated validation directory contains:
 The validation package supports one narrow claim:
 
 > MERCURY can package one bounded assurance-suite reviewer family for
-> internal, auditor, and counterparty review without redefining ARC truth or
+> internal, auditor, and counterparty review without redefining Chio truth or
 > widening into a generic review portal.
 
 It does not approve additional reviewer populations, additional downstream or

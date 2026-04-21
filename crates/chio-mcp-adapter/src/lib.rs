@@ -1695,7 +1695,7 @@ mod tests {
     // ---- Notification source tests ----
 
     #[test]
-    fn notification_source_returns_arc_transport() {
+    fn notification_source_returns_chio_transport() {
         let transport = MockTransport::simple(
             vec![text_tool_info("t")],
             MockCallBehavior::Success(success_result("ok")),

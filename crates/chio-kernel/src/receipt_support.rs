@@ -838,7 +838,7 @@ mod tests {
     fn raw_runtime_attestation() -> RuntimeAttestationEvidence {
         RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,

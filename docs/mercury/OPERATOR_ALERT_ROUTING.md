@@ -7,8 +7,8 @@
 
 ## Purpose
 
-This routing model distinguishes ARC substrate incidents from MERCURY-only,
-ARC-Wall-only, and trust-material incidents across the current product set.
+This routing model distinguishes Chio substrate incidents from MERCURY-only,
+Chio-Wall-only, and trust-material incidents across the current product set.
 
 ---
 
@@ -16,34 +16,34 @@ ARC-Wall-only, and trust-material incidents across the current product set.
 
 ### Shared substrate
 
-- owning team: `arc-release-control`
-- affected products: MERCURY, ARC-Wall
-- use when ARC-owned receipt, checkpoint, export, or verifier truth is at risk
+- owning team: `chio-release-control`
+- affected products: MERCURY, Chio-Wall
+- use when Chio-owned receipt, checkpoint, export, or verifier truth is at risk
 
 ### MERCURY product
 
 - owning team: `mercury-product-ops`
 - affected products: MERCURY
-- use when the incident is product-local and does not weaken shared ARC truth
+- use when the incident is product-local and does not weaken shared Chio truth
 
-### ARC-Wall product
+### Chio-Wall product
 
-- owning team: `arc-wall-ops`
-- affected products: ARC-Wall
-- use when the incident is product-local and does not weaken shared ARC truth
+- owning team: `chio-wall-ops`
+- affected products: Chio-Wall
+- use when the incident is product-local and does not weaken shared Chio truth
 
 ### Trust material
 
-- owning team: `arc-key-custody`
-- affected products: MERCURY, ARC-Wall
-- use when custody, rotation, or verification state changes for shared ARC
+- owning team: `chio-key-custody`
+- affected products: MERCURY, Chio-Wall
+- use when custody, rotation, or verification state changes for shared Chio
   trust material
 
 ---
 
 ## Fail-Closed Rule
 
-Alerts that cannot be classified as product-local default to the shared ARC
+Alerts that cannot be classified as product-local default to the shared Chio
 substrate route and pause both product lanes until triage completes.
 
 ---
@@ -51,7 +51,7 @@ substrate route and pause both product lanes until triage completes.
 ## Canonical Command
 
 ```bash
-cargo run -p arc-cli -- product-surface export --output target/arc-product-surface-hardening-export
+cargo run -p chio-cli -- product-surface export --output target/chio-product-surface-hardening-export
 ```
 
 The export package writes `operator-alert-routing.json`.

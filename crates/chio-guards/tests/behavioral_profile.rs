@@ -185,7 +185,7 @@ fn guard_reads_from_sqlite_receipt_store() {
     let cap = "cap-agent-c";
     for i in 0..10 {
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 &format!("r-lo-{i}"),
                 cap,
                 base_ts + i as u64,
@@ -195,7 +195,7 @@ fn guard_reads_from_sqlite_receipt_store() {
     }
     for i in 0..500 {
         store
-            .append_arc_receipt(&make_receipt(
+            .append_chio_receipt(&make_receipt(
                 &format!("r-hi-{i}"),
                 cap,
                 base_ts + 60 + (i as u64 % 60),

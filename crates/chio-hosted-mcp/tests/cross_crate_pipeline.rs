@@ -92,7 +92,7 @@ fn export_receipts(
 }
 
 #[test]
-fn hosted_mcp_receipts_flow_into_arc_siem_export() {
+fn hosted_mcp_receipts_flow_into_chio_siem_export() {
     let server = start_http_server("test-token");
     let session = server.initialize_session();
 

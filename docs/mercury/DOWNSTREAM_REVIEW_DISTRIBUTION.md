@@ -41,7 +41,7 @@ The downstream package includes:
 - one delivery acknowledgement that records the bounded file-drop handoff
 
 The downstream lane is an evidence-distribution path, not a new truth source.
-ARC receipts, checkpoints, proof packages, and inquiry packages remain
+Chio receipts, checkpoints, proof packages, and inquiry packages remain
 authoritative.
 
 ---
