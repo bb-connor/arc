@@ -44,3 +44,10 @@ crates/arc-cli/dashboard/dist/
 # Generated coverage artifacts
 /coverage/*
 !/coverage/README.md
+
+# Claude Code session
+.claude/
+
+# Lean build artifacts
+formal/lean4/**/.lake/
+**/.lake/build/
