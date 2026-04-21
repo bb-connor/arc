@@ -142,12 +142,12 @@ jobs:
       - name: MSRV workspace lane
         env:
           CARGO_BUILD_JOBS: "1"
-          CARGO_TARGET_DIR: ${{ runner.temp }}/arc-msrv-target
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-msrv-target
           RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
           cargo build --workspace
-          cargo test --workspace --exclude arc-conformance --exclude arc-wasm-guards
-          cargo test -p arc-wasm-guards --lib
+          cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards
+          cargo test -p chio-wasm-guards --lib
 
   coverage:
     name: Coverage
@@ -172,7 +172,7 @@ jobs:
         # Install tarpaulin on the host so run-coverage.sh takes the
         # local branch instead of falling back to the
         # `xd009642/tarpaulin` docker image (which has no protoc and
-        # therefore breaks arc-envoy-ext-authz's tonic-build).
+        # therefore breaks chio-envoy-ext-authz's tonic-build).
         run: cargo install cargo-tarpaulin --locked --version 0.31.2
 
       - name: Free disk space
@@ -184,9 +184,9 @@ jobs:
       - name: Coverage lane
         env:
           COVERAGE_FAIL_UNDER: "65"
-          COVERAGE_ROOT: ${{ runner.temp }}/arc-coverage
-          TARPAULIN_TARGET_DIR: ${{ runner.temp }}/arc-tarpaulin-target
-          TARPAULIN_LOCAL_LLVM_PROFILE_FILE: ${{ runner.temp }}/arc-tarpaulin-target/build_rs_cov-%p-%m.profraw
+          COVERAGE_ROOT: ${{ runner.temp }}/chio-coverage
+          TARPAULIN_TARGET_DIR: ${{ runner.temp }}/chio-tarpaulin-target
+          TARPAULIN_LOCAL_LLVM_PROFILE_FILE: ${{ runner.temp }}/chio-tarpaulin-target/build_rs_cov-%p-%m.profraw
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
@@ -197,5 +197,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: ${{ runner.temp }}/arc-coverage
+          path: ${{ runner.temp }}/chio-coverage
           retention-days: 21
