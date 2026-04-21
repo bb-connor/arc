@@ -30,6 +30,7 @@
           "delegation_depth": 1,
           "grant_index": 0,
           "oracle_evidence": {
+            "authority": "chio_link_runtime_v1",
             "base": "ETH",
             "cache_age_seconds": 45,
             "converted_cost_units": 300,
@@ -51,11 +52,11 @@
         }
       },
       "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "signature": "d761a0b24a676d0abe74e0d44a1dd55e5f72ad80f8187e99303a50eb48803e8f6796db338b43e367df2ae8083a2b48ac2bde18c7cd29cff5ea9940fe91c40707"
+      "signature": "8eb9e2aa3290e69362a270ce61ea9ab1269705bb62732746560c992b649ee5f3df400e9c4856644c73dbd021b9bbaf49fc57933deda3ef8d0280fa5a2484a600"
     },
     "receipt_inclusion": {
       "checkpoint_seq": 1042,
-      "merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+      "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
       "proof": {
         "tree_size": 1,
         "leaf_index": 0,
@@ -68,10 +69,10 @@
       "batch_start_seq": 104101,
       "batch_end_seq": 104200,
       "tree_size": 1,
-      "merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+      "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
       "issued_at": 1743292800,
       "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "signature": "69aadce95f4d6e54c0ac59fcccc47870ff85a1e5dfba74726dc95f7ef1f3b6256b98e8400a983e24a1411a4cb170c04eb9036d33ba29a4217752298122076a07"
+      "signature": "91ef6c1f7e1789491d77fec62448d70a1b2c850ff5e29f9db7b1d8cf29034328483448ebc747826bfecbe8293c2fc74bbadd66cc61d1339a6c52ae2282b7c40a"
     },
     "chain_anchor": {
       "chain_id": "eip155:8453",
@@ -80,18 +81,22 @@
       "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "block_number": 12345678,
       "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "anchored_merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+      "anchored_merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
       "anchored_checkpoint_seq": 1042
     },
     "bitcoin_anchor": {
       "method": "opentimestamps",
-      "ots_proof_b64": "ZXhhbXBsZS1vdHMtcHJvb2Y=",
+      "ots_proof_b64": "AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIzYALijEc8h4ZkccyoZoJ0M+ka8x5d6T5wzpXgTLQtcIABYiWDXPXGQEDoPc2",
       "bitcoin_block_height": 900000,
       "bitcoin_block_hash": "0000000000000000000abc"
     },
     "super_root_inclusion": {
-      "super_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
-      "proof": [],
+      "super_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+      "proof": {
+        "tree_size": 1,
+        "leaf_index": 0,
+        "audit_path": []
+      },
       "aggregated_checkpoint_start": 1042,
       "aggregated_checkpoint_end": 1042
     },
@@ -113,23 +118,10 @@
         "expires_at": 1774828800,
         "nonce": "0123456789abcdef0123456789abcdef"
       },
-      "signature": "d1978bdd761495173d855841000bdc52c9f195ed10b11d14066836541083de955033d52f8cf18c639af08154fde2f63cea483fa2553ab6a5d75f386eb822d505"
+      "signature": "66c566b5ed17f4b1b23a18ef073d3ed331f43d9e420bafc7edbd676c71e45e26285b5d35ad8fce99488968a368bb231fa8a83a6664f8979c725e4481143acd03"
     }
   },
   "secondary_lanes": [
-    "bitcoin_ots",
-    "solana_memo"
-  ],
-  "solana_anchor": {
-    "chain_id": "solana:mainnet-beta",
-    "operator_pubkey": "7xKXtg2CW9Q4hN7kD6A6tVWyQGm9Xxq6u9rY2T6yQkZp",
-    "memo_program_id": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
-    "tx_signature": "5W8D7gF9w3mP2nL6e1c4k7T9y2V6a1b3s5d7f9g2h4j6k8m1n3p5q7r9t1u3v5w7",
-    "slot": 310045221,
-    "block_time": 1743600000,
-    "memo_data": "Chio:1042:0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea:1743292800",
-    "anchored_merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
-    "anchored_checkpoint_seq": 1042
-  },
-  "note": "Illustrative structural example showing the bounded multi-lane bundle shape."
+    "bitcoin_ots"
+  ]
 }

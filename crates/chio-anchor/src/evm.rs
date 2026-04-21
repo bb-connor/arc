@@ -1072,7 +1072,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fixture carries arc.*.v1 signature; regeneration pending post-rename"]
     async fn verify_inclusion_onchain_decodes_registry_verdict() {
         let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
             IChioRootRegistry::verifyInclusionDetailedCall::abi_encode_returns(&true)

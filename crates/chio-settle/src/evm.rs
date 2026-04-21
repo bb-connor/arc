@@ -2172,7 +2172,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "fixture carries arc.*.v1 signature; regeneration pending post-rename"]
     fn builds_failure_and_reversal_receipts() {
         let dispatch = hex_dispatch();
 
@@ -2646,7 +2645,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "fixture carries arc.*.v1 signature; regeneration pending post-rename"]
     fn prepare_merkle_release_and_dual_sign_release_cover_full_and_partial_paths() {
         let mut config = sample_config();
         let proof = sample_primary_proof();
@@ -2709,7 +2707,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "fixture carries arc.*.v1 signature; regeneration pending post-rename"]
     async fn prepare_bond_lock_release_and_impair_cover_positive_paths() {
         let expected_vault_id = B256::from([0x44; 32]);
         let server = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
@@ -2767,7 +2764,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "fixture carries arc.*.v1 signature; regeneration pending post-rename"]
     fn settlement_prep_helpers_fail_closed_on_invalid_inputs() {
         let config = sample_config();
         let invalid_dispatch = hex_dispatch();

@@ -77,7 +77,7 @@
       "description": "release escrow over the official web3 rail"
     },
     "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
-    "signature": "750b701adf5963ce1d4934e3d910ca1f43f460084c33cf08613a0f5f030392108eae892c72f48ff4755f3f17d1fb3c0fcf149d041b6af8bbc070c4a50d440501"
+    "signature": "ffa1cb9483335fdc0470da1c8651532efe18ba98860fda29f42c0cea46bfb142f18108c72d415878373dcbd38ffc48c631defd5c07ca584ce8f7c4c2f34e6102"
   },
   "settlement_path": "merkle_proof",
   "settlement_amount": {
