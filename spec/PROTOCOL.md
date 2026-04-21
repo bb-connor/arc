@@ -1604,7 +1604,7 @@ assumptions. That surface is now backed locally by one packaged Solidity
 contract family in `contracts/`, one artifact-derived Rust Alloy bindings
 target in `crates/chio-web3-bindings/`, and one bounded local-devnet
 qualification run. Four contracts in that package are immutable; the one
-exception is `IArcIdentityRegistry`, which remains owner-managed and mutable
+exception is `IChioIdentityRegistry`, which remains owner-managed and mutable
 for operator registration and key-binding changes. Chio therefore does not
 claim universal immutability for every contract surface in the package.
 

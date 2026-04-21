@@ -7,40 +7,40 @@
     {
       "contract_id": "chio.root-registry",
       "kind": "root_registry",
-      "interface_name": "IArcRootRegistry",
-      "abi_reference": "contracts/artifacts/interfaces/IArcRootRegistry.json",
+      "interface_name": "IChioRootRegistry",
+      "abi_reference": "contracts/artifacts/interfaces/IChioRootRegistry.json",
       "implementation_reference": "contracts/src/ChioRootRegistry.sol",
       "immutable": true
     },
     {
       "contract_id": "chio.escrow",
       "kind": "escrow",
-      "interface_name": "IArcEscrow",
-      "abi_reference": "contracts/artifacts/interfaces/IArcEscrow.json",
+      "interface_name": "IChioEscrow",
+      "abi_reference": "contracts/artifacts/interfaces/IChioEscrow.json",
       "implementation_reference": "contracts/src/ChioEscrow.sol",
       "immutable": true
     },
     {
       "contract_id": "chio.bond-vault",
       "kind": "bond_vault",
-      "interface_name": "IArcBondVault",
-      "abi_reference": "contracts/artifacts/interfaces/IArcBondVault.json",
+      "interface_name": "IChioBondVault",
+      "abi_reference": "contracts/artifacts/interfaces/IChioBondVault.json",
       "implementation_reference": "contracts/src/ChioBondVault.sol",
       "immutable": true
     },
     {
       "contract_id": "chio.identity-registry",
       "kind": "identity_registry",
-      "interface_name": "IArcIdentityRegistry",
-      "abi_reference": "contracts/artifacts/interfaces/IArcIdentityRegistry.json",
+      "interface_name": "IChioIdentityRegistry",
+      "abi_reference": "contracts/artifacts/interfaces/IChioIdentityRegistry.json",
       "implementation_reference": "contracts/src/ChioIdentityRegistry.sol",
       "immutable": false
     },
     {
       "contract_id": "chio.price-resolver",
       "kind": "price_resolver",
-      "interface_name": "IArcPriceResolver",
-      "abi_reference": "contracts/artifacts/interfaces/IArcPriceResolver.json",
+      "interface_name": "IChioPriceResolver",
+      "abi_reference": "contracts/artifacts/interfaces/IChioPriceResolver.json",
       "implementation_reference": "contracts/src/ChioPriceResolver.sol",
       "immutable": true
     }
