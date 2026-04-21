@@ -182,7 +182,7 @@ published.
 
 The edge handles `message/send` JSON-RPC requests by:
 
-1. Resolving the target skill ID from `params.metadata.arc.targetSkillId`.
+1. Resolving the target skill ID from `params.metadata.chio.targetSkillId`.
    If only one skill is registered, the edge MAY infer the target
    automatically.
 2. If multiple skills are registered and no `targetSkillId` is provided,

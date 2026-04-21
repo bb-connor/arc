@@ -199,7 +199,7 @@ Normative requirements:
 
 ## 3. Hosted MCP HTTP Session Transport
 
-The hosted edge is implemented by `arc mcp serve-http` in
+The hosted edge is implemented by `chio mcp serve-http` in
 `crates/chio-cli/src/remote_mcp/http_service.rs`.
 
 ### 3.1 Endpoint Shape
@@ -305,7 +305,7 @@ Native Chio direct transport versioning rules:
 
 ## 4. Trust-Control Capability Lifecycle
 
-The trust-control service is implemented by `arc trust serve`.
+The trust-control service is implemented by `chio trust serve`.
 
 ### 4.1 Capability Issuance
 
@@ -451,7 +451,7 @@ Surface mapping rules:
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Edge as arc mcp serve-http
+    participant Edge as chio mcp serve-http
     participant Session as Hosted Session
 
     Client->>Edge: POST /mcp initialize (JSON-RPC request, no MCP-Session-Id)
@@ -470,7 +470,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant Trust as arc trust serve
+    participant Trust as chio trust serve
     participant Authority as Capability Authority
 
     Caller->>Trust: POST /v1/capabilities/issue
@@ -484,7 +484,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant Trust as arc trust serve
+    participant Trust as chio trust serve
     participant Store as Receipt/Lineage Store
     participant Authority as Capability Authority
 
@@ -527,7 +527,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Operator
-    participant Trust as arc trust serve
+    participant Trust as chio trust serve
     participant Store as Revocation Store
     participant Kernel
     participant Agent

@@ -8,7 +8,7 @@ capability-based access control, budget enforcement, and receipt signing.
 Lattice Platform Security needs a security review for their payments API.
 Vanguard Security provides reviews via an MCP tool server. Chio governs every
 interaction: the buyer's API sits behind `chio api protect`, the provider's
-MCP server sits behind `arc mcp serve-http`, and trust-control tracks
+MCP server sits behind `chio mcp serve-http`, and trust-control tracks
 budgets, receipts, and capabilities.
 
 A procurement agent (OpenAI Agents SDK) reasons about which review scope
@@ -18,8 +18,8 @@ approval if the price exceeds the threshold.
 ## Architecture
 
 ```
-arc trust serve                     capability authority, budget store
-arc mcp serve-http                  kernel-mediated provider MCP tools
+chio trust serve                     capability authority, budget store
+chio mcp serve-http                  kernel-mediated provider MCP tools
 chio api protect                    buyer API sidecar (receipt signing)
 buyer/app.py                        FastAPI procurement service
 provider/review_server.py           MCP tool server (quote, execute, dispute)
@@ -40,7 +40,7 @@ deterministic fallback flow (CI mode).
 
 - **Budget limits** on capability grants (`maxTotalCost`, `maxCostPerInvocation`)
 - **Receipt signing** for every buyer API call (via `chio api protect`)
-- **Guard policies** on provider MCP tools (via `arc mcp serve-http`)
+- **Guard policies** on provider MCP tools (via `chio mcp serve-http`)
 - **Budget tracking** via trust-control's split budget endpoints (`/v1/budgets/authorize-exposure`, `/v1/budgets/release-exposure`, `/v1/budgets/reconcile-spend`)
 - **Financial reports**: exposure ledger, settlement reconciliation
 
@@ -59,7 +59,7 @@ buyer/
 provider/
   review_server.py          MCP tool server
   policy.yaml               Chio HushSpec policy
-  run-edge.sh               arc mcp serve-http wrapper
+  run-edge.sh               chio mcp serve-http wrapper
 contracts/                  JSON contract templates
 orchestrate.py              entry point
 smoke.sh                    smoke test

@@ -2,8 +2,8 @@
 
 This example is the deployable local onboarding path for Chio. It starts:
 
-- `arc trust serve` with the receipt dashboard on `http://127.0.0.1:8940`
-- `arc mcp serve-http` on `http://127.0.0.1:8931`
+- `chio trust serve` with the receipt dashboard on `http://127.0.0.1:8940`
+- `chio mcp serve-http` on `http://127.0.0.1:8931`
 - the wrapped demo MCP tool server behind that hosted edge
 
 ## Quickstart

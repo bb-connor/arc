@@ -87,7 +87,7 @@ done
 BG_PIDS+=($!)
 
 # Executor does its own Chio validation (capabilities, revocation, budget)
-# and calls tools through arc mcp serve-http. No sidecar needed.
+# and calls tools through chio mcp serve-http. No sidecar needed.
 
 # -- Python services (with chio_asgi middleware pointing to their sidecars) --
 uv run --project "${EXAMPLE_ROOT}" python "${EXAMPLE_ROOT}/services/acp_broker.py" \

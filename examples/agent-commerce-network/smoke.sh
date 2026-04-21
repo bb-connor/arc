@@ -44,7 +44,7 @@ BG_PIDS+=($!)
 
 wait_for_http "${CONTROL_URL}/health"
 
-# Provider MCP edge (arc mcp serve-http wrapping the review server)
+# Provider MCP edge (chio mcp serve-http wrapping the review server)
 CHIO_BIN="${CHIO_BIN}" \
 CHIO_CONTROL_URL="${CONTROL_URL}" \
 CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" \

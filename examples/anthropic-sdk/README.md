@@ -16,7 +16,7 @@ Anthropic SDK while the hosted session itself is managed by
 
 - Node.js 22+
 - the phase `309` demo stack running locally, or equivalent direct
-  `arc trust serve` plus `arc mcp serve-http` processes
+  `chio trust serve` plus `chio mcp serve-http` processes
 - optional: `ANTHROPIC_API_KEY` for a live Claude call
 
 ## Install

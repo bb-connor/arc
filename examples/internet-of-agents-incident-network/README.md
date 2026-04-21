@@ -1,7 +1,7 @@
 # Internet of Agents Incident Network
 
 Multi-org incident response using Chio for capability-governed tool access.
-Every tool call goes through the Chio kernel (`arc mcp serve-http`), which
+Every tool call goes through the Chio kernel (`chio mcp serve-http`), which
 evaluates guard policies and signs receipts.
 
 ## Scenario
@@ -14,8 +14,8 @@ a bounded fix to the provider, all under Chio capability governance.
 ## Architecture
 
 ```
-arc trust serve                     capability authority
-arc mcp serve-http  x4              kernel-mediated MCP tool access
+chio trust serve                     capability authority
+chio mcp serve-http  x4              kernel-mediated MCP tool access
 services/acp_broker.py              cross-org task broker
 services/coordinator.py             provider entry point
 services/executor.py                bounded operation runner

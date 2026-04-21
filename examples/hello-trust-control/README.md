@@ -4,14 +4,14 @@ Minimal trust-plane and offline evidence example with no app surface in the midd
 
 This example teaches the control surfaces directly:
 
-- start `arc trust serve`
+- start `chio trust serve`
 - issue a capability from the trust-control service
 - materialize the capability token
 - query revocation status
 - revoke the capability
-- mint a real receipt with `arc check`
+- mint a real receipt with `chio check`
 - export an offline evidence package
-- verify that package with `arc evidence verify`
+- verify that package with `chio evidence verify`
 
 ## What It Demonstrates
 
