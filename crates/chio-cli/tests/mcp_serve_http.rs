@@ -571,28 +571,7 @@ fn spawn_http_server_with_session_lifecycle_tuning(
         idle_expiry_millis,
         drain_grace_millis,
         reaper_interval_millis,
-        "Chio",
-    )
-}
-
-fn spawn_http_server_with_legacy_session_lifecycle_tuning(
-    dir: &Path,
-    listen: SocketAddr,
-    token: &str,
-    session_db_path: Option<&Path>,
-    idle_expiry_millis: Option<u64>,
-    drain_grace_millis: Option<u64>,
-    reaper_interval_millis: Option<u64>,
-) -> ServerGuard {
-    spawn_http_server_with_session_lifecycle_env_prefix(
-        dir,
-        listen,
-        token,
-        session_db_path,
-        idle_expiry_millis,
-        drain_grace_millis,
-        reaper_interval_millis,
-        "Chio",
+        "CHIO",
     )
 }
 
@@ -2500,43 +2479,6 @@ fn mcp_serve_http_idle_expiry_reaps_sessions_and_blocks_reuse() {
         None,
     );
     assert_eq!(resumed_get.status(), reqwest::StatusCode::GONE);
-}
-
-#[test]
-fn mcp_serve_http_legacy_arc_session_env_aliases_still_work() {
-    let dir = unique_test_dir();
-    fs::create_dir_all(&dir).expect("create temp dir");
-    let listen = reserve_listen_addr();
-    let token = "test-token";
-    let _server = spawn_http_server_with_legacy_session_lifecycle_tuning(
-        &dir,
-        listen,
-        token,
-        None,
-        Some(250),
-        Some(250),
-        Some(50),
-    );
-    let client = Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .expect("build reqwest client");
-    let base_url = format!("http://{listen}");
-    wait_for_server(&client, &base_url);
-
-    let (session_id, _) = initialize_session(&client, &base_url, token);
-
-    for _ in 0..40 {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
-        assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
-        let trust_status: Value = trust_status.json().expect("session trust json");
-        if trust_status["lifecycle"]["state"].as_str() == Some("expired") {
-            return;
-        }
-        thread::sleep(Duration::from_millis(75));
-    }
-
-    panic!("session did not expire under legacy PACT env aliases");
 }
 
 #[test]

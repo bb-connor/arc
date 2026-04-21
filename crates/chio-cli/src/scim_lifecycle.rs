@@ -15,7 +15,7 @@ pub const SCIM_LIFECYCLE_RECORD_SCHEMA: &str = "chio.scim-lifecycle-record.v1";
 pub const SCIM_CORE_USER_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
 pub const SCIM_ERROR_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
 pub const CHIO_SCIM_USER_EXTENSION_SCHEMA: &str =
-    "urn:arc:params:scim:schemas:extension:arc:2.0:User";
+    "urn:chio:params:scim:schemas:extension:chio:2.0:User";
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

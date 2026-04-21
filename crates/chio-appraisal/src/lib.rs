@@ -3022,7 +3022,7 @@ mod tests {
             Some(AttestationVerifierFamily::EnterpriseVerifier)
         );
         assert_eq!(
-            verifier_family_for_attestation_schema("urn:arc:unknown"),
+            verifier_family_for_attestation_schema("urn:chio:unknown"),
             None
         );
     }
