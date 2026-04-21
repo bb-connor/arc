@@ -72,11 +72,11 @@
       "secrets": [
         {
           "name": "CHIO_SIGNING_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/signing-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:chio/signing-key"
         },
         {
           "name": "CHIO_CAPABILITY_AUTHORITY_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/capability-authority-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:chio/capability-authority-url"
         }
       ],
       "mountPoints": [
