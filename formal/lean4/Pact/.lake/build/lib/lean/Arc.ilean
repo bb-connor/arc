@@ -1,1 +1,0 @@
-{"decls":{},"directImports":[["Arc.Core.Capability",false,false,false],["Arc.Core.Receipt",false,false,false],["Arc.Core.Scope",false,false,false],["Arc.Core.Revocation",false,false,false],["Arc.Spec.Properties",false,false,false],["Arc.Proofs.Monotonicity",false,false,false],["Arc.Proofs.Receipt",false,false,false]],"module":"Arc","references":{},"version":5}

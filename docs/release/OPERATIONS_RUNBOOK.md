@@ -3,8 +3,8 @@
 This runbook covers the supported self-hosted operator surfaces for the current
 bounded Chio release candidate:
 
-- `arc trust serve` for the trust-control plane
-- `arc mcp serve-http` for a hosted remote MCP edge
+- `chio trust serve` for the trust-control plane
+- `chio mcp serve-http` for a hosted remote MCP edge
 - the receipt dashboard served from the trust-control process
 
 It is intentionally pragmatic and assumes one service owner is operating local
@@ -58,7 +58,7 @@ Clustered deployments additionally require:
 
 Required:
 
-- `arc mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
+- `chio mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
 
 Recommended persistent state:
 
@@ -100,25 +100,25 @@ Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
 1. Create a dedicated state directory, for example:
 
    ```bash
-   mkdir -p /var/lib/arc /etc/arc
+   mkdir -p /var/lib/chio /etc/chio
    ```
 
-2. Place policy and registry files under `/etc/arc` and SQLite state under
-   `/var/lib/arc`.
+2. Place policy and registry files under `/etc/chio` and SQLite state under
+   `/var/lib/chio`.
 
 3. Start the service:
 
    ```bash
-   arc trust serve \
+   chio trust serve \
      --listen 127.0.0.1:8940 \
      --service-token "$CHIO_SERVICE_TOKEN" \
-     --receipt-db /var/lib/arc/receipts.sqlite3 \
-     --revocation-db /var/lib/arc/revocations.sqlite3 \
-     --authority-db /var/lib/arc/authority.sqlite3 \
-     --budget-db /var/lib/arc/budgets.sqlite3 \
+     --receipt-db /var/lib/chio/receipts.sqlite3 \
+     --revocation-db /var/lib/chio/revocations.sqlite3 \
+     --authority-db /var/lib/chio/authority.sqlite3 \
+     --budget-db /var/lib/chio/budgets.sqlite3 \
      --enterprise-providers-file /etc/chio/enterprise-providers.json \
      --verifier-policies-file /etc/chio/verifier-policies.json \
-     --verifier-challenge-db /var/lib/arc/verifier-challenges.sqlite3 \
+     --verifier-challenge-db /var/lib/chio/verifier-challenges.sqlite3 \
      --certification-registry-file /etc/chio/certifications.json
    ```
 
@@ -135,16 +135,16 @@ Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
 1. Start the wrapped edge with persistent state and explicit admin auth:
 
    ```bash
-   arc mcp serve-http \
+   chio mcp serve-http \
      --policy examples/policies/canonical-hushspec.yaml \
      --server-id demo-server \
      --listen 127.0.0.1:8931 \
      --auth-token "$CHIO_EDGE_TOKEN" \
      --admin-token "$CHIO_ADMIN_TOKEN" \
-     --receipt-db /var/lib/arc/edge-receipts.sqlite3 \
-     --revocation-db /var/lib/arc/edge-revocations.sqlite3 \
-     --authority-db /var/lib/arc/edge-authority.sqlite3 \
-     --session-db /var/lib/arc/edge-sessions.sqlite3 \
+     --receipt-db /var/lib/chio/edge-receipts.sqlite3 \
+     --revocation-db /var/lib/chio/edge-revocations.sqlite3 \
+     --authority-db /var/lib/chio/edge-authority.sqlite3 \
+     --session-db /var/lib/chio/edge-sessions.sqlite3 \
      -- \
      python3 tests/conformance/fixtures/wave1/mock_mcp_server.py
    ```
@@ -160,7 +160,7 @@ Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
 
 ### Dashboard
 
-The dashboard is served by `arc trust serve` from `crates/chio-cli/dashboard/dist`.
+The dashboard is served by `chio trust serve` from `crates/chio-cli/dashboard/dist`.
 Build it before deployment:
 
 ```bash
@@ -225,28 +225,28 @@ authoritative backups.
 Back up SQLite state:
 
 ```bash
-sqlite3 /var/lib/arc/receipts.sqlite3 ".backup '/var/backups/arc/receipts.sqlite3'"
-sqlite3 /var/lib/arc/revocations.sqlite3 ".backup '/var/backups/arc/revocations.sqlite3'"
-sqlite3 /var/lib/arc/authority.sqlite3 ".backup '/var/backups/arc/authority.sqlite3'"
-sqlite3 /var/lib/arc/budgets.sqlite3 ".backup '/var/backups/arc/budgets.sqlite3'"
-sqlite3 /var/lib/arc/verifier-challenges.sqlite3 ".backup '/var/backups/arc/verifier-challenges.sqlite3'"
-sqlite3 /var/lib/arc/edge-sessions.sqlite3 ".backup '/var/backups/arc/edge-sessions.sqlite3'"
+sqlite3 /var/lib/chio/receipts.sqlite3 ".backup '/var/backups/chio/receipts.sqlite3'"
+sqlite3 /var/lib/chio/revocations.sqlite3 ".backup '/var/backups/chio/revocations.sqlite3'"
+sqlite3 /var/lib/chio/authority.sqlite3 ".backup '/var/backups/chio/authority.sqlite3'"
+sqlite3 /var/lib/chio/budgets.sqlite3 ".backup '/var/backups/chio/budgets.sqlite3'"
+sqlite3 /var/lib/chio/verifier-challenges.sqlite3 ".backup '/var/backups/chio/verifier-challenges.sqlite3'"
+sqlite3 /var/lib/chio/edge-sessions.sqlite3 ".backup '/var/backups/chio/edge-sessions.sqlite3'"
 ```
 
 Back up file-backed registries and policies:
 
 ```bash
-cp /etc/chio/enterprise-providers.json /var/backups/arc/
-cp /etc/chio/verifier-policies.json /var/backups/arc/
-cp /etc/chio/certifications.json /var/backups/arc/
-cp /etc/chio/*.yaml /var/backups/arc/
+cp /etc/chio/enterprise-providers.json /var/backups/chio/
+cp /etc/chio/verifier-policies.json /var/backups/chio/
+cp /etc/chio/certifications.json /var/backups/chio/
+cp /etc/chio/*.yaml /var/backups/chio/
 ```
 
 Record the binary version and git commit used for the backup snapshot.
 
 ## 5. Restore Procedure
 
-1. Stop the affected `arc trust serve` or `arc mcp serve-http` process.
+1. Stop the affected `chio trust serve` or `chio mcp serve-http` process.
 2. Restore the SQLite files into the exact paths expected by the service.
 3. Restore the file-backed registries and policies.
 4. Restart the process with the same command-line arguments used before the
@@ -271,7 +271,7 @@ Record the binary version and git commit used for the backup snapshot.
 4. Stop write traffic or drain external callers.
 5. Stop the running Chio processes.
 6. Replace the binary with the qualified candidate.
-7. Restart `arc trust serve` first, then any dependent `arc mcp serve-http`
+7. Restart `chio trust serve` first, then any dependent `chio mcp serve-http`
    edges.
 8. Run post-upgrade smoke checks:
 

@@ -1,4 +1,4 @@
-// Reference Azure Container Apps deployment with an Chio sidecar.
+// Reference Azure Container Apps deployment with a Chio sidecar.
 //
 // Placeholders:
 //   APP_IMAGE_PLACEHOLDER          -- replace with your application image
@@ -31,22 +31,22 @@ param managedEnvironmentId string
 param appImage string = 'APP_IMAGE_PLACEHOLDER'
 
 @description('Chio sidecar container image.')
-param arcSidecarImage string = 'ghcr.io/backbay/chio-sidecar:latest'
+param chioSidecarImage string = 'ghcr.io/backbay/chio-sidecar:latest'
 
 @description('Key Vault URI that holds the Chio signing key secret.')
-param arcSigningKeySecretUri string
+param chioSigningKeySecretUri string
 
 @description('Key Vault URI that holds the capability authority URL secret.')
-param arcCapabilityAuthoritySecretUri string
+param chioCapabilityAuthoritySecretUri string
 
 @description('User-assigned managed identity resource ID with Key Vault read access.')
 param userAssignedIdentityId string
 
 @description('Policy source URI (blob, file, or remote).')
-param arcPolicySource string = 'https://arcconfig.blob.core.windows.net/config/policy.yaml'
+param chioPolicySource string = 'https://chioconfig.blob.core.windows.net/config/policy.yaml'
 
 @description('Receipt sink destination.')
-param arcReceiptSink string = 'cosmosdb://chio-receipts'
+param chioReceiptSink string = 'cosmosdb://chio-receipts'
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
@@ -70,12 +70,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       secrets: [
         {
           name: 'chio-signing-key'
-          keyVaultUrl: arcSigningKeySecretUri
+          keyVaultUrl: chioSigningKeySecretUri
           identity: userAssignedIdentityId
         }
         {
           name: 'chio-capability-authority-url'
-          keyVaultUrl: arcCapabilityAuthoritySecretUri
+          keyVaultUrl: chioCapabilityAuthoritySecretUri
           identity: userAssignedIdentityId
         }
       ]
@@ -123,11 +123,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
         {
           name: 'chio-sidecar'
-          image: arcSidecarImage
+          image: chioSidecarImage
           // The sidecar image's CMD default is `--help`; override with
           // a long-running subcommand so the probes succeed and the
           // app container becomes ready. Only `args` is set so the
-          // image ENTRYPOINT (`/sbin/tini -- /usr/local/bin/arc`) is
+          // image ENTRYPOINT (`/sbin/tini -- /usr/local/bin/chio`) is
           // preserved.
           args: [
             'api'
@@ -156,11 +156,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'CHIO_POLICY_SOURCE'
-              value: arcPolicySource
+              value: chioPolicySource
             }
             {
               name: 'CHIO_RECEIPT_SINK'
-              value: arcReceiptSink
+              value: chioReceiptSink
             }
             {
               name: 'CHIO_LOG_LEVEL'

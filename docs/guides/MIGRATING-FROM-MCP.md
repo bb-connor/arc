@@ -24,32 +24,32 @@ If you'd rather stay inside Python and skip the CLI, jump to
 - macOS or Linux. Windows works via WSL.
 - 5 minutes.
 
-## Step 1: Install `arc`
+## Step 1: Install `chio`
 
 Use the release binary or build from source:
 
 ```bash
 # Homebrew release asset
-curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
-brew install --formula /tmp/arc.rb
+curl -fsSL -o /tmp/chio.rb https://github.com/bb-connor/chio/releases/latest/download/chio.rb
+brew install --formula /tmp/chio.rb
 
 # Or, from a local checkout
 cargo install --path crates/chio-cli
-arc --version
+chio --version
 ```
 
 You should see something like:
 
 ```
-arc 0.1.0
+chio 0.1.0
 ```
 
 ## Step 2: Bootstrap or copy the supported starter policy
 
-If this is a fresh project, scaffold one with `arc init`:
+If this is a fresh project, scaffold one with `chio init`:
 
 ```bash
-arc init my-chio-project
+chio init my-chio-project
 cd my-chio-project
 ```
 
@@ -67,14 +67,14 @@ That file is the canonical HushSpec starting point for coding-agent
 stacks: safe file access is allowed, obvious secret paths are denied,
 destructive shell commands are blocked, and receipts are on by default.
 
-## Step 3: Wrap your MCP server with `arc mcp serve --policy`
+## Step 3: Wrap your MCP server with `chio mcp serve --policy`
 
 This is the canonical supported path. The Chio CLI spawns your MCP server
 as a subprocess, mediates every tool call through the kernel, and
 re-exposes a compatible MCP edge over stdio:
 
 ```bash
-arc mcp serve \
+chio mcp serve \
   --policy ./policy.yaml \
   --server-id fs \
   -- npx -y @modelcontextprotocol/server-filesystem .
@@ -91,17 +91,17 @@ What the flags mean:
 A successful launch prints a structured log line on stderr:
 
 ```
-INFO arc::cli loaded policy for MCP edge policy_path="/tmp/chio-preset-.../code_agent_preset.yaml" preset="code-agent" server_id="fs" source_policy_hash="..."
-INFO arc::cli initialized MCP edge session capability_count=N wrapped_command="npx"
+INFO chio::cli loaded policy for MCP edge policy_path="/tmp/chio-preset-.../code_agent_preset.yaml" preset="code-agent" server_id="fs" source_policy_hash="..."
+INFO chio::cli initialized MCP edge session capability_count=N wrapped_command="npx"
 ```
 
 Point your MCP client at this process exactly the way you would point
 it at the upstream MCP server -- it speaks the same protocol.
 
-If you want the zero-config fallback instead, `arc mcp serve --preset code-agent`
+If you want the zero-config fallback instead, `chio mcp serve --preset code-agent`
 still exists and ships a bundled policy with the same intent.
 
-### Hosted HTTP variant: `arc mcp serve-http`
+### Hosted HTTP variant: `chio mcp serve-http`
 
 If you expose the same stack over HTTP instead of stdio, keep the session
 contract literal:
@@ -118,11 +118,11 @@ provenance is treated as `asserted` until a trusted subsystem upgrades it.
 
 ## Step 4: Prove one deny, one allow, and one receipt
 
-Run `arc check` against the same file-backed starter policy to confirm the
+Run `chio check` against the same file-backed starter policy to confirm the
 kernel path is live:
 
 ```bash
-arc check --policy ./policy.yaml \
+chio check --policy ./policy.yaml \
   --server fs --tool write_file \
   --params '{"path":"/workspace/project/.env","content":"BAD=1"}'
 ```
@@ -142,7 +142,7 @@ source:     9f1e73c6...
 A safe command is the reverse:
 
 ```bash
-arc check --policy ./policy.yaml \
+chio check --policy ./policy.yaml \
   --server shell --tool run_command \
   --params '{"command":"pwd"}'
 # verdict: ALLOW, exit 0
@@ -161,7 +161,7 @@ End-to-end through your MCP client:
 | `run_command("git push --force")` | Deny. `shell_command`. |
 
 If you see a different result, double-check that the MCP client is
-talking to the `arc mcp serve` process -- not the upstream server
+talking to the `chio mcp serve` process -- not the upstream server
 directly.
 
 ## Step 5: Next steps
@@ -174,7 +174,7 @@ Once the baseline deny list is in place:
    ```bash
    cp examples/policies/canonical-hushspec.yaml ./policy.yaml
    # edit policy.yaml, then:
-   arc mcp serve --policy ./policy.yaml --server-id fs -- npx -y @modelcontextprotocol/server-filesystem .
+   chio mcp serve --policy ./policy.yaml --server-id fs -- npx -y @modelcontextprotocol/server-filesystem .
    ```
 
 2. **Add more guards.** The preset ships with `forbidden_path`,
@@ -191,11 +191,11 @@ Once the baseline deny list is in place:
    See `docs/guards/` for the catalogue.
 
 3. **Verify receipts.** Every allow / deny is a signed artefact. Use
-   `arc receipt` to query them:
+   `chio receipt` to query them:
 
    ```bash
-   arc --receipt-db ./receipts.sqlite receipt list --limit 20
-   arc --receipt-db ./receipts.sqlite receipt verify <receipt-id>
+   chio --receipt-db ./receipts.sqlite receipt list --limit 20
+   chio --receipt-db ./receipts.sqlite receipt verify <receipt-id>
    ```
 
 4. **Enable delegation.** If you have a multi-agent crew, capability
@@ -228,7 +228,7 @@ asyncio.run(main())
 
 The Python package enforces the same coding-agent policy intent as the
 CLI starter path, but the supported default operator workflow remains the
-file-backed HushSpec plus `arc mcp serve`.
+file-backed HushSpec plus `chio mcp serve`.
 
 ## Servers other than filesystem
 
@@ -262,13 +262,13 @@ today. Use a custom `--policy` path for anything else.
 
 ### The upstream MCP server exits immediately
 
-`arc mcp serve` shells out exactly as written -- the first token is
+`chio mcp serve` shells out exactly as written -- the first token is
 the executable, the rest are argv. If you'd normally write
 `npx @modelcontextprotocol/server-filesystem .` make sure the `--`
 separator is in place:
 
 ```bash
-arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .
+chio mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .
 ```
 
 ### The client hangs on startup
@@ -276,8 +276,8 @@ arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem
 Check stderr. On a typical `stderr` the Chio CLI prints:
 
 ```
-INFO arc::cli loaded policy for MCP edge ...
-INFO arc::cli initialized MCP edge session ...
+INFO chio::cli loaded policy for MCP edge ...
+INFO chio::cli initialized MCP edge session ...
 ```
 
 If only the first line prints, the wrapped MCP server failed to
@@ -299,10 +299,10 @@ To permit broader writes, switch to a custom policy whose
 
 Not every MCP feature lands on day one. Known gaps:
 
-- **Streaming responses.** `arc mcp serve` supports streaming chunks
+- **Streaming responses.** `chio mcp serve` supports streaming chunks
   but the bundled preset does not yet throttle them. Heavy streamers
   (log tailers, large-file readers) should move to the HTTP edge
-  (`arc mcp serve-http`) which exposes backpressure controls.
+  (`chio mcp serve-http`) which exposes backpressure controls.
 - **Resource / prompt endpoints.** The preset only maps tool calls.
   MCP resources (`resources/list`, `resources/read`) and prompts
   (`prompts/get`) are wrapped but use default-allow through the
@@ -312,7 +312,7 @@ Not every MCP feature lands on day one. Known gaps:
   nested sampling governance, enable `allow_sampling_tool_use` in the
   policy's `kernel:` section and author a matching scope.
 - **Remote MCP.** This guide covers stdio edges. For remote MCP
-  (Streamable HTTP with OAuth2 / OIDC), use `arc mcp serve-http`;
+  (Streamable HTTP with OAuth2 / OIDC), use `chio mcp serve-http`;
   the `--preset` flag is a stdio-only convenience today.
 - **Pre-existing receipts.** Moving to Chio does not retroactively
   attest past tool calls; receipts start at the first call through

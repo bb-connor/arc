@@ -33,6 +33,14 @@ examples/openai-compatible/node_modules/
 examples/langchain/*.egg-info/
 examples/langchain/.venv/
 
+# Generated JVM and .NET build artifacts
+examples/**/.gradle/
+sdks/**/.gradle/
+examples/**/bin/
+examples/**/obj/
+sdks/dotnet/**/bin/
+sdks/dotnet/**/obj/
+
 # Generated coverage artifacts
 /coverage/*
 !/coverage/README.md

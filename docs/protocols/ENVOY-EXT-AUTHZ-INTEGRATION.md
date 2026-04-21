@@ -445,7 +445,7 @@ spec:
   # Apply to all tool server workloads in this namespace
   selector:
     matchLabels:
-      arc.protocol/secured: "true"
+      chio.protocol/secured: "true"
   action: CUSTOM
   provider:
     name: chio-ext-authz
@@ -459,7 +459,7 @@ spec:
 
 ### 6.4 Per-Workload Opt-In
 
-Not every service needs Chio. The `arc.protocol/secured: "true"` label
+Not every service needs Chio. The `chio.protocol/secured: "true"` label
 gates which workloads are evaluated. Services without the label use
 standard Istio RBAC only.
 
@@ -474,10 +474,10 @@ spec:
     metadata:
       labels:
         app: code-execution-tool
-        arc.protocol/secured: "true"  # Opt into Chio evaluation
+        chio.protocol/secured: "true"  # Opt into Chio evaluation
       annotations:
-        arc.protocol/policy: "high-risk-tool"
-        arc.protocol/fail-mode: "closed"
+        chio.protocol/policy: "high-risk-tool"
+        chio.protocol/fail-mode: "closed"
 ```
 
 ## 7. Consul Connect Integration
@@ -761,10 +761,10 @@ spec:
               value: sqlite:///var/chio/receipts.db
           volumeMounts:
             - name: chio-policy
-              mountPath: /etc/arc
+              mountPath: /etc/chio
               readOnly: true
             - name: chio-data
-              mountPath: /var/arc
+              mountPath: /var/chio
           resources:
             requests:
               cpu: 100m

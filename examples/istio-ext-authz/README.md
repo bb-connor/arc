@@ -138,7 +138,7 @@ istioctl proxy-config listener -n agent-tools "${POD}" \
 ### 4. Verify allow/deny with the test harness
 
 ```bash
-export CHIO_DEMO_CAPABILITY_TOKEN="$(cat ~/arc/demo.token)"
+export CHIO_DEMO_CAPABILITY_TOKEN="$(cat ~/.chio/demo.token)"
 ./examples/istio-ext-authz/test-harness.sh
 ```
 
@@ -195,7 +195,7 @@ x-chio-denial-guard: IstioAuthorization
 | All requests 403 (including authenticated) | Chio pod not ready or MeshConfig not reloaded | `kubectl -n chio-system get pods`; `istioctl proxy-config bootstrap ... | grep chio-ext-authz` |
 | Allowed requests missing `x-chio-receipt-id` | `includeRequestHeadersInCheck` omitted or ext_authz in HTTP mode | Re-apply `01-meshconfig-patch.yaml`; confirm `envoyExtAuthzGrpc` is used |
 | `AuthorizationPolicy` rejected at apply | API version mismatch (v1beta1 vs v1) | Ensure the cluster runs Istio 1.22+ and `security.istio.io/v1` is served |
-| Port-forward drops immediately | Pod not labelled `arc.protocol/secured=true` | `kubectl -n agent-tools get pod -l app.kubernetes.io/name=demo-tool --show-labels` |
+| Port-forward drops immediately | Pod not labelled `chio.protocol/secured=true` | `kubectl -n agent-tools get pod -l app.kubernetes.io/name=demo-tool --show-labels` |
 | 503 from demo pod | Istio sidecar injection disabled on `agent-tools` | Re-label: `kubectl label ns agent-tools istio-injection=enabled --overwrite` |
 
 ## Teardown
