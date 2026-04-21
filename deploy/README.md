@@ -95,8 +95,8 @@ az deployment group create \
   --parameters \
       managedEnvironmentId=/subscriptions/.../managedEnvironments/my-env \
       userAssignedIdentityId=/subscriptions/.../userAssignedIdentities/chio-mi \
-      arcSigningKeySecretUri=https://my-kv.vault.azure.net/secrets/chio-signing-key \
-      arcCapabilityAuthoritySecretUri=https://my-kv.vault.azure.net/secrets/chio-cap-authority-url
+      chioSigningKeySecretUri=https://my-kv.vault.azure.net/secrets/chio-signing-key \
+      chioCapabilityAuthoritySecretUri=https://my-kv.vault.azure.net/secrets/chio-cap-authority-url
 ```
 
 ### Sidecar image

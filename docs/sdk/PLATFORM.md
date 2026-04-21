@@ -235,7 +235,7 @@ chio.filter-order=1
 Or via `application.yml`:
 
 ```yaml
-arc:
+chio:
   sidecar-url: http://127.0.0.1:9090
   timeout-seconds: 5
   on-sidecar-error: deny
