@@ -137,7 +137,7 @@ describe("Fastify E2E conformance", () => {
 
     // Create Fastify app with Chio plugin
     fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: `http://127.0.0.1:${mock.port()}`,
       skip: ["/health"],
     });

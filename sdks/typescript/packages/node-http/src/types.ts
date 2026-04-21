@@ -139,7 +139,7 @@ export interface ChioConfig {
   sidecarUrl?: string | undefined;
 
   /**
-   * Path to arc.yaml config file. When provided, the sidecar reads
+   * Path to chio.yaml config file. When provided, the sidecar reads
    * route patterns and policies from this file.
    */
   config?: string | undefined;

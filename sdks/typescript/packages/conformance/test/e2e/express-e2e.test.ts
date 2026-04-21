@@ -172,7 +172,7 @@ describe("Express E2E conformance", () => {
     // Create Express app with Chio middleware
     const app = express();
     app.use(
-      arc({
+      chio({
         sidecarUrl: `http://127.0.0.1:${mock.port()}`,
         skip: ["/health"],
       }),

@@ -95,20 +95,20 @@ async function startMockSidecar(): Promise<{ server: http.Server; url: string }>
   };
 }
 
-describe("arc() middleware", () => {
-  it("exports arc as a function", () => {
-    expect(typeof arc).toBe("function");
+describe("chio() middleware", () => {
+  it("exports chio as a function", () => {
+    expect(typeof chio).toBe("function");
   });
 
   it("returns Express middleware (a function)", () => {
-    const middleware = arc({});
+    const middleware = chio({});
     expect(typeof middleware).toBe("function");
   });
 
   it("skip patterns bypass evaluation", async () => {
     const app = express();
     app.use(
-      arc({
+      chio({
         skip: ["/health", /^\/internal\//],
         sidecarUrl: "http://127.0.0.1:1", // Unreachable on purpose
       }),
@@ -132,7 +132,7 @@ describe("arc() middleware", () => {
   it("denies requests when sidecar is unreachable (fail-closed)", async () => {
     const app = express();
     app.use(
-      arc({
+      chio({
         sidecarUrl: "http://127.0.0.1:1", // Unreachable
         timeoutMs: 500,
       }),
@@ -157,7 +157,7 @@ describe("arc() middleware", () => {
   it("fail-open passthroughs do not synthesize Chio receipts", async () => {
     const app = express();
     app.use(
-      arc({
+      chio({
         sidecarUrl: "http://127.0.0.1:1", // Unreachable
         onSidecarError: "allow",
         timeoutMs: 500,
@@ -194,7 +194,7 @@ describe("arc() middleware", () => {
   it("preserves request bodies for downstream Express parsers", async () => {
     const sidecar = await startMockSidecar();
     const app = express();
-    app.use(arc({ sidecarUrl: sidecar.url }));
+    app.use(chio({ sidecarUrl: sidecar.url }));
     app.use(express.json());
     app.post("/echo", (req, res) => {
       res.json({

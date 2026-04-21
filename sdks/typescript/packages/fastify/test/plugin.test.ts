@@ -58,14 +58,14 @@ async function startMockSidecar(
   };
 }
 
-describe("arc fastify plugin", () => {
-  it("exports arc as a function", () => {
-    expect(typeof arc).toBe("function");
+describe("chio fastify plugin", () => {
+  it("exports chio as a function", () => {
+    expect(typeof chio).toBe("function");
   });
 
   it("registers without error", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1",
       skip: ["/health"],
     });
@@ -81,7 +81,7 @@ describe("arc fastify plugin", () => {
 
   it("skipped routes bypass Chio evaluation", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       skip: ["/health"],
     });
@@ -104,7 +104,7 @@ describe("arc fastify plugin", () => {
     const fastify = Fastify();
 
     // Register Chio plugin
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       timeoutMs: 1000,
     });
@@ -130,7 +130,7 @@ describe("arc fastify plugin", () => {
 
   it("allows requests when onSidecarError is allow", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       onSidecarError: "allow",
       timeoutMs: 500,
@@ -152,7 +152,7 @@ describe("arc fastify plugin", () => {
 
   it("skip patterns with regex work", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       skip: [/^\/internal\//],
     });
@@ -180,7 +180,7 @@ describe("arc fastify plugin", () => {
     });
 
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: sidecar.url,
     });
 

@@ -3,7 +3,7 @@
  *
  * Express middleware for the Chio protocol. Provides:
  *
- * - `arc()` middleware that evaluates requests against the Chio sidecar
+ * - `chio()` middleware that evaluates requests against the Chio sidecar
  * - `chioErrorHandler` for structured Chio error responses
  * - Chio evaluation results attached to req.chioResult when Chio produced a signed receipt
  * - Fail-open passthrough state attached to req.chioPassthrough when no receipt exists
@@ -14,7 +14,7 @@
  * import { chio, chioErrorHandler } from "@chio-protocol/express";
  *
  * const app = express();
- * app.use(arc({ config: "chio.yaml" }));
+ * app.use(chio({ config: "chio.yaml" }));
  * app.use(chioErrorHandler);
  * ```
  */

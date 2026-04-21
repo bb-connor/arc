@@ -3,7 +3,7 @@
  *
  * Elysia lifecycle hook for the Chio protocol. Provides:
  *
- * - `arc()` plugin that evaluates requests against the Chio sidecar
+ * - `chio()` plugin that evaluates requests against the Chio sidecar
  * - Structured Chio error responses
  *
  * @example
@@ -12,7 +12,7 @@
  * import { chio } from "@chio-protocol/elysia";
  *
  * const app = new Elysia()
- *   .use(arc({ config: "chio.yaml" }))
+ *   .use(chio({ config: "chio.yaml" }))
  *   .get("/", () => "Hello");
  * ```
  */

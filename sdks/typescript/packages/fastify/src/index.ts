@@ -3,7 +3,7 @@
  *
  * Fastify plugin for the Chio protocol. Provides:
  *
- * - `arc` plugin that evaluates requests against the Chio sidecar
+ * - `chio` plugin that evaluates requests against the Chio sidecar
  * - Chio evaluation results attached to request.chioResult
  *
  * @example
@@ -12,7 +12,7 @@
  * import { chio } from "@chio-protocol/fastify";
  *
  * const fastify = Fastify();
- * fastify.register(arc, { config: "chio.yaml" });
+ * fastify.register(chio, { config: "chio.yaml" });
  * ```
  */
 

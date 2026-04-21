@@ -21,10 +21,10 @@ Minimal Express example:
 
 ```ts
 import express from "express";
-import { arc } from "@chio-protocol/express";
+import { chio } from "@chio-protocol/express";
 
 const app = express();
-app.use(arc({ config: "chio.yaml" }));
+app.use(chio({ config: "chio.yaml" }));
 app.use(express.json());
 
 app.get("/pets", (_req, res) => {
@@ -170,7 +170,7 @@ interface EvaluateResponse {
 ```ts
 interface ChioConfig {
   sidecarUrl?: string;             // Default: CHIO_SIDECAR_URL env or "http://127.0.0.1:9090"
-  config?: string;                 // Path to arc.yaml config file
+  config?: string;                 // Path to chio.yaml config file
   identityExtractor?: IdentityExtractor;
   routePatternResolver?: RoutePatternResolver;
   onSidecarError?: "deny" | "allow";  // Default: "deny" (fail-closed)
@@ -292,10 +292,10 @@ if (result != null) {
 ### Helper Functions
 
 ```ts
-import { buildArcHttpRequest, resolveConfig } from "@chio-protocol/node-http";
+import { buildChioHttpRequest, resolveConfig } from "@chio-protocol/node-http";
 
 // Build an ChioHttpRequest from parts
-const arcReq = buildArcHttpRequest({
+const chioReq = buildChioHttpRequest({
   method: "POST",
   path: "/api/deploy",
   query: {},
@@ -324,12 +324,12 @@ npm install @chio-protocol/express
 
 ```ts
 import express from "express";
-import { arc, chioErrorHandler } from "@chio-protocol/express";
+import { chio, chioErrorHandler } from "@chio-protocol/express";
 
 const app = express();
 
 // Evaluate every request against Chio
-app.use(arc({ config: "chio.yaml" }));
+app.use(chio({ config: "chio.yaml" }));
 
 // Routes
 app.get("/pets", (req, res) => {
@@ -351,7 +351,7 @@ app.listen(3000);
 | `skip` | `Array<string \| RegExp>` | Paths to bypass Chio evaluation |
 
 ```ts
-app.use(arc({
+app.use(chio({
   config: "chio.yaml",
   sidecarUrl: "http://127.0.0.1:9090",
   onSidecarError: "deny",
@@ -368,12 +368,12 @@ The evaluation result is attached to the request when Chio evaluation succeeds:
 import type { ChioRequest } from "@chio-protocol/express";
 
 app.get("/pets", (req, res) => {
-  const arcReq = req as ChioRequest;
-  if (arcReq.arcResult) {
-    console.log("Receipt ID:", arcReq.arcResult.receipt.id);
+  const chioReq = req as ChioRequest;
+  if (chioReq.chioResult) {
+    console.log("Receipt ID:", chioReq.chioResult.receipt.id);
   }
-  if (arcReq.chioPassthrough) {
-    console.log("Chio passthrough mode:", arcReq.chioPassthrough.mode);
+  if (chioReq.chioPassthrough) {
+    console.log("Chio passthrough mode:", chioReq.chioPassthrough.mode);
   }
   res.json([]);
 });
@@ -405,12 +405,12 @@ npm install @chio-protocol/fastify
 
 ```ts
 import Fastify from "fastify";
-import { arc } from "@chio-protocol/fastify";
+import { chio } from "@chio-protocol/fastify";
 
 const fastify = Fastify();
 
 // Register the Chio plugin
-await fastify.register(arc, { config: "chio.yaml" });
+await fastify.register(chio, { config: "chio.yaml" });
 
 fastify.get("/pets", async (request, reply) => {
   return [{ name: "Fido" }];
@@ -428,7 +428,7 @@ await fastify.listen({ port: 3000 });
 | `skip` | `Array<string \| RegExp>` | Paths to bypass Chio evaluation |
 
 ```ts
-await fastify.register(arc, {
+await fastify.register(chio, {
   config: "chio.yaml",
   sidecarUrl: "http://127.0.0.1:9090",
   onSidecarError: "deny",
@@ -443,8 +443,8 @@ The Chio evaluation result is available on the Fastify request object when Chio 
 
 ```ts
 fastify.get("/pets", async (request, reply) => {
-  if (request.arcResult) {
-    console.log("Receipt ID:", request.arcResult.receipt.id);
+  if (request.chioResult) {
+    console.log("Receipt ID:", request.chioResult.receipt.id);
   }
   return [{ name: "Fido" }];
 });
@@ -476,10 +476,10 @@ bun add @chio-protocol/elysia
 
 ```ts
 import { Elysia } from "elysia";
-import { arc } from "@chio-protocol/elysia";
+import { chio } from "@chio-protocol/elysia";
 
 const app = new Elysia()
-  .use(arc({ config: "chio.yaml" }))
+  .use(chio({ config: "chio.yaml" }))
   .get("/pets", () => [{ name: "Fido" }])
   .listen(3000);
 ```
@@ -494,7 +494,7 @@ const app = new Elysia()
 
 ```ts
 const app = new Elysia()
-  .use(arc({
+  .use(chio({
     config: "chio.yaml",
     sidecarUrl: "http://127.0.0.1:9090",
     onSidecarError: "deny",
