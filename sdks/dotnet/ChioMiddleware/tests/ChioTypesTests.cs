@@ -4,7 +4,7 @@
 // Rust kernel types (shared test vectors).
 
 using System.Text.Json;
-using Backbay.Arc;
+using Backbay.Chio;
 using Xunit;
 
 namespace Backbay.Chio.Tests;

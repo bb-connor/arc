@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 
-namespace Backbay.Arc;
+namespace Backbay.Chio;
 
 /// <summary>
 /// Delegate for extracting caller identity from an HTTP request.

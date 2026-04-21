@@ -34,9 +34,18 @@ wheels = [
 ]
 
 [[package]]
-name = "arc-asgi"
+name = "certifi"
+version = "2026.2.25"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/2d/7bf41579a8986e348fa033a31cdd0e4121114f6bce2457e8876010b092dd/certifi-2026.2.25.tar.gz", hash = "sha256:e887ab5cee78ea814d3472169153c2d12cd43b14bd03329a39a9c6e2e80bfba7", size = 155029, upload-time = "2026-02-25T02:54:17.342Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl", hash = "sha256:027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa", size = 153684, upload-time = "2026-02-25T02:54:15.766Z" },
+]
+
+[[package]]
+name = "chio-asgi"
 version = "0.1.0"
-source = { directory = "../arc-asgi" }
+source = { directory = "../chio-asgi" }
 dependencies = [
     { name = "chio-sdk-python" },
 ]
@@ -52,11 +61,11 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [[package]]
-name = "arc-fastapi"
+name = "chio-fastapi"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "arc-asgi" },
+    { name = "chio-asgi" },
     { name = "chio-sdk-python" },
     { name = "fastapi" },
 ]
@@ -71,7 +80,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "arc-asgi", directory = "../arc-asgi" },
+    { name = "chio-asgi", directory = "../chio-asgi" },
     { name = "chio-sdk-python", directory = "../chio-sdk-python" },
     { name = "fastapi", specifier = ">=0.100" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27,<1" },
@@ -99,15 +108,6 @@ requires-dist = [
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.21,<1" },
 ]
 provides-extras = ["dev"]
-
-[[package]]
-name = "certifi"
-version = "2026.2.25"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/af/2d/7bf41579a8986e348fa033a31cdd0e4121114f6bce2457e8876010b092dd/certifi-2026.2.25.tar.gz", hash = "sha256:e887ab5cee78ea814d3472169153c2d12cd43b14bd03329a39a9c6e2e80bfba7", size = 155029, upload-time = "2026-02-25T02:54:17.342Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl", hash = "sha256:027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa", size = 153684, upload-time = "2026-02-25T02:54:15.766Z" },
-]
 
 [[package]]
 name = "colorama"

@@ -5,7 +5,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace Backbay.Arc;
+namespace Backbay.Chio;
 
 /// <summary>
 /// How the caller authenticated to the upstream API.

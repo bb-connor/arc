@@ -5,7 +5,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.4"
 }
 
-group = "examples.arc"
+group = "examples.chio"
 version = "0.1.0"
 
 java {
@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.backbay.arc:arc-spring-boot:0.1.0")
+    implementation("io.backbay.chio:chio-spring-boot:0.1.0")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -36,4 +36,3 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
-

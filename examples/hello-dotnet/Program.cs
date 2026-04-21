@@ -1,10 +1,10 @@
-using Backbay.Arc;
+using Backbay.Chio;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddArcProtection();
+builder.Services.AddChioProtection();
 
 var app = builder.Build();
-app.UseArcProtection();
+app.UseChioProtection();
 
 app.MapGet("/healthz", () => Results.Json(new { status = "ok" }));
 
@@ -20,4 +20,3 @@ app.MapPost("/echo", (EchoRequest payload) =>
 app.Run();
 
 internal sealed record EchoRequest(string Message, int Count = 1);
-

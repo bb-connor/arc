@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.IO;
 
-namespace Backbay.Arc;
+namespace Backbay.Chio;
 
 /// <summary>
 /// Configuration options for the Chio middleware.

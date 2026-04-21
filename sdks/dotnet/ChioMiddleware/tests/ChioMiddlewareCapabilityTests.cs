@@ -3,7 +3,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Backbay.Arc;
+using Backbay.Chio;
 using Xunit;
 
 namespace Backbay.Chio.Tests;

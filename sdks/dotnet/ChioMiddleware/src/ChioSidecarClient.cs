@@ -6,7 +6,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace Backbay.Arc;
+namespace Backbay.Chio;
 
 /// <summary>
 /// Exception thrown when the Chio sidecar is unreachable or returns an error.

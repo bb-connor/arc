@@ -5,7 +5,7 @@ use chio_a2a_edge::{A2aEdgeConfig, A2aKernelExecutionContext, ChioA2aEdge};
 use chio_core::capability::{ChioScope, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
 use chio_kernel::{
-    ChioKernel, KernelError, KernelConfig, NestedFlowBridge, ToolCallChunk, ToolCallStream,
+    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream,
     ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
@@ -137,6 +137,7 @@ fn build_demo_state() -> (ChioA2aEdge, ChioKernel, A2aKernelExecutionContext) {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     (
@@ -174,11 +175,12 @@ fn agent_card() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mode = std::env::args().nth(1).unwrap_or_else(|| "serve".to_string());
+    let mode = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "serve".to_string());
     match mode.as_str() {
         "serve" => serve(),
         "agent-card" => agent_card(),
         other => Err(format!("unknown mode: {other}").into()),
     }
 }
-

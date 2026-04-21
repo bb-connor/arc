@@ -110,7 +110,7 @@ spec:
                   key: signing-key
           volumeMounts:
             - name: chio-config
-              mountPath: /etc/arc
+              mountPath: /etc/chio
               readOnly: true
           resources:
             requests:

@@ -82,7 +82,7 @@
       "mountPoints": [
         {
           "sourceVolume": "chio-config",
-          "containerPath": "/etc/arc",
+          "containerPath": "/etc/chio",
           "readOnly": true
         }
       ],

@@ -12,7 +12,7 @@ services:
     ports:
       - "${CHIO_TRUST_PORT:-8940}:8940"
     volumes:
-      - chio_demo_state:/var/lib/arc
+      - chio_demo_state:/var/lib/chio
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8940/health >/dev/null 2>&1"]
       interval: 5s
