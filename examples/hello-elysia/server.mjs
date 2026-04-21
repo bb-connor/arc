@@ -1,12 +1,12 @@
 import http from "node:http";
 import { Elysia } from "elysia";
-import { arc } from "@chio-protocol/elysia";
+import { chio } from "@chio-protocol/elysia";
 
 const port = Number(process.env["HELLO_ELYSIA_PORT"] ?? "8014");
 
 const app = new Elysia()
   .use(
-    arc({
+    chio({
       sidecarUrl: process.env["CHIO_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
       skip: ["/healthz"],
     }),

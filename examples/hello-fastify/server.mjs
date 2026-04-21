@@ -1,9 +1,9 @@
 import Fastify from "fastify";
-import { arc } from "@chio-protocol/fastify";
+import { chio } from "@chio-protocol/fastify";
 
 const fastify = Fastify({ logger: false });
 
-await fastify.register(arc, {
+await fastify.register(chio, {
   sidecarUrl: process.env["CHIO_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
   skip: ["/healthz"],
 });
@@ -12,14 +12,14 @@ fastify.get("/healthz", async () => ({ status: "ok" }));
 
 fastify.get("/hello", async (request) => ({
   message: "hello from fastify",
-  receipt_id: request.arcResult?.receipt.id ?? null,
+  receipt_id: request.chioResult?.receipt.id ?? null,
 }));
 
 fastify.post("/echo", async (request) => {
   const payload = request.body ?? {};
   return {
     ...(typeof payload === "object" && payload !== null ? payload : { payload }),
-    receipt_id: request.arcResult?.receipt.id ?? null,
+    receipt_id: request.chioResult?.receipt.id ?? null,
   };
 });
 
