@@ -1,14 +1,14 @@
 {
-  "report_id": "arc.web3-deployment-promotion.base-mainnet.v1",
+  "report_id": "chio.web3-deployment-promotion.base-mainnet.v1",
   "generated_at": "2026-04-02T18:15:00Z",
   "environment": "base-mainnet",
   "status": "promoted",
-  "manifest_id": "arc.web3-deployment.base-mainnet.reviewed.v1",
+  "manifest_id": "chio.web3-deployment.base-mainnet.reviewed.v1",
   "manifest_sha256": "a5d95f8f523b7d2f1c0af1fd8a0d6ab9b3df2ceab0cb0a84fbb27db5ad9cb8a1",
-  "approval_id": "arc.web3-deployment-approval.base-mainnet.v1",
+  "approval_id": "chio.web3-deployment-approval.base-mainnet.v1",
   "approval_sha256": "0d2f3b9e24d8de7c2145af5dc6d2e8563d52e632490f5cfa8d63d61edca496de",
-  "candidate_release_id": "arc.web3-contract-package.release.v0.1.0",
-  "deployment_policy_id": "arc.web3-deployment-promotion.v1",
+  "candidate_release_id": "chio.web3-contract-package.release.v0.1.0",
+  "deployment_policy_id": "chio.web3-deployment-promotion.v1",
   "checks": [
     {
       "id": "approval.validation",
@@ -32,20 +32,20 @@
     }
   ],
   "planned_contract_addresses": {
-    "arc.identity-registry": "0x2222222222222222222222222222222222222222",
-    "arc.root-registry": "0x3333333333333333333333333333333333333333",
-    "arc.escrow": "0x4444444444444444444444444444444444444444",
-    "arc.bond-vault": "0x5555555555555555555555555555555555555555",
-    "arc.price-resolver": "0x6666666666666666666666666666666666666666"
+    "chio.identity-registry": "0x2222222222222222222222222222222222222222",
+    "chio.root-registry": "0x3333333333333333333333333333333333333333",
+    "chio.escrow": "0x4444444444444444444444444444444444444444",
+    "chio.bond-vault": "0x5555555555555555555555555555555555555555",
+    "chio.price-resolver": "0x6666666666666666666666666666666666666666"
   },
   "create2_factory_address": "0x1111111111111111111111111111111111111111",
   "deployment_path": "target/web3-promotion-qualification/run-a/deployment.json",
   "rollback_plan_path": "target/web3-promotion-qualification/run-a/rollback-plan.json",
   "deployed_contract_addresses": {
-    "arc.identity-registry": "0x2222222222222222222222222222222222222222",
-    "arc.root-registry": "0x3333333333333333333333333333333333333333",
-    "arc.escrow": "0x4444444444444444444444444444444444444444",
-    "arc.bond-vault": "0x5555555555555555555555555555555555555555",
-    "arc.price-resolver": "0x6666666666666666666666666666666666666666"
+    "chio.identity-registry": "0x2222222222222222222222222222222222222222",
+    "chio.root-registry": "0x3333333333333333333333333333333333333333",
+    "chio.escrow": "0x4444444444444444444444444444444444444444",
+    "chio.bond-vault": "0x5555555555555555555555555555555555555555",
+    "chio.price-resolver": "0x6666666666666666666666666666666666666666"
   }
 }

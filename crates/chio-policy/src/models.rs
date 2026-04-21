@@ -161,6 +161,10 @@ pub struct Rules {
     pub remote_desktop_channels: Option<RemoteDesktopChannelsRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_injection: Option<InputInjectionRule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub velocity: Option<VelocityRule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_in_loop: Option<HumanInLoopRule>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -322,6 +326,59 @@ pub struct InputInjectionRule {
     pub require_postcondition_probe: bool,
 }
 
+/// Token-bucket rate and spend limiting, compiled to `VelocityGuard` +
+/// `AgentVelocityGuard`. Wave 1.6: first-class variant restored in Wave 5.0.1
+/// after the `arc` -> `chio` rename.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VelocityRule {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_invocations_per_window: Option<u32>,
+    /// Integer minor units (e.g. cents) matching `ToolGrant::max_cost_per_invocation`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_spend_per_window: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_requests_per_agent: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_requests_per_session: Option<u32>,
+    #[serde(default = "default_velocity_window_secs")]
+    pub window_secs: u64,
+    #[serde(default = "default_burst_factor")]
+    pub burst_factor: f64,
+}
+
+/// Human-in-the-loop approval gating. Compiles to
+/// `Constraint::RequireApprovalAbove { threshold_units }` on tool grants.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HumanInLoopRule {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Tool-name globs that always need approval (compiles to threshold = 0).
+    #[serde(default)]
+    pub require_confirmation: Vec<String>,
+    /// Integer minor units; compiles to
+    /// `Constraint::RequireApprovalAbove { threshold_units }`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approve_above: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approve_above_currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+    #[serde(default)]
+    pub on_timeout: HumanInLoopTimeoutAction,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HumanInLoopTimeoutAction {
+    #[default]
+    Deny,
+    Defer,
+}
+
 // ---------------------------------------------------------------------------
 // Extensions
 // ---------------------------------------------------------------------------
@@ -339,6 +396,91 @@ pub struct Extensions {
     pub reputation: Option<ReputationExtension>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance: Option<RuntimeAssuranceExtension>,
+    /// Chio-specific extension slot. The kernel does not interpret this
+    /// block; it is carried verbatim for chio-bridge consumers. Restored in
+    /// Wave 5.0.1 after the `arc` -> `chio` rename.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chio: Option<ChioExtension>,
+}
+
+// ---------------------------------------------------------------------------
+// Chio extension (Wave 1.6, re-landed in 5.0.1)
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ChioExtension {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market_hours: Option<ChioMarketHours>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signing: Option<ChioSigning>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub k8s_namespaces: Option<ChioK8sNamespaces>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback: Option<ChioRollback>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_in_loop: Option<ChioHumanInLoopAdvanced>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChioMarketHours {
+    pub tz: String,
+    pub open: String,
+    pub close: String,
+    #[serde(default)]
+    pub days: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChioSigning {
+    pub algo: String,
+    #[serde(default = "default_true")]
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_ref: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChioK8sNamespaces {
+    #[serde(default)]
+    pub allow: Vec<String>,
+    #[serde(default)]
+    pub human_in_loop: Vec<String>,
+    #[serde(default)]
+    pub deny: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChioRollback {
+    #[serde(default)]
+    pub on_guard_fail: bool,
+    #[serde(default)]
+    pub on_timeout: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ChioHumanInLoopAdvanced {
+    #[serde(default)]
+    pub approve_when: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approvers: Option<ChioApproverSet>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChioApproverSet {
+    pub n: u32,
+    #[serde(default)]
+    pub of: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -735,4 +877,12 @@ fn default_imbalance_ratio() -> f64 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_velocity_window_secs() -> u64 {
+    60
+}
+
+fn default_burst_factor() -> f64 {
+    1.0
 }

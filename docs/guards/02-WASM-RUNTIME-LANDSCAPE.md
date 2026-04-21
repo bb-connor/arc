@@ -385,14 +385,14 @@ from its design:
 | Host property access | Guard context fields | Partially (JSON blob) |
 | Copy-based memory | Copy-based (JSON at offset 0) | Implemented |
 | Return action enum | Return verdict i32 | Implemented |
-| Structured logging | Host `arc.log` import | Not yet implemented |
+| Structured logging | Host `chio.log` import | Not yet implemented |
 
 **Key improvements planned for v1** (see `05-V1-DECISION.md`):
 
 1. **Configuration via manifest:** Guards receive static configuration
-   at load time from `guard-manifest.yaml`, accessed via `arc.get_config`.
-2. **Host function imports:** `arc.log`, `arc.get_config`,
-   `arc.get_time_unix_secs` registered on the linker.
+   at load time from `guard-manifest.yaml`, accessed via `chio.get_config`.
+2. **Host function imports:** `chio.log`, `chio.get_config`,
+   `chio.get_time_unix_secs` registered on the linker.
 3. **Structured deny reasons:** `chio_deny_reason` guest export as an
    alternative to the NUL-terminated string at offset 64 KiB.
 
@@ -795,8 +795,8 @@ the right foundation.
 ### 6.2 v1 (see `05-V1-DECISION.md` for authoritative scope)
 
 1. **Add `ResourceLimiter`** to cap memory per guard invocation.
-2. **Add host function imports** for structured logging (`arc.log`), config
-   access (`arc.get_config`), and wall-clock time (`arc.get_time_unix_secs`).
+2. **Add host function imports** for structured logging (`chio.log`), config
+   access (`chio.get_config`), and wall-clock time (`chio.get_time_unix_secs`).
 3. **Add `chio_alloc` / `chio_deny_reason`** export support.
 4. **Add module size and import validation** at load time.
 5. **Benchmark spike** -- module load, instantiation, p50/p99 evaluate

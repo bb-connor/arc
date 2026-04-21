@@ -1,7 +1,7 @@
 {
-  "approval_id": "arc.web3-deployment-approval.base-mainnet.v1",
-  "candidate_release_id": "arc.web3-contract-package.release.v0.1.0",
-  "deployment_policy_id": "arc.web3-deployment-promotion.v1",
+  "approval_id": "chio.web3-deployment-approval.base-mainnet.v1",
+  "candidate_release_id": "chio.web3-contract-package.release.v0.1.0",
+  "deployment_policy_id": "chio.web3-deployment-promotion.v1",
   "reviewed_manifest_path": "contracts/deployments/base-mainnet.reviewed.json",
   "reviewed_manifest_sha256": "a5d95f8f523b7d2f1c0af1fd8a0d6ab9b3df2ceab0cb0a84fbb27db5ad9cb8a1",
   "environment": "base-mainnet",
@@ -21,7 +21,7 @@
   "create2": {
     "factory_mode": "predeployed",
     "factory_address": "0x1111111111111111111111111111111111111111",
-    "salt_namespace": "arc.web3.v0.1.0"
+    "salt_namespace": "chio.web3.v0.1.0"
   },
   "failure_policy": {
     "rollback_mode": "manual-replacement-deployment",

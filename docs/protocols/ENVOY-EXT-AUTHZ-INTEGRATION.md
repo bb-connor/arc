@@ -309,11 +309,11 @@ evaluation data so Envoy access logs can include it:
 
 ```json
 {
-  "arc.receipt_id": "01917a3b-...",
-  "arc.verdict": "allow",
-  "arc.policy_hash": "sha256:abc123...",
-  "arc.guard_count": 3,
-  "arc.evaluation_ms": 12
+  "chio.receipt_id": "01917a3b-...",
+  "chio.verdict": "allow",
+  "chio.policy_hash": "sha256:abc123...",
+  "chio.guard_count": 3,
+  "chio.evaluation_ms": 12
 }
 ```
 

@@ -1,6 +1,6 @@
 {
-  "schema": "arc.link.qualification-matrix.v1",
-  "profileId": "arc.link.profile",
+  "schema": "chio.link.qualification-matrix.v1",
+  "profileId": "chio.link.profile",
   "cases": [
     {
       "id": "primary-path",

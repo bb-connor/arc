@@ -250,12 +250,12 @@ The `ChioProperties` class maps the `arc.*` prefix:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `arc.sidecar-url` | String | `CHIO_SIDECAR_URL` env or `http://127.0.0.1:9090` | Sidecar kernel URL |
-| `arc.timeout-seconds` | Long | 5 | HTTP timeout for sidecar calls |
-| `arc.on-sidecar-error` | String | `deny` | `deny` (fail-closed) or `allow` (fail-open passthrough without Chio receipt) |
-| `arc.enabled` | Boolean | true | Enable/disable Chio protection |
-| `arc.url-patterns` | List | `["/*"]` | URL patterns to protect |
-| `arc.filter-order` | Int | 1 | Servlet filter ordering |
+| `chio.sidecar-url` | String | `CHIO_SIDECAR_URL` env or `http://127.0.0.1:9090` | Sidecar kernel URL |
+| `chio.timeout-seconds` | Long | 5 | HTTP timeout for sidecar calls |
+| `chio.on-sidecar-error` | String | `deny` | `deny` (fail-closed) or `allow` (fail-open passthrough without Chio receipt) |
+| `chio.enabled` | Boolean | true | Enable/disable Chio protection |
+| `chio.url-patterns` | List | `["/*"]` | URL patterns to protect |
+| `chio.filter-order` | Int | 1 | Servlet filter ordering |
 
 ### ChioFilter
 
@@ -272,7 +272,7 @@ The `ChioFilter` is a standard Jakarta Servlet `Filter` that:
 
 `ChioAutoConfiguration` registers the filter automatically when:
 - `ChioFilter` is on the classpath (`@ConditionalOnClass`)
-- `arc.enabled` is `true` or absent (`@ConditionalOnProperty`, `matchIfMissing = true`)
+- `chio.enabled` is `true` or absent (`@ConditionalOnProperty`, `matchIfMissing = true`)
 
 No `@Bean` declarations are needed in application code.
 

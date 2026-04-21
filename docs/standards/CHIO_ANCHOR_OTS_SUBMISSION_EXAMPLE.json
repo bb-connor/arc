@@ -1,5 +1,5 @@
 {
-  "schema": "arc.anchor.ots-submission.v1",
+  "schema": "chio.anchor.ots-submission.v1",
   "calendar_urls": [
     "https://alice.btc.calendar.opentimestamps.org",
     "https://bob.btc.calendar.opentimestamps.org"

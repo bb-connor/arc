@@ -33,7 +33,7 @@ The selected Chio-Wall path is:
 - control surface: `tool_access_domain_boundary`
 - source domain: `research`
 - protected domain: `execution`
-- policy reference: `arc.wall.research_execution_barrier.v1`
+- policy reference: `chio.wall.research_execution_barrier.v1`
 
 The first shipped scenario is one denied cross-domain request:
 

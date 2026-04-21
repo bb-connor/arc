@@ -209,7 +209,7 @@ pub trait SigningBackend: Send + Sync {
 3. The kernel accepts a `Box<dyn SigningBackend>` instead of a raw `Keypair`.
    All signing operations go through the trait.
 
-4. Configuration in `arc.yaml`:
+4. Configuration in `chio.yaml`:
 
 ```yaml
 signing:
@@ -249,7 +249,7 @@ Chio's controls reduce the PCI DSS scope for the agent layer.
 | PCI DSS v4.0 Requirement | Chio Coverage | Gap |
 |---------------------------|-------------|-----|
 | **Req 1: Network security controls** | Out of scope. Chio operates at application layer, not network layer. | Network segmentation is a deployment concern. Chio's sidecar architecture is compatible with network isolation but does not enforce it. |
-| **Req 2: Secure configurations** | Partial. `arc.yaml` defines kernel configuration. Unified configuration doc covers secure defaults. | No configuration hardening benchmark. Need a PCI-specific secure baseline config. |
+| **Req 2: Secure configurations** | Partial. `chio.yaml` defines kernel configuration. Unified configuration doc covers secure defaults. | No configuration hardening benchmark. Need a PCI-specific secure baseline config. |
 | **Req 3: Protect stored account data** | Partial. `QueryResultGuard` can redact PII patterns from tool results. Column constraints restrict which database columns agents can access. | Chio does not encrypt data at rest in its receipt store. Receipt content hashes do not contain raw cardholder data (SHA-256 of arguments), but guard evidence may contain tool output snippets. Need configurable redaction of guard evidence before persistence. |
 | **Req 4: Protect data in transit** | Chio sidecar and kernel HTTP endpoints support TLS. mTLS is documented for tool server connections. | No enforcement of minimum TLS version in Chio configuration. Need `min_tls_version: 1.2` config option. |
 | **Req 5: Protect from malicious software** | Out of scope. Chio governs tool access, not endpoint protection. | N/A |
@@ -288,7 +288,7 @@ Map, partially to Govern and Manage, and weakly to Measure.
 
 | Category | Chio Relevance | Chio Mechanism |
 |----------|---------------|---------------|
-| GV-1: Policies and procedures | Partial. Chio enforces policies but does not define organizational AI governance. | Policy files (`arc.yaml`, guard configurations) are the executable expression of organizational policy. Policy hash is recorded in every receipt. |
+| GV-1: Policies and procedures | Partial. Chio enforces policies but does not define organizational AI governance. | Policy files (`chio.yaml`, guard configurations) are the executable expression of organizational policy. Policy hash is recorded in every receipt. |
 | GV-2: Accountability structures | Partial. Chio provides attribution (DPoP, agent identity) but does not define organizational accountability. | `WorkloadIdentity` captures agent metadata. `CapabilityToken.issuer` identifies the authority. Delegation chains provide provenance. |
 | GV-3: Workforce diversity and AI expertise | Out of scope. Organizational concern. | N/A |
 | GV-4: Organizational risk culture | Partial. Chio's fail-closed design embodies risk-averse defaults. | Guard pipeline defaults to deny. Budget enforcement is atomic. |

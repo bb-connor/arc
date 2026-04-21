@@ -3,7 +3,7 @@
 > **This document is a long-range roadmap, not the v1 plan.**
 > The scoped v1 implementation is defined in `05-V1-DECISION.md`.
 > Items in this document that conflict with 05 (CLI tooling, guest SDKs,
-> non-Rust SDKs, `arc.yaml` config field) are deferred to v2 or later.
+> non-Rust SDKs, `chio.yaml` config field) are deferred to v2 or later.
 > Read this document for architectural context and future direction;
 > read 05 for what ships next.
 
@@ -16,7 +16,7 @@ The codebase already has a well-structured foundation for WASM guards:
 | `chio-kernel` | Stable | Defines `Guard` trait, `GuardContext`, `Verdict` |
 | `chio-guards` | Stable | 15+ built-in Rust guards (path, egress, PII, velocity, etc.) |
 | `chio-wasm-guards` | Scaffold | ABI types, config, `WasmGuard` -> `Guard` adapter, wasmtime backend |
-| `chio-config` | Stable | `wasm_guards` section in `arc.yaml`, `WasmGuardEntry` schema |
+| `chio-config` | Stable | `wasm_guards` section in `chio.yaml`, `WasmGuardEntry` schema |
 
 The `chio-wasm-guards` crate already contains:
 - `WasmGuardAbi` trait abstracting the WASM backend
@@ -26,7 +26,7 @@ The `chio-wasm-guards` crate already contains:
 - `WasmGuardRuntime` that manages multiple loaded guards
 - A `wasmtime-runtime` feature flag with a working `WasmtimeBackend`
 - `MockWasmBackend` for testing
-- `chio-config` already parses `wasm_guards` entries from `arc.yaml`
+- `chio-config` already parses `wasm_guards` entries from `chio.yaml`
 
 What is missing: a guest-side SDK, a CLI workflow, a guard manifest/packaging format,
 host function imports, and integration wiring between `chio-config` and the kernel
@@ -231,7 +231,7 @@ pub struct WasmtimeBackend {
 The current code creates a new `Engine` per backend. This should be changed to
 accept an `Arc<Engine>` in the constructor.
 
-### 4.4 Startup Wiring: `arc.yaml` -> Kernel
+### 4.4 Startup Wiring: `chio.yaml` -> Kernel
 
 The missing integration is the bridge between `chio-config`'s `wasm_guards`
 entries and the kernel's `add_guard` call. This belongs in the CLI / proxy
@@ -462,7 +462,7 @@ On load, the host:
 2. Verifies `wasm_sha256` matches the actual `.wasm` file
 3. Validates `abi_version` is supported
 4. Parses `config_schema` and validates config values from the manifest's
-   `config` block (v1). In v1.1, `arc.yaml` `wasm_guards[].config` values
+   `config` block (v1). In v1.1, `chio.yaml` `wasm_guards[].config` values
    override manifest defaults.
 5. Loads the `.wasm` module via the `WasmGuardAbi` backend
 
@@ -515,7 +515,7 @@ The current wasmtime backend works but needs:
 
 1. **Shared `Arc<Engine>`** -- avoid creating one engine per guard
 2. **`chio_alloc` support** -- check for the export, use it if present
-3. **Host function registration** -- `arc.log`, `arc.get_config`, `arc.get_time_unix_secs`
+3. **Host function registration** -- `chio.log`, `chio.get_config`, `chio.get_time_unix_secs`
 4. **`WasmHostState` instead of `()`** -- carry config + log buffer in the Store
 5. **`chio_deny_reason` support** -- check for the export as an alternative to offset-64K
 
@@ -528,7 +528,7 @@ startup path. This involves more than a single call -- see
 1. Sort `WasmGuardEntry` list by priority before loading (runtime does
    not sort).
 2. For each entry, locate the adjacent `guard-manifest.yaml` and load
-   config from the manifest (v1 uses manifest-only config, not `arc.yaml`).
+   config from the manifest (v1 uses manifest-only config, not `chio.yaml`).
 3. Register HushSpec-compiled guards first (via `compile_policy()`), then
    WASM guards, then the advisory pipeline.
 
@@ -565,7 +565,7 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 
 - Add `Arc<Engine>` sharing across guards
 - Add `WasmHostState` with config + log buffer
-- Register `arc.log`, `arc.get_config`, `arc.get_time_unix_secs` host functions
+- Register `chio.log`, `chio.get_config`, `chio.get_time_unix_secs` host functions
 - Add `chio_alloc` / `chio_deny_reason` protocol support
 - Add guard manifest parsing + SHA-256 verification
 - Wire `chio-config` `wasm_guards` entries into kernel startup
@@ -618,8 +618,8 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 | Memory protocol | `chio_alloc` with offset-0 fallback | v1 | Backward-compatible, safe for GC languages |
 | Instance lifecycle | Fresh `Store` per invocation, shared `Engine` | v1 | Isolation without compilation cost |
 | WASI | Disabled | v1 | Guards must not have filesystem/network access |
-| Config source | Guard manifest file | v1 | `arc.yaml` schema needs change for `config` field |
-| Config source | `arc.yaml` `wasm_guards[].config` | v1.1 | Requires `WasmGuardEntry` schema change |
+| Config source | Guard manifest file | v1 | `chio.yaml` schema needs change for `config` field |
+| Config source | `chio.yaml` `wasm_guards[].config` | v1.1 | Requires `WasmGuardEntry` schema change |
 | Guard packaging | `guard-manifest.yaml` + `.wasm` binary | v1 | Inspectable, integrity-verified |
 | CLI integration | `arc guard` subcommand family | v2 | Follows existing `arc` CLI patterns |
 | Non-Rust SDKs | TypeScript, Python, Go | v2+ | After WIT migration |

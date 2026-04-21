@@ -14,7 +14,7 @@
  * import { chio, chioErrorHandler } from "@chio-protocol/express";
  *
  * const app = express();
- * app.use(arc({ config: "arc.yaml" }));
+ * app.use(arc({ config: "chio.yaml" }));
  * app.use(chioErrorHandler);
  * ```
  */

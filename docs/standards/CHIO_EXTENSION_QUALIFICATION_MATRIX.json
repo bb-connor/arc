@@ -1,14 +1,14 @@
 {
   "schema": "chio.extension-qualification-matrix.v1",
-  "official_stack_package_id": "arc.official-stack",
+  "official_stack_package_id": "chio.official-stack",
   "chio_contract_version": "2.0",
   "cases": [
     {
       "id": "official-local-receipt-baseline",
       "name": "Official local receipt-store baseline",
-      "extension_point_id": "arc.kernel.receipt_store",
-      "supported_component_id": "arc.sqlite-receipt-store",
-      "candidate_extension_id": "arc.sqlite-receipt-store",
+      "extension_point_id": "chio.kernel.receipt_store",
+      "supported_component_id": "chio.sqlite-receipt-store",
+      "candidate_extension_id": "chio.sqlite-receipt-store",
       "mode": "official_to_official",
       "expected_outcome": "pass",
       "observed_outcome": "pass",
@@ -20,8 +20,8 @@
     {
       "id": "custom-receipt-store-compatible",
       "name": "Custom remote receipt store stays within the official envelope",
-      "extension_point_id": "arc.kernel.receipt_store",
-      "supported_component_id": "arc.remote-receipt-store",
+      "extension_point_id": "chio.kernel.receipt_store",
+      "supported_component_id": "chio.remote-receipt-store",
       "candidate_extension_id": "sample.pg-receipt-store",
       "mode": "official_to_custom",
       "expected_outcome": "pass",
@@ -34,14 +34,14 @@
     {
       "id": "reject-receipt-store-version-mismatch",
       "name": "Chio contract mismatch fails closed for custom receipt stores",
-      "extension_point_id": "arc.kernel.receipt_store",
-      "supported_component_id": "arc.remote-receipt-store",
+      "extension_point_id": "chio.kernel.receipt_store",
+      "supported_component_id": "chio.remote-receipt-store",
       "candidate_extension_id": "sample.pg-receipt-store@arc-3",
       "mode": "official_to_custom",
       "expected_outcome": "fail_closed",
       "observed_outcome": "fail_closed",
       "rejection_codes": [
-        "unsupported_arc_contract"
+        "unsupported_chio_contract"
       ],
       "invariants": [
         "rejects_version_mismatch"
@@ -50,8 +50,8 @@
     {
       "id": "custom-a2a-oracle-compatible",
       "name": "Custom A2A oracle bridge remains policy-bound",
-      "extension_point_id": "arc.kernel.tool_server_connection",
-      "supported_component_id": "arc.a2a-adapter",
+      "extension_point_id": "chio.kernel.tool_server_connection",
+      "supported_component_id": "chio.a2a-adapter",
       "candidate_extension_id": "sample.web3-oracle-bridge",
       "mode": "official_to_custom",
       "expected_outcome": "pass",
@@ -65,8 +65,8 @@
     {
       "id": "reject-a2a-oracle-without-policy-activation",
       "name": "Evidence-importing A2A bridge without local policy activation fails closed",
-      "extension_point_id": "arc.kernel.tool_server_connection",
-      "supported_component_id": "arc.a2a-adapter",
+      "extension_point_id": "chio.kernel.tool_server_connection",
+      "supported_component_id": "chio.a2a-adapter",
       "candidate_extension_id": "sample.web3-oracle-bridge@no-policy",
       "mode": "official_to_custom",
       "expected_outcome": "fail_closed",
@@ -83,8 +83,8 @@
     {
       "id": "reject-truth-mutating-custom-store",
       "name": "Custom store that claims receipt truth mutation fails closed",
-      "extension_point_id": "arc.kernel.receipt_store",
-      "supported_component_id": "arc.remote-receipt-store",
+      "extension_point_id": "chio.kernel.receipt_store",
+      "supported_component_id": "chio.remote-receipt-store",
       "candidate_extension_id": "sample.receipt-store@truth-mutation",
       "mode": "official_to_custom",
       "expected_outcome": "fail_closed",

@@ -243,7 +243,7 @@ shipping surface.
 |------|-----------|-------|--------|
 | ACP kernel integration | Promote chio-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `chio-acp-proxy` | [Shipped] |
 | MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `chio-cli` | |
-| Unified runtime config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `chio-cli` | [Partial -- flat schema shipped, nested schema proposed. See spec/CONFIGURATION.md] |
+| Unified runtime config | Single `chio.yaml` that configures MCP, A2A, and ACP edges with shared policy | `chio-cli` | [Partial -- flat schema shipped, nested schema proposed. See spec/CONFIGURATION.md] |
 | Symlink fix | Workspace symlink resolution for monorepo consumers | `chio-cli` | |
 
 **Why Tier 1 first:** ACP live-path cryptographic enforcement is now landed, so
@@ -524,7 +524,7 @@ This is the **adoption wedge**, not the architectural boundary. Chio should win
 initial deployment through wrapped MCP edges while building toward broader
 protocol and native-surface coverage.
 
-### Phase 2: `arc.yaml` Unified Runtime Config (Proposed)
+### Phase 2: `chio.yaml` Unified Runtime Config (Proposed)
 
 One configuration file that defines all three protocol edges, shared policy,
 capability authorities, and receipt storage:

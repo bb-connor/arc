@@ -829,8 +829,8 @@ relevant session anchor.
 The report now declares Chio's first normative enterprise-facing profile over
 that projection:
 
-- report `schema`: `arc.oauth.authorization-context-report.v1`
-- profile `schema`: `arc.oauth.authorization-profile.v1`
+- report `schema`: `chio.oauth.authorization-context-report.v1`
+- profile `schema`: `chio.oauth.authorization-profile.v1`
 - profile `id`: `chio-governed-rar-v1`
 
 This profile is intentionally narrow. Chio claims one RFC-9396-style
@@ -931,7 +931,7 @@ authorization-server issuer.
 `/v1/reports/authorization-profile-metadata` packages that same profile into a
 machine-readable artifact for enterprise review. The report publishes:
 
-- metadata `schema`: `arc.oauth.authorization-metadata.v1`
+- metadata `schema`: `chio.oauth.authorization-metadata.v1`
 - canonical Chio profile `id` and `schema`
 - the authorization-context report schema
 - supported discovery paths
@@ -1092,7 +1092,7 @@ inventing new policy-specific blobs.
 Chio now also externalizes one signed appraisal-result contract over that same
 artifact boundary. The signed result carries:
 
-- result `schema`: `arc.runtime-attestation.appraisal-result.v1`
+- result `schema`: `chio.runtime-attestation.appraisal-result.v1`
 - deterministic `resultId`
 - `exportedAt`
 - exporting `issuer`
@@ -1145,11 +1145,11 @@ Chio now also defines one bounded verifier-federation metadata layer over that
 same appraisal boundary. The portable artifacts are:
 
 - signed verifier descriptor
-  `arc.runtime-attestation.verifier-descriptor.v1`
+  `chio.runtime-attestation.verifier-descriptor.v1`
 - signed reference-value set
-  `arc.runtime-attestation.reference-values.v1`
+  `chio.runtime-attestation.reference-values.v1`
 - signed trust bundle
-  `arc.runtime-attestation.trust-bundle.v1`
+  `chio.runtime-attestation.trust-bundle.v1`
 
 The signed verifier descriptor makes verifier identity machine-readable
 without collapsing it into local policy. The descriptor carries:
@@ -1251,7 +1251,7 @@ to emit:
 
 - one explicit underwriting-query scope with required anchor filters and a
   bounded receipt-reference limit
-- a stable `arc.underwriting.taxonomy.v1` vocabulary of risk classes and
+- a stable `chio.underwriting.taxonomy.v1` vocabulary of risk classes and
   reason codes
 - one canonical evidence snapshot covering receipt summaries plus optional
   reputation, certification, and runtime-assurance summaries
@@ -1544,7 +1544,7 @@ This surface is also intentionally conservative. It fails closed when:
 Chio signs the instruction contract it emits. By itself, this endpoint remains a
 custody-neutral intent surface and does not prove external execution. Under
 the shipped official web3 stack, a separate
-`arc.web3-settlement-dispatch.v1` artifact may bind that instruction to one
+`chio.web3-settlement-dispatch.v1` artifact may bind that instruction to one
 escrow and bond-vault lane, but observed settlement still must reconcile
 through explicit proof artifacts.
 
@@ -1592,12 +1592,12 @@ canonical economic evidence while keeping regulated-role assumptions explicit
 instead of ambient.
 
 The shipped official web3 execution surface is artifact-driven rather than
-permissionless. It consists of `arc.web3-trust-profile.v1`,
-`arc.web3-contract-package.v1`, `arc.web3-chain-configuration.v1`,
+permissionless. It consists of `chio.web3-trust-profile.v1`,
+`chio.web3-contract-package.v1`, `chio.web3-chain-configuration.v1`,
 `chio.anchor-inclusion-proof.v1`, `chio.oracle-conversion-evidence.v1`,
-`arc.web3-settlement-dispatch.v1`,
-`arc.web3-settlement-execution-receipt.v1`, and
-`arc.web3-qualification-matrix.v1`. Those artifacts bind one official
+`chio.web3-settlement-dispatch.v1`,
+`chio.web3-settlement-execution-receipt.v1`, and
+`chio.web3-qualification-matrix.v1`. Those artifacts bind one official
 Base-first escrow and bond-vault lane back to Chio receipts, checkpoints, and
 capital state without mutating prior signed truth or hiding custody
 assumptions. That surface is now backed locally by one packaged Solidity
@@ -1633,7 +1633,7 @@ finality-report artifact, one representative Solana settlement-preparation
 artifact, one qualification matrix, and one operator runbook. That surface
 binds approved capital instructions to explicit ERC-20 approval, escrow
 create/release/refund, and bond-vault lifecycle calls; projects chain state
-back into canonical `arc.web3-settlement-execution-receipt.v1` artifacts with
+back into canonical `chio.web3-settlement-execution-receipt.v1` artifacts with
 tiered confirmation and dispute-window policy; preserves reserve requirement
 metadata from signed bond artifacts while only locking collateral on-chain in
 the bond vault; and keeps Solana support
@@ -2256,7 +2256,7 @@ The certification contract covers:
   `not-found`
 - dispute states: `open`, `under-review`, `resolved-no-change`,
   `resolved-revoked`
-- legacy `arc.certify.check.v1` and `arc.certify.registry.v1` remain valid
+- legacy `chio.certify.check.v1` and `chio.certify.registry.v1` remain valid
   for verification and load
 - registry/discovery results that remain explicitly scoped to the operator that
   published them

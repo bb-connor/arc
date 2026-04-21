@@ -107,8 +107,8 @@ The command fails closed at the verdict layer:
 
 The generated JSON artifact contains:
 
-- the stable schema ID for new issuance: `arc.certify.check.v1`
-- legacy compatibility verifiers still accept `arc.certify.check.v1`
+- the stable schema ID for new issuance: `chio.certify.check.v1`
+- legacy compatibility verifiers still accept `chio.certify.check.v1`
 - the target tool-server identity
 - the criteria profile used
 - a pass/fail verdict

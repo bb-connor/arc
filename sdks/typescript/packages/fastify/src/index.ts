@@ -12,7 +12,7 @@
  * import { chio } from "@chio-protocol/fastify";
  *
  * const fastify = Fastify();
- * fastify.register(arc, { config: "arc.yaml" });
+ * fastify.register(arc, { config: "chio.yaml" });
  * ```
  */
 

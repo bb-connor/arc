@@ -497,7 +497,7 @@ async function main() {
     );
 
     const operatorConfig = manifest.operator_configuration ?? {};
-    const operatorLabel = operatorConfig.operator_ed_key_label ?? "arc-operator-ed25519-key";
+    const operatorLabel = operatorConfig.operator_ed_key_label ?? "chio-operator-ed25519-key";
     const operatorTx = await identityRegistry.registerOperator(
       operatorConfig.operator_address,
       labelHash(operatorLabel),

@@ -7,10 +7,10 @@ can trigger on repeated denials (circuit breakers, paging, etc.).
 
 Two event names are used:
 
-* ``arc.receipt.allow`` -- emitted after an allow verdict. Payload
+* ``chio.receipt.allow`` -- emitted after an allow verdict. Payload
   carries the receipt id, capability, tool server / name, and any
   timing metadata captured from the sidecar call.
-* ``arc.receipt.deny`` -- emitted after a deny verdict (including the
+* ``chio.receipt.deny`` -- emitted after a deny verdict (including the
   ``raise_on_deny`` HTTP 403 path). Payload carries the same shape plus
   the guard that denied and the reason string.
 
@@ -31,9 +31,9 @@ from chio_sdk.models import ChioReceipt
 logger = logging.getLogger(__name__)
 
 #: Prefect event name for an allow verdict.
-EVENT_ALLOW = "arc.receipt.allow"
+EVENT_ALLOW = "chio.receipt.allow"
 #: Prefect event name for a deny verdict.
-EVENT_DENY = "arc.receipt.deny"
+EVENT_DENY = "chio.receipt.deny"
 
 
 def _prefect_emit_event(
@@ -87,9 +87,9 @@ def _receipt_resource(receipt: ChioReceipt) -> dict[str, str]:
     return {
         "prefect.resource.id": f"arc.receipt.{receipt.id}",
         "prefect.resource.role": "chio-receipt",
-        "arc.capability_id": receipt.capability_id or "",
-        "arc.tool_server": receipt.tool_server or "",
-        "arc.tool_name": receipt.tool_name or "",
+        "chio.capability_id": receipt.capability_id or "",
+        "chio.tool_server": receipt.tool_server or "",
+        "chio.tool_name": receipt.tool_name or "",
     }
 
 
@@ -132,7 +132,7 @@ def emit_allow_event(
     task_run_id: str | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> Any | None:
-    """Emit an ``arc.receipt.allow`` Prefect event.
+    """Emit an ``chio.receipt.allow`` Prefect event.
 
     Returns the emitted :class:`prefect.events.Event` (or ``None`` when
     the events backend was unavailable and we fell back to logging).
@@ -179,12 +179,12 @@ def emit_deny_event(
     task_run_id: str | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> Any | None:
-    """Emit an ``arc.receipt.deny`` Prefect event.
+    """Emit an ``chio.receipt.deny`` Prefect event.
 
     Accepts either a deny :class:`ChioReceipt` (receipt-path deny) or a
     bare ``receipt_id`` string (HTTP-403 deny path, where no full receipt
     body was returned). The payload shape is identical in both cases so
-    Prefect Automations can trigger on ``arc.receipt.deny`` uniformly.
+    Prefect Automations can trigger on ``chio.receipt.deny`` uniformly.
     """
     resolved_receipt_id: str | None
     resolved_capability_id: str | None
@@ -205,9 +205,9 @@ def emit_deny_event(
                 else f"arc.receipt.denied.{task_name}"
             ),
             "prefect.resource.role": "chio-receipt",
-            "arc.capability_id": resolved_capability_id or "",
-            "arc.tool_server": resolved_tool_server or "",
-            "arc.tool_name": task_name,
+            "chio.capability_id": resolved_capability_id or "",
+            "chio.tool_server": resolved_tool_server or "",
+            "chio.tool_name": task_name,
         }
 
     payload: dict[str, Any] = {

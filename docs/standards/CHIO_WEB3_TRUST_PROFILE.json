@@ -1,6 +1,6 @@
 {
-  "schema": "arc.web3-trust-profile.v1",
-  "profile_id": "arc.official-web3-stack",
+  "schema": "chio.web3-trust-profile.v1",
+  "profile_id": "chio.official-web3-stack",
   "chio_contract_version": "2.0",
   "primary_chain_id": "eip155:8453",
   "secondary_chain_ids": [

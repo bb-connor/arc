@@ -17,7 +17,7 @@ Chio now ships one CCIP message family with these properties:
 - the router address, payload size ceiling, execution gas ceiling, and
   expected latency are configured per lane
 - the message payload is derived from one canonical
-  `arc.web3-settlement-execution-receipt.v1`
+  `chio.web3-settlement-execution-receipt.v1`
 - delivery is accepted only if the destination chain and payload hash match
   the prepared message exactly
 - duplicate delivery is suppressed fail closed

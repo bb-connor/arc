@@ -24,7 +24,7 @@ import express from "express";
 import { arc } from "@chio-protocol/express";
 
 const app = express();
-app.use(arc({ config: "arc.yaml" }));
+app.use(arc({ config: "chio.yaml" }));
 app.use(express.json());
 
 app.get("/pets", (_req, res) => {
@@ -258,7 +258,7 @@ Two interceptor patterns are provided for direct use (the framework packages use
 ```ts
 import { interceptNodeRequest, resolveConfig } from "@chio-protocol/node-http";
 
-const resolved = resolveConfig({ config: "arc.yaml" });
+const resolved = resolveConfig({ config: "chio.yaml" });
 
 const outcome = await interceptNodeRequest(req, res, resolved);
 if (!outcome.responseSent) {
@@ -276,7 +276,7 @@ if (!outcome.responseSent) {
 ```ts
 import { interceptWebRequest, resolveConfig } from "@chio-protocol/node-http";
 
-const resolved = resolveConfig({ config: "arc.yaml" });
+const resolved = resolveConfig({ config: "chio.yaml" });
 
 const { response, result, passthrough } = await interceptWebRequest(request, resolved);
 if (result != null) {
@@ -329,7 +329,7 @@ import { arc, chioErrorHandler } from "@chio-protocol/express";
 const app = express();
 
 // Evaluate every request against Chio
-app.use(arc({ config: "arc.yaml" }));
+app.use(arc({ config: "chio.yaml" }));
 
 // Routes
 app.get("/pets", (req, res) => {
@@ -352,7 +352,7 @@ app.listen(3000);
 
 ```ts
 app.use(arc({
-  config: "arc.yaml",
+  config: "chio.yaml",
   sidecarUrl: "http://127.0.0.1:9090",
   onSidecarError: "deny",
   timeoutMs: 5000,
@@ -410,7 +410,7 @@ import { arc } from "@chio-protocol/fastify";
 const fastify = Fastify();
 
 // Register the Chio plugin
-await fastify.register(arc, { config: "arc.yaml" });
+await fastify.register(arc, { config: "chio.yaml" });
 
 fastify.get("/pets", async (request, reply) => {
   return [{ name: "Fido" }];
@@ -429,7 +429,7 @@ await fastify.listen({ port: 3000 });
 
 ```ts
 await fastify.register(arc, {
-  config: "arc.yaml",
+  config: "chio.yaml",
   sidecarUrl: "http://127.0.0.1:9090",
   onSidecarError: "deny",
   timeoutMs: 5000,
@@ -479,7 +479,7 @@ import { Elysia } from "elysia";
 import { arc } from "@chio-protocol/elysia";
 
 const app = new Elysia()
-  .use(arc({ config: "arc.yaml" }))
+  .use(arc({ config: "chio.yaml" }))
   .get("/pets", () => [{ name: "Fido" }])
   .listen(3000);
 ```
@@ -495,7 +495,7 @@ const app = new Elysia()
 ```ts
 const app = new Elysia()
   .use(arc({
-    config: "arc.yaml",
+    config: "chio.yaml",
     sidecarUrl: "http://127.0.0.1:9090",
     onSidecarError: "deny",
     skip: ["/health"],

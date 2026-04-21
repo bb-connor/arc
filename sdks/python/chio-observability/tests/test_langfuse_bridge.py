@@ -80,7 +80,7 @@ class TestPublishAllow:
         bridge = LangFuseBridge(client=fake)
         bridge.publish(allow_receipt)
         assert len(fake.traces) == 1
-        assert fake.traces[0]["name"] == "arc.receipt.search"
+        assert fake.traces[0]["name"] == "chio.receipt.search"
 
     def test_span_attaches_to_synthetic_trace(
         self, allow_receipt: ChioReceipt
@@ -107,8 +107,8 @@ class TestPublishAllow:
         fake = FakeLangFuseClient()
         bridge = LangFuseBridge(client=fake)
         span_kwargs = bridge.publish(allow_receipt)
-        assert span_kwargs["metadata"]["arc.receipt_id"] == "rcpt_001"
-        assert span_kwargs["metadata"]["arc.capability_id"] == "cap-abc"
+        assert span_kwargs["metadata"]["chio.receipt_id"] == "rcpt_001"
+        assert span_kwargs["metadata"]["chio.capability_id"] == "cap-abc"
 
 
 # ---------------------------------------------------------------------------
@@ -140,14 +140,14 @@ class TestPublishDeny:
         fake = FakeLangFuseClient()
         bridge = LangFuseBridge(client=fake)
         span_kwargs = bridge.publish(deny_receipt)
-        names = {e["guard_name"] for e in span_kwargs["metadata"]["arc.evidence"]}
+        names = {e["guard_name"] for e in span_kwargs["metadata"]["chio.evidence"]}
         assert names == {"PathGuard", "PiiGuard"}
 
     def test_cost_metadata_preserved(self, deny_receipt: ChioReceipt) -> None:
         fake = FakeLangFuseClient()
         bridge = LangFuseBridge(client=fake)
         span_kwargs = bridge.publish(deny_receipt)
-        assert span_kwargs["metadata"]["arc.cost"] == {"units": 42, "currency": "USD"}
+        assert span_kwargs["metadata"]["chio.cost"] == {"units": 42, "currency": "USD"}
 
     def test_tags_include_verdict_tool_guard(
         self, deny_receipt: ChioReceipt

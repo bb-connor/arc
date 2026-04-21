@@ -4,7 +4,7 @@
   "display_name": "Sample Postgres Receipt Store",
   "version": "1.0.0",
   "distribution": "third_party_custom",
-  "extension_point_id": "arc.kernel.receipt_store",
+  "extension_point_id": "chio.kernel.receipt_store",
   "capabilities": [
     "receipt_append",
     "receipt_query",
@@ -15,9 +15,9 @@
   ],
   "compatibility": {
     "chio_contract_version": "2.0",
-    "official_stack_package_id": "arc.official-stack",
+    "official_stack_package_id": "chio.official-stack",
     "supported_component_ids": [
-      "arc.remote-receipt-store"
+      "chio.remote-receipt-store"
     ],
     "supported_contract_schemas": [
       "chio.extension-manifest.v1",

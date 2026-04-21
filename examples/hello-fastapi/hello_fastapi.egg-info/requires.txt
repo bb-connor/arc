@@ -1,5 +1,0 @@
-chio-asgi>=0.1.0
-chio-fastapi>=0.1.0
-chio-sdk-python>=0.1.0
-fastapi<1,>=0.116
-uvicorn<1,>=0.35

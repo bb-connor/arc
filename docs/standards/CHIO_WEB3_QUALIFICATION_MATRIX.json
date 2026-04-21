@@ -1,7 +1,7 @@
 {
-  "schema": "arc.web3-qualification-matrix.v1",
-  "trust_profile_id": "arc.official-web3-stack",
-  "contract_package_id": "arc.official-web3-contracts",
+  "schema": "chio.web3-qualification-matrix.v1",
+  "trust_profile_id": "chio.official-web3-stack",
+  "contract_package_id": "chio.official-web3-contracts",
   "cases": [
     {
       "id": "settled-happy-path",

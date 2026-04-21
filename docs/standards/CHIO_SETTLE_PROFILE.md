@@ -36,11 +36,11 @@ runtime example at `docs/standards/CHIO_SETTLE_RUNTIME_REPORT_EXAMPLE.json`.
   explicit recovery actions for confirmation wait, dispute wait, reorg retry,
   refund, and manual review
 - projection of observed chain state back into
-  `arc.web3-settlement-execution-receipt.v1` without mutating prior signed Chio
+  `chio.web3-settlement-execution-receipt.v1` without mutating prior signed Chio
   truth
 - one bounded Solana settlement-preparation model that verifies Chio Ed25519
   receipts and key bindings locally, then emits a canonical
-  `arc.settle.solana-release.v1` payload for parity checks
+  `chio.settle.solana-release.v1` payload for parity checks
 - one persistent Ganache runtime-devnet harness that qualifies the full local
   EVM lane end to end
 - one generated end-to-end qualification bundle under

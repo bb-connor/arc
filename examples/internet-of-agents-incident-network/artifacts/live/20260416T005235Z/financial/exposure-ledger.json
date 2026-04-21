@@ -1,6 +1,6 @@
 {
   "body": {
-    "schema": "arc.credit.exposure-ledger.v1",
+    "schema": "chio.credit.exposure-ledger.v1",
     "generatedAt": 1776300795,
     "filters": {
       "agentSubject": "c361f57a049f36123af2aba72508652ebf4f29edde01d69cb02ccd605efe9092",

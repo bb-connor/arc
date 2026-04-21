@@ -1,11 +1,11 @@
 {
-  "schema": "arc.web3-contract-package.v1",
-  "package_id": "arc.official-web3-contracts",
+  "schema": "chio.web3-contract-package.v1",
+  "package_id": "chio.official-web3-contracts",
   "version": "0.1.0",
   "chio_contract_version": "2.0",
   "contracts": [
     {
-      "contract_id": "arc.root-registry",
+      "contract_id": "chio.root-registry",
       "kind": "root_registry",
       "interface_name": "IArcRootRegistry",
       "abi_reference": "contracts/artifacts/interfaces/IArcRootRegistry.json",
@@ -13,7 +13,7 @@
       "immutable": true
     },
     {
-      "contract_id": "arc.escrow",
+      "contract_id": "chio.escrow",
       "kind": "escrow",
       "interface_name": "IArcEscrow",
       "abi_reference": "contracts/artifacts/interfaces/IArcEscrow.json",
@@ -21,7 +21,7 @@
       "immutable": true
     },
     {
-      "contract_id": "arc.bond-vault",
+      "contract_id": "chio.bond-vault",
       "kind": "bond_vault",
       "interface_name": "IArcBondVault",
       "abi_reference": "contracts/artifacts/interfaces/IArcBondVault.json",
@@ -29,7 +29,7 @@
       "immutable": true
     },
     {
-      "contract_id": "arc.identity-registry",
+      "contract_id": "chio.identity-registry",
       "kind": "identity_registry",
       "interface_name": "IArcIdentityRegistry",
       "abi_reference": "contracts/artifacts/interfaces/IArcIdentityRegistry.json",
@@ -37,7 +37,7 @@
       "immutable": false
     },
     {
-      "contract_id": "arc.price-resolver",
+      "contract_id": "chio.price-resolver",
       "kind": "price_resolver",
       "interface_name": "IArcPriceResolver",
       "abi_reference": "contracts/artifacts/interfaces/IArcPriceResolver.json",
@@ -51,11 +51,11 @@
       "crate_path": "crates/chio-web3-bindings/src/lib.rs",
       "module_name": "chio_web3_bindings",
       "contract_ids": [
-        "arc.root-registry",
-        "arc.escrow",
-        "arc.bond-vault",
-        "arc.identity-registry",
-        "arc.price-resolver"
+        "chio.root-registry",
+        "chio.escrow",
+        "chio.bond-vault",
+        "chio.identity-registry",
+        "chio.price-resolver"
       ]
     }
   ],

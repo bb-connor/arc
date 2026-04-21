@@ -8,8 +8,8 @@ profile over governed receipt truth.
 Chio maps signed governed receipt metadata into one narrow OAuth-family
 authorization surface:
 
-- report schema: `arc.oauth.authorization-context-report.v1`
-- profile schema: `arc.oauth.authorization-profile.v1`
+- report schema: `chio.oauth.authorization-context-report.v1`
+- profile schema: `chio.oauth.authorization-profile.v1`
 - profile id: `chio-governed-rar-v1`
 
 The profile is intentionally derived. Chio does not mint a second mutable

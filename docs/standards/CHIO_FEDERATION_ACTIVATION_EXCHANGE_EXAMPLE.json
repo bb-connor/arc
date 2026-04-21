@@ -8,7 +8,7 @@
   "listingId": "listing-liability-provider-1",
   "activationRef": {
     "kind": "trust_activation",
-    "schema": "arc.registry.trust-activation.v1",
+    "schema": "chio.registry.trust-activation.v1",
     "artifactId": "activation-1",
     "operatorId": "origin-operator",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -16,7 +16,7 @@
   },
   "listingRef": {
     "kind": "listing",
-    "schema": "arc.registry.listing.v1",
+    "schema": "chio.registry.listing.v1",
     "artifactId": "listing-liability-provider-1",
     "operatorId": "origin-operator",
     "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -24,7 +24,7 @@
   },
   "governingCharterRef": {
     "kind": "governance_charter",
-    "schema": "arc.registry.governance-charter.v1",
+    "schema": "chio.registry.governance-charter.v1",
     "artifactId": "charter-1",
     "operatorId": "origin-operator",
     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",

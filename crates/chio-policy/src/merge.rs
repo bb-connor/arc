@@ -5,9 +5,9 @@
 //! deep merge (default).
 
 use crate::models::{
-    DetectionExtension, Extensions, HushSpec, JailbreakDetection, MergeStrategy, OriginsExtension,
-    PostureExtension, PromptInjectionDetection, ReputationExtension, ReputationScoringConfig,
-    ReputationWeights, Rules, ThreatIntelDetection,
+    ChioExtension, DetectionExtension, Extensions, HushSpec, JailbreakDetection, MergeStrategy,
+    OriginsExtension, PostureExtension, PromptInjectionDetection, ReputationExtension,
+    ReputationScoringConfig, ReputationWeights, Rules, ThreatIntelDetection,
 };
 
 #[must_use = "merged spec is returned, not applied in place"]
@@ -80,6 +80,11 @@ fn merge_rules(base: &Option<Rules>, child: &Option<Rules>) -> Option<Rules> {
                     .input_injection
                     .clone()
                     .or(base_rules.input_injection),
+                velocity: child_rules.velocity.clone().or(base_rules.velocity),
+                human_in_loop: child_rules
+                    .human_in_loop
+                    .clone()
+                    .or(base_rules.human_in_loop),
             })
         }
         (Some(base_rules), None) => Some(base_rules.clone()),
@@ -103,6 +108,7 @@ fn merge_extensions_merge(
                     .runtime_assurance
                     .clone()
                     .or(base_ext.runtime_assurance),
+                chio: child_ext.chio.clone().or(base_ext.chio),
             })
         }
         (Some(base_ext), None) => Some(base_ext.clone()),
@@ -126,6 +132,7 @@ fn merge_extensions_deep(
                     .runtime_assurance
                     .clone()
                     .or(base_ext.runtime_assurance),
+                chio: merge_chio(&base_ext.chio, &child_ext.chio),
             })
         }
         (Some(base_ext), None) => Some(base_ext.clone()),
@@ -399,6 +406,44 @@ fn merge_threat_intel(
     }
 }
 
+fn merge_chio(
+    base: &Option<ChioExtension>,
+    child: &Option<ChioExtension>,
+) -> Option<ChioExtension> {
+    match (base, child) {
+        (_, Some(child_chio)) => {
+            if let Some(base_chio) = base {
+                Some(ChioExtension {
+                    market_hours: child_chio
+                        .market_hours
+                        .clone()
+                        .or_else(|| base_chio.market_hours.clone()),
+                    signing: child_chio
+                        .signing
+                        .clone()
+                        .or_else(|| base_chio.signing.clone()),
+                    k8s_namespaces: child_chio
+                        .k8s_namespaces
+                        .clone()
+                        .or_else(|| base_chio.k8s_namespaces.clone()),
+                    rollback: child_chio
+                        .rollback
+                        .clone()
+                        .or_else(|| base_chio.rollback.clone()),
+                    human_in_loop: child_chio
+                        .human_in_loop
+                        .clone()
+                        .or_else(|| base_chio.human_in_loop.clone()),
+                })
+            } else {
+                Some(child_chio.clone())
+            }
+        }
+        (Some(base_chio), None) => Some(base_chio.clone()),
+        (None, None) => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,6 +627,7 @@ mod tests {
                 tiers: BTreeMap::new(),
                 trusted_verifiers: BTreeMap::from([("base".to_string(), sample_verifier("base"))]),
             }),
+            chio: None,
         };
         let child_extensions = Extensions {
             posture: Some(PostureExtension {
@@ -610,6 +656,7 @@ mod tests {
             }),
             reputation: None,
             runtime_assurance: None,
+            chio: None,
         };
 
         let merged_extensions = merge_extensions_merge(
@@ -685,6 +732,7 @@ mod tests {
                 tiers: BTreeMap::new(),
                 trusted_verifiers: BTreeMap::from([("base".to_string(), sample_verifier("base"))]),
             }),
+            chio: None,
         };
         let child_extensions = Extensions {
             posture: Some(PostureExtension {
@@ -747,6 +795,7 @@ mod tests {
                 ]),
             }),
             runtime_assurance: None,
+            chio: None,
         };
 
         let base = HushSpec {

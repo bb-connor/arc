@@ -282,25 +282,25 @@ class ReceiptEnricher:
         trace_context: TraceContext,
     ) -> dict[str, Any]:
         metadata: dict[str, Any] = {
-            "arc.receipt_id": receipt.id,
-            "arc.capability_id": receipt.capability_id,
-            "arc.tool_name": receipt.tool_name,
-            "arc.tool_server": receipt.tool_server,
-            "arc.verdict": receipt.decision.verdict,
-            "arc.timestamp": receipt.timestamp,
-            "arc.content_hash": receipt.content_hash,
-            "arc.policy_hash": receipt.policy_hash,
-            "arc.kernel_key": receipt.kernel_key,
-            "arc.parameter_hash": receipt.action.parameter_hash,
+            "chio.receipt_id": receipt.id,
+            "chio.capability_id": receipt.capability_id,
+            "chio.tool_name": receipt.tool_name,
+            "chio.tool_server": receipt.tool_server,
+            "chio.verdict": receipt.decision.verdict,
+            "chio.timestamp": receipt.timestamp,
+            "chio.content_hash": receipt.content_hash,
+            "chio.policy_hash": receipt.policy_hash,
+            "chio.kernel_key": receipt.kernel_key,
+            "chio.parameter_hash": receipt.action.parameter_hash,
         }
         if receipt.decision.reason is not None:
-            metadata["arc.reason"] = receipt.decision.reason
+            metadata["chio.reason"] = receipt.decision.reason
         if receipt.decision.guard is not None:
-            metadata["arc.guard"] = receipt.decision.guard
+            metadata["chio.guard"] = receipt.decision.guard
         if cost_metadata:
-            metadata["arc.cost"] = dict(cost_metadata)
+            metadata["chio.cost"] = dict(cost_metadata)
         if not trace_context.is_empty():
-            metadata["arc.trace_context"] = trace_context.to_dict()
+            metadata["chio.trace_context"] = trace_context.to_dict()
         # Preserve any additional metadata the kernel attached (except
         # the trace block we already flattened and the cost block).
         for key, value in (receipt.metadata or {}).items():

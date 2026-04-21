@@ -18,7 +18,7 @@
       },
       "reportRef": {
         "kind": "listing_report",
-        "schema": "arc.registry.listing-report.v1",
+        "schema": "chio.registry.listing-report.v1",
         "artifactId": "report-origin-1",
         "operatorId": "origin-operator",
         "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -47,7 +47,7 @@
       },
       "reportRef": {
         "kind": "listing_report",
-        "schema": "arc.registry.listing-report.v1",
+        "schema": "chio.registry.listing-report.v1",
         "artifactId": "report-mirror-a-1",
         "operatorId": "mirror-operator-a",
         "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -76,7 +76,7 @@
       },
       "reportRef": {
         "kind": "listing_report",
-        "schema": "arc.registry.listing-report.v1",
+        "schema": "chio.registry.listing-report.v1",
         "artifactId": "report-indexer-a-1",
         "operatorId": "indexer-operator-a",
         "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",

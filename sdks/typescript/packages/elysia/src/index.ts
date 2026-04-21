@@ -12,7 +12,7 @@
  * import { chio } from "@chio-protocol/elysia";
  *
  * const app = new Elysia()
- *   .use(arc({ config: "arc.yaml" }))
+ *   .use(arc({ config: "chio.yaml" }))
  *   .get("/", () => "Hello");
  * ```
  */

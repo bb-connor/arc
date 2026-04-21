@@ -81,7 +81,7 @@ and by guard name, enabling Datadog dashboards and monitors out of the box.
   dyn-compatible `Exporter` trait.
 - Change the default service/source from `clawdstrike` to `arc`.
 - Map Chio `Decision` (Allow/Deny) and `GuardEvidence` to Datadog tags.
-- Metric prefix becomes `arc.siem` instead of `clawdstrike`.
+- Metric prefix becomes `chio.siem` instead of `clawdstrike`.
 - Retain configurable DD site, API key, tags, and TLS settings.
 
 ### 2.2 Sumo Logic (`exporters/sumo_logic.rs`)
@@ -252,7 +252,7 @@ CloudTrail supports custom event ingestion via CloudTrail Lake.
 - Use the `PutAuditEvents` API to write to a CloudTrail Lake event data
   store.
 - Map Chio receipts to CloudTrail's event structure: `eventSource` =
-  `arc.kernel`, `eventName` = tool_name, `requestParameters` =
+  `chio.kernel`, `eventName` = tool_name, `requestParameters` =
   action.parameters, `responseElements.decision` = Allow/Deny.
 - Implementation: new `CloudTrailExporter` implementing the `Exporter`
   trait. Uses `aws-sdk-cloudtrail` with standard credential chain
@@ -264,7 +264,7 @@ Cloud Audit Logs accepts custom audit log entries via the Cloud Logging API.
 
 - Write entries with `logName` =
   `projects/{project}/logs/arc.googleapis.com%2Fguard_audit`.
-- Use the `AuditLog` protobuf structure: `service_name` = `arc.kernel`,
+- Use the `AuditLog` protobuf structure: `service_name` = `chio.kernel`,
   `method_name` = tool_name, `authorization_info[]` maps from guard
   evidence.
 - Implementation: new `CloudAuditLogExporter`. Uses `google-cloud-logging`

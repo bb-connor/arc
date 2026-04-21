@@ -50,6 +50,7 @@ mod tests {
                 detection: None,
                 reputation: None,
                 runtime_assurance: None,
+                chio: None,
             }),
             metadata: None,
         }
@@ -86,6 +87,7 @@ mod tests {
                 detection: None,
                 reputation: None,
                 runtime_assurance: None,
+                chio: None,
             }),
             metadata: None,
         }
@@ -953,6 +955,7 @@ mod tests {
                 detection: None,
                 reputation: None,
                 runtime_assurance: None,
+                chio: None,
             }),
             metadata: None,
         };
@@ -1000,6 +1003,7 @@ mod tests {
                 detection: None,
                 reputation: None,
                 runtime_assurance: None,
+                chio: None,
             }),
             metadata: None,
         };

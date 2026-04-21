@@ -20,7 +20,7 @@ It covers four connected surfaces:
 
 Chio now claims one bounded web3 operations contract only:
 
-- one oracle runtime report under `arc.link.runtime-report.v1`
+- one oracle runtime report under `chio.link.runtime-report.v1`
 - one anchor runtime report under `chio.anchor-runtime-report.v1`
 - one settlement runtime report under `chio.settle-runtime-report.v1`
 - explicit indexer status classes: `healthy`, `lagging`, `drifted`,

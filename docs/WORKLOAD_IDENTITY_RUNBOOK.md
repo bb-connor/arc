@@ -111,14 +111,14 @@ extensions:
           ttl_seconds: 300
     trusted_verifiers:
       azure_contoso:
-        schema: arc.runtime-attestation.azure-maa.jwt.v1
+        schema: chio.runtime-attestation.azure-maa.jwt.v1
         verifier: https://maa.contoso.test
         verifier_family: azure_maa
         effective_tier: verified
         max_evidence_age_seconds: 120
         allowed_attestation_types: [sgx]
       google_cvm_prod:
-        schema: arc.runtime-attestation.google-confidential-vm.jwt.v1
+        schema: chio.runtime-attestation.google-confidential-vm.jwt.v1
         verifier: https://confidentialcomputing.googleapis.com
         verifier_family: google_attestation
         effective_tier: verified

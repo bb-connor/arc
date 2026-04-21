@@ -3,7 +3,7 @@
   "chio_contract_version": "2.0",
   "canonical_truth": [
     {
-      "id": "arc.canonical.capability",
+      "id": "chio.canonical.capability",
       "name": "Capability and approval artifacts",
       "crate_path": "crates/chio-core/src/capability.rs",
       "contract_kind": "capability",
@@ -15,7 +15,7 @@
       "extensions_may_write": false
     },
     {
-      "id": "arc.canonical.receipt",
+      "id": "chio.canonical.receipt",
       "name": "Signed receipts and checkpoints",
       "crate_path": "crates/chio-core/src/receipt.rs",
       "contract_kind": "receipt",
@@ -27,26 +27,26 @@
       "extensions_may_write": false
     },
     {
-      "id": "arc.canonical.policy",
+      "id": "chio.canonical.policy",
       "name": "Local policy activation and trust decisions",
       "crate_path": "crates/chio-policy/src/evaluate.rs",
       "contract_kind": "policy",
       "artifact_schemas": [
-        "arc.policy.runtime.v1",
+        "chio.policy.runtime.v1",
         "chio.generic-trust-activation.v1"
       ],
       "notes": "Custom adapters may surface external evidence, but local policy activation and trust admission remain Chio-owned decisions.",
       "extensions_may_write": false
     },
     {
-      "id": "arc.canonical.artifacts",
+      "id": "chio.canonical.artifacts",
       "name": "Signed Chio artifact families",
       "crate_path": "crates/chio-core/src/lib.rs",
       "contract_kind": "artifact_family",
       "artifact_schemas": [
         "chio.manifest.v1",
         "chio.agent-passport.v1",
-        "arc.runtime-attestation.appraisal-result.v1"
+        "chio.runtime-attestation.appraisal-result.v1"
       ],
       "notes": "Extensions may project, import, or dispatch around these artifacts only through named envelopes that preserve schema and signing truth.",
       "extensions_may_write": false
@@ -54,7 +54,7 @@
   ],
   "extension_points": [
     {
-      "id": "arc.kernel.capability_authority",
+      "id": "chio.kernel.capability_authority",
       "name": "Capability authority backend",
       "point_kind": "authority",
       "owner": "kernel",
@@ -76,12 +76,12 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": false,
       "official_component_ids": [
-        "arc.local-capability-authority",
-        "arc.remote-capability-authority"
+        "chio.local-capability-authority",
+        "chio.remote-capability-authority"
       ]
     },
     {
-      "id": "arc.kernel.receipt_store",
+      "id": "chio.kernel.receipt_store",
       "name": "Receipt store backend",
       "point_kind": "store",
       "owner": "kernel",
@@ -102,12 +102,12 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": false,
       "official_component_ids": [
-        "arc.sqlite-receipt-store",
-        "arc.remote-receipt-store"
+        "chio.sqlite-receipt-store",
+        "chio.remote-receipt-store"
       ]
     },
     {
-      "id": "arc.kernel.revocation_store",
+      "id": "chio.kernel.revocation_store",
       "name": "Revocation store backend",
       "point_kind": "store",
       "owner": "kernel",
@@ -128,12 +128,12 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": false,
       "official_component_ids": [
-        "arc.sqlite-revocation-store",
-        "arc.remote-revocation-store"
+        "chio.sqlite-revocation-store",
+        "chio.remote-revocation-store"
       ]
     },
     {
-      "id": "arc.kernel.budget_store",
+      "id": "chio.kernel.budget_store",
       "name": "Budget store backend",
       "point_kind": "store",
       "owner": "kernel",
@@ -154,12 +154,12 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": false,
       "official_component_ids": [
-        "arc.sqlite-budget-store",
-        "arc.remote-budget-store"
+        "chio.sqlite-budget-store",
+        "chio.remote-budget-store"
       ]
     },
     {
-      "id": "arc.kernel.tool_server_connection",
+      "id": "chio.kernel.tool_server_connection",
       "name": "Tool server connection",
       "point_kind": "tool_server_connection",
       "owner": "kernel",
@@ -185,13 +185,13 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": true,
       "official_component_ids": [
-        "arc.native-chio-service",
-        "arc.mcp-adapter",
-        "arc.a2a-adapter"
+        "chio.native-chio-service",
+        "chio.mcp-adapter",
+        "chio.a2a-adapter"
       ]
     },
     {
-      "id": "arc.kernel.resource_provider",
+      "id": "chio.kernel.resource_provider",
       "name": "Resource provider",
       "point_kind": "resource_provider",
       "owner": "kernel",
@@ -211,12 +211,12 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": false,
       "official_component_ids": [
-        "arc.native-chio-service",
-        "arc.mcp-adapter"
+        "chio.native-chio-service",
+        "chio.mcp-adapter"
       ]
     },
     {
-      "id": "arc.kernel.prompt_provider",
+      "id": "chio.kernel.prompt_provider",
       "name": "Prompt provider",
       "point_kind": "prompt_provider",
       "owner": "kernel",
@@ -236,12 +236,12 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": false,
       "official_component_ids": [
-        "arc.native-chio-service",
-        "arc.mcp-adapter"
+        "chio.native-chio-service",
+        "chio.mcp-adapter"
       ]
     },
     {
-      "id": "arc.adapter.mcp",
+      "id": "chio.adapter.mcp",
       "name": "MCP compatibility adapter",
       "point_kind": "adapter",
       "owner": "ecosystem_bridges",
@@ -262,11 +262,11 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": true,
       "official_component_ids": [
-        "arc.mcp-adapter"
+        "chio.mcp-adapter"
       ]
     },
     {
-      "id": "arc.adapter.a2a",
+      "id": "chio.adapter.a2a",
       "name": "A2A compatibility adapter",
       "point_kind": "adapter",
       "owner": "ecosystem_bridges",
@@ -285,7 +285,7 @@
       "custom_implementations_allowed": true,
       "policy_activation_required": true,
       "official_component_ids": [
-        "arc.a2a-adapter"
+        "chio.a2a-adapter"
       ]
     }
   ]

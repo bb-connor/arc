@@ -6,7 +6,7 @@
  *   import { chio } from "@chio-protocol/elysia";
  *
  *   const app = new Elysia()
- *     .use(arc({ config: "arc.yaml" }))
+ *     .use(arc({ config: "chio.yaml" }))
  *     .get("/", () => "Hello");
  *
  * The plugin intercepts every request via Elysia's beforeHandle lifecycle,
@@ -50,7 +50,7 @@ const VALID_METHODS = new Set<string>([
  * import { chio } from "@chio-protocol/elysia";
  *
  * const app = new Elysia()
- *   .use(arc({ config: "arc.yaml" }))
+ *   .use(arc({ config: "chio.yaml" }))
  *   .get("/pets", () => [{ name: "Fido" }]);
  * ```
  */

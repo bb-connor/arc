@@ -11,7 +11,7 @@ brew install --formula /tmp/arc.rb
 
 The release-binaries workflow renders the installable formula from
 [`Homebrew/arc.rb.tmpl`](../../Homebrew/arc.rb.tmpl) and publishes the
-result as the `arc.rb` release asset alongside the platform archives.
+result as the `chio.rb` release asset alongside the platform archives.
 
 ## Upgrading
 

@@ -536,7 +536,7 @@ impl Guard for SpiderSenseGuard {
 | Linear model weights | JSON (8 floats) | < 1 KB | Inline defaults in `LinearModelConfig` | `JailbreakDetector` ML layer |
 | Heuristic regex patterns | Compiled at startup via `OnceLock` | N/A (code) | Inline in source | `JailbreakDetector`, `PromptInjectionGuard`, `InstructionHierarchyEnforcer` |
 | SpiderSense pattern DB | JSON array of `PatternEntry` | Variable (depends on embedding dim and entry count) | User-provided file or embedded resource | `SpiderSenseDetector` |
-| External classifier config | `arc.yaml` fields | N/A | Operator config | Host function for external classifiers (v2) |
+| External classifier config | `chio.yaml` fields | N/A | Operator config | Host function for external classifiers (v2) |
 
 **No binary model files are required for v1.** The linear model weights are
 8 floating-point numbers with sensible defaults. The heuristic and

@@ -194,6 +194,81 @@ name: empty
 }
 
 #[test]
+fn compile_policy_emits_velocity_guard_from_velocity_rule() {
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  velocity:
+    max_invocations_per_window: 40
+    max_spend_per_window: 50000
+    max_requests_per_agent: 20
+    window_secs: 3600
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    assert!(
+        compiled.guard_names.contains(&"velocity".to_string()),
+        "expected velocity guard, got {:?}",
+        compiled.guard_names
+    );
+    assert!(
+        compiled.guard_names.contains(&"agent-velocity".to_string()),
+        "expected agent-velocity guard, got {:?}",
+        compiled.guard_names
+    );
+}
+
+#[test]
+fn compile_policy_emits_require_approval_above_from_human_in_loop() {
+    use chio_core::capability::Constraint;
+
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: ["payments.charge"]
+    default: block
+  human_in_loop:
+    enabled: true
+    approve_above: 15000
+    approve_above_currency: "USD"
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    let grant = compiled
+        .default_scope
+        .grants
+        .first()
+        .expect("grant from tool_access allow");
+    assert!(
+        grant
+            .constraints
+            .iter()
+            .any(|c| matches!(c, Constraint::RequireApprovalAbove { threshold_units: 15000 })),
+        "expected RequireApprovalAbove {{ threshold_units: 15000 }} from human_in_loop.approve_above; got {:?}",
+        grant.constraints
+    );
+}
+
+#[test]
+fn compile_policy_accepts_canonical_hushspec_fixture() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/policies/canonical-hushspec.yaml");
+    let yaml = std::fs::read_to_string(&fixture).expect("read canonical fixture");
+    let spec = HushSpec::parse(&yaml).expect("parse canonical hushspec");
+    let compiled = compile_policy(&spec).expect("compile canonical should succeed");
+    // Canonical fixture exercises forbidden_paths, path_allowlist, shell,
+    // tool_access, secret_patterns, patch_integrity. With no commented
+    // velocity/human_in_loop stanzas active, compilation must still be
+    // accepted (backward compatible).
+    assert!(
+        !compiled.guard_names.is_empty(),
+        "canonical fixture should emit at least one guard"
+    );
+}
+
+#[test]
 fn disabled_detection_blocks_do_not_emit_guards() {
     let yaml = r#"
 hushspec: "0.1.0"

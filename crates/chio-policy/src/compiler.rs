@@ -32,8 +32,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::models::{
-    DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
-    SecretPatternsRule, ThreatIntelDetection, ToolAccessRule,
+    DefaultAction, DetectionLevel, HumanInLoopRule, HushSpec, JailbreakDetection,
+    PromptInjectionDetection, SecretPatternsRule, ThreatIntelDetection, ToolAccessRule,
+    VelocityRule,
 };
 
 use chio_core::capability::{ChioScope, Constraint, Operation, ToolGrant};
@@ -44,10 +45,11 @@ use chio_guards::{
     prompt_injection::PromptInjectionConfig,
     response_sanitization::OutputSanitizerConfig,
     secret_leak::CustomSecretPattern,
+    velocity::VelocityConfig,
     AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
     InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
     PatternDb, PostInvocationPipeline, PromptInjectionGuard, SecretLeakGuard, ShellCommandGuard,
-    SpiderSenseConfig, SpiderSenseGuard,
+    SpiderSenseConfig, SpiderSenseGuard, VelocityGuard,
 };
 
 /// Errors that can occur during policy compilation.
@@ -161,6 +163,23 @@ fn compile_rule_guards(
                     fp.patterns.clone(),
                     fp.exceptions.clone(),
                 ));
+            }
+        }
+    }
+
+    // 1b. velocity -> VelocityGuard + AgentVelocityGuard
+    //
+    // Inserted between ForbiddenPathGuard and ShellCommandGuard so that
+    // rate-limit denials are observed before any shell semantics fire.
+    // Wave 1.6 design; re-landed in Wave 5.0.1 after the arc -> chio rename.
+    if let Some(v) = &rules.velocity {
+        if v.enabled {
+            let (velocity_cfg, agent_cfg) = compile_velocity_rule(v);
+            if let Some(cfg) = velocity_cfg {
+                builder.add(VelocityGuard::new(cfg));
+            }
+            if let Some(cfg) = agent_cfg {
+                builder.add(AgentVelocityGuard::new(cfg));
             }
         }
     }
@@ -513,13 +532,14 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
     }
 
     // Each allowed tool pattern becomes a grant on a wildcard server
+    let human_in_loop = rules.human_in_loop.as_ref();
     let mut grants = Vec::with_capacity(ta.allow.len());
     for tool_pattern in &ta.allow {
         grants.push(ToolGrant {
             server_id: "*".to_string(),
             tool_name: tool_pattern.clone(),
             operations: vec![Operation::Invoke],
-            constraints: compile_tool_constraints(ta, tool_pattern)?,
+            constraints: compile_tool_constraints(ta, tool_pattern, human_in_loop)?,
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
@@ -583,14 +603,40 @@ fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
 fn compile_tool_constraints(
     rule: &ToolAccessRule,
     tool_pattern: &str,
+    human_in_loop: Option<&HumanInLoopRule>,
 ) -> Result<Vec<Constraint>, CompileError> {
     let mut constraints = Vec::new();
     if let Some(max_args_size) = rule.max_args_size {
         constraints.push(Constraint::MaxArgsSize(max_args_size));
     }
+
+    // Determine approval threshold. tool_access.require_confirmation always
+    // forces threshold=0 (approval required for every invocation). A
+    // top-level `rules.human_in_loop` with `require_confirmation` globs that
+    // match this tool does the same. Otherwise, if `human_in_loop` is
+    // enabled and declares an `approve_above` threshold, use that threshold.
+    //
+    // Wave 1.6 behaviour, re-landed in Wave 5.0.1 after the arc -> chio
+    // rename.
+    let mut approval_threshold: Option<u64> = None;
     if confirmation_overlap(tool_pattern, &rule.require_confirmation)? {
-        constraints.push(Constraint::RequireApprovalAbove { threshold_units: 0 });
+        approval_threshold = Some(0);
     }
+    if let Some(hil) = human_in_loop {
+        if hil.enabled {
+            if confirmation_overlap(tool_pattern, &hil.require_confirmation)? {
+                approval_threshold = Some(0);
+            } else if approval_threshold.is_none() {
+                if let Some(threshold) = hil.approve_above {
+                    approval_threshold = Some(threshold);
+                }
+            }
+        }
+    }
+    if let Some(threshold_units) = approval_threshold {
+        constraints.push(Constraint::RequireApprovalAbove { threshold_units });
+    }
+
     if let Some(tier) = rule
         .require_runtime_assurance_tier
         .or(rule.prefer_runtime_assurance_tier)
@@ -598,6 +644,47 @@ fn compile_tool_constraints(
         constraints.push(Constraint::MinimumRuntimeAssurance(tier));
     }
     Ok(constraints)
+}
+
+/// Translate a `VelocityRule` into optional `VelocityConfig` +
+/// `AgentVelocityConfig`. If no invocation / spend / agent / session limit
+/// is set, returns `(None, None)` — i.e. the guard is effectively a no-op
+/// and no guard is pushed onto the pipeline. Wave 1.6 semantics.
+fn compile_velocity_rule(
+    rule: &VelocityRule,
+) -> (Option<VelocityConfig>, Option<AgentVelocityConfig>) {
+    let window_secs = rule.window_secs.max(1);
+    let burst_factor = if rule.burst_factor.is_finite() && rule.burst_factor > 0.0 {
+        rule.burst_factor
+    } else {
+        1.0
+    };
+
+    let velocity_cfg =
+        if rule.max_invocations_per_window.is_some() || rule.max_spend_per_window.is_some() {
+            Some(VelocityConfig {
+                max_invocations_per_window: rule.max_invocations_per_window,
+                max_spend_per_window: rule.max_spend_per_window,
+                window_secs,
+                burst_factor,
+            })
+        } else {
+            None
+        };
+
+    let agent_cfg =
+        if rule.max_requests_per_agent.is_some() || rule.max_requests_per_session.is_some() {
+            Some(AgentVelocityConfig {
+                max_requests_per_agent: rule.max_requests_per_agent,
+                max_requests_per_session: rule.max_requests_per_session,
+                window_secs,
+                burst_factor,
+            })
+        } else {
+            None
+        };
+
+    (velocity_cfg, agent_cfg)
 }
 
 fn confirmation_overlap(

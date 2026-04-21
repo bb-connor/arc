@@ -1,6 +1,6 @@
 {
-  "schema": "arc.settle.qualification-matrix.v1",
-  "profileId": "arc.settle.profile",
+  "schema": "chio.settle.qualification-matrix.v1",
+  "profileId": "chio.settle.profile",
   "cases": [
     {
       "id": "evm-merkle-release",

@@ -6,14 +6,14 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use chio_core::capability::{
-    ChioScope, CapabilityToken, CapabilityTokenBody, DelegationLink, DelegationLinkBody, Operation,
+    CapabilityToken, CapabilityTokenBody, ChioScope, DelegationLink, DelegationLinkBody, Operation,
     ToolGrant,
 };
 use chio_core::crypto::Keypair;
-use chio_core::receipt::{ChioReceipt, ChildRequestReceipt};
+use chio_core::receipt::{ChildRequestReceipt, ChioReceipt};
 use chio_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
 use chio_kernel::{
-    ChioKernel, CapabilitySnapshot, Guard, GuardContext, KernelConfig, KernelError, ReceiptStore,
+    CapabilitySnapshot, ChioKernel, Guard, GuardContext, KernelConfig, KernelError, ReceiptStore,
     ReceiptStoreError, ToolCallOutput, ToolCallRequest, ToolServerConnection, Verdict,
 };
 use std::collections::HashMap;

@@ -426,7 +426,7 @@ def lambda_handler(event, context):
 
 ```json
 {
-  "source": ["arc.protocol"],
+  "source": ["chio.protocol"],
   "detail-type": ["CapabilityDenied"],
   "detail": {
     "denial_count": [{"numeric": [">=", 5]}]

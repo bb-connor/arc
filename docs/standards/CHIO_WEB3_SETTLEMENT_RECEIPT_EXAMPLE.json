@@ -1,17 +1,17 @@
 {
-  "schema": "arc.web3-settlement-execution-receipt.v1",
+  "schema": "chio.web3-settlement-execution-receipt.v1",
   "execution_receipt_id": "receipt-web3-1",
   "issued_at": 1743292860,
   "dispatch": {
-    "schema": "arc.web3-settlement-dispatch.v1",
+    "schema": "chio.web3-settlement-dispatch.v1",
     "dispatch_id": "dispatch-web3-1",
     "issued_at": 1743292800,
-    "trust_profile_id": "arc.official-web3-stack",
-    "contract_package_id": "arc.official-web3-contracts",
+    "trust_profile_id": "chio.official-web3-stack",
+    "contract_package_id": "chio.official-web3-contracts",
     "chain_id": "eip155:8453",
     "capital_instruction": {
       "body": {
-        "schema": "arc.credit.capital-instruction.v1",
+        "schema": "chio.credit.capital-instruction.v1",
         "instructionId": "cei-web3-1",
         "issuedAt": 1743292800,
         "query": {

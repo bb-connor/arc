@@ -222,14 +222,14 @@ class LangFuseBridge:
         *,
         trace_id: str,
     ) -> dict[str, Any]:
-        verdict = payload.metadata.get("arc.verdict", "unknown")
+        verdict = payload.metadata.get("chio.verdict", "unknown")
         level = "ERROR" if verdict == "deny" else "DEFAULT"
 
         metadata = dict(payload.metadata)
         if payload.guard_evidence:
-            metadata["arc.evidence"] = [dict(e) for e in payload.guard_evidence]
+            metadata["chio.evidence"] = [dict(e) for e in payload.guard_evidence]
         if payload.cost_metadata:
-            metadata["arc.cost"] = dict(payload.cost_metadata)
+            metadata["chio.cost"] = dict(payload.cost_metadata)
 
         span_kwargs: dict[str, Any] = {
             "id": _new_observation_id(),
@@ -250,7 +250,7 @@ class LangFuseBridge:
         if payload.end_time is not None:
             span_kwargs["end_time"] = payload.end_time
         status_message = payload.error or (
-            payload.metadata.get("arc.reason") if verdict == "deny" else None
+            payload.metadata.get("chio.reason") if verdict == "deny" else None
         )
         if status_message is not None:
             span_kwargs["status_message"] = status_message

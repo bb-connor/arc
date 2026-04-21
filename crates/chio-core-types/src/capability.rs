@@ -2667,7 +2667,7 @@ mod tests {
             }),
             runtime_attestation: Some(RuntimeAttestationEvidence {
                 schema: "chio.runtime-attestation.v1".to_string(),
-                verifier: "verifier.arc".to_string(),
+                verifier: "verifier.chio".to_string(),
                 tier: RuntimeAssuranceTier::Attested,
                 issued_at: 900,
                 expires_at: 1200,
@@ -2987,7 +2987,7 @@ mod tests {
     fn runtime_attestation_evidence_validity_window_is_half_open() {
         let attestation = RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Verified,
             issued_at: 100,
             expires_at: 200,
@@ -3010,7 +3010,7 @@ mod tests {
 
         assert_eq!(workload.scheme, WorkloadIdentityScheme::Spiffe);
         assert_eq!(workload.credential_kind, WorkloadCredentialKind::Uri);
-        assert_eq!(workload.trust_domain, "prod.arc");
+        assert_eq!(workload.trust_domain, "prod.chio");
         assert_eq!(workload.path, "/payments/worker");
     }
 
@@ -3050,7 +3050,7 @@ mod tests {
     fn runtime_attestation_normalizes_spiffe_runtime_identity() {
         let attestation = RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,
@@ -3064,7 +3064,7 @@ mod tests {
             .normalized_workload_identity()
             .expect("normalize workload identity")
             .expect("workload identity present");
-        assert_eq!(workload.trust_domain, "prod.arc");
+        assert_eq!(workload.trust_domain, "prod.chio");
         assert_eq!(workload.path, "/payments/worker");
     }
 
@@ -3072,7 +3072,7 @@ mod tests {
     fn runtime_attestation_rejects_conflicting_explicit_workload_identity() {
         let attestation = RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,
@@ -3082,7 +3082,7 @@ mod tests {
                 scheme: WorkloadIdentityScheme::Spiffe,
                 credential_kind: WorkloadCredentialKind::X509Svid,
                 uri: "spiffe://dev.chio/payments/worker".to_string(),
-                trust_domain: "dev.arc".to_string(),
+                trust_domain: "dev.chio".to_string(),
                 path: "/payments/worker".to_string(),
             }),
             claims: None,
@@ -3100,7 +3100,7 @@ mod tests {
             scheme: WorkloadIdentityScheme::Spiffe,
             credential_kind: WorkloadCredentialKind::Uri,
             uri: "spiffe://prod.chio/payments/worker".to_string(),
-            trust_domain: "prod.arc".to_string(),
+            trust_domain: "prod.chio".to_string(),
             path: "/payments/other".to_string(),
         };
         assert!(matches!(
@@ -3110,7 +3110,7 @@ mod tests {
 
         let attestation = RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,
@@ -3126,7 +3126,7 @@ mod tests {
 
         let attestation = RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,
@@ -3136,7 +3136,7 @@ mod tests {
                 scheme: WorkloadIdentityScheme::Spiffe,
                 credential_kind: WorkloadCredentialKind::Uri,
                 uri: "spiffe://prod.chio/payments/worker".to_string(),
-                trust_domain: "prod.arc".to_string(),
+                trust_domain: "prod.chio".to_string(),
                 path: "/payments/worker".to_string(),
             }),
             claims: None,
@@ -3148,7 +3148,7 @@ mod tests {
 
         let attestation = RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
+            verifier: "verifier.chio".to_string(),
             tier: RuntimeAssuranceTier::Attested,
             issued_at: 100,
             expires_at: 200,
@@ -3158,7 +3158,7 @@ mod tests {
                 scheme: WorkloadIdentityScheme::Spiffe,
                 credential_kind: WorkloadCredentialKind::Uri,
                 uri: "spiffe://prod.chio/payments/worker".to_string(),
-                trust_domain: "prod.arc".to_string(),
+                trust_domain: "prod.chio".to_string(),
                 path: "/payments/worker".to_string(),
             }),
             claims: None,
@@ -3167,7 +3167,7 @@ mod tests {
             .normalized_workload_identity()
             .expect("explicit workload identity should normalize")
             .expect("workload identity should exist");
-        assert_eq!(normalized.trust_domain, "prod.arc");
+        assert_eq!(normalized.trust_domain, "prod.chio");
     }
 
     #[test]

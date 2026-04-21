@@ -269,12 +269,12 @@ Two options:
 ### Option A: Manifest-only config (v1)
 
 In v1, guard-specific configuration lives in `guard-manifest.yaml` shipped
-alongside the `.wasm` binary. The `arc.yaml` schema (`WasmGuardEntry`)
+alongside the `.wasm` binary. The `chio.yaml` schema (`WasmGuardEntry`)
 currently only allows `name`, `path`, `fuel_limit`, `priority`, and
 `advisory` with `deny_unknown_fields` -- it has no `config` field. The
 guard reads manifest config at load time via `arc.get_config(key)`.
 
-### Option B: `arc.yaml` config field (v1.1 -- not yet implemented)
+### Option B: `chio.yaml` config field (v1.1 -- not yet implemented)
 
 A future schema change would add an inline `config` map to `WasmGuardEntry`,
 letting operators override manifest defaults per deployment:
@@ -397,7 +397,7 @@ acme-security-policy/
     guard-manifest.yaml
 ```
 
-The `arc.yaml` configuration should support referencing both in a single
+The `chio.yaml` configuration should support referencing both in a single
 policy bundle:
 
 ```yaml
@@ -466,7 +466,7 @@ to `WasmGuardEntry` (see Section 5, Option A above).
    verdict, the receipt should include the guard's verified hash from its
    manifest.
 
-5. **Reserve the `arc.evaluate_hushspec_detection` host function** in the ABI
+5. **Reserve the `chio.evaluate_hushspec_detection` host function** in the ABI
    design. Don't implement it now, but don't use that namespace for something
    else.
 

@@ -16,10 +16,10 @@ etc.) pass straight through to the underlying :func:`prefect.task` /
 Denied tasks raise :class:`PermissionError`. Prefect routes any
 exception raised inside a task body to a ``Failed`` task-run state, so
 ``PermissionError`` surfaces naturally on the flow-run timeline. The
-integration also emits an ``arc.receipt.deny`` Prefect event (see
+integration also emits an ``chio.receipt.deny`` Prefect event (see
 :mod:`chio_prefect.events`) before raising so Automations can fire.
 
-Allow verdicts emit an ``arc.receipt.allow`` event with the receipt id
+Allow verdicts emit an ``chio.receipt.allow`` event with the receipt id
 so the receipt renders on the Prefect UI timeline.
 
 Flow scope attenuation

@@ -10,7 +10,7 @@
 //
 //	mux := http.NewServeMux()
 //	mux.HandleFunc("/pets", handlePets)
-//	protected := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+//	protected := arc.Protect(mux, arc.ConfigFile("chio.yaml"))
 //	http.ListenAndServe(":8080", protected)
 package arc
 

@@ -192,7 +192,7 @@ from prefect.events import emit_event
 
 # Inside chio_task wrapper, after recording receipt:
 emit_event(
-    event="arc.receipt.created",
+    event="chio.receipt.created",
     resource={"prefect.resource.id": f"arc.receipt.{receipt.receipt_id}"},
     payload={
         "receipt_id": receipt.receipt_id,
@@ -204,7 +204,7 @@ emit_event(
 
 # Denial events:
 emit_event(
-    event="arc.capability.denied",
+    event="chio.capability.denied",
     resource={"prefect.resource.id": f"arc.denial.{verdict.receipt_id}"},
     payload={
         "tool": fn.__name__,

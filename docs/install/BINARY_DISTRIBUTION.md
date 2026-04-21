@@ -24,7 +24,7 @@ arc --version
 ```
 
 The release workflow renders the installable formula from
-`Homebrew/arc.rb.tmpl` and publishes it as the `arc.rb` release asset.
+`Homebrew/arc.rb.tmpl` and publishes it as the `chio.rb` release asset.
 See [`docs/install/homebrew.md`](./homebrew.md) for details.
 
 ## Install via Docker
@@ -117,4 +117,4 @@ docker buildx imagetools inspect ghcr.io/bb-connor/chio-sidecar:0.1.0
 | ---------------------------------------------- | ----------------------------------------------------- |
 | GitHub Release archives + `SHA256SUMS`         | `.github/workflows/release-binaries.yml`              |
 | `ghcr.io/bb-connor/chio-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
-| Homebrew formula template                      | `Homebrew/arc.rb.tmpl` rendered into release asset `arc.rb` |
+| Homebrew formula template                      | `Homebrew/arc.rb.tmpl` rendered into release asset `chio.rb` |

@@ -23,7 +23,7 @@
   ],
   "governingCharterRef": {
     "kind": "governance_charter",
-    "schema": "arc.registry.governance-charter.v1",
+    "schema": "chio.registry.governance-charter.v1",
     "artifactId": "charter-1",
     "operatorId": "origin-operator",
     "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
@@ -31,7 +31,7 @@
   },
   "feeScheduleRef": {
     "kind": "open_market_fee_schedule",
-    "schema": "arc.registry.market-fee-schedule.v1",
+    "schema": "chio.registry.market-fee-schedule.v1",
     "artifactId": "fee-schedule-1",
     "operatorId": "origin-operator",
     "sha256": "3333333333333333333333333333333333333333333333333333333333333333",

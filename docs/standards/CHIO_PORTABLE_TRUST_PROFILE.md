@@ -41,9 +41,9 @@ The profile covers:
 - `chio.evidence_export_manifest.v1`
 - `chio.federation-policy.v1`
 - `chio.federated-delegation-policy.v1`
-- `arc.certify.check.v1`
-- `arc.certify.registry.v1`
-- `arc.certify.discovery-network.v1`
+- `chio.certify.check.v1`
+- `chio.certify.registry.v1`
+- `chio.certify.discovery-network.v1`
 - optional normalized `runtimeAttestation` evidence embedded inside portable
   credential evidence records
 
@@ -208,9 +208,9 @@ The profile does not cover:
   applied
 - Chio now also defines one bounded verifier-metadata layer over that appraisal
   boundary:
-  one signed `arc.runtime-attestation.verifier-descriptor.v1`,
-  one signed `arc.runtime-attestation.reference-values.v1`,
-  and one signed `arc.runtime-attestation.trust-bundle.v1`
+  one signed `chio.runtime-attestation.verifier-descriptor.v1`,
+  one signed `chio.runtime-attestation.reference-values.v1`,
+  and one signed `chio.runtime-attestation.trust-bundle.v1`
 - verifier descriptors must make verifier identity, verifier family, adapter,
   compatible attestation schemas, canonical appraisal schemas, signer-key
   fingerprints, and validity window explicit
@@ -266,8 +266,8 @@ The profile does not cover:
 - unknown schema identifiers must be rejected
 - legacy `arc.*` passport, verifier-policy, challenge, response, evidence, and
   delegation schemas remain valid compatibility inputs
-- `arc.certify.check.v1`, `arc.certify.registry.v1`, and
-  `arc.certify.discovery-network.v1` remain the supported certification
+- `chio.certify.check.v1`, `chio.certify.registry.v1`, and
+  `chio.certify.discovery-network.v1` remain the supported certification
   compatibility inputs
 - additive fields are allowed where signature verification still succeeds
 - consumers must not invent cross-issuer trust semantics not present in the

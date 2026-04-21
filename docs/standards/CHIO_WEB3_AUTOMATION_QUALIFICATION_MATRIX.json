@@ -1,6 +1,6 @@
 {
-  "schema": "arc.web3-automation-qualification-matrix.v1",
-  "profileId": "arc.web3.automation-and-interop.profile",
+  "schema": "chio.web3-automation-qualification-matrix.v1",
+  "profileId": "chio.web3.automation-and-interop.profile",
   "cases": [
     {
       "id": "functions-bounded-audit",

@@ -155,8 +155,8 @@ async function main() {
     const nowBlock = await provider.getBlock("latest");
     const now = Number(nowBlock.timestamp);
 
-    const operatorEdKeyHash = toBytes32Label("arc-operator-ed25519-key");
-    const beneficiaryEntityId = toBytes32Label("arc-beneficiary-entity");
+    const operatorEdKeyHash = toBytes32Label("chio-operator-ed25519-key");
+    const beneficiaryEntityId = toBytes32Label("chio-beneficiary-entity");
     const priceBase = toBytes32Label("ETH");
     const priceQuote = toBytes32Label("USD");
 

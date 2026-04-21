@@ -3,7 +3,7 @@
  *
  * Usage:
  *   import { chio } from "@chio-protocol/express";
- *   app.use(arc({ config: "arc.yaml" }));
+ *   app.use(arc({ config: "chio.yaml" }));
  *
  * The middleware intercepts every request, evaluates it against the Chio
  * sidecar kernel, and either allows it to proceed or returns a structured
@@ -43,7 +43,7 @@ export interface ChioExpressConfig extends ChioConfig {
  * import { chio } from "@chio-protocol/express";
  *
  * const app = express();
- * app.use(arc({ config: "arc.yaml" }));
+ * app.use(arc({ config: "chio.yaml" }));
  * ```
  */
 export function chio(config: ChioExpressConfig = {}): RequestHandler {

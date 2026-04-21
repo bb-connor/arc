@@ -42,7 +42,7 @@ The unsigned body of a compliance certificate.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema` | string | Schema identifier. MUST be `"arc.compliance.certificate.v1"`. |
+| `schema` | string | Schema identifier. MUST be `"chio.compliance.certificate.v1"`. |
 | `session_id` | string | Session ID the certificate covers. |
 | `issued_at` | u64 | Unix timestamp (seconds) when the certificate was generated. |
 | `receipt_count` | u64 | Number of receipts examined. |

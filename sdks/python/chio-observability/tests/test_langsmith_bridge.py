@@ -96,8 +96,8 @@ class TestPublishAllow:
         fake = FakeLangSmithClient()
         bridge = LangSmithBridge(client=fake, project="demo")
         request = bridge.publish(allow_receipt)
-        assert request["extra"]["metadata"]["arc.receipt_id"] == "rcpt_001"
-        assert request["extra"]["metadata"]["arc.capability_id"] == "cap-abc"
+        assert request["extra"]["metadata"]["chio.receipt_id"] == "rcpt_001"
+        assert request["extra"]["metadata"]["chio.capability_id"] == "cap-abc"
 
     def test_client_receives_request(self, allow_receipt: ChioReceipt) -> None:
         fake = FakeLangSmithClient()

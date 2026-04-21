@@ -1,6 +1,6 @@
 {
-  "schema": "arc.anchor.qualification-matrix.v1",
-  "profileId": "arc.anchor.profile",
+  "schema": "chio.anchor.qualification-matrix.v1",
+  "profileId": "chio.anchor.profile",
   "cases": [
     {
       "id": "evm-publication-guard",

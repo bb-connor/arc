@@ -1,5 +1,5 @@
 {
-  "policyId": "arc.web3-deployment-promotion.v1",
+  "policyId": "chio.web3-deployment-promotion.v1",
   "generatedAt": "2026-04-02T09:00:00Z",
   "environments": [
     "local-devnet",

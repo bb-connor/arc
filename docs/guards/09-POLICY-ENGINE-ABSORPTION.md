@@ -307,7 +307,7 @@ It also derives an `ChioScope` from tool_access rules.
 
 4. **WASM guard declaration in policy**: the policy format has no way to
    declare WASM guards. An operator must configure them separately in
-   `arc.yaml`.
+   `chio.yaml`.
 
 5. **Signed policy bundles**: for production deployments, policies must be
    integrity-verifiable.
@@ -475,7 +475,7 @@ pub struct SignedPolicyBundle {
 
 ## 5. WASM Guards in the Policy Format
 
-Today WASM guards are configured in `arc.yaml` via `WasmGuardEntry` and are
+Today WASM guards are configured in `chio.yaml` via `WasmGuardEntry` and are
 completely separate from the HushSpec policy. For the universal kernel, the
 policy format must be the single configuration surface.
 

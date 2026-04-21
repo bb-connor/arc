@@ -392,7 +392,7 @@ Without any promotion rules, the advisory pipeline **MUST** always return
 
 ### 5.4 PromotionPolicy
 
-Operators configure promotion rules in `arc.yaml` to convert advisory signals
+Operators configure promotion rules in `chio.yaml` to convert advisory signals
 into deterministic denials:
 
 ```yaml
@@ -554,7 +554,7 @@ overflow, unreachable instruction) **MUST** result in denial.
 
 ### 6.4 Configuration
 
-WASM guards are declared in `arc.yaml`:
+WASM guards are declared in `chio.yaml`:
 
 ```yaml
 wasm_guards:

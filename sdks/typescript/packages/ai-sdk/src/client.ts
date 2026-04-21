@@ -197,7 +197,7 @@ export class ChioClient {
     }
     const sidecarBody = buildSidecarRequest(normalizedBody);
 
-    this.debug?.("arc.evaluate.request", {
+    this.debug?.("chio.evaluate.request", {
       url,
       tool_server: sidecarBody.tool_server,
       tool_name: sidecarBody.tool_name,
@@ -228,7 +228,7 @@ export class ChioClient {
           "sidecar response missing `decision` field",
         );
       }
-      this.debug?.("arc.evaluate.response", {
+      this.debug?.("chio.evaluate.response", {
         id: receipt.id,
         verdict: receipt.decision.verdict,
       });

@@ -28,7 +28,7 @@ It covers four connected surfaces:
 - Base and Arbitrum operator chain inventory with sequencer-uptime monitoring
 - operator-visible global pause, pair disable, chain disable, and forced-
   backend overrides
-- one structured runtime report under `arc.link.runtime-report.v1`
+- one structured runtime report under `chio.link.runtime-report.v1`
 
 ## Machine-Readable Artifacts
 

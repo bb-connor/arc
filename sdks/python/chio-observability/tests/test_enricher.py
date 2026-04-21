@@ -33,10 +33,10 @@ class TestEnrichAllowReceipt:
         self, allow_receipt: ChioReceipt
     ) -> None:
         payload = ReceiptEnricher().enrich(allow_receipt)
-        assert payload.metadata["arc.receipt_id"] == "rcpt_001"
-        assert payload.metadata["arc.capability_id"] == "cap-abc"
-        assert payload.metadata["arc.tool_name"] == "search"
-        assert payload.metadata["arc.policy_hash"] == "b" * 64
+        assert payload.metadata["chio.receipt_id"] == "rcpt_001"
+        assert payload.metadata["chio.capability_id"] == "cap-abc"
+        assert payload.metadata["chio.tool_name"] == "search"
+        assert payload.metadata["chio.policy_hash"] == "b" * 64
 
     def test_trace_context_empty_when_metadata_missing(
         self, allow_receipt: ChioReceipt
@@ -84,12 +84,12 @@ class TestEnrichDenyReceipt:
     ) -> None:
         payload = ReceiptEnricher().enrich(deny_receipt)
         assert payload.cost_metadata == {"units": 42, "currency": "USD"}
-        assert payload.metadata["arc.cost"] == {"units": 42, "currency": "USD"}
+        assert payload.metadata["chio.cost"] == {"units": 42, "currency": "USD"}
         assert "arc.cost:42USD" in payload.tags
 
     def test_extra_metadata_preserved(self, deny_receipt: ChioReceipt) -> None:
         payload = ReceiptEnricher().enrich(deny_receipt)
-        assert payload.metadata["arc.extra.extra_tag"] == "demo"
+        assert payload.metadata["chio.extra.extra_tag"] == "demo"
 
 
 class TestEnricherOptions:
@@ -111,7 +111,7 @@ class TestEnricherOptions:
         payload = enricher.enrich(allow_receipt)
         assert payload.inputs == {}
         # Hash is still captured for correlation.
-        assert payload.metadata["arc.parameter_hash"]
+        assert payload.metadata["chio.parameter_hash"]
 
     def test_truncate_parameters_replaces_long_values(self) -> None:
         receipt = build_receipt(parameters={"blob": "x" * 500})
@@ -136,7 +136,7 @@ class TestEnricherOptions:
         assert as_dict["name"] == "write"
         assert as_dict["run_type"] == "tool"
         assert as_dict["cost_metadata"] == {"units": 42, "currency": "USD"}
-        assert as_dict["metadata"]["arc.verdict"] == "deny"
+        assert as_dict["metadata"]["chio.verdict"] == "deny"
         assert as_dict["trace_context"]["langsmith_run_id"] == "run_parent_123"
 
 

@@ -51,3 +51,4 @@ crates/arc-cli/dashboard/dist/
 # Lean build artifacts
 formal/lean4/**/.lake/
 **/.lake/build/
+*.egg-info/

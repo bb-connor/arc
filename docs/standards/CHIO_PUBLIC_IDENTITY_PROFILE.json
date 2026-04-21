@@ -46,7 +46,7 @@
     },
     {
       "kind": "oid4vp_verifier_metadata",
-      "schema": "arc.oid4vp-verifier-metadata.v1",
+      "schema": "chio.oid4vp-verifier-metadata.v1",
       "artifactId": "oid4vp-1",
       "operatorId": "verifier-operator-1",
       "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",

@@ -21,7 +21,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pets", handlePets)
 
-	protected := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+	protected := arc.Protect(mux, arc.ConfigFile("chio.yaml"))
 	http.ListenAndServe(":8080", protected)
 }
 
@@ -72,7 +72,7 @@ Pass options as variadic arguments to `Protect`:
 
 ```go
 protected := arc.Protect(handler,
-	arc.ConfigFile("arc.yaml"),
+	arc.ConfigFile("chio.yaml"),
 	arc.WithSidecarURL("http://127.0.0.1:9090"),
 	arc.WithTimeout(10),
 	arc.WithOnSidecarError("deny"),
@@ -85,10 +85,10 @@ protected := arc.Protect(handler,
 
 **`ConfigFile(path string)`**
 
-Set the path to the `arc.yaml` configuration file. The sidecar reads route patterns and policies from this file.
+Set the path to the `chio.yaml` configuration file. The sidecar reads route patterns and policies from this file.
 
 ```go
-arc.ConfigFile("arc.yaml")
+arc.ConfigFile("chio.yaml")
 ```
 
 **`WithSidecarURL(url string)`**
@@ -338,7 +338,7 @@ r.Get("/pets", handlePets)
 r.Post("/pets", handleCreatePet)
 
 protected := arc.Protect(r,
-	arc.ConfigFile("arc.yaml"),
+	arc.ConfigFile("chio.yaml"),
 	arc.WithRouteResolver(func(method, path string) string {
 		// Chi provides route context; extract pattern if needed
 		return path
@@ -359,7 +359,7 @@ r := mux.NewRouter()
 r.HandleFunc("/pets/{petId}", handleGetPet).Methods("GET")
 
 protected := arc.Protect(r,
-	arc.ConfigFile("arc.yaml"),
+	arc.ConfigFile("chio.yaml"),
 	arc.WithRouteResolver(func(method, path string) string {
 		return path
 	}),
@@ -374,6 +374,6 @@ mux := http.NewServeMux()
 mux.HandleFunc("GET /pets/{petId}", handleGetPet)
 mux.HandleFunc("POST /pets", handleCreatePet)
 
-protected := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+protected := arc.Protect(mux, arc.ConfigFile("chio.yaml"))
 http.ListenAndServe(":8080", protected)
 ```

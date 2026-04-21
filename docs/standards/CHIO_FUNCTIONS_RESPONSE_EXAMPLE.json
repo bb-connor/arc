@@ -1,5 +1,5 @@
 {
-  "request_id": "arc.functions.eip155-8453.4b1c7d22f0a6b913",
+  "request_id": "chio.functions.eip155-8453.4b1c7d22f0a6b913",
   "target_chain_id": "eip155:8453",
   "status": "verified",
   "verified_receipt_count": 2,

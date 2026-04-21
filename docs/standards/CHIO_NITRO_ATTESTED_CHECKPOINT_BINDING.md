@@ -4,7 +4,7 @@
 
 This note turns Pattern B from
 `docs/research/TEE_RUNTIME_ASSURANCE_BINDING_MEMO.md` into one concrete
-candidate artifact shape for `arc.nitro.attested_checkpoint_binding.v1`.
+candidate artifact shape for `chio.nitro.attested_checkpoint_binding.v1`.
 
 It is intentionally bounded:
 
@@ -15,7 +15,7 @@ It is intentionally bounded:
 
 ## Candidate Contract
 
-`arc.nitro.attested_checkpoint_binding.v1` is a body artifact that proves one
+`chio.nitro.attested_checkpoint_binding.v1` is a body artifact that proves one
 canonical Chio checkpoint was bound to one AWS Nitro attestation document over
 one short validity window.
 
@@ -35,7 +35,7 @@ envelope or another explicit transport. That envelope is out of scope here.
 The artifact body must carry these fields:
 
 - `schema`
-  Must be `arc.nitro.attested_checkpoint_binding.v1`.
+  Must be `chio.nitro.attested_checkpoint_binding.v1`.
 - `bindingId`
   Stable artifact identifier for this binding statement.
 - `issuedAt`
@@ -104,7 +104,7 @@ Consumers should verify in this order and fail closed on any mismatch:
 
 ```json
 {
-  "schema": "arc.nitro.attested_checkpoint_binding.v1",
+  "schema": "chio.nitro.attested_checkpoint_binding.v1",
   "bindingId": "nitro-bind-prod-us-east-1-checkpoint-9184",
   "issuedAt": 1776286500,
   "expiresAt": 1776286800,
@@ -149,7 +149,7 @@ Consumers should verify in this order and fail closed on any mismatch:
     "descriptorId": "vrd-aws-nitro-prod-us-east-1",
     "verifier": "did:chio:9f4f2d8e7c1ab34d56e7890ffedcba1234567890abcdef1234567890abcdef12#aws-nitro-prod",
     "verifierFamily": "aws_nitro",
-    "adapter": "arc.aws-nitro-attestation-document",
+    "adapter": "chio.aws-nitro-attestation-document",
     "referenceValuesId": "rv-aws-nitro-eif-2026-04-14",
     "referenceValuesSha256": "0x4444444444444444444444444444444444444444444444444444444444444444",
     "requiredPcrs": [
@@ -179,7 +179,7 @@ This note does not define:
 
 - per-receipt Nitro quotes
 - a generic cross-vendor TEE binding contract
-- a replacement for `arc.runtime-attestation.appraisal-result.v1`
+- a replacement for `chio.runtime-attestation.appraisal-result.v1`
 - a kernel admission record or governed-execution policy surface
 
 ## Source Notes

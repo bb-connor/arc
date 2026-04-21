@@ -107,7 +107,7 @@ ignore them continue to work. The host populates them by calling
 ### 4. Config: Manifest-only for v1, schema change for v1.1
 
 **Choice:** Guard-specific configuration lives in `guard-manifest.yaml`
-shipped alongside the `.wasm` binary. The `arc.yaml` `WasmGuardEntry` is
+shipped alongside the `.wasm` binary. The `chio.yaml` `WasmGuardEntry` is
 not changed in v1.
 
 **Why:** `WasmGuardEntry` uses `deny_unknown_fields`. Adding a `config`
@@ -116,14 +116,14 @@ already has a natural place for config. Do the schema change as a fast
 follow (v1.1) once the manifest format is validated.
 
 **v1 flow:**
-1. `arc.yaml` references the guard: `path: /etc/arc/guards/pii/pii.wasm`
+1. `chio.yaml` references the guard: `path: /etc/arc/guards/pii/pii.wasm`
 2. The loader looks for `guard-manifest.yaml` adjacent to the `.wasm` file
 3. Manifest contains `config:` block
-4. Config is loaded into `WasmHostState` and exposed via `arc.get_config`
+4. Config is loaded into `WasmHostState` and exposed via `chio.get_config`
 
 **v1.1 flow** (after schema change):
-1. `arc.yaml` gains a `config: {}` field on `WasmGuardEntry`
-2. Values from `arc.yaml` override manifest defaults
+1. `chio.yaml` gains a `config: {}` field on `WasmGuardEntry`
+2. Values from `chio.yaml` override manifest defaults
 3. Lets operators customize guard behavior per deployment without editing
    the manifest
 
@@ -155,7 +155,7 @@ hard-coded defaults, ignoring the HushSpec policy. The real bridge is
 
 - [ ] Shared `Arc<Engine>` across all WASM guards (currently one per guard)
 - [ ] `WasmHostState` instead of `()` in Store (carries config + log buffer)
-- [ ] Host functions: `arc.log`, `arc.get_config`, `arc.get_time_unix_secs`
+- [ ] Host functions: `chio.log`, `chio.get_config`, `chio.get_time_unix_secs`
 - [ ] `chio_alloc` support (check for export, use it, fall back to offset 0)
 - [ ] `chio_deny_reason` export support (fall back to offset-64K convention)
 - [ ] Guard manifest format (`guard-manifest.yaml`) with SHA-256 verification
@@ -179,7 +179,7 @@ hard-coded defaults, ignoring the HushSpec policy. The real bridge is
 - Guard registry / marketplace / OCI distribution (v2+)
 - Persistent per-guard state across invocations (v2)
 - Async host functions / network access (v2)
-- `WasmGuardEntry.config` field in `arc.yaml` schema (v1.1)
+- `WasmGuardEntry.config` field in `chio.yaml` schema (v1.1)
 - Epoch interruption as secondary timeout (v1.1)
 - HushSpec detection delegation host function (v2)
 - Severity field on `GuardVerdict::Deny` (v1.1 -- receipts only)
@@ -215,7 +215,7 @@ revisit the per-call fresh-Store model (consider instance pooling).
 | `crates/chio-config/src/schema.rs` | No change in v1. Add `config: HashMap` in v1.1. |
 | Startup code (proxy/CLI) | Wire `compile_policy()` + sorted WASM entries + advisory pipeline in correct order. |
 | New file: `crates/chio-wasm-guards/src/manifest.rs` | Guard manifest parsing + SHA-256 verification. |
-| New file: `crates/chio-wasm-guards/src/host.rs` | `WasmHostState` struct, `arc.log`/`arc.get_config`/`arc.get_time_unix_secs` implementations. |
+| New file: `crates/chio-wasm-guards/src/host.rs` | `WasmHostState` struct, `chio.log`/`chio.get_config`/`chio.get_time_unix_secs` implementations. |
 | New file: `crates/chio-wasm-guards/benches/` | Benchmark suite for the validation measurements. |
 
 ---

@@ -85,8 +85,8 @@ if __name__ == "__main__":
 - The enclosing `@chio_flow` scope bounds every task's scope. A task
   whose scope is not a subset of the flow's scope fails with
   `ChioPrefectConfigError` before any sidecar call.
-- Allow and deny verdicts are emitted as `arc.receipt.allow` and
-  `arc.receipt.deny` Prefect Events with the receipt id, capability,
+- Allow and deny verdicts are emitted as `chio.receipt.allow` and
+  `chio.receipt.deny` Prefect Events with the receipt id, capability,
   tool server / name, guard, and reason, related to the task-run and
   flow-run resource ids so the Prefect UI timeline draws them on the
   right task.
@@ -98,8 +98,8 @@ if __name__ == "__main__":
 
 ### Prefect UI receipts
 
-Receipts appear on the flow-run timeline as `arc.receipt.allow` and
-`arc.receipt.deny` events. Click through to the event payload to see
+Receipts appear on the flow-run timeline as `chio.receipt.allow` and
+`chio.receipt.deny` events. Click through to the event payload to see
 the receipt id, capability id, and guard that produced the verdict.
 
 > Screenshot placeholder: `docs/screenshots/prefect-ui-receipts.png`

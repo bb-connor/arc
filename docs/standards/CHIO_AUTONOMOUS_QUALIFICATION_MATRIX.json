@@ -1,6 +1,6 @@
 {
   "schema": "chio.autonomous-qualification-matrix.v1",
-  "profile_id": "arc.autonomous-pricing.profile",
+  "profile_id": "chio.autonomous-pricing.profile",
   "cases": [
     {
       "id": "pricing-decision",

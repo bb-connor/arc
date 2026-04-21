@@ -112,7 +112,7 @@ Developer overrides (optional):
 ### Chio Metadata Extensions for OpenAPI
 
 Developers add extra Chio metadata only where needed. These extend the OpenAPI
-spec via `x-chio-*` fields or standalone `arc.yaml` policy:
+spec via `x-chio-*` fields or standalone `chio.yaml` policy:
 
 ```yaml
 # In OpenAPI spec (x-arc extensions)
@@ -135,7 +135,7 @@ paths:
       x-chio-data-volume-limit: 50mb
 ```
 
-Or equivalently in `arc.yaml`:
+Or equivalently in `chio.yaml`:
 
 ```yaml
 routes:
@@ -204,7 +204,7 @@ Python (FastAPI):
 from chio_fastapi import ChioMiddleware
 
 app = FastAPI()
-app.add_middleware(ChioMiddleware, config="arc.yaml")
+app.add_middleware(ChioMiddleware, config="chio.yaml")
 ```
 
 TypeScript (Elysia):
@@ -220,7 +220,7 @@ Go (net/http):
 import "github.com/backbay-labs/chio-go-http"
 
 mux := http.NewServeMux()
-handler := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+handler := arc.Protect(mux, arc.ConfigFile("chio.yaml"))
 ```
 
 What this adds over Level 0:

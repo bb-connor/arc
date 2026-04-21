@@ -387,7 +387,7 @@ Certificates export as structured events via `EvidenceExportBundle`:
 
 ```json
 {
-  "event_type": "arc.session_compliance_certificate",
+  "event_type": "chio.session_compliance_certificate",
   "event_id": "<certificate_id>",
   "session_id": "<session_id>",
   "agent_id": "<agent_id>",

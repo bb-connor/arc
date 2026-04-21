@@ -5,7 +5,7 @@ Authors: Chio core team
 Normative spec: `spec/CONFIGURATION.md`
 
 > **Status note (amended April 2026)**: This document was originally written
-> as the design rationale for a unified `arc.yaml` configuration system.
+> as the design rationale for a unified `chio.yaml` configuration system.
 > **Parts of this document are aspirational and do not match the current
 > implementation.** Specifically:
 >
@@ -43,7 +43,7 @@ remaining honest about trust-boundary complexity in larger deployments.
 
 ## 2. Design Goals
 
-1. **Single file** -- one `arc.yaml` describes the kernel, all adapters, edges,
+1. **Single file** -- one `chio.yaml` describes the kernel, all adapters, edges,
    receipts, and logging.
 2. **Environment variable interpolation** -- `${VAR}` syntax for secrets and
    per-environment values.
@@ -61,7 +61,7 @@ remaining honest about trust-boundary complexity in larger deployments.
 ## 3. File Format
 
 YAML. Nested structures (auth blocks, partner policies, exporter lists) are more
-readable in YAML than in TOML's table syntax. The file is named `arc.yaml` by
+readable in YAML than in TOML's table syntax. The file is named `chio.yaml` by
 convention and, in the proposed runtime flow, would be loaded via
 `arc start --config arc.yaml`.
 
@@ -625,7 +625,7 @@ trust/receipt commands. This section specifies the intended future entry point.
 
 ### Startup sequence
 
-1. Parse `arc.yaml` and resolve environment variables.
+1. Parse `chio.yaml` and resolve environment variables.
 2. Run validation (Section 7).
 3. Load the keypair from `kernel.keypair`.
 4. Initialize the receipt store from `receipts.store`.
@@ -758,11 +758,11 @@ impl ChioConfig {
 
 ### Hybrid mode
 
-A deployment can load a base config from `arc.yaml` and then programmatically
+A deployment can load a base config from `chio.yaml` and then programmatically
 add or override adapters before starting the kernel:
 
 ```rust
-let mut runtime = ChioConfig::load("arc.yaml")?.into_runtime()?;
+let mut runtime = ChioConfig::load("chio.yaml")?.into_runtime()?;
 
 // Add an adapter not in the YAML file
 runtime.register_mcp_adapter(my_custom_adapter);

@@ -1,6 +1,6 @@
 {
   "schema": "chio.federation-qualification-matrix.v1",
-  "profileId": "arc.federation.profile",
+  "profileId": "chio.federation.profile",
   "exchangeRef": "fex-1",
   "quorumReportRef": "fqr-1",
   "reputationClearingRef": "frc-1",

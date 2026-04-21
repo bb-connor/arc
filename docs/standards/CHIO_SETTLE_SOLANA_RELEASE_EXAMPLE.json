@@ -1,5 +1,5 @@
 {
-  "schema": "arc.settle.solana-release.v1",
+  "schema": "chio.settle.solana-release.v1",
   "chainId": "solana:mainnet",
   "cluster": "mainnet-beta",
   "programId": "ChioSettle1111111111111111111111111111111111",

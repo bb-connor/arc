@@ -1,6 +1,6 @@
 {
-  "schema": "arc.settle.finality-report.v1",
-  "profileId": "arc.settle.profile",
+  "schema": "chio.settle.finality-report.v1",
+  "profileId": "chio.settle.profile",
   "chainId": "eip155:31337",
   "networkName": "Ganache Runtime Devnet",
   "settlementReference": "settlement-runtime-1",

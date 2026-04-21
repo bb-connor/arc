@@ -386,7 +386,8 @@ pub fn arb_impl_resource_operations() -> impl Strategy<Value = Vec<chio_core::ca
     })
 }
 
-pub fn arb_impl_prompt_operations() -> impl Strategy<Value = Vec<chio_core::capability::Operation>> {
+pub fn arb_impl_prompt_operations() -> impl Strategy<Value = Vec<chio_core::capability::Operation>>
+{
     Just(vec![chio_core::capability::Operation::Get])
 }
 
@@ -478,13 +479,13 @@ pub fn arb_impl_scope() -> impl Strategy<Value = chio_core::capability::ChioScop
         prop::collection::vec(arb_impl_resource_grant(), 0..4),
         prop::collection::vec(arb_impl_prompt_grant(), 0..4),
     )
-        .prop_map(
-            |(grants, resource_grants, prompt_grants)| chio_core::capability::ChioScope {
+        .prop_map(|(grants, resource_grants, prompt_grants)| {
+            chio_core::capability::ChioScope {
                 grants,
                 resource_grants,
                 prompt_grants,
-            },
-        )
+            }
+        })
 }
 
 fn spec_op_to_impl(op: &SpecOperation) -> chio_core::capability::Operation {
@@ -685,7 +686,8 @@ pub fn spec_scope_to_normalized(s: &SpecChioScope) -> NormalizedScope {
 }
 
 /// Generate paired (spec, impl) scopes from the same random seed.
-pub fn arb_paired_scope() -> impl Strategy<Value = (SpecChioScope, chio_core::capability::ChioScope)> {
+pub fn arb_paired_scope() -> impl Strategy<Value = (SpecChioScope, chio_core::capability::ChioScope)>
+{
     arb_spec_scope().prop_map(|spec| {
         let impl_scope = spec_scope_to_impl(&spec);
         (spec, impl_scope)

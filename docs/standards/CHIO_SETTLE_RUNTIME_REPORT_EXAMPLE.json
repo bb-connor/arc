@@ -42,7 +42,7 @@
   ],
   "recoveries": [
     {
-      "executionReceiptId": "arc.web3-execution-receipt.replay-001",
+      "executionReceiptId": "chio.web3-execution-receipt.replay-001",
       "chainId": "eip155:8453",
       "txHash": "0x9c4c7e6af6a876d4dd9d9a4e66d60b7222d7c23bb0b4f5a0f2d43c1d3f0ac7bb",
       "finalityStatus": "reorged",
@@ -57,7 +57,7 @@
       "code": "settlement_reorg",
       "severity": "critical",
       "chainId": "eip155:8453",
-      "executionReceiptId": "arc.web3-execution-receipt.replay-001",
+      "executionReceiptId": "chio.web3-execution-receipt.replay-001",
       "observedAt": 1764826170,
       "message": "Confirmed settlement receipt no longer matches canonical chain history."
     },

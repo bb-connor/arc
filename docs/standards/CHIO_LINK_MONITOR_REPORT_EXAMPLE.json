@@ -1,5 +1,5 @@
 {
-  "schema": "arc.link.runtime-report.v1",
+  "schema": "chio.link.runtime-report.v1",
   "generatedAt": 1743499990,
   "globalPause": false,
   "chains": [

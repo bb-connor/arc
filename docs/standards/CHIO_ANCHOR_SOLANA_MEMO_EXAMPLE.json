@@ -1,5 +1,5 @@
 {
-  "schema": "arc.anchor.solana-memo-publication.v1",
+  "schema": "chio.anchor.solana-memo-publication.v1",
   "chain_id": "solana:mainnet-beta",
   "operator_pubkey": "7xKXtg2CW9Q4hN7kD6A6tVWyQGm9Xxq6u9rY2T6yQkZp",
   "memo_program_id": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",

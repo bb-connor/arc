@@ -280,7 +280,8 @@ mod tests {
         )
         .expect("valid p256 public key");
 
-        let error = DidChio::try_from_public_key(p256_generator).expect_err("unsupported algorithm");
+        let error =
+            DidChio::try_from_public_key(p256_generator).expect_err("unsupported algorithm");
         assert!(matches!(error, DidError::UnsupportedKeyAlgorithm(_)));
     }
 
