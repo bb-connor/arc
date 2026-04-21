@@ -1,6 +1,6 @@
 // Lean compiler output
 // Module: Pact.Spec.Properties
-// Imports: public import Init public import Arc.Core.Capability public import Arc.Core.Scope
+// Imports: public import Init public import Chio.Core.Capability public import Chio.Core.Scope
 #include <lean/lean.h>
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -14,20 +14,20 @@
 extern "C" {
 #endif
 lean_object* initialize_Init(uint8_t builtin);
-lean_object* initialize_arc_Arc_Core_Capability(uint8_t builtin);
-lean_object* initialize_arc_Arc_Core_Scope(uint8_t builtin);
+lean_object* initialize_chio_Chio_Core_Capability(uint8_t builtin);
+lean_object* initialize_chio_Chio_Core_Scope(uint8_t builtin);
 static bool _G_initialized = false;
-LEAN_EXPORT lean_object* initialize_arc_Pact_Spec_Properties(uint8_t builtin) {
+LEAN_EXPORT lean_object* initialize_chio_Pact_Spec_Properties(uint8_t builtin) {
 lean_object * res;
 if (_G_initialized) return lean_io_result_mk_ok(lean_box(0));
 _G_initialized = true;
 res = initialize_Init(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_arc_Arc_Core_Capability(builtin);
+res = initialize_chio_Chio_Core_Capability(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_arc_Arc_Core_Scope(builtin);
+res = initialize_chio_Chio_Core_Scope(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
 return lean_io_result_mk_ok(lean_box(0));

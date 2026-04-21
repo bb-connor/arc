@@ -1,7 +1,7 @@
-# ARC Binary Distribution
+# Chio Binary Distribution
 
 Pre-built `arc` sidecar binaries are published with every tagged release so
-developers can run ARC without installing a Rust toolchain.
+developers can run Chio without installing a Rust toolchain.
 
 ## Supported Platforms
 
@@ -31,13 +31,13 @@ See [`docs/install/homebrew.md`](./homebrew.md) for details.
 
 ```bash
 # Pull the latest published image
-docker pull ghcr.io/bb-connor/arc-sidecar:latest
+docker pull ghcr.io/bb-connor/chio-sidecar:latest
 
 # Pin to a specific version
-docker pull ghcr.io/bb-connor/arc-sidecar:0.1.0
+docker pull ghcr.io/bb-connor/chio-sidecar:0.1.0
 
 # Run the published image
-docker run --rm ghcr.io/bb-connor/arc-sidecar:latest --help
+docker run --rm ghcr.io/bb-connor/chio-sidecar:latest --help
 ```
 
 The image:
@@ -95,7 +95,7 @@ Container image provenance is attested by the build workflow
 workflow logged:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/bb-connor/arc-sidecar:0.1.0
+docker buildx imagetools inspect ghcr.io/bb-connor/chio-sidecar:0.1.0
 ```
 
 ## Troubleshooting
@@ -116,5 +116,5 @@ docker buildx imagetools inspect ghcr.io/bb-connor/arc-sidecar:0.1.0
 | Asset                                          | Built by                                              |
 | ---------------------------------------------- | ----------------------------------------------------- |
 | GitHub Release archives + `SHA256SUMS`         | `.github/workflows/release-binaries.yml`              |
-| `ghcr.io/bb-connor/arc-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
+| `ghcr.io/bb-connor/chio-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
 | Homebrew formula template                      | `Homebrew/arc.rb.tmpl` rendered into release asset `arc.rb` |

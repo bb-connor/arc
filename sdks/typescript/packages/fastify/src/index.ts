@@ -1,30 +1,30 @@
 /**
- * @arc-protocol/fastify
+ * @chio-protocol/fastify
  *
- * Fastify plugin for the ARC protocol. Provides:
+ * Fastify plugin for the Chio protocol. Provides:
  *
- * - `arc` plugin that evaluates requests against the ARC sidecar
- * - ARC evaluation results attached to request.arcResult
+ * - `arc` plugin that evaluates requests against the Chio sidecar
+ * - Chio evaluation results attached to request.chioResult
  *
  * @example
  * ```ts
  * import Fastify from "fastify";
- * import { arc } from "@arc-protocol/fastify";
+ * import { chio } from "@chio-protocol/fastify";
  *
  * const fastify = Fastify();
  * fastify.register(arc, { config: "arc.yaml" });
  * ```
  */
 
-export { arc, type ArcFastifyConfig } from "./plugin.js";
+export { chio, type ChioFastifyConfig } from "./plugin.js";
 
 // Re-export key types from node-http for convenience
 export type {
-  ArcConfig,
+  ChioConfig,
   EvaluateResponse,
   HttpReceipt,
   Verdict,
   CallerIdentity,
   GuardEvidence,
-  ArcErrorResponse,
-} from "@arc-protocol/node-http";
+  ChioErrorResponse,
+} from "@chio-protocol/node-http";

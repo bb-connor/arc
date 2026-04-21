@@ -3,39 +3,39 @@ package main
 import "encoding/json"
 
 // Kubernetes admission webhook types.
-// These are minimal types sufficient for the ARC admission controller
+// These are minimal types sufficient for the Chio admission controller
 // without pulling in the full k8s.io/api dependency at runtime.
 
-// ARC annotation keys for pod configuration.
+// Chio annotation keys for pod configuration.
 const (
-	// AnnotationCapabilityToken is the pod annotation containing the ARC
+	// AnnotationCapabilityToken is the pod annotation containing the Chio
 	// capability token. Required unless the pod is exempt.
-	AnnotationCapabilityToken = "arc.protocol/capability-token"
+	AnnotationCapabilityToken = "chio.protocol/capability-token"
 
-	// AnnotationRequiredScopes is a comma-separated list of required ARC
+	// AnnotationRequiredScopes is a comma-separated list of required Chio
 	// scopes for the pod's namespace or label selector.
-	AnnotationRequiredScopes = "arc.backbay.io/required-scopes"
+	AnnotationRequiredScopes = "chio.backbay.io/required-scopes"
 
 	// AnnotationExempt exempts a pod from the capability token requirement.
-	AnnotationExempt = "arc.backbay.io/exempt"
+	AnnotationExempt = "chio.backbay.io/exempt"
 
 	// AnnotationInject triggers sidecar injection when set to "true".
-	AnnotationInject = "arc.backbay.io/inject"
+	AnnotationInject = "chio.backbay.io/inject"
 
 	// AnnotationSidecarImage overrides the default sidecar container image.
-	AnnotationSidecarImage = "arc.backbay.io/sidecar-image"
+	AnnotationSidecarImage = "chio.backbay.io/sidecar-image"
 
 	// AnnotationUpstream sets the upstream URL the sidecar proxies to.
-	AnnotationUpstream = "arc.backbay.io/upstream"
+	AnnotationUpstream = "chio.backbay.io/upstream"
 
 	// AnnotationSpecPath sets the path to the OpenAPI spec file in the pod.
-	AnnotationSpecPath = "arc.backbay.io/spec-path"
+	AnnotationSpecPath = "chio.backbay.io/spec-path"
 
 	// AnnotationReceiptStore sets the receipt storage backend for the sidecar.
-	AnnotationReceiptStore = "arc.backbay.io/receipt-store"
+	AnnotationReceiptStore = "chio.backbay.io/receipt-store"
 
-	// DefaultSidecarImage is the default container image for the ARC sidecar.
-	DefaultSidecarImage = "ghcr.io/backbay-labs/arc:latest"
+	// DefaultSidecarImage is the default container image for the Chio sidecar.
+	DefaultSidecarImage = "ghcr.io/backbay/chio:latest"
 )
 
 // AdmissionReview wraps an admission request and response.

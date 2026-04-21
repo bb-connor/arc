@@ -1,0 +1,29 @@
+[package]
+name = "chio-mcp-edge"
+description = "MCP edge runtime and shared transport contracts for Chio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[lib]
+name = "chio_mcp_edge"
+
+[dependencies]
+chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+chio-cross-protocol = { path = "../chio-cross-protocol" }
+chio-kernel = { path = "../chio-kernel" }
+chio-manifest = { path = "../chio-manifest" }
+chrono = { workspace = true, features = ["clock"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

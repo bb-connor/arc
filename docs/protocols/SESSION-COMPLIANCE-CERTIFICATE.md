@@ -1,10 +1,10 @@
 # Session Compliance Certificate
 
-**Status:** Shipped | **Version:** 1.0.0 | **Schema:** `arc.session_compliance_certificate.v1`
+**Status:** Shipped | **Version:** 1.0.0 | **Schema:** `chio.session_compliance_certificate.v1`
 Normative spec: `spec/COMPLIANCE-CERTIFICATE.md`
 
 > **Status**: The certificate generation and verification APIs described here
-> are implemented in `crates/arc-acp-proxy/src/compliance.rs`. The normative
+> are implemented in `crates/chio-acp-proxy/src/compliance.rs`. The normative
 > specification for certificate structure, generation algorithm, abort errors,
 > and verification modes is `spec/COMPLIANCE-CERTIFICATE.md`. This document
 > is retained as a non-normative companion for design rationale, regulatory
@@ -12,9 +12,9 @@ Normative spec: `spec/COMPLIANCE-CERTIFICATE.md`
 
 ## 1. Problem Statement
 
-Enterprises deploying ARC-governed agent systems must demonstrate to auditors,
+Enterprises deploying Chio-governed agent systems must demonstrate to auditors,
 regulators, and internal compliance teams that every agent session operated
-within its authorized boundaries. ARC already produces Ed25519-signed receipts
+within its authorized boundaries. Chio already produces Ed25519-signed receipts
 for every tool call and commits them to Merkle-rooted checkpoint batches. However,
 reconstructing compliance from individual receipts requires tooling that
 understands the full protocol: verifying signatures, replaying scope checks,
@@ -30,7 +30,7 @@ can verify without replaying every guard evaluation.
 A valid certificate makes six assertions about the session it covers:
 
 1. **Capability validity.** Every tool call presented a capability token that was non-expired, non-revoked, and signed by a recognized Capability Authority at invocation time.
-2. **Scope containment.** No capability was exercised outside the tool grants, resource grants, and prompt grants declared in its `ArcScope`.
+2. **Scope containment.** No capability was exercised outside the tool grants, resource grants, and prompt grants declared in its `ChioScope`.
 3. **Budget compliance.** No `ToolGrant` with `max_invocations`, `max_cost_per_invocation`, or `max_total_cost` constraints had those limits exceeded.
 4. **Guard passage.** Every `GuardEvidence` entry attached to every receipt has `verdict: true`. No denied guard evaluation was bypassed.
 5. **No privilege escalation.** The effective scope never widened beyond what the root capability authority granted. Delegation chains maintained monotonic attenuation.
@@ -48,7 +48,7 @@ portable artifact.
 
 ```rust
 pub const SESSION_COMPLIANCE_CERTIFICATE_SCHEMA: &str =
-    "arc.session_compliance_certificate.v1";
+    "chio.session_compliance_certificate.v1";
 
 /// A signed proof that an entire agent session complied with policy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,7 +183,7 @@ pub struct RedactionProfileSummary {
 ### 3.2 Serialization
 
 All certificate fields use canonical JSON (RFC 8785 / JCS) for deterministic
-hashing and signature verification, consistent with all other ARC signed
+hashing and signature verification, consistent with all other Chio signed
 artifacts. The signature covers `canonical_json_bytes(&body)`.
 
 ## 4. Generation Process
@@ -254,7 +254,7 @@ verify_compliance_certificate(cert, trusted_kernel_keys) -> Result<()>
 
 1. Verify cert.signature against cert.body using cert.body.issuer_key.
 2. Confirm cert.body.issuer_key is in trusted_kernel_keys.
-3. Confirm cert.body.schema == "arc.session_compliance_certificate.v1".
+3. Confirm cert.body.schema == "chio.session_compliance_certificate.v1".
 4. Confirm cert.body.guard_summary.failed == 0.
 5. For each budget_summary entry: assert usage <= limit where limits exist.
 6. Confirm time_range.start <= time_range.end and total_receipt_count > 0.
@@ -302,7 +302,7 @@ computed at creation time. The certificate anchors this chain via `chain_head`
 
 ### 6.3 Merkle Anchoring
 
-The certificate's Merkle root commits the entire ordered receipt set using ARC's
+The certificate's Merkle root commits the entire ordered receipt set using Chio's
 RFC 6962-compatible tree (`MerkleTree::from_leaves`):
 
 - Leaf: `SHA-256(byte(0x00) || canonical_json_bytes(receipt.body()))`
@@ -315,10 +315,10 @@ A verifier holding the certificate and a single receipt can obtain a
 
 ## 7. Regulatory Mapping
 
-> **Disclaimer**: These mappings illustrate how ARC artifacts can provide
+> **Disclaimer**: These mappings illustrate how Chio artifacts can provide
 > evidence for regulatory requirements. Regulatory compliance depends on
 > deployment context, organizational controls, and legal interpretation.
-> Consult legal counsel before relying on ARC artifacts for regulatory claims.
+> Consult legal counsel before relying on Chio artifacts for regulatory claims.
 
 ### 7.1 SOC 2
 
@@ -358,7 +358,7 @@ A verifier holding the certificate and a single receipt can obtain a
 ### 8.1 Kernel API
 
 ```rust
-impl ArcKernel {
+impl ChioKernel {
     /// Generate a compliance certificate for a completed session.
     pub async fn generate_compliance_certificate(
         &self,
@@ -410,7 +410,7 @@ timestamped proof independent of the issuing kernel's availability.
 ```json
 {
   "body": {
-    "schema": "arc.session_compliance_certificate.v1",
+    "schema": "chio.session_compliance_certificate.v1",
     "certificate_id": "019058a3-7b2c-7def-8a00-4e6f8c3d1a2b",
     "session_id": "session-2026-04-13-ab7f",
     "agent_id": "agent-research-assistant-01",
@@ -427,7 +427,7 @@ timestamped proof independent of the issuing kernel's availability.
         { "server_id": "pubmed-search", "tool_name": "get_abstract" },
         { "server_id": "file-writer", "tool_name": "write_file" }
       ],
-      "resources_accessed": ["arc://pubmed-search/config"],
+      "resources_accessed": ["chio://pubmed-search/config"],
       "prompts_accessed": []
     },
     "budget_summary": [
@@ -465,7 +465,7 @@ timestamped proof independent of the issuing kernel's availability.
       "runtime_attestation": {
         "format": "tee-report-v1",
         "measurement_hash": "sha256:runtime-measurement-abc",
-        "verifier": "arc-control-plane"
+        "verifier": "chio-control-plane"
       }
     },
     "approval_refs": [

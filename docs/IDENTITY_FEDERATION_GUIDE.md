@@ -1,6 +1,6 @@
 # Identity Federation Guide
 
-ARC now ships the next identity-federation alpha for bearer-authenticated
+Chio now ships the next identity-federation alpha for bearer-authenticated
 `arc mcp serve-http` deployments, including both JWT verification and opaque
 bearer admission via token introspection.
 
@@ -13,7 +13,7 @@ bearer admission via token introspection.
   - `oidc:<issuer>#oid:<oid>` for user principals when `--auth-jwt-provider-profile azure-ad`
     is configured
   - falls back to `azp` / `appid` / `client_id` for client principals on that profile
-- Derives a stable ARC subject key from that federated principal when
+- Derives a stable Chio subject key from that federated principal when
   `--identity-federation-seed-file` is configured.
 - Issues default session capabilities against that stable subject instead of a
   random per-session subject.
@@ -34,7 +34,7 @@ bearer admission via token introspection.
   confidential-client authentication to the introspection endpoint.
 
 This means repeated sessions for the same enterprise principal converge on the
-same ARC subject and therefore the same receipt attribution path.
+same Chio subject and therefore the same receipt attribution path.
 
 ## CLI
 
@@ -48,7 +48,7 @@ arc mcp serve-http \
   --listen 127.0.0.1:8931 \
   --auth-jwt-public-key <ed25519-public-key-hex> \
   --auth-jwt-issuer https://issuer.example \
-  --auth-jwt-audience arc-mcp \
+  --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -64,7 +64,7 @@ arc mcp serve-http \
   --listen 127.0.0.1:8931 \
   --auth-jwt-discovery-url https://id.example.com/tenant/v2.0/.well-known/openid-configuration \
   --auth-jwt-provider-profile azure-ad \
-  --auth-jwt-audience arc-mcp \
+  --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -79,10 +79,10 @@ arc mcp serve-http \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-introspection-url https://id.example.com/oauth2/introspect \
-  --auth-introspection-client-id arc-edge \
-  --auth-introspection-client-secret "$ARC_EDGE_SECRET" \
+  --auth-introspection-client-id chio-edge \
+  --auth-introspection-client-secret "$CHIO_EDGE_SECRET" \
   --auth-jwt-issuer https://id.example.com/oauth2/default \
-  --auth-jwt-audience arc-mcp \
+  --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -126,7 +126,7 @@ registries become global trust roots.
 
 ## Conservative Cross-Org Reputation Distribution
 
-ARC now also exposes imported reputation as a conservative operator-visible
+Chio now also exposes imported reputation as a conservative operator-visible
 signal instead of folding remote evidence into local receipt truth.
 
 The supported flow is:
@@ -138,7 +138,7 @@ The supported flow is:
    from native local reputation
 
 That separation is deliberate. Imported evidence does not rewrite the local
-receipt log, local budget history, or the native `scorecard` that ARC uses for
+receipt log, local budget history, or the native `scorecard` that Chio uses for
 local truth.
 
 Use the local CLI surfaces to inspect imported trust:
@@ -176,12 +176,12 @@ The default guardrails are intentionally conservative:
 - stale imported signals expire out of consideration
 - imported scores are attenuated instead of treated as native confidence
 
-This means ARC can surface cross-org reputation without implying a universal
+This means Chio can surface cross-org reputation without implying a universal
 portable score or a hidden trust merge.
 
 ## Provider-Admin Registry
 
-ARC now ships a file-backed provider-admin registry for enterprise federation.
+Chio now ships a file-backed provider-admin registry for enterprise federation.
 Each provider record is an explicit `oidc_jwks`, `oauth_introspection`,
 `scim`, or `saml` source with:
 
@@ -237,11 +237,11 @@ POST   /scim/v2/Users
 DELETE /scim/v2/Users/{id}
 ```
 
-The `POST /scim/v2/Users` body must include the core SCIM user schema plus ARC's
+The `POST /scim/v2/Users` body must include the core SCIM user schema plus Chio's
 SCIM extension identifying the validated `providerId`. Trust-control validates
-that provider against the shared provider-admin registry, derives the ARC
+that provider against the shared provider-admin registry, derives the Chio
 enterprise identity context, persists the provisioned user in the operator-owned
-SCIM lifecycle registry, and returns a SCIM user resource annotated with ARC
+SCIM lifecycle registry, and returns a SCIM user resource annotated with Chio
 identity metadata.
 
 `DELETE /scim/v2/Users/{id}` marks the stored SCIM identity inactive, revokes
@@ -258,8 +258,8 @@ Health output now reports SCIM lifecycle storage availability and counts under
 
 ## Operational Behavior
 
-- Same federated principal + same seed file => same derived ARC subject key.
-- Different federated principal + same seed file => different derived ARC
+- Same federated principal + same seed file => same derived Chio subject key.
+- Different federated principal + same seed file => different derived Chio
   subject key.
 - OIDC discovery and discovered `jwks_uri` must use `https`, or localhost-only
   `http` during local testing.
@@ -351,7 +351,7 @@ operator can see which provider, organization, group, or role inputs failed.
   trust-control reputation views, but those signals remain evidence-backed,
   issuer-scoped, attenuated, and separate from native local score history.
 - Multi-issuer passport composition and evaluation support now ships
-  (see `arc-credentials/src/cross_issuer.rs` for `CrossIssuerPortfolio`
+  (see `chio-credentials/src/cross_issuer.rs` for `CrossIssuerPortfolio`
   and `CrossIssuerEvaluator`). Automatic local bundle authoring (where
   the system assembles multi-issuer bundles without operator input)
   remains future work.

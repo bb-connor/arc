@@ -1,4 +1,4 @@
-# ARC Post-Roadmap Addendum
+# Chio Post-Roadmap Addendum
 
 > **Date**: 2026-04-16
 > **Scope**: Phases that should begin only after the current `docs/ROADMAP.md`
@@ -17,7 +17,7 @@
 
 ## Why This Addendum Exists
 
-The current roadmap captures ARC's breadth well, but the latest repo review and
+The current roadmap captures Chio's breadth well, but the latest repo review and
 multi-agent debate found that the next bottleneck is not new breadth. The next
 bottleneck is tightening trust-critical semantics that are still:
 
@@ -65,16 +65,16 @@ Phases 26 through 31 are the remaining repo-solvable full-vision closure path.
 > - `docs/release/QUALIFICATION.md`
 
 **Current repo baseline**:
-- [`crates/arc-kernel/src/authority.rs`](../crates/arc-kernel/src/authority.rs),
-  [`crates/arc-cli/src/trust_control/cluster_and_reports.rs`](../crates/arc-cli/src/trust_control/cluster_and_reports.rs),
+- [`crates/chio-kernel/src/authority.rs`](../crates/chio-kernel/src/authority.rs),
+  [`crates/chio-cli/src/trust_control/cluster_and_reports.rs`](../crates/chio-cli/src/trust_control/cluster_and_reports.rs),
   and
-  [`crates/arc-cli/src/trust_control/service_runtime.rs`](../crates/arc-cli/src/trust_control/service_runtime.rs)
+  [`crates/chio-cli/src/trust_control/service_runtime.rs`](../crates/chio-cli/src/trust_control/service_runtime.rs)
   already provide a real authority and clustered trust-control surface. The
   remaining gap is fenced custody and stale-leader rejection, not absence of an
   authority subsystem.
-- [`crates/arc-kernel/src/budget_store.rs`](../crates/arc-kernel/src/budget_store.rs),
-  [`crates/arc-store-sqlite/src/budget_store.rs`](../crates/arc-store-sqlite/src/budget_store.rs),
-  and [`crates/arc-cli/tests/trust_cluster.rs`](../crates/arc-cli/tests/trust_cluster.rs)
+- [`crates/chio-kernel/src/budget_store.rs`](../crates/chio-kernel/src/budget_store.rs),
+  [`crates/chio-store-sqlite/src/budget_store.rs`](../crates/chio-store-sqlite/src/budget_store.rs),
+  and [`crates/chio-cli/tests/trust_cluster.rs`](../crates/chio-cli/tests/trust_cluster.rs)
   already implement hold and mutation-event substrate plus clustered tests.
   Phase 21 is about making those holds and events authoritative across the HA
   path instead of leaving money truth partly leader-local or merge-shaped.
@@ -86,11 +86,11 @@ bearer internal authority APIs with node identity, and add term-based stale
 leader fencing.
 
 **Files**:
-- `crates/arc-kernel/src/authority.rs`
-- `crates/arc-cli/src/trust_control/cluster_and_reports.rs`
-- `crates/arc-cli/src/trust_control/service_runtime.rs`
-- `crates/arc-cli/src/trust_control/service_types.rs`
-- `crates/arc-cli/src/trust_control/http_handlers_b.rs`
+- `crates/chio-kernel/src/authority.rs`
+- `crates/chio-cli/src/trust_control/cluster_and_reports.rs`
+- `crates/chio-cli/src/trust_control/service_runtime.rs`
+- `crates/chio-cli/src/trust_control/service_types.rs`
+- `crates/chio-cli/src/trust_control/http_handlers_b.rs`
 
 **Acceptance**:
 - authority seed material is no longer serialized and replayed as ordinary
@@ -107,11 +107,11 @@ local hold and event model that already exists, so the remote path cannot widen
 bounded money truth into a stronger claim.
 
 **Files**:
-- `crates/arc-kernel/src/budget_store.rs`
-- `crates/arc-store-sqlite/src/budget_store.rs`
-- `crates/arc-cli/src/trust_control/service_runtime.rs`
-- `crates/arc-cli/src/trust_control/service_types.rs`
-- `crates/arc-cli/tests/trust_cluster.rs`
+- `crates/chio-kernel/src/budget_store.rs`
+- `crates/chio-store-sqlite/src/budget_store.rs`
+- `crates/chio-cli/src/trust_control/service_runtime.rs`
+- `crates/chio-cli/src/trust_control/service_types.rs`
+- `crates/chio-cli/tests/trust_cluster.rs`
 
 **Acceptance**:
 - budget truth is derived from committed holds and events, not merged counters
@@ -156,15 +156,15 @@ authoritative budget semantics.
 > - `docs/guards/13-CODE-EXECUTION-GUARDS.md`
 
 **Current repo baseline**:
-- [`crates/arc-wasm-guards/src/wiring.rs`](../crates/arc-wasm-guards/src/wiring.rs),
-  [`crates/arc-wasm-guards/src/manifest.rs`](../crates/arc-wasm-guards/src/manifest.rs),
-  [`crates/arc-wasm-guards/src/runtime.rs`](../crates/arc-wasm-guards/src/runtime.rs),
-  and [`crates/arc-cli/src/guards/sign.rs`](../crates/arc-cli/src/guards/sign.rs)
+- [`crates/chio-wasm-guards/src/wiring.rs`](../crates/chio-wasm-guards/src/wiring.rs),
+  [`crates/chio-wasm-guards/src/manifest.rs`](../crates/chio-wasm-guards/src/manifest.rs),
+  [`crates/chio-wasm-guards/src/runtime.rs`](../crates/chio-wasm-guards/src/runtime.rs),
+  and [`crates/chio-cli/src/guards/sign.rs`](../crates/chio-cli/src/guards/sign.rs)
   already provide signed-guard machinery. The open issue is that the default
   loader path still needs mandatory signature enforcement.
-- [`crates/arc-data-guards/src/sql_parser.rs`](../crates/arc-data-guards/src/sql_parser.rs),
-  [`crates/arc-data-guards/src/sql_guard.rs`](../crates/arc-data-guards/src/sql_guard.rs),
-  and [`crates/arc-policy/src/compiler.rs`](../crates/arc-policy/src/compiler.rs)
+- [`crates/chio-data-guards/src/sql_parser.rs`](../crates/chio-data-guards/src/sql_parser.rs),
+  [`crates/chio-data-guards/src/sql_guard.rs`](../crates/chio-data-guards/src/sql_guard.rs),
+  and [`crates/chio-policy/src/compiler.rs`](../crates/chio-policy/src/compiler.rs)
   already implement real data-guard and policy-compiler paths. Phase 22 closes
   known bypass and coverage gaps in those existing paths rather than adding a
   brand-new guard stack.
@@ -175,11 +175,11 @@ authoritative budget semantics.
 just on helper or explicit signed-load APIs.
 
 **Files**:
-- `crates/arc-wasm-guards/src/wiring.rs`
-- `crates/arc-wasm-guards/src/manifest.rs`
-- `crates/arc-wasm-guards/src/runtime.rs`
-- `crates/arc-cli/src/guards/sign.rs`
-- `crates/arc-wasm-guards/tests/signing_roundtrip.rs`
+- `crates/chio-wasm-guards/src/wiring.rs`
+- `crates/chio-wasm-guards/src/manifest.rs`
+- `crates/chio-wasm-guards/src/runtime.rs`
+- `crates/chio-cli/src/guards/sign.rs`
+- `crates/chio-wasm-guards/tests/signing_roundtrip.rs`
 
 **Acceptance**:
 - the default runtime path rejects unsigned or invalidly signed guards
@@ -193,9 +193,9 @@ just on helper or explicit signed-load APIs.
 first-statement-only bypass.
 
 **Files**:
-- `crates/arc-data-guards/src/sql_parser.rs`
-- `crates/arc-data-guards/src/sql_guard.rs`
-- `crates/arc-data-guards/tests/sql_guard.rs`
+- `crates/chio-data-guards/src/sql_parser.rs`
+- `crates/chio-data-guards/src/sql_guard.rs`
+- `crates/chio-data-guards/tests/sql_guard.rs`
 
 **Acceptance**:
 - a query containing multiple statements cannot pass by validating only the
@@ -210,9 +210,9 @@ first-statement-only bypass.
 policy block lacks a runtime guard mapping.
 
 **Files**:
-- `crates/arc-policy/src/compiler.rs`
-- `crates/arc-wasm-guards/src/wiring.rs`
-- `crates/arc-policy/tests/integration_smoke.rs`
+- `crates/chio-policy/src/compiler.rs`
+- `crates/chio-wasm-guards/src/wiring.rs`
+- `crates/chio-policy/tests/integration_smoke.rs`
 
 **Acceptance**:
 - compiler coverage exists for all supported guard families the schema accepts
@@ -236,17 +236,17 @@ policy block lacks a runtime guard mapping.
 > - `docs/TOOL_PRICING_GUIDE.md`
 
 **Current repo baseline**:
-- [`crates/arc-kernel/src/payment.rs`](../crates/arc-kernel/src/payment.rs)
+- [`crates/chio-kernel/src/payment.rs`](../crates/chio-kernel/src/payment.rs)
   already defines both `not_applicable` and `settled`, while
-  [`crates/arc-kernel/src/kernel/mod.rs`](../crates/arc-kernel/src/kernel/mod.rs)
+  [`crates/chio-kernel/src/kernel/mod.rs`](../crates/chio-kernel/src/kernel/mod.rs)
   and
-  [`crates/arc-kernel/src/kernel/responses.rs`](../crates/arc-kernel/src/kernel/responses.rs)
+  [`crates/chio-kernel/src/kernel/responses.rs`](../crates/chio-kernel/src/kernel/responses.rs)
   still surface `settled` on some no-adapter paths. Phase 23 corrects that
   truth boundary rather than inventing settlement support from zero.
-- [`crates/arc-kernel/src/operator_report.rs`](../crates/arc-kernel/src/operator_report.rs),
-  [`crates/arc-store-sqlite/src/receipt_store/reports.rs`](../crates/arc-store-sqlite/src/receipt_store/reports.rs),
+- [`crates/chio-kernel/src/operator_report.rs`](../crates/chio-kernel/src/operator_report.rs),
+  [`crates/chio-store-sqlite/src/receipt_store/reports.rs`](../crates/chio-store-sqlite/src/receipt_store/reports.rs),
   and
-  [`crates/arc-kernel/tests/property_budget_store.rs`](../crates/arc-kernel/tests/property_budget_store.rs)
+  [`crates/chio-kernel/tests/property_budget_store.rs`](../crates/chio-kernel/tests/property_budget_store.rs)
   already preserve hold lineage, guarantee level, and budget-authority context
   on several reporting paths. The remaining work is preventing later report and
   export layers from collapsing budget, meter, rail, and settlement truth into
@@ -259,8 +259,8 @@ asset, amount ceiling, settlement mode, and quote or tariff identity, while
 keeping economic-party truth distinct from authorization lineage alone.
 
 **Files**:
-- `crates/arc-core-types/src/capability.rs`
-- `crates/arc-core-types/src/receipt.rs`
+- `crates/chio-core-types/src/capability.rs`
+- `crates/chio-core-types/src/receipt.rs`
 - `spec/PROTOCOL.md`
 
 **Acceptance**:
@@ -276,10 +276,10 @@ keeping economic-party truth distinct from authorization lineage alone.
 **What**: Stop marking no-adapter or no-rail flows as settled.
 
 **Files**:
-- `crates/arc-kernel/src/payment.rs`
-- `crates/arc-kernel/src/kernel/mod.rs`
-- `crates/arc-kernel/src/kernel/responses.rs`
-- `crates/arc-kernel/src/receipt_support.rs`
+- `crates/chio-kernel/src/payment.rs`
+- `crates/chio-kernel/src/kernel/mod.rs`
+- `crates/chio-kernel/src/kernel/responses.rs`
+- `crates/chio-kernel/src/receipt_support.rs`
 
 **Acceptance**:
 - no-adapter paths emit `not_applicable` or an equivalent bounded truth,
@@ -296,10 +296,10 @@ keeping economic-party truth distinct from authorization lineage alone.
 reconciliation surfaces.
 
 **Files**:
-- `crates/arc-kernel/src/operator_report.rs`
-- `crates/arc-kernel/src/cost_attribution.rs`
-- `crates/arc-store-sqlite/src/receipt_store/reports.rs`
-- `crates/arc-cli/tests/receipt_query.rs`
+- `crates/chio-kernel/src/operator_report.rs`
+- `crates/chio-kernel/src/cost_attribution.rs`
+- `crates/chio-store-sqlite/src/receipt_store/reports.rs`
+- `crates/chio-cli/tests/receipt_query.rs`
 
 **Acceptance**:
 - derived rows preserve hold lineage, guarantee level, and economic truth class
@@ -331,22 +331,22 @@ reconciliation surfaces.
   a real bounded-release qualification surface. Phase 24 is mainly about claim
   synchronization and gate enforcement.
 - Public entry-point crates already exist at
-  [`crates/arc-api-protect`](../crates/arc-api-protect),
-  [`crates/arc-http-core`](../crates/arc-http-core),
-  [`crates/arc-hosted-mcp`](../crates/arc-hosted-mcp),
-  [`crates/arc-openapi`](../crates/arc-openapi),
-  [`crates/arc-openapi-mcp-bridge`](../crates/arc-openapi-mcp-bridge),
-  [`crates/arc-workflow`](../crates/arc-workflow), and
-  [`crates/arc-http-session`](../crates/arc-http-session). Existing public
+  [`crates/chio-api-protect`](../crates/chio-api-protect),
+  [`crates/chio-http-core`](../crates/chio-http-core),
+  [`crates/chio-hosted-mcp`](../crates/chio-hosted-mcp),
+  [`crates/chio-openapi`](../crates/chio-openapi),
+  [`crates/chio-openapi-mcp-bridge`](../crates/chio-openapi-mcp-bridge),
+  [`crates/chio-workflow`](../crates/chio-workflow), and
+  [`crates/chio-http-session`](../crates/chio-http-session). Existing public
   boundary docs such as
   [`spec/OPENAPI-INTEGRATION.md`](../spec/OPENAPI-INTEGRATION.md) and
-  [`docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json)
+  [`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json)
   already reference parts of that surface.
 
 ### 24.1 Claim-Discipline Sync Gate
 
 **What**: Add an automated gate that checks ship-facing docs and planning state
-for milestone and claim drift against the existing bounded ARC release boundary.
+for milestone and claim drift against the existing bounded Chio release boundary.
 
 **Files**:
 - `spec/PROTOCOL.md`
@@ -376,14 +376,14 @@ for milestone and claim drift against the existing bounded ARC release boundary.
 on kernel and CLI integration coverage.
 
 **Files**:
-- `crates/arc-api-protect/`
-- `crates/arc-http-core/`
-- `crates/arc-hosted-mcp/`
-- `crates/arc-openapi/`
-- `crates/arc-openapi-mcp-bridge/`
-- `crates/arc-workflow/`
-- `crates/arc-http-session/`
-- `crates/arc-config/`
+- `crates/chio-api-protect/`
+- `crates/chio-http-core/`
+- `crates/chio-hosted-mcp/`
+- `crates/chio-openapi/`
+- `crates/chio-openapi-mcp-bridge/`
+- `crates/chio-workflow/`
+- `crates/chio-http-session/`
+- `crates/chio-config/`
 
 **Acceptance**:
 - each public boundary crate has direct regression coverage for its primary
@@ -420,12 +420,12 @@ pre-merge gate, a post-merge release gate, or split by surface.
 > - `docs/SDK_PARITY_EXECUTION_ROADMAP.md`
 
 **Current repo baseline**:
-- [`packages/sdk/arc-py`](../packages/sdk/arc-py) and
-  [`packages/sdk/arc-ts`](../packages/sdk/arc-ts) already exist with package
+- [`packages/sdk/chio-py`](../packages/sdk/chio-py) and
+  [`packages/sdk/chio-ts`](../packages/sdk/chio-ts) already exist with package
   structure, tests, and release-check scripts such as
-  [`scripts/check-arc-py-release.sh`](../scripts/check-arc-py-release.sh) and
-  [`scripts/check-arc-ts-release.sh`](../scripts/check-arc-ts-release.sh).
-- [`crates/arc-http-core/src/verdict.rs`](../crates/arc-http-core/src/verdict.rs)
+  [`scripts/check-chio-py-release.sh`](../scripts/check-chio-py-release.sh) and
+  [`scripts/check-chio-ts-release.sh`](../scripts/check-chio-ts-release.sh).
+- [`crates/chio-http-core/src/verdict.rs`](../crates/chio-http-core/src/verdict.rs)
   already emits richer deny structure, and the remaining work is carrying that
   contract cleanly through the Python and TypeScript SDKs and into externally
   consumable artifacts.
@@ -436,12 +436,12 @@ pre-merge gate, a post-merge release gate, or split by surface.
 the enriched Rust contract is visible to users.
 
 **Files**:
-- `crates/arc-http-core/src/verdict.rs`
-- `packages/sdk/arc-py/src/arc/errors.py`
-- `packages/sdk/arc-py/tests/test_errors.py`
-- `packages/sdk/arc-ts/src/errors.ts`
-- `packages/sdk/arc-ts/src/types.ts`
-- `packages/sdk/arc-ts/test/errors.test.ts`
+- `crates/chio-http-core/src/verdict.rs`
+- `packages/sdk/chio-py/src/arc/errors.py`
+- `packages/sdk/chio-py/tests/test_errors.py`
+- `packages/sdk/chio-ts/src/errors.ts`
+- `packages/sdk/chio-ts/src/types.ts`
+- `packages/sdk/chio-ts/test/errors.test.ts`
 
 **Acceptance**:
 - Python and TypeScript surface the same deny details contract that Rust emits
@@ -454,13 +454,13 @@ the enriched Rust contract is visible to users.
 `MockArcClient`.
 
 **Files**:
-- `packages/sdk/arc-ts/src/testing.ts`
-- `packages/sdk/arc-ts/package.json`
-- `packages/sdk/arc-ts/test/`
+- `packages/sdk/chio-ts/src/testing.ts`
+- `packages/sdk/chio-ts/package.json`
+- `packages/sdk/chio-ts/test/`
 
 **Acceptance**:
 - JavaScript and TypeScript users can unit test without a live sidecar
-- `@arc-protocol/sdk` exports allow-all, deny-all, and policy fixtures from a
+- `@chio-protocol/sdk` exports allow-all, deny-all, and policy fixtures from a
   stable testing surface
 - package-backed examples or tests use the same test-double contract
 
@@ -470,12 +470,12 @@ the enriched Rust contract is visible to users.
 and verifiable as release outputs.
 
 **Files**:
-- `packages/sdk/arc-py/pyproject.toml`
-- `packages/sdk/arc-ts/package.json`
-- `packages/sdk/arc-py/RELEASING.md`
-- `packages/sdk/arc-ts/README.md`
-- `scripts/check-arc-py-release.sh`
-- `scripts/check-arc-ts-release.sh`
+- `packages/sdk/chio-py/pyproject.toml`
+- `packages/sdk/chio-ts/package.json`
+- `packages/sdk/chio-py/RELEASING.md`
+- `packages/sdk/chio-ts/README.md`
+- `scripts/check-chio-py-release.sh`
+- `scripts/check-chio-ts-release.sh`
 - `.github/workflows/publish-typescript.yml`
 - `.github/workflows/publish-python.yml`
 - `.github/workflows/release-binaries.yml`
@@ -492,7 +492,7 @@ and verifiable as release outputs.
 
 ## Non-Goals For This Addendum
 
-This addendum does not automatically widen ARC into:
+This addendum does not automatically widen Chio into:
 
 - a proved market-position thesis
 - a general public transparency-log claim beyond the qualified publication path
@@ -507,14 +507,14 @@ tracks after the numbered closure ladder ends.
 ## Repo-Solvable Full-Vision Closure After Phase 25
 
 The phases above close the near-term truth, runtime, and release gaps. They do
-not yet make the strongest ARC thesis literally true.
+not yet make the strongest Chio thesis literally true.
 
-The remaining repo-solvable work to reach the strongest honest ARC boundary
+The remaining repo-solvable work to reach the strongest honest Chio boundary
 falls into the following candidate phases.
 
 ### Phase 26: Authenticated Provenance DAG and Cross-Kernel Continuity
 
-> **Goal**: Make ARC able to prove who authorized what across recursive,
+> **Goal**: Make Chio able to prove who authorized what across recursive,
 > cross-kernel, and cross-protocol execution with one durable provenance model.
 > **Refs**:
 > - `docs/review/04-provenance-call-chain-remediation.md`
@@ -523,11 +523,11 @@ falls into the following candidate phases.
 **Current repo baseline**:
 - [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already defines the
   `asserted`, `observed`, and `verified` provenance classes plus versioned
-  artifacts such as `arc.session_anchor.v1`,
-  `arc.request_lineage_record.v1`,
-  `arc.receipt_lineage_statement.v1`, and
-  `arc.call_chain_continuation.v1`.
-- [`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md)
+  artifacts such as `chio.session_anchor.v1`,
+  `chio.request_lineage_record.v1`,
+  `chio.receipt_lineage_statement.v1`, and
+  `chio.call_chain_continuation.v1`.
+- [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md)
   already states that session anchors and request-lineage records are part of
   the shipped bounded profile, while stronger cross-kernel receipt lineage and
   continuation proofs remain bounded or optional.
@@ -555,16 +555,16 @@ falls into the following candidate phases.
 > - `docs/review/09-session-isolation-remediation.md`
 
 **Current repo baseline**:
-- [`crates/arc-core-types/src/capability.rs`](../crates/arc-core-types/src/capability.rs)
+- [`crates/chio-core-types/src/capability.rs`](../crates/chio-core-types/src/capability.rs)
   already includes `RuntimeAssuranceTier`, governed-autonomy requirements, and
   workload-identity structures. The missing piece is making the strongest
   runtime-assurance path the default qualified path.
 - [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) and
-  [`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md)
+  [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md)
   already distinguish stronger sender-constrained or attested modes from
   bounded hosted compatibility modes such as `shared_hosted_owner`.
 - This phase is about verifier-backed attestation records and sender-constrained
-  continuity on ARC's existing runtime-assurance path. It does not require
+  continuity on Chio's existing runtime-assurance path. It does not require
   TEE-rooted receipt signing, enclave-sealed receipt keys, or hardware-bound
   receipt execution claims.
 
@@ -595,9 +595,9 @@ falls into the following candidate phases.
 - [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already defines checkpoint
   statements, trust-anchor bindings, and explicit `audit_only` and
   `transparency_preview` claim boundaries.
-- [`crates/arc-anchor/src/bundle.rs`](../crates/arc-anchor/src/bundle.rs),
-  [`crates/arc-anchor/src/ops.rs`](../crates/arc-anchor/src/ops.rs), and
-  [`crates/arc-web3/src/lib.rs`](../crates/arc-web3/src/lib.rs) already
+- [`crates/chio-anchor/src/bundle.rs`](../crates/chio-anchor/src/bundle.rs),
+  [`crates/chio-anchor/src/ops.rs`](../crates/chio-anchor/src/ops.rs), and
+  [`crates/chio-web3/src/lib.rs`](../crates/chio-web3/src/lib.rs) already
   implement checkpoint packaging, publication operations, and verification.
   Phase 28 is the step from bounded transparency preview to externally
   checkable append-only semantics.
@@ -611,7 +611,7 @@ falls into the following candidate phases.
   workflows
 
 **Exit condition**:
-- ARC can truthfully claim public append-only receipt verification on the
+- Chio can truthfully claim public append-only receipt verification on the
   qualified publication path
 - trust-anchor and witness conflicts are detectable and reviewer-visible
 
@@ -625,7 +625,7 @@ falls into the following candidate phases.
 > - `docs/review/15-vision-gap-map.md`
 
 **Current repo baseline**:
-- [`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md)
+- [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md)
   already documents that trust-control writes are leader-local and budgets are
   local-only or bounded on clustered paths. That file is the clearest statement
   of the current floor.
@@ -643,7 +643,7 @@ falls into the following candidate phases.
 **Exit condition**:
 - failover and recovery preserve authority, issuance, and spend truth under
   tested partition and repair scenarios
-- ARC can truthfully claim comptroller-grade HA and distributed spend semantics
+- Chio can truthfully claim comptroller-grade HA and distributed spend semantics
 
 ### Phase 30: Portable Trust, Passport Clearing, and Sybil Resistance
 
@@ -658,11 +658,11 @@ falls into the following candidate phases.
 - [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already contains shipped or bounded
   passport, OID4VCI, OID4VP, discovery, cross-issuer portfolio, trust-pack,
   and migration semantics.
-- [`crates/arc-did/src/lib.rs`](../crates/arc-did/src/lib.rs),
-  [`crates/arc-credentials/src/oid4vci.rs`](../crates/arc-credentials/src/oid4vci.rs),
-  [`crates/arc-credentials/src/oid4vp.rs`](../crates/arc-credentials/src/oid4vp.rs),
-  [`crates/arc-core/src/identity_network.rs`](../crates/arc-core/src/identity_network.rs),
-  [`crates/arc-federation/src/lib.rs`](../crates/arc-federation/src/lib.rs),
+- [`crates/chio-did/src/lib.rs`](../crates/chio-did/src/lib.rs),
+  [`crates/chio-credentials/src/oid4vci.rs`](../crates/chio-credentials/src/oid4vci.rs),
+  [`crates/chio-credentials/src/oid4vp.rs`](../crates/chio-credentials/src/oid4vp.rs),
+  [`crates/chio-core/src/identity_network.rs`](../crates/chio-core/src/identity_network.rs),
+  [`crates/chio-federation/src/lib.rs`](../crates/chio-federation/src/lib.rs),
   and [`docs/IDENTITY_FEDERATION_GUIDE.md`](IDENTITY_FEDERATION_GUIDE.md)
   already provide real identity, federation, clearing, and Sybil-control
   substrate. Phase 30 is about turning that substrate into a trust-portable
@@ -684,7 +684,7 @@ falls into the following candidate phases.
 
 ### Phase 31: Verified Core Boundary and Claim-Proof Discipline
 
-> **Goal**: Make ARC's formal-verification story literally true inside one
+> **Goal**: Make Chio's formal-verification story literally true inside one
 > explicit verified core and prevent claim drift.
 > **Refs**:
 > - `docs/review/01-formal-verification-remediation.md`
@@ -720,7 +720,7 @@ falls into the following candidate phases.
 
 The numbered closure ladder stops at Phase 31.
 
-What remains after that is still necessary for the strongest ARC vision, but
+What remains after that is still necessary for the strongest Chio vision, but
 it is no longer honest to represent it as more repo-solvable roadmap phases.
 The remainder splits into:
 
@@ -746,11 +746,11 @@ milestones:
 - TEE-backed receipt and runtime-assurance binding
 
 Current research memos:
-- `docs/research/ARC_ZK_RECEIPT_PROOFS_MEMO.md`
+- `docs/research/CHIO_ZK_RECEIPT_PROOFS_MEMO.md`
 - `docs/research/TEE_RUNTIME_ASSURANCE_BINDING_MEMO.md`
 
 Working boundary:
-- the ZK track is about proving narrow predicates over ARC's existing signed
+- the ZK track is about proving narrow predicates over Chio's existing signed
   receipts, lineage artifacts, and checkpoint proofs after the Phase 26 and
   Phase 28 substrate is stable enough to prove over honestly
 - the TEE track is about adding hardware-rooted receipt or checkpoint
@@ -761,18 +761,18 @@ Working boundary:
   criteria or widened ship claims
 
 They are powerful extensions, but they are not required for Phases 26 through
-31 or the post-31 external programs to establish the non-research ARC thesis.
+31 or the post-31 external programs to establish the non-research Chio thesis.
 
 ---
 
 ## Bottom Line
 
-The post-roadmap priority is to make ARC's strongest safety-sensitive and
+The post-roadmap priority is to make Chio's strongest safety-sensitive and
 ship-facing claims line up with the runtime's default behavior, public entry
 points, and release gates.
 
 Phases 21 through 25 tighten truth.
 Phases 26 through 31 are the remaining repo-solvable path from truthful bounded
-ARC to the strongest honest repo-local ARC boundary.
+Chio to the strongest honest repo-local Chio boundary.
 After Phase 31, the remaining vision work continues in external programs and
 research, not more numbered product phases.

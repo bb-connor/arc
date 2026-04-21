@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/hero.png" alt="ARC" width="900" />
+  <img src="assets/hero.png" alt="Chio" width="900" />
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/MSRV-1.93-orange?style=flat-square&logo=rust" alt="MSRV: 1.93">
 </p>
 
-<h1 align="center">ARC</h1>
+<h1 align="center">Chio</h1>
 
 <p align="center">
   <strong>Governed tool access for AI systems</strong><br/>
@@ -25,20 +25,20 @@
 
 ---
 
-ARC is the runtime and trust-control layer that sits between an agent and the
+Chio is the runtime and trust-control layer that sits between an agent and the
 actions it can take. It validates capabilities, enforces policy and budgets,
 and produces signed receipts for every governed decision.
 
 ## Start Here
 
-1. Install ARC: [docs/install/README.md](docs/install/README.md)
+1. Install Chio: [docs/install/README.md](docs/install/README.md)
 2. Run the guided local walkthrough: [docs/PROGRESSIVE_TUTORIAL.md](docs/PROGRESSIVE_TUTORIAL.md)
 3. Pick the supported path that matches your use case:
    - Existing MCP server or coding-agent flow:
      [docs/guides/MIGRATING-FROM-MCP.md](docs/guides/MIGRATING-FROM-MCP.md)
    - Web backend:
      [docs/guides/WEB_BACKEND_QUICKSTART.md](docs/guides/WEB_BACKEND_QUICKSTART.md)
-   - Native ARC tool server:
+   - Native Chio tool server:
      [docs/NATIVE_ADOPTION_GUIDE.md](docs/NATIVE_ADOPTION_GUIDE.md)
 
 ## Supported Paths
@@ -64,9 +64,9 @@ The supported order is:
 Shared verification flow:
 [docs/guides/WEB_BACKEND_QUICKSTART.md](docs/guides/WEB_BACKEND_QUICKSTART.md)
 
-### Native ARC Tool Servers
+### Native Chio Tool Servers
 
-For native ARC authoring, start with the native adoption guide and the minimal
+For native Chio authoring, start with the native adoption guide and the minimal
 tool example:
 
 - [docs/NATIVE_ADOPTION_GUIDE.md](docs/NATIVE_ADOPTION_GUIDE.md)
@@ -77,7 +77,7 @@ tool example:
 The supported operator and local-development entrypoints are:
 
 - `arc check`: evaluate a single governed tool call and inspect the verdict
-- `arc mcp serve`: wrap an MCP server with ARC governance
+- `arc mcp serve`: wrap an MCP server with Chio governance
 - `arc mcp serve-http`: expose the governed MCP edge over Streamable HTTP
 - `arc trust serve`: run the shared trust-control service
 
@@ -88,9 +88,9 @@ Install and verification instructions live in
 
 | Language | Package | Package README |
 | --- | --- | --- |
-| TypeScript | `@arc-protocol/sdk` | [packages/sdk/arc-ts/README.md](packages/sdk/arc-ts/README.md) |
-| Python | `arc-sdk` | [packages/sdk/arc-py/README.md](packages/sdk/arc-py/README.md) |
-| Go | `arc-go` | [packages/sdk/arc-go/README.md](packages/sdk/arc-go/README.md) |
+| TypeScript | `@chio-protocol/sdk` | [packages/sdk/chio-ts/README.md](packages/sdk/chio-ts/README.md) |
+| Python | `chio-sdk` | [packages/sdk/chio-py/README.md](packages/sdk/chio-py/README.md) |
+| Go | `chio-go` | [packages/sdk/chio-go/README.md](packages/sdk/chio-go/README.md) |
 
 The primary Python and TypeScript packages include runnable quickstarts and
 canonical example links back to the supported web-backend flow.

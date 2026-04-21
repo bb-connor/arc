@@ -1,8 +1,8 @@
 {
-  "name": "@arc-protocol/ai-sdk",
+  "name": "@chio-protocol/ai-sdk",
   "version": "1.0.0",
   "type": "module",
-  "description": "ARC protocol wrapper for the Vercel AI SDK -- streaming-safe arcTool()",
+  "description": "Chio protocol wrapper for the Vercel AI SDK -- streaming-safe chioTool()",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

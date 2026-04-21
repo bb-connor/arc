@@ -1,6 +1,6 @@
-# Migrating from MCP to ARC
+# Migrating from MCP to Chio
 
-This guide adds ARC protection to an existing MCP server in about five
+This guide adds Chio protection to an existing MCP server in about five
 minutes. It covers the most common setup: a local MCP tool server
 (filesystem, git, shell) invoked by a coding agent (Claude Code,
 Cursor, a custom CLI).
@@ -34,7 +34,7 @@ curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/downl
 brew install --formula /tmp/arc.rb
 
 # Or, from a local checkout
-cargo install --path crates/arc-cli
+cargo install --path crates/chio-cli
 arc --version
 ```
 
@@ -49,8 +49,8 @@ arc 0.1.0
 If this is a fresh project, scaffold one with `arc init`:
 
 ```bash
-arc init my-arc-project
-cd my-arc-project
+arc init my-chio-project
+cd my-chio-project
 ```
 
 That creates a runnable `policy.yaml`, a sample tool server, and a
@@ -69,7 +69,7 @@ destructive shell commands are blocked, and receipts are on by default.
 
 ## Step 3: Wrap your MCP server with `arc mcp serve --policy`
 
-This is the canonical supported path. The ARC CLI spawns your MCP server
+This is the canonical supported path. The Chio CLI spawns your MCP server
 as a subprocess, mediates every tool call through the kernel, and
 re-exposes a compatible MCP edge over stdio:
 
@@ -85,13 +85,13 @@ What the flags mean:
 | Flag | Purpose |
 |------|---------|
 | `--policy ./policy.yaml` | File-backed HushSpec starter you can edit in-repo while keeping the wrapped MCP flow unchanged. |
-| `--server-id fs` | ARC's internal id for the wrapped server. Used in receipts. Any short string works. |
-| `--` | Everything after this is the literal command ARC runs as the MCP subprocess. |
+| `--server-id fs` | Chio's internal id for the wrapped server. Used in receipts. Any short string works. |
+| `--` | Everything after this is the literal command Chio runs as the MCP subprocess. |
 
 A successful launch prints a structured log line on stderr:
 
 ```
-INFO arc::cli loaded policy for MCP edge policy_path="/tmp/arc-preset-.../code_agent_preset.yaml" preset="code-agent" server_id="fs" source_policy_hash="..."
+INFO arc::cli loaded policy for MCP edge policy_path="/tmp/chio-preset-.../code_agent_preset.yaml" preset="code-agent" server_id="fs" source_policy_hash="..."
 INFO arc::cli initialized MCP edge session capability_count=N wrapped_command="npx"
 ```
 
@@ -112,7 +112,7 @@ contract literal:
 - use `GET /mcp` for live notifications and replay, with `Last-Event-ID` as the replay cursor
 - expect late notifications and task handles to stay scoped to the session that created them, even when a shared hosted owner reuses one upstream subprocess
 
-If your client sends `_meta.modelMetadata` or `_meta.arcModelMetadata`, ARC
+If your client sends `_meta.modelMetadata` or `_meta.arcModelMetadata`, Chio
 preserves that data on the request and receipt path, but the incoming
 provenance is treated as `asserted` until a trusted subsystem upgrades it.
 
@@ -200,25 +200,25 @@ Once the baseline deny list is in place:
 
 4. **Enable delegation.** If you have a multi-agent crew, capability
    attenuation lets you hand a junior agent a strictly narrower
-   token. See `sdks/python/arc-crewai/README.md`.
+   token. See `sdks/python/chio-crewai/README.md`.
 
 ## Alternate route: embedded Python SDK
 
 If your coding agent is a Python process, skip the CLI entirely and
-embed `arc-code-agent`:
+embed `chio-code-agent`:
 
 ```bash
-pip install arc-code-agent arc-sdk-python
+pip install chio-code-agent chio-sdk-python
 ```
 
 ```python
 import asyncio
-from arc_code_agent import CodeAgent
-from arc_sdk import ArcClient
+from chio_code_agent import CodeAgent
+from chio_sdk import ChioClient
 
 async def main() -> None:
-    async with ArcClient("http://127.0.0.1:9090") as client:
-        agent = CodeAgent(arc_client=client, capability_id="cap-123")
+    async with ChioClient("http://127.0.0.1:9090") as client:
+        agent = CodeAgent(chio_client=client, capability_id="cap-123")
         result = await agent.files.read_file("README.md")   # allow
         print(result.result)
         await agent.files.write_file(".env", "BAD=value")   # deny
@@ -273,7 +273,7 @@ arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem
 
 ### The client hangs on startup
 
-Check stderr. On a typical `stderr` the ARC CLI prints:
+Check stderr. On a typical `stderr` the Chio CLI prints:
 
 ```
 INFO arc::cli loaded policy for MCP edge ...
@@ -314,7 +314,7 @@ Not every MCP feature lands on day one. Known gaps:
 - **Remote MCP.** This guide covers stdio edges. For remote MCP
   (Streamable HTTP with OAuth2 / OIDC), use `arc mcp serve-http`;
   the `--preset` flag is a stdio-only convenience today.
-- **Pre-existing receipts.** Moving to ARC does not retroactively
+- **Pre-existing receipts.** Moving to Chio does not retroactively
   attest past tool calls; receipts start at the first call through
   the edge.
 - **Non-coding workloads.** The `code-agent` preset is tuned for
@@ -324,7 +324,7 @@ Not every MCP feature lands on day one. Known gaps:
   kernel-minted default capabilities; integrating an external
   authority, issuing time-bounded child tokens, or wiring DPoP
   nonces requires explicit policy and client changes (see
-  `docs/DPOP_INTEGRATION_GUIDE.md`, `sdks/python/arc-sdk-python`).
+  `docs/DPOP_INTEGRATION_GUIDE.md`, `sdks/python/chio-sdk-python`).
 - **Windows stdio.** Tested on macOS and Linux. Windows works via
   WSL; native Windows stdio is untested.
 

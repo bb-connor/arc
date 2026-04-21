@@ -7,17 +7,17 @@ name = "hello-fastapi"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-  "arc-asgi>=0.1.0",
-  "arc-fastapi>=0.1.0",
-  "arc-sdk-python>=0.1.0",
+  "chio-asgi>=0.1.0",
+  "chio-fastapi>=0.1.0",
+  "chio-sdk-python>=0.1.0",
   "fastapi>=0.116,<1",
   "uvicorn>=0.35,<1",
 ]
 
 [tool.uv.sources]
-arc-asgi = { path = "../../sdks/python/arc-asgi" }
-arc-fastapi = { path = "../../sdks/python/arc-fastapi" }
-arc-sdk-python = { path = "../../sdks/python/arc-sdk-python" }
+chio-asgi = { path = "../../sdks/python/chio-asgi" }
+chio-fastapi = { path = "../../sdks/python/chio-fastapi" }
+chio-sdk-python = { path = "../../sdks/python/chio-sdk-python" }
 
 [tool.setuptools]
 py-modules = ["app"]

@@ -1,13 +1,13 @@
 /-
   Bounded receipt/checkpoint model for the formal receipt-proof lane.
   Mirrors the structural contracts in:
-  - arc-core/src/receipt.rs
-  - arc-kernel/src/checkpoint.rs
+  - chio-kernel-core/src/receipt.rs
+  - chio-kernel/src/checkpoint.rs
 -/
 
 set_option autoImplicit false
 
-namespace Arc.Core
+namespace Chio.Core
 
 structure ReceiptBody where
   id : String
@@ -103,4 +103,4 @@ def buildCheckpoint (checkpointSeq : Nat) (tree : ReceiptTree) : KernelCheckpoin
 
 abbrev CheckpointStore := Nat → Option KernelCheckpoint
 
-end Arc.Core
+end Chio.Core

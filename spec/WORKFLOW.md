@@ -1,11 +1,11 @@
-# ARC Workflow
+# Chio Workflow
 
 **Version:** 1.0
 **Date:** 2026-04-14
 **Status:** Normative
 
-This specification defines the skill and workflow authority system for ARC
-runtimes. It extends the ARC capability model with multi-step tool
+This specification defines the skill and workflow authority system for Chio
+runtimes. It extends the Chio capability model with multi-step tool
 compositions, I/O contracts between steps, budget envelopes, and signed
 workflow receipts. Implementations MUST follow the grant, manifest, receipt,
 and authority lifecycle described herein.
@@ -38,7 +38,7 @@ single authorization with a shared budget envelope.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `schema` | string | Yes | -- | MUST be `"arc.skill-grant.v1"` |
+| `schema` | string | Yes | -- | MUST be `"chio.skill-grant.v1"` |
 | `skill_id` | string | Yes | -- | Unique skill identifier (e.g., `"search-and-summarize"`) |
 | `skill_version` | string | Yes | -- | Version of the skill manifest this grant authorizes |
 | `authorized_steps` | string[] | Yes | -- | Tool steps in declared order; format `"server_id:tool_name"` |
@@ -73,7 +73,7 @@ execution plan for a skill.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `schema` | string | Yes | -- | MUST be `"arc.skill-manifest.v1"` |
+| `schema` | string | Yes | -- | MUST be `"chio.skill-manifest.v1"` |
 | `skill_id` | string | Yes | -- | Unique skill identifier |
 | `version` | string | Yes | -- | Semantic version |
 | `name` | string | Yes | -- | Human-readable name |
@@ -138,7 +138,7 @@ signed artifact.
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Unique receipt ID |
-| `schema` | string | MUST be `"arc.workflow-receipt.v1"` |
+| `schema` | string | MUST be `"chio.workflow-receipt.v1"` |
 | `started_at` | u64 | Unix timestamp when execution started |
 | `completed_at` | u64 | Unix timestamp when execution completed |
 | `skill_id` | string | Skill ID from the manifest |
@@ -318,7 +318,7 @@ A two-step "search and summarize" skill:
 
 ```yaml
 # Skill Manifest
-schema: arc.skill-manifest.v1
+schema: chio.skill-manifest.v1
 skill_id: search-and-summarize
 version: "1.0.0"
 name: Search and Summarize
@@ -344,7 +344,7 @@ budget_envelope:
 
 ```yaml
 # Skill Grant
-schema: arc.skill-grant.v1
+schema: chio.skill-grant.v1
 skill_id: search-and-summarize
 skill_version: "1.0.0"
 authorized_steps:

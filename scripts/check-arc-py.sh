@@ -4,11 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "arc-sdk checks require python3 on PATH" >&2
+  echo "chio-sdk checks require python3 on PATH" >&2
   exit 1
 fi
 
-venv_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-sdk-check.XXXXXX")"
+venv_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-sdk-check.XXXXXX")"
 cleanup() {
   rm -rf "$venv_dir"
 }
@@ -16,5 +16,5 @@ trap cleanup EXIT
 
 python3 -m venv "$venv_dir"
 . "$venv_dir/bin/activate"
-python -m pip install --quiet -e packages/sdk/arc-py
-python -m unittest discover -s packages/sdk/arc-py/tests
+python -m pip install --quiet -e packages/sdk/chio-py
+python -m unittest discover -s packages/sdk/chio-py/tests

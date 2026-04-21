@@ -1,8 +1,7 @@
-# arc-k8s-controller
+# chio-k8s-controller
 
-A Kubernetes controller that extends the ARC (Provable Agent Capability
-Transport) protocol to batch `Job` workloads. Jobs carrying the
-`arc.protocol/governed: "true"` label get a capability grant minted at
+A Kubernetes controller that extends the Chio protocol to batch `Job` workloads. Jobs carrying the
+`chio.protocol/governed: "true"` label get a capability grant minted at
 creation, per-pod receipts aggregated across the Job's lifecycle, and the
 grant released at completion or failure alongside a signed `JobReceipt`.
 
@@ -16,14 +15,14 @@ clients; it does not open raw watches via `client-go`. The single reconciler
 (`internal/reconciler.JobReconciler`) handles four lifecycle points:
 
 1. **New governed Job.** The controller adds the finalizer
-   `arc.protocol/capability-finalizer`, calls the sidecar's
+   `chio.protocol/capability-finalizer`, calls the sidecar's
    `POST /v1/capabilities/mint`, and persists the grant on the Job as
-   annotations (`arc.protocol/capability-id`,
-   `arc.protocol/capability-token`,
-   `arc.protocol/capability-expires-at`).
+   annotations (`chio.protocol/capability-id`,
+   `chio.protocol/capability-token`,
+   `chio.protocol/capability-expires-at`).
 2. **Running Job.** Pods owned by the Job are watched (`Owns(&corev1.Pod{})`).
    Each reconciliation caused by a Pod update re-enters the Job reconciler,
-   which harvests any `arc.protocol/receipt` annotations the sidecar posted
+   which harvests any `chio.protocol/receipt` annotations the sidecar posted
    onto the Pod.
 3. **Completed / failed Job.** The reconciler calls
    `POST /v1/capabilities/release`, aggregates the harvested pod receipts
@@ -35,13 +34,13 @@ clients; it does not open raw watches via `client-go`. The single reconciler
 
 ### Fail-closed behavior
 
-If the ARC sidecar is unreachable at mint time (HTTP transport error or
+If the Chio sidecar is unreachable at mint time (HTTP transport error or
 5xx), the reconciler **records a warning event and requeues** with
 exponential backoff. It does **not** persist an empty / placeholder
 capability, so Pods created by the Job remain ungoverned and will be
-rejected by the ARC admission webhook. Receipt submission uses a bounded
+rejected by the Chio admission webhook. Receipt submission uses a bounded
 exponential backoff (`DefaultRetryPolicy`: base 2s, cap 2m, max 8 attempts);
-once attempts are exhausted the reconciler surfaces `ArcReceiptDropped`
+once attempts are exhausted the reconciler surfaces `ChioReceiptDropped`
 and allows the finalizer to be removed so that the Job is not wedged
 forever.
 
@@ -49,9 +48,9 @@ forever.
 
 Every mutation is gated on the presence (or absence) of an annotation the
 reconciler itself sets. A capability is minted only when
-`arc.protocol/capability-id` is empty. Release is gated on
-`arc.protocol/released-at`. Receipt submission is gated on
-`arc.protocol/receipt-id`. Running `Reconcile` repeatedly on a stable Job
+`chio.protocol/capability-id` is empty. Release is gated on
+`chio.protocol/released-at`. Receipt submission is gated on
+`chio.protocol/receipt-id`. Running `Reconcile` repeatedly on a stable Job
 converges without additional sidecar calls.
 
 ## Configuration
@@ -61,30 +60,30 @@ converges without additional sidecar calls.
 | `--metrics-bind-address`     | `:8080`                                                   | Controller-runtime metrics.         |
 | `--health-probe-bind-address`| `:8081`                                                   | Liveness / readiness probe server.  |
 | `--leader-elect`             | `false`                                                   | Enable leader election.             |
-| `--leader-election-namespace`| `arc-system`                                              | Namespace for the leader lease.     |
-| `--arc-sidecar-url`          | `http://arc-sidecar.arc-system.svc.cluster.local:9090`    | ARC sidecar base URL.               |
-| `--arc-sidecar-control-token`| `""`                                                     | Bearer token for remote sidecar control APIs; required for non-loopback sidecars. |
-| `--arc-request-timeout`      | `10s`                                                     | HTTP timeout for sidecar calls.     |
+| `--leader-election-namespace`| `chio-system`                                              | Namespace for the leader lease.     |
+| `--chio-sidecar-url`          | `http://chio-sidecar.chio-system.svc.cluster.local:9090`    | Chio sidecar base URL.               |
+| `--chio-sidecar-control-token`| `""`                                                     | Bearer token for remote sidecar control APIs; required for non-loopback sidecars. |
+| `--chio-request-timeout`      | `10s`                                                     | HTTP timeout for sidecar calls.     |
 | `--max-concurrent-reconciles`| `4`                                                       | Parallelism.                        |
 
-The sidecar URL can also be provided via the `ARC_SIDECAR_URL` environment
+The sidecar URL can also be provided via the `CHIO_SIDECAR_URL` environment
 variable. The control token can be provided via
-`ARC_SIDECAR_CONTROL_TOKEN`.
+`CHIO_SIDECAR_CONTROL_TOKEN`.
 
-If `ARC_SIDECAR_URL` points at a non-loopback sidecar service, configure the
-same `ARC_SIDECAR_CONTROL_TOKEN` on both the controller and the sidecar. The
+If `CHIO_SIDECAR_URL` points at a non-loopback sidecar service, configure the
+same `CHIO_SIDECAR_CONTROL_TOKEN` on both the controller and the sidecar. The
 shipped `config/manager/manager.yaml` requires that token via the
-`arc-sidecar-control` Secret.
+`chio-sidecar-control` Secret.
 
 ## Installation
 
 ```bash
-make docker-build IMG=ghcr.io/backbay/arc-k8s-controller:dev
-kind load docker-image ghcr.io/backbay/arc-k8s-controller:dev   # or push to a registry
+make docker-build IMG=ghcr.io/backbay/chio-k8s-controller:dev
+kind load docker-image ghcr.io/backbay/chio-k8s-controller:dev   # or push to a registry
 make deploy
 ```
 
-The manifests under `config/` create the `arc-system` namespace, a
+The manifests under `config/` create the `chio-system` namespace, a
 `ServiceAccount`, a `ClusterRole` + `ClusterRoleBinding`, and the
 `Deployment`. Override the image via the `IMG` env var when running
 `make docker-build` / the corresponding image edit in
@@ -92,38 +91,38 @@ The manifests under `config/` create the `arc-system` namespace, a
 
 ## End-to-end demo
 
-With the controller running and an ARC sidecar reachable at the configured
+With the controller running and an Chio sidecar reachable at the configured
 URL:
 
 ```yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: arc-demo
+  name: chio-demo
   namespace: default
   labels:
-    arc.protocol/governed: "true"
+    chio.protocol/governed: "true"
   annotations:
-    arc.protocol/scopes: "tools:search,tools:fetch"
+    chio.protocol/scopes: "tools:search,tools:fetch"
 spec:
   template:
     spec:
       restartPolicy: Never
       containers:
         - name: worker
-          image: ghcr.io/backbay/arc-demo-job:latest
+          image: ghcr.io/backbay/chio-demo-job:latest
 ```
 
 Apply it with `kubectl apply -f demo.yaml`. Watch the annotations land:
 
 ```bash
-kubectl get job arc-demo -o jsonpath='{.metadata.annotations}' | jq
-kubectl get events --field-selector involvedObject.name=arc-demo
+kubectl get job chio-demo -o jsonpath='{.metadata.annotations}' | jq
+kubectl get events --field-selector involvedObject.name=chio-demo
 ```
 
-On completion the events will show `ArcCapabilityMinted`,
-`ArcCapabilityReleased`, and `ArcReceiptSubmitted`. The `arc.protocol/receipt-id`
-annotation carries the ID assigned by the ARC receipt store.
+On completion the events will show `ChioCapabilityMinted`,
+`ChioCapabilityReleased`, and `ChioReceiptSubmitted`. The `chio.protocol/receipt-id`
+annotation carries the ID assigned by the Chio receipt store.
 
 ## Development
 
@@ -135,15 +134,15 @@ make docker-build
 ```
 
 The test suite uses `sigs.k8s.io/controller-runtime/pkg/client/fake` plus a
-stub `ArcClient` so unit tests run without a live cluster or sidecar. One
+stub `ChioClient` so unit tests run without a live cluster or sidecar. One
 test additionally drives the real `arc.Client` against an `httptest.Server`
 to cover the HTTP wire format.
 
 ## File map
 
 ```
-cmd/arc-controller/main.go           entrypoint
-internal/arc/{client,types}.go       sidecar HTTP client + data types
+cmd/chio-controller/main.go           entrypoint
+internal/chio/{client,types}.go       sidecar HTTP client + data types
 internal/reconciler/job_reconciler.go core reconcile loop
 internal/reconciler/job_reconciler_test.go tests
 config/rbac/role.yaml                ClusterRole + ClusterRoleBinding

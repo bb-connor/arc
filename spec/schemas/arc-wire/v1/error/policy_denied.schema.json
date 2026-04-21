@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC ToolCallError policy_denied",
+  "title": "Chio ToolCallError policy_denied",
   "type": "object",
   "additionalProperties": false,
   "required": ["code", "detail"],

@@ -1,0 +1,475 @@
+{
+  "contractName": "IChioRootRegistry",
+  "sourceName": "src/interfaces/IChioRootRegistry.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "delegate",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "expiresAt",
+          "type": "uint64"
+        }
+      ],
+      "name": "DelegateRegistered",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "delegate",
+          "type": "address"
+        }
+      ],
+      "name": "DelegateRevoked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "publisher",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint64",
+          "name": "checkpointSeq",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "merkleRoot",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "batchStartSeq",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "batchEndSeq",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "treeSize",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "publishedAt",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "operatorKeyHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RootPublished",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "getLatestRoot",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "merkleRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "checkpointSeq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "batchStartSeq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "batchEndSeq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "treeSize",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "publishedAt",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "operatorKeyHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IChioRootRegistry.RootEntry",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "getLatestSeq",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "checkpointSeq",
+          "type": "uint64"
+        }
+      ],
+      "name": "getRoot",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "merkleRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "checkpointSeq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "batchStartSeq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "batchEndSeq",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "treeSize",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "publishedAt",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "operatorKeyHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IChioRootRegistry.RootEntry",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "publisher",
+          "type": "address"
+        }
+      ],
+      "name": "isAuthorizedPublisher",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "merkleRoot",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint64",
+          "name": "checkpointSeq",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "batchStartSeq",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "batchEndSeq",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "treeSize",
+          "type": "uint64"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "operatorKeyHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "publishRoot",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "merkleRoots",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint64[]",
+          "name": "checkpointSeqs",
+          "type": "uint64[]"
+        },
+        {
+          "internalType": "uint64[]",
+          "name": "batchStartSeqs",
+          "type": "uint64[]"
+        },
+        {
+          "internalType": "uint64[]",
+          "name": "batchEndSeqs",
+          "type": "uint64[]"
+        },
+        {
+          "internalType": "uint64[]",
+          "name": "treeSizes",
+          "type": "uint64[]"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "operatorKeyHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "publishRootBatch",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "delegate",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "expiresAt",
+          "type": "uint64"
+        }
+      ],
+      "name": "registerDelegate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "delegate",
+          "type": "address"
+        }
+      ],
+      "name": "revokeDelegate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "proof",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "root",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "leafHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "verifyInclusion",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "valid",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32[]",
+              "name": "auditPath",
+              "type": "bytes32[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "leafIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "treeSize",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct ChioMerkle.Proof",
+          "name": "proof",
+          "type": "tuple"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "root",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "leafHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "verifyInclusionDetailed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "valid",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"delegate\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"expiresAt\",\"type\":\"uint64\"}],\"name\":\"DelegateRegistered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"delegate\",\"type\":\"address\"}],\"name\":\"DelegateRevoked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"publisher\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"checkpointSeq\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"batchStartSeq\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"batchEndSeq\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"treeSize\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"publishedAt\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"operatorKeyHash\",\"type\":\"bytes32\"}],\"name\":\"RootPublished\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"getLatestRoot\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"checkpointSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"batchStartSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"batchEndSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"treeSize\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"publishedAt\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"operatorKeyHash\",\"type\":\"bytes32\"}],\"internalType\":\"struct IChioRootRegistry.RootEntry\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"getLatestSeq\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"checkpointSeq\",\"type\":\"uint64\"}],\"name\":\"getRoot\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"checkpointSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"batchStartSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"batchEndSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"treeSize\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"publishedAt\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"operatorKeyHash\",\"type\":\"bytes32\"}],\"internalType\":\"struct IChioRootRegistry.RootEntry\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"publisher\",\"type\":\"address\"}],\"name\":\"isAuthorizedPublisher\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"checkpointSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"batchStartSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"batchEndSeq\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"treeSize\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"operatorKeyHash\",\"type\":\"bytes32\"}],\"name\":\"publishRoot\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"bytes32[]\",\"name\":\"merkleRoots\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint64[]\",\"name\":\"checkpointSeqs\",\"type\":\"uint64[]\"},{\"internalType\":\"uint64[]\",\"name\":\"batchStartSeqs\",\"type\":\"uint64[]\"},{\"internalType\":\"uint64[]\",\"name\":\"batchEndSeqs\",\"type\":\"uint64[]\"},{\"internalType\":\"uint64[]\",\"name\":\"treeSizes\",\"type\":\"uint64[]\"},{\"internalType\":\"bytes32\",\"name\":\"operatorKeyHash\",\"type\":\"bytes32\"}],\"name\":\"publishRootBatch\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"delegate\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"expiresAt\",\"type\":\"uint64\"}],\"name\":\"registerDelegate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"delegate\",\"type\":\"address\"}],\"name\":\"revokeDelegate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"proof\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"leafHash\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"verifyInclusion\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"valid\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32[]\",\"name\":\"auditPath\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint256\",\"name\":\"leafIndex\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"treeSize\",\"type\":\"uint256\"}],\"internalType\":\"struct ChioMerkle.Proof\",\"name\":\"proof\",\"type\":\"tuple\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"leafHash\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"verifyInclusionDetailed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"valid\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/interfaces/IChioRootRegistry.sol\":\"IChioRootRegistry\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"src/interfaces/IChioRootRegistry.sol\":{\"keccak256\":\"0xa29d09c99efb249f990468a342b847e17e326318cfc78096ebafed0502f0ea59\",\"license\":\"Apache-2.0\",\"urls\":[\"bzz-raw://b422d046ed0c490003b79d233afe457d8b783cf7554979697e4e1c6502009749\",\"dweb:/ipfs/Qmbz6urU2weFitTybxbo5vhG9BDQZaceDNBFCNHsgb6ENs\"]},\"src/lib/ChioMerkle.sol\":{\"keccak256\":\"0x2672b98dca14fddaedcc851061dfe10a00b47b58bcbf5fcb8c4b9df8490836ad\",\"license\":\"Apache-2.0\",\"urls\":[\"bzz-raw://f7764a63dd055e33787005b061966bb74969b8538d543e106c12033e6096a91b\",\"dweb:/ipfs/QmSiYybwfR47x2vqUdueKpNjdzyMPzqbxig6vk6TD4wHWq\"]}},\"version\":1}"
+}

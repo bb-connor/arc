@@ -1,5 +1,5 @@
 {
-  "name": "arc-anthropic-sdk-example",
+  "name": "chio-anthropic-sdk-example",
   "private": true,
   "type": "module",
   "engines": {
@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
-    "@arc-protocol/sdk": "file:../../packages/sdk/arc-ts"
+    "@chio-protocol/sdk": "file:../../packages/sdk/chio-ts"
   }
 }

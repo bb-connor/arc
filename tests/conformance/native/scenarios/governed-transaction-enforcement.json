@@ -4,8 +4,8 @@
   "category": "governed_transaction_enforcement",
   "driver": "http",
   "fixture": "governed_request",
-  "specVersion": "arc-wire-v1",
-  "httpPath": "/arc-conformance/v1/invoke",
+  "specVersion": "chio-wire-v1",
+  "httpPath": "/chio-conformance/v1/invoke",
   "assertions": [
     {
       "name": "terminal_status_ok",

@@ -6,27 +6,27 @@
 
 ## Context
 
-ARC capability tokens are Bearer-style credentials: any holder can present
+Chio capability tokens are Bearer-style credentials: any holder can present
 them. This creates a stolen-token risk: if an agent's token is captured in
 transit or on disk, an attacker can replay it until expiry.
 
 The standard mitigation is Demonstration of Proof-of-Possession (DPoP), where
 the holder proves they control the private key corresponding to the subject
 field in the token. RFC 9449 defines DPoP for HTTP, binding proofs to HTTP
-method and URI. ARC does not use HTTP for agent-to-kernel communication (it
+method and URI. Chio does not use HTTP for agent-to-kernel communication (it
 uses an anonymous pipe or Unix domain socket), so RFC 9449's HTTP-shaped
 binding fields are not applicable.
 
 ## Decision
 
-ARC implements its own DPoP format, `arc.dpop_proof.v1`, designed for the
-ARC wire protocol rather than HTTP.
+Chio implements its own DPoP format, `chio.dpop_proof.v1`, designed for the
+Chio wire protocol rather than HTTP.
 
 ### Proof Body (8 fields)
 
 ```rust
 pub struct DpopProofBody {
-    pub schema:        String,    // "arc.dpop_proof.v1" (forward-compat guard)
+    pub schema:        String,    // "chio.dpop_proof.v1" (forward-compat guard)
     pub capability_id: String,    // ID of the capability token being used
     pub tool_server:   String,    // server_id of the target tool server
     pub tool_name:     String,    // Name of the tool being called
@@ -42,7 +42,7 @@ Ed25519. The signature covers all 8 fields; none are mutable after signing.
 
 ### Verification Steps (in order)
 
-1. **Schema check** -- `schema` must equal `"arc.dpop_proof.v1"`. Unknown
+1. **Schema check** -- `schema` must equal `"chio.dpop_proof.v1"`. Unknown
    schema strings are rejected to allow future protocol evolution.
 2. **Sender constraint** -- `agent_key` must equal `capability.subject`. This
    binds the proof to the key the CA authorized.
@@ -79,9 +79,9 @@ Kernel will reject any invocation that does not include a valid proof.
 ## Why Not RFC 9449
 
 RFC 9449 binds proofs to HTTP method, URI, and optional access token hash.
-These fields are HTTP-specific and meaningless in ARC's pipe/UDS transport.
-ARC binds proofs to `capability_id`, `tool_server`, `tool_name`, and
-`action_hash`, which provide equivalent or stronger binding for the ARC
+These fields are HTTP-specific and meaningless in Chio's pipe/UDS transport.
+Chio binds proofs to `capability_id`, `tool_server`, `tool_name`, and
+`action_hash`, which provide equivalent or stronger binding for the Chio
 invocation model.
 
 ## Consequences
@@ -92,7 +92,7 @@ invocation model.
   channel (typically a local pipe or UDS that is not TCP).
 - Binding to `action_hash` means a proof cannot be replayed for a different
   set of arguments, even with the same token.
-- Schema versioning (`arc.dpop_proof.v1`) allows the format to evolve without
+- Schema versioning (`chio.dpop_proof.v1`) allows the format to evolve without
   breaking existing verifiers.
 
 ### Negative

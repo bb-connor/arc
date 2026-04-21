@@ -1,8 +1,8 @@
-# ARC ext_authz gRPC adapter: Deployment + Service + Namespace
+# Chio ext_authz gRPC adapter: Deployment + Service + Namespace
 #
-# Runs the ARC sidecar image (see crates/arc-envoy-ext-authz + deploy/sidecar)
+# Runs the Chio sidecar image (see crates/chio-envoy-ext-authz + deploy/sidecar)
 # as a cluster-wide Deployment. Istio's `extensionProviders` entry in
-# `01-meshconfig-patch.yaml` points at the `arc-sidecar` Service created here.
+# `01-meshconfig-patch.yaml` points at the `chio-sidecar` Service created here.
 #
 # Listeners
 #   :9091  gRPC  envoy.service.auth.v3.Authorization/Check
@@ -15,37 +15,37 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: arc-system
+  name: chio-system
   labels:
     # istio-injection stays OFF: the adapter is itself the policy engine and
     # must not sit behind another ext_authz call to avoid recursion.
     istio-injection: disabled
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: arc-sidecar
-  namespace: arc-system
+  name: chio-sidecar
+  namespace: chio-system
   labels:
-    app.kubernetes.io/name: arc-sidecar
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/name: chio-sidecar
+    app.kubernetes.io/part-of: chio-protocol
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: arc-sidecar
-  namespace: arc-system
+  name: chio-sidecar
+  namespace: chio-system
   labels:
-    app.kubernetes.io/name: arc-sidecar
+    app.kubernetes.io/name: chio-sidecar
     app.kubernetes.io/component: ext-authz
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   replicas: 2
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app.kubernetes.io/name: arc-sidecar
+      app.kubernetes.io/name: chio-sidecar
       app.kubernetes.io/component: ext-authz
   strategy:
     type: RollingUpdate
@@ -55,11 +55,11 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: arc-sidecar
+        app.kubernetes.io/name: chio-sidecar
         app.kubernetes.io/component: ext-authz
-        app.kubernetes.io/part-of: arc-protocol
+        app.kubernetes.io/part-of: chio-protocol
     spec:
-      serviceAccountName: arc-sidecar
+      serviceAccountName: chio-sidecar
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -69,12 +69,12 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: arc-sidecar
+        - name: chio-sidecar
           # This example needs a dedicated Envoy ext_authz adapter image.
-          # The generic ghcr.io/backbay/arc-sidecar image is the HTTP sidecar
+          # The generic ghcr.io/backbay/chio-sidecar image is the HTTP sidecar
           # and does not expose the gRPC Authorization/Check service on :9091.
           # Replace this placeholder with the image you built for the adapter.
-          image: ghcr.io/backbay/arc-ext-authz:latest
+          image: ghcr.io/backbay/chio-ext-authz:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: grpc-ext-authz
@@ -84,32 +84,32 @@ spec:
               containerPort: 9090
               protocol: TCP
           env:
-            - name: ARC_LISTEN_ADDR
+            - name: CHIO_LISTEN_ADDR
               value: "0.0.0.0:9090"
-            - name: ARC_EXT_AUTHZ_LISTEN_ADDR
+            - name: CHIO_EXT_AUTHZ_LISTEN_ADDR
               value: "0.0.0.0:9091"
-            - name: ARC_HEALTH_PATH
+            - name: CHIO_HEALTH_PATH
               value: "/health"
-            - name: ARC_KERNEL_CONFIG_PATH
+            - name: CHIO_KERNEL_CONFIG_PATH
               value: "/etc/arc/kernel.yaml"
-            - name: ARC_POLICY_SOURCE
+            - name: CHIO_POLICY_SOURCE
               value: "file:///etc/arc/policy.yaml"
-            - name: ARC_RECEIPT_SINK
+            - name: CHIO_RECEIPT_SINK
               value: "stdout"
-            - name: ARC_LOG_LEVEL
+            - name: CHIO_LOG_LEVEL
               value: "info"
-            - name: ARC_CAPABILITY_AUTHORITY_URL
+            - name: CHIO_CAPABILITY_AUTHORITY_URL
               valueFrom:
                 secretKeyRef:
-                  name: arc-secrets
+                  name: chio-secrets
                   key: capability-authority-url
-            - name: ARC_SIGNING_KEY
+            - name: CHIO_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
-                  name: arc-secrets
+                  name: chio-secrets
                   key: signing-key
           volumeMounts:
-            - name: arc-config
+            - name: chio-config
               mountPath: /etc/arc
               readOnly: true
           resources:
@@ -151,9 +151,9 @@ spec:
               drop:
                 - ALL
       volumes:
-        - name: arc-config
+        - name: chio-config
           configMap:
-            name: arc-kernel-config
+            name: chio-kernel-config
             # 256 (decimal) == 0400 (octal): read-only for the container UID.
             # Kubernetes expects an int32 here, not a YAML octal literal.
             defaultMode: 256
@@ -163,11 +163,11 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: arc-kernel-config
-  namespace: arc-system
+  name: chio-kernel-config
+  namespace: chio-system
   labels:
-    app.kubernetes.io/name: arc-sidecar
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/name: chio-sidecar
+    app.kubernetes.io/part-of: chio-protocol
 data:
   kernel.yaml: |
     listen: 0.0.0.0:9090
@@ -177,7 +177,7 @@ data:
   policy.yaml: |
     # Minimal demo policy. Allow requests whose capability token presents the
     # scope `demo.read`; deny everything else. Real deployments load from a
-    # signed policy bundle via ARC_POLICY_SOURCE.
+    # signed policy bundle via CHIO_POLICY_SOURCE.
     version: 1
     default: deny
     guards:
@@ -191,11 +191,11 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: arc-secrets
-  namespace: arc-system
+  name: chio-secrets
+  namespace: chio-system
   labels:
-    app.kubernetes.io/name: arc-sidecar
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/name: chio-sidecar
+    app.kubernetes.io/part-of: chio-protocol
 type: Opaque
 stringData:
   capability-authority-url: "http://localhost:9192/capabilities"
@@ -206,16 +206,16 @@ stringData:
 apiVersion: v1
 kind: Service
 metadata:
-  name: arc-sidecar
-  namespace: arc-system
+  name: chio-sidecar
+  namespace: chio-system
   labels:
-    app.kubernetes.io/name: arc-sidecar
+    app.kubernetes.io/name: chio-sidecar
     app.kubernetes.io/component: ext-authz
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: arc-sidecar
+    app.kubernetes.io/name: chio-sidecar
     app.kubernetes.io/component: ext-authz
   ports:
     - name: grpc-ext-authz

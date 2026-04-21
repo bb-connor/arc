@@ -1,6 +1,6 @@
-# ARC DPoP Integration Guide
+# Chio DPoP Integration Guide
 
-DPoP (Demonstration of Proof-of-Possession) is ARC's optional sender-constrained invocation profile. When a `ToolGrant` carries `dpop_required: Some(true)`, the kernel requires the agent to attach a fresh cryptographic proof with every invocation. The proof binds the call to the agent's keypair, the specific capability token, the target tool, and the exact arguments. Grants without `dpop_required: Some(true)` remain compatibility paths and should not be described as universally sender-constrained.
+DPoP (Demonstration of Proof-of-Possession) is Chio's optional sender-constrained invocation profile. When a `ToolGrant` carries `dpop_required: Some(true)`, the kernel requires the agent to attach a fresh cryptographic proof with every invocation. The proof binds the call to the agent's keypair, the specific capability token, the target tool, and the exact arguments. Grants without `dpop_required: Some(true)` remain compatibility paths and should not be described as universally sender-constrained.
 
 ## When DPoP Is Required
 
@@ -17,14 +17,14 @@ pub struct ToolGrant {
 
 ## Proof Format
 
-A DPoP proof is an ARC-native structure using Ed25519 and RFC 8785 canonical
+A DPoP proof is an Chio-native structure using Ed25519 and RFC 8785 canonical
 JSON. It is not a JWT.
 
 ### DpopProofBody
 
 ```rust
 pub struct DpopProofBody {
-    pub schema: String,        // "arc.dpop_proof.v1" (compatibility schema alias accepted)
+    pub schema: String,        // "chio.dpop_proof.v1" (compatibility schema alias accepted)
     pub capability_id: String, // token ID of the capability being used
     pub tool_server: String,   // server_id of the target tool server
     pub tool_name: String,     // name of the tool being called
@@ -57,9 +57,9 @@ Each proof is bound to a single invocation by four fields:
 
 ## Verification Steps
 
-`verify_dpop_proof` in `arc-kernel` enforces six steps in order. The first failure returns an error and the invocation is denied.
+`verify_dpop_proof` in `chio-kernel` enforces six steps in order. The first failure returns an error and the invocation is denied.
 
-1. Schema check: `body.schema` must equal the current ARC DPoP schema or a
+1. Schema check: `body.schema` must equal the current Chio DPoP schema or a
    compatibility alias accepted by the verifier.
 2. Sender constraint: `body.agent_key` must equal `capability.subject` (the public key the token was issued to).
 3. Binding fields: `capability_id`, `tool_server`, `tool_name`, and `action_hash` must all match the kernel's expected values.
@@ -84,7 +84,7 @@ pub struct DpopConfig {
 ## Generating Proofs (Rust)
 
 ```rust
-use arc_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
 
 let body = DpopProofBody {
     schema: DPOP_SCHEMA.to_string(),
@@ -105,6 +105,6 @@ Attach `proof` to the `ToolCallRequest.dpop_proof` field before sending.
 ## Generating Proofs (TypeScript SDK)
 
 See `docs/SDK_TYPESCRIPT_REFERENCE.md` for the `signDpopProof` function. The
-TypeScript implementation now emits the ARC-primary schema identifier while
+TypeScript implementation now emits the Chio-primary schema identifier while
 remaining interoperable with verifiers that still accept legacy `arc.*`
 proofs.

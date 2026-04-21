@@ -13,7 +13,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-# ci-workspace remains the fast regression gate. The bounded ARC release lane
+# ci-workspace remains the fast regression gate. The bounded Chio release lane
 # is the ship-facing qualification boundary.
 ./scripts/ci-workspace.sh
 ./scripts/qualify-bounded-arc.sh
@@ -21,9 +21,9 @@ fi
 ./scripts/qualify-portable-browser.sh
 ./scripts/qualify-mobile-kernel.sh
 ./scripts/check-dashboard-release.sh
-./scripts/check-arc-ts-release.sh
-./scripts/check-arc-py-release.sh
-./scripts/check-arc-go-release.sh
+./scripts/check-chio-ts-release.sh
+./scripts/check-chio-py-release.sh
+./scripts/check-chio-go-release.sh
 
 output_root="target/release-qualification"
 conformance_root="${output_root}/conformance"
@@ -45,22 +45,22 @@ run_wave() {
   local certification_report_path="${wave_dir}/certification-report.md"
   local verification_path="${wave_dir}/certification-verify.json"
   mkdir -p "${wave_dir}/results"
-  cargo run -p arc-conformance --bin arc-conformance-runner -- \
+  cargo run -p chio-conformance --bin chio-conformance-runner -- \
     --scenarios-dir "${scenarios_dir}" \
     "$@" \
     --results-dir "${wave_dir}/results" \
     --report-output "${report_path}"
 
-  cargo run -p arc-cli --bin arc -- certify check \
+  cargo run -p chio-cli --bin arc -- certify check \
     --scenarios-dir "${scenarios_dir}" \
     --results-dir "${wave_dir}/results" \
     --output "${certification_path}" \
     --report-output "${certification_report_path}" \
-    --tool-server-id "arc-conformance-${wave}" \
-    --tool-server-name "ARC Conformance ${wave}" \
+    --tool-server-id "chio-conformance-${wave}" \
+    --tool-server-name "Chio Conformance ${wave}" \
     --signing-seed-file "${certify_seed}"
 
-  cargo run -p arc-cli --bin arc -- certify verify \
+  cargo run -p chio-cli --bin arc -- certify verify \
     --input "${certification_path}" >"${verification_path}"
 }
 
@@ -70,7 +70,7 @@ run_wave wave3 tests/conformance/scenarios/wave3 --auth-mode oauth-local
 run_wave wave4 tests/conformance/scenarios/wave4
 run_wave wave5 tests/conformance/scenarios/wave5
 
-cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
+cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
   | tee "${log_root}/trust-cluster-repeat-run.log"
 
 COVERAGE_FAIL_UNDER=65 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"

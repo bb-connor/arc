@@ -4,13 +4,13 @@
 
 use proptest::prelude::*;
 
-use arc_kernel_core::normalized::{
+use chio_kernel_core::normalized::{
     NormalizedConstraint, NormalizedMonetaryAmount, NormalizedOperation, NormalizedPromptGrant,
     NormalizedResourceGrant, NormalizedRuntimeAssuranceTier, NormalizedScope, NormalizedToolGrant,
 };
 
 use crate::spec::{
-    SpecArcScope, SpecConstraint, SpecMonetaryAmount, SpecOperation, SpecPromptGrant,
+    SpecChioScope, SpecConstraint, SpecMonetaryAmount, SpecOperation, SpecPromptGrant,
     SpecResourceGrant, SpecRuntimeAssuranceTier, SpecToolGrant,
 };
 
@@ -59,9 +59,9 @@ const DOMAINS: &[&str] = &[
 ];
 
 const RESOURCE_PATTERNS: &[&str] = &[
-    "arc://receipts/*",
-    "arc://receipts/session/*",
-    "arc://lineage/*",
+    "chio://receipts/*",
+    "chio://receipts/session/*",
+    "chio://lineage/*",
     "https://api.example.com/resources/*",
     "*",
 ];
@@ -234,13 +234,13 @@ pub fn arb_spec_prompt_grant() -> impl Strategy<Value = SpecPromptGrant> {
     )
 }
 
-pub fn arb_spec_scope() -> impl Strategy<Value = SpecArcScope> {
+pub fn arb_spec_scope() -> impl Strategy<Value = SpecChioScope> {
     (
         prop::collection::vec(arb_spec_tool_grant(), 0..8),
         prop::collection::vec(arb_spec_resource_grant(), 0..4),
         prop::collection::vec(arb_spec_prompt_grant(), 0..4),
     )
-        .prop_map(|(grants, resource_grants, prompt_grants)| SpecArcScope {
+        .prop_map(|(grants, resource_grants, prompt_grants)| SpecChioScope {
             grants,
             resource_grants,
             prompt_grants,
@@ -254,14 +254,14 @@ pub fn arb_spec_scope() -> impl Strategy<Value = SpecArcScope> {
 /// 2. Keeping the same operations per grant (narrowing is complex)
 /// 3. Optionally adding constraints
 /// 4. Optionally reducing budget
-pub fn arb_attenuated_scope_pair() -> impl Strategy<Value = (SpecArcScope, SpecArcScope)> {
+pub fn arb_attenuated_scope_pair() -> impl Strategy<Value = (SpecChioScope, SpecChioScope)> {
     arb_spec_scope().prop_flat_map(|parent| {
         let grants = parent.grants.clone();
         let len = grants.len();
         if len == 0 {
             return Just((
                 parent.clone(),
-                SpecArcScope {
+                SpecChioScope {
                     grants: vec![],
                     resource_grants: vec![],
                     prompt_grants: vec![],
@@ -333,7 +333,7 @@ pub fn arb_attenuated_scope_pair() -> impl Strategy<Value = (SpecArcScope, SpecA
                 move |child_grants| {
                     (
                         parent.clone(),
-                        SpecArcScope {
+                        SpecChioScope {
                             grants: child_grants,
                             resource_grants: vec![],
                             prompt_grants: vec![],
@@ -345,82 +345,82 @@ pub fn arb_attenuated_scope_pair() -> impl Strategy<Value = (SpecArcScope, SpecA
     })
 }
 
-pub fn arb_impl_operation() -> impl Strategy<Value = arc_core::capability::Operation> {
+pub fn arb_impl_operation() -> impl Strategy<Value = chio_core::capability::Operation> {
     prop_oneof![
-        Just(arc_core::capability::Operation::Invoke),
-        Just(arc_core::capability::Operation::ReadResult),
-        Just(arc_core::capability::Operation::Read),
-        Just(arc_core::capability::Operation::Subscribe),
-        Just(arc_core::capability::Operation::Get),
-        Just(arc_core::capability::Operation::Delegate),
+        Just(chio_core::capability::Operation::Invoke),
+        Just(chio_core::capability::Operation::ReadResult),
+        Just(chio_core::capability::Operation::Read),
+        Just(chio_core::capability::Operation::Subscribe),
+        Just(chio_core::capability::Operation::Get),
+        Just(chio_core::capability::Operation::Delegate),
     ]
 }
 
-pub fn arb_impl_tool_operations() -> impl Strategy<Value = Vec<arc_core::capability::Operation>> {
+pub fn arb_impl_tool_operations() -> impl Strategy<Value = Vec<chio_core::capability::Operation>> {
     (any::<bool>(), any::<bool>(), any::<bool>()).prop_map(|(invoke, read, delegate)| {
         let mut ops = Vec::new();
         if invoke || (!read && !delegate) {
-            ops.push(arc_core::capability::Operation::Invoke);
+            ops.push(chio_core::capability::Operation::Invoke);
         }
         if read {
-            ops.push(arc_core::capability::Operation::ReadResult);
+            ops.push(chio_core::capability::Operation::ReadResult);
         }
         if delegate {
-            ops.push(arc_core::capability::Operation::Delegate);
+            ops.push(chio_core::capability::Operation::Delegate);
         }
         ops
     })
 }
 
-pub fn arb_impl_resource_operations() -> impl Strategy<Value = Vec<arc_core::capability::Operation>>
+pub fn arb_impl_resource_operations() -> impl Strategy<Value = Vec<chio_core::capability::Operation>>
 {
     (any::<bool>(), any::<bool>()).prop_map(|(read, subscribe)| {
         let mut ops = Vec::new();
         if read || !subscribe {
-            ops.push(arc_core::capability::Operation::Read);
+            ops.push(chio_core::capability::Operation::Read);
         }
         if subscribe {
-            ops.push(arc_core::capability::Operation::Subscribe);
+            ops.push(chio_core::capability::Operation::Subscribe);
         }
         ops
     })
 }
 
-pub fn arb_impl_prompt_operations() -> impl Strategy<Value = Vec<arc_core::capability::Operation>> {
-    Just(vec![arc_core::capability::Operation::Get])
+pub fn arb_impl_prompt_operations() -> impl Strategy<Value = Vec<chio_core::capability::Operation>> {
+    Just(vec![chio_core::capability::Operation::Get])
 }
 
-pub fn arb_impl_constraint() -> impl Strategy<Value = arc_core::capability::Constraint> {
+pub fn arb_impl_constraint() -> impl Strategy<Value = chio_core::capability::Constraint> {
     prop_oneof![
         (0usize..PATH_PREFIXES.len())
-            .prop_map(|i| arc_core::capability::Constraint::PathPrefix(pool_path(i))),
+            .prop_map(|i| chio_core::capability::Constraint::PathPrefix(pool_path(i))),
         (0usize..DOMAINS.len())
-            .prop_map(|i| arc_core::capability::Constraint::DomainExact(pool_domain(i))),
+            .prop_map(|i| chio_core::capability::Constraint::DomainExact(pool_domain(i))),
         (0usize..DOMAINS.len())
-            .prop_map(|i| arc_core::capability::Constraint::DomainGlob(pool_domain(i))),
-        (1usize..4096).prop_map(arc_core::capability::Constraint::MaxLength),
-        (1usize..16_384).prop_map(arc_core::capability::Constraint::MaxArgsSize),
-        Just(arc_core::capability::Constraint::GovernedIntentRequired),
+            .prop_map(|i| chio_core::capability::Constraint::DomainGlob(pool_domain(i))),
+        (1usize..4096).prop_map(chio_core::capability::Constraint::MaxLength),
+        (1usize..16_384).prop_map(chio_core::capability::Constraint::MaxArgsSize),
+        Just(chio_core::capability::Constraint::GovernedIntentRequired),
         (1u64..10_000).prop_map(|threshold_units| {
-            arc_core::capability::Constraint::RequireApprovalAbove { threshold_units }
+            chio_core::capability::Constraint::RequireApprovalAbove { threshold_units }
         }),
         (0usize..DOMAINS.len())
-            .prop_map(|i| arc_core::capability::Constraint::SellerExact(pool_domain(i))),
+            .prop_map(|i| chio_core::capability::Constraint::SellerExact(pool_domain(i))),
         prop_oneof![
-            Just(arc_core::capability::RuntimeAssuranceTier::None),
-            Just(arc_core::capability::RuntimeAssuranceTier::Basic),
-            Just(arc_core::capability::RuntimeAssuranceTier::Attested),
-            Just(arc_core::capability::RuntimeAssuranceTier::Verified),
+            Just(chio_core::capability::RuntimeAssuranceTier::None),
+            Just(chio_core::capability::RuntimeAssuranceTier::Basic),
+            Just(chio_core::capability::RuntimeAssuranceTier::Attested),
+            Just(chio_core::capability::RuntimeAssuranceTier::Verified),
         ]
-        .prop_map(arc_core::capability::Constraint::MinimumRuntimeAssurance),
+        .prop_map(chio_core::capability::Constraint::MinimumRuntimeAssurance),
     ]
 }
 
-pub fn arb_impl_constraints() -> impl Strategy<Value = Vec<arc_core::capability::Constraint>> {
+pub fn arb_impl_constraints() -> impl Strategy<Value = Vec<chio_core::capability::Constraint>> {
     prop::collection::vec(arb_impl_constraint(), 0..4)
 }
 
-pub fn arb_impl_tool_grant() -> impl Strategy<Value = arc_core::capability::ToolGrant> {
+pub fn arb_impl_tool_grant() -> impl Strategy<Value = chio_core::capability::ToolGrant> {
     (
         0usize..SERVER_IDS.len(),
         0usize..TOOL_NAMES.len(),
@@ -430,7 +430,7 @@ pub fn arb_impl_tool_grant() -> impl Strategy<Value = arc_core::capability::Tool
         prop_oneof![
             Just(None),
             ((1u64..10_000), 0usize..CURRENCIES.len()).prop_map(|(units, currency_idx)| {
-                Some(arc_core::capability::MonetaryAmount {
+                Some(chio_core::capability::MonetaryAmount {
                     units,
                     currency: pool_currency(currency_idx),
                 })
@@ -439,7 +439,7 @@ pub fn arb_impl_tool_grant() -> impl Strategy<Value = arc_core::capability::Tool
         prop_oneof![
             Just(None),
             ((1u64..10_000), 0usize..CURRENCIES.len()).prop_map(|(units, currency_idx)| {
-                Some(arc_core::capability::MonetaryAmount {
+                Some(chio_core::capability::MonetaryAmount {
                     units,
                     currency: pool_currency(currency_idx),
                 })
@@ -458,7 +458,7 @@ pub fn arb_impl_tool_grant() -> impl Strategy<Value = arc_core::capability::Tool
                 max_total_cost,
                 dpop_required,
             )| {
-                arc_core::capability::ToolGrant {
+                chio_core::capability::ToolGrant {
                     server_id: pool_server(server_idx),
                     tool_name: pool_tool(tool_idx),
                     operations,
@@ -472,14 +472,14 @@ pub fn arb_impl_tool_grant() -> impl Strategy<Value = arc_core::capability::Tool
         )
 }
 
-pub fn arb_impl_scope() -> impl Strategy<Value = arc_core::capability::ArcScope> {
+pub fn arb_impl_scope() -> impl Strategy<Value = chio_core::capability::ChioScope> {
     (
         prop::collection::vec(arb_impl_tool_grant(), 0..8),
         prop::collection::vec(arb_impl_resource_grant(), 0..4),
         prop::collection::vec(arb_impl_prompt_grant(), 0..4),
     )
         .prop_map(
-            |(grants, resource_grants, prompt_grants)| arc_core::capability::ArcScope {
+            |(grants, resource_grants, prompt_grants)| chio_core::capability::ChioScope {
                 grants,
                 resource_grants,
                 prompt_grants,
@@ -487,50 +487,50 @@ pub fn arb_impl_scope() -> impl Strategy<Value = arc_core::capability::ArcScope>
         )
 }
 
-fn spec_op_to_impl(op: &SpecOperation) -> arc_core::capability::Operation {
+fn spec_op_to_impl(op: &SpecOperation) -> chio_core::capability::Operation {
     match op {
-        SpecOperation::Invoke => arc_core::capability::Operation::Invoke,
-        SpecOperation::ReadResult => arc_core::capability::Operation::ReadResult,
-        SpecOperation::Read => arc_core::capability::Operation::Read,
-        SpecOperation::Subscribe => arc_core::capability::Operation::Subscribe,
-        SpecOperation::Get => arc_core::capability::Operation::Get,
-        SpecOperation::Delegate => arc_core::capability::Operation::Delegate,
+        SpecOperation::Invoke => chio_core::capability::Operation::Invoke,
+        SpecOperation::ReadResult => chio_core::capability::Operation::ReadResult,
+        SpecOperation::Read => chio_core::capability::Operation::Read,
+        SpecOperation::Subscribe => chio_core::capability::Operation::Subscribe,
+        SpecOperation::Get => chio_core::capability::Operation::Get,
+        SpecOperation::Delegate => chio_core::capability::Operation::Delegate,
     }
 }
 
-fn spec_constraint_to_impl(c: &SpecConstraint) -> arc_core::capability::Constraint {
+fn spec_constraint_to_impl(c: &SpecConstraint) -> chio_core::capability::Constraint {
     match c {
-        SpecConstraint::PathPrefix(s) => arc_core::capability::Constraint::PathPrefix(s.clone()),
-        SpecConstraint::DomainExact(s) => arc_core::capability::Constraint::DomainExact(s.clone()),
-        SpecConstraint::DomainGlob(s) => arc_core::capability::Constraint::DomainGlob(s.clone()),
-        SpecConstraint::RegexMatch(s) => arc_core::capability::Constraint::RegexMatch(s.clone()),
-        SpecConstraint::MaxLength(n) => arc_core::capability::Constraint::MaxLength(*n),
-        SpecConstraint::MaxArgsSize(n) => arc_core::capability::Constraint::MaxArgsSize(*n),
+        SpecConstraint::PathPrefix(s) => chio_core::capability::Constraint::PathPrefix(s.clone()),
+        SpecConstraint::DomainExact(s) => chio_core::capability::Constraint::DomainExact(s.clone()),
+        SpecConstraint::DomainGlob(s) => chio_core::capability::Constraint::DomainGlob(s.clone()),
+        SpecConstraint::RegexMatch(s) => chio_core::capability::Constraint::RegexMatch(s.clone()),
+        SpecConstraint::MaxLength(n) => chio_core::capability::Constraint::MaxLength(*n),
+        SpecConstraint::MaxArgsSize(n) => chio_core::capability::Constraint::MaxArgsSize(*n),
         SpecConstraint::GovernedIntentRequired => {
-            arc_core::capability::Constraint::GovernedIntentRequired
+            chio_core::capability::Constraint::GovernedIntentRequired
         }
         SpecConstraint::RequireApprovalAbove { threshold_units } => {
-            arc_core::capability::Constraint::RequireApprovalAbove {
+            chio_core::capability::Constraint::RequireApprovalAbove {
                 threshold_units: *threshold_units,
             }
         }
-        SpecConstraint::SellerExact(s) => arc_core::capability::Constraint::SellerExact(s.clone()),
+        SpecConstraint::SellerExact(s) => chio_core::capability::Constraint::SellerExact(s.clone()),
         SpecConstraint::MinimumRuntimeAssurance(tier) => {
-            arc_core::capability::Constraint::MinimumRuntimeAssurance(match tier {
-                SpecRuntimeAssuranceTier::None => arc_core::capability::RuntimeAssuranceTier::None,
+            chio_core::capability::Constraint::MinimumRuntimeAssurance(match tier {
+                SpecRuntimeAssuranceTier::None => chio_core::capability::RuntimeAssuranceTier::None,
                 SpecRuntimeAssuranceTier::Basic => {
-                    arc_core::capability::RuntimeAssuranceTier::Basic
+                    chio_core::capability::RuntimeAssuranceTier::Basic
                 }
                 SpecRuntimeAssuranceTier::Attested => {
-                    arc_core::capability::RuntimeAssuranceTier::Attested
+                    chio_core::capability::RuntimeAssuranceTier::Attested
                 }
                 SpecRuntimeAssuranceTier::Verified => {
-                    arc_core::capability::RuntimeAssuranceTier::Verified
+                    chio_core::capability::RuntimeAssuranceTier::Verified
                 }
             })
         }
         SpecConstraint::Custom(k, v) => {
-            arc_core::capability::Constraint::Custom(k.clone(), v.clone())
+            chio_core::capability::Constraint::Custom(k.clone(), v.clone())
         }
     }
 }
@@ -573,21 +573,21 @@ fn spec_constraint_to_normalized(c: &SpecConstraint) -> NormalizedConstraint {
     }
 }
 
-fn spec_grant_to_impl(g: &SpecToolGrant) -> arc_core::capability::ToolGrant {
-    arc_core::capability::ToolGrant {
+fn spec_grant_to_impl(g: &SpecToolGrant) -> chio_core::capability::ToolGrant {
+    chio_core::capability::ToolGrant {
         server_id: g.server_id.clone(),
         tool_name: g.tool_name.clone(),
         operations: g.operations.iter().map(spec_op_to_impl).collect(),
         constraints: g.constraints.iter().map(spec_constraint_to_impl).collect(),
         max_invocations: g.max_invocations,
         max_cost_per_invocation: g.max_cost_per_invocation.as_ref().map(|amount| {
-            arc_core::capability::MonetaryAmount {
+            chio_core::capability::MonetaryAmount {
                 units: amount.units,
                 currency: amount.currency.clone(),
             }
         }),
         max_total_cost: g.max_total_cost.as_ref().map(|amount| {
-            arc_core::capability::MonetaryAmount {
+            chio_core::capability::MonetaryAmount {
                 units: amount.units,
                 currency: amount.currency.clone(),
             }
@@ -624,8 +624,8 @@ pub fn spec_grant_to_normalized(g: &SpecToolGrant) -> NormalizedToolGrant {
     }
 }
 
-fn spec_resource_grant_to_impl(g: &SpecResourceGrant) -> arc_core::capability::ResourceGrant {
-    arc_core::capability::ResourceGrant {
+fn spec_resource_grant_to_impl(g: &SpecResourceGrant) -> chio_core::capability::ResourceGrant {
+    chio_core::capability::ResourceGrant {
         uri_pattern: g.uri_pattern.clone(),
         operations: g.operations.iter().map(spec_op_to_impl).collect(),
     }
@@ -638,8 +638,8 @@ pub fn spec_resource_grant_to_normalized(g: &SpecResourceGrant) -> NormalizedRes
     }
 }
 
-fn spec_prompt_grant_to_impl(g: &SpecPromptGrant) -> arc_core::capability::PromptGrant {
-    arc_core::capability::PromptGrant {
+fn spec_prompt_grant_to_impl(g: &SpecPromptGrant) -> chio_core::capability::PromptGrant {
+    chio_core::capability::PromptGrant {
         prompt_name: g.prompt_name.clone(),
         operations: g.operations.iter().map(spec_op_to_impl).collect(),
     }
@@ -652,8 +652,8 @@ pub fn spec_prompt_grant_to_normalized(g: &SpecPromptGrant) -> NormalizedPromptG
     }
 }
 
-fn spec_scope_to_impl(s: &SpecArcScope) -> arc_core::capability::ArcScope {
-    arc_core::capability::ArcScope {
+fn spec_scope_to_impl(s: &SpecChioScope) -> chio_core::capability::ChioScope {
+    chio_core::capability::ChioScope {
         grants: s.grants.iter().map(spec_grant_to_impl).collect(),
         resource_grants: s
             .resource_grants
@@ -668,7 +668,7 @@ fn spec_scope_to_impl(s: &SpecArcScope) -> arc_core::capability::ArcScope {
     }
 }
 
-pub fn spec_scope_to_normalized(s: &SpecArcScope) -> NormalizedScope {
+pub fn spec_scope_to_normalized(s: &SpecChioScope) -> NormalizedScope {
     NormalizedScope {
         grants: s.grants.iter().map(spec_grant_to_normalized).collect(),
         resource_grants: s
@@ -685,7 +685,7 @@ pub fn spec_scope_to_normalized(s: &SpecArcScope) -> NormalizedScope {
 }
 
 /// Generate paired (spec, impl) scopes from the same random seed.
-pub fn arb_paired_scope() -> impl Strategy<Value = (SpecArcScope, arc_core::capability::ArcScope)> {
+pub fn arb_paired_scope() -> impl Strategy<Value = (SpecChioScope, chio_core::capability::ChioScope)> {
     arb_spec_scope().prop_map(|spec| {
         let impl_scope = spec_scope_to_impl(&spec);
         (spec, impl_scope)
@@ -693,7 +693,7 @@ pub fn arb_paired_scope() -> impl Strategy<Value = (SpecArcScope, arc_core::capa
 }
 
 /// Generate paired (spec, normalized) scopes by normalizing production structs.
-pub fn arb_paired_normalized_scope() -> impl Strategy<Value = (SpecArcScope, NormalizedScope)> {
+pub fn arb_paired_normalized_scope() -> impl Strategy<Value = (SpecChioScope, NormalizedScope)> {
     arb_spec_scope().prop_map(|spec| {
         let impl_scope = spec_scope_to_impl(&spec);
         let normalized =
@@ -705,8 +705,8 @@ pub fn arb_paired_normalized_scope() -> impl Strategy<Value = (SpecArcScope, Nor
 /// Generate paired (spec, impl) scope pairs for subset testing.
 pub fn arb_paired_scope_pair() -> impl Strategy<
     Value = (
-        (SpecArcScope, arc_core::capability::ArcScope),
-        (SpecArcScope, arc_core::capability::ArcScope),
+        (SpecChioScope, chio_core::capability::ChioScope),
+        (SpecChioScope, chio_core::capability::ChioScope),
     ),
 > {
     (arb_spec_scope(), arb_spec_scope()).prop_map(|(spec_a, spec_b)| {
@@ -719,8 +719,8 @@ pub fn arb_paired_scope_pair() -> impl Strategy<
 /// Generate paired (spec, normalized) scope pairs for subset testing.
 pub fn arb_paired_normalized_scope_pair() -> impl Strategy<
     Value = (
-        (SpecArcScope, NormalizedScope),
-        (SpecArcScope, NormalizedScope),
+        (SpecChioScope, NormalizedScope),
+        (SpecChioScope, NormalizedScope),
     ),
 > {
     (arb_spec_scope(), arb_spec_scope()).prop_map(|(spec_a, spec_b)| {
@@ -735,7 +735,7 @@ pub fn arb_paired_normalized_scope_pair() -> impl Strategy<
 }
 
 /// Generate paired (spec, impl) tool grants from the same seed.
-pub fn arb_paired_grant() -> impl Strategy<Value = (SpecToolGrant, arc_core::capability::ToolGrant)>
+pub fn arb_paired_grant() -> impl Strategy<Value = (SpecToolGrant, chio_core::capability::ToolGrant)>
 {
     arb_spec_tool_grant().prop_map(|spec| {
         let impl_grant = spec_grant_to_impl(&spec);
@@ -753,26 +753,26 @@ pub fn arb_paired_normalized_grant() -> impl Strategy<Value = (SpecToolGrant, No
     })
 }
 
-fn spec_resource_to_impl(grant: &SpecResourceGrant) -> arc_core::capability::ResourceGrant {
+fn spec_resource_to_impl(grant: &SpecResourceGrant) -> chio_core::capability::ResourceGrant {
     spec_resource_grant_to_impl(grant)
 }
 
-pub fn arb_impl_resource_grant() -> impl Strategy<Value = arc_core::capability::ResourceGrant> {
+pub fn arb_impl_resource_grant() -> impl Strategy<Value = chio_core::capability::ResourceGrant> {
     (
         0usize..RESOURCE_PATTERNS.len(),
         arb_impl_resource_operations(),
     )
         .prop_map(
-            |(pattern_idx, operations)| arc_core::capability::ResourceGrant {
+            |(pattern_idx, operations)| chio_core::capability::ResourceGrant {
                 uri_pattern: pool_resource_pattern(pattern_idx),
                 operations,
             },
         )
 }
 
-pub fn arb_impl_prompt_grant() -> impl Strategy<Value = arc_core::capability::PromptGrant> {
+pub fn arb_impl_prompt_grant() -> impl Strategy<Value = chio_core::capability::PromptGrant> {
     (0usize..PROMPT_NAMES.len(), arb_impl_prompt_operations()).prop_map(
-        |(prompt_idx, operations)| arc_core::capability::PromptGrant {
+        |(prompt_idx, operations)| chio_core::capability::PromptGrant {
             prompt_name: pool_prompt_name(prompt_idx),
             operations,
         },
@@ -780,7 +780,7 @@ pub fn arb_impl_prompt_grant() -> impl Strategy<Value = arc_core::capability::Pr
 }
 
 pub fn arb_paired_resource_grant(
-) -> impl Strategy<Value = (SpecResourceGrant, arc_core::capability::ResourceGrant)> {
+) -> impl Strategy<Value = (SpecResourceGrant, chio_core::capability::ResourceGrant)> {
     arb_spec_resource_grant().prop_map(|spec| {
         let impl_grant = spec_resource_to_impl(&spec);
         (spec, impl_grant)
@@ -797,7 +797,7 @@ pub fn arb_paired_normalized_resource_grant(
 }
 
 pub fn arb_paired_prompt_grant(
-) -> impl Strategy<Value = (SpecPromptGrant, arc_core::capability::PromptGrant)> {
+) -> impl Strategy<Value = (SpecPromptGrant, chio_core::capability::PromptGrant)> {
     arb_spec_prompt_grant().prop_map(|spec| {
         let impl_grant = spec_prompt_grant_to_impl(&spec);
         (spec, impl_grant)

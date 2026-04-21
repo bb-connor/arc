@@ -1,10 +1,10 @@
 import Fastify from "fastify";
-import { arc } from "@arc-protocol/fastify";
+import { arc } from "@chio-protocol/fastify";
 
 const fastify = Fastify({ logger: false });
 
 await fastify.register(arc, {
-  sidecarUrl: process.env["ARC_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
+  sidecarUrl: process.env["CHIO_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
   skip: ["/healthz"],
 });
 

@@ -6,11 +6,11 @@ import logging
 import os
 from typing import Any
 
-from incident_network.arc import ArcMcpClient, StdioMcpClient
+from incident_network.arc import ChioMcpClient, StdioMcpClient
 
 log = logging.getLogger("incident-network")
 
-McpClient = ArcMcpClient | StdioMcpClient
+McpClient = ChioMcpClient | StdioMcpClient
 
 # -- System prompts -----------------------------------------------------------
 

@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	arcapi "github.com/backbay/arc-k8s-controller/internal/arc"
+	chioapi "github.com/backbay/chio-k8s-controller/internal/chio"
 )
 
 func newScheme(t *testing.T) *runtime.Scheme {
@@ -40,9 +40,9 @@ func newScheme(t *testing.T) *runtime.Scheme {
 	return s
 }
 
-// stubArcClient is an in-memory implementation of the ArcClient interface
+// stubChioClient is an in-memory implementation of the ChioClient interface
 // used for unit tests. It records calls and can be configured to fail.
-type stubArcClient struct {
+type stubChioClient struct {
 	mu            sync.Mutex
 	mintCalls     int
 	releaseCalls  int
@@ -50,14 +50,14 @@ type stubArcClient struct {
 	mintErr       error
 	releaseErr    error
 	receiptErr    error
-	lastMint      arcapi.MintRequest
-	lastRelease   arcapi.ReleaseRequest
-	lastReceipt   arcapi.JobReceipt
+	lastMint      chioapi.MintRequest
+	lastRelease   chioapi.ReleaseRequest
+	lastReceipt   chioapi.JobReceipt
 	nextCapID     string
 	nextReceiptID string
 }
 
-func (s *stubArcClient) Mint(_ context.Context, req arcapi.MintRequest) (*arcapi.CapabilityToken, error) {
+func (s *stubChioClient) Mint(_ context.Context, req chioapi.MintRequest) (*chioapi.CapabilityToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.mintCalls++
@@ -69,7 +69,7 @@ func (s *stubArcClient) Mint(_ context.Context, req arcapi.MintRequest) (*arcapi
 	if id == "" {
 		id = fmt.Sprintf("cap-%d", s.mintCalls)
 	}
-	return &arcapi.CapabilityToken{
+	return &chioapi.CapabilityToken{
 		ID:        id,
 		Token:     "token-" + id,
 		Issuer:    "issuer-test",
@@ -80,7 +80,7 @@ func (s *stubArcClient) Mint(_ context.Context, req arcapi.MintRequest) (*arcapi
 	}, nil
 }
 
-func (s *stubArcClient) Release(_ context.Context, req arcapi.ReleaseRequest) error {
+func (s *stubChioClient) Release(_ context.Context, req chioapi.ReleaseRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.releaseCalls++
@@ -88,7 +88,7 @@ func (s *stubArcClient) Release(_ context.Context, req arcapi.ReleaseRequest) er
 	return s.releaseErr
 }
 
-func (s *stubArcClient) SubmitReceipt(_ context.Context, receipt arcapi.JobReceipt) (string, error) {
+func (s *stubChioClient) SubmitReceipt(_ context.Context, receipt chioapi.JobReceipt) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.receiptCalls++
@@ -103,7 +103,7 @@ func (s *stubArcClient) SubmitReceipt(_ context.Context, receipt arcapi.JobRecei
 	return id, nil
 }
 
-func (s *stubArcClient) counts() (mint, release, receipt int) {
+func (s *stubChioClient) counts() (mint, release, receipt int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.mintCalls, s.releaseCalls, s.receiptCalls
@@ -191,7 +191,7 @@ func reconcileUntilStable(t *testing.T, r *JobReconciler, key types.NamespacedNa
 	t.Fatalf("reconcile did not stabilize")
 }
 
-func buildReconciler(t *testing.T, arc *stubArcClient, objs ...client.Object) (*JobReconciler, client.Client) {
+func buildReconciler(t *testing.T, arc *stubChioClient, objs ...client.Object) (*JobReconciler, client.Client) {
 	t.Helper()
 	s := newScheme(t)
 	c := fake.NewClientBuilder().
@@ -207,7 +207,7 @@ func buildReconciler(t *testing.T, arc *stubArcClient, objs ...client.Object) (*
 
 // Test (a): governed Job at creation mints a grant.
 func TestReconcile_NewGovernedJob_MintsGrant(t *testing.T) {
-	arc := &stubArcClient{nextCapID: "cap-abc"}
+	arc := &stubChioClient{nextCapID: "cap-abc"}
 	job := governedJob()
 	r, c := buildReconciler(t, arc, job)
 	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
@@ -225,8 +225,8 @@ func TestReconcile_NewGovernedJob_MintsGrant(t *testing.T) {
 	if got.Annotations[AnnotationCapabilityToken] != "" {
 		t.Fatalf("expected no top-level capability-token annotation, got %q", got.Annotations[AnnotationCapabilityToken])
 	}
-	if got.Spec.Template.Annotations["arc.protocol/capability-token"] != "token-cap-abc" {
-		t.Fatalf("expected pod-template capability-token annotation, got %q", got.Spec.Template.Annotations["arc.protocol/capability-token"])
+	if got.Spec.Template.Annotations["chio.protocol/capability-token"] != "token-cap-abc" {
+		t.Fatalf("expected pod-template capability-token annotation, got %q", got.Spec.Template.Annotations["chio.protocol/capability-token"])
 	}
 	if _, err := time.Parse(time.RFC3339, got.Annotations[AnnotationCapabilityExpiresAt]); err != nil {
 		t.Fatalf("invalid expires-at annotation %q: %v", got.Annotations[AnnotationCapabilityExpiresAt], err)
@@ -249,7 +249,7 @@ func TestReconcile_NewGovernedJob_MintsGrant(t *testing.T) {
 
 // Test (b): completed governed Job releases grant and emits receipt.
 func TestReconcile_CompletedJob_ReleasesAndEmitsReceipt(t *testing.T) {
-	arc := &stubArcClient{nextCapID: "cap-ok", nextReceiptID: "rcpt-ok"}
+	arc := &stubChioClient{nextCapID: "cap-ok", nextReceiptID: "rcpt-ok"}
 	job := governedJob()
 	// Pre-set: the mint has already happened.
 	job.Annotations[AnnotationCapabilityID] = "cap-ok"
@@ -311,7 +311,7 @@ func TestReconcile_CompletedJob_ReleasesAndEmitsReceipt(t *testing.T) {
 // Test (c): failed governed Job releases grant and emits receipt with
 // outcome=failed.
 func TestReconcile_FailedJob_ReleasesAndEmitsReceipt(t *testing.T) {
-	arc := &stubArcClient{}
+	arc := &stubChioClient{}
 	job := governedJob()
 	job.Annotations[AnnotationCapabilityID] = "cap-fail"
 	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-fail"}
@@ -343,7 +343,7 @@ func TestReconcile_FailedJob_ReleasesAndEmitsReceipt(t *testing.T) {
 }
 
 func TestReconcile_JobSuccessCriteriaMet_WaitsForJobComplete(t *testing.T) {
-	arc := &stubArcClient{}
+	arc := &stubChioClient{}
 	job := jobWithSuccessCriteriaMet(governedJob())
 	job.Annotations[AnnotationCapabilityID] = "cap-pending-success"
 	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-pending-success"}
@@ -383,7 +383,7 @@ func TestReconcile_JobSuccessCriteriaMet_WaitsForJobComplete(t *testing.T) {
 
 // Test (d): Jobs without the governed label are ignored entirely.
 func TestReconcile_UngovernedJob_Ignored(t *testing.T) {
-	arc := &stubArcClient{}
+	arc := &stubChioClient{}
 	job := ungovernedJob()
 	r, c := buildReconciler(t, arc, job)
 	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
@@ -417,7 +417,7 @@ func TestReconcile_UngovernedJob_Ignored(t *testing.T) {
 
 // Fail-closed: if sidecar is unreachable during mint, requeue, don't proceed.
 func TestReconcile_SidecarUnreachable_Requeues(t *testing.T) {
-	arc := &stubArcClient{mintErr: fmt.Errorf("%w: connection refused", arcapi.ErrSidecarUnreachable)}
+	arc := &stubChioClient{mintErr: fmt.Errorf("%w: connection refused", chioapi.ErrSidecarUnreachable)}
 	job := governedJob()
 	r, c := buildReconciler(t, arc, job)
 	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
@@ -450,7 +450,7 @@ func TestReconcile_SidecarUnreachable_Requeues(t *testing.T) {
 }
 
 func TestReconcile_DeleteReleaseLogicalError_KeepsFinalizer(t *testing.T) {
-	arc := &stubArcClient{releaseErr: fmt.Errorf("arc: http://sidecar/v1/capabilities/release returned 400: bad request")}
+	arc := &stubChioClient{releaseErr: fmt.Errorf("arc: http://sidecar/v1/capabilities/release returned 400: bad request")}
 	job := governedJob()
 	job.Annotations[AnnotationCapabilityID] = "cap-delete"
 	job.Finalizers = []string{FinalizerName}
@@ -491,7 +491,7 @@ func TestReconcile_DeleteReleaseLogicalError_KeepsFinalizer(t *testing.T) {
 // Idempotency: reconciling a completed job twice must not cause duplicate
 // release or receipt submission.
 func TestReconcile_Idempotent(t *testing.T) {
-	arc := &stubArcClient{}
+	arc := &stubChioClient{}
 	job := completedJob(governedJob())
 	job.Annotations[AnnotationCapabilityID] = "cap-idem"
 	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-idem"}
@@ -518,18 +518,18 @@ func TestReconcile_Idempotent(t *testing.T) {
 }
 
 // Integration-ish test: drive the real arc.Client against an httptest server.
-func TestArcClient_EndToEndViaHTTPStub(t *testing.T) {
+func TestChioClient_EndToEndViaHTTPStub(t *testing.T) {
 	var mintCount, releaseCount, receiptCount int32
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/capabilities/mint", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&mintCount, 1)
-		var req arcapi.MintRequest
+		var req chioapi.MintRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		resp := arcapi.MintResponse{Capability: arcapi.CapabilityToken{
+		resp := chioapi.MintResponse{Capability: chioapi.CapabilityToken{
 			ID:        "server-cap",
 			Issuer:    "issuer-server",
 			Subject:   req.Subject,
@@ -542,29 +542,29 @@ func TestArcClient_EndToEndViaHTTPStub(t *testing.T) {
 	})
 	mux.HandleFunc("/v1/capabilities/release", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&releaseCount, 1)
-		_ = json.NewEncoder(w).Encode(arcapi.ReleaseResponse{Released: true})
+		_ = json.NewEncoder(w).Encode(chioapi.ReleaseResponse{Released: true})
 	})
 	mux.HandleFunc("/v1/receipts", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&receiptCount, 1)
-		_ = json.NewEncoder(w).Encode(arcapi.SubmitReceiptResponse{ReceiptID: "rcpt-server", Accepted: true})
+		_ = json.NewEncoder(w).Encode(chioapi.SubmitReceiptResponse{ReceiptID: "rcpt-server", Accepted: true})
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	client := arcapi.NewClient(srv.URL, "", srv.Client())
+	client := chioapi.NewClient(srv.URL, "", srv.Client())
 
 	ctx := context.Background()
-	cap, err := client.Mint(ctx, arcapi.MintRequest{Subject: "job/default/demo", Scopes: []string{"tools:search"}, JobUID: "u"})
+	cap, err := client.Mint(ctx, chioapi.MintRequest{Subject: "job/default/demo", Scopes: []string{"tools:search"}, JobUID: "u"})
 	if err != nil {
 		t.Fatalf("mint: %v", err)
 	}
 	if cap.ID != "server-cap" {
 		t.Fatalf("unexpected cap id: %q", cap.ID)
 	}
-	if err := client.Release(ctx, arcapi.ReleaseRequest{CapabilityID: cap.ID, JobUID: "u", Reason: "succeeded"}); err != nil {
+	if err := client.Release(ctx, chioapi.ReleaseRequest{CapabilityID: cap.ID, JobUID: "u", Reason: "succeeded"}); err != nil {
 		t.Fatalf("release: %v", err)
 	}
-	rid, err := client.SubmitReceipt(ctx, arcapi.JobReceipt{JobName: "demo", Namespace: "default", JobUID: "u", Outcome: "succeeded"})
+	rid, err := client.SubmitReceipt(ctx, chioapi.JobReceipt{JobName: "demo", Namespace: "default", JobUID: "u", Outcome: "succeeded"})
 	if err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
@@ -578,13 +578,13 @@ func TestArcClient_EndToEndViaHTTPStub(t *testing.T) {
 }
 
 // 5xx responses from the sidecar should be reported as ErrSidecarUnreachable.
-func TestArcClient_ServerError_IsUnreachable(t *testing.T) {
+func TestChioClient_ServerError_IsUnreachable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	client := arcapi.NewClient(srv.URL, "", srv.Client())
-	_, err := client.Mint(context.Background(), arcapi.MintRequest{Subject: "job/x/y", JobUID: "u"})
+	client := chioapi.NewClient(srv.URL, "", srv.Client())
+	_, err := client.Mint(context.Background(), chioapi.MintRequest{Subject: "job/x/y", JobUID: "u"})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -593,12 +593,12 @@ func TestArcClient_ServerError_IsUnreachable(t *testing.T) {
 	}
 }
 
-func TestArcClient_SendsControlBearerToken(t *testing.T) {
+func TestChioClient_SendsControlBearerToken(t *testing.T) {
 	var authHeader string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader = r.Header.Get("Authorization")
-		resp := arcapi.MintResponse{Capability: arcapi.CapabilityToken{
+		resp := chioapi.MintResponse{Capability: chioapi.CapabilityToken{
 			ID:        "server-cap",
 			Issuer:    "issuer-server",
 			Subject:   "job/default/demo",
@@ -611,10 +611,10 @@ func TestArcClient_SendsControlBearerToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := arcapi.NewClient(srv.URL, "cluster-control-token", srv.Client())
+	client := chioapi.NewClient(srv.URL, "cluster-control-token", srv.Client())
 	if _, err := client.Mint(
 		context.Background(),
-		arcapi.MintRequest{Subject: "job/default/demo", JobUID: "u"},
+		chioapi.MintRequest{Subject: "job/default/demo", JobUID: "u"},
 	); err != nil {
 		t.Fatalf("mint: %v", err)
 	}
@@ -625,7 +625,7 @@ func TestArcClient_SendsControlBearerToken(t *testing.T) {
 
 // Receipt aggregation: backoff grows with retries.
 func TestBackoff_GrowsExponentially(t *testing.T) {
-	arc := &stubArcClient{}
+	arc := &stubChioClient{}
 	r, _ := buildReconciler(t, arc)
 	r.Retry = RetryPolicy{BaseDelay: 1 * time.Millisecond, MaxDelay: 16 * time.Millisecond, MaxAttempts: 5}
 
@@ -657,7 +657,7 @@ func containsFinalizer(job *batchv1.Job, name string) bool {
 }
 
 func isUnreachable(err error) bool {
-	return err != nil && (err == arcapi.ErrSidecarUnreachable || errorsIs(err, arcapi.ErrSidecarUnreachable))
+	return err != nil && (err == chioapi.ErrSidecarUnreachable || errorsIs(err, chioapi.ErrSidecarUnreachable))
 }
 
 // errorsIs is a local wrapper so test code compiles without re-importing

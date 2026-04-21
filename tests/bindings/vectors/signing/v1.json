@@ -1,5 +1,5 @@
 {
-  "generated_by": "arc-bindings-core",
+  "generated_by": "chio-bindings-core",
   "json_cases": [
     {
       "canonical_json": "{\"a\":2,\"z\":1}",

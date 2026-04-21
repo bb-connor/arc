@@ -11,7 +11,7 @@ const contractsDir = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(contractsDir, "..");
 const artifactsDir = path.join(contractsDir, "artifacts");
 
-const LOCAL_PORT = Number(process.env.ARC_PROMOTION_DEVNET_PORT ?? "8551");
+const LOCAL_PORT = Number(process.env.CHIO_PROMOTION_DEVNET_PORT ?? "8551");
 const LOCAL_RPC_URL = `http://127.0.0.1:${LOCAL_PORT}`;
 const LOCAL_CHAIN_ID = 31337;
 const USDC_UNITS = 10n ** 6n;
@@ -230,7 +230,7 @@ function resolveValue(token, state) {
 
 function deploymentReportSkeleton({ manifest, manifestHash, approval, approvalHash, environment }) {
   return {
-    report_id: `arc.web3-deployment-promotion.${environment}.v1`,
+    report_id: `chio.web3-deployment-promotion.${environment}.v1`,
     generated_at: new Date().toISOString(),
     environment,
     status: "pending",
@@ -246,7 +246,7 @@ function deploymentReportSkeleton({ manifest, manifestHash, approval, approvalHa
 
 function rollbackPlanSkeleton({ manifest, approval, environment }) {
   return {
-    plan_id: `arc.web3-rollback-plan.${environment}.v1`,
+    plan_id: `chio.web3-rollback-plan.${environment}.v1`,
     generated_at: new Date().toISOString(),
     environment,
     manifest_id: manifest.manifest_id,
@@ -309,8 +309,8 @@ async function main() {
   ensureDir(outputDir);
   const manifest = readJson(manifestPath);
   const approval = readJson(approvalPath);
-  const contractRelease = readJson(path.join(contractsDir, "release", "ARC_WEB3_CONTRACT_RELEASE.json"));
-  const deploymentPolicy = readJson(path.join(repoRoot, "docs", "standards", "ARC_WEB3_DEPLOYMENT_POLICY.json"));
+  const contractRelease = readJson(path.join(contractsDir, "release", "CHIO_WEB3_CONTRACT_RELEASE.json"));
+  const deploymentPolicy = readJson(path.join(repoRoot, "docs", "standards", "CHIO_WEB3_DEPLOYMENT_POLICY.json"));
   const manifestHash = sha256File(manifestPath);
   const approvalHash = sha256File(approvalPath);
   const environment = localDevnet ? "local-devnet" : approval.environment ?? "operator-rollout";
@@ -388,7 +388,7 @@ async function main() {
       throw new Error(`manifest chain id ${manifest.chain_id} does not match target chain eip155:${network.chainId}`);
     }
 
-    const factoryArtifact = readArtifact("contracts/artifacts/mocks/ArcCreate2Factory.json");
+    const factoryArtifact = readArtifact("contracts/artifacts/mocks/ChioCreate2Factory.json");
     let create2FactoryAddress = approval.create2?.factory_address ?? null;
     let create2Factory;
 
@@ -446,7 +446,7 @@ async function main() {
         init_code: initCode
       });
 
-      const placeholderKey = contract.contract_id.replace("arc.", "").replaceAll("-", "_");
+      const placeholderKey = contract.contract_id.replace("chio.", "").replaceAll("-", "_");
       state.contractAddresses[`${placeholderKey}_address`] = plannedAddress;
       state.contractAddresses[`${placeholderKey}`] = plannedAddress;
     }
@@ -476,22 +476,22 @@ async function main() {
       state.deploymentPlan.map((plan) => [plan.contract_id, plan.planned_address])
     );
 
-    const identityRegistryArtifact = readArtifact("contracts/artifacts/ArcIdentityRegistry.json");
-    const rootRegistryArtifact = readArtifact("contracts/artifacts/ArcRootRegistry.json");
-    const priceResolverArtifact = readArtifact("contracts/artifacts/ArcPriceResolver.json");
+    const identityRegistryArtifact = readArtifact("contracts/artifacts/ChioIdentityRegistry.json");
+    const rootRegistryArtifact = readArtifact("contracts/artifacts/ChioRootRegistry.json");
+    const priceResolverArtifact = readArtifact("contracts/artifacts/ChioPriceResolver.json");
 
     const identityRegistry = new ethers.Contract(
-      deployedContracts["arc.identity-registry"],
+      deployedContracts["chio.identity-registry"],
       identityRegistryArtifact.abi,
       wallets.admin
     );
     const rootRegistry = new ethers.Contract(
-      deployedContracts["arc.root-registry"],
+      deployedContracts["chio.root-registry"],
       rootRegistryArtifact.abi,
       wallets.operator
     );
     const priceResolver = new ethers.Contract(
-      deployedContracts["arc.price-resolver"],
+      deployedContracts["chio.price-resolver"],
       priceResolverArtifact.abi,
       wallets.priceAdmin
     );
@@ -538,7 +538,7 @@ async function main() {
     });
 
     const deploymentRecord = {
-      deployment_id: `arc.web3-reviewed-rollout.${environment}.v1`,
+      deployment_id: `chio.web3-reviewed-rollout.${environment}.v1`,
       generated_at: new Date().toISOString(),
       environment,
       manifest_id: manifest.manifest_id,

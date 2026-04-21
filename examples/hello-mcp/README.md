@@ -1,12 +1,12 @@
 # hello-mcp
 
-Minimal MCP example using [`crates/arc-mcp-edge`](../../crates/arc-mcp-edge/).
+Minimal MCP example using [`crates/chio-mcp-edge`](../../crates/chio-mcp-edge/).
 
 ## What It Demonstrates
 
 - `initialize`, required `notifications/initialized`, then `tools/list` over stdio JSON-RPC
-- authoritative `tools/call` execution through the embedded ARC kernel
-- a companion bridge call that exposes the underlying ARC receipt id
+- authoritative `tools/call` execution through the embedded Chio kernel
+- a companion bridge call that exposes the underlying Chio receipt id
 
 ## Files
 

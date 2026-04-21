@@ -1,0 +1,33 @@
+[package]
+name = "chio-policy"
+description = "HushSpec policy format for the Chio runtime -- parse, validate, merge, evaluate, and compile to Chio guards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[lib]
+name = "chio_policy"
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-core = { path = "../chio-core" }
+chio-guards = { path = "../chio-guards" }
+chio-kernel = { path = "../chio-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yml = { workspace = true }
+thiserror = { workspace = true }
+regex = "1"
+sha2 = { workspace = true }
+hex = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

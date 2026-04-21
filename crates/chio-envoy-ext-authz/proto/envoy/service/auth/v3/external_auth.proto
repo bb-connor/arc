@@ -1,0 +1,108 @@
+// Minimal vendored copy of envoy.service.auth.v3.Authorization from
+// https://github.com/envoyproxy/envoy/blob/main/api/envoy/service/auth/v3/external_auth.proto
+//
+// Only the messages and fields that the Chio adapter produces or consumes are
+// retained. Field numbers match the upstream definition so on-the-wire
+// compatibility with Envoy is preserved.
+
+syntax = "proto3";
+
+package envoy.service.auth.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/service/auth/v3/attribute_context.proto";
+import "envoy/type/v3/http_status.proto";
+import "google/protobuf/struct.proto";
+import "google/rpc/status.proto";
+
+option java_package = "io.envoyproxy.envoy.service.auth.v3";
+option java_outer_classname = "ExternalAuthProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3;authv3";
+
+// A generic interface for performing authorization check on an incoming
+// request.
+service Authorization {
+  // Performs authorization check based on the attributes associated with the
+  // incoming request, and returns status `OK` or not `OK`.
+  rpc Check(CheckRequest) returns (CheckResponse);
+}
+
+message CheckRequest {
+  // The request attributes.
+  AttributeContext attributes = 1;
+}
+
+// HTTP attributes for a denied response.
+message DeniedHttpResponse {
+  // This field allows the authorization service to send HTTP response status
+  // code to the downstream client.
+  envoy.type.v3.HttpStatus status = 1;
+
+  // Extra HTTP headers to populate in the response. Any existing conflicting
+  // headers will be overridden.
+  repeated envoy.config.core.v3.HeaderValueOption headers = 2;
+
+  // This field allows the authorization service to send a response body to
+  // the downstream client.
+  string body = 3;
+}
+
+// HTTP attributes for an OK response.
+message OkHttpResponse {
+  // HTTP entity headers in addition to the original request headers. This
+  // allows the authorization service to append, to add or to override headers
+  // from the original request before dispatching it to the upstream.
+  repeated envoy.config.core.v3.HeaderValueOption headers = 2;
+
+  // HTTP entity headers to remove from the original request before dispatching
+  // it to the upstream.
+  repeated string headers_to_remove = 5;
+
+  // Optional response HTTP headers to add to the client response.
+  repeated envoy.config.core.v3.HeaderValueOption response_headers_to_add = 6;
+
+  // Queryparameters to be set (or overwritten) to the query string before
+  // dispatching the request to upstream.
+  repeated QueryParameter query_parameters_to_set = 7;
+
+  // Query parameters to be removed from the request before dispatching it to
+  // the upstream.
+  repeated string query_parameters_to_remove = 8;
+}
+
+// Query parameter name/value pair.
+message QueryParameter {
+  // Parameter name.
+  string key = 1;
+  // Parameter value.
+  string value = 2;
+}
+
+// Intended for gRPC and Network Authorization servers `only`.
+message CheckResponse {
+  // Status `OK` allows the request. Any other status indicates the request
+  // should be denied, and for HTTP filter, if not overridden by
+  // denied HTTP response code, a `403 Forbidden` response will be sent to the
+  // downstream client.
+  google.rpc.Status status = 1;
+
+  // An message that contains HTTP response attributes. This message is
+  // used when the authorization service needs to send custom responses
+  // to the downstream client or, to modify/add request headers being
+  // dispatched to the upstream.
+  oneof http_response {
+    // Supplies http attributes for a denied response.
+    DeniedHttpResponse denied_response = 2;
+
+    // Supplies http attributes for an ok response.
+    OkHttpResponse ok_response = 3;
+  }
+
+  // Optional response metadata that will be emitted as dynamic metadata to be
+  // consumed by the next filter. This metadata lives in a namespace specified
+  // by the canonical name of extension filter that requires it:
+  // - `envoy.filters.http.ext_authz` for HTTP filter.
+  // - `envoy.filters.network.ext_authz` for network filter.
+  google.protobuf.Struct dynamic_metadata = 4;
+}

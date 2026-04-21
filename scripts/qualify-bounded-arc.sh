@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "bounded ARC qualification requires python3 on PATH" >&2
+  echo "bounded Chio qualification requires python3 on PATH" >&2
   exit 1
 fi
 
@@ -13,12 +13,12 @@ log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-matrix_src="docs/standards/ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
-matrix_snapshot="${output_root}/ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
-profile_src="docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md"
-profile_snapshot="${output_root}/ARC_BOUNDED_OPERATIONAL_PROFILE.md"
-checklist_src="docs/review/14-bounded-arc-pre-ship-checklist.md"
-checklist_snapshot="${output_root}/bounded-arc-pre-ship-checklist.md"
+matrix_src="docs/standards/CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
+matrix_snapshot="${output_root}/CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
+profile_src="docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md"
+profile_snapshot="${output_root}/CHIO_BOUNDED_OPERATIONAL_PROFILE.md"
+checklist_src="docs/review/14-bounded-chio-pre-ship-checklist.md"
+checklist_snapshot="${output_root}/bounded-chio-pre-ship-checklist.md"
 
 rm -rf "${output_root}"
 mkdir -p "${log_root}"
@@ -63,16 +63,16 @@ from pathlib import Path
 
 checks = {
     ".planning/PROJECT.md": [
-        "Latest completed milestone:** v3.18 Bounded ARC Ship Readiness Closure",
-        "Most recent implemented milestone:** Post-v3.18 ARC Closure Program",
+        "Latest completed milestone:** v3.18 Bounded Chio Ship Readiness Closure",
+        "Most recent implemented milestone:** Post-v3.18 Chio Closure Program",
     ],
     ".planning/STATE.md": [
-        "Status: `v3.18` is now the latest completed milestone and bounded ARC",
+        "Status: `v3.18` is now the latest completed milestone and bounded Chio",
         "ship-readiness lane.",
         "post-`v3.18` closure tracker is also complete locally",
     ],
     ".planning/REQUIREMENTS.md": [
-        "after completing the v3.18 bounded ARC ship-readiness closure",
+        "after completing the v3.18 bounded Chio ship-readiness closure",
     ],
     ".planning/ROADMAP.md": [
         "| 417 | v3.18 | Claim Discipline and Planning Truth Closure | Complete |",
@@ -120,20 +120,20 @@ for rel_path, required in checks.items():
 PY
 
 cat >"${report_path}" <<'EOF'
-# Bounded ARC Qualification Gate
+# Bounded Chio Qualification Gate
 
 This bundle records the current ship-facing release boundary.
 
 Decision:
 
-- ARC is qualified locally as a bounded governance and evidence control plane.
+- Chio is qualified locally as a bounded governance and evidence control plane.
 - The current bounded release excludes stronger recursive delegation,
   verifier-bound runtime, transparency-log, consensus-HA, and market-position
   claims.
 
 Executed checks:
 
-- JSON validation of `ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json`
+- JSON validation of `CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json`
 - bounded claim-discipline grep checks over README and competitive-positioning
   copy
 - planning-truth checks over `.planning/*`
@@ -141,9 +141,9 @@ Executed checks:
 
 Supporting documents:
 
-- `ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json`
-- `ARC_BOUNDED_OPERATIONAL_PROFILE.md`
-- `bounded-arc-pre-ship-checklist.md`
+- `CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json`
+- `CHIO_BOUNDED_OPERATIONAL_PROFILE.md`
+- `bounded-chio-pre-ship-checklist.md`
 EOF
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

@@ -1,0 +1,84 @@
+[package]
+name = "chio-cli"
+description = "CLI binary for the Chio runtime kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+default-run = "chio"
+autobins = false
+readme = "README.md"
+publish = false
+
+[[bin]]
+name = "chio"
+path = "src/bin/chio.rs"
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-api-protect = { path = "../chio-api-protect" }
+chio-control-plane = { path = "../chio-control-plane" }
+chio-acp-proxy = { path = "../chio-acp-proxy" }
+chio-core = { path = "../chio-core" }
+chio-credentials = { path = "../chio-credentials" }
+chio-data-guards = { path = "../chio-data-guards" }
+chio-did = { path = "../chio-did" }
+chio-external-guards = { path = "../chio-external-guards" }
+chio-federation = { path = "../chio-federation" }
+chio-hosted-mcp = { path = "../chio-hosted-mcp" }
+chio-kernel = { path = "../chio-kernel" }
+chio-guards = { path = "../chio-guards" }
+chio-listing = { path = "../chio-listing" }
+chio-policy = { path = "../chio-policy" }
+chio-mcp-adapter = { path = "../chio-mcp-adapter" }
+chio-conformance = { path = "../chio-conformance" }
+chio-reputation = { path = "../chio-reputation" }
+chio-store-sqlite = { path = "../chio-store-sqlite" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yml = { workspace = true }
+thiserror = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sha2 = { workspace = true }
+hex = { workspace = true }
+subtle = "2.6"
+tokio = { workspace = true }
+axum = "0.8"
+async-stream = "0.3"
+url = "2"
+percent-encoding = "2"
+base64 = "0.22"
+reqwest = { workspace = true, features = ["blocking", "form", "json", "query", "rustls"] }
+ureq = { version = "2.10", features = ["json"] }
+serde_urlencoded = "0.7"
+rusqlite = { workspace = true }
+chio-siem = { path = "../chio-siem", optional = true }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+chrono = { version = "0.4", features = ["clock"] }
+rsa = { version = "0.9", features = ["sha2"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+p384 = { version = "0.13", features = ["ecdsa"] }
+chio-wasm-guards = { path = "../chio-wasm-guards", features = ["wasmtime-runtime"] }
+ed25519-dalek = { workspace = true }
+wasmparser = "0.221"
+flate2 = "1"
+tar = "0.4"
+rand_core = { workspace = true }
+
+[dev-dependencies]
+chio-credit = { path = "../chio-credit" }
+chio-open-market = { path = "../chio-open-market" }
+chio-underwriting = { path = "../chio-underwriting" }
+rand_core = { workspace = true }
+tempfile = "3"
+wiremock = "0.6"
+
+[features]
+siem = ["chio-siem"]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

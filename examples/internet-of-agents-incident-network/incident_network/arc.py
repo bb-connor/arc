@@ -1,4 +1,4 @@
-"""ARC integration: MCP clients and trust-control HTTP interface."""
+"""Chio integration: MCP clients and trust-control HTTP interface."""
 from __future__ import annotations
 
 import json
@@ -9,12 +9,12 @@ from typing import Any
 import httpx
 
 
-# -- ARC MCP HTTP client (talks to arc mcp serve-http) -----------------------
+# -- Chio MCP HTTP client (talks to arc mcp serve-http) -----------------------
 
-class ArcMcpClient:
+class ChioMcpClient:
     """Calls MCP tools through an arc mcp serve-http endpoint.
 
-    The ARC kernel validates capabilities, evaluates guard policies,
+    The Chio kernel validates capabilities, evaluates guard policies,
     and signs a receipt for every tool invocation.
     """
 
@@ -25,7 +25,7 @@ class ArcMcpClient:
         self._seq = 0
         self._http = httpx.Client(timeout=30.0)
 
-    def __enter__(self) -> ArcMcpClient:
+    def __enter__(self) -> ChioMcpClient:
         self._handshake()
         return self
 
@@ -98,10 +98,10 @@ class ArcMcpClient:
         return self._rpc("tools/call", {"name": name, "arguments": arguments}).get("structuredContent", {})
 
 
-# -- Stdio MCP client (direct, no ARC kernel) --------------------------------
+# -- Stdio MCP client (direct, no Chio kernel) --------------------------------
 
 class StdioMcpClient:
-    """Talks to an MCP server subprocess over stdio. No ARC mediation."""
+    """Talks to an MCP server subprocess over stdio. No Chio mediation."""
 
     def __init__(self, script: str):
         self._script = script

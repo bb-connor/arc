@@ -1,40 +1,40 @@
-# Edge Crate Symmetry: `arc-a2a-edge` and `arc-acp-edge`
+# Edge Crate Symmetry: `chio-a2a-edge` and `chio-acp-edge`
 
 Design spec for bidirectional protocol bridging. Edge crates bridge
-_outward_: exposing ARC-native tools through a foreign protocol so non-ARC
-clients can discover and invoke them. `arc-mcp-edge` is the reference
+_outward_: exposing Chio-native tools through a foreign protocol so non-Chio
+clients can discover and invoke them. `chio-mcp-edge` is the reference
 implementation. This document covers A2A and ACP equivalents.
 
 ## 1. The Composability Gap
 
 | Crate | Direction | Protocol |
 |-------|-----------|----------|
-| `arc-mcp-edge` | outward | MCP |
-| `arc-mcp-adapter` | inward | MCP |
-| `arc-a2a-adapter` | inward | A2A |
-| `arc-acp-proxy` | inward | ACP |
+| `chio-mcp-edge` | outward | MCP |
+| `chio-mcp-adapter` | inward | MCP |
+| `chio-a2a-adapter` | inward | A2A |
+| `chio-acp-proxy` | inward | ACP |
 
 The outward column has only MCP. That means:
 
-- An ARC tool cannot appear in an A2A Agent Card. Agents that speak only
+- An Chio tool cannot appear in an A2A Agent Card. Agents that speak only
   A2A have no discovery or invocation path.
-- An ARC tool cannot appear in an ACP session. Editors like Zed or
+- An Chio tool cannot appear in an ACP session. Editors like Zed or
   JetBrains that speak ACP cannot use it.
 - Cross-protocol discovery is impossible. A tool registered once should be
   listable via MCP `tools/list`, the A2A Agent Card `skills` array, and
   ACP command enumeration from the same kernel.
 
 This is not just a product-completeness issue. It is also a runtime-security
-coverage issue: if ARC only exposes or governs MCP-native surfaces cleanly,
+coverage issue: if Chio only exposes or governs MCP-native surfaces cleanly,
 security teams may overestimate how much of the agent runtime is actually under
 deterministic control.
 
 ### Target Scenarios
 
-- **A2A skills.** `arc-a2a-edge` on HTTPS; remote agents discover via
+- **A2A skills.** `chio-a2a-edge` on HTTPS; remote agents discover via
   Agent Card, invoke with `SendMessage`, kernel runs guards and signs
   receipts.
-- **ACP capabilities.** Editor connects to `arc-acp-edge` over stdio;
+- **ACP capabilities.** Editor connects to `chio-acp-edge` over stdio;
   each authoritative `tool/invoke` triggers a kernel tool invocation with full
   capability validation.
 - **One tool, three surfaces.** Single `ToolManifest` loaded once, three
@@ -42,12 +42,12 @@ deterministic control.
 
 ### Coverage Principle
 
-`arc-mcp-edge` is the immediate adoption wedge because MCP is the easiest
+`chio-mcp-edge` is the immediate adoption wedge because MCP is the easiest
 wrapped surface to deploy today. But edge symmetry matters because wrapped MCP
-traffic is only one slice of real agent execution. ARC should avoid implying
+traffic is only one slice of real agent execution. Chio should avoid implying
 that an MCP-facing chokepoint equals complete runtime security.
 
-## 2. `arc-a2a-edge` Design
+## 2. `chio-a2a-edge` Design
 
 ### 2.1 Core Types
 
@@ -67,7 +67,7 @@ pub enum A2aSecuritySchemeConfig {
 }
 
 pub struct A2aExposedSkill {
-    pub id: String,          // matches ARC tool name
+    pub id: String,          // matches Chio tool name
     pub name: String,
     pub description: String,
     pub input_schema: serde_json::Value,
@@ -75,9 +75,9 @@ pub struct A2aExposedSkill {
     pub tags: Vec<String>,   // "side-effects", "latency:fast", etc.
 }
 
-pub struct ArcA2aEdge {
+pub struct ChioA2aEdge {
     config: A2aEdgeConfig,
-    kernel: ArcKernel,
+    kernel: ChioKernel,
     agent_id: String,
     capabilities: Vec<CapabilityToken>,
     skills: Vec<A2aExposedSkillBinding>,
@@ -91,11 +91,11 @@ pub struct ArcA2aEdge {
 
 `manifest_tool_to_a2a_skill` maps `ToolDefinition` fields directly.
 `has_side_effects` and `latency_hint` become skill tags. The function
-mirrors `manifest_tool_to_mcp_tool` in `arc-mcp-edge`.
+mirrors `manifest_tool_to_mcp_tool` in `chio-mcp-edge`.
 
 ### 2.3 Agent Card Generation
 
-`ArcA2aEdge::agent_card() -> serde_json::Value` builds the A2A Agent Card
+`ChioA2aEdge::agent_card() -> serde_json::Value` builds the A2A Agent Card
 from config and registered skills. Served at
 `/.well-known/agent-card.json`. Includes `securitySchemes`,
 `securityRequirements`, and a JSONRPC interface entry pointing to
@@ -105,9 +105,9 @@ from config and registered skills. Served at
 
 | A2A Method | Edge Behavior |
 |------------|---------------|
-| `SendMessage` | Extract `targetSkillId`, resolve binding, submit to the authoritative ARC path, return blocking A2A task/result payload |
+| `SendMessage` | Extract `targetSkillId`, resolve binding, submit to the authoritative Chio path, return blocking A2A task/result payload |
 | `SendStreamingMessage` | Create a deferred authoritative task with `receiptPending = true` |
-| `GetTask` | Resolve a deferred task through the authoritative ARC path and return the terminal receipt-bearing task result |
+| `GetTask` | Resolve a deferred task through the authoritative Chio path and return the terminal receipt-bearing task result |
 | `CancelTask` | Cancel a deferred task before execution |
 
 The shipped authoritative A2A profile is now dual-surface: blocking
@@ -123,7 +123,7 @@ Inbound credentials are validated before creating a `SessionAuthContext`
 (bearer, API key, or OAuth2). The auth context flows into the kernel and
 is available to guards for policy decisions.
 
-## 3. `arc-acp-edge` Design
+## 3. `chio-acp-edge` Design
 
 ### 3.1 Core Types
 
@@ -146,9 +146,9 @@ pub struct AcpExposedCommand {
     pub has_side_effects: bool,
 }
 
-pub struct ArcAcpEdge {
+pub struct ChioAcpEdge {
     config: AcpEdgeConfig,
-    kernel: ArcKernel,
+    kernel: ChioKernel,
     agent_id: String,
     capabilities: Vec<CapabilityToken>,
     commands: Vec<AcpExposedCommandBinding>,
@@ -173,10 +173,10 @@ session ID, and auth context.
 |------------|---------------|
 | `session/list_capabilities` | Return the truthful authoritative ACP capability surface |
 | `session/request_permission` | Capability-aware preview only; does not imply receipt-bearing execution by itself |
-| `tool/invoke` | Blocking authoritative invocation path with ARC receipt metadata |
+| `tool/invoke` | Blocking authoritative invocation path with Chio receipt metadata |
 | `tool/stream` | Create a deferred authoritative task with receipt-pending metadata |
 | `tool/cancel` | Cancel a deferred task before execution |
-| `tool/resume` | Resolve a deferred task through the authoritative ARC path and return the terminal result |
+| `tool/resume` | Resolve a deferred task through the authoritative Chio path and return the terminal result |
 
 ```rust
 The shipped authoritative ACP profile is now blocking `tool/invoke` plus a
@@ -194,9 +194,9 @@ must not be implied by the current edge surface.
 
 ### 3.5 Permission Gating
 
-`session/request_permission` replaces `arc-acp-proxy`'s allowlist model
+`session/request_permission` replaces `chio-acp-proxy`'s allowlist model
 with the kernel's full capability pipeline (guards + budgets). The edge
-maps the ACP permission type to an ARC `Operation` and scope, then
+maps the ACP permission type to an Chio `Operation` and scope, then
 delegates to `kernel.check_capability(...)`.
 
 ### 3.6 Transport
@@ -204,7 +204,7 @@ delegates to `kernel.check_capability(...)`.
 Primary transport is stdio, matching how editors launch ACP agents:
 
 ```rust
-impl ArcAcpEdge {
+impl ChioAcpEdge {
     pub fn serve_stdio<R: BufRead, W: Write>(
         &mut self, reader: R, writer: W,
     ) -> Result<(), AcpEdgeError> { /* ... */ }
@@ -229,7 +229,7 @@ handshake; A2A: stateless HTTP with task-based async; ACP: session-scoped
 JSON-RPC). A shared trait would be too abstract to be useful. The pattern
 is documented here; each crate implements it directly.
 
-### 4.2 Shared Utilities (`arc-edge-common`)
+### 4.2 Shared Utilities (`chio-edge-common`)
 
 Candidates for a small internal crate:
 
@@ -252,7 +252,7 @@ pub fn iso8601_now() -> String;
 |-------|-----|-----|-----|
 | Name | `server_name` | `agent_name` | `agent_name` |
 | Version | `server_version` | `agent_version` | `agent_version` |
-| Kernel | `ArcKernel` | `ArcKernel` | `ArcKernel` |
+| Kernel | `ChioKernel` | `ChioKernel` | `ChioKernel` |
 | Caps | `Vec<CapabilityToken>` | `Vec<CapabilityToken>` | `Vec<CapabilityToken>` |
 | Manifests | `Vec<ToolManifest>` | `Vec<ToolManifest>` | `Vec<ToolManifest>` |
 
@@ -286,19 +286,19 @@ exist.
 The current edge implementations now enforce this as runtime policy rather than
 just design guidance:
 
-- Shared semantic hints come from `x-arc-publish`,
-  `x-arc-approval-required`, `x-arc-streaming`, `x-arc-cancellation`, and
-  `x-arc-partial-output`.
-- `arc-a2a-edge` auto-publishes only `Lossless` and `Adapted` skills. Approval
+- Shared semantic hints come from `x-chio-publish`,
+  `x-chio-approval-required`, `x-chio-streaming`, `x-chio-cancellation`, and
+  `x-chio-partial-output`.
+- `chio-a2a-edge` auto-publishes only `Lossless` and `Adapted` skills. Approval
   and cancellation requirements are treated as `Unsupported`; side effects and
   collated streaming/partial-output semantics are exposed as `Adapted`
   caveats.
-- `arc-acp-edge` auto-publishes only `Lossless` and `Adapted` capabilities.
+- `chio-acp-edge` auto-publishes only `Lossless` and `Adapted` capabilities.
   Browser projections and generic mutating tools are treated as
   `Unsupported`; permission-preview, generic-tool-category, and collected
   streaming semantics are exposed as `Adapted` caveats.
 
-This same discipline should apply to security claims. ARC should never present
+This same discipline should apply to security claims. Chio should never present
 "discoverable on MCP" as equivalent to "governed across the full runtime path"
 when meaningful A2A, ACP, or native execution paths remain outside the same
 kernel/evidence model.
@@ -310,9 +310,9 @@ of manifests.
 
 | Protocol | Discovery Mechanism | Served By |
 |----------|-------------------|-----------|
-| MCP | `tools/list` JSON-RPC | `arc-mcp-edge` |
-| A2A | `GET /.well-known/agent-card.json` | `arc-a2a-edge` |
-| ACP | `initialize` response | `arc-acp-edge` |
+| MCP | `tools/list` JSON-RPC | `chio-mcp-edge` |
+| A2A | `GET /.well-known/agent-card.json` | `chio-a2a-edge` |
+| ACP | `initialize` response | `chio-acp-edge` |
 
 An optional unified `GET /arc/discover` endpoint (outside the edge crates)
 can aggregate all surfaces into a single JSON response listing each tool
@@ -323,11 +323,11 @@ and its MCP, A2A, and ACP endpoints.
 ```
                        Outward (edge)                              Inward (adapter)
 
-MCP Client <--stdio/http--> arc-mcp-edge --+              +-- arc-mcp-adapter <--stdio--> MCP Server
+MCP Client <--stdio/http--> chio-mcp-edge --+              +-- chio-mcp-adapter <--stdio--> MCP Server
                                            |              |
-A2A Client <--http/json-->  arc-a2a-edge --+-- ARC Kernel-+-- arc-a2a-adapter <--http-->  A2A Agent
+A2A Client <--http/json-->  chio-a2a-edge --+-- Chio Kernel-+-- chio-a2a-adapter <--http-->  A2A Agent
                                            |              |
-ACP Editor <--stdio-->      arc-acp-edge --+              +-- arc-acp-proxy   <--stdio--> ACP Agent
+ACP Editor <--stdio-->      chio-acp-edge --+              +-- chio-acp-proxy   <--stdio--> ACP Agent
                                            |
                                     [guards, budgets,
                                      receipts, caps]
@@ -336,7 +336,7 @@ ACP Editor <--stdio-->      arc-acp-edge --+              +-- arc-acp-proxy   <-
 Request flow (same pattern for all three edges):
 
 ```
-Protocol Client          arc-*-edge               ARC Kernel           Tool Server
+Protocol Client          arc-*-edge               Chio Kernel           Tool Server
     |                        |                        |                     |
     |-- protocol request --->|                        |                     |
     |                        |-- resolve binding      |                     |
@@ -353,12 +353,12 @@ Protocol Client          arc-*-edge               ARC Kernel           Tool Serv
 
 ## 7. Implementation Priority
 
-### Build `arc-a2a-edge` first.
+### Build `chio-a2a-edge` first.
 
 1. **Ecosystem demand.** A2A has broad adoption (Google, LangChain,
-   CrewAI). Exposing ARC tools as A2A skills makes them immediately usable
+   CrewAI). Exposing Chio tools as A2A skills makes them immediately usable
    by any A2A-compatible framework.
-2. **Adapter symmetry.** `arc-a2a-adapter` already implements the client
+2. **Adapter symmetry.** `chio-a2a-adapter` already implements the client
    side. The edge completes the bidirectional bridge; its A2A types and
    parsing code can be reused.
 3. **HTTP simplicity.** A2A runs over HTTP. No stdio plumbing or subprocess
@@ -366,7 +366,7 @@ Protocol Client          arc-*-edge               ARC Kernel           Tool Serv
 4. **Incremental streaming.** Blocking `SendMessage` is sufficient for v1.
 
 Security rationale: A2A coverage is one of the clearest ways to avoid reducing
-ARC to an MCP-only gateway story. It expands deterministic enforcement and
+Chio to an MCP-only gateway story. It expands deterministic enforcement and
 signed observability to a second major runtime surface.
 
 | Phase | Scope |
@@ -376,9 +376,9 @@ signed observability to a second major runtime surface.
 | 3 | Authentication scheme validation |
 | 4 | Future richer lifecycle only if the shared protocol fabric can support it honestly |
 
-### `arc-acp-edge` second.
+### `chio-acp-edge` second.
 
-ACP is newer; the editor ecosystem is still consolidating. `arc-acp-proxy`
+ACP is newer; the editor ecosystem is still consolidating. `chio-acp-proxy`
 provides partial coverage. The edge crate is a cleaner design (acts as the
 agent rather than proxying one) but can wait until A2A edge is stable.
 

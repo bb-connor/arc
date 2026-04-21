@@ -4,17 +4,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 domain_manifests=(
-  "crates/arc-core/Cargo.toml"
-  "crates/arc-manifest/Cargo.toml"
-  "crates/arc-did/Cargo.toml"
-  "crates/arc-guards/Cargo.toml"
-  "crates/arc-policy/Cargo.toml"
-  "crates/arc-reputation/Cargo.toml"
-  "crates/arc-credentials/Cargo.toml"
-  "crates/arc-kernel/Cargo.toml"
+  "crates/chio-core/Cargo.toml"
+  "crates/chio-manifest/Cargo.toml"
+  "crates/chio-did/Cargo.toml"
+  "crates/chio-guards/Cargo.toml"
+  "crates/chio-policy/Cargo.toml"
+  "crates/chio-reputation/Cargo.toml"
+  "crates/chio-credentials/Cargo.toml"
+  "crates/chio-kernel/Cargo.toml"
 )
 
-blocked_workspace_paths='path = "\\.\\./(arc-cli|arc-control-plane|arc-hosted-mcp)"'
+blocked_workspace_paths='path = "\\.\\./(chio-cli|chio-control-plane|chio-hosted-mcp)"'
 blocked_transport_deps='^(clap|axum|reqwest)[[:space:]]*='
 failed=0
 

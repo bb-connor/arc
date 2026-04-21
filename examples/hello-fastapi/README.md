@@ -2,8 +2,8 @@
 
 Minimal FastAPI example using the shipped Python HTTP surfaces:
 
-- [`arc-asgi`](../../sdks/python/arc-asgi/) for request interception
-- [`arc-fastapi`](../../sdks/python/arc-fastapi/) for FastAPI-native receipt access
+- [`chio-asgi`](../../sdks/python/chio-asgi/) for request interception
+- [`chio-fastapi`](../../sdks/python/chio-fastapi/) for FastAPI-native receipt access
 
 This is the recommended second web-backend example. Do
 [`hello-openapi-sidecar/`](../hello-openapi-sidecar/README.md) first, then use
@@ -15,7 +15,7 @@ same local sidecar model.
 - `GET /hello` is allowed and returns a receipt header
 - `POST /echo` is denied without a capability token
 - `POST /echo` succeeds with a trust-issued capability token and a receipt header
-- the app talks to a real local ARC sidecar over `/arc/evaluate`
+- the app talks to a real local Chio sidecar over `/arc/evaluate`
 - the smoke flow lists persisted receipts from the sidecar SQLite store
 
 ## Files

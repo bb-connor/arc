@@ -1,0 +1,41 @@
+[package]
+name = "chio-conformance"
+description = "Scenario loading and report generation for Chio cross-language conformance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_conformance"
+
+[[bin]]
+name = "chio-conformance-report"
+path = "src/bin/chio_conformance_report.rs"
+
+[[bin]]
+name = "chio-conformance-runner"
+path = "src/bin/chio_conformance_runner.rs"
+
+[[bin]]
+name = "chio-native-conformance-runner"
+path = "src/bin/chio_native_conformance_runner.rs"
+
+[[bin]]
+name = "chio-native-conformance-fixture"
+path = "src/bin/chio_native_conformance_fixture.rs"
+
+[dependencies]
+chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+chio-kernel = { path = "../chio-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+reqwest = { workspace = true, features = ["blocking", "form", "query", "rustls"] }
+tiny_http = "0.12"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

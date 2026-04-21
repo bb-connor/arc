@@ -1,12 +1,12 @@
 # Agent Commerce Network
 
-Governed service procurement between a buyer and provider using ARC for
+Governed service procurement between a buyer and provider using Chio for
 capability-based access control, budget enforcement, and receipt signing.
 
 ## Scenario
 
 Lattice Platform Security needs a security review for their payments API.
-Vanguard Security provides reviews via an MCP tool server. ARC governs every
+Vanguard Security provides reviews via an MCP tool server. Chio governs every
 interaction: the buyer's API sits behind `arc api protect`, the provider's
 MCP server sits behind `arc mcp serve-http`, and trust-control tracks
 budgets, receipts, and capabilities.
@@ -36,7 +36,7 @@ cargo build --bin arc
 Set `OPENAI_API_KEY` for live agent reasoning. Without it, runs a
 deterministic fallback flow (CI mode).
 
-## What ARC Governs
+## What Chio Governs
 
 - **Budget limits** on capability grants (`maxTotalCost`, `maxCostPerInvocation`)
 - **Receipt signing** for every buyer API call (via `arc api protect`)
@@ -48,17 +48,17 @@ deterministic fallback flow (CI mode).
 
 ```
 commerce_network/           shared package
-  arc.py                    ARC clients (MCP, trust-control)
+  arc.py                    Chio clients (MCP, trust-control)
   agents.py                 procurement agent (Agents SDK / Anthropic)
   verify.py                 bundle verification
 buyer/
   app.py                    FastAPI procurement service
-  policy.yaml               ARC HushSpec policy
-  openapi.yaml              API spec with x-arc-* metadata
+  policy.yaml               Chio HushSpec policy
+  openapi.yaml              API spec with x-chio-* metadata
   run-sidecar.sh            arc api protect wrapper
 provider/
   review_server.py          MCP tool server
-  policy.yaml               ARC HushSpec policy
+  policy.yaml               Chio HushSpec policy
   run-edge.sh               arc mcp serve-http wrapper
 contracts/                  JSON contract templates
 orchestrate.py              entry point

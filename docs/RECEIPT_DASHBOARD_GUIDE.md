@@ -1,29 +1,29 @@
 # Receipt Dashboard Guide
 
-The ARC receipt dashboard is a React SPA that visualizes the kernel's receipt log. It is served directly by the trust-control axum server from the `dashboard/dist/` directory.
+The Chio receipt dashboard is a React SPA that visualizes the kernel's receipt log. It is served directly by the trust-control axum server from the `dashboard/dist/` directory.
 
 ## Building the Dashboard
 
 ```bash
-cd crates/arc-cli/dashboard
+cd crates/chio-cli/dashboard
 npm install
 npm run test
 npm run build
 ```
 
-The build output lands in `crates/arc-cli/dashboard/dist/`. The trust-control server serves the `dist/` directory as a static catch-all after all API routes. No separate web server is needed.
+The build output lands in `crates/chio-cli/dashboard/dist/`. The trust-control server serves the `dist/` directory as a static catch-all after all API routes. No separate web server is needed.
 
 The dashboard has no dependency on the `siem` feature flag. It communicates with the trust-control server's existing HTTP API.
 
 ## Accessing the Dashboard
 
-Start the trust-control server, then open `http://localhost:<port>/` in a browser. The server port is set in your ARC configuration.
+Start the trust-control server, then open `http://localhost:<port>/` in a browser. The server port is set in your Chio configuration.
 
 ### Authentication
 
 All API calls from the dashboard require a Bearer token. The token is read in this order:
 
-1. `sessionStorage` key `arc_token` (set from a previous visit)
+1. `sessionStorage` key `chio_token` (set from a previous visit)
 2. URL query parameter `?token=<value>`
 
 When a token is found in the URL it is moved to `sessionStorage` and removed from the URL bar (using `window.history.replaceState`) to prevent it from appearing in browser history or the `Referer` header.

@@ -26,7 +26,7 @@ ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    go build -trimpath -ldflags "-s -w" -o /out/manager ./cmd/arc-controller
+    go build -trimpath -ldflags "-s -w" -o /out/manager ./cmd/chio-controller
 
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /

@@ -1,8 +1,8 @@
-# ARC v2.0 Agent Economy Foundation -- Session Summary
+# Chio v2.0 Agent Economy Foundation -- Session Summary
 
 ## What We Built
 
-Transformed ARC from a v1.0 security protocol into the economic infrastructure for autonomous agent systems. In a single autonomous session, we executed 5 phases (8-12), ran 3 rounds of security audits with full remediation, and produced comprehensive documentation.
+Transformed Chio from a v1.0 security protocol into the economic infrastructure for autonomous agent systems. In a single autonomous session, we executed 5 phases (8-12), ran 3 rounds of security audits with full remediation, and produced comprehensive documentation.
 
 ### Milestone: v2.0 Agent Economy Foundation
 
@@ -15,7 +15,7 @@ Transformed ARC from a v1.0 security protocol into the economic infrastructure f
 ## Phases Executed
 
 ### Phase 7: Schema Compatibility and Monetary Foundation
-- Removed `deny_unknown_fields` from 18 arc-core types for forward compatibility
+- Removed `deny_unknown_fields` from 18 chio-core types for forward compatibility
 - Added `MonetaryAmount` (u64 minor-units), `max_cost_per_invocation`/`max_total_cost` on `ToolGrant`
 - Added `ReduceCostPerInvocation`/`ReduceTotalCost` attenuation variants
 - Plans: `.planning/phases/07-schema-compatibility-and-monetary-foundation/`
@@ -29,7 +29,7 @@ Transformed ARC from a v1.0 security protocol into the economic infrastructure f
 - Plans: `.planning/phases/08-core-enforcement/`
 
 ### Phase 9: Compliance and DPoP
-- DPoP proof-of-possession (ARC-native Ed25519 canonical JSON, not HTTP-shaped)
+- DPoP proof-of-possession (Chio-native Ed25519 canonical JSON, not HTTP-shaped)
 - LRU nonce replay store with configurable TTL (5-min default)
 - Receipt retention with time-based (90-day) and size-based (10GB) rotation
 - Colorado SB 24-205 compliance mapping (16 clause-to-test references)
@@ -40,17 +40,17 @@ Transformed ARC from a v1.0 security protocol into the economic infrastructure f
 - Receipt query API with 8-dimension filtering and cursor-based pagination
 - HTTP endpoint: `GET /v1/receipts/query` on trust-control axum server
 - CLI: `arc receipt list` with JSON Lines output and 10 filter flags
-- TypeScript SDK hardened to `@arc-protocol/sdk@1.0.0`
+- TypeScript SDK hardened to `@chio-protocol/sdk@1.0.0`
 - `signDpopProof` with canonical JSON matching Rust `DpopProofBody` exactly
 - `ReceiptQueryClient` with `query()` and `paginate()` async generator
 - Plans: `.planning/phases/10-receipt-query-api-and-typescript-sdk-1-0/`
 
 ### Phase 11: SIEM Integration
-- New `arc-siem` crate behind `--features siem` flag
+- New `chio-siem` crate behind `--features siem` flag
 - Splunk HEC exporter (newline-separated JSON, HEC token auth, TLS enforced)
 - Elasticsearch bulk exporter (NDJSON, API key + Basic auth, partial failure detection)
 - `ExporterManager` with cursor-pull loop, exponential backoff, bounded DLQ
-- Kernel TCB isolation verified (no HTTP client deps in arc-kernel)
+- Kernel TCB isolation verified (no HTTP client deps in chio-kernel)
 - Plans: `.planning/phases/11-siem-integration/`
 
 ### Phase 12: Capability Lineage Index and Receipt Dashboard
@@ -107,7 +107,7 @@ Plus protocol spec additions, 4 ADRs, migration guide, and changelog.
 - `docs/VELOCITY_GUARDS.md` -- Token bucket config, per-grant enforcement
 - `docs/SIEM_INTEGRATION_GUIDE.md` -- Splunk HEC + ES bulk setup, DLQ behavior
 - `docs/RECEIPT_DASHBOARD_GUIDE.md` -- Dashboard access, filtering, delegation views
-- `docs/SDK_TYPESCRIPT_REFERENCE.md` -- @arc-protocol/sdk API reference
+- `docs/SDK_TYPESCRIPT_REFERENCE.md` -- @chio-protocol/sdk API reference
 
 ### Protocol and Architecture (new)
 - `spec/PROTOCOL.md` appendices D-G (Financial Metadata, Receipt Query, Checkpoints, Nested Flows)

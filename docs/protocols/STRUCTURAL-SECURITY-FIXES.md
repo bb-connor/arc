@@ -49,13 +49,13 @@ When `evaluate()` returns `Verdict::Allow`, the kernel issues a short-lived,
 single-use `ExecutionNonce` bound to that specific verdict. The tool server
 must present this nonce when the actual call arrives. The nonce is
 replay-protected via an LRU store (reusing the `DpopNonceStore` pattern from
-`crates/arc-kernel/src/dpop.rs`).
+`crates/chio-kernel/src/dpop.rs`).
 
 ### 1.3 Type Signatures
 
 ```rust
 /// Schema identifier for execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "arc.execution_nonce.v1";
+pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
 
 /// A short-lived, single-use token binding a kernel verdict to a tool
 /// execution. Issued by the kernel on Allow, consumed by the tool server
@@ -292,7 +292,7 @@ a breaking change.
 Framework integrations pass the nonce to the tool server via:
 
 ```
-X-Arc-Execution-Nonce: <base64url-encoded canonical JSON of ExecutionNonce>
+X-Chio-Execution-Nonce: <base64url-encoded canonical JSON of ExecutionNonce>
 ```
 
 This avoids modifying tool call payloads and works across all transports
@@ -306,7 +306,7 @@ This avoids modifying tool call payloads and works across all transports
 
 In the wrapper integration pattern (all framework integrations: LangChain,
 CrewAI, AutoGen, Vercel AI SDK, etc.), the agent framework calls
-`arc_client.evaluate()` as middleware, then calls the tool server directly.
+`chio_client.evaluate()` as middleware, then calls the tool server directly.
 Nothing prevents the agent from skipping the middleware and calling the tool
 server without evaluation. This is "governance by convention" -- it works only
 if every code path is correctly instrumented.
@@ -332,7 +332,7 @@ pub enum TrustLevel {
     /// Kernel dispatches tool calls directly. The agent never touches
     /// the tool server. Bypass is architecturally impossible.
     ///
-    /// Used by: native ARC transport, kernel-managed tool servers.
+    /// Used by: native Chio transport, kernel-managed tool servers.
     Mediated,
 
     /// Wrapper pattern with execution nonce. The agent calls the tool
@@ -353,7 +353,7 @@ pub enum TrustLevel {
 
 This enum is added to:
 
-1. **`ArcReceipt`** -- new field `trust_level: TrustLevel`. Auditors can
+1. **`ChioReceipt`** -- new field `trust_level: TrustLevel`. Auditors can
    filter receipts by trust level and flag any `Advisory` invocations in
    production.
 
@@ -394,11 +394,11 @@ fn default_trust_level() -> TrustLevel {
 
 #### Solution B: Network-Level Enforcement (Envoy ext_authz)
 
-Tool servers behind an Envoy proxy configured with ARC as the ext_authz
+Tool servers behind an Envoy proxy configured with Chio as the ext_authz
 backend (see `ENVOY-EXT-AUTHZ-INTEGRATION.md`) only accept traffic that has
 been authorized by the kernel. This is infrastructure-level bypass prevention.
 
-The Envoy filter checks for a valid `X-Arc-Execution-Nonce` header on every
+The Envoy filter checks for a valid `X-Chio-Execution-Nonce` header on every
 request to the tool server. Requests without a nonce (or with an expired/
 replayed nonce) are rejected at the proxy layer before reaching the tool
 server.
@@ -411,7 +411,7 @@ http_filters:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
       grpc_service:
         envoy_grpc:
-          cluster_name: arc-kernel
+          cluster_name: chio-kernel
       failure_mode_deny: true  # fail-closed
       with_request_body:
         max_request_bytes: 65536
@@ -424,7 +424,7 @@ effectively `Mediated` regardless of the integration pattern.
 
 #### Solution C: Tool Server Authentication
 
-Tool servers reject calls that do not carry a valid `X-Arc-Execution-Nonce`
+Tool servers reject calls that do not carry a valid `X-Chio-Execution-Nonce`
 header. This is application-level enforcement complementing the network layer.
 
 ```rust
@@ -445,7 +445,7 @@ impl NonceValidationMiddleware {
     /// In permissive mode (development), missing nonces log a warning but
     /// the request proceeds.
     pub fn validate(&self, headers: &HeaderMap) -> Result<(), VerifyError> {
-        let nonce_header = headers.get("x-arc-execution-nonce");
+        let nonce_header = headers.get("x-chio-execution-nonce");
         match nonce_header {
             None if self.permissive => {
                 tracing::warn!("missing execution nonce; permissive mode, allowing");
@@ -477,7 +477,7 @@ Implement all three. They compose:
 | Layer | What it prevents | Deployment cost |
 |-------|-----------------|-----------------|
 | Trust taxonomy (A) | Misclassification. Operators see exactly what level of enforcement is active. | Zero -- type system + receipt field |
-| Network enforcement (B) | Bypass at the transport level. Agent cannot reach tool server without going through ARC. | Medium -- requires Envoy or equivalent proxy |
+| Network enforcement (B) | Bypass at the transport level. Agent cannot reach tool server without going through Chio. | Medium -- requires Envoy or equivalent proxy |
 | Tool server auth (C) | Bypass at the application level. Even if the agent reaches the server, the server rejects unauthorized calls. | Low -- middleware in tool server |
 
 Trust level is the **minimum viable fix**. Network enforcement is the
@@ -490,14 +490,14 @@ for deployments that cannot run a proxy.
 
 ### 3.1 Problem
 
-ARC governs tool calls but agents write to memory stores outside the guard
+Chio governs tool calls but agents write to memory stores outside the guard
 pipeline:
 
 - **Vector databases** (Pinecone, Weaviate, Chroma) for RAG context
 - **Conversation history** (Redis, PostgreSQL, file-backed stores)
 - **Scratchpad files** (agent working memory, chain-of-thought caches)
 
-These writes are invisible to ARC. A compromised or confused agent can:
+These writes are invisible to Chio. A compromised or confused agent can:
 
 1. Write poisoned context that persists across sessions.
 2. Perform indirect prompt injection by planting instructions in RAG context.
@@ -514,7 +514,7 @@ evaluation, guard execution, receipt signing.
 
 ### 3.3 New ToolAction Variant
 
-Extend the `ToolAction` enum in `arc-guards/src/action.rs`:
+Extend the `ToolAction` enum in `chio-guards/src/action.rs`:
 
 ```rust
 pub enum ToolAction {
@@ -565,7 +565,7 @@ pub enum MemoryStoreType {
 
 ### 3.4 New Constraint Variants
 
-Extend the `Constraint` enum in `arc-core-types/src/capability.rs`:
+Extend the `Constraint` enum in `chio-core-types/src/capability.rs`:
 
 ```rust
 pub enum Constraint {
@@ -773,9 +773,9 @@ Framework integrations wrap memory operations in tool calls:
 
 ```python
 # Python SDK example: wrapping a Chroma upsert
-from arc_sdk import ArcClient, MemoryWriteAction
+from chio_sdk import ChioClient, MemoryWriteAction
 
-arc = ArcClient()
+arc = ChioClient()
 
 # Instead of:
 #   collection.upsert(ids=["doc1"], documents=["..."])
@@ -792,7 +792,7 @@ if result.allowed:
     collection.upsert(
         ids=["doc1"],
         documents=[document_text],
-        metadatas=[{"arc_receipt_id": result.receipt_id}],
+        metadatas=[{"chio_receipt_id": result.receipt_id}],
     )
 ```
 
@@ -934,7 +934,7 @@ down the kernel process. This is too coarse and too slow.
 
 ### 5.2 Solution
 
-Add `emergency_stop()` and `emergency_resume()` methods to `ArcKernel`. When
+Add `emergency_stop()` and `emergency_resume()` methods to `ChioKernel`. When
 the kill switch is engaged:
 
 1. All active capabilities are logically revoked (added to the revocation
@@ -950,7 +950,7 @@ The kill switch persists until `emergency_resume()` is called manually.
 ### 5.3 Implementation
 
 ```rust
-impl ArcKernel {
+impl ChioKernel {
     /// Engage the emergency kill switch.
     ///
     /// All active capabilities are revoked. All new evaluate() calls are
@@ -1006,10 +1006,10 @@ impl ArcKernel {
 }
 ```
 
-New field on `ArcKernel`:
+New field on `ChioKernel`:
 
 ```rust
-pub struct ArcKernel {
+pub struct ChioKernel {
     // ... existing fields ...
 
     /// Emergency kill switch. When true, all evaluate() calls are denied.
@@ -1062,8 +1062,8 @@ Add `tenant_id` to receipts and enforce tenant isolation at the store level.
 ### 6.3 Type Changes
 
 ```rust
-// Addition to ArcReceiptBody and ArcReceipt:
-pub struct ArcReceipt {
+// Addition to ChioReceiptBody and ChioReceipt:
+pub struct ChioReceipt {
     // ... existing fields ...
 
     /// Tenant identifier for multi-tenant deployments.
@@ -1097,7 +1097,7 @@ pub trait ReceiptStore: Send + Sync {
         &self,
         tenant_id: &str,
         filter: &ReceiptQuery,
-    ) -> Result<Vec<ArcReceipt>, ReceiptStoreError>;
+    ) -> Result<Vec<ChioReceipt>, ReceiptStoreError>;
 
     /// Return the tenant_id that should be used for queries from
     /// the given authentication context.
@@ -1108,7 +1108,7 @@ pub trait ReceiptStore: Send + Sync {
 }
 ```
 
-For the SQLite receipt store (`arc-store-sqlite`), this is a `WHERE` clause:
+For the SQLite receipt store (`chio-store-sqlite`), this is a `WHERE` clause:
 
 ```sql
 SELECT * FROM receipts
@@ -1119,7 +1119,7 @@ ORDER BY timestamp DESC
 LIMIT ?4
 ```
 
-For deployments using the receipt query API (`arc-cli`'s `trust serve`), the
+For deployments using the receipt query API (`chio-cli`'s `trust serve`), the
 HTTP handler extracts the tenant ID from the operator's authentication
 context and passes it to the store. There is no query parameter for tenant
 ID -- the tenant is determined by authentication, not by the caller's choice.

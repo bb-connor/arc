@@ -1,15 +1,15 @@
 use std::error::Error;
 use std::io::{self, BufRead, Write};
 
-use arc_acp_edge::{AcpEdgeConfig, AcpKernelExecutionContext, ArcAcpEdge};
-use arc_core::capability::{ArcScope, Operation, ToolGrant};
-use arc_core::crypto::Keypair;
-use arc_kernel::{
-    ArcKernel, KernelError, KernelConfig, NestedFlowBridge, ToolCallChunk, ToolCallStream,
+use chio_acp_edge::{AcpEdgeConfig, AcpKernelExecutionContext, ChioAcpEdge};
+use chio_core::capability::{ChioScope, Operation, ToolGrant};
+use chio_core::crypto::Keypair;
+use chio_kernel::{
+    ChioKernel, KernelError, KernelConfig, NestedFlowBridge, ToolCallChunk, ToolCallStream,
     ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use arc_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{ToolDefinition, ToolManifest};
 use serde_json::{json, Value};
 
 struct HelloToolServer;
@@ -78,7 +78,7 @@ fn kernel_config() -> KernelConfig {
 
 fn demo_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "arc.manifest.v1".to_string(),
+        schema: "chio.manifest.v1".to_string(),
         server_id: "hello-acp-srv".to_string(),
         name: "Hello ACP Server".to_string(),
         description: Some("A tiny receipt-bearing ACP hello surface".to_string()),
@@ -88,9 +88,9 @@ fn demo_manifest() -> ToolManifest {
             description: "Return a greeting payload".to_string(),
             input_schema: json!({
                 "type": "object",
-                "x-arc-streaming": true,
-                "x-arc-partial-output": true,
-                "x-arc-cancellation": true
+                "x-chio-streaming": true,
+                "x-chio-partial-output": true,
+                "x-chio-cancellation": true
             }),
             output_schema: None,
             pricing: None,
@@ -102,15 +102,15 @@ fn demo_manifest() -> ToolManifest {
     }
 }
 
-fn build_demo_state() -> (ArcAcpEdge, ArcKernel, AcpKernelExecutionContext) {
-    let mut kernel = ArcKernel::new(kernel_config());
+fn build_demo_state() -> (ChioAcpEdge, ChioKernel, AcpKernelExecutionContext) {
+    let mut kernel = ChioKernel::new(kernel_config());
     kernel.register_tool_server(Box::new(HelloToolServer));
 
     let agent = Keypair::generate();
     let capability = kernel
         .issue_capability(
             &agent.public_key(),
-            ArcScope {
+            ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "hello-acp-srv".to_string(),
                     tool_name: "hello_tool".to_string(),
@@ -121,7 +121,7 @@ fn build_demo_state() -> (ArcAcpEdge, ArcKernel, AcpKernelExecutionContext) {
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..ArcScope::default()
+                ..ChioScope::default()
             },
             300,
         )
@@ -136,7 +136,7 @@ fn build_demo_state() -> (ArcAcpEdge, ArcKernel, AcpKernelExecutionContext) {
     };
 
     (
-        ArcAcpEdge::new(AcpEdgeConfig::default(), vec![demo_manifest()]).expect("create edge"),
+        ChioAcpEdge::new(AcpEdgeConfig::default(), vec![demo_manifest()]).expect("create edge"),
         kernel,
         execution,
     )

@@ -23,12 +23,12 @@ log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-matrix_src="docs/standards/ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json"
-matrix_snapshot="${output_root}/ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json"
-runbook_src="docs/release/ARC_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md"
-runbook_snapshot="${output_root}/ARC_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md"
-partner_proof_src="docs/release/ARC_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md"
-partner_proof_snapshot="${output_root}/ARC_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md"
+matrix_src="docs/standards/CHIO_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json"
+matrix_snapshot="${output_root}/CHIO_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json"
+runbook_src="docs/release/CHIO_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md"
+runbook_snapshot="${output_root}/CHIO_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md"
+partner_proof_src="docs/release/CHIO_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md"
+partner_proof_snapshot="${output_root}/CHIO_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md"
 cargo_target_dir="target/qualify-universal-control-plane-build"
 
 rm -rf "${output_root}" "${cargo_target_dir}"
@@ -50,11 +50,11 @@ cp "${partner_proof_src}" "${partner_proof_snapshot}"
 export CARGO_TARGET_DIR="${cargo_target_dir}"
 
 run_and_log universal-fabric \
-  cargo test -p arc-cross-protocol -p arc-mcp-edge -p arc-a2a-edge -p arc-acp-edge
+  cargo test -p chio-cross-protocol -p chio-mcp-edge -p chio-a2a-edge -p chio-acp-edge
 run_and_log kernel-authority \
-  cargo test -p arc-http-core -p arc-api-protect -p arc-tower
+  cargo test -p chio-http-core -p chio-api-protect -p chio-tower
 run_and_log control-plane-authority \
-  cargo test -p arc-openai-adapter -p arc-acp-proxy
+  cargo test -p chio-openai-adapter -p chio-acp-proxy
 run_and_log planning-truth \
   node "/Users/connor/.codex/get-shit-done/bin/gsd-tools.cjs" roadmap analyze
 
@@ -62,13 +62,13 @@ cat >"${report_path}" <<'EOF'
 # Universal Control-Plane Qualification Gate
 
 This artifact bundle captures the post-v3.16 technical control-plane
-qualification evidence for ARC's strongest honest technical claim.
+qualification evidence for Chio's strongest honest technical claim.
 
 Decision:
 
-- ARC now qualifies the stronger original technical control-plane thesis on the
+- Chio now qualifies the stronger original technical control-plane thesis on the
   supported authoritative protocol surfaces.
-- The qualified claim is: ARC ships a cryptographically signed, fail-closed,
+- The qualified claim is: Chio ships a cryptographically signed, fail-closed,
   intent-aware governance control plane with shared executor registry
   resolution, signed route-selection evidence, receipt-bearing multi-hop route
   execution, and one shared lifecycle contract across HTTP APIs, MCP, OpenAI
@@ -87,16 +87,16 @@ Still not qualified:
 
 Executed command set:
 
-- `cargo test -p arc-cross-protocol -p arc-mcp-edge -p arc-a2a-edge -p arc-acp-edge`
-- `cargo test -p arc-http-core -p arc-api-protect -p arc-tower`
-- `cargo test -p arc-openai-adapter -p arc-acp-proxy`
+- `cargo test -p chio-cross-protocol -p chio-mcp-edge -p chio-a2a-edge -p chio-acp-edge`
+- `cargo test -p chio-http-core -p chio-api-protect -p chio-tower`
+- `cargo test -p chio-openai-adapter -p chio-acp-proxy`
 - `node "/Users/connor/.codex/get-shit-done/bin/gsd-tools.cjs" roadmap analyze`
 
 Supporting documents:
 
-- `ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
-- `ARC_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md`
-- `ARC_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md`
+- `CHIO_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
+- `CHIO_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md`
+- `CHIO_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md`
 EOF
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

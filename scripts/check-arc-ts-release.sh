@@ -2,10 +2,10 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-source_dir="${repo_root}/packages/sdk/arc-ts"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-ts-release.XXXXXX")"
+source_dir="${repo_root}/packages/sdk/chio-ts"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-ts-release.XXXXXX")"
 repo_copy_dir="${work_dir}/repo"
-sdk_dir="${repo_copy_dir}/packages/sdk/arc-ts"
+sdk_dir="${repo_copy_dir}/packages/sdk/chio-ts"
 consumer_dir="${work_dir}/consumer"
 
 cleanup() {
@@ -14,7 +14,7 @@ cleanup() {
 trap cleanup EXIT
 
 if ! command -v npm >/dev/null 2>&1; then
-  echo "ARC TypeScript release checks require npm on PATH" >&2
+  echo "Chio TypeScript release checks require npm on PATH" >&2
   exit 1
 fi
 
@@ -52,7 +52,7 @@ pack_file="$(
 mkdir -p "${consumer_dir}"
 cat > "${consumer_dir}/package.json" <<'EOF'
 {
-  "name": "arc-ts-release-smoke",
+  "name": "chio-ts-release-smoke",
   "private": true,
   "type": "module"
 }
@@ -62,19 +62,19 @@ EOF
   cd "${consumer_dir}"
   npm install --no-fund --no-audit "${sdk_dir}/${pack_file}"
   node --input-type=module <<'EOF'
-import { ArcClient, ReceiptQueryClient } from "@arc-protocol/sdk";
+import { ChioClient, ReceiptQueryClient } from "@chio-protocol/sdk";
 
-if (typeof ArcClient?.withStaticBearer !== "function") {
-  throw new Error("expected ArcClient.withStaticBearer export");
+if (typeof ChioClient?.withStaticBearer !== "function") {
+  throw new Error("expected ChioClient.withStaticBearer export");
 }
 
 if (typeof ReceiptQueryClient !== "function") {
   throw new Error("expected ReceiptQueryClient export");
 }
 
-const client = ArcClient.withStaticBearer("http://127.0.0.1:8080/mcp", "token");
+const client = ChioClient.withStaticBearer("http://127.0.0.1:8080/mcp", "token");
 if (!client || typeof client.initialize !== "function") {
-  throw new Error("expected initialized ArcClient surface");
+  throw new Error("expected initialized ChioClient surface");
 }
 
 const receiptClient = new ReceiptQueryClient("http://127.0.0.1:8940", "token");
@@ -82,8 +82,8 @@ if (!receiptClient || typeof receiptClient.query !== "function") {
   throw new Error("expected receipt query surface");
 }
 
-console.log("ARC TypeScript package smoke verified");
+console.log("Chio TypeScript package smoke verified");
 EOF
 )
 
-echo "ARC TypeScript release qualification passed"
+echo "Chio TypeScript release qualification passed"

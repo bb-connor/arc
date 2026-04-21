@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import express from "express";
 import http from "node:http";
-import { arc, arcErrorHandler } from "../src/index.js";
-import type { EvaluateResponse } from "@arc-protocol/node-http";
+import { chio, chioErrorHandler } from "../src/index.js";
+import type { EvaluateResponse } from "@chio-protocol/node-http";
 
 // Helper to make HTTP requests to a test server
 async function request(
@@ -148,13 +148,13 @@ describe("arc() middleware", () => {
       const resp = await request(server, "GET", "/test");
       expect(resp.status).toBe(502);
       const body = JSON.parse(resp.body);
-      expect(body.error).toBe("arc_sidecar_unreachable");
+      expect(body.error).toBe("chio_sidecar_unreachable");
     } finally {
       server.close();
     }
   });
 
-  it("fail-open passthroughs do not synthesize ARC receipts", async () => {
+  it("fail-open passthroughs do not synthesize Chio receipts", async () => {
     const app = express();
     app.use(
       arc({
@@ -164,10 +164,10 @@ describe("arc() middleware", () => {
       }),
     );
     app.get("/test", (req, res) => {
-      const arcReq = req as import("../src/index.js").ArcRequest;
+      const chioReq = req as import("../src/index.js").ChioRequest;
       res.json({
-        hasArcResult: arcReq.arcResult != null,
-        arcPassthrough: arcReq.arcPassthrough,
+        hasChioResult: chioReq.chioResult != null,
+        chioPassthrough: chioReq.chioPassthrough,
       });
     });
 
@@ -177,12 +177,12 @@ describe("arc() middleware", () => {
     try {
       const resp = await request(server, "GET", "/test");
       expect(resp.status).toBe(200);
-      expect(resp.headers["x-arc-receipt-id"]).toBeUndefined();
+      expect(resp.headers["x-chio-receipt-id"]).toBeUndefined();
       expect(JSON.parse(resp.body)).toEqual({
-        hasArcResult: false,
-        arcPassthrough: {
+        hasChioResult: false,
+        chioPassthrough: {
           mode: "allow_without_receipt",
-          error: "arc_sidecar_unreachable",
+          error: "chio_sidecar_unreachable",
           message: expect.stringContaining("sidecar"),
         },
       });
@@ -230,8 +230,8 @@ describe("arc() middleware", () => {
   });
 });
 
-describe("arcErrorHandler", () => {
-  it("exports arcErrorHandler as a function", () => {
-    expect(typeof arcErrorHandler).toBe("function");
+describe("chioErrorHandler", () => {
+  it("exports chioErrorHandler as a function", () => {
+    expect(typeof chioErrorHandler).toBe("function");
   });
 });

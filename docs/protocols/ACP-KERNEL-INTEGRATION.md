@@ -1,9 +1,9 @@
 # ACP Proxy Kernel Integration
 
-Technical design specification for integrating `arc-acp-proxy` with the ARC kernel's
+Technical design specification for integrating `chio-acp-proxy` with the Chio kernel's
 receipt signing and capability validation infrastructure.
 
-**Status**: Design Proposal -- Tier 1 Priority  **Date**: 2026-04-13  **Crate**: `arc-acp-proxy`
+**Status**: Design Proposal -- Tier 1 Priority  **Date**: 2026-04-13  **Crate**: `chio-acp-proxy`
 
 > **Status**: Design proposal. The `ReceiptSigner` and `CapabilityChecker` traits
 > described here are not yet implemented. This document specifies the target
@@ -15,7 +15,7 @@ receipt signing and capability validation infrastructure.
 
 The ACP proxy produces **unsigned** `AcpToolCallAuditEntry` objects for tool-call events
 observed in `session/update` notifications. These lack three properties that the MCP and
-A2A adapters provide through kernel-mediated `ArcReceipt` objects:
+A2A adapters provide through kernel-mediated `ChioReceipt` objects:
 
 1. **Non-repudiation.** No cryptographic binding to the kernel's signing key. An attacker
    with write access to the audit log can forge, reorder, or delete entries undetected.
@@ -28,7 +28,7 @@ A2A adapters provide through kernel-mediated `ArcReceipt` objects:
    kernel's `ReceiptStore` or included in Merkle checkpoint batches, breaking the
    commitment chain for organizations running ACP agents alongside MCP tool servers.
 
-This is the single largest security gap in the ARC protocol stack.
+This is the single largest security gap in the Chio protocol stack.
 
 ---
 
@@ -36,11 +36,11 @@ This is the single largest security gap in the ARC protocol stack.
 
 | Goal | Constraint |
 |------|-----------|
-| Signed `ArcReceipt` for ACP tool-call events | Must not force proxy to implement `ToolServerConnection` |
+| Signed `ChioReceipt` for ACP tool-call events | Must not force proxy to implement `ToolServerConnection` |
 | Capability-token validation for resource access | Preserve proxy's boundary architecture |
 | Merkle receipt chain integration | Proxy must not hold private key material |
 | Standalone proxy support (no kernel) | Preserve optional unsigned standalone mode, but label it as outside full attestation claims |
-| Minimal coupling | Traits in `arc-acp-proxy`; impls in `arc-kernel` or bridge crate |
+| Minimal coupling | Traits in `chio-acp-proxy`; impls in `chio-kernel` or bridge crate |
 
 Core decision: **inject the kernel as a service, not as a trait implementation.** The
 proxy accepts `ReceiptSigner` and `CapabilityChecker` via constructor injection. It
@@ -57,7 +57,7 @@ as equivalent to a fully attested ACP event.
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AcpAttestationMode {
-    /// Default for ARC-governed deployments. Unsigned ACP observations are
+    /// Default for Chio-governed deployments. Unsigned ACP observations are
     /// treated as non-compliant evidence gaps.
     Required,
     /// Standalone compatibility mode only. Unsigned ACP observations may still be written,
@@ -75,7 +75,7 @@ pub enum AcpAttestationStatus {
 }
 ```
 
-Any ACP session containing a status other than `FullyAttested` is outside ARC's
+Any ACP session containing a status other than `FullyAttested` is outside Chio's
 full cross-protocol attestation claim and must be excluded from compliance
 certificate issuance unless a later repair flow closes the evidence gap.
 
@@ -88,9 +88,9 @@ certificate issuance unless a later repair flow closes the evidence gap.
 Both traits are `Option`-wrapped in `MessageInterceptor`. When `None`, the proxy uses
 the existing unsigned `AcpToolCallAuditEntry` path.
 
-> **Note on imports**: Types are imported from `arc_core`, which re-exports from
-> `arc_core_types`. In Cargo.toml, depend on
-> `arc-core = { package = "arc-core-types", path = "../arc-core-types" }`.
+> **Note on imports**: Types are imported from `chio_core`, which re-exports from
+> `chio_core_types`. In Cargo.toml, depend on
+> `chio-core = { package = "chio-core-types", path = "../chio-core-types" }`.
 
 ```rust
 pub struct MessageInterceptor {
@@ -120,7 +120,7 @@ the interceptor consults `CapabilityChecker` (if present) before the existing gu
 Both layers must allow; either can deny (defense-in-depth).
 
 **Post-observation:** On `session/update` with a tool-call event, the interceptor builds
-an `AcpToolCallAuditEntry`, then promotes it to a signed `ArcReceipt` via
+an `AcpToolCallAuditEntry`, then promotes it to a signed `ChioReceipt` via
 `ReceiptSigner`.
 
 - In `Required` mode, signer failure emits an explicit attestation-gap artifact
@@ -135,7 +135,7 @@ an `AcpToolCallAuditEntry`, then promotes it to a signed `ArcReceipt` via
 ## 4. `ReceiptSigner` Trait Design
 
 ```rust
-use arc_core::receipt::ArcReceipt;
+use chio_core::receipt::ChioReceipt;
 
 /// Scope context for the resource or action being attested.
 #[derive(Debug, Clone)]
@@ -148,7 +148,7 @@ pub enum AcpScopeContext {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileOperation { Read, Write }
 
-/// Parameters for signing an ACP tool-call event into an ARC receipt.
+/// Parameters for signing an ACP tool-call event into an Chio receipt.
 #[derive(Debug, Clone)]
 pub struct AcpReceiptRequest {
     /// Unique tool call ID from the ACP protocol.
@@ -175,15 +175,15 @@ pub enum ReceiptSignError {
     Internal(String),
 }
 
-/// Signs ACP audit events into ARC receipts.
+/// Signs ACP audit events into Chio receipts.
 ///
 /// Implementations hold or delegate to the kernel's signing key.
 /// The proxy never touches key material directly.
 pub trait ReceiptSigner: Send + Sync {
-    /// Promote an ACP tool-call event into a signed `ArcReceipt`.
+    /// Promote an ACP tool-call event into a signed `ChioReceipt`.
     ///
     /// Responsible for: generating receipt ID (UUIDv7), populating
-    /// `capability_id` and `policy_hash`, building `ArcReceiptBody`,
+    /// `capability_id` and `policy_hash`, building `ChioReceiptBody`,
     /// signing with the kernel keypair, and appending to `ReceiptStore`.
     ///
     /// Errors surface as explicit degraded-attestation states. Unsigned
@@ -191,7 +191,7 @@ pub trait ReceiptSigner: Send + Sync {
     fn sign_acp_receipt(
         &self,
         request: &AcpReceiptRequest,
-    ) -> Result<ArcReceipt, ReceiptSignError>;
+    ) -> Result<ChioReceipt, ReceiptSignError>;
 }
 ```
 
@@ -200,7 +200,7 @@ pub trait ReceiptSigner: Send + Sync {
 ## 5. `CapabilityChecker` Trait Design
 
 ```rust
-/// Capability check verdict (local to arc-acp-proxy to avoid kernel dependency).
+/// Capability check verdict (local to chio-acp-proxy to avoid kernel dependency).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AcpVerdict {
     Allow,
@@ -234,7 +234,7 @@ pub enum CapabilityCheckError {
     Internal(String),
 }
 
-/// Validates ACP resource access against ARC capability tokens.
+/// Validates ACP resource access against Chio capability tokens.
 ///
 /// Implementations consult the kernel's capability authority, revocation
 /// store, and budget store. The proxy calls this before forwarding
@@ -270,7 +270,7 @@ pub enum InterceptResult {
 }
 
 pub enum AcpAttestationArtifact {
-    SignedReceipt(ArcReceipt),
+    SignedReceipt(ChioReceipt),
     Gap(AcpAttestationGap),
     UnsignedObservation(AcpToolCallAuditEntry),
 }
@@ -320,7 +320,7 @@ receipts: Ed25519 signature over canonical JSON, embedded `kernel_key`,
 `content_hash` from the ACP event, `policy_hash`, and inclusion in the Merkle
 checkpoint chain when a `ReceiptStore` is configured.
 
-**Compliance boundary honesty.** ARC may still enforce policy even when ACP
+**Compliance boundary honesty.** Chio may still enforce policy even when ACP
 attestation is degraded, but such sessions must not be described as fully
 attested. This preserves the integrity of cross-protocol claims.
 
@@ -331,10 +331,10 @@ attested. This preserves the integrity of cross-protocol claims.
 ### 8.1 Kernel-Backed ReceiptSigner
 
 ```rust
-use arc_core::crypto::Keypair;
-use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
-use arc_core::crypto::sha256_hex;
-use arc_acp_proxy::{AcpReceiptRequest, ReceiptSigner, ReceiptSignError};
+use chio_core::crypto::Keypair;
+use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction};
+use chio_core::crypto::sha256_hex;
+use chio_acp_proxy::{AcpReceiptRequest, ReceiptSigner, ReceiptSignError};
 
 pub struct KernelReceiptSigner {
     keypair: Keypair,
@@ -346,7 +346,7 @@ impl ReceiptSigner for KernelReceiptSigner {
     fn sign_acp_receipt(
         &self,
         req: &AcpReceiptRequest,
-    ) -> Result<ArcReceipt, ReceiptSignError> {
+    ) -> Result<ChioReceipt, ReceiptSignError> {
         let action = ToolCallAction {
             parameters: serde_json::json!({
                 "tool_call_id": req.tool_call_id,
@@ -354,7 +354,7 @@ impl ReceiptSigner for KernelReceiptSigner {
             }),
             parameter_hash: sha256_hex(req.tool_call_id.as_bytes()),
         };
-        let body = ArcReceiptBody {
+        let body = ChioReceiptBody {
             id: format!("rcpt-acp-{}", uuid::Uuid::now_v7()),
             timestamp: current_unix_secs(),
             capability_id: self.capability_id.clone(),
@@ -371,7 +371,7 @@ impl ReceiptSigner for KernelReceiptSigner {
             })),
             kernel_key: self.keypair.public_key(),
         };
-        ArcReceipt::sign(body, &self.keypair)
+        ChioReceipt::sign(body, &self.keypair)
             .map_err(|e| ReceiptSignError::Internal(e.to_string()))
     }
 }
@@ -407,7 +407,7 @@ tool registry with a phantom server.
 command allowlists without capability-token infrastructure). A hard kernel requirement
 would eliminate that use case.
 
-**Why define traits in `arc-acp-proxy`?** Dependency direction: the proxy should not
-depend on `arc-kernel` at compile time. The kernel (or bridge crate) depends on the
+**Why define traits in `chio-acp-proxy`?** Dependency direction: the proxy should not
+depend on `chio-kernel` at compile time. The kernel (or bridge crate) depends on the
 proxy's trait definitions, keeping the proxy lightweight and avoiding the kernel's
 dependency tree in editor integrations.

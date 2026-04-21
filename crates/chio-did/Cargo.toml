@@ -1,0 +1,23 @@
+[package]
+name = "chio-did"
+description = "Self-certifying did:chio documents and resolution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_did"
+
+[dependencies]
+chio-core = { path = "../chio-core" }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+bs58 = { workspace = true }
+url = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

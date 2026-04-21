@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Elysia } from "elysia";
-import { arc } from "../src/index.js";
+import { chio } from "../src/index.js";
 
 describe("arc elysia plugin", () => {
   it("exports arc as a function", () => {
@@ -47,7 +47,7 @@ describe("arc elysia plugin", () => {
 
     expect(response.status).toBe(502);
     const body = await response.json();
-    expect(body.error).toBe("arc_sidecar_unreachable");
+    expect(body.error).toBe("chio_sidecar_unreachable");
   });
 
   it("allows requests when onSidecarError is allow", async () => {

@@ -1,11 +1,11 @@
 import express from "express";
-import { arc, arcErrorHandler } from "@arc-protocol/express";
+import { chio, chioErrorHandler } from "@chio-protocol/express";
 
 const app = express();
 
 app.use(
-  arc({
-    sidecarUrl: process.env["ARC_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
+  chio({
+    sidecarUrl: process.env["CHIO_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
     skip: ["/healthz"],
   }),
 );
@@ -18,19 +18,19 @@ app.get("/healthz", (_req, res) => {
 app.get("/hello", (req, res) => {
   res.json({
     message: "hello from express",
-    receipt_id: req.arcResult?.receipt.id ?? null,
+    receipt_id: req.chioResult?.receipt.id ?? null,
   });
 });
 
 app.post("/echo", (req, res) => {
   res.json({
     ...(typeof req.body === "object" && req.body !== null ? req.body : { payload: req.body }),
-    receipt_id: req.arcResult?.receipt.id ?? null,
+    receipt_id: req.chioResult?.receipt.id ?? null,
     has_raw_body: Buffer.isBuffer(req.rawBody),
   });
 });
 
-app.use(arcErrorHandler);
+app.use(chioErrorHandler);
 
 const port = Number(process.env["HELLO_EXPRESS_PORT"] ?? "8011");
 app.listen(port, "127.0.0.1", () => {

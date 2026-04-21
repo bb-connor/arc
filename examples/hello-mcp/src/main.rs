@@ -1,14 +1,14 @@
 use std::error::Error;
 use std::io::{self, BufRead, Write};
 
-use arc_core::capability::{ArcScope, Operation, ToolGrant};
-use arc_core::crypto::Keypair;
-use arc_kernel::{
-    ArcKernel, KernelError, KernelConfig, ToolCallOutput, ToolCallRequest, ToolServerConnection,
+use chio_core::capability::{ChioScope, Operation, ToolGrant};
+use chio_core::crypto::Keypair;
+use chio_kernel::{
+    ChioKernel, KernelError, KernelConfig, ToolCallOutput, ToolCallRequest, ToolServerConnection,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use arc_manifest::{ToolDefinition, ToolManifest};
-use arc_mcp_edge::{ArcMcpEdge, McpEdgeConfig};
+use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_mcp_edge::{ChioMcpEdge, McpEdgeConfig};
 use serde_json::{json, Value};
 
 struct HelloServer;
@@ -26,7 +26,7 @@ impl ToolServerConnection for HelloServer {
         &self,
         _tool_name: &str,
         arguments: Value,
-        _nested_flow_bridge: Option<&mut dyn arc_kernel::NestedFlowBridge>,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
     ) -> Result<Value, KernelError> {
         let name = arguments
             .get("name")
@@ -59,7 +59,7 @@ fn kernel_config(authority: Keypair) -> KernelConfig {
 fn demo_manifest() -> ToolManifest {
     let manifest_key = Keypair::generate();
     ToolManifest {
-        schema: "arc.manifest.v1".to_string(),
+        schema: "chio.manifest.v1".to_string(),
         server_id: "hello-mcp-srv".to_string(),
         name: "Hello MCP Server".to_string(),
         description: Some("Minimal governed MCP hello tool".to_string()),
@@ -89,16 +89,16 @@ fn demo_manifest() -> ToolManifest {
     }
 }
 
-fn build_demo_state() -> (ArcKernel, arc_core::capability::CapabilityToken, String, ToolManifest) {
+fn build_demo_state() -> (ChioKernel, chio_core::capability::CapabilityToken, String, ToolManifest) {
     let authority = Keypair::generate();
-    let mut kernel = ArcKernel::new(kernel_config(authority.clone()));
+    let mut kernel = ChioKernel::new(kernel_config(authority.clone()));
     kernel.register_tool_server(Box::new(HelloServer));
 
     let agent = Keypair::generate();
     let capability = kernel
         .issue_capability(
             &agent.public_key(),
-            ArcScope {
+            ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "hello-mcp-srv".to_string(),
                     tool_name: "hello_tool".to_string(),
@@ -109,7 +109,7 @@ fn build_demo_state() -> (ArcKernel, arc_core::capability::CapabilityToken, Stri
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..ArcScope::default()
+                ..ChioScope::default()
             },
             300,
         )
@@ -118,9 +118,9 @@ fn build_demo_state() -> (ArcKernel, arc_core::capability::CapabilityToken, Stri
     (kernel, capability, agent.public_key().to_hex(), demo_manifest())
 }
 
-fn make_edge() -> ArcMcpEdge {
+fn make_edge() -> ChioMcpEdge {
     let (kernel, capability, agent_id, manifest) = build_demo_state();
-    ArcMcpEdge::new(
+    ChioMcpEdge::new(
         McpEdgeConfig::default(),
         kernel,
         agent_id,

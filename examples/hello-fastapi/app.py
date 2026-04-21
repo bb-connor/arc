@@ -5,8 +5,8 @@ import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from arc_asgi import ArcASGIMiddleware
-from arc_asgi.config import ArcASGIConfig
+from chio_asgi import ChioASGIMiddleware
+from chio_asgi.config import ChioASGIConfig
 
 
 class EchoRequest(BaseModel):
@@ -24,9 +24,9 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(
-        ArcASGIMiddleware,
-        config=ArcASGIConfig(
-            sidecar_url=os.environ.get("ARC_SIDECAR_URL", "http://127.0.0.1:9090"),
+        ChioASGIMiddleware,
+        config=ChioASGIConfig(
+            sidecar_url=os.environ.get("CHIO_SIDECAR_URL", "http://127.0.0.1:9090"),
             exclude_paths=frozenset({"/healthz"}),
         ),
     )

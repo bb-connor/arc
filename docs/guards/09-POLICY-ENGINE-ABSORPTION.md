@@ -1,9 +1,9 @@
-# Policy Engine Absorption: ClawdStrike into ARC
+# Policy Engine Absorption: ClawdStrike into Chio
 
-ARC is becoming the universal security kernel. A universal kernel needs a
+Chio is becoming the universal security kernel. A universal kernel needs a
 policy engine that compiles declarative YAML into the guard pipeline. Today
 that engine lives in ClawdStrike. This document specifies the plan to absorb
-it into ARC.
+it into Chio.
 
 ---
 
@@ -184,23 +184,23 @@ tamper-evident policy distribution.
 
 ---
 
-## 2. What ARC's arc-policy Already Has
+## 2. What Chio's chio-policy Already Has
 
 ### 2.1 Complete HushSpec schema
 
-`arc-policy/src/models.rs` defines the full HushSpec schema as native Rust
+`chio-policy/src/models.rs` defines the full HushSpec schema as native Rust
 types. It covers all 10 rule types (forbidden_paths, path_allowlist, egress,
 secret_patterns, patch_integrity, shell_commands, tool_access, computer_use,
 remote_desktop_channels, input_injection) and all extension modules (posture,
 origins, detection, reputation, runtime_assurance).
 
-ARC's schema is a superset of ClawdStrike's HushSpec support -- it includes
+Chio's schema is a superset of ClawdStrike's HushSpec support -- it includes
 `reputation` and `runtime_assurance` extensions, plus `WorkloadIdentityMatch`
 on tool_access rules, plus `GovernanceMetadata`.
 
 ### 2.2 Validation
 
-`arc-policy/src/validate.rs` validates the full HushSpec schema:
+`chio-policy/src/validate.rs` validates the full HushSpec schema:
 - Version checks against `HUSHSPEC_SUPPORTED_VERSIONS`
 - Regex compilation for secret patterns, shell commands, patch integrity
 - Posture state machine consistency
@@ -210,21 +210,21 @@ on tool_access rules, plus `GovernanceMetadata`.
 
 ### 2.3 Merge/inheritance
 
-`arc-policy/src/merge.rs` implements deep merge for HushSpec documents:
+`chio-policy/src/merge.rs` implements deep merge for HushSpec documents:
 - Rule-level merge (child rules override base per slot)
 - Extension deep merge (posture states merge by name, origins profiles merge
   by ID, detection fields merge per-field with Option fallback, reputation
   tiers and scoring weights merge individually)
 - `Replace`, `Merge`, `DeepMerge` strategies
 
-`arc-policy/src/resolve.rs` resolves `extends` chains:
+`chio-policy/src/resolve.rs` resolves `extends` chains:
 - Filesystem-based resolution with relative path support
 - Cycle detection via stack tracking
 - `create_composite_loader()` for extensible loading
 
 ### 2.4 Conditions
 
-`arc-policy/src/conditions.rs` provides conditional rule activation:
+`chio-policy/src/conditions.rs` provides conditional rule activation:
 - `Condition` type with `time_window`, `context`, `all_of`, `any_of`, `not`
 - `RuntimeContext` with user, environment, deployment, agent, session, request,
   custom fields
@@ -232,24 +232,24 @@ on tool_access rules, plus `GovernanceMetadata`.
 
 ### 2.5 Detection
 
-`arc-policy/src/detection.rs` provides regex-based content detectors for
+`chio-policy/src/detection.rs` provides regex-based content detectors for
 prompt injection, jailbreak, and secret patterns.
 
 ### 2.6 Evaluation
 
-`arc-policy/src/evaluate.rs` evaluates a HushSpec policy against an action,
+`chio-policy/src/evaluate.rs` evaluates a HushSpec policy against an action,
 producing `Allow`, `Warn`, or `Deny` decisions. It handles posture-aware
 evaluation, origin profile selection, and produces `EvaluationResult` with
 matched rules and reasons.
 
 ### 2.7 Receipts
 
-`arc-policy/src/receipt.rs` wraps evaluation in auditable receipts with
+`chio-policy/src/receipt.rs` wraps evaluation in auditable receipts with
 timing, hashing, and decision metadata.
 
 ### 2.8 Compiler bridge
 
-`arc-policy/src/compiler.rs` compiles HushSpec policies into ARC guard
+`chio-policy/src/compiler.rs` compiles HushSpec policies into Chio guard
 pipelines:
 
 ```rust
@@ -260,7 +260,7 @@ pub fn compile_policy(policy: &HushSpec) -> Result<CompiledPolicy, CompileError>
 }
 ```
 
-This maps 7 rule types to ARC guard instances:
+This maps 7 rule types to Chio guard instances:
 - `forbidden_paths` -> `ForbiddenPathGuard`
 - `shell_commands` -> `ShellCommandGuard`
 - `egress` -> `EgressAllowlistGuard`
@@ -269,40 +269,40 @@ This maps 7 rule types to ARC guard instances:
 - `patch_integrity` -> `PatchIntegrityGuard`
 - `path_allowlist` -> `PathAllowlistGuard`
 
-It also derives an `ArcScope` from tool_access rules.
+It also derives an `ChioScope` from tool_access rules.
 
 ---
 
 ## 3. Gap Analysis
 
-| Capability | ClawdStrike | ARC (arc-policy) | Gap |
+| Capability | ClawdStrike | Chio (chio-policy) | Gap |
 |-----------|-------------|------------------|-----|
-| Schema format | Native YAML with versioned schema | HushSpec YAML (0.1.0) | ARC lacks a native policy format with schema versioning |
-| Schema versioning | 1.1.0 - 1.5.0 with feature gating | 0.1.0 only | ARC needs versioned schema evolution |
+| Schema format | Native YAML with versioned schema | HushSpec YAML (0.1.0) | Chio lacks a native policy format with schema versioning |
+| Schema versioning | 1.1.0 - 1.5.0 with feature gating | 0.1.0 only | Chio needs versioned schema evolution |
 | Guard compilation | 12 guard types + async + custom | 7 guard types, sync only | Missing: prompt_injection, jailbreak, computer_use, remote_desktop, input_injection |
 | Custom guards | `PolicyCustomGuardSpec` + `CustomGuardRegistry` | None | No policy-driven custom guard instantiation |
 | Built-in rulesets | 11 rulesets via `include_str!()` | None | No built-in rulesets |
 | Signed bundles | `SignedPolicyBundle` with Ed25519 | None | No tamper-evident policy distribution |
 | Policy resolver | `PolicyResolver` trait with filesystem + builtin | Filesystem + cycle detection | Missing: builtin rulesets, git/package locations |
 | Merge strategy | Deep merge with `additional_*`/`remove_*` modifiers | Deep merge, no additive/subtractive modifiers | Merge is simpler; lacks overlay operators |
-| Async guards | `AsyncGuardRuntime` + policy-driven config | None | Async guard support deferred for ARC |
-| HushSpec interop | Bidirectional compiler (compile + decompile) | One-way (compile only) | Decompile not needed for ARC |
+| Async guards | `AsyncGuardRuntime` + policy-driven config | None | Async guard support deferred for Chio |
+| HushSpec interop | Bidirectional compiler (compile + decompile) | One-way (compile only) | Decompile not needed for Chio |
 | Validation depth | Glob, regex, placeholder, cross-field, version gating | Regex, posture, detection, reputation | Missing: glob validation, placeholder support |
 | Settings | fail_fast, verbose_logging, session_timeout, verification | None | No policy-level kernel settings |
 | Posture program | `PostureProgram` compiled from config | Posture in schema and eval, not compiled | No compiled state machine for the kernel |
 | Origin runtime | `OriginRuntimeState`, budget counters, bridge checks | Origin matching in evaluation | No runtime state tracking |
-| Broker policy | `BrokerConfig` for provider-mediated egress | None | Not needed for ARC v1 |
+| Broker policy | `BrokerConfig` for provider-mediated egress | None | Not needed for Chio v1 |
 
 ### Critical gaps for universal kernel
 
-1. **Guard compilation coverage**: ARC compiles 7 of 12 guard types. The
+1. **Guard compilation coverage**: Chio compiles 7 of 12 guard types. The
    missing 5 (prompt_injection, jailbreak, computer_use, remote_desktop,
    input_injection) are defined in the schema but not compiled to guards.
 
 2. **Built-in rulesets**: operators should be able to write
    `extends: arc:strict` without shipping YAML files.
 
-3. **Schema versioning**: ARC needs its own versioned schema so policies
+3. **Schema versioning**: Chio needs its own versioned schema so policies
    can be forward-compatible and feature-gated.
 
 4. **WASM guard declaration in policy**: the policy format has no way to
@@ -319,24 +319,24 @@ It also derives an `ArcScope` from tool_access rules.
 ### 4.1 Strategy: absorb, don't wrap
 
 ClawdStrike's policy engine was built for ClawdStrike's async guard trait.
-ARC has its own synchronous `Guard` trait and its own guard implementations.
+Chio has its own synchronous `Guard` trait and its own guard implementations.
 Wrapping ClawdStrike as a dependency would drag in async runtime,
 ClawdStrike-specific guard types, and an incompatible guard interface.
 
-Instead: **absorb the design patterns into arc-policy** while keeping ARC's
+Instead: **absorb the design patterns into chio-policy** while keeping Chio's
 type system.
 
-### 4.2 What moves into arc-policy
+### 4.2 What moves into chio-policy
 
 | Feature | Source | Target | Adaptation |
 |---------|--------|--------|------------|
 | Guard compilation (full) | `policy.create_guards()` | `compiler::compile_policy()` | Add 5 missing guard types to existing compiler |
-| Built-in rulesets | `RuleSet`, `rulesets/` | `arc-policy/rulesets/` + `Ruleset` enum | Port YAML files; adapt to HushSpec format |
-| Schema versioning | `POLICY_SCHEMA_VERSION` | `version.rs` | ARC uses its own version track |
+| Built-in rulesets | `RuleSet`, `rulesets/` | `chio-policy/rulesets/` + `Ruleset` enum | Port YAML files; adapt to HushSpec format |
+| Schema versioning | `POLICY_SCHEMA_VERSION` | `version.rs` | Chio uses its own version track |
 | Policy resolver (builtins) | `PolicyResolver` trait | `resolve.rs` | Extend existing resolver with builtin support |
 | Merge modifiers | `additional_*`/`remove_*` | `merge.rs` | Add additive/subtractive operators to HushSpec merge |
 | PolicySettings | `PolicySettings` | New `settings` module | Map settings to kernel config |
-| Signed bundles | `PolicyBundle`, `SignedPolicyBundle` | New `bundle` module | Use ARC's existing signing primitives |
+| Signed bundles | `PolicyBundle`, `SignedPolicyBundle` | New `bundle` module | Use Chio's existing signing primitives |
 | Custom guard specs | `PolicyCustomGuardSpec` | New `custom_guards` field on `HushSpec` | Bridge to WASM guard loading |
 | Load-time verification | `install_policy_load_verifier()` | Hook on kernel load | Policy integrity check at startup |
 
@@ -347,26 +347,26 @@ type system.
 - `HushEngine` (ClawdStrike's enforcement engine)
 - ClawdStrike-specific guards (Spider Sense threat intel, output sanitizer)
 - Bidirectional HushSpec compiler (only needed inside ClawdStrike)
-- Broker policy (not applicable to ARC's model)
+- Broker policy (not applicable to Chio's model)
 
 ### 4.4 Phased implementation
 
 **Phase 1: Complete guard compilation**
 
-Extend `arc-policy/src/compiler.rs` to compile all guard types that
-`arc-guards` implements. This requires adding guards that ARC already has
+Extend `chio-policy/src/compiler.rs` to compile all guard types that
+`chio-guards` implements. This requires adding guards that Chio already has
 Rust implementations for but does not compile from policy:
 
 ```rust
 // In compile_guards(), add:
-// computer_use -> ComputerUseGuard (if arc-guards has it)
+// computer_use -> ComputerUseGuard (if chio-guards has it)
 // remote_desktop_channels -> RemoteDesktopSideChannelGuard
 // input_injection -> InputInjectionCapabilityGuard
 // detection.prompt_injection -> PromptInjectionGuard
 // detection.jailbreak -> JailbreakGuard
 ```
 
-For guards that ARC does not yet have native implementations of, the
+For guards that Chio does not yet have native implementations of, the
 compiler should emit a warning and skip (fail-open for missing guard
 implementations, fail-closed for misconfigured existing guards).
 
@@ -375,7 +375,7 @@ implementations, fail-closed for misconfigured existing guards).
 Port ClawdStrike's rulesets to HushSpec format and embed them:
 
 ```rust
-// arc-policy/src/rulesets.rs
+// chio-policy/src/rulesets.rs
 pub enum BuiltinRuleset {
     Default,
     Strict,
@@ -427,7 +427,7 @@ pub fn create_composite_loader() -> impl Fn(&str, Option<&str>)
 
 **Phase 3: Schema versioning**
 
-ARC's HushSpec schema starts at `0.1.0`. As features are absorbed, the
+Chio's HushSpec schema starts at `0.1.0`. As features are absorbed, the
 version increments:
 
 | Version | Added |
@@ -451,8 +451,8 @@ pub fn version_supports_custom_guards(version: &str) -> bool {
 
 **Phase 5: Signed bundles**
 
-Port `PolicyBundle` and `SignedPolicyBundle`, using ARC's existing
-`arc-core` signing primitives instead of `hush-core`:
+Port `PolicyBundle` and `SignedPolicyBundle`, using Chio's existing
+`chio-core` signing primitives instead of `hush-core`:
 
 ```rust
 pub struct PolicyBundle {
@@ -460,14 +460,14 @@ pub struct PolicyBundle {
     pub bundle_id: String,
     pub compiled_at: String,
     pub policy: HushSpec,
-    pub policy_hash: arc_core::Hash,
+    pub policy_hash: chio_core::Hash,
     pub sources: Vec<String>,
 }
 
 pub struct SignedPolicyBundle {
     pub bundle: PolicyBundle,
-    pub signature: arc_core::Signature,
-    pub public_key: Option<arc_core::PublicKey>,
+    pub signature: chio_core::Signature,
+    pub public_key: Option<chio_core::PublicKey>,
 }
 ```
 
@@ -568,7 +568,7 @@ validates the spec and passes it through:
 ```rust
 pub struct CompiledPolicy {
     pub guards: GuardPipeline,
-    pub default_scope: ArcScope,
+    pub default_scope: ChioScope,
     pub custom_guards: Vec<CustomGuardSpec>,  // new
     pub settings: Option<PolicySettings>,     // new
 }
@@ -591,15 +591,15 @@ Section 1.
 
 ### 6.1 Which rulesets to port
 
-| ClawdStrike ruleset | Port to ARC? | Rationale |
+| ClawdStrike ruleset | Port to Chio? | Rationale |
 |---------------------|-------------|-----------|
 | `default` | Yes | Universal baseline; every deployment needs a starting point |
 | `strict` | Yes | High-security baseline for production |
 | `permissive` | Yes | Development and testing |
-| `ai-agent` | Yes | Primary use case for ARC |
+| `ai-agent` | Yes | Primary use case for Chio |
 | `ai-agent-posture` | Yes | Demonstrates posture state machine |
 | `cicd` | Yes | Common deployment context |
-| `remote-desktop` | No | ClawdStrike-specific use case, not relevant to ARC's agent model |
+| `remote-desktop` | No | ClawdStrike-specific use case, not relevant to Chio's agent model |
 | `remote-desktop-strict` | No | Same |
 | `remote-desktop-permissive` | No | Same |
 | `spider-sense` | No | Depends on ClawdStrike's threat intel infrastructure |
@@ -607,7 +607,7 @@ Section 1.
 
 ### 6.2 Adaptation required
 
-ClawdStrike rulesets use ClawdStrike's native YAML format. ARC rulesets must
+ClawdStrike rulesets use ClawdStrike's native YAML format. Chio rulesets must
 use HushSpec format. The translation is mechanical:
 
 ClawdStrike native:
@@ -620,7 +620,7 @@ guards:
     allow: [...]
 ```
 
-ARC HushSpec:
+Chio HushSpec:
 ```yaml
 hushspec: "0.1.0"
 rules:
@@ -656,28 +656,28 @@ is for clarity when mixing with filesystem paths.
 
 ### 7.1 The vision
 
-A single HushSpec policy configures guards across all ARC integration
+A single HushSpec policy configures guards across all Chio integration
 surfaces:
 
 ```
 HushSpec YAML
   |
   v
-arc-policy compiler
+chio-policy compiler
   |
   +--> GuardPipeline (native guards)
   |      |
-  |      +--> arc-kernel (direct tool calls)
-  |      +--> arc-mcp-edge (MCP protocol)
-  |      +--> arc-a2a-edge (A2A protocol)
-  |      +--> arc-openai (OpenAI-compatible API)
-  |      +--> arc-api-protect (HTTP proxy)
+  |      +--> chio-kernel (direct tool calls)
+  |      +--> chio-mcp-edge (MCP protocol)
+  |      +--> chio-a2a-edge (A2A protocol)
+  |      +--> chio-openai (OpenAI-compatible API)
+  |      +--> chio-api-protect (HTTP proxy)
   |
   +--> CustomGuardSpec[] (WASM guards)
   |      |
-  |      +--> arc-wasm-guards runtime
+  |      +--> chio-wasm-guards runtime
   |
-  +--> ArcScope (default capability scope)
+  +--> ChioScope (default capability scope)
   |
   +--> PolicySettings (kernel configuration)
 ```
@@ -743,21 +743,21 @@ ClawdStrike's native schema versions:
 | 1.4.0 | origins extension |
 | 1.5.0 | broker extension, custom guards with async config |
 
-### 8.2 ARC's HushSpec schema lineage
+### 8.2 Chio's HushSpec schema lineage
 
-ARC uses HushSpec format, which has its own version track. The current
-version is `0.1.0` (pre-stable). ARC's schema already contains features
+Chio uses HushSpec format, which has its own version track. The current
+version is `0.1.0` (pre-stable). Chio's schema already contains features
 that ClawdStrike added incrementally (posture, origins, detection,
 reputation, runtime assurance).
 
-ARC's schema evolution is independent of ClawdStrike's. The HushSpec
-compiler in ClawdStrike handles the translation. ARC does not need to track
+Chio's schema evolution is independent of ClawdStrike's. The HushSpec
+compiler in ClawdStrike handles the translation. Chio does not need to track
 ClawdStrike's version numbers.
 
 ### 8.3 Forward compatibility contract
 
 ```rust
-// arc-policy/src/version.rs
+// chio-policy/src/version.rs
 
 pub const HUSHSPEC_VERSION: &str = "0.1.0";
 pub const HUSHSPEC_SUPPORTED_VERSIONS: &[&str] = &["0.1.0"];
@@ -777,7 +777,7 @@ The rules:
 
 ### 8.4 Version bump cadence
 
-ARC increments the HushSpec minor version when adding:
+Chio increments the HushSpec minor version when adding:
 - New rule types to the `rules` block
 - New extension modules
 - New top-level sections (e.g., `custom_guards`, `settings`)
@@ -795,12 +795,12 @@ backward-incompatible changes require migration support.
 ### 9.1 Compiled policy output
 
 ```rust
-/// The result of compiling a HushSpec policy into ARC primitives.
+/// The result of compiling a HushSpec policy into Chio primitives.
 pub struct CompiledPolicy {
     /// Native guard pipeline configured from policy rules.
     pub guards: GuardPipeline,
     /// Default capability scope derived from tool_access rules.
-    pub default_scope: ArcScope,
+    pub default_scope: ChioScope,
     /// WASM and builtin custom guard specifications.
     pub custom_guards: Vec<CustomGuardSpec>,
     /// Policy-level settings for kernel configuration.
@@ -832,7 +832,7 @@ pub struct PolicySettings {
 ### 9.3 Builtin ruleset type
 
 ```rust
-/// Built-in rulesets shipped with ARC.
+/// Built-in rulesets shipped with Chio.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuiltinRuleset {
     Default,
@@ -889,9 +889,9 @@ pub fn create_composite_loader() -> impl Fn(&str, Option<&str>)
 ### 9.5 Kernel integration sketch
 
 ```rust
-// In arc-kernel startup or edge crate setup:
+// In chio-kernel startup or edge crate setup:
 
-use arc_policy::{compile_policy, resolve_from_path, validate};
+use chio_policy::{compile_policy, resolve_from_path, validate};
 
 // Load and resolve
 let spec = resolve_from_path("./policy.yaml")?;
@@ -904,7 +904,7 @@ if !validation.is_valid() {
 let compiled = compile_policy(&spec)?;
 
 // Build kernel
-let mut kernel = ArcKernel::new(identity);
+let mut kernel = ChioKernel::new(identity);
 
 // Register native guards
 for guard in compiled.guards.into_guards() {
@@ -935,7 +935,7 @@ if let Some(settings) = compiled.settings {
 
 ## 10. Open Questions
 
-1. **Should arc-policy depend on arc-guards?** Currently it does (compiler.rs
+1. **Should chio-policy depend on chio-guards?** Currently it does (compiler.rs
    imports guard types). This is acceptable for the compiler module but
    creates a coupling. Alternative: compiler returns configuration structs
    and the kernel performs instantiation. Decision: keep the current coupling
@@ -953,13 +953,13 @@ if let Some(settings) = compiled.settings {
    implement it yet.
 
 4. **Remote policy resolution.** ClawdStrike supports `PolicyLocation::Git`
-   and `PolicyLocation::Url`. ARC should add these when needed, behind a
+   and `PolicyLocation::Url`. Chio should add these when needed, behind a
    feature flag. Not required for initial absorption.
 
-5. **Detection guard compilation.** ARC has `detection.rs` with regex-based
+5. **Detection guard compilation.** Chio has `detection.rs` with regex-based
    detectors but does not have native `PromptInjectionGuard` or
-   `JailbreakGuard` implementations in `arc-guards`. These would need to be
+   `JailbreakGuard` implementations in `chio-guards`. These would need to be
    implemented or the detection extension would only work through
-   `arc-policy`'s own evaluation path (not the kernel guard pipeline).
-   Decision: implement minimal detection guards in `arc-guards` that delegate
-   to `arc-policy::detection`.
+   `chio-policy`'s own evaluation path (not the kernel guard pipeline).
+   Decision: implement minimal detection guards in `chio-guards` that delegate
+   to `chio-policy::detection`.

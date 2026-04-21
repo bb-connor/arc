@@ -1,16 +1,16 @@
 # Web Backend Quickstart
 
-This is the supported order for web backends in ARC:
+This is the supported order for web backends in Chio:
 
 1. start with [`examples/hello-openapi-sidecar/`](/Users/connor/Medica/backbay/standalone/arc/examples/hello-openapi-sidecar)
 2. move to [`examples/hello-fastapi/`](/Users/connor/Medica/backbay/standalone/arc/examples/hello-fastapi) only if you specifically want app-level Python integration
 
 That ordering is intentional.
 
-- `hello-openapi-sidecar` is first because the upstream app stays plain. ARC
+- `hello-openapi-sidecar` is first because the upstream app stays plain. Chio
   lives entirely in the OpenAPI sidecar, so you can prove deny, allow, and
   receipt behavior before adopting a framework SDK.
-- `hello-fastapi` is second because it adds `arc-asgi` and `arc-fastapi` on top
+- `hello-fastapi` is second because it adds `chio-asgi` and `chio-fastapi` on top
   of the same local sidecar model.
 
 ## Shared Verification Flow

@@ -1,6 +1,6 @@
-# ARC Wire Schemas v1
+# Chio Wire Schemas v1
 
-These files are the machine-readable schema contract for the shipped native ARC
+These files are the machine-readable schema contract for the shipped native Chio
 message families defined in [WIRE_PROTOCOL.md](../../../WIRE_PROTOCOL.md).
 
 Directory layout:
@@ -31,7 +31,7 @@ Directory layout:
 
 Scope notes:
 
-- These schemas cover the typed native ARC message families that the Rust
+- These schemas cover the typed native Chio message families that the Rust
   implementation serializes directly today.
 - The hosted MCP HTTP edge and trust-control APIs are specified normatively in
   `spec/WIRE_PROTOCOL.md`, but they are not represented as typed JSON Schema

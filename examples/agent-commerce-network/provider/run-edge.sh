@@ -10,29 +10,29 @@ mkdir -p "${STATE_DIR}"
 
 cd "${ROOT}"
 
-if [[ -n "${ARC_BIN:-}" ]]; then
-  if [[ -n "${ARC_CONTROL_URL:-}" ]]; then
-    exec "${ARC_BIN}" \
-      --control-url "${ARC_CONTROL_URL}" \
-      --control-token "${ARC_CONTROL_TOKEN:-demo-token}" \
+if [[ -n "${CHIO_BIN:-}" ]]; then
+  if [[ -n "${CHIO_CONTROL_URL:-}" ]]; then
+    exec "${CHIO_BIN}" \
+      --control-url "${CHIO_CONTROL_URL}" \
+      --control-token "${CHIO_CONTROL_TOKEN:-demo-token}" \
       mcp serve-http \
       --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
       --server-id provider-security-review \
       --server-name "Vanguard Security Review" \
       --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
-      --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
+      --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
       --session-db "${SESSION_DB}" \
       -- \
       python3 "${EXAMPLE_ROOT}/provider/review_server.py"
   fi
 
-  exec "${ARC_BIN}" \
+  exec "${CHIO_BIN}" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
     --server-id provider-security-review \
     --server-name "Vanguard Security Review" \
     --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
-    --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
+    --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
     --receipt-db "${STATE_DIR}/receipts.sqlite3" \
     --revocation-db "${STATE_DIR}/revocations.sqlite3" \
     --authority-db "${STATE_DIR}/authority.sqlite3" \
@@ -41,16 +41,16 @@ if [[ -n "${ARC_BIN:-}" ]]; then
     python3 "${EXAMPLE_ROOT}/provider/review_server.py"
 fi
 
-if [[ -n "${ARC_CONTROL_URL:-}" ]]; then
+if [[ -n "${CHIO_CONTROL_URL:-}" ]]; then
   exec cargo run --bin arc -- \
-    --control-url "${ARC_CONTROL_URL}" \
-    --control-token "${ARC_CONTROL_TOKEN:-demo-token}" \
+    --control-url "${CHIO_CONTROL_URL}" \
+    --control-token "${CHIO_CONTROL_TOKEN:-demo-token}" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
     --server-id provider-security-review \
     --server-name "Vanguard Security Review" \
     --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
-    --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
+    --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
     --session-db "${SESSION_DB}" \
     -- \
     python3 "${EXAMPLE_ROOT}/provider/review_server.py"
@@ -62,7 +62,7 @@ exec cargo run --bin arc -- \
   --server-id provider-security-review \
   --server-name "Vanguard Security Review" \
   --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
-  --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
+  --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
   --receipt-db "${STATE_DIR}/receipts.sqlite3" \
   --revocation-db "${STATE_DIR}/revocations.sqlite3" \
   --authority-db "${STATE_DIR}/authority.sqlite3" \

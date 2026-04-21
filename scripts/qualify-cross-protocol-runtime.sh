@@ -43,8 +43,8 @@ log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-matrix_src="docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json"
-matrix_snapshot="${output_root}/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json"
+matrix_src="docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json"
+matrix_snapshot="${output_root}/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json"
 
 rm -rf "${output_root}"
 mkdir -p "${log_root}"
@@ -60,34 +60,34 @@ run_and_log() {
 python3 -m json.tool "${matrix_src}" >/dev/null
 cp "${matrix_src}" "${matrix_snapshot}"
 
-run_and_log arc-cross-protocol cargo test -p arc-cross-protocol
-run_and_log arc-mcp-edge cargo test -p arc-mcp-edge
-run_and_log arc-acp-edge cargo test -p arc-acp-edge
-run_and_log arc-a2a-edge cargo test -p arc-a2a-edge
-run_and_log arc-http-core cargo test -p arc-http-core
-run_and_log arc-api-protect cargo test -p arc-api-protect
-run_and_log arc-tower cargo test -p arc-tower
-run_and_log arc-openai cargo test -p arc-openai-adapter
-run_and_log arc-acp-proxy cargo test -p arc-acp-proxy
+run_and_log chio-cross-protocol cargo test -p chio-cross-protocol
+run_and_log chio-mcp-edge cargo test -p chio-mcp-edge
+run_and_log chio-acp-edge cargo test -p chio-acp-edge
+run_and_log chio-a2a-edge cargo test -p chio-a2a-edge
+run_and_log chio-http-core cargo test -p chio-http-core
+run_and_log chio-api-protect cargo test -p chio-api-protect
+run_and_log chio-tower cargo test -p chio-tower
+run_and_log chio-openai cargo test -p chio-openai-adapter
+run_and_log chio-acp-proxy cargo test -p chio-acp-proxy
 run_and_log ts-node-http sh -lc 'cd sdks/typescript/packages/node-http && npm test'
 run_and_log ts-express sh -lc 'cd sdks/typescript/packages/express && npm test'
-run_and_log go-sdk sh -lc 'cd sdks/go/arc-go-http && go test ./...'
-run_and_log python-sdk sh -lc 'cd sdks/python/arc-sdk-python && uv run --extra dev pytest tests/test_models.py tests/test_client.py'
-run_and_log python-asgi sh -lc 'cd sdks/python/arc-asgi && uv run --extra dev pytest tests/test_middleware.py'
-run_and_log python-django sh -lc 'cd sdks/python/arc-django && uv run --extra dev pytest tests/test_middleware.py'
-run_and_log python-fastapi sh -lc 'cd sdks/python/arc-fastapi && uv run --extra dev pytest tests/test_dependencies.py'
-run_and_log jvm-sdk sh -lc 'cd sdks/jvm/arc-spring-boot && ./gradlew test --no-daemon'
-run_and_log dotnet-sdk sh -lc 'cd sdks/dotnet/ArcMiddleware && dotnet test ArcMiddleware.sln'
+run_and_log go-sdk sh -lc 'cd sdks/go/chio-go-http && go test ./...'
+run_and_log python-sdk sh -lc 'cd sdks/python/chio-sdk-python && uv run --extra dev pytest tests/test_models.py tests/test_client.py'
+run_and_log python-asgi sh -lc 'cd sdks/python/chio-asgi && uv run --extra dev pytest tests/test_middleware.py'
+run_and_log python-django sh -lc 'cd sdks/python/chio-django && uv run --extra dev pytest tests/test_middleware.py'
+run_and_log python-fastapi sh -lc 'cd sdks/python/chio-fastapi && uv run --extra dev pytest tests/test_dependencies.py'
+run_and_log jvm-sdk sh -lc 'cd sdks/jvm/chio-spring-boot && ./gradlew test --no-daemon'
+run_and_log dotnet-sdk sh -lc 'cd sdks/dotnet/ChioMiddleware && dotnet test ChioMiddleware.sln'
 
 cat >"${report_path}" <<'EOF'
 # Cross-Protocol Runtime Qualification Gate
 
 This artifact bundle captures the local post-v3.15 qualification evidence for
-ARC's bounded cross-protocol runtime substrate.
+Chio's bounded cross-protocol runtime substrate.
 
 Decision:
 
-- ARC ships a cryptographically signed, fail-closed governance kernel and a
+- Chio ships a cryptographically signed, fail-closed governance kernel and a
   bounded protocol-aware cross-protocol execution fabric across HTTP APIs,
   MCP, OpenAI tool execution, A2A skills, and ACP capabilities.
 - On supported authoritative paths, execution is kernel-mediated,
@@ -100,34 +100,34 @@ Decision:
 
 Not yet qualified:
 
-- ARC does not yet claim a fully realized universal protocol-to-protocol
+- Chio does not yet claim a fully realized universal protocol-to-protocol
   orchestration layer or a proved "comptroller of the agent economy" position.
 
 Executed command set:
 
-- `cargo test -p arc-cross-protocol`
-- `cargo test -p arc-mcp-edge`
-- `cargo test -p arc-acp-edge`
-- `cargo test -p arc-a2a-edge`
-- `cargo test -p arc-http-core`
-- `cargo test -p arc-api-protect`
-- `cargo test -p arc-tower`
-- `cargo test -p arc-openai-adapter`
-- `cargo test -p arc-acp-proxy`
+- `cargo test -p chio-cross-protocol`
+- `cargo test -p chio-mcp-edge`
+- `cargo test -p chio-acp-edge`
+- `cargo test -p chio-a2a-edge`
+- `cargo test -p chio-http-core`
+- `cargo test -p chio-api-protect`
+- `cargo test -p chio-tower`
+- `cargo test -p chio-openai-adapter`
+- `cargo test -p chio-acp-proxy`
 - `npm test` in `sdks/typescript/packages/node-http`
 - `npm test` in `sdks/typescript/packages/express`
-- `go test ./...` in `sdks/go/arc-go-http`
-- `uv run --extra dev pytest tests/test_models.py tests/test_client.py` in `sdks/python/arc-sdk-python`
-- `uv run --extra dev pytest tests/test_middleware.py` in `sdks/python/arc-asgi`
-- `uv run --extra dev pytest tests/test_middleware.py` in `sdks/python/arc-django`
-- `uv run --extra dev pytest tests/test_dependencies.py` in `sdks/python/arc-fastapi`
-- `./gradlew test --no-daemon` in `sdks/jvm/arc-spring-boot`
-- `dotnet test ArcMiddleware.sln` in `sdks/dotnet/ArcMiddleware`
+- `go test ./...` in `sdks/go/chio-go-http`
+- `uv run --extra dev pytest tests/test_models.py tests/test_client.py` in `sdks/python/chio-sdk-python`
+- `uv run --extra dev pytest tests/test_middleware.py` in `sdks/python/chio-asgi`
+- `uv run --extra dev pytest tests/test_middleware.py` in `sdks/python/chio-django`
+- `uv run --extra dev pytest tests/test_dependencies.py` in `sdks/python/chio-fastapi`
+- `./gradlew test --no-daemon` in `sdks/jvm/chio-spring-boot`
+- `dotnet test ChioMiddleware.sln` in `sdks/dotnet/ChioMiddleware`
 
 Supporting machine-readable gate:
 
-- `ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`
-- successor gate: `ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
+- `CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`
+- successor gate: `CHIO_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
 EOF
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

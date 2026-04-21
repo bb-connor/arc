@@ -67,7 +67,7 @@ Agent Network Protocol Community Group.
 | Revocation | DID Document updates can rotate keys, but there is no capability-level revocation or cascade semantics. |
 | Cross-org trust | DID federation provides cross-org identity resolution. Trust decisions are still application-specific. |
 
-**Bottom line.** ANP has the best identity story outside of ARC, but stops at
+**Bottom line.** ANP has the best identity story outside of Chio, but stops at
 "who are you?" and never reaches "what are you allowed to do?" or "prove what
 you did."
 
@@ -167,13 +167,13 @@ track multi-hop value flow from user intent to final settlement.
 | Dimension | Assessment |
 |-----------|------------|
 | Identity | Google Account identity. Agents authenticated via Google Cloud credentials. |
-| Capability delegation | Intent Mandates are the closest analogue to ARC capability tokens in the payment space. They carry user-approved scope (merchant categories, amounts, time bounds) and can be attenuated by intermediary agents. |
+| Capability delegation | Intent Mandates are the closest analogue to Chio capability tokens in the payment space. They carry user-approved scope (merchant categories, amounts, time bounds) and can be attenuated by intermediary agents. |
 | Budget/spending | Strong: Intent Mandates carry explicit spending limits and category restrictions. |
 | Receipts/proof | VDC chains provide a value-flow audit trail. Financial receipts, not tool-action receipts. No signed attestation of tool behavior. |
 | Revocation | Mandate expiry and explicit user revocation via Google Pay. |
 | Cross-org trust | Google-mediated. Mandates flow through Google's settlement infrastructure. |
 
-**Gap.** AP2's Intent Mandates are structurally similar to ARC capability
+**Gap.** AP2's Intent Mandates are structurally similar to Chio capability
 tokens but operate exclusively in the payment domain. They cannot authorize
 tool invocations, constrain tool arguments, or produce proof of tool behavior.
 
@@ -278,7 +278,7 @@ token exchange to obtain scoped access tokens for downstream services.
 | Revocation | SPIFFE SVID rotation and OAuth token expiry. No capability-level cascade revocation. |
 
 **Bottom line.** AIMS provides the identity substrate but not the authorization
-or attestation layers. ARC's identity model is compatible with SPIFFE IDs
+or attestation layers. Chio's identity model is compatible with SPIFFE IDs
 (the spec supports SPIFFE URIs as agent/server identifiers).
 
 ### UCAN (User-Controlled Authorization Networks)
@@ -292,14 +292,14 @@ the UCAN spec (ucanto).
 | Dimension | Assessment |
 |-----------|------------|
 | Identity | DID-based. Issuers and audiences are identified by did:key or did:web. |
-| Capability delegation | Strong. The core design: delegable tokens with monotonic attenuation. Closest to ARC's capability model among existing standards. |
+| Capability delegation | Strong. The core design: delegable tokens with monotonic attenuation. Closest to Chio's capability model among existing standards. |
 | Receipts/proof | UCAN Invocation receipts exist in the spec (ucan/invocation) but adoption is limited. Receipts are not Merkle-committed. |
 | Revocation | UCAN Revocation spec defines MUST-level cascade semantics (all derivatives must be marked invalid). Adoption is growing but not yet universal across implementations. |
 
-**Differences from ARC:**
-- UCAN tokens are JWTs; ARC uses Ed25519 over canonical JSON (deterministic signing, no JWT header ambiguity).
-- UCAN has no kernel/TCB concept -- the verifier is the resource server, which may also be the tool. ARC separates enforcement from tool execution.
-- UCAN receipts are optional; ARC receipts are mandatory for every decision (allow and deny).
+**Differences from Chio:**
+- UCAN tokens are JWTs; Chio uses Ed25519 over canonical JSON (deterministic signing, no JWT header ambiguity).
+- UCAN has no kernel/TCB concept -- the verifier is the resource server, which may also be the tool. Chio separates enforcement from tool execution.
+- UCAN receipts are optional; Chio receipts are mandatory for every decision (allow and deny).
 - UCAN has no formal verification of safety properties.
 - UCAN has no invocation budget constraints in the token.
 
@@ -317,7 +317,7 @@ mesh identity, now being applied to agent workload identity (see IETF AIMS).
 | Receipts/proof | Not in scope. |
 
 **Bottom line.** SPIFFE is an identity primitive, not an authorization
-protocol. ARC uses a SPIFFE-compatible identifier format for tool server IDs
+protocol. Chio uses a SPIFFE-compatible identifier format for tool server IDs
 (the codebase notes server IDs "may be a SPIFFE URI"), but there is no runtime
 SPIFFE/SPIRE integration -- no SVID issuance, no workload attestation, no
 mTLS via SPIRE.
@@ -387,7 +387,7 @@ systems, not attestation systems.
 
 ## 6. Competitive Matrix
 
-| Dimension | A2A | MCP | ANP | Stripe ACP | AP2 | x402 | IETF AIMS | UCAN | ARC |
+| Dimension | A2A | MCP | ANP | Stripe ACP | AP2 | x402 | IETF AIMS | UCAN | Chio |
 |-----------|-----|-----|-----|------------|-----|------|-----------|------|------|
 | **Cryptographic identity** | Partial (signed Agent Cards) | Partial (OAuth 2.1) | Yes (DID) | -- | -- | Yes (wallet) | Yes (SPIFFE) | Yes (DID) | Yes (Ed25519; SPIFFE-compatible ID format) |
 | **Scoped capability tokens** | -- | -- | -- | Partial (payment) | Yes (payment) | -- | Partial (OAuth) | Yes | Yes |
@@ -402,7 +402,7 @@ systems, not attestation systems.
 | **Cross-org federated trust** | -- | -- | Partial (DID) | Stripe Connect | Google-mediated | Blockchain | SPIFFE federation | DID federation | Yes (delegation chains) |
 | **Subject-bound tokens (DPoP)** | -- | -- | -- | -- | -- | Wallet-bound | mTLS | DID-bound | Partial (subject binding implemented; per-invocation DPoP specified, not yet in code) |
 
-ARC is unusual in covering all twelve dimensions within one governed execution stack, but not every ARC dimension is at the strongest imaginable boundary today. The bounded release is strongest on fail-closed mediation, signed receipts, budgets, and kernel-enforced execution, while sender-constrained invocation proofs and transparency-log semantics remain explicitly bounded or optional.
+Chio is unusual in covering all twelve dimensions within one governed execution stack, but not every Chio dimension is at the strongest imaginable boundary today. The bounded release is strongest on fail-closed mediation, signed receipts, budgets, and kernel-enforced execution, while sender-constrained invocation proofs and transparency-log semantics remain explicitly bounded or optional.
 The closest competitor on authorization semantics is UCAN, which lacks the
 kernel TCB, mandatory receipts, invocation budgets, and formal proofs (UCAN
 does specify cascade revocation at the spec level). The closest competitor on
@@ -411,14 +411,14 @@ which lacks tool-level authorization and cryptographic action receipts.
 
 ---
 
-## 7. ARC's Structural Advantages
+## 7. Chio's Structural Advantages
 
 These properties are architectural and cannot be retrofitted onto existing
 protocols without redesigning their core abstractions.
 
 ### 7.1 Kernel as Trusted Computing Base
 
-The ARC kernel sits between the untrusted agent and sandboxed tool servers.
+The Chio kernel sits between the untrusted agent and sandboxed tool servers.
 The agent cannot address the kernel (no PID, no socket path, no signing key
 visible). The kernel is the sole nexus for capability validation, guard
 evaluation, receipt signing, and tool dispatch. This is a process-level
@@ -430,7 +430,7 @@ client-server model that the entire ecosystem is built on.
 
 ### 7.2 Delegation Chains with Bounded Revocation Coverage
 
-ARC capability tokens carry an ordered `delegation_chain` field listing
+Chio capability tokens carry an ordered `delegation_chain` field listing
 every ancestor capability ID from root to leaf. When any ancestor is
 presented as part of that chain is revoked, the descendant presentation is
 rejected. The current shipped runtime goes further than simple caller-presented
@@ -441,22 +441,22 @@ plus declared attenuations, and rejects the leaf if any recursive ancestor is
 missing, revoked, or structurally inconsistent.
 
 UCAN's Revocation spec defines MUST-level cascade semantics at the spec level.
-ARC's shipped boundary is still distinct: it relies on locally trusted ancestor
+Chio's shipped boundary is still distinct: it relies on locally trusted ancestor
 snapshots rather than globally replicated lineage state. This is distinct
 from OAuth refresh token rotation, where revoking a refresh token does not
 automatically invalidate downstream tokens issued via token exchange.
 
 ### 7.3 Receipts as Protocol Primitive
 
-Every kernel decision -- allow or deny -- produces a signed ArcReceipt
+Every kernel decision -- allow or deny -- produces a signed ChioReceipt
 containing the capability ID, tool name, action, decision, content hash,
 policy hash, per-guard evidence, and the kernel's Ed25519 signature. Receipts
 are stored as signed audit artifacts with checkpoint and export support.
 
 This is not ordinary logging. OTel traces (MCP's approach) are mutable,
-filterable, and deletable. ARC receipts are signed decision artifacts backed
+filterable, and deletable. Chio receipts are signed decision artifacts backed
 by checkpoint material and operator-local storage. A missing receipt remains a
-useful signal of protocol drift or operational failure, but ARC's bounded
+useful signal of protocol drift or operational failure, but Chio's bounded
 release does not claim public transparency-log or strong non-repudiation
 semantics.
 Receipts cover denials as well as approvals -- you can prove an agent was
@@ -464,7 +464,7 @@ blocked, not just that it succeeded.
 
 ### 7.4 Safety Evidence Boundary
 
-ARC's core safety boundary is backed by executable differential tests, runtime
+Chio's core safety boundary is backed by executable differential tests, runtime
 tests, conformance, and release qualification. The Lean work remains useful
 and informative, but it is not the shipped release gate while portions remain
 outside the root import surface or contain `sorry` placeholders.
@@ -481,13 +481,13 @@ outside the root import surface or contain `sorry` placeholders.
   presented chain.
 
 No other agent protocol ships this exact mix of differential tests, signed
-receipt evidence, qualification lanes, and optional formal artifacts. ARC's
+receipt evidence, qualification lanes, and optional formal artifacts. Chio's
 bounded release should be compared on that executable evidence boundary rather
 than on proof branding alone.
 
 ### 7.5 Subject-Bound Tokens via DPoP
 
-ARC capability tokens carry a subject field binding them to the presenting
+Chio capability tokens carry a subject field binding them to the presenting
 agent's Ed25519 key; this binding is checked at validation time. The protocol
 spec also defines per-invocation DPoP proofs (adapted from RFC 9449), and the
 runtime can require PoP on selected grants. That makes replay materially
@@ -505,13 +505,13 @@ There is no "default allow" mode. Guard evidence is collected per-guard and
 included in the receipt, providing a complete audit trail of why a decision
 was made.
 
-This is verifiable at the policy level before deployment -- ARC policies are
+This is verifiable at the policy level before deployment -- Chio policies are
 validated at load time, and invalid policies are rejected. The kernel never
 operates with an unverified policy.
 
 ---
 
-## 8. Key Gaps ARC Fills
+## 8. Key Gaps Chio Fills
 
 ### 8.1 No protocol combines identity + capability delegation + economic primitives + receipts
 
@@ -524,7 +524,7 @@ The competitive landscape splits into three silos:
 3. **Identity standards** (AIMS, UCAN, SPIFFE) define who agents are but not
    what scoped authority they hold or how to attest their actions.
 
-ARC is the only protocol where a single token simultaneously expresses
+Chio is the only protocol where a single token simultaneously expresses
 identity (subject-bound Ed25519 key), authorization (scoped tool grants with
 argument constraints), economic limits (invocation budgets), and produces
 cryptographic proof (signed receipts in a Merkle log) for every decision.
@@ -540,10 +540,10 @@ received. The authorization gap is:
 ```
 User intent -> [???] -> Payment execution -> Settlement
                ^^^^^
-               ARC fills this gap
+               Chio fills this gap
 ```
 
-ARC's capability token authorizes the tool invocations that lead to a
+Chio's capability token authorizes the tool invocations that lead to a
 payment decision. The receipt chain proves the agent's reasoning path from
 authorized capability to tool result to payment trigger. This makes the
 agent's behavior auditable end-to-end, not just at the payment boundary.
@@ -555,7 +555,7 @@ compliance snapshots. Between snapshots, agent behavior is unattested. A model
 update, configuration change, or novel input could cause policy violations that
 go undetected until the next audit cycle.
 
-ARC produces a signed receipt for every tool invocation in real time. The
+Chio produces a signed receipt for every tool invocation in real time. The
 receipt plane provides continuous signed action evidence with checkpoint and
 export support. Compliance is therefore no longer only a periodic assertion --
 it can be tied to specific invocations and reviewed against signed receipt
@@ -563,5 +563,5 @@ artifacts and the kernel's public key. The bounded release still does not
 claim public transparency-log semantics.
 
 The difference is structural: audits verify *systems*, receipts verify
-*actions*. ARC makes every agent action independently verifiable without
+*actions*. Chio makes every agent action independently verifiable without
 trusting the agent, the operator, or the auditor.

@@ -5,7 +5,7 @@
   "category": "mcp-core",
   "specVersions": ["2025-11-25"],
   "transport": ["stdio", "streamable-http"],
-  "peerRoles": ["client_to_arc_server", "arc_client_to_server"],
+  "peerRoles": ["client_to_arc_server", "chio_client_to_server"],
   "deploymentModes": ["wrapped_stdio", "remote_http"],
   "requiredCapabilities": {
     "server": ["resources"],

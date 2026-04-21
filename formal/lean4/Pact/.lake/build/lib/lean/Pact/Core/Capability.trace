@@ -1,9 +1,9 @@
 {"synthetic": false,
  "schemaVersion": "2025-09-10",
  "outputs":
- {"o": ["d2671862db156608.olean"],
-  "i": "6494dcc00ff9e579.ilean",
-  "c": "5f38e5745927c096.c"},
+ {"o": ["96349a4c031c0453.olean"],
+  "i": "d089a6f46bee9b5f.ilean",
+  "c": "5ed01a18b7a0eb0b.c"},
  "log":
  [{"message":
    ".> LEAN_PATH=/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean /Users/connor/.elan/toolchains/leanprover--lean4---v4.28.0-rc1/bin/lean /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/Pact/Core/Capability.lean -o /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Capability.olean -i /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Capability.ilean -c /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/ir/Pact/Core/Capability.c --setup /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/ir/Pact/Core/Capability.setup.json --json",
@@ -11,7 +11,7 @@
  "inputs":
  [["Pact.Core.Capability:deps",
    [["deps",
-     [["arc/Pact:extraDep", [["@arc:extraDep", "00000000000006bb"]]],
+     [["chio/Pact:extraDep", [["@chio:extraDep", "00000000000006bb"]]],
       ["imports", "00000000000006bb"]]],
     ["libs",
      [["import dynlibs", "00000000000006bb"],
@@ -21,7 +21,7 @@
   ["Lean 4.28.0, commit 3b0f2862196c6a8af9eb0025ee650252694013dd",
    "612345b87aa96642"],
   ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/Pact/Core/Capability.lean",
-   "980855d3286a0fd2"],
+   "2c094b4de1ec3d6c"],
   ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
   ["Module.leanArgs: #[]", "00000000000006bb"]],
- "depHash": "6249331993270859"}
+ "depHash": "f5600518aa4256bb"}

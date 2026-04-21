@@ -1,10 +1,10 @@
-# ARC Security And Threat Model
+# Chio Security And Threat Model
 
 **Version:** 1.0  
 **Date:** 2026-04-13  
 **Status:** Normative shipped surface
 
-This document defines the standalone threat model for the ARC agent-kernel-tool
+This document defines the standalone threat model for the Chio agent-kernel-tool
 trust boundary. It complements [WIRE_PROTOCOL.md](WIRE_PROTOCOL.md): that
 document defines message shapes and lifecycle flows; this document defines the
 attacks those flows must resist and the minimum transport security posture
@@ -14,7 +14,7 @@ The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document.
 
 ## 1. Boundary
 
-ARC's security boundary for this document is the path from one caller with
+Chio's security boundary for this document is the path from one caller with
 authority material to one mediated tool execution:
 
 1. capability issuance or continuation on the trust-control surface
@@ -41,18 +41,18 @@ Primary assets protected by this boundary:
 
 The machine-readable companion artifact for this document is:
 
-- `spec/security/arc-threat-model.v1.json`
+- `spec/security/chio-threat-model.v1.json`
 
 ## 2. Threat Register
 
-The required threats for the shipped ARC boundary are:
+The required threats for the shipped Chio boundary are:
 
 | ID | Threat | Primary surface |
 | --- | --- | --- |
-| `capability_token_theft` | capability token theft or reuse by an unintended caller | trust-control, hosted MCP, native ARC |
-| `kernel_impersonation` | a caller speaks to a fake kernel or hosted edge | hosted MCP, native ARC |
+| `capability_token_theft` | capability token theft or reuse by an unintended caller | trust-control, hosted MCP, native Chio |
+| `kernel_impersonation` | a caller speaks to a fake kernel or hosted edge | hosted MCP, native Chio |
 | `tool_server_escape` | the selected tool server exceeds its intended confinement | kernel-to-tool transport, host runtime |
-| `native_channel_replay` | a captured native request or proof is replayed on the framed lane | native ARC |
+| `native_channel_replay` | a captured native request or proof is replayed on the framed lane | native Chio |
 | `resource_exhaustion_dos` | memory, stream, or concurrency pressure denies service | all surfaces |
 | `delegation_chain_abuse` | an attacker widens, truncates, or otherwise abuses delegated authority | trust-control, kernel admission |
 | `ssrf_via_http_substrate` | an agent crafts tool invocations that target internal network endpoints through the HTTP substrate | HTTP substrate, kernel-to-tool transport |
@@ -71,7 +71,7 @@ handle and attempts to reuse it from a different caller or at a later time.
 Existing controls:
 
 - capabilities are signed and time-bounded
-- the kernel can require ARC-native DPoP per grant
+- the kernel can require Chio-native DPoP per grant
 - the hosted edge can enforce sender-constrained DPoP and mTLS thumbprint
   continuity
 - revocation state exists for capability identifiers
@@ -96,7 +96,7 @@ Residual risk:
 
 Attack:
 the caller establishes a session or native transport with a malicious service
-that pretends to be the ARC kernel or hosted edge.
+that pretends to be the Chio kernel or hosted edge.
 
 Existing controls:
 
@@ -111,7 +111,7 @@ Required mitigations:
 - any cross-host hosted MCP or trust-control deployment **MUST** use TLS
 - any cross-host native deployment **MUST** use TLS and **MUST** authenticate
   the remote peer before authority is treated as valid
-- operator distributions **SHOULD** pin or otherwise securely provision ARC
+- operator distributions **SHOULD** pin or otherwise securely provision Chio
   verifier keys, service certificates, or equivalent trust anchors
 
 Residual risk:
@@ -140,20 +140,20 @@ Required mitigations:
   are part of the same reviewed binary and privilege domain
 - cross-process or cross-host tool servers **MUST** run behind authenticated
   transport, and cross-host TCP **MUST** use mTLS
-- operators **SHOULD** pair ARC mediation with OS or container confinement,
+- operators **SHOULD** pair Chio mediation with OS or container confinement,
   least-privilege filesystem access, and outbound-network controls where the
   tool is not inherently trusted
 
 Residual risk:
 
-- ARC mediation cannot by itself sandbox arbitrary tool-server code
+- Chio mediation cannot by itself sandbox arbitrary tool-server code
 - a compromised tool process can still abuse whatever host privileges the
-  operator granted it outside ARC
+  operator granted it outside Chio
 
 ### 2.4 Native Channel Replay
 
 Attack:
-an attacker captures a native ARC frame or proof and replays it on the
+an attacker captures a native Chio frame or proof and replays it on the
 length-prefixed channel to obtain duplicate or unauthorized execution.
 
 Existing controls:
@@ -196,14 +196,14 @@ Required mitigations:
   limits at the hosted and trust-control edges
 - operators **SHOULD** bound retained replay buffers, task queues, and
   per-session state
-- high-value multi-tenant deployments **SHOULD** pair ARC with upstream load
+- high-value multi-tenant deployments **SHOULD** pair Chio with upstream load
   shedding and admission control
 
 Residual risk:
 
 - authenticated callers can still consume their own allowed budgets or queue
   share
-- ARC's current size and lifecycle checks reduce but do not eliminate all
+- Chio's current size and lifecycle checks reduce but do not eliminate all
   asymmetric workload attacks
 
 ### 2.6 Delegation Chain Abuse
@@ -430,7 +430,7 @@ Required mitigations:
 Residual risk:
 
 - linear memory allocation within the fuel budget is bounded by the WASM
-  runtime's memory limits but not explicitly capped by ARC; a guard that
+  runtime's memory limits but not explicitly capped by Chio; a guard that
   allocates large amounts of memory within its fuel budget may increase host
   memory pressure
 - compilation of WASM modules is not fuel-metered; a pathologically complex
@@ -443,7 +443,7 @@ minimum shipped rules.
 
 | Surface | TLS requirement | mTLS requirement | DPoP requirement | When transport security is absent |
 | --- | --- | --- | --- | --- |
-| Native ARC direct transport | **MUST** use TLS for any cross-host or untrusted-network deployment. Same-host UDS or loopback development **MAY** omit TLS. | **MUST** use mTLS when the remote peer identity is itself part of the authorization trust decision or when operators cross an untrusted boundary. | **MUST** use DPoP whenever the matched grant requires it. | Only same-host UDS or loopback development is conformant. Otherwise the deployment is nonconformant and capability/session material is considered exposed. |
+| Native Chio direct transport | **MUST** use TLS for any cross-host or untrusted-network deployment. Same-host UDS or loopback development **MAY** omit TLS. | **MUST** use mTLS when the remote peer identity is itself part of the authorization trust decision or when operators cross an untrusted boundary. | **MUST** use DPoP whenever the matched grant requires it. | Only same-host UDS or loopback development is conformant. Otherwise the deployment is nonconformant and capability/session material is considered exposed. |
 | Hosted MCP HTTP (`/mcp`) | **MUST** use TLS for any remote or non-loopback deployment. Plain HTTP is only for loopback or explicit test harnesses. | **MUST** use mTLS when the active sender-constrained session profile binds to an mTLS thumbprint. Otherwise mTLS is optional, not universal. | **MUST** use DPoP when the active sender-constrained profile or downstream matched grant requires it. Missing required proof is a denial, not a downgrade. | Remote plaintext deployment is nonconformant. Session ids, proofs, and authority material are treated as observable and replayable. |
 | Trust-control HTTP (`/v1/...`) | **MUST** use TLS for any remote or non-loopback deployment. Plain HTTP is only for local development and test harnesses. | **MUST** use mTLS for operator-internal service-to-service deployments that rely on transport identity rather than bearer auth alone. | DPoP is not the primary trust-control transport mechanism today. If sender-constrained issuance inputs are used, the receiving profile **MUST** preserve their required proof semantics downstream. | Remote plaintext deployment is nonconformant and downgrades issuance, revocation, and receipt-query confidentiality and authenticity to local-dev-only posture. |
 | Kernel-to-tool transport | Same-host UDS **SHOULD** be preferred. If TCP or another network transport is used, TLS is implicit in the mTLS requirement. | Cross-host or cross-process TCP transport **MUST** use mTLS. Same-host UDS does not need mTLS because the OS path is the authenticated boundary. | DPoP does not replace kernel-to-tool transport authentication. Sender proof binds the caller to the capability, not the tool server to the kernel. | Unauthenticated network transport is nonconformant for production. Tool identity and confidentiality are not established. |
@@ -468,13 +468,13 @@ Additional rules:
   authentication as complementary:
   transport authentication proves the service identity; DPoP proves caller
   possession of the sender-bound key.
-- Tool servers are not made safe by transport security alone. ARC mediation
+- Tool servers are not made safe by transport security alone. Chio mediation
   protects admission and auditability, but host-level sandboxing remains the
   operator's responsibility.
 
 ## 5. Machine-Readable Register
 
-`spec/security/arc-threat-model.v1.json` is the normative machine-readable
+`spec/security/chio-threat-model.v1.json` is the normative machine-readable
 representation of:
 
 - the minimum threat set

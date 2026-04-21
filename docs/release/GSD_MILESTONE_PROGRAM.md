@@ -1,6 +1,6 @@
 # GSD Milestone Program
 
-This document maps the remaining ARC roadmap into GSD milestone cycles.
+This document maps the remaining Chio roadmap into GSD milestone cycles.
 
 ## Operating Rules
 

@@ -16,10 +16,10 @@ Slice A is now partially shipped:
 
 Slice C is now partially shipped too:
 
-- `arc-kernel` has a SQLite receipt backend for signed tool and child-request receipts
+- `chio-kernel` has a SQLite receipt backend for signed tool and child-request receipts
 - the CLI now exposes that through `--receipt-db`
 - the CLI/runtime paths now also expose durable revocation through `--revocation-db`
-- `arc-kernel` also has a SQLite revocation backend and a pluggable capability-authority interface with a local implementation
+- `chio-kernel` also has a SQLite revocation backend and a pluggable capability-authority interface with a local implementation
 - the CLI now has a first local operator-facing trust control surface via `arc trust revoke` and `arc trust status`
 - the hosted HTTP runtime now has remote trust-admin surfaces for receipt queries, arbitrary capability revocation, per-session trust revocation, and authority status/rotation
 - restart-proof kernel tests now validate durable revocation enforcement and durable receipt persistence
@@ -58,11 +58,11 @@ What is still missing:
 
 ## Problem
 
-ARC can now look convincing as a local or wrapped stdio MCP replacement, but it is not yet credible as a remote deployment target.
+Chio can now look convincing as a local or wrapped stdio MCP replacement, but it is not yet credible as a remote deployment target.
 
 That blocks:
 
-- hosted MCP-compatible ARC servers
+- hosted MCP-compatible Chio servers
 - authenticated remote sessions
 - durable audit and revocation guarantees
 - production adoption beyond local subprocess mediation
@@ -71,7 +71,7 @@ That blocks:
 
 By the end of E7:
 
-- ARC can host an authenticated remote MCP edge
+- Chio can host an authenticated remote MCP edge
 - session authentication and action authorization are cleanly separated
 - revocation and receipt durability survive process restarts
 - remote sessions preserve the same kernel enforcement guarantees as local ones
@@ -96,9 +96,9 @@ Out of scope:
 ## Primary files and areas
 
 - new remote edge crate or modules
-- `crates/arc-mcp-adapter`
-- `crates/arc-kernel`
-- `crates/arc-core`
+- `crates/chio-mcp-adapter`
+- `crates/chio-kernel`
+- `crates/chio-core`
 - trust-service crates if added
 - `docs`
 
@@ -166,7 +166,7 @@ Responsibilities:
 
 Current status:
 
-- SQLite receipt persistence is shipped in `arc-kernel`
+- SQLite receipt persistence is shipped in `chio-kernel`
 - receipt durability is validated through kernel and CLI tests
 - SQLite revocation persistence plus local and shared-SQLite pluggable capability authorities are now shipped in the kernel
 - deployment wiring for those local stores now reaches `run`, `check`, `mcp serve`, and `mcp serve-http`
@@ -214,7 +214,7 @@ Useful references to study, not copy blindly:
 - RMCP transport-hardening tests for stale sessions and reserved headers
 - MCP authorization model for protected HTTP transports
 
-ARC should copy the shape of the solution where it helps, but keep its own kernel-mediated authority and receipt model.
+Chio should copy the shape of the solution where it helps, but keep its own kernel-mediated authority and receipt model.
 
 ## Dependencies
 
@@ -237,7 +237,7 @@ ARC should copy the shape of the solution where it helps, but keep its own kerne
 
 ## Acceptance criteria
 
-- a remote MCP client can initialize, call tools, use nested flows, and retrieve task results through ARC
+- a remote MCP client can initialize, call tools, use nested flows, and retrieve task results through Chio
 - multiple sessions can coexist without corrupting in-flight ownership
 - authenticated remote sessions preserve capability checks and receipt issuance
 - revocation and receipts survive process restart

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move ARC from:
+Move Chio from:
 
 - one shared trust-control service with optional local OAuth metadata
 
@@ -30,9 +30,9 @@ As shipped before this rewrite:
 The code already has the right seams:
 
 - kernel extension points for `CapabilityAuthority`, `ReceiptStore`, `RevocationStore`, and now `BudgetStore`
-- CLI/runtime construction concentrated in `crates/arc-cli/src/main.rs`
-- hosted HTTP auth and admin behavior concentrated in `crates/arc-cli/src/remote_mcp.rs`
-- control-plane HTTP client and server behavior concentrated in `crates/arc-cli/src/trust_control.rs`
+- CLI/runtime construction concentrated in `crates/chio-cli/src/main.rs`
+- hosted HTTP auth and admin behavior concentrated in `crates/chio-cli/src/remote_mcp.rs`
+- control-plane HTTP client and server behavior concentrated in `crates/chio-cli/src/trust_control.rs`
 
 The rewrite should preserve those seams instead of inventing a second trust model.
 
@@ -40,7 +40,7 @@ The rewrite should preserve those seams instead of inventing a second trust mode
 
 ### 1. Control cluster model
 
-ARC will use a pragmatic replicated control cluster:
+Chio will use a pragmatic replicated control cluster:
 
 - every trust-control node owns local durable SQLite state
 - every node knows its own `advertise_url` and a list of `peer_urls`

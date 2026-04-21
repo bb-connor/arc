@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-arc_bin="${repo_root}/target/debug/arc"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-sdk-examples.XXXXXX")"
+chio_bin="${repo_root}/target/debug/arc"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-sdk-examples.XXXXXX")"
 venv_dir="${work_dir}/python-venv"
 auth_token="demo-token"
 
@@ -69,9 +69,9 @@ PY
 control_url="http://127.0.0.1:${control_port}"
 mcp_url="http://127.0.0.1:${mcp_port}"
 
-cargo build -p arc-cli --bin arc >/dev/null
+cargo build -p chio-cli --bin arc >/dev/null
 
-"${arc_bin}" \
+"${chio_bin}" \
   --receipt-db "${work_dir}/receipts.sqlite" \
   --revocation-db "${work_dir}/revocations.sqlite" \
   --authority-db "${work_dir}/authority.sqlite" \
@@ -97,7 +97,7 @@ if ! curl --silent --fail "${control_url}/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-"${arc_bin}" \
+"${chio_bin}" \
   --control-url "${control_url}" \
   --control-token "${auth_token}" \
   mcp serve-http \
@@ -128,27 +128,27 @@ if [[ "${status}" != "401" ]]; then
   exit 1
 fi
 
-if [[ -f "${repo_root}/packages/sdk/arc-ts/package-lock.json" ]]; then
-  npm --prefix "${repo_root}/packages/sdk/arc-ts" ci --no-fund --no-audit >/dev/null
+if [[ -f "${repo_root}/packages/sdk/chio-ts/package-lock.json" ]]; then
+  npm --prefix "${repo_root}/packages/sdk/chio-ts" ci --no-fund --no-audit >/dev/null
 else
-  npm --prefix "${repo_root}/packages/sdk/arc-ts" install --no-fund --no-audit >/dev/null
+  npm --prefix "${repo_root}/packages/sdk/chio-ts" install --no-fund --no-audit >/dev/null
 fi
 
-ARC_BASE_URL="${mcp_url}" \
-ARC_CONTROL_URL="${control_url}" \
-ARC_AUTH_TOKEN="${auth_token}" \
-node --experimental-strip-types "${repo_root}/packages/sdk/arc-ts/examples/governed_hello.ts" \
+CHIO_BASE_URL="${mcp_url}" \
+CHIO_CONTROL_URL="${control_url}" \
+CHIO_AUTH_TOKEN="${auth_token}" \
+node --experimental-strip-types "${repo_root}/packages/sdk/chio-ts/examples/governed_hello.ts" \
   >"${work_dir}/ts-example.json"
 
 python3 -m venv "${venv_dir}"
 . "${venv_dir}/bin/activate"
 python -m pip install --quiet --upgrade pip
-python -m pip install --quiet -e "${repo_root}/packages/sdk/arc-py"
+python -m pip install --quiet -e "${repo_root}/packages/sdk/chio-py"
 
-ARC_BASE_URL="${mcp_url}" \
-ARC_CONTROL_URL="${control_url}" \
-ARC_AUTH_TOKEN="${auth_token}" \
-python "${repo_root}/packages/sdk/arc-py/examples/governed_hello.py" \
+CHIO_BASE_URL="${mcp_url}" \
+CHIO_CONTROL_URL="${control_url}" \
+CHIO_AUTH_TOKEN="${auth_token}" \
+python "${repo_root}/packages/sdk/chio-py/examples/governed_hello.py" \
   >"${work_dir}/py-example.json"
 
 deactivate

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC KernelMessage capability_revoked",
+  "title": "Chio KernelMessage capability_revoked",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "id"],

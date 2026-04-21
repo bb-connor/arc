@@ -8,14 +8,14 @@
 
 ## 1. Why Extend the K8s Integration
 
-ARC already ships K8s primitives:
+Chio already ships K8s primitives:
 
-- `ArcPolicy` CRD -- declares capability scopes and selectors
+- `ChioPolicy` CRD -- declares capability scopes and selectors
 - Validating webhook -- rejects pods that violate policy
-- Mutating webhook -- injects ARC sidecar into annotated pods
+- Mutating webhook -- injects Chio sidecar into annotated pods
 
 These work at pod admission time. But Kubernetes Jobs and CronJobs have a
-lifecycle that maps more naturally to ARC's capability model:
+lifecycle that maps more naturally to Chio's capability model:
 
 - A **Job** has a defined start and end. Its capability grant should be
   time-bounded to the job's lifetime.
@@ -38,7 +38,7 @@ lifecycle that maps more naturally to ARC's capability model:
 
 ### 2.1 Job Controller
 
-A custom Kubernetes controller watches Job resources and manages ARC
+A custom Kubernetes controller watches Job resources and manages Chio
 capability lifecycle:
 
 ```
@@ -46,7 +46,7 @@ K8s API Server
      |
      v
 +------------------------------------+
-| ARC Job Controller                 |
+| Chio Job Controller                 |
 |                                    |
 | Watch: Jobs, CronJobs              |
 | On Job create:                     |
@@ -64,7 +64,7 @@ K8s API Server
 +------------------------------------+
      |
      v
-ARC Kernel (cluster-scoped or per-namespace)
+Chio Kernel (cluster-scoped or per-namespace)
 ```
 
 ### 2.2 Grant Lifecycle
@@ -85,13 +85,13 @@ CronJob (schedule: "0 */6 * * *")
   |       +-- ...
 ```
 
-## 3. Custom Resource: `ArcJobGrant`
+## 3. Custom Resource: `ChioJobGrant`
 
-Extends the existing `ArcPolicy` CRD with job-specific fields:
+Extends the existing `ChioPolicy` CRD with job-specific fields:
 
 ```yaml
 apiVersion: arc.protocol/v1alpha1
-kind: ArcJobGrant
+kind: ChioJobGrant
 metadata:
   name: etl-pipeline-grant
   namespace: data-team
@@ -127,7 +127,7 @@ spec:
   # Receipt aggregation
   receipts:
     aggregate: true
-    sink: arc-receipts    # ConfigMap/Secret name for receipt storage
+    sink: chio-receipts    # ConfigMap/Secret name for receipt storage
     sinkType: s3          # s3 | configmap | external
 
   # CronJob-specific
@@ -158,7 +158,7 @@ import (
 
 type JobReconciler struct {
     client.Client
-    ArcKernel ArcKernelClient
+    ChioKernel ChioKernelClient
 }
 
 func (r *JobReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -167,13 +167,13 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req reconcile.Request) (r
         return reconcile.Result{}, client.IgnoreNotFound(err)
     }
 
-    // Find matching ArcJobGrant
+    // Find matching ChioJobGrant
     grant, err := r.findMatchingGrant(ctx, &job)
     if err != nil {
         return reconcile.Result{}, err
     }
     if grant == nil {
-        return reconcile.Result{}, nil // No ARC governance for this Job
+        return reconcile.Result{}, nil // No Chio governance for this Job
     }
 
     switch {
@@ -194,10 +194,10 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req reconcile.Request) (r
 func (r *JobReconciler) handleJobCreated(
     ctx context.Context,
     job *batchv1.Job,
-    grantSpec *arcv1.ArcJobGrant,
+    grantSpec *arcv1.ChioJobGrant,
 ) (reconcile.Result, error) {
-    // Acquire capability grant from ARC kernel
-    token, err := r.ArcKernel.AcquireGrant(ctx, AcquireGrantRequest{
+    // Acquire capability grant from Chio kernel
+    token, err := r.ChioKernel.AcquireGrant(ctx, AcquireGrantRequest{
         Scopes:  grantSpec.Spec.Capability.Scopes,
         Guards:  grantSpec.Spec.Capability.Guards,
         Budget:  grantSpec.Spec.Capability.Budget,
@@ -210,13 +210,13 @@ func (r *JobReconciler) handleJobCreated(
     })
     if err != nil {
         // Grant denied -- fail the Job
-        return reconcile.Result{}, r.failJob(ctx, job, fmt.Sprintf("ARC grant denied: %v", err))
+        return reconcile.Result{}, r.failJob(ctx, job, fmt.Sprintf("Chio grant denied: %v", err))
     }
 
     // Store grant token as a Secret
     secret := &corev1.Secret{
         ObjectMeta: metav1.ObjectMeta{
-            Name:      fmt.Sprintf("arc-grant-%s", job.Name),
+            Name:      fmt.Sprintf("chio-grant-%s", job.Name),
             Namespace: job.Namespace,
             OwnerReferences: []metav1.OwnerReference{
                 *metav1.NewControllerRef(job, batchv1.SchemeGroupVersion.WithKind("Job")),
@@ -239,7 +239,7 @@ func (r *JobReconciler) handleJobCreated(
 
 ### 4.2 Pod Template Mutation
 
-The mutating webhook injects the ARC sidecar and mounts the grant secret
+The mutating webhook injects the Chio sidecar and mounts the grant secret
 into Job pods:
 
 ```yaml
@@ -249,22 +249,22 @@ spec:
     - name: worker
       image: my-app:latest
       env:
-        - name: ARC_GRANT_TOKEN
+        - name: CHIO_GRANT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: arc-grant-etl-job-12345
+              name: chio-grant-etl-job-12345
               key: token
-        - name: ARC_SIDECAR_URL
+        - name: CHIO_SIDECAR_URL
           value: "http://localhost:9090"
-    - name: arc-sidecar
-      image: ghcr.io/backbay/arc-sidecar:latest
+    - name: chio-sidecar
+      image: ghcr.io/backbay/chio-sidecar:latest
       ports:
         - containerPort: 9090
       env:
-        - name: ARC_GRANT_TOKEN
+        - name: CHIO_GRANT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: arc-grant-etl-job-12345
+              name: chio-grant-etl-job-12345
               key: token
       resources:
         requests:
@@ -281,7 +281,7 @@ spec:
 func (r *JobReconciler) handleJobCompleted(
     ctx context.Context,
     job *batchv1.Job,
-    grantSpec *arcv1.ArcJobGrant,
+    grantSpec *arcv1.ChioJobGrant,
 ) (reconcile.Result, error) {
     tokenSecret := job.Annotations["arc.protocol/grant-token-secret"]
 
@@ -300,7 +300,7 @@ func (r *JobReconciler) handleJobCompleted(
 
     // Finalize workflow receipt
     if len(receiptIDs) > 0 && grantSpec.Spec.Receipts.Aggregate {
-        workflowReceipt, err := r.ArcKernel.FinalizeWorkflow(ctx, FinalizeRequest{
+        workflowReceipt, err := r.ChioKernel.FinalizeWorkflow(ctx, FinalizeRequest{
             StepReceiptIDs: receiptIDs,
             WorkflowID:     string(job.UID),
         })
@@ -311,7 +311,7 @@ func (r *JobReconciler) handleJobCompleted(
     }
 
     // Release the grant
-    if err := r.ArcKernel.ReleaseGrant(ctx, tokenSecret); err != nil {
+    if err := r.ChioKernel.ReleaseGrant(ctx, tokenSecret); err != nil {
         return reconcile.Result{}, err
     }
 
@@ -382,13 +382,13 @@ sdks/k8s/
     job_reconciler.go           # New: Job lifecycle management
     cronjob_reconciler.go       # New: CronJob grant evaluation
     capability.go               # Existing: grant acquisition
-    types.go                    # Extended: ArcJobGrant types
+    types.go                    # Extended: ChioJobGrant types
     controller_test.go          # Extended tests
   webhooks/
     validating-webhook.yaml     # Existing
     mutating-webhook.yaml       # Existing (extended for Jobs)
   helm/
-    arc-k8s-controller/
+    chio-k8s-controller/
       Chart.yaml
       values.yaml
       templates/
@@ -401,10 +401,10 @@ sdks/k8s/
 
 ```
 Existing K8s integration:
-  ArcPolicy CRD -----> Admission webhooks -----> Pod-level sidecar injection
+  ChioPolicy CRD -----> Admission webhooks -----> Pod-level sidecar injection
                                                        |
 Extended (this doc):                                   |
-  ArcJobGrant CRD --> Job controller --> Grant lifecycle --> Sidecar (shared grant)
+  ChioJobGrant CRD --> Job controller --> Grant lifecycle --> Sidecar (shared grant)
                                      --> Receipt aggregation on Job complete
                                      --> CronJob per-run evaluation
 ```
@@ -416,15 +416,15 @@ provide (admission is a single point-in-time check; Jobs have duration).
 ## 9. Open Questions
 
 1. **Indexed Jobs.** Kubernetes Indexed Jobs assign each pod an index.
-   Should ARC support per-index capability scoping (e.g., index 0 gets
+   Should Chio support per-index capability scoping (e.g., index 0 gets
    `data:region-us`, index 1 gets `data:region-eu`)?
 
 2. **TTL controller.** Kubernetes has a TTL-after-finished controller that
-   cleans up completed Jobs. Should the ARC grant TTL align with or be
+   cleans up completed Jobs. Should the Chio grant TTL align with or be
    independent of the Job's TTL?
 
 3. **Job suspend/resume.** Kubernetes 1.24+ supports suspending Jobs.
-   Should suspending a Job also suspend (not revoke) the ARC grant?
+   Should suspending a Job also suspend (not revoke) the Chio grant?
 
 4. **Argo Workflows / Tekton.** These are Kubernetes-native workflow
    engines that build on Jobs. Should the Job controller be aware of

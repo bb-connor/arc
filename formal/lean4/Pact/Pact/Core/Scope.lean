@@ -1,11 +1,11 @@
 /-
-  Scope subsumption logic: ToolGrant.isSubsetOf, ArcScope.isSubsetOf.
-  Mirrors: arc-core/src/capability.rs (ToolGrant::is_subset_of, ArcScope::is_subset_of)
+  Scope subsumption logic: ToolGrant.isSubsetOf, ChioScope.isSubsetOf.
+  Mirrors: chio-kernel-core/src/capability.rs (ToolGrant::is_subset_of, ChioScope::is_subset_of)
 
-  This is the core of ARC's capability monotonicity guarantee.
+  This is the core of Chio's capability monotonicity guarantee.
 -/
 
-import Arc.Core.Capability
+import Chio.Core.Capability
 
 set_option autoImplicit false
 
@@ -17,7 +17,7 @@ def isSubsetOf {α : Type} [BEq α] (child parent : List α) : Bool :=
 
 end List
 
-namespace Arc.Core
+namespace Chio.Core
 
 private theorem any_eq_true_of_mem {α : Type} [BEq α] [LawfulBEq α]
     {x : α} {xs : List α} (h_mem : x ∈ xs) :
@@ -49,20 +49,20 @@ def ToolGrant.isSubsetOf (child parent : ToolGrant) : Bool :=
   -- Constraints: parent's constraints must all appear in child
   && parent.constraints.isSubsetOf child.constraints
 
-/-- Mirrors: ArcScope::is_subset_of in capability.rs.
+/-- Mirrors: ChioScope::is_subset_of in capability.rs.
 
     Returns true if every grant in `child` is covered by some grant in `parent`. -/
-def ArcScope.isSubsetOf (child parent : ArcScope) : Bool :=
+def ChioScope.isSubsetOf (child parent : ChioScope) : Bool :=
   child.grants.all (fun cg =>
     parent.grants.any (fun pg => cg.isSubsetOf pg))
 
 /-- The empty scope: no grants at all. -/
-def ArcScope.empty : ArcScope := { grants := [] }
+def ChioScope.empty : ChioScope := { grants := [] }
 
 /-- Empty scope is a subset of any scope. -/
-theorem ArcScope.empty_isSubsetOf (parent : ArcScope) :
-    ArcScope.isSubsetOf ArcScope.empty parent = true := by
-  unfold ArcScope.isSubsetOf ArcScope.empty
+theorem ChioScope.empty_isSubsetOf (parent : ChioScope) :
+    ChioScope.isSubsetOf ChioScope.empty parent = true := by
+  unfold ChioScope.isSubsetOf ChioScope.empty
   simp [List.all]
 
 /-- Reflexivity: a scope is a subset of itself. -/
@@ -76,4 +76,4 @@ theorem ToolGrant.isSubsetOf_refl (g : ToolGrant) :
     | none => simp
     | some n => simp
 
-end Arc.Core
+end Chio.Core

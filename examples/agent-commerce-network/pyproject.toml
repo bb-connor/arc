@@ -1,7 +1,7 @@
 [project]
 name = "agent-commerce-network"
 version = "0.2.0"
-description = "Multi-org service procurement with ARC capability governance and agent reasoning"
+description = "Multi-org service procurement with Chio capability governance and agent reasoning"
 requires-python = ">=3.11"
 dependencies = [
   "anthropic>=0.52.0",

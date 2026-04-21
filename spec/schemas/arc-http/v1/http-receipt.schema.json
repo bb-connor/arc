@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC HTTP Receipt",
-  "description": "Signed receipt proving that an HTTP request was evaluated by the ARC kernel. The signature covers canonical JSON of all fields except 'signature' itself.",
+  "title": "Chio HTTP Receipt",
+  "description": "Signed receipt proving that an HTTP request was evaluated by the Chio kernel. The signature covers canonical JSON of all fields except 'signature' itself.",
   "type": "object",
   "required": [
     "id",
@@ -79,7 +79,7 @@
       "type": "integer",
       "minimum": 100,
       "maximum": 599,
-      "description": "HTTP status ARC associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete ARC error status; allow receipts may carry evaluation-time status metadata rather than downstream response evidence."
+      "description": "HTTP status Chio associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete Chio error status; allow receipts may carry evaluation-time status metadata rather than downstream response evidence."
     },
     "timestamp": {
       "type": "integer",

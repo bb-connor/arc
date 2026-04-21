@@ -1,0 +1,49 @@
+[package]
+name = "chio-core"
+description = "Core types for the Chio (Chio) protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[lib]
+name = "chio_core"
+
+[[bench]]
+name = "core_primitives"
+harness = false
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-autonomy = { path = "../chio-autonomy" }
+chio-core-types = { path = "../chio-core-types" }
+chio-credit = { path = "../chio-credit" }
+chio-federation = { path = "../chio-federation" }
+chio-governance = { path = "../chio-governance" }
+chio-listing = { path = "../chio-listing" }
+chio-market = { path = "../chio-market" }
+chio-open-market = { path = "../chio-open-market" }
+chio-underwriting = { path = "../chio-underwriting" }
+chio-web3 = { path = "../chio-web3" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand_core = { workspace = true }
+hex = { workspace = true }
+ryu = { workspace = true }
+sha2 = { workspace = true }
+percent-encoding = "2"
+url = "2"
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

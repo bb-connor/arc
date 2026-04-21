@@ -1,0 +1,24 @@
+[package]
+name = "chio-autonomy"
+description = "Chio bounded autonomy pricing, execution, and rollback contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_autonomy"
+
+[dependencies]
+chio-core-types = { path = "../chio-core-types" }
+chio-market = { path = "../chio-market" }
+chio-web3 = { path = "../chio-web3" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

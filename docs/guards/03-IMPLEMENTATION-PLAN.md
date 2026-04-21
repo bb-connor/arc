@@ -13,23 +13,23 @@ The codebase already has a well-structured foundation for WASM guards:
 
 | Crate | Status | Role |
 |-------|--------|------|
-| `arc-kernel` | Stable | Defines `Guard` trait, `GuardContext`, `Verdict` |
-| `arc-guards` | Stable | 15+ built-in Rust guards (path, egress, PII, velocity, etc.) |
-| `arc-wasm-guards` | Scaffold | ABI types, config, `WasmGuard` -> `Guard` adapter, wasmtime backend |
-| `arc-config` | Stable | `wasm_guards` section in `arc.yaml`, `WasmGuardEntry` schema |
+| `chio-kernel` | Stable | Defines `Guard` trait, `GuardContext`, `Verdict` |
+| `chio-guards` | Stable | 15+ built-in Rust guards (path, egress, PII, velocity, etc.) |
+| `chio-wasm-guards` | Scaffold | ABI types, config, `WasmGuard` -> `Guard` adapter, wasmtime backend |
+| `chio-config` | Stable | `wasm_guards` section in `arc.yaml`, `WasmGuardEntry` schema |
 
-The `arc-wasm-guards` crate already contains:
+The `chio-wasm-guards` crate already contains:
 - `WasmGuardAbi` trait abstracting the WASM backend
 - `GuardRequest` / `GuardVerdict` types for the host-guest boundary
 - `WasmGuardConfig` with fuel limits, priority, advisory mode
-- `WasmGuard` that implements `arc_kernel::Guard` by delegating to a `WasmGuardAbi` backend
+- `WasmGuard` that implements `chio_kernel::Guard` by delegating to a `WasmGuardAbi` backend
 - `WasmGuardRuntime` that manages multiple loaded guards
 - A `wasmtime-runtime` feature flag with a working `WasmtimeBackend`
 - `MockWasmBackend` for testing
-- `arc-config` already parses `wasm_guards` entries from `arc.yaml`
+- `chio-config` already parses `wasm_guards` entries from `arc.yaml`
 
 What is missing: a guest-side SDK, a CLI workflow, a guard manifest/packaging format,
-host function imports, and integration wiring between `arc-config` and the kernel
+host function imports, and integration wiring between `chio-config` and the kernel
 startup path.
 
 > **ABI decision:** This plan targets the **raw core-WASM ABI** already in
@@ -42,12 +42,12 @@ startup path.
 
 ### Decision: No new crates needed for the host side
 
-The existing `arc-wasm-guards` crate is the correct home for all host-side WASM
-runtime code. It already depends on `arc-kernel` and `arc-core`, implements the
+The existing `chio-wasm-guards` crate is the correct home for all host-side WASM
+runtime code. It already depends on `chio-kernel` and `chio-core`, implements the
 `Guard` trait, and has the wasmtime backend behind a feature flag. Adding more
 host-side crates would fragment responsibility.
 
-### New crate: `arc-guard-sdk` (guest-side)
+### New crate: `chio-guard-sdk` (guest-side)
 
 A new crate is needed for the guest side. WASM modules compiled from Rust need
 a thin library that:
@@ -57,15 +57,15 @@ a thin library that:
 3. Handles the `#[no_std]`-friendly allocation dance
 4. Exports the expected ABI entry point
 
-This is analogous to how `arc-mcp-adapter` wraps external MCP servers -- except
+This is analogous to how `chio-mcp-adapter` wraps external MCP servers -- except
 here we are wrapping user-authored WASM code behind the `Guard` trait.
 
 ```
 crates/
-  arc-guard-sdk/         # NEW -- guest-side Rust SDK
+  chio-guard-sdk/         # NEW -- guest-side Rust SDK
     Cargo.toml
     src/
-      lib.rs             # #[arc_guard] macro + typed API
+      lib.rs             # #[chio_guard] macro + typed API
       alloc.rs           # Guest-side allocator for shared memory
       request.rs         # GuardRequest deserialization (mirrors abi.rs)
       response.rs        # Verdict encoding into linear memory
@@ -77,9 +77,9 @@ language-specific packages that generate the same ABI exports. These live in
 
 ```
 packages/sdk/
-  arc-guard-ts/          # AssemblyScript / ts2wasm guard SDK
-  arc-guard-py/          # componentize-py or Extism PDK for Python
-  arc-guard-go/          # TinyGo guard SDK
+  chio-guard-ts/          # AssemblyScript / ts2wasm guard SDK
+  chio-guard-py/          # componentize-py or Extism PDK for Python
+  chio-guard-go/          # TinyGo guard SDK
 ```
 
 
@@ -87,7 +87,7 @@ packages/sdk/
 
 ### 3.1 Exported Functions (guest must export)
 
-The current ABI in `arc-wasm-guards/src/abi.rs` uses a minimal contract:
+The current ABI in `chio-wasm-guards/src/abi.rs` uses a minimal contract:
 
 ```text
 // Required exports from the WASM module:
@@ -98,19 +98,19 @@ evaluate(request_ptr: i32, request_len: i32) -> i32
 
 // Optional exports:
 
-arc_alloc(size: i32) -> i32
+chio_alloc(size: i32) -> i32
                 -- Guest-side allocator. If present, the host calls this
                    to allocate space for the request JSON instead of
                    writing at offset 0. This avoids clobbering the
                    guest's own heap.
 
-arc_free(ptr: i32, size: i32)
-                -- Frees memory previously allocated via arc_alloc.
+chio_free(ptr: i32, size: i32)
+                -- Frees memory previously allocated via chio_alloc.
 ```
 
-**Decision point: keep the current offset-0 protocol or require `arc_alloc`?**
+**Decision point: keep the current offset-0 protocol or require `chio_alloc`?**
 
-Recommendation: support both. If the guest exports `arc_alloc`, use it. Otherwise
+Recommendation: support both. If the guest exports `chio_alloc`, use it. Otherwise
 fall back to writing at offset 0 (the current behavior). This keeps trivial C/Zig
 guards simple while giving Rust/Go/AS guards proper memory safety.
 
@@ -122,13 +122,13 @@ guest memory. This works but is fragile. A better protocol:
 ```text
 // After evaluate() returns 1 (Deny), the host checks for an exported function:
 
-arc_deny_reason(ptr_out: i32, len_out: i32) -> i32
+chio_deny_reason(ptr_out: i32, len_out: i32) -> i32
                 -- Guest writes (ptr, len) of a UTF-8 reason string into
                    the two i32 slots. Returns 0 on success, -1 if no
                    reason is available.
 ```
 
-If `arc_deny_reason` is not exported, fall back to the offset-64K convention
+If `chio_deny_reason` is not exported, fall back to the offset-64K convention
 for backward compatibility.
 
 ### 3.3 Host Functions (imported by the guest)
@@ -181,11 +181,11 @@ offset 0 of the serialized buffer (0x00 = JSON, 0x01 = MessagePack) and handle
 both in the host.
 
 
-## 4. Integration Points in `arc-kernel`
+## 4. Integration Points in `chio-kernel`
 
 ### 4.1 Where `WasmGuard` Implements `Guard`
 
-Already done. `arc-wasm-guards/src/runtime.rs` contains:
+Already done. `chio-wasm-guards/src/runtime.rs` contains:
 
 ```rust
 impl Guard for WasmGuard {
@@ -233,18 +233,18 @@ accept an `Arc<Engine>` in the constructor.
 
 ### 4.4 Startup Wiring: `arc.yaml` -> Kernel
 
-The missing integration is the bridge between `arc-config`'s `wasm_guards`
+The missing integration is the bridge between `chio-config`'s `wasm_guards`
 entries and the kernel's `add_guard` call. This belongs in the CLI / proxy
-startup code (likely `arc-acp-proxy` or `arc-cli`), not in the kernel itself:
+startup code (likely `chio-acp-proxy` or `chio-cli`), not in the kernel itself:
 
 ```rust
-// In the startup path (arc-cli or arc-acp-proxy):
-use arc_wasm_guards::{WasmGuardConfig, WasmGuardRuntime};
-use arc_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
+// In the startup path (chio-cli or chio-acp-proxy):
+use chio_wasm_guards::{WasmGuardConfig, WasmGuardRuntime};
+use chio_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
 
 fn load_wasm_guards(
-    entries: &[arc_config::WasmGuardEntry],
-    kernel: &mut ArcKernel,
+    entries: &[chio_config::WasmGuardEntry],
+    kernel: &mut ChioKernel,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = WasmGuardRuntime::new();
 
@@ -298,9 +298,9 @@ A Rust guard author should write:
 
 ```rust
 // my_guard/src/lib.rs
-use arc_guard_sdk::prelude::*;
+use chio_guard_sdk::prelude::*;
 
-#[arc_guard]
+#[chio_guard]
 fn evaluate(req: GuardRequest) -> GuardVerdict {
     if req.tool_name == "delete_file" && req.arguments["path"] == "/etc/passwd" {
         GuardVerdict::deny("cannot delete /etc/passwd")
@@ -318,7 +318,7 @@ cargo build --target wasm32-unknown-unknown --release
 
 ### 5.2 SDK Internals
 
-The `#[arc_guard]` proc macro generates:
+The `#[chio_guard]` proc macro generates:
 
 ```rust
 #[no_mangle]
@@ -331,19 +331,19 @@ pub extern "C" fn evaluate(ptr: i32, len: i32) -> i32 {
 }
 
 #[no_mangle]
-pub extern "C" fn arc_alloc(size: i32) -> i32 {
+pub extern "C" fn chio_alloc(size: i32) -> i32 {
     // Allocate `size` bytes and return the pointer
 }
 
 #[no_mangle]
-pub extern "C" fn arc_free(ptr: i32, size: i32) {
+pub extern "C" fn chio_free(ptr: i32, size: i32) {
     // Free the allocation
 }
 ```
 
 The SDK crate would have:
-- `arc-guard-sdk` (library) -- types + glue
-- `arc-guard-sdk-macros` (proc-macro crate) -- the `#[arc_guard]` attribute
+- `chio-guard-sdk` (library) -- types + glue
+- `chio-guard-sdk-macros` (proc-macro crate) -- the `#[chio_guard]` attribute
 
 ### 5.3 Non-Rust Guest SDKs
 
@@ -351,7 +351,7 @@ The SDK crate would have:
 
 ```typescript
 // guard.ts
-import { GuardRequest, allow, deny } from "@arc-protocol/guard-sdk";
+import { GuardRequest, allow, deny } from "@chio-protocol/guard-sdk";
 
 export function evaluate(ptr: i32, len: i32): i32 {
   const req = GuardRequest.parse(ptr, len);
@@ -366,7 +366,7 @@ export function evaluate(ptr: i32, len: i32): i32 {
 
 ```python
 # guard.py
-from arc_guard_sdk import guard, allow, deny
+from chio_guard_sdk import guard, allow, deny
 
 @guard
 def evaluate(req):
@@ -380,7 +380,7 @@ def evaluate(req):
 ```go
 package main
 
-import "github.com/backbay/arc-guard-sdk-go"
+import "github.com/backbay/chio-guard-sdk-go"
 
 //export evaluate
 func evaluate(ptr, len int32) int32 {
@@ -401,11 +401,11 @@ language's WASM compilation toolchain.
 ### 6.1 Guard Manifest Format
 
 Each WASM guard should ship with a manifest (separate from the tool server
-manifest in `arc-manifest`). This is a YAML/JSON file:
+manifest in `chio-manifest`). This is a YAML/JSON file:
 
 ```yaml
 # guard-manifest.yaml
-schema: "arc.guard.v1"
+schema: "chio.guard.v1"
 name: "pii-redaction-guard"
 version: "1.2.0"
 description: "Detects and blocks PII in tool arguments"
@@ -466,7 +466,7 @@ On load, the host:
    override manifest defaults.
 5. Loads the `.wasm` module via the `WasmGuardAbi` backend
 
-The manifest types belong in `arc-wasm-guards` since they are host-side
+The manifest types belong in `chio-wasm-guards` since they are host-side
 concerns (the guest does not read its own manifest).
 
 
@@ -485,7 +485,7 @@ arc guard inspect <path>       # Print manifest + ABI info
 arc guard bench <path>         # Measure fuel consumption on sample inputs
 ```
 
-These subcommands live in `arc-cli/src/cli/guard.rs` (new module).
+These subcommands live in `chio-cli/src/cli/guard.rs` (new module).
 
 ### 7.2 Test Fixtures
 
@@ -507,19 +507,19 @@ expected_reason_contains: "passwd"
 ```
 
 
-## 8. Remaining Work in `arc-wasm-guards`
+## 8. Remaining Work in `chio-wasm-guards`
 
 ### 8.1 WasmtimeBackend Improvements
 
 The current wasmtime backend works but needs:
 
 1. **Shared `Arc<Engine>`** -- avoid creating one engine per guard
-2. **`arc_alloc` support** -- check for the export, use it if present
+2. **`chio_alloc` support** -- check for the export, use it if present
 3. **Host function registration** -- `arc.log`, `arc.get_config`, `arc.get_time_unix_secs`
 4. **`WasmHostState` instead of `()`** -- carry config + log buffer in the Store
-5. **`arc_deny_reason` support** -- check for the export as an alternative to offset-64K
+5. **`chio_deny_reason` support** -- check for the export as an alternative to offset-64K
 
-### 8.2 Integration with `arc-config`
+### 8.2 Integration with `chio-config`
 
 Wire up the `wasm_guards` config entries to actual guard loading in the
 startup path. This involves more than a single call -- see
@@ -566,9 +566,9 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 - Add `Arc<Engine>` sharing across guards
 - Add `WasmHostState` with config + log buffer
 - Register `arc.log`, `arc.get_config`, `arc.get_time_unix_secs` host functions
-- Add `arc_alloc` / `arc_deny_reason` protocol support
+- Add `chio_alloc` / `chio_deny_reason` protocol support
 - Add guard manifest parsing + SHA-256 verification
-- Wire `arc-config` `wasm_guards` entries into kernel startup
+- Wire `chio-config` `wasm_guards` entries into kernel startup
 - Add memory limit enforcement
 - Add module import validation (reject non-`arc` imports)
 - Enrich `GuardRequest` with host-extracted action context
@@ -577,8 +577,8 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 
 ### Phase 2: Guest-side Rust SDK -- v2
 
-- Create `arc-guard-sdk` crate (library)
-- Create `arc-guard-sdk-macros` crate (proc-macro for `#[arc_guard]`)
+- Create `chio-guard-sdk` crate (library)
+- Create `chio-guard-sdk-macros` crate (proc-macro for `#[chio_guard]`)
 - Implement guest-side allocator
 - Implement `GuardRequest` deserialization + `GuardVerdict` encoding
 - Add host function bindings (`arc::log`, `arc::get_config`)
@@ -596,9 +596,9 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 ### Phase 4: Non-Rust guest SDKs + WIT migration -- v2+
 
 - Define WIT interface, migrate from raw ABI
-- TypeScript/AssemblyScript guard SDK (`packages/sdk/arc-guard-ts`)
-- Python guard SDK (`packages/sdk/arc-guard-py`)
-- Go guard SDK (TinyGo, `packages/sdk/arc-guard-go`)
+- TypeScript/AssemblyScript guard SDK (`packages/sdk/chio-guard-ts`)
+- Python guard SDK (`packages/sdk/chio-guard-py`)
+- Go guard SDK (TinyGo, `packages/sdk/chio-guard-go`)
 - Cross-language conformance test suite
 
 
@@ -611,11 +611,11 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 |----------|--------|---------|-----------|
 | ABI contract | Raw core-WASM (`evaluate(ptr, len) -> i32`) | v1 | Already implemented, validate before migrating |
 | ABI contract | WIT / Component Model | v2 | Type-safe bindings, multi-language SDK generation |
-| Host-side crate | Existing `arc-wasm-guards` | v1 | Already structured correctly |
-| Guest-side crate | New `arc-guard-sdk` | v2 | Deferred until ABI is stable |
+| Host-side crate | Existing `chio-wasm-guards` | v1 | Already structured correctly |
+| Guest-side crate | New `chio-guard-sdk` | v2 | Deferred until ABI is stable |
 | WASM runtime | wasmtime (behind feature flag) | v1 | Already integrated, mature, fuel metering |
 | Serialization format | JSON | v1 | Already used, universal, debuggable |
-| Memory protocol | `arc_alloc` with offset-0 fallback | v1 | Backward-compatible, safe for GC languages |
+| Memory protocol | `chio_alloc` with offset-0 fallback | v1 | Backward-compatible, safe for GC languages |
 | Instance lifecycle | Fresh `Store` per invocation, shared `Engine` | v1 | Isolation without compilation cost |
 | WASI | Disabled | v1 | Guards must not have filesystem/network access |
 | Config source | Guard manifest file | v1 | `arc.yaml` schema needs change for `config` field |
@@ -629,14 +629,14 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 
 Existing files relevant to this work:
 
-- `crates/arc-wasm-guards/src/lib.rs` -- crate root, re-exports
-- `crates/arc-wasm-guards/src/abi.rs` -- `GuardRequest`, `GuardVerdict`, `WasmGuardAbi` trait
-- `crates/arc-wasm-guards/src/config.rs` -- `WasmGuardConfig` with fuel/priority/advisory
-- `crates/arc-wasm-guards/src/error.rs` -- `WasmGuardError` enum
-- `crates/arc-wasm-guards/src/runtime.rs` -- `WasmGuard`, `WasmGuardRuntime`, `WasmtimeBackend`, `MockWasmBackend`
-- `crates/arc-kernel/src/kernel/mod.rs` (line 451) -- `Guard` trait definition
-- `crates/arc-kernel/src/kernel/mod.rs` (line 463) -- `GuardContext` struct
-- `crates/arc-kernel/src/runtime.rs` (line 17) -- `Verdict` enum
-- `crates/arc-guards/src/pipeline.rs` -- `GuardPipeline` (pattern for composing guards)
-- `crates/arc-config/src/schema.rs` (line 41) -- `wasm_guards: Vec<WasmGuardEntry>`
-- `crates/arc-mcp-adapter/src/lib.rs` -- pattern for wrapping external systems behind ARC traits
+- `crates/chio-wasm-guards/src/lib.rs` -- crate root, re-exports
+- `crates/chio-wasm-guards/src/abi.rs` -- `GuardRequest`, `GuardVerdict`, `WasmGuardAbi` trait
+- `crates/chio-wasm-guards/src/config.rs` -- `WasmGuardConfig` with fuel/priority/advisory
+- `crates/chio-wasm-guards/src/error.rs` -- `WasmGuardError` enum
+- `crates/chio-wasm-guards/src/runtime.rs` -- `WasmGuard`, `WasmGuardRuntime`, `WasmtimeBackend`, `MockWasmBackend`
+- `crates/chio-kernel/src/kernel/mod.rs` (line 451) -- `Guard` trait definition
+- `crates/chio-kernel/src/kernel/mod.rs` (line 463) -- `GuardContext` struct
+- `crates/chio-kernel/src/runtime.rs` (line 17) -- `Verdict` enum
+- `crates/chio-guards/src/pipeline.rs` -- `GuardPipeline` (pattern for composing guards)
+- `crates/chio-config/src/schema.rs` (line 41) -- `wasm_guards: Vec<WasmGuardEntry>`
+- `crates/chio-mcp-adapter/src/lib.rs` -- pattern for wrapping external systems behind Chio traits

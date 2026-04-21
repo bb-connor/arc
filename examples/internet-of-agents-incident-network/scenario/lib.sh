@@ -14,9 +14,9 @@ prepare_scenario_dir() {
 
 start_live_topology() {
   local bundle_dir="$1"
-  ARC_BIN="$(ensure_arc_bin)"
-  SERVICE_TOKEN="${ARC_SERVICE_TOKEN:-demo-token}"
-  ARC_AUTH_TOKEN="${ARC_AUTH_TOKEN:-demo-token}"
+  CHIO_BIN="$(ensure_arc_bin)"
+  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+  CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
   LOG_DIR="${bundle_dir}/logs"
   STATE_DIR="${bundle_dir}/state"
   mkdir -p "${LOG_DIR}" "${STATE_DIR}"
@@ -57,7 +57,7 @@ start_live_topology() {
   OPS_URL="http://127.0.0.1:${OPS_PORT}"
 
   # Trust-control
-  "${ARC_BIN}" trust serve \
+  "${CHIO_BIN}" trust serve \
     --listen "127.0.0.1:${TRUST_PORT}" --service-token "${SERVICE_TOKEN}" \
     --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
     --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
@@ -73,10 +73,10 @@ start_live_topology() {
     "mcp-pagerduty:${PD_PORT}:pagerduty:tools/pagerduty.py" \
     "mcp-provider-ops:${OPS_PORT}:provider-ops:tools/provider_ops.py"; do
     IFS=: read -r sid port policy script <<< "${spec}"
-    "${ARC_BIN}" mcp serve-http \
+    "${CHIO_BIN}" mcp serve-http \
       --policy "${EXAMPLE_ROOT}/policies/${policy}.yaml" \
       --server-id "${sid}" --listen "127.0.0.1:${port}" \
-      --auth-token "${ARC_AUTH_TOKEN}" --shared-hosted-owner \
+      --auth-token "${CHIO_AUTH_TOKEN}" --shared-hosted-owner \
       -- python "${EXAMPLE_ROOT}/${script}" \
       >"${LOG_DIR}/arc-${sid}.log" 2>&1 &
   done
@@ -95,21 +95,21 @@ start_live_topology() {
     --port "${APPROVAL_PORT}" >"${LOG_DIR}/approval.log" 2>&1 &
   APPROVAL_PID=$!
 
-  # ARC api protect sidecars
-  "${ARC_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+  # Chio api protect sidecars
+  "${CHIO_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
     api protect --upstream "http://127.0.0.1:${COORD_RAW_PORT}" \
     --spec "${EXAMPLE_ROOT}/services/coordinator-openapi.yaml" \
     --listen "127.0.0.1:${COORD_SIDECAR_PORT}" \
     --receipt-store "${STATE_DIR}/coordinator-receipts.sqlite3" \
-    >"${LOG_DIR}/arc-coordinator-sidecar.log" 2>&1 &
+    >"${LOG_DIR}/chio-coordinator-sidecar.log" 2>&1 &
   COORD_SIDECAR_PID=$!
 
-  "${ARC_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+  "${CHIO_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
     api protect --upstream "http://127.0.0.1:${EXEC_RAW_PORT}" \
     --spec "${EXAMPLE_ROOT}/services/executor-openapi.yaml" \
     --listen "127.0.0.1:${EXEC_SIDECAR_PORT}" \
     --receipt-store "${STATE_DIR}/executor-receipts.sqlite3" \
-    >"${LOG_DIR}/arc-executor-sidecar.log" 2>&1 &
+    >"${LOG_DIR}/chio-executor-sidecar.log" 2>&1 &
   EXEC_SIDECAR_PID=$!
 
   # Wait
@@ -149,7 +149,7 @@ run_live_scenario() {
     --github-mcp-url "${GIT_URL}" \
     --pagerduty-mcp-url "${PD_URL}" \
     --provider-ops-mcp-url "${OPS_URL}" \
-    --arc-auth-token "${ARC_AUTH_TOKEN}" \
+    --chio-auth-token "${CHIO_AUTH_TOKEN}" \
     --artifact-dir "${bundle_dir}" \
     > "${bundle_dir}/run-result.json"
 

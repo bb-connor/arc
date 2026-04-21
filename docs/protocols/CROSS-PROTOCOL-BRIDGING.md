@@ -3,7 +3,7 @@
 **Status:** Draft architecture with shipped edge baseline
 **Date:** 2026-04-13
 
-> **Status**: ARC now ships a shared `arc-cross-protocol` substrate with a real
+> **Status**: Chio now ships a shared `chio-cross-protocol` substrate with a real
 > `CrossProtocolOrchestrator`, `CapabilityBridge`, capability-envelope, and
 > bridge-lineage model. The current implementation is the authoritative
 > edge-to-native execution substrate used by the A2A/ACP lanes.
@@ -23,10 +23,10 @@ own tool/skill/capability model, invocation envelope, and trust assumptions.
 Tool authors implement three adapters, operators run three control planes,
 and audit trails scatter across incompatible formats.
 
-ARC aims to reduce this fragmentation by serving as the universal protocol
-bridge. A tool published once through ARC can be made consumable via MCP, A2A,
+Chio aims to reduce this fragmentation by serving as the universal protocol
+bridge. A tool published once through Chio can be made consumable via MCP, A2A,
 and ACP surfaces when the semantic projection is faithful enough to preserve
-ARC's security and execution guarantees. Every bridged invocation passes
+Chio's security and execution guarantees. Every bridged invocation passes
 through the same kernel in the shipped edge-helper paths. The generic
 orchestrator sketched here is the next architectural step, not a current
 runtime claim.
@@ -37,7 +37,7 @@ runtime claim.
                    | (registered once)|
                    +--------+---------+
                             |
-                    ARC Kernel (TCB)
+                    Chio Kernel (TCB)
                   /    |    |    \
            +-----+ +------+ +------+ +------+
            | MCP | | A2A  | | ACP  | |Native|
@@ -72,16 +72,16 @@ govern the runtime behavior that actually matters."
 
 ### 2.1 Concept Alignment
 
-| ARC               | MCP                  | A2A                | ACP                  |
+| Chio               | MCP                  | A2A                | ACP                  |
 |--------------------|----------------------|--------------------|----------------------|
 | Tool               | Tool                 | Skill              | Capability/Function  |
 | ToolManifest       | tools/list response  | AgentCard.skills   | capabilities object  |
 | ToolCallRequest    | tools/call           | SendMessage        | tool_calls[]         |
 | ToolCallResponse   | tools/call result    | Task artifact      | tool_results[]       |
 | CapabilityToken    | (none)               | (none)             | (none)               |
-| ArcReceipt         | (none)               | (none)             | (none)               |
+| ChioReceipt         | (none)               | (none)             | (none)               |
 
-Capability tokens and receipts have no external equivalents. ARC adds these
+Capability tokens and receipts have no external equivalents. Chio adds these
 security properties transparently at the bridge layer.
 
 ### 2.1.1 Deterministic Governance, Observability, and Dynamic Governance
@@ -156,7 +156,7 @@ Skill `inputModes`/`outputModes` are recorded in adapter metadata.
 
 ### 2.6 Semantic Conformance Matrix
 
-Not every tool maps cleanly across MCP calls, A2A tasks, and ACP sessions. ARC
+Not every tool maps cleanly across MCP calls, A2A tasks, and ACP sessions. Chio
 should only auto-publish a tool on a target protocol when the projection is
 either lossless or explicitly caveated.
 
@@ -181,16 +181,16 @@ pub enum BridgeFidelity {
 Every outward edge should compute a per-tool `BridgeFidelity` before automatic
 publication. `Unsupported` tools stay local to their source protocol.
 
-The shipped `arc-cross-protocol` substrate now derives these decisions from a
+The shipped `chio-cross-protocol` substrate now derives these decisions from a
 shared semantic-hint pass over tool schemas:
 
-- `x-arc-publish: false` gates publication entirely.
-- `x-arc-approval-required` marks projections that need honest interactive
+- `x-chio-publish: false` gates publication entirely.
+- `x-chio-approval-required` marks projections that need honest interactive
   approval semantics.
-- `x-arc-streaming`, `x-arc-cancellation`, and `x-arc-partial-output` express
+- `x-chio-streaming`, `x-chio-cancellation`, and `x-chio-partial-output` express
   lifecycle guarantees that must either survive the bridge or be surfaced as
   caveats.
-- `x-arc-target-protocol` records the intended authoritative target protocol
+- `x-chio-target-protocol` records the intended authoritative target protocol
   for a published outward binding (`native`, `mcp`, `http`, `a2a`, `acp`,
   `open_ai`). Unsupported values fail closed.
 
@@ -214,11 +214,11 @@ Current truthful publication rules are intentionally conservative:
 
 ### 3.1 Chain Integrity
 
-When an A2A agent delegates to an MCP tool through ARC, the capability
+When an A2A agent delegates to an MCP tool through Chio, the capability
 chain remains intact. The bridge never manufactures authority.
 
 ```
-  A2A Agent            ARC Kernel         MCP Tool Server
+  A2A Agent            Chio Kernel         MCP Tool Server
      |                    |                    |
      |-- SendMessage ---->|                    |
      |   (bridge cap ref) |                    |
@@ -243,7 +243,7 @@ pub trait CapabilityBridge: Send + Sync {
         request: &serde_json::Value,
     ) -> Result<Option<CrossProtocolCapabilityRef>, BridgeError>;
 
-    /// Inject ARC capability into outbound protocol envelope.
+    /// Inject Chio capability into outbound protocol envelope.
     fn inject_capability_ref(
         &self,
         envelope: &mut serde_json::Value,
@@ -253,7 +253,7 @@ pub trait CapabilityBridge: Send + Sync {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossProtocolCapabilityRef {
-    pub arc_capability_id: String,
+    pub chio_capability_id: String,
     pub origin_protocol: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protocol_context: Option<serde_json::Value>,
@@ -266,11 +266,11 @@ pub struct CrossProtocolCapabilityRef {
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossProtocolCapabilityEnvelope {
-    pub schema: String,  // "arc.cross-protocol-cap.v1"
+    pub schema: String,  // "chio.cross-protocol-cap.v1"
     pub capability: CapabilityToken,
     pub target_protocol: String,
     /// Must be a strict subset of capability.scope.
-    pub attenuated_scope: ArcScope,
+    pub attenuated_scope: ChioScope,
     pub bridged_at: u64,
     pub bridge_id: String,
 }
@@ -279,15 +279,15 @@ pub struct CrossProtocolCapabilityEnvelope {
 ### 3.4 Attenuation
 
 Sub-capabilities crossing protocol boundaries are strictly narrower than
-the parent. The bridge computes the intersection of the parent's `ArcScope`
+the parent. The bridge computes the intersection of the parent's `ChioScope`
 with the target tool's requirements:
 
 ```rust
 fn attenuate_for_bridge(
-    parent_scope: &ArcScope,
+    parent_scope: &ChioScope,
     target_server: &str,
     target_tool: &str,
-) -> Option<ArcScope> {
+) -> Option<ChioScope> {
     let matching: Vec<ToolGrant> = parent_scope.grants.iter()
         .filter(|g| g.server_id == target_server && g.tool_name == target_tool)
         .cloned()
@@ -295,7 +295,7 @@ fn attenuate_for_bridge(
     if matching.is_empty() {
         return None; // Fail closed.
     }
-    Some(ArcScope { grants: matching, resource_grants: vec![], prompt_grants: vec![] })
+    Some(ChioScope { grants: matching, resource_grants: vec![], prompt_grants: vec![] })
 }
 ```
 
@@ -347,7 +347,7 @@ pub trait ToolRegistry: Send + Sync {
 pub struct ToolQuery {
     pub name_pattern: Option<String>,
     pub protocols: Option<Vec<DiscoveryProtocol>>,
-    pub scope_filter: Option<ArcScope>,
+    pub scope_filter: Option<ChioScope>,
     pub limit: usize,
 }
 ```
@@ -359,7 +359,7 @@ representations at registration time (not query time), but only publishes
 surfaces whose fidelity is `Lossless` or `Adapted`:
 
 ```
-  Register "analyze-code" via ARC native API
+  Register "analyze-code" via Chio native API
      |
      +-> MCP: tools/list entry     (published if fidelity != Unsupported)
      +-> A2A: AgentCard skill      (published if fidelity != Unsupported)
@@ -394,9 +394,9 @@ pub struct ProtocolHop {
 Receipts form a parent-child tree across protocol boundaries:
 
 ```
-  ArcReceipt (root: A2A inbound)
-    +-- ArcReceipt (bridge: A2A -> kernel)
-    |     +-- ArcReceipt (kernel -> MCP tool)
+  ChioReceipt (root: A2A inbound)
+    +-- ChioReceipt (bridge: A2A -> kernel)
+    |     +-- ChioReceipt (kernel -> MCP tool)
     +-- ChildRequestReceipt (sampling callback)
 ```
 
@@ -428,13 +428,13 @@ instances in federated deployments.
 pub struct CrossProtocolOrchestrator {
     registry: Box<dyn ToolRegistry>,
     bridges: HashMap<DiscoveryProtocol, Box<dyn CapabilityBridge>>,
-    kernel: Arc<ArcKernel>,
+    kernel: Arc<ChioKernel>,
     active_traces: HashMap<String, CrossProtocolTraceContext>,
 }
 ```
 
 The shipped runtime now implements the substrate-level form of this idea in
-`arc-cross-protocol`: a real orchestrator, capability-envelope contract,
+`chio-cross-protocol`: a real orchestrator, capability-envelope contract,
 trace-lineage model, and protocol executor registry seam. The current
 authoritative edges use shared bridge metadata plus that executor seam to
 select supported targets such as `native` and `mcp` without hardcoding every
@@ -474,8 +474,8 @@ outer A2A and ACP hops are tied into the same kernel and receipt graph.
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossProtocolReceipt {
-    pub root_receipt: ArcReceipt,
-    pub hop_receipts: Vec<ArcReceipt>,
+    pub root_receipt: ChioReceipt,
+    pub hop_receipts: Vec<ChioReceipt>,
     pub trace: CrossProtocolTraceContext,
     /// Allow only if every hop allowed.
     pub aggregate_decision: Decision,
@@ -559,7 +559,7 @@ is a future extension through the evidence-sharing mechanism.
 | 1 | Foundation: MCP + A2A adapters (shipped) | -- |
 | 2 | `UnifiedToolRegistry`, `DiscoveredTool`, `ToolQuery` API | Phase 1 |
 | 3 | Protocol-semantic conformance matrix + `BridgeFidelity` gating | Phase 2 |
-| 4 | `arc-acp-adapter` crate, ACP discovery + invocation | Phase 1 |
+| 4 | `chio-acp-adapter` crate, ACP discovery + invocation | Phase 1 |
 | 5 | `CapabilityBridge` trait, `CrossProtocolCapabilityEnvelope`, attenuation | Phase 2, 3 |
 | 6 | `CrossProtocolTraceContext`, receipt correlation, session fingerprint | Phase 5 |
 | 7 | `CrossProtocolOrchestrator`, multi-hop chaining, unified receipts | Phase 5, 6 |

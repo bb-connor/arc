@@ -36,7 +36,7 @@ The parameter names follow `camelCase` in the HTTP query string (matching the `R
 {
   "totalCount": 1024,
   "nextCursor": 47,
-  "receipts": [ ...ArcReceipt objects... ]
+  "receipts": [ ...ChioReceipt objects... ]
 }
 ```
 
@@ -44,7 +44,7 @@ The parameter names follow `camelCase` in the HTTP query string (matching the `R
 
 `nextCursor` is the `seq` value of the last receipt in this page. Pass it as `cursor` on the next request to get the following page. When `nextCursor` is `null` (or absent), this is the last page.
 
-`receipts` is an array of `ArcReceipt` objects ordered by `seq ASC`.
+`receipts` is an array of `ChioReceipt` objects ordered by `seq ASC`.
 
 ### Cursor-Based Pagination
 

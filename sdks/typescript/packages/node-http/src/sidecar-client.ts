@@ -1,14 +1,14 @@
 /**
- * ARC sidecar HTTP client.
+ * Chio sidecar HTTP client.
  *
- * Communicates with the ARC Rust kernel running as a localhost sidecar.
+ * Communicates with the Chio Rust kernel running as a localhost sidecar.
  * The sidecar exposes a POST /arc/evaluate endpoint that accepts an
- * ArcHttpRequest and returns an EvaluateResponse with a signed receipt.
+ * ChioHttpRequest and returns an EvaluateResponse with a signed receipt.
  */
 
 import type {
-  ArcConfig,
-  ArcHttpRequest,
+  ChioConfig,
+  ChioHttpRequest,
   EvaluateResponse,
   HttpReceipt,
   Verdict,
@@ -28,11 +28,11 @@ export class SidecarError extends Error {
 }
 
 /** Resolve the sidecar URL from config or environment. */
-export function resolveSidecarUrl(config: ArcConfig): string {
+export function resolveSidecarUrl(config: ChioConfig): string {
   if (config.sidecarUrl != null) {
     return config.sidecarUrl.replace(/\/+$/, "");
   }
-  const envUrl = process.env["ARC_SIDECAR_URL"];
+  const envUrl = process.env["CHIO_SIDECAR_URL"];
   if (envUrl != null && envUrl.length > 0) {
     return envUrl.replace(/\/+$/, "");
   }
@@ -40,24 +40,24 @@ export function resolveSidecarUrl(config: ArcConfig): string {
 }
 
 /**
- * ARC sidecar client. Sends evaluation requests to the Rust kernel
+ * Chio sidecar client. Sends evaluation requests to the Rust kernel
  * over localhost HTTP and returns signed receipts.
  */
-export class ArcSidecarClient {
+export class ChioSidecarClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
 
-  constructor(config: ArcConfig) {
+  constructor(config: ChioConfig) {
     this.baseUrl = resolveSidecarUrl(config);
     this.timeoutMs = config.timeoutMs ?? 5000;
   }
 
   /**
-   * Evaluate an HTTP request against the ARC kernel.
+   * Evaluate an HTTP request against the Chio kernel.
    * Returns the verdict and a signed receipt.
    */
   async evaluate(
-    request: ArcHttpRequest,
+    request: ChioHttpRequest,
     capabilityToken?: string,
   ): Promise<EvaluateResponse> {
     const url = `${this.baseUrl}/arc/evaluate`;
@@ -67,7 +67,7 @@ export class ArcSidecarClient {
       "Content-Type": "application/json",
     };
     if (capabilityToken != null && capabilityToken.length > 0) {
-      headers["X-Arc-Capability"] = capabilityToken;
+      headers["X-Chio-Capability"] = capabilityToken;
     }
 
     try {
@@ -81,7 +81,7 @@ export class ArcSidecarClient {
       if (!response.ok) {
         const body = await response.text().catch(() => "");
         throw new SidecarError(
-          "arc_evaluation_failed",
+          "chio_evaluation_failed",
           `sidecar returned ${response.status}: ${body}`,
           response.status,
         );
@@ -95,12 +95,12 @@ export class ArcSidecarClient {
       }
       if (error instanceof DOMException && error.name === "AbortError") {
         throw new SidecarError(
-          "arc_timeout",
+          "chio_timeout",
           `sidecar request timed out after ${this.timeoutMs}ms`,
         );
       }
       throw new SidecarError(
-        "arc_sidecar_unreachable",
+        "chio_sidecar_unreachable",
         `failed to reach sidecar at ${this.baseUrl}: ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {

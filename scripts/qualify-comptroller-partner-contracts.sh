@@ -18,12 +18,12 @@ log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-matrix_src="docs/standards/ARC_PARTNER_RECEIPT_SETTLEMENT_CONTRACT_MATRIX.json"
-matrix_snapshot="${output_root}/ARC_PARTNER_RECEIPT_SETTLEMENT_CONTRACT_MATRIX.json"
-package_src="docs/standards/ARC_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json"
-package_snapshot="${output_root}/ARC_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json"
-contracts_src="docs/release/ARC_COMPTROLLER_PARTNER_CONTRACTS.md"
-contracts_snapshot="${output_root}/ARC_COMPTROLLER_PARTNER_CONTRACTS.md"
+matrix_src="docs/standards/CHIO_PARTNER_RECEIPT_SETTLEMENT_CONTRACT_MATRIX.json"
+matrix_snapshot="${output_root}/CHIO_PARTNER_RECEIPT_SETTLEMENT_CONTRACT_MATRIX.json"
+package_src="docs/standards/CHIO_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json"
+package_snapshot="${output_root}/CHIO_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json"
+contracts_src="docs/release/CHIO_COMPTROLLER_PARTNER_CONTRACTS.md"
+contracts_snapshot="${output_root}/CHIO_COMPTROLLER_PARTNER_CONTRACTS.md"
 cargo_target_dir="target/qualify-comptroller-partner-contracts-build"
 
 rm -rf "${output_root}"
@@ -46,28 +46,28 @@ cp "${contracts_src}" "${contracts_snapshot}"
 export CARGO_TARGET_DIR="${cargo_target_dir}"
 
 run_and_log receipt-checkpoint \
-  cargo test -p arc-kernel --test retention archived_receipt_verifies_against_checkpoint
+  cargo test -p chio-kernel --test retention archived_receipt_verifies_against_checkpoint
 run_and_log liability-market \
-  cargo test -p arc-cli --test receipt_query test_liability_market_quote_and_bind_workflow_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_liability_market_quote_and_bind_workflow_surfaces -- --exact
 run_and_log liability-claim \
-  cargo test -p arc-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact
 run_and_log underwriting-contract \
-  cargo test -p arc-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact
 run_and_log credit-contract \
-  cargo test -p arc-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact
 run_and_log capital-contract \
-  cargo test -p arc-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact
 
 cat >"${report_path}" <<'EOF'
 # Comptroller Partner-Contract Qualification
 
-This bundle records the focused proof that ARC exposes partner-visible receipt,
+This bundle records the focused proof that Chio exposes partner-visible receipt,
 checkpoint, settlement, underwriting, credit, capital, and liability contract
 surfaces.
 
 Decision:
 
-- ARC qualifies locally for partner-visible receipt and settlement contracts.
+- Chio qualifies locally for partner-visible receipt and settlement contracts.
 - Governed receipts, checkpoints, settlement reconciliation, and signed
   economic artifacts are packaged as explicit review surfaces.
 - Compatibility-only `allow_without_receipt` paths remain explicitly
@@ -76,22 +76,22 @@ Decision:
 Still not proved:
 
 - ecosystem-wide partner adoption
-- economic dependence on ARC as an unavoidable settlement or billing authority
+- economic dependence on Chio as an unavoidable settlement or billing authority
 
 Executed command set:
 
-- `cargo test -p arc-kernel --test retention archived_receipt_verifies_against_checkpoint`
-- `cargo test -p arc-cli --test receipt_query test_liability_market_quote_and_bind_workflow_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact`
+- `cargo test -p chio-kernel --test retention archived_receipt_verifies_against_checkpoint`
+- `cargo test -p chio-cli --test receipt_query test_liability_market_quote_and_bind_workflow_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact`
 
 Supporting documents:
 
-- `ARC_PARTNER_RECEIPT_SETTLEMENT_CONTRACT_MATRIX.json`
-- `ARC_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json`
-- `ARC_COMPTROLLER_PARTNER_CONTRACTS.md`
+- `CHIO_PARTNER_RECEIPT_SETTLEMENT_CONTRACT_MATRIX.json`
+- `CHIO_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json`
+- `CHIO_COMPTROLLER_PARTNER_CONTRACTS.md`
 EOF
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

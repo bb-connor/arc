@@ -11,7 +11,7 @@ Sampling and elicitation introduce nested workflows:
 - a server handling one request can ask the client for a model generation
 - a server handling one request can ask the client for structured user input
 
-ARC needs a model that preserves:
+Chio needs a model that preserves:
 
 - traceability
 - user control
@@ -25,7 +25,7 @@ The two broad options are:
 
 ## Decision
 
-ARC will model sampling and elicitation as child requests within the same session.
+Chio will model sampling and elicitation as child requests within the same session.
 
 Each child request will have:
 

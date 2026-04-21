@@ -1,0 +1,62 @@
+[package]
+name = "chio-control-plane"
+description = "Trust-control service, client, and shared runtime support for Chio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[lib]
+name = "chio_control_plane"
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-core = { path = "../chio-core" }
+chio-credentials = { path = "../chio-credentials" }
+chio-data-guards = { path = "../chio-data-guards" }
+chio-did = { path = "../chio-did" }
+chio-external-guards = { path = "../chio-external-guards" }
+chio-kernel = { path = "../chio-kernel" }
+chio-guards = { path = "../chio-guards" }
+chio-policy = { path = "../chio-policy" }
+chio-reputation = { path = "../chio-reputation" }
+chio-conformance = { path = "../chio-conformance" }
+chio-mcp-adapter = { path = "../chio-mcp-adapter" }
+chio-store-sqlite = { path = "../chio-store-sqlite" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yml = { workspace = true }
+thiserror = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tracing = { workspace = true }
+tokio = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+subtle = "2.6"
+axum = "0.8"
+reqwest = { workspace = true, features = ["blocking", "form", "json", "query", "rustls"] }
+ureq = { version = "2.10", features = ["json"] }
+serde_urlencoded = "0.7"
+percent-encoding = "2"
+rusqlite = { workspace = true }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+chrono = { version = "0.4", features = ["clock"] }
+base64 = "0.22"
+ciborium = "0.2"
+rsa = { version = "0.9", features = ["sha2"] }
+p384 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+x509-cert = "0.2"
+url = "2"
+
+[dev-dependencies]
+chio-anchor = { path = "../chio-anchor" }
+chio-link = { path = "../chio-link" }
+chio-settle = { path = "../chio-settle" }
+rcgen = "0.13"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

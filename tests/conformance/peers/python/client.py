@@ -10,14 +10,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-SDK_PYTHON_SRC = Path(__file__).resolve().parents[4] / "packages" / "sdk" / "arc-py" / "src"
+SDK_PYTHON_SRC = Path(__file__).resolve().parents[4] / "packages" / "sdk" / "chio-py" / "src"
 if str(SDK_PYTHON_SRC) not in sys.path:
     sys.path.insert(0, str(SDK_PYTHON_SRC))
 
 from arc import (
     NestedCallbackRouter,
-    ArcClient,
-    ArcSession,
+    ChioClient,
+    ChioSession,
     elicitation_accept_result,
     exchange_access_token as sdk_exchange_access_token,
     resolve_oauth_access_token,
@@ -31,7 +31,7 @@ from arc.transport import (
 )
 
 if "--help" in sys.argv:
-    print("ARC Python conformance client")
+    print("Chio Python conformance client")
     raise SystemExit(0)
 
 ARGS = {}
@@ -114,7 +114,7 @@ def post_rpc(
         )
     )
 
-def delete_session(session: ArcSession) -> int:
+def delete_session(session: ChioSession) -> int:
     return session.close()
 
 
@@ -203,15 +203,15 @@ def resolve_auth(transcript: list[dict]) -> dict:
 
 def initialize_session(
     base_url: str, auth_token: str, transcript: list[dict], step_prefix: str = ""
-) -> ArcSession:
+) -> ChioSession:
     for attempt in range(30):
         try:
             nested_router = build_nested_callback_router(transcript)
-            client = ArcClient.with_static_bearer(base_url, auth_token)
+            client = ChioClient.with_static_bearer(base_url, auth_token)
             session = client.initialize(
                 capabilities=CONFORMANCE_CLIENT_CAPABILITIES,
                 client_info={
-                    "name": "arc-conformance-python",
+                    "name": "chio-conformance-python",
                     "version": "0.1.0",
                 },
                 on_message=lambda message, session: nested_router.handle(
@@ -254,7 +254,7 @@ def build_nested_callback_router(transcript: list[dict]) -> NestedCallbackRouter
             builder=lambda message, _session: sampling_text_result(
                 message,
                 text=CONFORMANCE_SAMPLE_TEXT,
-                model="arc-conformance-python-model",
+                model="chio-conformance-python-model",
             ),
         )
         .register(
@@ -281,7 +281,7 @@ def build_nested_callback_router(transcript: list[dict]) -> NestedCallbackRouter
 
 
 def run_scenario(
-    scenario: dict, auth_context: dict, session: ArcSession, transcript: list[dict]
+    scenario: dict, auth_context: dict, session: ChioSession, transcript: list[dict]
 ) -> dict:
     started = time.time()
     session_auth_token = auth_context["access_token"]
@@ -302,7 +302,7 @@ def run_scenario(
                             "protocolVersion": "2025-11-25",
                             "capabilities": {},
                             "clientInfo": {
-                                "name": "arc-conformance-python-unauthorized",
+                                "name": "chio-conformance-python-unauthorized",
                                 "version": "0.1.0",
                             },
                         },

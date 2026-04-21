@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 #
-# ARC sidecar image.
+# Chio sidecar image.
 #
 # Build:
-#   docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/arc-sidecar:latest .
+#   docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/chio-sidecar:latest .
 #
 # The sidecar exposes :9090 and responds to GET /arc/health. It reads policy and
 # signing material from env vars documented in
-# docs/protocols/CLOUD-SIDECAR-INTEGRATION.md; if ARC_KERNEL_CONFIG_PATH is
+# docs/protocols/CLOUD-SIDECAR-INTEGRATION.md; if CHIO_KERNEL_CONFIG_PATH is
 # unreadable the process exits non-zero and the platform marks the container
 # unhealthy (fail closed).
 
@@ -15,7 +15,7 @@ ARG RUST_VERSION=1.93
 ARG DEBIAN_VERSION=bookworm
 
 # -----------------------------------------------------------------------------
-# Stage 1: build the arc-sidecar binary.
+# Stage 1: build the chio-sidecar binary.
 # -----------------------------------------------------------------------------
 FROM rust:${RUST_VERSION}-slim-${DEBIAN_VERSION} AS builder
 
@@ -37,23 +37,23 @@ WORKDIR /build
 
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
-# `wit/` is consumed by arc-wasm-guards via
-# `wasmtime::component::bindgen!(path = "../../wit/arc-guard.wit")`,
-# which resolves at compile time. arc-cli enables the component backend,
+# `wit/` is consumed by chio-wasm-guards via
+# `wasmtime::component::bindgen!(path = "../../wit/chio-guard.wit")`,
+# which resolves at compile time. chio-cli enables the component backend,
 # so the wit directory MUST be in the build context or `cargo build -p
-# arc-cli --bin arc` fails with a missing-path error.
+# chio-cli --bin arc` fails with a missing-path error.
 COPY wit ./wit
 COPY examples ./examples
 COPY formal ./formal
 COPY tests ./tests
 
-# The sidecar binary lives in arc-cli (arc serve-sidecar). If a dedicated
-# arc-sidecar bin is introduced, replace the --bin arg accordingly.
+# The sidecar binary lives in chio-cli (arc serve-sidecar). If a dedicated
+# chio-sidecar bin is introduced, replace the --bin arg accordingly.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p arc-cli --bin arc \
+    cargo build --release --locked -p chio-cli --bin arc \
  && mkdir -p /out \
- && cp /build/target/release/arc /out/arc-sidecar
+ && cp /build/target/release/arc /out/chio-sidecar
 
 # -----------------------------------------------------------------------------
 # Stage 2: healthcheck helper (distroless has no shell or curl).
@@ -94,16 +94,16 @@ RUN apt-get update \
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 
 # Metadata.
-LABEL org.opencontainers.image.title="arc-sidecar" \
-      org.opencontainers.image.description="ARC (Chio) kernel sidecar for multi-container platforms" \
+LABEL org.opencontainers.image.title="chio-sidecar" \
+      org.opencontainers.image.description="Chio (Chio) kernel sidecar for multi-container platforms" \
       org.opencontainers.image.source="https://github.com/backbay/arc" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 # Runtime config defaults (overridable at deploy time).
-ENV ARC_LISTEN_ADDR=0.0.0.0:9090 \
-    ARC_HEALTH_PATH=/arc/health \
-    ARC_LOG_LEVEL=info \
-    ARC_KERNEL_CONFIG_PATH=/etc/arc/kernel.yaml
+ENV CHIO_LISTEN_ADDR=0.0.0.0:9090 \
+    CHIO_HEALTH_PATH=/arc/health \
+    CHIO_LOG_LEVEL=info \
+    CHIO_KERNEL_CONFIG_PATH=/etc/arc/kernel.yaml
 
 # Copy the binary and the healthcheck helper from earlier stages. The
 # healthcheck stage has already arch-normalized curl + its shared libs
@@ -111,7 +111,7 @@ ENV ARC_LISTEN_ADDR=0.0.0.0:9090 \
 # x86_64-linux-gnu multiarch path. distroless/cc-debian12 already has
 # /usr/lib on the default ld.so search path, so dropping libs there
 # resolves for both amd64 and arm64 builds.
-COPY --from=builder /out/arc-sidecar /usr/local/bin/arc-sidecar
+COPY --from=builder /out/chio-sidecar /usr/local/bin/chio-sidecar
 COPY --from=healthcheck /out/bin/curl /usr/bin/curl
 COPY --from=healthcheck /out/lib/ /usr/lib/
 
@@ -126,7 +126,7 @@ EXPOSE 9090
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
   CMD ["/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"]
 
-ENTRYPOINT ["/usr/local/bin/arc-sidecar"]
+ENTRYPOINT ["/usr/local/bin/chio-sidecar"]
 # `serve-sidecar` is not a real subcommand in the arc CLI tree; a
 # container built from the old default exited immediately with CLI
 # usage errors before ever opening /arc/health. There is no single

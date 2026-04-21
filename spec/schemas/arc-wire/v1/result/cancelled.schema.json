@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC ToolCallResult cancelled",
+  "title": "Chio ToolCallResult cancelled",
   "type": "object",
   "additionalProperties": false,
   "required": ["status", "reason", "chunks_received"],

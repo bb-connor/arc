@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local smoke-test for every ARC TypeScript SDK package.
+# Local smoke-test for every Chio TypeScript SDK package.
 #
 # For each package listed below:
 #   1. Run `npm run build`.

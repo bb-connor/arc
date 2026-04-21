@@ -1,5 +1,5 @@
 [package]
-name = "arc-formal-diff-tests"
+name = "chio-formal-diff-tests"
 description = "Differential testing: random inputs compared against reference spec and production implementation"
 publish = false
 version.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }
-arc-kernel-core = { path = "../../crates/arc-kernel-core" }
+chio-core = { package = "chio-core-types", path = "../../crates/chio-core-types" }
+chio-kernel-core = { path = "../../crates/chio-kernel-core" }
 proptest = "1.10"
 serde_json = { workspace = true }

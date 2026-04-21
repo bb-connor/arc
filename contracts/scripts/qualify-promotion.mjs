@@ -45,7 +45,7 @@ function runNode(args, expectSuccess = true) {
 
 function buildApproval({ manifestPath, manifest, manifestHash, status = "approved", environment = "local-devnet" }) {
   return {
-    approval_id: `arc.web3-deployment-approval.${environment}.v1`,
+    approval_id: `chio.web3-deployment-approval.${environment}.v1`,
     candidate_release_id: manifest.review_context.candidate_release_id,
     deployment_policy_id: manifest.review_context.deployment_policy_id,
     reviewed_manifest_path: repoRelative(manifestPath),
@@ -186,7 +186,7 @@ async function main() {
   assert.equal(rollbackPlan.rollback_executed, true, "rollback should execute on failed local promotion");
 
   const summary = {
-    report_id: "arc.web3-deployment-promotion-qualification.local-devnet.v1",
+    report_id: "chio.web3-deployment-promotion-qualification.local-devnet.v1",
     generated_at: new Date().toISOString(),
     manifest: repoRelative(manifestPath),
     checks: [

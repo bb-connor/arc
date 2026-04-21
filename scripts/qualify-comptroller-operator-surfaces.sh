@@ -18,10 +18,10 @@ log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-profile_src="docs/standards/ARC_OPERATOR_CONTROL_SURFACE_PROFILE.json"
-profile_snapshot="${output_root}/ARC_OPERATOR_CONTROL_SURFACE_PROFILE.json"
-runbook_src="docs/release/ARC_COMPTROLLER_OPERATOR_RUNBOOK.md"
-runbook_snapshot="${output_root}/ARC_COMPTROLLER_OPERATOR_RUNBOOK.md"
+profile_src="docs/standards/CHIO_OPERATOR_CONTROL_SURFACE_PROFILE.json"
+profile_snapshot="${output_root}/CHIO_OPERATOR_CONTROL_SURFACE_PROFILE.json"
+runbook_src="docs/release/CHIO_COMPTROLLER_OPERATOR_RUNBOOK.md"
+runbook_snapshot="${output_root}/CHIO_COMPTROLLER_OPERATOR_RUNBOOK.md"
 cargo_target_dir="target/qualify-comptroller-operator-surfaces-build"
 
 rm -rf "${output_root}"
@@ -42,30 +42,30 @@ cp "${runbook_src}" "${runbook_snapshot}"
 export CARGO_TARGET_DIR="${cargo_target_dir}"
 
 run_and_log operator-report \
-  cargo test -p arc-cli --test receipt_query test_operator_report_endpoint -- --exact
+  cargo test -p chio-cli --test receipt_query test_operator_report_endpoint -- --exact
 run_and_log settlement-reconciliation \
-  cargo test -p arc-cli --test receipt_query test_settlement_reconciliation_report_and_action_endpoint -- --exact
+  cargo test -p chio-cli --test receipt_query test_settlement_reconciliation_report_and_action_endpoint -- --exact
 run_and_log metered-billing \
-  cargo test -p arc-cli --test receipt_query test_metered_billing_reconciliation_report_and_action_endpoint -- --exact
+  cargo test -p chio-cli --test receipt_query test_metered_billing_reconciliation_report_and_action_endpoint -- --exact
 run_and_log authorization-context \
-  cargo test -p arc-cli --test receipt_query test_authorization_context_report_and_cli -- --exact
+  cargo test -p chio-cli --test receipt_query test_authorization_context_report_and_cli -- --exact
 run_and_log underwriting-surface \
-  cargo test -p arc-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact
 run_and_log credit-surface \
-  cargo test -p arc-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact
 run_and_log capital-surface \
-  cargo test -p arc-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact
+  cargo test -p chio-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact
 
 cat >"${report_path}" <<'EOF'
 # Comptroller Operator-Surface Qualification
 
-This bundle records the focused post-v3.16 proof that ARC exposes explicit
+This bundle records the focused post-v3.16 proof that Chio exposes explicit
 operator-facing economic control surfaces rather than only crate-internal
 comptroller primitives.
 
 Decision:
 
-- ARC qualifies locally for operator-facing economic control surfaces.
+- Chio qualifies locally for operator-facing economic control surfaces.
 - The trust-control service exposes report and action endpoints over governed
   operator evidence, settlement reconciliation, metered billing
   reconciliation, and authorization-context review.
@@ -75,22 +75,22 @@ Decision:
 Still not proved:
 
 - independent third-party operators running these surfaces in production
-- partner economic dependence on ARC as a market control layer
+- partner economic dependence on Chio as a market control layer
 
 Executed command set:
 
-- `cargo test -p arc-cli --test receipt_query test_operator_report_endpoint -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_settlement_reconciliation_report_and_action_endpoint -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_metered_billing_reconciliation_report_and_action_endpoint -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_authorization_context_report_and_cli -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_operator_report_endpoint -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_settlement_reconciliation_report_and_action_endpoint -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_metered_billing_reconciliation_report_and_action_endpoint -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_and_cli -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_credit_facility_report_issue_and_list_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_capital_book_report_export_surfaces -- --exact`
 
 Supporting documents:
 
-- `ARC_OPERATOR_CONTROL_SURFACE_PROFILE.json`
-- `ARC_COMPTROLLER_OPERATOR_RUNBOOK.md`
+- `CHIO_OPERATOR_CONTROL_SURFACE_PROFILE.json`
+- `CHIO_COMPTROLLER_OPERATOR_RUNBOOK.md`
 EOF
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

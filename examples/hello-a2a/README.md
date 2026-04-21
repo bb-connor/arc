@@ -1,6 +1,6 @@
 # hello-a2a
 
-Minimal A2A example using [`crates/arc-a2a-edge`](../../crates/arc-a2a-edge/).
+Minimal A2A example using [`crates/chio-a2a-edge`](../../crates/chio-a2a-edge/).
 
 ## What It Demonstrates
 

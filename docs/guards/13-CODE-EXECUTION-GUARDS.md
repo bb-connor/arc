@@ -3,14 +3,14 @@
 > **Status**: Proposed April 2026
 > **Depends on**: `docs/guards/01-CURRENT-GUARD-SYSTEM.md` (guard trait and
 > pipeline), `docs/guards/08-DESKTOP-CUA-GUARD-ABSORPTION.md` (CUA action
-> taxonomy), `crates/arc-guards/src/action.rs` (ToolAction enum)
+> taxonomy), `crates/chio-guards/src/action.rs` (ToolAction enum)
 
 When an agent invokes a code execution sandbox (E2B, Modal, Code Interpreter)
 or controls a headless browser (Playwright, Puppeteer, Anthropic Computer
 Use), the blast radius is maximal. Arbitrary code execution grants the agent
 Turing-complete capability within the sandbox boundary. Browser automation
 grants the agent access to any reachable web service with full interaction
-capability. ARC cannot govern what happens inside these environments, but it
+capability. Chio cannot govern what happens inside these environments, but it
 can govern the agent's authority to invoke them and constrain the parameters
 of invocation.
 
@@ -29,8 +29,8 @@ for these surfaces.
 | Local interpreter | Code Interpreter, ipython | Agent runs code on the host or in a lightweight container. Blast radius depends entirely on isolation quality. |
 | Raw exec | `subprocess.run`, `os.system` | No sandbox boundary. Full host access. Already covered by `ShellCommandGuard`. |
 
-The key insight: the sandbox itself is a security boundary. ARC does not
-replace it. ARC governs the agent's authorization to invoke the sandbox,
+The key insight: the sandbox itself is a security boundary. Chio does not
+replace it. Chio governs the agent's authorization to invoke the sandbox,
 constrains invocation parameters (language, network access, execution time),
 and produces receipts for audit.
 
@@ -48,14 +48,14 @@ automation operates at the DOM level (navigate to URL, click selector, type
 into element). Doc 08 covers CUA. This document covers headless/DOM-level
 automation.
 
-### 1.3 What ARC does NOT do
+### 1.3 What Chio does NOT do
 
-- ARC does not sandbox code. The sandbox provider does.
-- ARC does not intercept network traffic inside sandboxes. The sandbox provider's
+- Chio does not sandbox code. The sandbox provider does.
+- Chio does not intercept network traffic inside sandboxes. The sandbox provider's
   network policy does.
-- ARC does not parse or execute code. It inspects metadata about the code
+- Chio does not parse or execute code. It inspects metadata about the code
   (language, hash, requested capabilities) and the invocation parameters.
-- ARC does not inject itself into browser sessions. It governs the tool call
+- Chio does not inject itself into browser sessions. It governs the tool call
   that launches or controls the browser.
 
 ---
@@ -491,7 +491,7 @@ Agent calls e2b_execute   -->  CodeExecutionGuard   (sandbox-level network toggl
 
 If the sandbox has network access enabled (and the guard allows it), traffic
 inside the sandbox is governed by the sandbox provider's network policy, not
-by ARC's `EgressAllowlistGuard`. ARC does not intercept sandbox-internal
+by Chio's `EgressAllowlistGuard`. Chio does not intercept sandbox-internal
 traffic.
 
 ---
@@ -790,11 +790,11 @@ allowed to spend on sandbox usage.
 
 ### 5.2 What This Guard Is (and Is Not)
 
-ARC governs the agent's ability to INVOKE the sandbox. It does not replace
+Chio governs the agent's ability to INVOKE the sandbox. It does not replace
 the sandbox's own security boundary.
 
 ```
-Agent                     ARC Kernel                    Sandbox
+Agent                     Chio Kernel                    Sandbox
   |                          |                            |
   |-- tool_call: e2b_exec -->|                            |
   |                          |-- CodeExecutionGuard       |
@@ -810,7 +810,7 @@ Agent                     ARC Kernel                    Sandbox
   |<-- receipt + result -----|                            |
 ```
 
-The sandbox is already a security boundary. ARC adds three things the
+The sandbox is already a security boundary. Chio adds three things the
 sandbox does not provide:
 
 1. **Authorization**: Is this agent permitted to invoke this sandbox at all?
@@ -1037,7 +1037,7 @@ pub struct BrowserAutomationReceiptData {
 
 ### 8.1 `GuardRequest` enrichment
 
-The `GuardRequest` struct (in `arc-wasm-guards/src/abi.rs`) gains new
+The `GuardRequest` struct (in `chio-wasm-guards/src/abi.rs`) gains new
 `action_type` values for WASM guards to match on:
 
 | `action_type` value | When set |
@@ -1073,9 +1073,9 @@ pub struct GuardRequest {
 
 ```rust
 // Guest code (compiles to .wasm)
-use arc_guard_sdk::prelude::*;
+use chio_guard_sdk::prelude::*;
 
-#[arc_guard]
+#[chio_guard]
 fn evaluate(req: &GuardRequest) -> GuardVerdict {
     if req.action_type.as_deref() != Some("code_execution") {
         return GuardVerdict::Allow;
@@ -1103,9 +1103,9 @@ fn evaluate(req: &GuardRequest) -> GuardVerdict {
 ### 8.3 Custom WASM guard example: browser navigation taxonomy
 
 ```rust
-use arc_guard_sdk::prelude::*;
+use chio_guard_sdk::prelude::*;
 
-#[arc_guard]
+#[chio_guard]
 fn evaluate(req: &GuardRequest) -> GuardVerdict {
     if req.action_type.as_deref() != Some("browser_action") {
         return GuardVerdict::Allow;
@@ -1183,14 +1183,14 @@ fn evaluate(req: &GuardRequest) -> GuardVerdict {
 
 | File | Change |
 |------|--------|
-| `crates/arc-guards/src/action.rs` | Add `CodeExecution` variant. Add `Screenshot`, `ExtractContent`, `WaitFor` to `BrowserActionType`. Extend `extract_action`. Add accessors. |
-| `crates/arc-guards/src/lib.rs` | Add `pub mod code_execution`, `pub mod browser_automation`, `pub mod sandbox_invocation`. Re-export guard types. |
-| `crates/arc-guards/src/code_execution.rs` | New file. `CodeExecutionGuard`. |
-| `crates/arc-guards/src/browser_automation.rs` | New file. `BrowserAutomationGuard`. |
-| `crates/arc-guards/src/sandbox_invocation.rs` | New file. `SandboxInvocationGuard`. |
-| `crates/arc-guards/src/pipeline.rs` | Register new guards at correct priority (group 3). |
-| `crates/arc-wasm-guards/src/abi.rs` | Add code execution and browser fields to `GuardRequest`. |
-| `crates/arc-wasm-guards/src/runtime.rs` | Populate new fields in `build_request`. |
+| `crates/chio-guards/src/action.rs` | Add `CodeExecution` variant. Add `Screenshot`, `ExtractContent`, `WaitFor` to `BrowserActionType`. Extend `extract_action`. Add accessors. |
+| `crates/chio-guards/src/lib.rs` | Add `pub mod code_execution`, `pub mod browser_automation`, `pub mod sandbox_invocation`. Re-export guard types. |
+| `crates/chio-guards/src/code_execution.rs` | New file. `CodeExecutionGuard`. |
+| `crates/chio-guards/src/browser_automation.rs` | New file. `BrowserAutomationGuard`. |
+| `crates/chio-guards/src/sandbox_invocation.rs` | New file. `SandboxInvocationGuard`. |
+| `crates/chio-guards/src/pipeline.rs` | Register new guards at correct priority (group 3). |
+| `crates/chio-wasm-guards/src/abi.rs` | Add code execution and browser fields to `GuardRequest`. |
+| `crates/chio-wasm-guards/src/runtime.rs` | Populate new fields in `build_request`. |
 
 ---
 

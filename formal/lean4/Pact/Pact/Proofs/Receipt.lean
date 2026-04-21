@@ -5,13 +5,13 @@
   - receipt immutability
 -/
 
-import Arc.Core.Receipt
+import Chio.Core.Receipt
 
 set_option autoImplicit false
 
-namespace Arc.Proofs
+namespace Chio.Proofs
 
-open Arc.Core
+open Chio.Core
 
 theorem applyProof_append (start : MerkleHash)
     (proofPrefix proofSuffix : ReceiptProof) :
@@ -118,4 +118,4 @@ theorem receipt_immutability
     exact h_eq.symm
   simp [verifyReceipt, signReceipt, h_body_ne]
 
-end Arc.Proofs
+end Chio.Proofs

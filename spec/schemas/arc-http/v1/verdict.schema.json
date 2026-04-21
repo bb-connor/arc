@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC HTTP Verdict",
+  "title": "Chio HTTP Verdict",
   "description": "Tagged union representing the evaluation verdict for an HTTP request.",
   "oneOf": [
     {

@@ -4,7 +4,7 @@ import json
 import os
 
 import httpx
-from arc import ArcClient, ReceiptQueryClient
+from arc import ChioClient, ReceiptQueryClient
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
@@ -30,18 +30,18 @@ def session_capability_id(base_url: str, auth_token: str, session_id: str) -> st
 
 
 class EchoInput(BaseModel):
-    """Arguments passed through LangChain into the ARC-governed MCP tool."""
+    """Arguments passed through LangChain into the Chio-governed MCP tool."""
 
-    message: str = Field(description="Message to echo through ARC")
+    message: str = Field(description="Message to echo through Chio")
 
 
 def main() -> None:
-    base_url = os.environ.get("ARC_BASE_URL", DEFAULT_ARC_BASE_URL)
-    control_url = os.environ.get("ARC_CONTROL_URL", DEFAULT_ARC_CONTROL_URL)
-    auth_token = os.environ.get("ARC_AUTH_TOKEN", DEFAULT_ARC_AUTH_TOKEN)
-    client = ArcClient.with_static_bearer(base_url, auth_token)
+    base_url = os.environ.get("CHIO_BASE_URL", DEFAULT_ARC_BASE_URL)
+    control_url = os.environ.get("CHIO_CONTROL_URL", DEFAULT_ARC_CONTROL_URL)
+    auth_token = os.environ.get("CHIO_AUTH_TOKEN", DEFAULT_ARC_AUTH_TOKEN)
+    client = ChioClient.with_static_bearer(base_url, auth_token)
     session = client.initialize(
-        client_info={"name": "arc-langchain-example", "version": "0.2.0"}
+        client_info={"name": "chio-langchain-example", "version": "0.2.0"}
     )
     try:
         tools_result = session.list_tools()
@@ -49,7 +49,7 @@ def main() -> None:
         capability_id = session_capability_id(base_url, auth_token, session.session_id)
 
         def echo_via_arc(message: str) -> str:
-            """Call the ARC-governed echo_text tool and return its text payload."""
+            """Call the Chio-governed echo_text tool and return its text payload."""
 
             result = session.call_tool("echo_text", {"message": message}).get("result", {})
             if result.get("structuredContent"):
@@ -61,12 +61,12 @@ def main() -> None:
 
         tool = StructuredTool.from_function(
             func=echo_via_arc,
-            name="arc_echo_text",
-            description="Invoke the ARC-governed echo_text MCP tool",
+            name="chio_echo_text",
+            description="Invoke the Chio-governed echo_text MCP tool",
             args_schema=EchoInput,
         )
 
-        message = os.environ.get("ARC_MESSAGE", "hello from LangChain")
+        message = os.environ.get("CHIO_MESSAGE", "hello from LangChain")
         result = tool.invoke({"message": message})
         receipts = ReceiptQueryClient(control_url, auth_token).query(
             {"capabilityId": capability_id, "limit": 10}

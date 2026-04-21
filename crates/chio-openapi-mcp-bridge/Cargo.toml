@@ -1,0 +1,27 @@
+[package]
+name = "chio-openapi-mcp-bridge"
+description = "Bridge that exposes Chio-governed HTTP APIs as MCP tool surfaces via OpenAPI spec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_openapi_mcp_bridge"
+
+[dependencies]
+chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+chio-kernel = { path = "../chio-kernel" }
+chio-manifest = { path = "../chio-manifest" }
+chio-mcp-edge = { path = "../chio-mcp-edge" }
+chio-openapi = { path = "../chio-openapi" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

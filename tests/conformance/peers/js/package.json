@@ -1,5 +1,5 @@
 {
-  "name": "arc-conformance-js-peer",
+  "name": "chio-conformance-js-peer",
   "private": true,
   "type": "module",
   "scripts": {

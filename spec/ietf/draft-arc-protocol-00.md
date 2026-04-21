@@ -1,15 +1,15 @@
-Network Working Group                                          ARC Editors
+Network Working Group                                          Chio Editors
 Internet-Draft                                                April 2026
 Intended status: Standards Track
 Expires: October 2026
 
-# The ARC Protocol
+# The Chio Protocol
 
 ## Abstract
 
-This document describes ARC, a protocol and runtime profile for mediated tool
+This document describes Chio, a protocol and runtime profile for mediated tool
 execution under signed capabilities, signed receipts, explicit versioning, and
-bounded transport security requirements. ARC defines a native framed transport,
+bounded transport security requirements. Chio defines a native framed transport,
 an MCP-compatible hosted edge, and trust-control lifecycle endpoints for
 capability issuance, delegated issuance, receipt query, and revocation.
 
@@ -23,16 +23,16 @@ published for review and discussion.
 
 ## 1. Introduction
 
-ARC is designed to let one caller invoke one tool under explicit delegated
+Chio is designed to let one caller invoke one tool under explicit delegated
 authority while producing signed audit receipts. The protocol surface is split
 into three cooperating layers:
 
-1. a native ARC framed transport for direct agent-to-kernel messages
+1. a native Chio framed transport for direct agent-to-kernel messages
 2. a hosted MCP-compatible HTTP session transport
 3. trust-control lifecycle APIs for issuance, delegation, receipt query, and
    revocation
 
-The native transport alone is intentionally narrow. ARC's broader deployment
+The native transport alone is intentionally narrow. Chio's broader deployment
 story depends on the cooperating hosted and trust-control surfaces.
 
 ## 2. Conventions And Terminology
@@ -43,24 +43,24 @@ only when, they appear in all capitals, as shown here.
 
 Terms used in this document:
 
-- capability: a signed ARC authority token
-- receipt: a signed ARC audit artifact for one evaluated action
+- capability: a signed Chio authority token
+- receipt: a signed Chio audit artifact for one evaluated action
 - sender constraint: proof that binds a caller to an issued capability or
   session profile
-- native ARC transport: the framed transport defined in phase `311`
+- native Chio transport: the framed transport defined in phase `311`
 
 ## 3. Protocol Surface
 
-### 3.1 Native ARC Transport
+### 3.1 Native Chio Transport
 
-The native ARC transport uses one frame format:
+The native Chio transport uses one frame format:
 
 - 4-byte unsigned big-endian length prefix
 - canonical JSON payload bytes
 
 Current versioning is out-of-band exact match:
 
-- wire version: `arc-wire-v1`
+- wire version: `chio-wire-v1`
 - no in-band downgrade
 - incompatible peers close or reset the transport
 
@@ -105,22 +105,22 @@ policy ceiling when a parent capability is continued.
 
 ## 4. Error And Version Model
 
-ARC publishes two machine-readable registries:
+Chio publishes two machine-readable registries:
 
-- `spec/versions/arc-protocol-negotiation.v1.json`
-- `spec/errors/arc-error-registry.v1.json`
+- `spec/versions/chio-protocol-negotiation.v1.json`
+- `spec/errors/chio-error-registry.v1.json`
 
 The negotiation artifact defines exact-match compatibility and rejection
 behavior for the native, hosted, and trust-control surfaces. The error
-registry defines numeric ARC error codes, categories, transient/permanent
+registry defines numeric Chio error codes, categories, transient/permanent
 classification, and retry guidance.
 
 ## 5. Security Considerations
 
-The ARC threat model is defined in `spec/SECURITY.md` and the machine-readable
-register `spec/security/arc-threat-model.v1.json`.
+The Chio threat model is defined in `spec/SECURITY.md` and the machine-readable
+register `spec/security/chio-threat-model.v1.json`.
 
-At minimum, ARC implementations need to address:
+At minimum, Chio implementations need to address:
 
 - capability token theft
 - kernel impersonation
@@ -142,7 +142,7 @@ sender continuity over the same request.
 
 ## 6. Conformance
 
-Checked-in conformance evidence for the native ARC lane lives under
+Checked-in conformance evidence for the native Chio lane lives under
 `tests/conformance/native/`. The suite covers:
 
 - capability validation
@@ -161,9 +161,9 @@ This document has no IANA actions in its current form.
 
 Future versions may request registrations for:
 
-- ARC media types
-- ARC protocol parameter names
-- ARC error registry identifiers
+- Chio media types
+- Chio protocol parameter names
+- Chio error registry identifiers
 
 ## 8. References
 

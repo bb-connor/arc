@@ -1,8 +1,8 @@
 /**
- * Core types for the ARC HTTP substrate.
+ * Core types for the Chio HTTP substrate.
  *
- * These types mirror the Rust arc-http-core crate and define the contract
- * between TypeScript middleware and the ARC sidecar kernel.
+ * These types mirror the Rust chio-http-core crate and define the contract
+ * between TypeScript middleware and the Chio sidecar kernel.
  */
 
 // -- HTTP Method --
@@ -81,7 +81,7 @@ export interface HttpReceipt {
   session_id?: string | undefined;
   verdict: Verdict;
   evidence: GuardEvidence[];
-  // ARC evaluation-time HTTP status; allow receipts may be signed before the
+  // Chio evaluation-time HTTP status; allow receipts may be signed before the
   // downstream response exists.
   response_status: number;
   timestamp: number;
@@ -93,9 +93,9 @@ export interface HttpReceipt {
   signature: string;
 }
 
-// -- ARC HTTP Request (sent to sidecar for evaluation) --
+// -- Chio HTTP Request (sent to sidecar for evaluation) --
 
-export interface ArcHttpRequest {
+export interface ChioHttpRequest {
   request_id: string;
   method: HttpMethod;
   route_pattern: string;
@@ -120,21 +120,21 @@ export interface EvaluateResponse {
 }
 
 /**
- * Explicit passthrough state when ARC is configured fail-open and the sidecar
+ * Explicit passthrough state when Chio is configured fail-open and the sidecar
  * could not produce a signed evaluation result.
  */
-export interface ArcPassthrough {
+export interface ChioPassthrough {
   mode: "allow_without_receipt";
-  error: typeof ARC_ERROR_CODES.SIDECAR_UNREACHABLE;
+  error: typeof CHIO_ERROR_CODES.SIDECAR_UNREACHABLE;
   message: string;
 }
 
-// -- ARC middleware configuration --
+// -- Chio middleware configuration --
 
-export interface ArcConfig {
+export interface ChioConfig {
   /**
-   * URL of the ARC sidecar kernel (e.g., "http://127.0.0.1:9090").
-   * Defaults to ARC_SIDECAR_URL env var or "http://127.0.0.1:9090".
+   * URL of the Chio sidecar kernel (e.g., "http://127.0.0.1:9090").
+   * Defaults to CHIO_SIDECAR_URL env var or "http://127.0.0.1:9090".
    */
   sidecarUrl?: string | undefined;
 
@@ -157,7 +157,7 @@ export interface ArcConfig {
 
   /**
    * Called when the sidecar is unreachable. Defaults to deny (fail-closed).
-   * `allow` forwards the request without an ARC receipt.
+   * `allow` forwards the request without an Chio receipt.
    */
   onSidecarError?: "deny" | "allow" | undefined;
 
@@ -179,21 +179,21 @@ export type IdentityExtractor = (headers: Record<string, string | string[] | und
 /** Resolve a raw request path to a route pattern. */
 export type RoutePatternResolver = (method: HttpMethod, path: string) => string;
 
-// -- ARC error codes for HTTP responses --
+// -- Chio error codes for HTTP responses --
 
-export const ARC_ERROR_CODES = {
-  ACCESS_DENIED: "arc_access_denied",
-  SIDECAR_UNREACHABLE: "arc_sidecar_unreachable",
-  EVALUATION_FAILED: "arc_evaluation_failed",
-  INVALID_RECEIPT: "arc_invalid_receipt",
-  TIMEOUT: "arc_timeout",
+export const CHIO_ERROR_CODES = {
+  ACCESS_DENIED: "chio_access_denied",
+  SIDECAR_UNREACHABLE: "chio_sidecar_unreachable",
+  EVALUATION_FAILED: "chio_evaluation_failed",
+  INVALID_RECEIPT: "chio_invalid_receipt",
+  TIMEOUT: "chio_timeout",
 } as const;
 
-export type ArcErrorCode = typeof ARC_ERROR_CODES[keyof typeof ARC_ERROR_CODES];
+export type ChioErrorCode = typeof CHIO_ERROR_CODES[keyof typeof CHIO_ERROR_CODES];
 
 /** Structured error response body. */
-export interface ArcErrorResponse {
-  error: ArcErrorCode;
+export interface ChioErrorResponse {
+  error: ChioErrorCode;
   message: string;
   receipt_id?: string | undefined;
   suggestion?: string | undefined;

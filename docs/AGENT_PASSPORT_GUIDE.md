@@ -1,4 +1,4 @@
-# ARC Agent Passport Guide
+# Chio Agent Passport Guide
 
 **Status:** alpha plus verifier infrastructure, lifecycle status distribution,
 portable OID4VCI-compatible issuance, holder transport over public
@@ -10,18 +10,18 @@ analytics shipped
 
 ## Overview
 
-ARC now ships Agent Passport verification and presentation on top of:
+Chio now ships Agent Passport verification and presentation on top of:
 
 - local reputation scoring
 - reputation-gated issuance
-- `did:arc`
+- `did:chio`
 - signed receipt and checkpoint evidence
 - signed reusable verifier policy artifacts
 - replay-safe verifier challenge state
 - truthful multi-issuer bundle verification and evaluation
 - shared-evidence provenance in operator and comparison reporting
 
-The current CLI surface is ARC-first, with `arc` retained as a compatibility
+The current CLI surface is Chio-first, with `arc` retained as a compatibility
 alias during the rename window:
 
 ```text
@@ -52,7 +52,7 @@ arc passport status revoke
 
 The passport is a bundle of independently verifiable reputation credentials.
 Each embedded credential is signed by the issuing operator key and identifies
-both issuer and subject as `did:arc` DIDs.
+both issuer and subject as `did:chio` DIDs.
 
 `arc passport create` still produces a single-issuer passport from one local
 operator signing key and one local receipt corpus. Verification, evaluation,
@@ -65,36 +65,36 @@ the issuing operator explicitly supplies enterprise identity context during
 passport creation; verification recomputes the passport-level provenance from
 the embedded credentials and fails closed if the aggregate is tampered.
 
-New ARC issuance uses these primary schema identifiers while verification still
+New Chio issuance uses these primary schema identifiers while verification still
 accepts legacy `arc.*` passport artifacts:
 
-- `arc.agent-passport.v1`
-- `arc.passport-verifier-policy.v1`
-- `arc.agent-passport-presentation-challenge.v1`
-- `arc.agent-passport-presentation-response.v1`
+- `chio.agent-passport.v1`
+- `chio.passport-verifier-policy.v1`
+- `chio.agent-passport-presentation-challenge.v1`
+- `chio.agent-passport-presentation-response.v1`
 
-Issuer and subject identifiers currently remain `did:arc`. `did:arc` is the
+Issuer and subject identifiers currently remain `did:chio`. `did:chio` is the
 shipped canonical DID method.
 
-ARC now also publishes one bounded public identity-profile and wallet-routing
+Chio now also publishes one bounded public identity-profile and wallet-routing
 contract over the passport substrate in
-`docs/standards/ARC_PUBLIC_IDENTITY_PROFILE.md`. That profile may name
+`docs/standards/CHIO_PUBLIC_IDENTITY_PROFILE.md`. That profile may name
 `did:web`, `did:key`, and `did:jwk` as compatibility inputs, but the shipped
-passport artifact and projected portable responses still keep `did:arc` as the
+passport artifact and projected portable responses still keep `did:chio` as the
 signed provenance anchor.
 
 ## OID4VCI-Compatible Issuance
 
-ARC now ships one conservative OID4VCI-style pre-authorized-code issuance lane
+Chio now ships one conservative OID4VCI-style pre-authorized-code issuance lane
 for the existing `AgentPassport` artifact plus two bounded projected portable
-passport profiles. This is still a transport and delivery layer over ARC's
-current passport truth surface, not a rewrite of ARC credentials into generic
+passport profiles. This is still a transport and delivery layer over Chio's
+current passport truth surface, not a rewrite of Chio credentials into generic
 `ldp_vc` or arbitrary VC wallet formats.
 
 The shipped profile is:
 
-- configuration id: `arc_agent_passport`
-- format: `arc-agent-passport+json`
+- configuration id: `chio_agent_passport`
+- format: `chio-agent-passport+json`
 - issuer metadata: `/.well-known/openid-credential-issuer`
 - operator-authenticated offer creation: `/v1/passport/issuance/offers`
 - holder-facing token redemption: `/v1/passport/issuance/token`
@@ -147,18 +147,18 @@ arc trust serve \
 Remote compatibility is bounded intentionally:
 
 - `credential_issuer` is an operator-controlled HTTPS transport identifier
-- the delivered credential still binds issuer and subject as `did:arc`
-- offer creation stays on ARC's authenticated admin plane
+- the delivered credential still binds issuer and subject as `did:chio`
+- offer creation stays on Chio's authenticated admin plane
 - pre-authorized codes and access tokens are single-use and short-lived
 - portable lifecycle support is only advertised when the issuer has a published
   read-only lifecycle resolve plane
 - if the trust-control service is configured for portable lifecycle support,
   offer creation fails closed until the target passport is already published
   active into that lifecycle registry
-- ARC now also publishes one bounded public identity-profile, wallet-
+- Chio now also publishes one bounded public identity-profile, wallet-
   directory, and routing contract for the documented passport profile family
-- ARC still does not claim generic OID4VP, DIDComm, permissionless public-
-  wallet, or arbitrary non-ARC credential compatibility
+- Chio still does not claim generic OID4VP, DIDComm, permissionless public-
+  wallet, or arbitrary non-Chio credential compatibility
 
 ## Create
 
@@ -180,7 +180,7 @@ What this does:
 
 - assembles the local reputation corpus for the selected subject
 - computes a deterministic local scorecard
-- builds one signed `ArcReputationAttestation`
+- builds one signed `ChioReputationAttestation`
 - wraps it in an `AgentPassport`
 - optionally projects enterprise federation facts into typed
   `enterpriseIdentityProvenance` on the credential and the passport bundle
@@ -197,7 +197,7 @@ arc passport verify --input passport.json
 Verification checks:
 
 - every embedded credential signature
-- `did:arc` issuer and subject consistency
+- `did:chio` issuer and subject consistency
 - credential validity windows
 - single-subject passport consistency
 - bundle `validUntil` does not exceed the minimum credential expiry
@@ -211,7 +211,7 @@ Verification checks:
 
 ## Lifecycle Status And Distribution
 
-ARC now treats passport lifecycle as operator-managed truth instead of a
+Chio now treats passport lifecycle as operator-managed truth instead of a
 private convention. A relying party can distinguish:
 
 - `active`: the published passport is current
@@ -276,16 +276,16 @@ You can also advertise the lifecycle endpoint through the subject DID document:
 
 ```text
 arc did resolve \
-  --id did:arc:<subject> \
+  --id did:chio:<subject> \
   --passport-status-url https://trust.example.com/v1/public/passport/statuses/resolve
 ```
 
-This emits an `ArcPassportStatusService` DID service entry so relying parties
+This emits an `ChioPassportStatusService` DID service entry so relying parties
 have one supported place to discover lifecycle state.
 
 ## Multi-Issuer Composition
 
-ARC now accepts passport bundles that contain credentials from multiple
+Chio now accepts passport bundles that contain credentials from multiple
 issuers when all credentials:
 
 - independently verify
@@ -302,12 +302,12 @@ The verifier contract remains conservative:
 - evaluation output reports `matchedIssuers` plus `credentialResults[].issuer`
 
 This means multi-issuer support is a verification/evaluation/presentation
-feature, not a claim that ARC now synthesizes a new trust signal across
+feature, not a claim that Chio now synthesizes a new trust signal across
 issuers.
 
 ## Cross-Issuer Portfolios
 
-ARC now also defines one bounded cross-issuer portfolio layer over those same
+Chio now also defines one bounded cross-issuer portfolio layer over those same
 passport artifacts:
 
 - a portfolio can hold native, imported, or explicitly migrated passport
@@ -360,7 +360,7 @@ verification:
 
 ```yaml
 issuerAllowlist:
-  - "did:arc:..."
+  - "did:chio:..."
 requireActiveLifecycle: true
 ```
 
@@ -516,7 +516,7 @@ was not activated.
 arc passport present \
   --input passport.json \
   --output presented.json \
-  --issuer did:arc:... \
+  --issuer did:chio:... \
   --max-credentials 1
 ```
 
@@ -592,13 +592,13 @@ challenge verification applies the same lifecycle fail-closed rules as
 
 ## Holder Transport
 
-Phase 55 adds one conservative holder-facing transport over the existing ARC
+Phase 55 adds one conservative holder-facing transport over the existing Chio
 challenge and response artifacts. The proof material is unchanged:
 
 - the verifier/admin still creates the signed
-  `arc.agent-passport-presentation-challenge.v1`
+  `chio.agent-passport-presentation-challenge.v1`
 - the holder still signs the existing
-  `arc.agent-passport-presentation-response.v1`
+  `chio.agent-passport-presentation-response.v1`
 - replay truth still lives in the verifier challenge store
 
 What changed is transport:
@@ -703,7 +703,7 @@ challenge store semantics.
 Shipped now:
 
 - single-issuer reputation credentials
-- single-issuer passport bundle creation with ARC-primary schema issuance
+- single-issuer passport bundle creation with Chio-primary schema issuance
 - multi-issuer passport bundle verification, evaluation, and filtered presentation
 - offline verification without custom glue code
 - relying-party policy evaluation over passports without custom glue code
@@ -733,11 +733,11 @@ Shipped now:
 
 Not shipped yet:
 
-- `did:arc` issuance and resolution
-- `did:arc:update` rotation flows
+- `did:chio` issuance and resolution
+- `did:chio:update` rotation flows
 - zero-knowledge selective disclosure
 - generic OID4VP, DIDComm, or universal wallet qualification beyond the
-  documented ARC verifier profile plus bounded public identity-profile and
+  documented Chio verifier profile plus bounded public identity-profile and
   wallet-routing contract
 - permissionless or auto-trusting public issuer, verifier, or wallet
   discovery networks

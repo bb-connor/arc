@@ -2,13 +2,13 @@
 
 **Status:** Working research / brainstorming document
 **Date:** 2026-04-13
-**Scope:** MCP gateway limits, direct-access monitoring limits, protocol bypass, ARC implications
+**Scope:** MCP gateway limits, direct-access monitoring limits, protocol bypass, Chio implications
 
 ---
 
 ## 1. Why This Document Exists
 
-ARC currently has a strong story around deterministic governance and signed
+Chio currently has a strong story around deterministic governance and signed
 observability, especially on wrapped MCP surfaces. Recent external research and
 market commentary sharpen an important architectural risk:
 
@@ -22,7 +22,7 @@ It is intentionally not a polished product spec. It is a workspace for:
 - framing the problem precisely
 - collecting external signals
 - generating architecture options
-- identifying what ARC should claim now versus later
+- identifying what Chio should claim now versus later
 
 ---
 
@@ -150,9 +150,9 @@ forensics product rather than a runtime security layer.
 
 ---
 
-## 4. ARC Working Position
+## 4. Chio Working Position
 
-ARC should not choose between these patterns naively. The stronger ARC thesis
+Chio should not choose between these patterns naively. The stronger Chio thesis
 is:
 
 1. deterministic governance is the minimum credible base layer
@@ -160,13 +160,13 @@ is:
 3. dynamic governance should be treated as an optional higher layer, not as a
    prerequisite for the system to be valuable
 
-In ARC terms:
+In Chio terms:
 
 - **Layer 1:** capabilities, guards, budgets, revocation, allow/deny
 - **Layer 2:** receipts, lineage, traces, compliance bundles, operator reports
 - **Layer 3:** future dynamic controls based on intent/risk/drift signals
 
-This means ARC should aim to combine enforcement and context without claiming
+This means Chio should aim to combine enforcement and context without claiming
 that every risk can be solved through intent inference.
 
 ---
@@ -184,7 +184,7 @@ Why:
 
 - MCP is useful for adoption
 - MCP-only security is structurally incomplete
-- ARC becomes more defensible as more runtime surfaces feed the same kernel and
+- Chio becomes more defensible as more runtime surfaces feed the same kernel and
   receipt graph
 
 ### 5.2 Where Should Context Live?
@@ -225,7 +225,7 @@ Questions:
 - is MCP + A2A + ACP enough to cover the most important near-term runtime
   surfaces?
 - how urgent is an OpenAI/native-function surface relative to ACP edge work?
-- should ARC define "native execution surfaces" as a first-class category
+- should Chio define "native execution surfaces" as a first-class category
   separate from protocol adapters?
 
 ### 5.5 Is the Language Gap Real?
@@ -254,7 +254,7 @@ Working answer:
 
 Implication:
 
-- ARC should frame OpenAPI as the best current wedge for HTTP/API governance,
+- Chio should frame OpenAPI as the best current wedge for HTTP/API governance,
   not as proof that every API route can or should become an agent tool
 
 ### 5.7 Which Guard Classes Should Fail Closed?
@@ -279,7 +279,7 @@ easily than dynamic runtime governance.
 
 Implication:
 
-- ARC should lead with enforceable controls and signed evidence, not intent AI
+- Chio should lead with enforceable controls and signed evidence, not intent AI
 
 ### H2
 
@@ -299,7 +299,7 @@ native APIs and mixed protocol stacks.
 
 Implication:
 
-- ARC should use MCP to land, then expand aggressively into non-MCP surfaces
+- Chio should use MCP to land, then expand aggressively into non-MCP surfaces
 
 ### H4
 
@@ -308,13 +308,13 @@ observability" before they accept fully dynamic policy mutation at runtime.
 
 Implication:
 
-- ARC can be valuable before shipping intent-aware dynamic governance
+- Chio can be valuable before shipping intent-aware dynamic governance
 
 ---
 
 ## 7. Evaluation Criteria For Architectures and Vendors
 
-When evaluating ARC or competitors, ask:
+When evaluating Chio or competitors, ask:
 
 ### Coverage
 
@@ -357,7 +357,7 @@ When evaluating ARC or competitors, ask:
 
 ### Competitive Categories Worth Tracking
 
-| Category | Representative systems | What they prove | What ARC still needs to prove |
+| Category | Representative systems | What they prove | What Chio still needs to prove |
 |----------|------------------------|-----------------|-------------------------------|
 | **Runtime governance** | Microsoft AGT | multi-language packaging and policy-engine DX matter | portable signed evidence and broader cross-surface lineage can justify a differentiated platform |
 | **Policy decision points** | OPA, Cerbos | deterministic policy evaluation is well understood and operationally valuable | agent-native delegation, signed receipts, and economic controls matter enough to warrant a new layer |
@@ -366,13 +366,13 @@ When evaluating ARC or competitors, ask:
 
 ---
 
-## 8. ARC Architecture Directions To Explore
+## 8. Chio Architecture Directions To Explore
 
 ### Direction A: Stronger Session Context in the Kernel
 
 Questions:
 
-- should ARC sessions carry a declared objective hash or workflow intent field?
+- should Chio sessions carry a declared objective hash or workflow intent field?
 - should every protocol edge feed a normalized session-context object?
 - should approvals and prompt bundle hashes be first-class kernel metadata?
 
@@ -392,7 +392,7 @@ Examples:
 
 Idea:
 
-- ARC could emit signed behavioral/risk observations without immediately turning
+- Chio could emit signed behavioral/risk observations without immediately turning
   them into block decisions
 
 Why:
@@ -411,7 +411,7 @@ Idea:
 
 Why:
 
-- reduces the risk that ARC becomes "excellent at securing a shrinking slice"
+- reduces the risk that Chio becomes "excellent at securing a shrinking slice"
 
 ### Direction E: Guard Taxonomy and Rollout
 
@@ -434,13 +434,13 @@ Why:
 - What is the minimum session context needed to make deterministic enforcement
   meaningfully safer than isolated request inspection?
 - Which dynamic signals are reliable enough to operationalize first?
-- How should ARC represent "declared intent" without relying on unverifiable
+- How should Chio represent "declared intent" without relying on unverifiable
   natural-language summaries?
-- Should ARC dynamic governance produce hard denies, soft escalations, or
+- Should Chio dynamic governance produce hard denies, soft escalations, or
   signed advisory signals first?
 - Which surfaces are most urgent after MCP: A2A, ACP, or native function
   calling?
-- How should ARC measure real coverage versus perceived coverage in a customer
+- How should Chio measure real coverage versus perceived coverage in a customer
   deployment?
 
 ---
@@ -449,7 +449,7 @@ Why:
 
 ### Short-Term
 
-- map ARC's current shipped coverage by runtime surface
+- map Chio's current shipped coverage by runtime surface
 - document which session context fields already exist in the kernel
 - compare MCP wrapped enforcement to hosted direct-access trust-control paths
 - define an honest "coverage statement" template for docs and sales
@@ -467,14 +467,14 @@ Why:
 - prototype dynamic escalation instead of binary allow/deny
 - study how to bind behavioral signals into compliance artifacts without
   overstating certainty
-- evaluate whether ARC needs a dedicated behavioral analytics subsystem or can
+- evaluate whether Chio needs a dedicated behavioral analytics subsystem or can
   keep this as a kernel + evidence-layer extension
 
 ---
 
 ## 11. Current Working Conclusion
 
-The most credible ARC position today is:
+The most credible Chio position today is:
 
 - deterministic governance first
 - signed observability second
@@ -483,7 +483,7 @@ The most credible ARC position today is:
 - moat claims as differentiation theses, not universal absolutes
 - TAM/ARR modeling in separate strategy material unless externally sourced
 
-ARC should land via wrapped MCP enforcement, but it should not describe itself
+Chio should land via wrapped MCP enforcement, but it should not describe itself
 as merely an MCP gateway. The deeper product is a kernel-centered runtime
 governance and evidence system that becomes more valuable as agent execution
 spreads across protocols and native surfaces. The HTTP/framework adoption track

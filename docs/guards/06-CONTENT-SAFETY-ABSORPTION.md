@@ -1,7 +1,7 @@
-# Content Safety Guard Absorption: ClawdStrike to ARC
+# Content Safety Guard Absorption: ClawdStrike to Chio
 
 This document covers porting the four content safety modules from ClawdStrike
-into ARC's `arc-guards` crate. These represent the P0 gap in ARC's guard
+into Chio's `chio-guards` crate. These represent the P0 gap in Chio's guard
 coverage: the existing 15 guards handle filesystem, network, rate-limiting,
 data-flow, and advisory signals, but nothing screens the actual content of
 agent inputs for jailbreak, prompt injection, or instruction hierarchy
@@ -165,9 +165,9 @@ flags, reminder frequency, and context byte limits.
 
 ---
 
-## 2. Refactoring for ARC's Guard Trait
+## 2. Refactoring for Chio's Guard Trait
 
-ARC's `Guard` trait (`arc_kernel::Guard`) is synchronous:
+Chio's `Guard` trait (`chio_kernel::Guard`) is synchronous:
 
 ```rust
 pub trait Guard: Send + Sync {
@@ -178,7 +178,7 @@ pub trait Guard: Send + Sync {
 
 `Verdict` is `Allow | Deny`. No `Warn`, no `Abstain`. `GuardContext` provides
 `request: &ToolCallRequest` (with `tool_name`, `arguments: serde_json::Value`,
-`agent_id`, `server_id`), `scope: &ArcScope`, and session metadata.
+`agent_id`, `server_id`), `scope: &ChioScope`, and session metadata.
 
 ### 2.1 Async removal
 
@@ -200,7 +200,7 @@ host-function extensions (see section 4).
 ### 2.2 Action model mapping
 
 ClawdStrike uses `GuardAction::Custom(kind, payload)` to route content to the
-right guard. ARC has no `GuardAction` -- guards receive `GuardContext` with
+right guard. Chio has no `GuardAction` -- guards receive `GuardContext` with
 `ToolCallRequest.arguments`.
 
 **Mapping strategy**: Content safety guards inspect
@@ -227,7 +227,7 @@ does not apply to this tool call).
 ### 2.3 Verdict mapping
 
 ClawdStrike's `GuardResult` has `allow`, `warn`, and `block` constructors plus
-`details: Option<serde_json::Value>`. ARC's `Verdict` is binary
+`details: Option<serde_json::Value>`. Chio's `Verdict` is binary
 (Allow/Deny).
 
 **Mapping**:
@@ -274,38 +274,38 @@ receipt's evidence field. The warn threshold becomes a separate
 
 | Component | Disposition | Reason |
 |-----------|-------------|--------|
-| `async_trait` + `#[async_trait] impl Guard` | **Drop** | ARC's Guard trait is sync |
+| `async_trait` + `#[async_trait] impl Guard` | **Drop** | Chio's Guard trait is sync |
 | `LlmJudge` trait + `OpenAiLlmJudge` | **Defer to host function** | Requires async HTTP; should be a WASM host function or separate guard |
-| `SessionStore` trait (async persistence) | **Defer** | ARC uses `SessionJournal` from `arc-http-session`; adapt to that |
+| `SessionStore` trait (async persistence) | **Defer** | Chio uses `SessionJournal` from `chio-http-session`; adapt to that |
 | `GuardAction::Custom` dispatch | **Drop** | Replaced by `scan_keys` argument inspection |
 | ClawdStrike `GuardResult` / `Severity` types | **Drop** | Replaced by `Verdict` + `AdvisorySignal` |
-| `hush_core::sha256` dependency | **Replace** | Use `arc-core`'s SHA-256 (already exists) |
-| `feature = "full"` conditional compilation | **Drop** | All sync code in ARC; async extensions are separate crates |
+| `hush_core::sha256` dependency | **Replace** | Use `chio-core`'s SHA-256 (already exists) |
+| `feature = "full"` conditional compilation | **Drop** | All sync code in Chio; async extensions are separate crates |
 | Instruction hierarchy `MarkerFormat::Xml` / `Json` rendering | **Defer** | Low priority; keep `Delimited` only for v1 |
-| Instruction hierarchy reminder injection | **Evaluate** | May conflict with ARC's kernel-level concerns; keep the pattern detection, defer the message mutation |
+| Instruction hierarchy reminder injection | **Evaluate** | May conflict with Chio's kernel-level concerns; keep the pattern detection, defer the message mutation |
 | `HierarchyState.trust_score` | **Adapt** | Map to `AdvisorySignal` severity rather than a floating-point trust metric |
 
 ### 3.3 Dependencies to vendor or adapt
 
-| ClawdStrike dep | ARC equivalent |
+| ClawdStrike dep | Chio equivalent |
 |-----------------|----------------|
-| `hush_core::sha256` / `hush_core::Hash` | `arc_core::crypto::sha256` (or add if missing) |
-| `crate::text_utils::canonicalize_for_detection` | New `arc-guards/src/text_canonicalization.rs` module |
+| `hush_core::sha256` / `hush_core::Hash` | `chio_core::crypto::sha256` (or add if missing) |
+| `crate::text_utils::canonicalize_for_detection` | New `chio-guards/src/text_canonicalization.rs` module |
 | `crate::text_utils::truncate_to_char_boundary` | Same new module |
 | `crate::text_utils::compile_hardcoded_regex` | Same new module |
 | `crate::text_utils::is_zero_width_or_formatting` | Same new module |
-| `unicode-normalization` crate | Add to `arc-guards/Cargo.toml` |
-| `regex` crate | Already in `arc-guards` dependency tree |
+| `unicode-normalization` crate | Add to `chio-guards/Cargo.toml` |
+| `regex` crate | Already in `chio-guards` dependency tree |
 
 ---
 
 ## 4. SpiderSense and External ML Classifiers
 
-### 4.1 SpiderSense in ARC
+### 4.1 SpiderSense in Chio
 
 SpiderSense is already WASM-compatible and sync. Two integration paths:
 
-**Option A: Native guard in `arc-guards`**
+**Option A: Native guard in `chio-guards`**
 
 ```rust
 pub struct SpiderSenseGuard {
@@ -346,7 +346,7 @@ module). Option B is the long-term target for third-party pattern databases.
 
 External classifiers (Lakera Guard, NVIDIA NeMo Guardrails, AWS Bedrock
 Guardrails, Azure AI Content Safety) require HTTP calls and are inherently
-async. They cannot implement `arc_kernel::Guard` directly.
+async. They cannot implement `chio_kernel::Guard` directly.
 
 **Architecture**: Host-function-backed WASM guards.
 
@@ -368,14 +368,14 @@ The WASM guard is the policy layer (interpret classifier output, apply
 thresholds, map to allow/deny). The host function is the I/O layer (HTTP
 client, auth, caching, retry).
 
-**Host function signature** (defined in `arc-wasm-guards`):
+**Host function signature** (defined in `chio-wasm-guards`):
 
 ```rust
 /// Host function exposed to WASM guards for external content classification.
 ///
 /// The guest passes a JSON-serialized ClassificationRequest.
 /// The host returns a JSON-serialized ClassificationResponse.
-fn arc_classify_content(request_ptr: i32, request_len: i32) -> i64;
+fn chio_classify_content(request_ptr: i32, request_len: i32) -> i64;
 
 pub struct ClassificationRequest {
     pub provider: String,           // "lakera" | "nemo" | "bedrock" | "azure"
@@ -396,14 +396,14 @@ and statistical layers only.
 
 ---
 
-## 5. Concrete Type Signatures for ARC-Native Guards
+## 5. Concrete Type Signatures for Chio-Native Guards
 
 ### 5.1 JailbreakGuard
 
 ```rust
-// arc-guards/src/jailbreak.rs
+// chio-guards/src/jailbreak.rs
 
-use arc_kernel::{Guard, GuardContext, KernelError, Verdict};
+use chio_kernel::{Guard, GuardContext, KernelError, Verdict};
 
 pub struct JailbreakGuard {
     config: JailbreakGuardConfig,
@@ -433,7 +433,7 @@ configurable session key extractor).
 ### 5.2 PromptInjectionGuard
 
 ```rust
-// arc-guards/src/prompt_injection.rs
+// chio-guards/src/prompt_injection.rs
 
 pub struct PromptInjectionGuard {
     config: PromptInjectionGuardConfig,
@@ -452,12 +452,12 @@ impl Guard for PromptInjectionGuard {
 ```
 
 Detection delegates to `detect_prompt_injection_with_limit()`, ported into a
-new `arc-guards/src/prompt_injection_detection.rs` module.
+new `chio-guards/src/prompt_injection_detection.rs` module.
 
 ### 5.3 InstructionHierarchyGuard
 
 ```rust
-// arc-guards/src/instruction_hierarchy.rs
+// chio-guards/src/instruction_hierarchy.rs
 
 pub struct InstructionHierarchyGuard {
     config: HierarchyGuardConfig,
@@ -489,7 +489,7 @@ detection regex patterns only, applied to individual tool call arguments.
 ### 5.4 ContentSafetyAdvisoryGuard
 
 ```rust
-// arc-guards/src/advisory.rs (extend existing module)
+// chio-guards/src/advisory.rs (extend existing module)
 
 pub struct ContentSafetyAdvisoryGuard {
     jailbreak_detector: JailbreakDetector,
@@ -514,7 +514,7 @@ via `PromotionPolicy`.
 ### 5.5 SpiderSenseGuard
 
 ```rust
-// arc-guards/src/spider_sense.rs
+// chio-guards/src/spider_sense.rs
 
 pub struct SpiderSenseGuard {
     detector: SpiderSenseDetector,
@@ -545,7 +545,7 @@ SpiderSense pattern database, which is optional and user-provided.
 
 ### 6.1 Text canonicalization module
 
-A new shared module `arc-guards/src/text_canonicalization.rs` is needed,
+A new shared module `chio-guards/src/text_canonicalization.rs` is needed,
 porting these functions from ClawdStrike's `text_utils.rs`:
 
 - `canonicalize_for_detection(text: &str) -> (String, CanonicalizationStats)` -- NFKC, casefold, zero-width strip, whitespace collapse
@@ -554,7 +554,7 @@ porting these functions from ClawdStrike's `text_utils.rs`:
 - `compile_hardcoded_regex(pattern: &'static str) -> Regex`
 - `CanonicalizationStats` struct
 
-This requires adding `unicode-normalization` to `arc-guards/Cargo.toml`.
+This requires adding `unicode-normalization` to `chio-guards/Cargo.toml`.
 
 ---
 
@@ -563,7 +563,7 @@ This requires adding `unicode-normalization` to `arc-guards/Cargo.toml`.
 ### Phase 1: Core content scanning (P0)
 
 1. **Text canonicalization module** -- Foundation for all content guards.
-   Port `text_utils.rs` functions into `arc-guards/src/text_canonicalization.rs`.
+   Port `text_utils.rs` functions into `chio-guards/src/text_canonicalization.rs`.
 
 2. **PromptInjectionGuard** -- Simplest guard, fully sync, no internal state.
    Port `hygiene.rs` detection + wrap in `Guard` trait. Scans
@@ -588,15 +588,15 @@ This requires adding `unicode-normalization` to `arc-guards/Cargo.toml`.
    sync and WASM-compatible; mainly needs the `Guard` trait wrapper and
    embedding key extraction.
 
-7. **External classifier host functions** -- Define `arc_classify_content`
-   host function in `arc-wasm-guards`. Implement provider adapters for
+7. **External classifier host functions** -- Define `chio_classify_content`
+   host function in `chio-wasm-guards`. Implement provider adapters for
    Lakera, NeMo, Bedrock, Azure. This is a v2 feature gated on the host
    function framework.
 
 ### Phase 4: Session and LLM judge (P3)
 
 8. **Session aggregation adapter** -- Bridge `JailbreakDetector`'s session
-   state to ARC's `SessionJournal` from `arc-http-session`.
+   state to Chio's `SessionJournal` from `chio-http-session`.
 
 9. **LLM-as-judge host function** -- Expose `LlmJudge` scoring as a host
    function callable from WASM guards. Provider-agnostic interface.
@@ -606,7 +606,7 @@ This requires adding `unicode-normalization` to `arc-guards/Cargo.toml`.
 ## 8. File Layout After Port
 
 ```
-crates/arc-guards/src/
+crates/chio-guards/src/
   lib.rs                          (add new guard exports)
   text_canonicalization.rs        (new: ported from text_utils.rs)
   jailbreak.rs                    (new: JailbreakGuard + JailbreakDetector)
@@ -627,7 +627,7 @@ across multiple modules when the detection logic is small enough to inline.
 ## 9. Open Questions
 
 1. **Session key extraction**: ClawdStrike uses `GuardContext.session_id` for
-   session aggregation. ARC's `GuardContext` has no explicit session ID field.
+   session aggregation. Chio's `GuardContext` has no explicit session ID field.
    Options: (a) derive from `agent_id`, (b) add `session_id` to
    `GuardContext`, (c) extract from `ToolCallRequest` metadata.
 
@@ -636,7 +636,7 @@ across multiple modules when the detection logic is small enough to inline.
    Recursive scanning catches more injection vectors but costs more.
 
 3. **Instruction hierarchy scope**: The full `InstructionHierarchyEnforcer`
-   operates on message sequences, but ARC guards see one tool call at a time.
+   operates on message sequences, but Chio guards see one tool call at a time.
    Should the hierarchy guard maintain cross-request state via
    `SessionJournal`, or should it be stateless (single-message conflict
    detection only)?

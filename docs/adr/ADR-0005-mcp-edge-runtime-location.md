@@ -6,25 +6,25 @@
 
 ## Context
 
-The repository already contains `arc-mcp-adapter`, which wraps MCP servers for use under ARC.
+The repository already contains `chio-mcp-adapter`, which wraps MCP servers for use under Chio.
 
-As ARC grows an MCP-compatible public edge, there are two choices:
+As Chio grows an MCP-compatible public edge, there are two choices:
 
-1. keep extending `arc-mcp-adapter` until it becomes the MCP edge runtime
-2. keep `arc-mcp-adapter` focused on migration and create a separate MCP edge runtime
+1. keep extending `chio-mcp-adapter` until it becomes the MCP edge runtime
+2. keep `chio-mcp-adapter` focused on migration and create a separate MCP edge runtime
 
 ## Decision
 
-ARC will keep `arc-mcp-adapter` focused on migration and adaptation of upstream MCP servers.
+Chio will keep `chio-mcp-adapter` focused on migration and adaptation of upstream MCP servers.
 
-ARC will add a separate MCP edge runtime module or crate for first-class MCP-compatible hosting.
+Chio will add a separate MCP edge runtime module or crate for first-class MCP-compatible hosting.
 
 ## Rationale
 
 These are different responsibilities:
 
 - the adapter translates and wraps foreign MCP servers
-- the edge runtime hosts ARC itself as an MCP-compatible endpoint
+- the edge runtime hosts Chio itself as an MCP-compatible endpoint
 
 Merging them would blur concerns and make both paths harder to reason about.
 
@@ -49,6 +49,6 @@ Merging them would blur concerns and make both paths harder to reason about.
 
 ## Guideline
 
-If a change primarily helps ARC host itself as an MCP-compatible endpoint, it belongs in the edge runtime.
+If a change primarily helps Chio host itself as an MCP-compatible endpoint, it belongs in the edge runtime.
 
-If a change primarily helps wrap an existing MCP server under ARC, it belongs in the adapter.
+If a change primarily helps wrap an existing MCP server under Chio, it belongs in the adapter.

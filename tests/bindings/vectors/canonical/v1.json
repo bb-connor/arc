@@ -31,6 +31,6 @@
       "input_json": "{\"text\":\"line\\n\\\"quoted\\\"\\\\path\"}"
     }
   ],
-  "generated_by": "arc-bindings-core",
+  "generated_by": "chio-bindings-core",
   "version": 1
 }

@@ -7,7 +7,7 @@
 ## Goal
 
 Produce a turnkey export that a regulated operator can hand to an auditor and
-independently verify without a running ARC node.
+independently verify without a running Chio node.
 
 The first implementation target is a filesystem package generated from local
 SQLite state. Remote trust-control export can follow the same manifest shape
@@ -118,7 +118,7 @@ evidence-package/
 
 ### Policy attachment
 
-- ARC receipts persist `policy_hash`, but not the source policy artifact.
+- Chio receipts persist `policy_hash`, but not the source policy artifact.
 - The first exporter version should accept `--policy-file` and emit:
   - raw source file
   - source hash
@@ -134,15 +134,15 @@ evidence-package/
 
 ## Suggested Code Layout
 
-- `crates/arc-kernel/src/evidence_export.rs`
+- `crates/chio-kernel/src/evidence_export.rs`
   - package manifest types
   - inclusion-proof record types
   - local SQLite export helpers
-- `crates/arc-cli/src/evidence_export.rs`
+- `crates/chio-cli/src/evidence_export.rs`
   - CLI orchestration
   - output directory/tar writing
   - policy-file attachment handling
-- `crates/arc-cli/src/main.rs`
+- `crates/chio-cli/src/main.rs`
   - new `evidence export` subcommand wiring
 
 ## Acceptance Criteria For The First Coding Pass

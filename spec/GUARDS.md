@@ -1,10 +1,10 @@
-# ARC Guard Taxonomy and Security Model
+# Chio Guard Taxonomy and Security Model
 
 **Version:** 1.0
 **Date:** 2026-04-14
 **Status:** Normative
 
-This document defines the complete guard taxonomy for the ARC runtime kernel,
+This document defines the complete guard taxonomy for the Chio runtime kernel,
 including guard categories, configuration, fail-closed behavior, advisory
 signals, WASM custom guards, and the session journal contract. It complements
 [SECURITY.md](SECURITY.md) (threat model) and [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md)
@@ -17,7 +17,7 @@ The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document
 
 ## 1. Guard Pipeline Overview
 
-The ARC runtime kernel evaluates guards in a sequential pipeline before
+The Chio runtime kernel evaluates guards in a sequential pipeline before
 admitting any tool invocation. The pipeline operates under a universal
 **fail-closed** invariant:
 
@@ -35,7 +35,7 @@ the request and what they observed.
 
 ### 1.1 Guard Categories
 
-ARC guards are classified into five categories based on their state
+Chio guards are classified into five categories based on their state
 requirements and execution phase:
 
 | Category | State | Phase | Blocking |
@@ -483,9 +483,9 @@ The `type` discriminator field uses `snake_case` naming in JSON serialization.
 
 ## 6. WASM Custom Guards
 
-The `arc-wasm-guards` crate allows operators to author guards in any language
+The `chio-wasm-guards` crate allows operators to author guards in any language
 that compiles to WebAssembly (Rust, AssemblyScript, Go, C) and load them into
-the ARC kernel at runtime.
+the Chio kernel at runtime.
 
 ### 6.1 Host-Guest ABI
 
@@ -594,7 +594,7 @@ guards in production without blocking traffic.
 
 ## 7. Session Journal Contract
 
-The session journal (`arc-http-session` crate) is the shared state layer
+The session journal (`chio-http-session` crate) is the shared state layer
 that session-aware guards and advisory guards read from. It is an
 append-only, hash-chained log of request records within a single session.
 
@@ -763,15 +763,15 @@ wasm_guards:
 
 | Guard | Crate | Status |
 | --- | --- | --- |
-| InternalNetworkGuard | `arc-guards` | Full |
-| AgentVelocityGuard | `arc-guards` | Full |
-| DataFlowGuard | `arc-guards` | Full |
-| BehavioralSequenceGuard | `arc-guards` | Full |
-| ResponseSanitizationGuard | `arc-guards` | Full |
-| PostInvocationPipeline | `arc-guards` | Full |
-| AdvisoryPipeline | `arc-guards` | Full |
-| AnomalyAdvisoryGuard | `arc-guards` | Full |
-| DataTransferAdvisoryGuard | `arc-guards` | Full |
-| WasmGuard | `arc-wasm-guards` | Full |
-| WasmGuardRuntime | `arc-wasm-guards` | Full |
-| SessionJournal | `arc-http-session` | Full |
+| InternalNetworkGuard | `chio-guards` | Full |
+| AgentVelocityGuard | `chio-guards` | Full |
+| DataFlowGuard | `chio-guards` | Full |
+| BehavioralSequenceGuard | `chio-guards` | Full |
+| ResponseSanitizationGuard | `chio-guards` | Full |
+| PostInvocationPipeline | `chio-guards` | Full |
+| AdvisoryPipeline | `chio-guards` | Full |
+| AnomalyAdvisoryGuard | `chio-guards` | Full |
+| DataTransferAdvisoryGuard | `chio-guards` | Full |
+| WasmGuard | `chio-wasm-guards` | Full |
+| WasmGuardRuntime | `chio-wasm-guards` | Full |
+| SessionJournal | `chio-http-session` | Full |

@@ -4,11 +4,11 @@ If you only want the supported first steps:
 
 - Docker smoke path: [`docker/`](./docker/)
 - Web backend path: [`hello-openapi-sidecar/`](./hello-openapi-sidecar/), then [`hello-fastapi/`](./hello-fastapi/)
-- Native ARC tool example: [`hello-tool/`](./hello-tool/)
+- Native Chio tool example: [`hello-tool/`](./hello-tool/)
 
 This directory has two layers:
 
-- flagship examples that show ARC as a real control plane in a multi-process or multi-operator setting
+- flagship examples that show Chio as a real control plane in a multi-process or multi-operator setting
 - small `hello-*` examples that isolate one surface at a time and can be understood in a few minutes
 
 For a one-page map of what each example teaches, see [EXAMPLE_SURFACE_MATRIX.md](./EXAMPLE_SURFACE_MATRIX.md).
@@ -36,7 +36,7 @@ The `hello-*` family follows one shared contract:
 2. Expose one governed path such as `POST /echo`, `tool/invoke`, or `message/send`.
 3. Show the deny path without a capability token where applicable.
 4. Show the allow path with a capability token or authoritative session.
-5. Capture or print at least one ARC receipt or receipt id.
+5. Capture or print at least one Chio receipt or receipt id.
 6. Ship with one smoke command.
 
 Use the root runner to list or execute the current smoke set:
@@ -61,14 +61,14 @@ Use the root runner to list or execute the current smoke set:
 | Example | Surface | Runtime | Smoke |
 | --- | --- | --- | --- |
 | [`hello-openapi-sidecar/`](./hello-openapi-sidecar/) | OpenAPI + `arc api protect` sidecar | `./run.sh` | `./smoke.sh` |
-| [`hello-fastapi/`](./hello-fastapi/) | FastAPI + `arc-asgi` | `./run.sh` | `./smoke.sh` |
-| [`hello-django/`](./hello-django/) | Django + `arc-django` | `./run.sh` | `./smoke.sh` |
-| [`hello-fastify/`](./hello-fastify/) | Fastify + `@arc-protocol/fastify` | `./run.sh` | `./smoke.sh` |
-| [`hello-elysia/`](./hello-elysia/) | Elysia + `@arc-protocol/elysia` | `./run.sh` | `./smoke.sh` |
-| [`hello-express/`](./hello-express/) | Express + `@arc-protocol/express` | `./run.sh` | `./smoke.sh` |
-| [`hello-chi/`](./hello-chi/) | Go `chi` + `arc-go-http` | `./run.sh` | `./smoke.sh` |
-| [`hello-spring-boot/`](./hello-spring-boot/) | Spring Boot + `arc-spring-boot` | `./run.sh` | `./smoke.sh` |
-| [`hello-dotnet/`](./hello-dotnet/) | ASP.NET + `ArcMiddleware` | `./run.sh` | `./smoke.sh` |
+| [`hello-fastapi/`](./hello-fastapi/) | FastAPI + `chio-asgi` | `./run.sh` | `./smoke.sh` |
+| [`hello-django/`](./hello-django/) | Django + `chio-django` | `./run.sh` | `./smoke.sh` |
+| [`hello-fastify/`](./hello-fastify/) | Fastify + `@chio-protocol/fastify` | `./run.sh` | `./smoke.sh` |
+| [`hello-elysia/`](./hello-elysia/) | Elysia + `@chio-protocol/elysia` | `./run.sh` | `./smoke.sh` |
+| [`hello-express/`](./hello-express/) | Express + `@chio-protocol/express` | `./run.sh` | `./smoke.sh` |
+| [`hello-chi/`](./hello-chi/) | Go `chi` + `chio-go-http` | `./run.sh` | `./smoke.sh` |
+| [`hello-spring-boot/`](./hello-spring-boot/) | Spring Boot + `chio-spring-boot` | `./run.sh` | `./smoke.sh` |
+| [`hello-dotnet/`](./hello-dotnet/) | ASP.NET + `ChioMiddleware` | `./run.sh` | `./smoke.sh` |
 
 ### Protocol And Agent Surfaces
 

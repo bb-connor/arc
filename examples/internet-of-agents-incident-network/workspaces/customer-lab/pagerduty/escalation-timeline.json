@@ -283,7 +283,7 @@
       "action": "Initiated cross-organization escalation to Stratos Networks",
       "details": {
         "provider_org": "StratosNetworks",
-        "escalation_method": "ARC cross-org capability request",
+        "escalation_method": "Chio cross-org capability request",
         "requested_action": "Revert geo-restrict-v42 from blocking to dry-run for tenant MeridianLabs on service inference-gateway",
         "justification": "Edge rule blocking legitimate inference traffic from eu-west, ap-southeast, and sa-east regions. Sev-1 outage with 38.7% error rate and SLO budget near exhaustion."
       }

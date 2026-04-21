@@ -1,3 +1,3 @@
--- ARC formal verification legacy root alias.
+-- Chio formal verification legacy root alias.
 
-import Arc
+import Chio

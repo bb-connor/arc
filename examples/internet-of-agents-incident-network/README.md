@@ -1,7 +1,7 @@
 # Internet of Agents Incident Network
 
-Multi-org incident response using ARC for capability-governed tool access.
-Every tool call goes through the ARC kernel (`arc mcp serve-http`), which
+Multi-org incident response using Chio for capability-governed tool access.
+Every tool call goes through the Chio kernel (`arc mcp serve-http`), which
 evaluates guard policies and signs receipts.
 
 ## Scenario
@@ -9,7 +9,7 @@ evaluates guard policies and signs receipts.
 Meridian Labs has a sev-1 outage on their inference gateway. A bad edge rule
 (`geo-restrict-v42`) from their CDN provider Stratos Networks is blocking
 legitimate traffic. A commander agent orchestrates investigation, delegates
-a bounded fix to the provider, all under ARC capability governance.
+a bounded fix to the provider, all under Chio capability governance.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ orchestrate.py                      agent orchestrator (entry point)
 
 Agents use the OpenAI Agents SDK (`Agent`, `Runner`, `FunctionTool`) or
 Anthropic SDK for tool-use loops. Each MCP tool call is wrapped as a
-`FunctionTool` backed by an ARC MCP endpoint.
+`FunctionTool` backed by an Chio MCP endpoint.
 
 ## Running
 
@@ -51,13 +51,13 @@ deterministic fallback (CI mode).
 
 ```
 incident_network/           Python package
-  arc.py                    ARC MCP client, trust-control client
+  arc.py                    Chio MCP client, trust-control client
   capabilities.py           Identity, delegation, signing
   agents.py                 Agent definitions, prompts, runner
   verify.py                 Bundle verification
 orchestrate.py              Entry point
 services/                   FastAPI services (separate processes)
-tools/                      MCP servers (stdio, wrapped by ARC)
+tools/                      MCP servers (stdio, wrapped by Chio)
 policies/                   HushSpec guard policies
 workspaces/                 Fixture data
 scenario/                   Scenario runners

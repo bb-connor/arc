@@ -1,19 +1,19 @@
 //! # hello-tool
 //!
-//! A small native ARC service built with the higher-level authoring helpers in
-//! `arc-mcp-adapter`. This example keeps the runtime concepts visible without
+//! A small native Chio service built with the higher-level authoring helpers in
+//! `chio-mcp-adapter`. This example keeps the runtime concepts visible without
 //! forcing the user to hand-write every kernel trait implementation.
 
-use arc_core::crypto::Keypair;
-use arc_core::{PromptMessage, ResourceContent};
-use arc_kernel::{PromptProvider, ResourceProvider, ToolServerConnection, ToolServerEvent};
-use arc_mcp_adapter::{NativeArcServiceBuilder, NativePrompt, NativeResource, NativeTool};
+use chio_core::crypto::Keypair;
+use chio_core::{PromptMessage, ResourceContent};
+use chio_kernel::{PromptProvider, ResourceProvider, ToolServerConnection, ToolServerEvent};
+use chio_mcp_adapter::{NativeChioServiceBuilder, NativePrompt, NativeResource, NativeTool};
 
-fn build_service(public_key_hex: String) -> arc_mcp_adapter::NativeArcService {
-    NativeArcServiceBuilder::new("srv-hello", public_key_hex)
+fn build_service(public_key_hex: String) -> chio_mcp_adapter::NativeChioService {
+    NativeChioServiceBuilder::new("srv-hello", public_key_hex)
         .server_name("Hello Tool Server")
         .server_version("0.1.0")
-        .server_description("A tiny native ARC service that exposes a tool, resource, prompt, and priced manifest")
+        .server_description("A tiny native Chio service that exposes a tool, resource, prompt, and priced manifest")
         .tool(
             NativeTool::new(
                 "greet",
@@ -37,14 +37,14 @@ fn build_service(public_key_hex: String) -> arc_mcp_adapter::NativeArcService {
             }))
             .read_only()
             .per_invocation_price(25, "USD")
-            .latency_hint(arc_manifest::LatencyHint::Instant),
+            .latency_hint(chio_manifest::LatencyHint::Instant),
             |arguments| {
                 let name = arguments
                     .get("name")
                     .and_then(|value| value.as_str())
                     .unwrap_or("stranger");
                 Ok(serde_json::json!({
-                    "greeting": format!("Hello, {name}! This greeting was served by a native ARC service.")
+                    "greeting": format!("Hello, {name}! This greeting was served by a native Chio service.")
                 }))
             },
         )
@@ -55,7 +55,7 @@ fn build_service(public_key_hex: String) -> arc_mcp_adapter::NativeArcService {
             vec![ResourceContent {
                 uri: "memory://hello/template".to_string(),
                 mime_type: Some("text/plain".to_string()),
-                text: Some("Hello, {name}! This greeting was served by a native ARC service.".to_string()),
+                text: Some("Hello, {name}! This greeting was served by a native Chio service.".to_string()),
                 blob: None,
                 annotations: None,
             }],
@@ -63,7 +63,7 @@ fn build_service(public_key_hex: String) -> arc_mcp_adapter::NativeArcService {
         .static_prompt(
             NativePrompt::new("compose_greeting")
                 .description("Creates a user prompt that asks for a polite greeting"),
-            arc_core::PromptResult {
+            chio_core::PromptResult {
                 description: Some("Greeting composition prompt".to_string()),
                 messages: vec![PromptMessage {
                     role: "user".to_string(),
@@ -75,11 +75,11 @@ fn build_service(public_key_hex: String) -> arc_mcp_adapter::NativeArcService {
             },
         )
         .build()
-        .expect("build native ARC service")
+        .expect("build native Chio service")
 }
 
 fn main() {
-    println!("=== ARC hello-tool example ===\n");
+    println!("=== Chio hello-tool example ===\n");
 
     let server_kp = Keypair::generate();
     let service = build_service(server_kp.public_key().to_hex());
@@ -116,7 +116,7 @@ fn main() {
         }
     }
 
-    match arc_manifest::sign_manifest(service.manifest(), &server_kp) {
+    match chio_manifest::sign_manifest(service.manifest(), &server_kp) {
         Ok(_signed) => println!("\nManifest signed successfully."),
         Err(error) => {
             eprintln!("\nFailed to sign manifest: {error}");
@@ -161,7 +161,7 @@ fn main() {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::build_service;
-    use arc_manifest::PricingModel;
+    use chio_manifest::PricingModel;
 
     #[test]
     fn hello_tool_manifest_advertises_pricing_metadata() {

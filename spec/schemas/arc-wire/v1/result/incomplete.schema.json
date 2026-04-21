@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC ToolCallResult incomplete",
+  "title": "Chio ToolCallResult incomplete",
   "type": "object",
   "additionalProperties": false,
   "required": ["status", "reason", "chunks_received"],

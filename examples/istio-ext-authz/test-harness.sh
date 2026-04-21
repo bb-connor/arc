@@ -5,15 +5,15 @@
 #
 # Assumes you have already:
 #   1. Installed Istio 1.22+ with 01-meshconfig-patch.yaml applied.
-#   2. Deployed the ARC sidecar via 00-arc-sidecar-deployment.yaml.
+#   2. Deployed the Chio sidecar via 00-chio-sidecar-deployment.yaml.
 #   3. Applied 02-authorization-policy.yaml and 03-demo-workload.yaml.
-#   4. Issued a demo capability token into $ARC_DEMO_CAPABILITY_TOKEN.
+#   4. Issued a demo capability token into $CHIO_DEMO_CAPABILITY_TOKEN.
 #
 # Two requests are sent through a `kubectl port-forward` against the demo
 # Service. The first carries a capability token and must return HTTP 200
-# with an `x-arc-receipt-id` header injected by the ARC adapter. The second
+# with an `x-chio-receipt-id` header injected by the Chio adapter. The second
 # omits all credentials and must come back as HTTP 403 from the DENY policy
-# (no token -> Istio DENY action triggers before ARC ever runs, matching the
+# (no token -> Istio DENY action triggers before Chio ever runs, matching the
 # fail-closed invariant in the roadmap).
 #
 # Exits 0 on success, non-zero with a human-readable diagnostic on failure.
@@ -25,7 +25,7 @@ LOCAL_PORT="${LOCAL_PORT:-18080}"
 REMOTE_PORT="${REMOTE_PORT:-80}"
 KUBECTL="${KUBECTL:-kubectl}"
 CURL="${CURL:-curl}"
-CAPABILITY_TOKEN="${ARC_DEMO_CAPABILITY_TOKEN:-demo-capability-token}"
+CAPABILITY_TOKEN="${CHIO_DEMO_CAPABILITY_TOKEN:-demo-capability-token}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-${SCRIPT_DIR}/.artifacts/$(date -u +"%Y%m%dT%H%M%SZ")}"
@@ -94,7 +94,7 @@ ALLOW_STATUS="$(
     -o "${ALLOW_BODY}" \
     -D "${ALLOW_HEADERS}" \
     -w '%{http_code}' \
-    -H "x-arc-capability-token: ${CAPABILITY_TOKEN}" \
+    -H "x-chio-capability-token: ${CAPABILITY_TOKEN}" \
     -H "authorization: Bearer ${CAPABILITY_TOKEN}" \
     -X POST \
     --data '{"hello":"world"}' \
@@ -109,14 +109,14 @@ fi
 
 # Header names are case-insensitive per RFC 7230. Match loosely.
 RECEIPT_ID="$(
-  awk 'BEGIN{IGNORECASE=1} /^x-arc-receipt-id:/ { sub(/\r$/, ""); print $2; exit }' \
+  awk 'BEGIN{IGNORECASE=1} /^x-chio-receipt-id:/ { sub(/\r$/, ""); print $2; exit }' \
     "${ALLOW_HEADERS}"
 )"
 
 if [[ -z "${RECEIPT_ID}" ]]; then
   log "allow response headers:"
   cat "${ALLOW_HEADERS}" >&2 || true
-  fail "allow response missing x-arc-receipt-id header"
+  fail "allow response missing x-chio-receipt-id header"
 fi
 
 log "allow OK: status=200 receipt=${RECEIPT_ID}"

@@ -1,14 +1,14 @@
-# Progressive ARC Tutorial
+# Progressive Chio Tutorial
 
-This tutorial takes the shortest honest path from "what is ARC?" to "I made a
+This tutorial takes the shortest honest path from "what is Chio?" to "I made a
 governed call and I understand how delegation continues from here."
 
 It reuses the phase `309` demo stack so the same local deployment can back the
 tutorial, the SDK examples, and the receipt viewer.
 
-## 1. ARC Concepts
+## 1. Chio Concepts
 
-ARC sits between an agent client and the tools it wants to call.
+Chio sits between an agent client and the tools it wants to call.
 
 - Policies define what can be issued.
 - Capabilities bind those permissions to a subject and a TTL.
@@ -43,7 +43,7 @@ already qualified the equivalent `arc trust serve` plus
 
 ## 3. Write A Policy
 
-ARC policies describe what the hosted edge may issue when a session starts.
+Chio policies describe what the hosted edge may issue when a session starts.
 The demo policy is intentionally small:
 
 ```yaml
@@ -75,7 +75,7 @@ You can save this as `tutorial-policy.yaml` or reuse
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](/Users/connor/Medica/backbay/standalone/arc/examples/docker/mock_mcp_server.py).
 
-To put ARC in front of it without Docker:
+To put Chio in front of it without Docker:
 
 ```bash
 arc \
@@ -92,7 +92,7 @@ arc \
 ```
 
 At this point the upstream tool is no longer called directly. Clients connect
-to the ARC hosted edge, ARC issues the session capability, and every governed
+to the Chio hosted edge, Chio issues the session capability, and every governed
 call produces a receipt.
 
 ## 5. Execute A Governed Call
@@ -203,10 +203,10 @@ defaults:
 
 They all:
 
-- initialize a hosted ARC session
-- list tools through the official ARC SDK
+- initialize a hosted Chio session
+- list tools through the official Chio SDK
 - perform a governed `echo_text` call
 - resolve the resulting receipt through the trust service
 
-That is the stable baseline for integrating ARC into higher-level agent
+That is the stable baseline for integrating Chio into higher-level agent
 frameworks.

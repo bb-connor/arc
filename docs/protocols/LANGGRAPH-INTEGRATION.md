@@ -3,11 +3,11 @@
 > **Status**: Tier 1 -- proposed April 2026
 > **Priority**: High -- LangGraph is the stateful orchestration layer for
 > multi-agent systems built on LangChain. Each node transition is a
-> capability boundary. Extends the existing `arc-langchain` SDK.
+> capability boundary. Extends the existing `chio-langchain` SDK.
 
 ## 1. Why LangGraph
 
-ARC already ships `arc-langchain` which wraps ARC tools as LangChain
+Chio already ships `chio-langchain` which wraps Chio tools as LangChain
 `BaseTool` instances. But LangChain is the tool layer; LangGraph is the
 orchestration layer. LangGraph adds:
 
@@ -17,14 +17,14 @@ orchestration layer. LangGraph adds:
 - **Multi-agent** -- supervisor/worker patterns, handoffs, parallel branches
 - **Checkpointing** -- graph state persisted across invocations
 
-Each of these creates a natural ARC enforcement point. A node transition
-is a capability boundary. A human-in-the-loop interrupt maps to an ARC
+Each of these creates a natural Chio enforcement point. A node transition
+is a capability boundary. A human-in-the-loop interrupt maps to an Chio
 approval guard. A supervisor dispatching to workers is a capability
 delegation chain.
 
-### What ARC Adds to LangGraph
+### What Chio Adds to LangGraph
 
-| LangGraph alone | LangGraph + ARC |
+| LangGraph alone | LangGraph + Chio |
 |-----------------|-----------------|
 | Graph structure defines control flow | Capability tokens scope what each node can do |
 | Human-in-the-loop is UX-driven | Approval guards are policy-driven (human approval is one guard type) |
@@ -40,7 +40,7 @@ delegation chain.
 |                                                                  |
 |  [Supervisor Node]                                               |
 |       |                                                          |
-|       | ARC: delegate(scope="research:*")                        |
+|       | Chio: delegate(scope="research:*")                        |
 |       |                                                          |
 |  +----v-----------+    +------------------+                      |
 |  | Researcher Node|    | Writer Node      |                      |
@@ -48,13 +48,13 @@ delegation chain.
 |  |   |            |    |   |              |                      |
 |  |   | tool_call  |    |   | tool_call    |                      |
 |  |   v            |    |   v              |                      |
-|  | [ARC evaluate] |    | [ARC evaluate]   |                      |
+|  | [Chio evaluate] |    | [Chio evaluate]   |                      |
 |  +----------------+    +------------------+                      |
 |                                                                  |
 +------------------------------------------------------------------+
          |                        |
          v                        v
-  ARC Kernel Sidecar (shared, :9090)
+  Chio Kernel Sidecar (shared, :9090)
   Capability | Guard | Receipt | Budget
 ```
 
@@ -68,14 +68,14 @@ Supervisor (cap: agent:supervisor)
     |
     +---> Researcher (cap: tools:search, tools:browse)
     |         |
-    |         +---> [search tool] -- ARC evaluates against tools:search
-    |         +---> [browse tool] -- ARC evaluates against tools:browse
-    |         +---> [write tool]  -- ARC DENIES (not in researcher scope)
+    |         +---> [search tool] -- Chio evaluates against tools:search
+    |         +---> [browse tool] -- Chio evaluates against tools:browse
+    |         +---> [write tool]  -- Chio DENIES (not in researcher scope)
     |
     +---> Writer (cap: tools:write, tools:format)
               |
-              +---> [write tool]  -- ARC evaluates against tools:write
-              +---> [search tool] -- ARC DENIES (not in writer scope)
+              +---> [write tool]  -- Chio evaluates against tools:write
+              +---> [search tool] -- Chio DENIES (not in writer scope)
 ```
 
 ## 3. Integration Model
@@ -84,25 +84,25 @@ Supervisor (cap: agent:supervisor)
 
 ```python
 from langgraph.graph import StateGraph, START, END
-from arc_langgraph import ArcGraphConfig, arc_node
+from chio_langgraph import ChioGraphConfig, chio_node
 
-# Define the graph with ARC capability scoping
+# Define the graph with Chio capability scoping
 graph = StateGraph(AgentState)
 
 # Each node gets a capability scope
-graph.add_node("supervisor", arc_node(
+graph.add_node("supervisor", chio_node(
     supervisor_agent,
     scope="agent:supervisor",
     can_delegate=["tools:search", "tools:browse", "tools:write"],
 ))
 
-graph.add_node("researcher", arc_node(
+graph.add_node("researcher", chio_node(
     researcher_agent,
     scope="tools:search,tools:browse",
     budget={"max_calls": 20, "max_cost_usd": 0.50},
 ))
 
-graph.add_node("writer", arc_node(
+graph.add_node("writer", chio_node(
     writer_agent,
     scope="tools:write,tools:format",
     budget={"max_calls": 10},
@@ -117,8 +117,8 @@ graph.add_edge(START, "supervisor")
 
 app = graph.compile(
     checkpointer=MemorySaver(),
-    # ARC configuration applied to the compiled graph
-    arc=ArcGraphConfig(
+    # Chio configuration applied to the compiled graph
+    arc=ChioGraphConfig(
         sidecar_url="http://127.0.0.1:9090",
         # Workflow-level grant acquired on graph start
         workflow_scope="agent:full-pipeline",
@@ -126,23 +126,23 @@ app = graph.compile(
 )
 ```
 
-### 3.2 The `arc_node` Wrapper
+### 3.2 The `chio_node` Wrapper
 
-`arc_node` wraps any LangGraph node function with ARC capability context:
+`chio_node` wraps any LangGraph node function with Chio capability context:
 
 ```python
-from arc_langgraph import ArcNodeContext
+from chio_langgraph import ChioNodeContext
 
-def arc_node(fn, scope: str, budget: dict | None = None, can_delegate: list[str] | None = None):
-    """Wrap a LangGraph node with ARC capability enforcement."""
+def chio_node(fn, scope: str, budget: dict | None = None, can_delegate: list[str] | None = None):
+    """Wrap a LangGraph node with Chio capability enforcement."""
 
     async def wrapper(state: AgentState, config: RunnableConfig) -> AgentState:
-        arc_ctx = ArcNodeContext.from_config(config)
+        chio_ctx = ChioNodeContext.from_config(config)
 
         # Enter the node's capability scope
-        async with arc_ctx.scoped(scope, budget=budget) as node_ctx:
-            # Inject ARC-aware tools into the agent
-            state["arc_context"] = node_ctx
+        async with chio_ctx.scoped(scope, budget=budget) as node_ctx:
+            # Inject Chio-aware tools into the agent
+            state["chio_context"] = node_ctx
 
             result = await fn(state, config)
 
@@ -161,16 +161,16 @@ def arc_node(fn, scope: str, budget: dict | None = None, can_delegate: list[str]
 
 ### 3.3 Human-in-the-Loop as Approval Guard
 
-LangGraph's `interrupt()` mechanism maps to ARC's approval guard:
+LangGraph's `interrupt()` mechanism maps to Chio's approval guard:
 
 ```python
 from langgraph.types import interrupt
-from arc_langgraph import arc_approval_node
+from chio_langgraph import chio_approval_node
 
-@arc_approval_node(
+@chio_approval_node(
     scope="tools:dangerous",
     guard="human-approval",
-    # ARC guard config -- who can approve, timeout, escalation
+    # Chio guard config -- who can approve, timeout, escalation
     approval_config={
         "approvers": ["admin@example.com"],
         "timeout_seconds": 3600,
@@ -178,13 +178,13 @@ from arc_langgraph import arc_approval_node
     },
 )
 async def dangerous_action(state: AgentState, config: RunnableConfig):
-    """This node requires human approval via ARC guard before executing."""
+    """This node requires human approval via Chio guard before executing."""
     # If we reach here, the approval guard passed
     result = await execute_dangerous_tool(state["action"])
     return {"result": result}
 ```
 
-Under the hood, `arc_approval_node` does:
+Under the hood, `chio_approval_node` does:
 
 1. Calls `arc.evaluate()` with the `human-approval` guard
 2. If the guard returns `pending`, calls `interrupt()` to pause the graph
@@ -196,10 +196,10 @@ Under the hood, `arc_approval_node` does:
 When a supervisor delegates to a worker, the capability chain narrows:
 
 ```python
-from arc_langgraph import ArcDelegation
+from chio_langgraph import ChioDelegation
 
 async def supervisor_node(state: AgentState, config: RunnableConfig):
-    arc_ctx = ArcNodeContext.from_config(config)
+    chio_ctx = ChioNodeContext.from_config(config)
 
     # Supervisor decides which worker to route to
     decision = await supervisor_llm.invoke(state["messages"])
@@ -208,13 +208,13 @@ async def supervisor_node(state: AgentState, config: RunnableConfig):
         # Create a delegated capability for the researcher
         # Scope is narrowed: supervisor has agent:supervisor,
         # researcher gets only tools:search,tools:browse
-        delegation = await arc_ctx.delegate(
+        delegation = await chio_ctx.delegate(
             target_node="researcher",
             scope="tools:search,tools:browse",
             budget={"max_calls": 20},
             # Delegation is recorded in the receipt chain
         )
-        state["arc_delegation"] = delegation
+        state["chio_delegation"] = delegation
 
     return {**state, "next": decision.worker}
 ```
@@ -227,46 +227,46 @@ boundary:
 ```python
 # Inner graph -- research pipeline
 research_graph = StateGraph(ResearchState)
-research_graph.add_node("search", arc_node(search_fn, scope="tools:search"))
-research_graph.add_node("analyze", arc_node(analyze_fn, scope="tools:analyze"))
+research_graph.add_node("search", chio_node(search_fn, scope="tools:search"))
+research_graph.add_node("analyze", chio_node(analyze_fn, scope="tools:analyze"))
 
 # Outer graph -- uses research as a subgraph
 outer_graph = StateGraph(AgentState)
-outer_graph.add_node("plan", arc_node(plan_fn, scope="agent:plan"))
-outer_graph.add_node("research", arc_node(
+outer_graph.add_node("plan", chio_node(plan_fn, scope="agent:plan"))
+outer_graph.add_node("research", chio_node(
     research_graph.compile(),
     scope="tools:search,tools:analyze",  # ceiling for the entire subgraph
 ))
-outer_graph.add_node("write", arc_node(write_fn, scope="tools:write"))
+outer_graph.add_node("write", chio_node(write_fn, scope="tools:write"))
 ```
 
 The subgraph's nodes cannot exceed the scope ceiling set by the outer graph.
 
 ## 4. Checkpoint and Receipt Correlation
 
-LangGraph checkpoints graph state at each node. ARC receipts record each
+LangGraph checkpoints graph state at each node. Chio receipts record each
 tool invocation. These should cross-reference:
 
 ```python
-class ArcCheckpointAdapter:
-    """Wraps a LangGraph checkpointer to include ARC receipt metadata."""
+class ChioCheckpointAdapter:
+    """Wraps a LangGraph checkpointer to include Chio receipt metadata."""
 
-    def __init__(self, inner_checkpointer, arc_client):
+    def __init__(self, inner_checkpointer, chio_client):
         self.inner = inner_checkpointer
-        self.arc = arc_client
+        self.arc = chio_client
 
     async def aput(self, config, checkpoint, metadata):
         # Attach receipt IDs to checkpoint metadata
-        receipt_ids = ArcNodeContext.from_config(config).receipt_ids
-        metadata["arc_receipt_ids"] = receipt_ids
-        metadata["arc_receipt_chain_head"] = receipt_ids[-1] if receipt_ids else None
+        receipt_ids = ChioNodeContext.from_config(config).receipt_ids
+        metadata["chio_receipt_ids"] = receipt_ids
+        metadata["chio_receipt_chain_head"] = receipt_ids[-1] if receipt_ids else None
         return await self.inner.aput(config, checkpoint, metadata)
 ```
 
 ### Querying
 
 ```
-# Find all ARC receipts for a LangGraph thread
+# Find all Chio receipts for a LangGraph thread
 arc receipt list --meta langgraph.thread_id=<thread-id>
 
 # Find receipts for a specific node execution
@@ -278,17 +278,17 @@ arc receipt chain <head-receipt-id> --format langgraph
 
 ## 5. Tool Binding
 
-The existing `arc-langchain` `ArcToolkit` works inside LangGraph nodes.
+The existing `chio-langchain` `ChioToolkit` works inside LangGraph nodes.
 The integration adds scope awareness:
 
 ```python
-from arc_langchain import ArcToolkit
+from chio_langchain import ChioToolkit
 
 async def researcher_agent(state: AgentState, config: RunnableConfig):
-    arc_ctx = ArcNodeContext.from_config(config)
+    chio_ctx = ChioNodeContext.from_config(config)
 
-    # ArcToolkit filters to only tools within this node's scope
-    toolkit = ArcToolkit.from_context(arc_ctx)
+    # ChioToolkit filters to only tools within this node's scope
+    toolkit = ChioToolkit.from_context(chio_ctx)
     tools = toolkit.get_tools()  # only search, browse -- not write
 
     agent = create_react_agent(llm, tools)
@@ -300,16 +300,16 @@ async def researcher_agent(state: AgentState, config: RunnableConfig):
 ## 6. Package Structure
 
 ```
-sdks/python/arc-langgraph/
-  pyproject.toml            # deps: arc-sdk-python, arc-langchain, langgraph
-  src/arc_langgraph/
+sdks/python/chio-langgraph/
+  pyproject.toml            # deps: chio-sdk-python, chio-langchain, langgraph
+  src/chio_langgraph/
     __init__.py
-    config.py               # ArcGraphConfig
-    node.py                 # arc_node wrapper
-    context.py              # ArcNodeContext
-    delegation.py           # ArcDelegation, capability narrowing
-    approval.py             # arc_approval_node, guard-to-interrupt bridge
-    checkpoint.py           # ArcCheckpointAdapter
+    config.py               # ChioGraphConfig
+    node.py                 # chio_node wrapper
+    context.py              # ChioNodeContext
+    delegation.py           # ChioDelegation, capability narrowing
+    approval.py             # chio_approval_node, guard-to-interrupt bridge
+    checkpoint.py           # ChioCheckpointAdapter
   tests/
     test_node_scoping.py
     test_delegation.py
@@ -317,34 +317,34 @@ sdks/python/arc-langgraph/
     test_subgraph.py
 ```
 
-## 7. Relationship to `arc-langchain`
+## 7. Relationship to `chio-langchain`
 
 ```
-arc-sdk-python          (base HTTP client to sidecar)
+chio-sdk-python          (base HTTP client to sidecar)
     |
-arc-langchain           (ArcToolkit, ArcTool -- tool wrapping)
+chio-langchain           (ChioToolkit, ChioTool -- tool wrapping)
     |
-arc-langgraph           (graph-level scoping, delegation, approvals)
+chio-langgraph           (graph-level scoping, delegation, approvals)
 ```
 
-`arc-langgraph` depends on `arc-langchain` for tool binding and adds the
+`chio-langgraph` depends on `chio-langchain` for tool binding and adds the
 graph orchestration layer. Users who only need tool wrapping without graph
-orchestration use `arc-langchain` directly.
+orchestration use `chio-langchain` directly.
 
 ## 8. Open Questions
 
 1. **LangGraph Platform.** LangGraph Cloud runs graphs as a managed service.
-   The sidecar model requires the ARC kernel to run in the same environment.
-   Should ARC support a remote kernel mode for managed LangGraph deployments?
+   The sidecar model requires the Chio kernel to run in the same environment.
+   Should Chio support a remote kernel mode for managed LangGraph deployments?
 
-2. **Streaming.** LangGraph streams node outputs. Should ARC receipts be
+2. **Streaming.** LangGraph streams node outputs. Should Chio receipts be
    emitted as stream events, or only on node completion?
 
 3. **Time travel.** LangGraph supports replaying from a checkpoint. If the
-   graph is replayed, should ARC re-evaluate capabilities (they may have
+   graph is replayed, should Chio re-evaluate capabilities (they may have
    been revoked since the checkpoint), or honor the original evaluation?
 
 4. **CrewAI / AutoGen.** These frameworks serve a similar multi-agent
-   orchestration role. Should the `arc_node` pattern be generalized into a
+   orchestration role. Should the `chio_node` pattern be generalized into a
    framework-agnostic multi-agent adapter, or should each framework get
    its own integration?

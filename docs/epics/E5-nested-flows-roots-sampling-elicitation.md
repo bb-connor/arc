@@ -18,7 +18,7 @@ Implemented in the second slice:
 - explicit child-request helpers in the kernel for nested flows
 - negotiated sampling capability capture during MCP initialization
 - policy-gated nested sampling flags in the runtime policy and kernel config
-- normalized `sampling/createMessage` request and result types in `arc-core`
+- normalized `sampling/createMessage` request and result types in `chio-core`
 - edge-owned `sampling/createMessage` child-request plumbing with fail-closed validation
 
 Implemented in the third slice:
@@ -40,9 +40,9 @@ Still pending:
 
 ## Problem
 
-ARC now has strong coverage for tools, resources, prompts, completion, and logging, but it still lacks the client-feature flows that make MCP servers agentic.
+Chio now has strong coverage for tools, resources, prompts, completion, and logging, but it still lacks the client-feature flows that make MCP servers agentic.
 
-Without E5, ARC can mediate actions and context, but it cannot safely support:
+Without E5, Chio can mediate actions and context, but it cannot safely support:
 
 - client workspace roots as a negotiated security boundary
 - server-initiated model execution through the client
@@ -75,17 +75,17 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-core/src/session.rs`
-- `crates/arc-kernel/src/session.rs`
-- `crates/arc-kernel/src/lib.rs`
-- `crates/arc-mcp-adapter/src/edge.rs`
-- `crates/arc-cli/src/policy.rs`
+- `crates/chio-core/src/session.rs`
+- `crates/chio-kernel/src/session.rs`
+- `crates/chio-kernel/src/lib.rs`
+- `crates/chio-mcp-adapter/src/edge.rs`
+- `crates/chio-cli/src/policy.rs`
 
 ## Implementation slices
 
 ### Slice A: roots substrate
 
-- add root types to `arc-core`
+- add root types to `chio-core`
 - track negotiated roots capability in session state
 - refresh root snapshots from the MCP client after initialization and on list-changed notifications
 - expose root snapshots through the kernel session model

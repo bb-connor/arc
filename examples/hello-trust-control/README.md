@@ -16,7 +16,7 @@ This example teaches the control surfaces directly:
 ## What It Demonstrates
 
 - capability issuance through the shared trust-control HTTP API
-- capability status and revocation through the ARC CLI
+- capability status and revocation through the Chio CLI
 - receipt creation without any HTTP app or framework
 - offline receipt verification through exported evidence
 

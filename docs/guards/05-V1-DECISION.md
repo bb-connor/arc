@@ -1,6 +1,6 @@
 # WASM Guard v1: Decision Record
 
-This document defines the scoped v1 of WASM guards for ARC. It resolves the
+This document defines the scoped v1 of WASM guards for Chio. It resolves the
 ambiguities identified in review and draws a hard line between what ships in
 v1 and what is deferred.
 
@@ -13,7 +13,7 @@ v1 and what is deferred.
 **Choice:** Raw `evaluate(ptr, len) -> i32` over JSON in linear memory,
 targeting `wasm32-unknown-unknown`.
 
-**Why:** The code already implements this (`arc-wasm-guards/src/abi.rs`,
+**Why:** The code already implements this (`chio-wasm-guards/src/abi.rs`,
 `runtime.rs`). WIT would require rewriting the host, the ABI types, and
 introducing new compilation toolchains before the basic execution envelope
 is validated. We are not going to build two ecosystems.
@@ -95,7 +95,7 @@ pub struct GuardRequest {
 
 All new fields are optional and additive -- existing WASM guards that
 ignore them continue to work. The host populates them by calling
-`arc_guards::extract_action()` before serializing.
+`chio_guards::extract_action()` before serializing.
 
 **Why the host extracts, not the guest:**
 - `extract_action()` contains heuristic tool-name matching, path
@@ -131,7 +131,7 @@ follow (v1.1) once the manifest format is validated.
 
 **Choice:** Startup code enforces this order:
 
-1. **HushSpec-compiled guards** via `arc_policy::compiler::compile_policy()`
+1. **HushSpec-compiled guards** via `chio_policy::compiler::compile_policy()`
 2. **WASM guards** sorted by `WasmGuardEntry.priority` before loading
 3. **Advisory pipeline** (always last)
 
@@ -147,7 +147,7 @@ follow (v1.1) once the manifest format is validated.
 
 **Not** `GuardPipeline::default_pipeline()` -- that creates guards with
 hard-coded defaults, ignoring the HushSpec policy. The real bridge is
-`arc_policy::compiler::compile_policy()`.
+`chio_policy::compiler::compile_policy()`.
 
 ### 6. Scope: What ships in v1
 
@@ -156,19 +156,19 @@ hard-coded defaults, ignoring the HushSpec policy. The real bridge is
 - [ ] Shared `Arc<Engine>` across all WASM guards (currently one per guard)
 - [ ] `WasmHostState` instead of `()` in Store (carries config + log buffer)
 - [ ] Host functions: `arc.log`, `arc.get_config`, `arc.get_time_unix_secs`
-- [ ] `arc_alloc` support (check for export, use it, fall back to offset 0)
-- [ ] `arc_deny_reason` export support (fall back to offset-64K convention)
+- [ ] `chio_alloc` support (check for export, use it, fall back to offset 0)
+- [ ] `chio_deny_reason` export support (fall back to offset-64K convention)
 - [ ] Guard manifest format (`guard-manifest.yaml`) with SHA-256 verification
 - [ ] Enriched `GuardRequest` with host-extracted action context
 - [ ] Memory limit enforcement (`ResourceLimiter`)
 - [ ] Module import validation (reject non-`arc` imports)
-- [ ] Wiring: `arc-config` `wasm_guards` entries to kernel startup via
-      `arc_policy::compiler` + `WasmGuardRuntime`
+- [ ] Wiring: `chio-config` `wasm_guards` entries to kernel startup via
+      `chio_policy::compiler` + `WasmGuardRuntime`
 - [ ] Fix: sort WASM guards by priority in startup code
 - [ ] Fuel consumption in receipt metadata
 - [ ] Guard manifest SHA-256 in receipt metadata
 - [ ] Benchmarks: module load time, instantiate time, p50/p99 evaluate
-      latency, fuel overhead on representative ARC workloads
+      latency, fuel overhead on representative Chio workloads
 
 **Out of scope (deferred):**
 
@@ -208,15 +208,15 @@ revisit the per-call fresh-Store model (consider instance pooling).
 
 | File | Change |
 |------|--------|
-| `crates/arc-wasm-guards/src/abi.rs` | Add `action_type`, `extracted_path`, `extracted_target`, `filesystem_roots`, `matched_grant_index` to `GuardRequest`. Remove `session_metadata`. |
-| `crates/arc-wasm-guards/src/runtime.rs` | Update `build_request` to call `extract_action()` and populate new fields. Fix doc-comment on `WasmGuardRuntime` (does not sort). |
-| `crates/arc-wasm-guards/src/runtime.rs` | `WasmtimeBackend`: accept `Arc<Engine>`, add `WasmHostState`, register `arc.*` host functions, add `arc_alloc`/`arc_deny_reason` support, add `ResourceLimiter`. |
-| `crates/arc-wasm-guards/Cargo.toml` | Add dep on `arc-guards` (for `extract_action`). |
-| `crates/arc-config/src/schema.rs` | No change in v1. Add `config: HashMap` in v1.1. |
+| `crates/chio-wasm-guards/src/abi.rs` | Add `action_type`, `extracted_path`, `extracted_target`, `filesystem_roots`, `matched_grant_index` to `GuardRequest`. Remove `session_metadata`. |
+| `crates/chio-wasm-guards/src/runtime.rs` | Update `build_request` to call `extract_action()` and populate new fields. Fix doc-comment on `WasmGuardRuntime` (does not sort). |
+| `crates/chio-wasm-guards/src/runtime.rs` | `WasmtimeBackend`: accept `Arc<Engine>`, add `WasmHostState`, register `arc.*` host functions, add `chio_alloc`/`chio_deny_reason` support, add `ResourceLimiter`. |
+| `crates/chio-wasm-guards/Cargo.toml` | Add dep on `chio-guards` (for `extract_action`). |
+| `crates/chio-config/src/schema.rs` | No change in v1. Add `config: HashMap` in v1.1. |
 | Startup code (proxy/CLI) | Wire `compile_policy()` + sorted WASM entries + advisory pipeline in correct order. |
-| New file: `crates/arc-wasm-guards/src/manifest.rs` | Guard manifest parsing + SHA-256 verification. |
-| New file: `crates/arc-wasm-guards/src/host.rs` | `WasmHostState` struct, `arc.log`/`arc.get_config`/`arc.get_time_unix_secs` implementations. |
-| New file: `crates/arc-wasm-guards/benches/` | Benchmark suite for the validation measurements. |
+| New file: `crates/chio-wasm-guards/src/manifest.rs` | Guard manifest parsing + SHA-256 verification. |
+| New file: `crates/chio-wasm-guards/src/host.rs` | `WasmHostState` struct, `arc.log`/`arc.get_config`/`arc.get_time_unix_secs` implementations. |
+| New file: `crates/chio-wasm-guards/benches/` | Benchmark suite for the validation measurements. |
 
 ---
 
@@ -224,12 +224,12 @@ revisit the per-call fresh-Store model (consider instance pooling).
 
 **HushSpec first, WASM for what YAML can't say.**
 
-- HushSpec (via `arc-policy`) handles the standard declarative rules: path
+- HushSpec (via `chio-policy`) handles the standard declarative rules: path
   blocking, egress allowlists, secret detection, shell command blocking, tool
   access control, patch integrity.
-- ClawdStrike is the reference engine. `arc-guards` adapts its guard
-  implementations to ARC's `Guard` trait. `arc-policy::compiler` bridges
-  HushSpec rules to configured `arc-guards` instances.
+- ClawdStrike is the reference engine. `chio-guards` adapts its guard
+  implementations to Chio's `Guard` trait. `chio-policy::compiler` bridges
+  HushSpec rules to configured `chio-guards` instances.
 - WASM guards handle the custom tail: semantic argument inspection,
   org-specific compliance, complex pattern matching, custom secret detection.
 

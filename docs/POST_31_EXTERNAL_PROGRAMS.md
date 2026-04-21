@@ -1,4 +1,4 @@
-# ARC Post-31 External Programs
+# Chio Post-31 External Programs
 
 > **Date**: 2026-04-16
 > **Scope**: Work required after the numbered post-roadmap closure phases end
@@ -16,14 +16,14 @@
 
 ## Why This Document Exists
 
-The post-roadmap addendum closes the remaining repo-solvable ARC work.
-The strongest ARC vision still requires evidence that repository work cannot
+The post-roadmap addendum closes the remaining repo-solvable Chio work.
+The strongest Chio vision still requires evidence that repository work cannot
 manufacture by itself:
 
 - outside standards legitimacy
 - trust portability exercised across real peers
-- operator and partner dependence on ARC truth
-- market evidence that ARC is relied on as control-plane substrate rather than
+- operator and partner dependence on Chio truth
+- market evidence that Chio is relied on as control-plane substrate rather than
   merely integrated as optional software
 
 Those are not normal product phases, so they should not be represented as more
@@ -43,7 +43,7 @@ The recommended order is:
 5. Program B insurance, marketplace, and broader market-validation evidence
 
 This order is deliberate.
-Program B claims are weaker and noisier if ARC does not first have a clean
+Program B claims are weaker and noisier if Chio does not first have a clean
 standards, portability, and qualification story with checked artifacts.
 
 ---
@@ -52,51 +52,51 @@ standards, portability, and qualification story with checked artifacts.
 
 The repo already contains meaningful substrate for both external programs.
 What it does not yet contain is independent external evidence that those
-surfaces are relied on outside ARC's own operator boundary.
+surfaces are relied on outside Chio's own operator boundary.
 
 - Standards, claim-boundary, and qualification substrate already exists in
   [`docs/release/QUALIFICATION.md`](release/QUALIFICATION.md),
   [`docs/release/RELEASE_AUDIT.md`](release/RELEASE_AUDIT.md),
-  [`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md),
-  [`docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
+  [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
+  [`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
   [`docs/review/12-standards-positioning-remediation.md`](review/12-standards-positioning-remediation.md),
   and [`spec/PROTOCOL.md`](../spec/PROTOCOL.md).
 - Identity, passport, and federation substrate already exists in
-  [`crates/arc-core/src/identity_network.rs`](../crates/arc-core/src/identity_network.rs),
-  [`crates/arc-did/src/lib.rs`](../crates/arc-did/src/lib.rs),
-  [`crates/arc-credentials/src/oid4vci.rs`](../crates/arc-credentials/src/oid4vci.rs),
-  [`crates/arc-credentials/src/oid4vp.rs`](../crates/arc-credentials/src/oid4vp.rs),
-  [`crates/arc-federation/src/lib.rs`](../crates/arc-federation/src/lib.rs),
+  [`crates/chio-core/src/identity_network.rs`](../crates/chio-core/src/identity_network.rs),
+  [`crates/chio-did/src/lib.rs`](../crates/chio-did/src/lib.rs),
+  [`crates/chio-credentials/src/oid4vci.rs`](../crates/chio-credentials/src/oid4vci.rs),
+  [`crates/chio-credentials/src/oid4vp.rs`](../crates/chio-credentials/src/oid4vp.rs),
+  [`crates/chio-federation/src/lib.rs`](../crates/chio-federation/src/lib.rs),
   and [`docs/IDENTITY_FEDERATION_GUIDE.md`](IDENTITY_FEDERATION_GUIDE.md).
 - Market-facing and external-proof substrate already exists in
-  [`crates/arc-market/src/lib.rs`](../crates/arc-market/src/lib.rs),
-  [`crates/arc-store-sqlite/src/receipt_store/liability_market.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_market.rs),
-  [`crates/arc-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_claims.rs),
+  [`crates/chio-market/src/lib.rs`](../crates/chio-market/src/lib.rs),
+  [`crates/chio-store-sqlite/src/receipt_store/liability_market.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_market.rs),
+  [`crates/chio-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_claims.rs),
   [`docs/release/PARTNER_PROOF.md`](release/PARTNER_PROOF.md), and
-  [`docs/release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md`](release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md).
+  [`docs/release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md`](release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md).
 
 ---
 
 ## Program A: Standards And Trust-Portability Qualification
 
-> **Goal**: Prove that ARC semantics are accepted across real peers and that
+> **Goal**: Prove that Chio semantics are accepted across real peers and that
 > trust-portable artifacts remain bounded, qualified, and interoperable outside
 > one local operator surface.
 
 ### Current Repo Baseline
 
-- [`docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
-  [`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md),
+- [`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
+  [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
   [`docs/review/12-standards-positioning-remediation.md`](review/12-standards-positioning-remediation.md),
   and [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already define large parts of
-  ARC's claim-boundary and interoperability story, but not yet as one checked
+  Chio's claim-boundary and interoperability story, but not yet as one checked
   external-facing registry.
-- [`crates/arc-core/src/identity_network.rs`](../crates/arc-core/src/identity_network.rs),
-  [`crates/arc-federation/src/lib.rs`](../crates/arc-federation/src/lib.rs),
-  [`crates/arc-did/src/lib.rs`](../crates/arc-did/src/lib.rs),
-  [`crates/arc-credentials/src/oid4vci.rs`](../crates/arc-credentials/src/oid4vci.rs),
-  and [`crates/arc-credentials/src/oid4vp.rs`](../crates/arc-credentials/src/oid4vp.rs)
-  already give ARC real portability and identity substrate. Program A turns
+- [`crates/chio-core/src/identity_network.rs`](../crates/chio-core/src/identity_network.rs),
+  [`crates/chio-federation/src/lib.rs`](../crates/chio-federation/src/lib.rs),
+  [`crates/chio-did/src/lib.rs`](../crates/chio-did/src/lib.rs),
+  [`crates/chio-credentials/src/oid4vci.rs`](../crates/chio-credentials/src/oid4vci.rs),
+  and [`crates/chio-credentials/src/oid4vp.rs`](../crates/chio-credentials/src/oid4vp.rs)
+  already give Chio real portability and identity substrate. Program A turns
   that repo-local substrate into checked and reviewable peer evidence.
 
 ### Evidence Categories
@@ -114,7 +114,7 @@ surfaces are relied on outside ARC's own operator boundary.
 
 ### Exit Criteria
 
-- ARC compatibility and portability claims are backed by checked artifacts and
+- Chio compatibility and portability claims are backed by checked artifacts and
   external-peer qualification runs
 - a relying party can evaluate issuer accountability, subject continuity, and
   trust-portability bounds without bilateral private assumptions
@@ -123,7 +123,7 @@ surfaces are relied on outside ARC's own operator boundary.
 
 ### Non-Goals
 
-- proving that ARC already has market dominance
+- proving that Chio already has market dominance
 - widening release claims beyond the qualified bounded release boundary
 - turning research surfaces into product truth by prose
 - treating research-track prototypes, benchmark notes, or feasibility memos as
@@ -133,14 +133,14 @@ surfaces are relied on outside ARC's own operator boundary.
 
 #### A1. Claim Taxonomy And Qualification Matrix Closure
 
-**Why**: ARC still needs one explicit distinction between native protocol,
+**Why**: Chio still needs one explicit distinction between native protocol,
 compatibility, bridge, product/platform, external-proof, and research claims.
 Here, `research claims` means explicitly non-ship, non-program claim classes
 tracked for boundary discipline, not hidden Program A deliverables.
 
 **Existing substrate**:
-[`docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
-[`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md),
+[`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
+[`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
 [`docs/review/12-standards-positioning-remediation.md`](review/12-standards-positioning-remediation.md),
 and [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already cover parts of this
 taxonomy. The missing step is unifying them into one checked claim registry.
@@ -163,18 +163,18 @@ taxonomy. The missing step is unifying them into one checked claim registry.
 
 #### A2. External Peer Qualification Harness
 
-**Why**: ARC cannot claim broad interoperability if qualification only runs
-against ARC-owned demos or local adapters.
+**Why**: Chio cannot claim broad interoperability if qualification only runs
+against Chio-owned demos or local adapters.
 
 **Existing substrate**:
-[`docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
-[`crates/arc-core/src/identity_network.rs`](../crates/arc-core/src/identity_network.rs),
-[`crates/arc-federation/src/lib.rs`](../crates/arc-federation/src/lib.rs),
+[`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
+[`crates/chio-core/src/identity_network.rs`](../crates/chio-core/src/identity_network.rs),
+[`crates/chio-federation/src/lib.rs`](../crates/chio-federation/src/lib.rs),
 and the OID portability surfaces in
-[`crates/arc-credentials/src/oid4vci.rs`](../crates/arc-credentials/src/oid4vci.rs)
-and [`crates/arc-credentials/src/oid4vp.rs`](../crates/arc-credentials/src/oid4vp.rs)
-already give ARC something to qualify. The gap is repeatable testing against
-external peers instead of ARC-owned fixtures alone.
+[`crates/chio-credentials/src/oid4vci.rs`](../crates/chio-credentials/src/oid4vci.rs)
+and [`crates/chio-credentials/src/oid4vp.rs`](../crates/chio-credentials/src/oid4vp.rs)
+already give Chio something to qualify. The gap is repeatable testing against
+external peers instead of Chio-owned fixtures alone.
 
 **Repo-prep work**:
 - define repeatable peer-qualification harnesses for MCP, A2A, identity, and
@@ -191,7 +191,7 @@ external peers instead of ARC-owned fixtures alone.
 **Done when**:
 - external peer qualification can be repeated and reviewed without reading
   prose alone
-- ARC claims tested compatibility profiles instead of implying general support
+- Chio claims tested compatibility profiles instead of implying general support
 
 #### A3. Issuer Descriptor And Independence Policy
 
@@ -199,8 +199,8 @@ external peers instead of ARC-owned fixtures alone.
   identity, governance, and independence metadata.
 
 **Existing substrate**:
-[`crates/arc-core/src/identity_network.rs`](../crates/arc-core/src/identity_network.rs),
-[`crates/arc-federation/src/lib.rs`](../crates/arc-federation/src/lib.rs),
+[`crates/chio-core/src/identity_network.rs`](../crates/chio-core/src/identity_network.rs),
+[`crates/chio-federation/src/lib.rs`](../crates/chio-federation/src/lib.rs),
 and [`docs/IDENTITY_FEDERATION_GUIDE.md`](IDENTITY_FEDERATION_GUIDE.md)
 already model public identity profiles, federation metadata, certification
 references, and Sybil-control concepts. This track packages those concepts into
@@ -228,10 +228,10 @@ auditable issuer-accountability artifacts and fail-closed policy.
 
 **Existing substrate**:
 [`spec/PROTOCOL.md`](../spec/PROTOCOL.md),
-[`crates/arc-credentials/src/oid4vci.rs`](../crates/arc-credentials/src/oid4vci.rs),
-[`crates/arc-credentials/src/oid4vp.rs`](../crates/arc-credentials/src/oid4vp.rs),
-[`crates/arc-did/src/lib.rs`](../crates/arc-did/src/lib.rs),
-[`crates/arc-federation/src/lib.rs`](../crates/arc-federation/src/lib.rs),
+[`crates/chio-credentials/src/oid4vci.rs`](../crates/chio-credentials/src/oid4vci.rs),
+[`crates/chio-credentials/src/oid4vp.rs`](../crates/chio-credentials/src/oid4vp.rs),
+[`crates/chio-did/src/lib.rs`](../crates/chio-did/src/lib.rs),
+[`crates/chio-federation/src/lib.rs`](../crates/chio-federation/src/lib.rs),
 and [`docs/IDENTITY_FEDERATION_GUIDE.md`](IDENTITY_FEDERATION_GUIDE.md)
 already define passport, migration, discovery, and trust-pack substrate. The
 missing piece is external clearing discipline and continuity evidence across
@@ -248,7 +248,7 @@ real counterparties.
 - publish bounded clearing reports that preserve local-admission autonomy
 
 **Done when**:
-- ARC can show bounded portable-trust clearing instead of only bilateral
+- Chio can show bounded portable-trust clearing instead of only bilateral
   evidence portability
 - imported trust no longer reads like recomputed local truth
 
@@ -260,7 +260,7 @@ real counterparties.
 **Existing substrate**:
 [`docs/release/QUALIFICATION.md`](release/QUALIFICATION.md),
 [`docs/release/RELEASE_AUDIT.md`](release/RELEASE_AUDIT.md),
-[`docs/standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md`](standards/ARC_BOUNDED_OPERATIONAL_PROFILE.md),
+[`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
 and the review memos under [`docs/review`](review) already form an internal
 reviewer package. This track makes that package standards-facing, bounded, and
 reusable by third parties.
@@ -280,44 +280,44 @@ reusable by third parties.
 
 ## Program B: Market Validation And External Proof
 
-> **Goal**: Prove the strongest strategic ARC thesis with external evidence:
-> ARC is relied on as control-plane truth by outside operators, partners, and
+> **Goal**: Prove the strongest strategic Chio thesis with external evidence:
+> Chio is relied on as control-plane truth by outside operators, partners, and
 > economic actors.
 
 ### Current Repo Baseline
 
-- [`crates/arc-market/src/lib.rs`](../crates/arc-market/src/lib.rs),
-  [`crates/arc-store-sqlite/src/receipt_store/liability_market.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_market.rs),
-  and [`crates/arc-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_claims.rs)
+- [`crates/chio-market/src/lib.rs`](../crates/chio-market/src/lib.rs),
+  [`crates/chio-store-sqlite/src/receipt_store/liability_market.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_market.rs),
+  and [`crates/chio-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_claims.rs)
   already model market, liability, and claims-shaped workflows.
-- [`crates/arc-kernel/src/operator_report.rs`](../crates/arc-kernel/src/operator_report.rs),
-  [`crates/arc-anchor/src/bundle.rs`](../crates/arc-anchor/src/bundle.rs),
-  [`crates/arc-anchor/src/ops.rs`](../crates/arc-anchor/src/ops.rs), and
-  [`crates/arc-web3/src/lib.rs`](../crates/arc-web3/src/lib.rs) already give
-  ARC exportable operator, checkpoint, and proof artifacts. Program B turns
+- [`crates/chio-kernel/src/operator_report.rs`](../crates/chio-kernel/src/operator_report.rs),
+  [`crates/chio-anchor/src/bundle.rs`](../crates/chio-anchor/src/bundle.rs),
+  [`crates/chio-anchor/src/ops.rs`](../crates/chio-anchor/src/ops.rs), and
+  [`crates/chio-web3/src/lib.rs`](../crates/chio-web3/src/lib.rs) already give
+  Chio exportable operator, checkpoint, and proof artifacts. Program B turns
   those internal artifacts into evidence of outside dependence.
 
 ### Evidence Categories
 
-- outside operators using ARC receipts, checkpoints, or control-plane semantics
+- outside operators using Chio receipts, checkpoints, or control-plane semantics
   as authoritative inputs
 - partner dependence on bilateral runtime co-signing, reconciliation, or
   evidence exchange
 - production usage and repeat economic flows that persist without repo-local
   prompting
-- insurance, underwriting, dispute, and claims evidence where ARC artifacts
+- insurance, underwriting, dispute, and claims evidence where Chio artifacts
   materially affect decisions
-- marketplace activity, pricing, and placements that depend on verified ARC
+- marketplace activity, pricing, and placements that depend on verified Chio
   evidence
 - external proof bundles that an independent reviewer can verify
 
 ### Exit Criteria
 
-- outside parties rely on ARC truth for consequential workflows, not just
+- outside parties rely on Chio truth for consequential workflows, not just
   optional integration paths
 - operator, partner, and market evidence supports the stronger strategic thesis
   with independent artifacts
-- ARC's control-plane thesis is demonstrated by external dependence, not just
+- Chio's control-plane thesis is demonstrated by external dependence, not just
   by internal implementation depth
 
 ### Non-Goals
@@ -337,8 +337,8 @@ evidence scattered across decks and docs.
 
 **Existing substrate**:
 [`docs/release/PARTNER_PROOF.md`](release/PARTNER_PROOF.md),
-[`docs/release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md`](release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md),
-[`crates/arc-market/src/lib.rs`](../crates/arc-market/src/lib.rs), and the
+[`docs/release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md`](release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md),
+[`crates/chio-market/src/lib.rs`](../crates/chio-market/src/lib.rs), and the
 liability-market store modules already sketch several evidence categories. This
 track standardizes them into one reusable proof-bundle contract.
 
@@ -357,14 +357,14 @@ track standardizes them into one reusable proof-bundle contract.
 
 #### B2. Operator Reliance Pilots
 
-**Why**: the comptroller thesis requires outside operators to rely on ARC
+**Why**: the comptroller thesis requires outside operators to rely on Chio
 truth for consequential workflows.
 
 **Existing substrate**:
-[`crates/arc-kernel/src/operator_report.rs`](../crates/arc-kernel/src/operator_report.rs),
-[`crates/arc-anchor/src/bundle.rs`](../crates/arc-anchor/src/bundle.rs),
-[`crates/arc-anchor/src/ops.rs`](../crates/arc-anchor/src/ops.rs), and
-[`crates/arc-web3/src/lib.rs`](../crates/arc-web3/src/lib.rs) already produce
+[`crates/chio-kernel/src/operator_report.rs`](../crates/chio-kernel/src/operator_report.rs),
+[`crates/chio-anchor/src/bundle.rs`](../crates/chio-anchor/src/bundle.rs),
+[`crates/chio-anchor/src/ops.rs`](../crates/chio-anchor/src/ops.rs), and
+[`crates/chio-web3/src/lib.rs`](../crates/chio-web3/src/lib.rs) already produce
 machine-verifiable operator and checkpoint artifacts. What is missing is
 outside operator dependence on those artifacts.
 
@@ -373,10 +373,10 @@ outside operator dependence on those artifacts.
 - collect evidence that receipts, checkpoints, or control-plane truth are
   authoritative inputs to real decisions
 - capture failure modes, rollback behavior, and reasons operators trust or do
-  not trust ARC as authoritative substrate
+  not trust Chio as authoritative substrate
 
 **Done when**:
-- at least one outside operator is using ARC truth as more than optional
+- at least one outside operator is using Chio truth as more than optional
   telemetry
 - the evidence bundle shows operational dependence instead of superficial
   integration
@@ -388,33 +388,33 @@ real market control-plane truth.
 
 **Existing substrate**:
 [`docs/release/PARTNER_PROOF.md`](release/PARTNER_PROOF.md),
-[`crates/arc-kernel/src/operator_report.rs`](../crates/arc-kernel/src/operator_report.rs),
-and [`crates/arc-store-sqlite/src/receipt_store/reports.rs`](../crates/arc-store-sqlite/src/receipt_store/reports.rs)
-already give ARC reconciliation and report substrate that can feed bilateral
+[`crates/chio-kernel/src/operator_report.rs`](../crates/chio-kernel/src/operator_report.rs),
+and [`crates/chio-store-sqlite/src/receipt_store/reports.rs`](../crates/chio-store-sqlite/src/receipt_store/reports.rs)
+already give Chio reconciliation and report substrate that can feed bilateral
 proof. This track turns that substrate into counterparty-reviewed dependence.
 
 **Repo-prep work**:
 - define bilateral co-signing, reconciliation, and dispute-evidence bundle
   requirements
-- define what proof is needed to say a partner depends on ARC truth
+- define what proof is needed to say a partner depends on Chio truth
 
 **External evidence work**:
-- run partner pilots where a counterparty consumes ARC evidence in settlement,
+- run partner pilots where a counterparty consumes Chio evidence in settlement,
   reconciliation, dispute, or admission workflows
 - publish bounded partner-proof bundles
 
 **Done when**:
-- one or more counterparties rely on ARC artifacts in workflows that matter to
+- one or more counterparties rely on Chio artifacts in workflows that matter to
   them operationally or financially
 
 #### B4. Insurance And Underwriting Dependence
 
-**Why**: insurance and underwriting are central to the stronger ARC vision, but
+**Why**: insurance and underwriting are central to the stronger Chio vision, but
 need real dependence evidence rather than protocol completeness.
 
 **Existing substrate**:
-[`crates/arc-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_claims.rs),
-[`crates/arc-market/src/lib.rs`](../crates/arc-market/src/lib.rs), and
+[`crates/chio-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_claims.rs),
+[`crates/chio-market/src/lib.rs`](../crates/chio-market/src/lib.rs), and
 [`docs/release/PARTNER_PROOF.md`](release/PARTNER_PROOF.md) already show that
 the repo has claims and liability-shaped primitives. What it does not yet have
 is insurer or underwriter evidence that those primitives changed a real
@@ -422,12 +422,12 @@ decision.
 
 **Repo-prep work**:
 - define underwriting, coverage, claim, and dispute bundle formats
-- define what it means for ARC artifacts to materially affect underwriting or
+- define what it means for Chio artifacts to materially affect underwriting or
   claims outcomes
 
 **External evidence work**:
 - run insurer or underwriter pilots
-- collect evidence that ARC receipts, provenance, or controls changed a real
+- collect evidence that Chio receipts, provenance, or controls changed a real
   pricing, coverage, or claim decision
 
 **Done when**:
@@ -437,13 +437,13 @@ decision.
 #### B5. Marketplace And Liquidity Proof
 
 **Why**: marketplace claims require evidence of actual pricing, matching, and
-liquidity behavior around ARC-verified artifacts.
+liquidity behavior around Chio-verified artifacts.
 
 **Existing substrate**:
-[`crates/arc-market/src/lib.rs`](../crates/arc-market/src/lib.rs),
-[`crates/arc-store-sqlite/src/receipt_store/liability_market.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_market.rs),
-[`crates/arc-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/arc-store-sqlite/src/receipt_store/liability_claims.rs),
-and [`docs/release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md`](release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md)
+[`crates/chio-market/src/lib.rs`](../crates/chio-market/src/lib.rs),
+[`crates/chio-store-sqlite/src/receipt_store/liability_market.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_market.rs),
+[`crates/chio-store-sqlite/src/receipt_store/liability_claims.rs`](../crates/chio-store-sqlite/src/receipt_store/liability_claims.rs),
+and [`docs/release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md`](release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md)
 already define marketplace-shaped substrate and strategy claims. The missing
 proof is live third-party pricing, matching, and repeated use.
 
@@ -456,7 +456,7 @@ proof is live third-party pricing, matching, and repeated use.
 **External evidence work**:
 - run bounded live marketplace or placement pilots
 - capture evidence of repeated real usage and third-party willingness to price
-  against ARC-backed signals
+  against Chio-backed signals
 
 **Done when**:
 - the marketplace story is supported by live economic activity, not just by
@@ -479,7 +479,7 @@ done," the highest-leverage queue is:
 6. Start `B4` and `B5` only after the earlier evidence lanes are stable enough
    to be reviewed externally.
 
-That is the concrete answer to "what else should ARC work on after the current
+That is the concrete answer to "what else should Chio work on after the current
 roadmap and post-roadmap addendum are complete."
 
 ---
@@ -510,9 +510,9 @@ deliverables:
   verifier or proving benchmarks only
 
 - ZK receipt proofs
-  See `docs/research/ARC_ZK_RECEIPT_PROOFS_MEMO.md`.
+  See `docs/research/CHIO_ZK_RECEIPT_PROOFS_MEMO.md`.
   Focus: prove narrow predicates over signed receipts, lineage edges, and
-  checkpoint proofs after ARC's non-research receipt and append-only substrate
+  checkpoint proofs after Chio's non-research receipt and append-only substrate
   is already in place.
 - TEE-backed execution and receipt binding
   See `docs/research/TEE_RUNTIME_ASSURANCE_BINDING_MEMO.md`.
@@ -521,14 +521,14 @@ deliverables:
 
 They may later influence the product or evidence story, but they are not
 prerequisites for any numbered phase or external evidence program and do not
-establish the non-research ARC thesis on their own.
+establish the non-research Chio thesis on their own.
 
 ---
 
 ## Bottom Line
 
 The numbered roadmap should stop where repo-solvable closure stops.
-After that, ARC still has real work left, but it is external-program work and
+After that, Chio still has real work left, but it is external-program work and
 research. Research remains distinct from Program A and Program B and does not
 become another internal product ladder or an implicit dependency of those
 programs.

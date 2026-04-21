@@ -1,4 +1,4 @@
-# Roadmap: ARC
+# Roadmap: Chio
 
 ## Milestones
 
@@ -12,7 +12,7 @@
   2026-03-25)
 - [x] **v2.4 Architecture and Runtime Decomposition** - Phases 25-28
   (completed 2026-03-25)
-- [x] **v2.5 ARC Rename and Identity Realignment** - Phases 29-32 (completed
+- [x] **v2.5 Chio Rename and Identity Realignment** - Phases 29-32 (completed
   2026-03-26)
 - [x] **v2.6 Governed Transactions and Payment Rails** - Phases 33-36
   (completed 2026-03-26)
@@ -36,7 +36,7 @@
   (completed 2026-03-28)
 - [x] **v2.16 Enterprise Authorization and IAM Standards Profiles** - Phases
   73-76 (completed 2026-03-28)
-- [x] **v2.17 ARC Certify Public Discovery Marketplace and Governance** -
+- [x] **v2.17 Chio Certify Public Discovery Marketplace and Governance** -
   Phases 77-80 (completed 2026-03-29)
 - [x] **v2.18 Credit, Exposure, and Capital Policy** - Phases 81-84
   (completed 2026-03-29)
@@ -72,11 +72,11 @@
   Qualification** - Phases 141-144 (completed locally 2026-03-31)
 - [x] **v2.34 Official Web3 Runtime Contracts and Deployment Harness** -
   Phases 145-148 (completed locally 2026-04-01)
-- [x] **v2.35 arc-link Oracle Runtime and Cross-Currency Budget
+- [x] **v2.35 chio-link Oracle Runtime and Cross-Currency Budget
   Enforcement** - Phases 149-152 (completed locally 2026-04-01)
-- [x] **v2.36 arc-anchor Multi-Chain Anchoring and Proof Verification** -
+- [x] **v2.36 chio-anchor Multi-Chain Anchoring and Proof Verification** -
   Phases 153-156 (completed locally 2026-04-01)
-- [x] **v2.37 arc-settle On-Chain Settlement, Escrow, and Bond Runtime** -
+- [x] **v2.37 chio-settle On-Chain Settlement, Escrow, and Bond Runtime** -
   Phases 157-160 (completed locally 2026-04-01)
 - [x] **v2.38 Web3 Automation, Cross-Chain Transport, and Agent Payment
   Interop** - Phases 161-164 (completed locally 2026-04-02)
@@ -103,12 +103,12 @@
   Bounded SDK Surface** - Phases 201-204 (completed locally 2026-04-03)
 - [x] **v2.49 MERCURY Trust Network Witness, Publication, and Proof-Profile
   Interoperability** - Phases 205-208 (completed locally 2026-04-03)
-- [x] **v2.50 ARC-Wall Companion Product Core, Guard Evidence, and Buyer
+- [x] **v2.50 Chio-Wall Companion Product Core, Guard Evidence, and Buyer
   Motion** - Phases 209-212 (completed locally 2026-04-03)
 - [x] **v2.51 MERCURY Extensions Shared Service Boundaries, Cross-Product
   Governance, and Platform Hardening** - Phases 213-216 (completed locally
   2026-04-03)
-- [x] **v2.52 MERCURY Extensions ARC Purity Restoration, Boundary Cleanup,
+- [x] **v2.52 MERCURY Extensions Chio Purity Restoration, Boundary Cleanup,
   and Qualification** - Phases 217-220 (completed locally 2026-04-03)
 - [x] **v2.53 MERCURY Release Readiness, Partner Delivery, and Controlled
   Adoption** - Phases 221-224 (completed locally 2026-04-03)
@@ -157,7 +157,7 @@
   2026-04-13)
 - [x] **v2.80 Core Decomposition and Async Kernel** - Phases 303-306
   (completed locally 2026-04-13)
-- [x] **v2.81 Deployable ARC and Developer Onboarding** - Phases 307-310
+- [x] **v2.81 Deployable Chio and Developer Onboarding** - Phases 307-310
   (completed locally 2026-04-13; archived locally)
 - [x] **v2.82 Normative Protocol Specification and Conformance** - Phases
   311-314 (completed locally 2026-04-13; archived locally)
@@ -199,7 +199,7 @@
   locally 2026-04-15; pending archival)
 - [x] **v3.17 Comptroller Market Position Proof** - Phases 413-416
   (completed locally 2026-04-15; pending archival)
-- [x] **v3.18 Bounded ARC Ship Readiness Closure** - Phases 417-421
+- [x] **v3.18 Bounded Chio Ship Readiness Closure** - Phases 417-421
   (completed locally 2026-04-15; pending archival)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
@@ -215,11 +215,11 @@ v2.71+v2.72+v2.73 (parallel).
 ### v2.66 Test Coverage for Untested Crates (Phases 273-276)
 
 **Milestone Goal:** Add meaningful unit and integration tests to the three
-untested crates (arc-hosted-mcp, arc-wall, arc-siem) and create cross-crate
+untested crates (chio-hosted-mcp, chio-wall, chio-siem) and create cross-crate
 integration tests exercising the hosted-mcp -> kernel -> wall -> siem
 workflow path.
 
-### Phase 273: arc-hosted-mcp Unit Tests
+### Phase 273: chio-hosted-mcp Unit Tests
 **Goal**: Hosted MCP sessions are exercised under test so regressions in session lifecycle, tenant isolation, auth, and error handling are caught before CI
 **Depends on**: Nothing (first phase of ship readiness ladder)
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
@@ -230,17 +230,17 @@ workflow path.
   4. Malformed requests, expired tokens, and missing headers all return structured errors and never panic
 **Plans**: 3/3 plans complete
 
-### Phase 274: arc-wall Unit Tests
+### Phase 274: chio-wall Unit Tests
 **Goal**: Wall validation rules, edge cases, and barrier review logic are exercised under test so security policy regressions are caught before CI
 **Depends on**: Nothing (parallel with 273)
 **Requirements**: TEST-05, TEST-06, TEST-07
 **Success Criteria** (what must be TRUE):
-  1. Every rule type defined in arc-wall (allow, deny, conditional, scoped) has at least one passing and one rejecting test case
+  1. Every rule type defined in chio-wall (allow, deny, conditional, scoped) has at least one passing and one rejecting test case
   2. Boundary conditions -- empty input, maximum-length fields, Unicode edge cases, zero-length scopes -- produce correct accept/reject outcomes
   3. Barrier review decisions (approve, reject, escalate) propagate correctly through the control-room pipeline under test
 **Plans**: 3/3 plans complete
 
-### Phase 275: arc-siem Unit Tests
+### Phase 275: chio-siem Unit Tests
 **Goal**: SIEM export pipelines (Splunk HEC, Elasticsearch bulk, DLQ, rate limiting) are exercised under test so export regressions are caught before CI
 **Depends on**: Nothing (parallel with 273, 274)
 **Requirements**: TEST-08, TEST-09, TEST-10, TEST-11
@@ -256,7 +256,7 @@ workflow path.
 **Depends on**: Phase 273, Phase 274, Phase 275
 **Requirements**: TEST-12, TEST-13
 **Success Criteria** (what must be TRUE):
-  1. A tool call arriving at arc-hosted-mcp flows through arc-kernel guard evaluation, arc-wall policy enforcement, and arc-siem event export -- all observable in a single integration test
+  1. A tool call arriving at chio-hosted-mcp flows through chio-kernel guard evaluation, chio-wall policy enforcement, and chio-siem event export -- all observable in a single integration test
   2. When any crate in the chain returns an error, the upstream crate fails closed -- the tool call is denied and no partial receipt is emitted
 **Plans**: 2/2 plans complete
 
@@ -265,16 +265,16 @@ workflow path.
 ### v2.67 Kernel Panic Hardening (Phases 277-280)
 
 **Milestone Goal:** Inventory the stale literal panic surface, keep
-`arc-kernel/src` free of literal `panic!` macros, and prove ARC's canonical
+`chio-kernel/src` free of literal `panic!` macros, and prove Chio's canonical
 JSON transport fails closed under malformed, truncated, and wrong-type input.
 
 ### Phase 277: Panic Audit and Classification
-**Goal**: Every literal `panic!` site in `arc-kernel/src` is inventoried and classified so the hardening work targets the real crash surface
+**Goal**: Every literal `panic!` site in `chio-kernel/src` is inventoried and classified so the hardening work targets the real crash surface
 **Depends on**: Nothing (parallel with v2.66, v2.68)
 **Requirements**: HARDEN-01
 **Success Criteria** (what must be TRUE):
   1. A published audit document lists all 22 literal `panic!` sites with file, baseline line, triggering condition, and classification (invariant-violation vs input-dependent)
-  2. Each site is tagged as `convert` or `harden`, and the audit records that all 22 sites are test-only invariants while production `arc-kernel` code has zero literal panic sites
+  2. Each site is tagged as `convert` or `harden`, and the audit records that all 22 sites are test-only invariants while production `chio-kernel` code has zero literal panic sites
 **Plans**: 1/1 plans complete
 
 ### Phase 278: Input-Dependent Panic Conversion
@@ -288,13 +288,13 @@ JSON transport fails closed under malformed, truncated, and wrong-type input.
 **Plans**: 1/1 plans complete
 
 ### Phase 279: Invariant Panic Hardening
-**Goal**: Remaining test-only invariant panic assertions are removed from `arc-kernel/src` so panic scans only flag real regressions
+**Goal**: Remaining test-only invariant panic assertions are removed from `chio-kernel/src` so panic scans only flag real regressions
 **Depends on**: Phase 278
 **Requirements**: HARDEN-04
 **Success Criteria** (what must be TRUE):
-  1. All remaining literal `panic!` macros in `crates/arc-kernel/src` are replaced with explicit non-`panic!` assertion style
+  1. All remaining literal `panic!` macros in `crates/chio-kernel/src` are replaced with explicit non-`panic!` assertion style
   2. Production kernel behavior is unchanged because the audited invariant sites were already test-only
-  3. `rg -n "panic!\\(" crates/arc-kernel/src` returns no matches
+  3. `rg -n "panic!\\(" crates/chio-kernel/src` returns no matches
 **Plans**: 1/1 plans complete
 
 ### Phase 280: Adversarial Input Tests
@@ -386,17 +386,17 @@ hosted-observation hold that has blocked external publication.
 
 ### v2.70 Developer Experience and Packaging (Phases 287-290)
 
-**Milestone Goal:** Package ARC for easy adoption with container images,
+**Milestone Goal:** Package Chio for easy adoption with container images,
 framework integration examples, and an updated quickstart so developers can
-go from zero to ARC-governed tool access in under 5 minutes.
+go from zero to Chio-governed tool access in under 5 minutes.
 
 ### Phase 287: Dockerfile and Container Images
-**Goal**: ARC ships as a minimal container image that developers can pull and run without building from source
+**Goal**: Chio ships as a minimal container image that developers can pull and run without building from source
 **Depends on**: Phase 286 (v2.69 complete)
 **Requirements**: DX-01, DX-02
 **Success Criteria** (what must be TRUE):
   1. A multi-stage Dockerfile produces a minimal Alpine-based image containing the arc CLI binary and nothing else unnecessary
-  2. A Docker Compose example file wraps an MCP server with ARC policy enforcement -- `docker compose up` starts both the MCP server and the ARC kernel with a working policy
+  2. A Docker Compose example file wraps an MCP server with Chio policy enforcement -- `docker compose up` starts both the MCP server and the Chio kernel with a working policy
 **Plans**: 1/1 plans complete
 
 ### Phase 288: Anthropic SDK Integration Example
@@ -409,29 +409,29 @@ go from zero to ARC-governed tool access in under 5 minutes.
 **Plans**: 1/1 plans complete
 
 ### Phase 289: LangChain/LlamaIndex Example
-**Goal**: Developers can see how to wrap an ARC-governed tool server as a LangChain tool
+**Goal**: Developers can see how to wrap an Chio-governed tool server as a LangChain tool
 **Depends on**: Phase 287
 **Requirements**: DX-04
 **Success Criteria** (what must be TRUE):
-  1. A working example in examples/ wraps an ARC-governed tool server as a LangChain tool with policy enforcement intact
+  1. A working example in examples/ wraps an Chio-governed tool server as a LangChain tool with policy enforcement intact
   2. The example includes a README explaining setup, prerequisites, and expected output
 **Plans**: 1/1 plans complete
 
 ### Phase 290: Quickstart Guide Refresh
-**Goal**: The project README provides a clear 5-minute path from zero to ARC-governed tool access using container or source builds
+**Goal**: The project README provides a clear 5-minute path from zero to Chio-governed tool access using container or source builds
 **Depends on**: Phase 288, Phase 289
 **Requirements**: DX-05
 **Success Criteria** (what must be TRUE):
   1. README contains a container quickstart section showing docker pull, docker run, and first policy-enforced tool call
   2. README contains a framework examples section pointing to the Anthropic SDK and LangChain examples
-  3. A developer following the README can go from zero to a working ARC-governed tool call in under 5 minutes
+  3. A developer following the README can go from zero to a working Chio-governed tool call in under 5 minutes
 **Plans**: 1/1 plans complete
 
 ---
 
 ### v2.71 Web3 Live Activation (Phases 291-294)
 
-**Milestone Goal:** Activate ARC's web3 settlement, Bitcoin OTS anchoring,
+**Milestone Goal:** Activate Chio's web3 settlement, Bitcoin OTS anchoring,
 and Solana memo publication on live testnets so the multi-chain proof story
 is exercised against real external infrastructure.
 **Status:** deferred locally on 2026-04-12 pending external Base Sepolia
@@ -439,11 +439,11 @@ credentials, reviewed live-chain rollout artifacts, and OpenTimestamps
 tooling.
 
 ### Phase 291: Web3 Settlement E2E on Testnet
-**Goal**: ARC smart contracts are deployed to a live testnet and the full capability-to-settlement flow runs with real test tokens
+**Goal**: Chio smart contracts are deployed to a live testnet and the full capability-to-settlement flow runs with real test tokens
 **Depends on**: Phase 290 (v2.70 complete)
 **Requirements**: WEB3-01, WEB3-02
 **Success Criteria** (what must be TRUE):
-  1. ARC contracts are deployed to Base Sepolia testnet with verified contract addresses recorded in configuration
+  1. Chio contracts are deployed to Base Sepolia testnet with verified contract addresses recorded in configuration
   2. An end-to-end flow runs: capability issuance -> tool call -> receipt signing -> on-chain settlement using test tokens, observable in a block explorer
 **Plans**: `01` complete -- live checker wiring, trusted signature verification, and receipt-facing capability correlation landed on 2026-04-14
 
@@ -452,7 +452,7 @@ tooling.
 **Depends on**: Phase 291
 **Requirements**: WEB3-03
 **Success Criteria** (what must be TRUE):
-  1. Integration tests produce an OTS receipt that aggregates multiple ARC receipt hashes into a single Bitcoin-anchored super-root
+  1. Integration tests produce an OTS receipt that aggregates multiple Chio receipt hashes into a single Bitcoin-anchored super-root
   2. The OTS proof can be independently verified using the OpenTimestamps toolchain
 **Plans**: `01` complete -- explicit kernel-backed A2A/ACP execution helpers and receipt metadata landed on 2026-04-14, and the remaining direct helpers are now explicitly narrowed to compatibility paths
 
@@ -461,9 +461,9 @@ tooling.
 **Depends on**: Phase 291
 **Requirements**: WEB3-04, WEB3-05
 **Success Criteria** (what must be TRUE):
-  1. The conformance harness publishes ARC receipt hashes as Solana memo instructions on devnet/testnet
+  1. The conformance harness publishes Chio receipt hashes as Solana memo instructions on devnet/testnet
   2. A cross-chain proof bundle containing EVM settlement proof, Bitcoin OTS proof, and Solana memo proof verifies successfully in a single test
-**Plans**: `01` in progress -- durable SQLite receipt persistence landed for proxy and `/arc/evaluate` flows on 2026-04-14; `arc-tower` body binding and Kubernetes validation remain
+**Plans**: `01` in progress -- durable SQLite receipt persistence landed for proxy and `/arc/evaluate` flows on 2026-04-14; `chio-tower` body binding and Kubernetes validation remain
 
 ### Phase 294: Multi-Chain Qualification Report
 **Goal**: A qualification report documents all three chains working and an operator runbook covers enabling and monitoring web3 settlement
@@ -483,7 +483,7 @@ Plans:
 
 **Milestone Goal:** Upgrade trust-control from single-node to Raft-replicated
 consensus, enable permissionless federation with anti-sybil controls, and
-automate identity lifecycle via SCIM so ARC can operate in multi-region
+automate identity lifecycle via SCIM so Chio can operate in multi-region
 production deployments.
 **Status:** complete locally 2026-04-13.
 
@@ -506,12 +506,12 @@ production deployments.
 **Plans**: [296-01-PLAN.md](./phases/296-permissionless-federation-policy/296-01-PLAN.md), [296-01-SUMMARY.md](./phases/296-permissionless-federation-policy/296-01-SUMMARY.md)
 
 ### Phase 297: SCIM Lifecycle Automation
-**Goal**: External identity providers can automatically provision and deprovision ARC identities via SCIM 2.0
+**Goal**: External identity providers can automatically provision and deprovision Chio identities via SCIM 2.0
 **Depends on**: Phase 295
 **Requirements**: DIST-05, DIST-06
 **Success Criteria** (what must be TRUE):
-  1. A SCIM 2.0 POST /Users request from an external IdP creates a corresponding ARC identity with correct attributes and entitlements
-  2. A SCIM 2.0 DELETE /Users request from an external IdP deactivates the corresponding ARC identity, revokes active capabilities, and emits a deprovisioning receipt
+  1. A SCIM 2.0 POST /Users request from an external IdP creates a corresponding Chio identity with correct attributes and entitlements
+  2. A SCIM 2.0 DELETE /Users request from an external IdP deactivates the corresponding Chio identity, revokes active capabilities, and emits a deprovisioning receipt
 **Plans**: [297-01-PLAN.md](./phases/297-scim-lifecycle-automation/297-01-PLAN.md), [297-01-SUMMARY.md](./phases/297-scim-lifecycle-automation/297-01-SUMMARY.md)
 
 ### Phase 298: Multi-Region Qualification
@@ -581,9 +581,9 @@ v2.66+v2.67+v2.68 (parallel) -> v2.69 -> v2.70 -> v2.71+v2.72+v2.73 (parallel)
 
 | Phase | Milestone | Title | Plans | Status |
 |------:|-----------|-------|-------|--------|
-| 273 | v2.66 | arc-hosted-mcp Unit Tests | 3/3 | Complete |
-| 274 | v2.66 | arc-wall Unit Tests | 3/3 | Complete |
-| 275 | v2.66 | arc-siem Unit Tests | 2/2 | Complete |
+| 273 | v2.66 | chio-hosted-mcp Unit Tests | 3/3 | Complete |
+| 274 | v2.66 | chio-wall Unit Tests | 3/3 | Complete |
+| 275 | v2.66 | chio-siem Unit Tests | 2/2 | Complete |
 | 276 | v2.66 | Cross-Crate Integration Tests | 2/2 | Complete |
 | 277 | v2.67 | Panic Audit and Classification | 1/1 | Complete |
 | 278 | v2.67 | Input-Dependent Panic Conversion | 1/1 | Complete |
@@ -621,14 +621,14 @@ still defer broader revenue operations automation, channel programs, and
 commercial platform breadth. If `v2.64` proves one bounded program-family
 package, the next honest step remains Mercury-specific: prove one named
 commercial handoff can consume that bounded family evidence without widening
-into a generic revenue operations system, channel program, or ARC commercial
+into a generic revenue operations system, channel program, or Chio commercial
 surface.
 
 **Milestone Goal:** Qualify one bounded Mercury portfolio-revenue-boundary
 lane over the existing program-family package so Mercury can prove one named
 commercial handoff can consume program-family evidence without widening into
 generic revenue operations systems, forecasting stacks, billing platforms,
-channel programs, merged shells, or ARC commercial surfaces.
+channel programs, merged shells, or Chio commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `269` through `272` are
 implemented, verified, audited, and archived locally.
@@ -680,7 +680,7 @@ widening into generic portfolio-management or revenue-platform work.
 existing third-program package so Mercury can prove one explicitly named small
 program family can be reviewed together without widening into generic
 portfolio-management tooling, revenue operations systems, forecasting stacks,
-billing platforms, channel programs, merged shells, or ARC commercial
+billing platforms, channel programs, merged shells, or Chio commercial
 surfaces.
 
 **Status:** complete locally 2026-04-04; phases `265` through `268` are
@@ -704,7 +704,7 @@ than generalized portfolio tooling.
 - Integer phases 265-268: completed `v2.64` Mercury program family
   qualification, shared review package, and portfolio claim discipline
 
-This completed ladder still keeps ARC generic and Mercury opinionated while
+This completed ladder still keeps Chio generic and Mercury opinionated while
 moving one step beyond an adjacent third program and stopping far short of
 generic portfolio management.
 
@@ -726,14 +726,14 @@ Mercury-specific: prove one evidence-backed multi-account program family can
 support one additional adjacent third-program reuse decision without widening
 into generic portfolio-management tooling, revenue operations systems,
 forecasting stacks, billing platforms, channel programs, merged shells, or
-ARC commercial surfaces.
+Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury third-program lane over the
 existing second-portfolio-program package so Mercury can prove one evidence-
 backed multi-account program family can support one additional adjacent
 program reuse decision without widening into generic portfolio-management
 tooling, revenue operations systems, forecasting stacks, billing platforms,
-channel programs, merged shells, or ARC commercial surfaces.
+channel programs, merged shells, or Chio commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `261` through `264` are
 implemented, verified, audited, and archived locally.
@@ -756,7 +756,7 @@ justify one bounded next step beyond a single adjacent second program.
 - Integer phases 261-264: completed `v2.63` Mercury third-program
   qualification, reuse repeatability, and multi-program boundary
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into one additional adjacent third program rather than
 generic portfolio management or revenue-platform work.
 
@@ -778,14 +778,14 @@ Mercury-specific: prove one evidence-backed multi-account program can support
 one adjacent second-portfolio-program reuse decision without widening into
 generic portfolio-management tooling, revenue operations systems,
 forecasting stacks, billing platforms, channel programs, merged shells, or
-ARC commercial surfaces.
+Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury second-portfolio-program
 lane over the existing portfolio-program package so Mercury can prove one
 evidence-backed multi-account program can support one adjacent program reuse
 decision without widening into generic portfolio-management tooling, revenue
 operations systems, forecasting stacks, billing platforms, channel programs,
-merged shells, or ARC commercial surfaces.
+merged shells, or Chio commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `257` through `260` are
 implemented, verified, audited, and archived locally.
@@ -809,7 +809,7 @@ beyond a single portfolio program.
 - Integer phases 257-260: completed `v2.62` Mercury second-portfolio-program
   qualification, reuse discipline, and revenue boundary
 
-This activated ladder keeps ARC generic and Mercury opinionated while
+This activated ladder keeps Chio generic and Mercury opinionated while
 pushing the next bounded step into one adjacent second portfolio program
 rather than generic portfolio management or revenue-platform work.
 
@@ -830,14 +830,14 @@ existing renewal-qualification package. The next honest step therefore
 remains Mercury-specific: prove one renewed workflow can support one bounded
 portfolio-program lane without widening into generic customer-success
 tooling, account-management platforms, revenue operations systems, channel
-marketplaces, merged shells, or ARC commercial surfaces.
+marketplaces, merged shells, or Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury portfolio-program lane over
 the existing second-account-expansion package so Mercury can prove one
 renewed workflow can support one explicitly governed multi-account program
 without widening into generic customer-success tooling, account-management
 platforms, revenue operations systems, channel marketplaces, merged shells,
-or ARC commercial surfaces.
+or Chio commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `253` through `256` are
 implemented, verified, audited, and archived locally.
@@ -860,7 +860,7 @@ justify one bounded next step beyond single follow-on account expansion.
 - Integer phases 253-256: completed `v2.61` Mercury portfolio-program
   qualification, multi-account boundary, and revenue operations guardrails
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into one explicitly governed portfolio program rather
 than generic account-management or revenue-operations platform work.
 
@@ -881,13 +881,13 @@ existing delivery-continuity package. The next honest step therefore remains
 Mercury-specific: prove one renewed account can support one bounded second-
 account expansion and portfolio-review lane without widening into generic
 customer-success tooling, account-management platforms, multi-account renewal
-programs, channel marketplaces, merged shells, or ARC commercial surfaces.
+programs, channel marketplaces, merged shells, or Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury second-account expansion lane
 over the existing renewal-qualification package so Mercury can prove one
 renewed account can support one adjacent account expansion decision without
 widening into generic customer-success tooling, account-management platforms,
-multi-account renewal programs, channel marketplaces, merged shells, or ARC
+multi-account renewal programs, channel marketplaces, merged shells, or Chio
 commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `249` through `252` are
@@ -896,7 +896,7 @@ implemented, verified, audited, and archived locally.
 **Why this now exists:** the Mercury GTM and `v2.59` closeout docs now
 justify one bounded post-renewal expansion motion, but they do not justify a
 generic customer-success suite, account-management platform, multi-account
-renewal program, channel marketplace, or ARC-side commercial substrate.
+renewal program, channel marketplace, or Chio-side commercial substrate.
 
 **Research and decision basis:**
 - `docs/mercury/GO_TO_MARKET.md`
@@ -911,7 +911,7 @@ renewal program, channel marketplace, or ARC-side commercial substrate.
 - Integer phases 249-252: completed `v2.60` Mercury second-account
   expansion qualification, portfolio boundary, and reuse governance
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into one explicitly scoped second-account expansion
 motion rather than generic customer-platform work.
 
@@ -932,13 +932,13 @@ selective-account-activation package. The next honest step therefore remains
 Mercury-specific: prove one activated account can cross one bounded renewal
 decision and outcome-review lane without widening into generic customer-
 success tooling, CRM workflows, account-management platforms, channel
-marketplaces, merged shells, or ARC commercial surfaces.
+marketplaces, merged shells, or Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury renewal lane over the existing
 delivery-continuity package so Mercury can prove one activated account can
 cross one evidence-backed renewal decision boundary without widening into
 generic customer-success tooling, CRM workflows, account-management
-platforms, channel marketplaces, merged shells, or ARC commercial surfaces.
+platforms, channel marketplaces, merged shells, or Chio commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `245` through `248` are
 implemented, verified, audited, and archived locally.
@@ -946,7 +946,7 @@ implemented, verified, audited, and archived locally.
 **Why this now exists:** the Mercury GTM docs and `v2.58` closeout now
 justify one bounded post-continuity renewal motion, but they do not justify a
 generic customer-success suite, CRM workflow, account-management platform,
-channel marketplace, or ARC-side commercial substrate.
+channel marketplace, or Chio-side commercial substrate.
 
 **Research and decision basis:**
 - `docs/mercury/GO_TO_MARKET.md`
@@ -961,7 +961,7 @@ channel marketplace, or ARC-side commercial substrate.
 - Integer phases 245-248: completed `v2.59` Mercury renewal qualification,
   outcome review, and expansion boundary
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into renewal qualification rather than generic customer-
 platform work.
 
@@ -981,13 +981,13 @@ existing broader-distribution package. The next honest step therefore remains
 Mercury-specific: prove one activated account can remain in one controlled-
 delivery continuity lane with bounded outcome evidence and one renewal gate,
 without widening into generic onboarding tooling, CRM workflows, support
-desks, channel marketplaces, merged shells, or ARC commercial surfaces.
+desks, channel marketplaces, merged shells, or Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury controlled-delivery
 continuity lane over the existing selective-account-activation package so
 Mercury can prove one activated account remains evidence-backed, renewal-
 gated, and supportable without widening into generic onboarding tooling, CRM
-workflows, support desks, channel marketplaces, merged shells, or ARC
+workflows, support desks, channel marketplaces, merged shells, or Chio
 commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `241` through `244` are
@@ -996,7 +996,7 @@ implemented, verified, audited, and archived locally.
 **Why this now exists:** the Mercury GTM docs and `v2.57` closeout now justify
 one bounded post-activation continuity and renewal-readiness motion, but they
 do not justify a generic onboarding suite, CRM workflow, support platform,
-channel marketplace, or ARC-side commercial substrate.
+channel marketplace, or Chio-side commercial substrate.
 
 **Research and decision basis:**
 - `docs/mercury/GO_TO_MARKET.md`
@@ -1011,7 +1011,7 @@ channel marketplace, or ARC-side commercial substrate.
 - Integer phases 241-244: completed `v2.58` Mercury controlled-delivery
   continuity, outcome evidence, and renewal gate
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into controlled-delivery continuity rather than generic
 onboarding or customer-platform work.
 
@@ -1031,14 +1031,14 @@ onboarding or customer-platform work.
 existing reference-distribution package. The next honest step therefore
 remains Mercury-specific: move one governed qualified account into one
 selective-account activation motion without widening into generic onboarding
-tooling, CRM workflows, channel marketplaces, merged shells, or ARC
+tooling, CRM workflows, channel marketplaces, merged shells, or Chio
 commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury selective-account activation
 lane over the existing broader-distribution package so Mercury can move one
 governed qualified account into controlled delivery without widening into
 generic onboarding tooling, CRM workflows, channel marketplaces, merged
-shells, or ARC commercial surfaces.
+shells, or Chio commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `237` through `240` are
 implemented, verified, audited, and archived locally.
@@ -1046,7 +1046,7 @@ implemented, verified, audited, and archived locally.
 **Why this now exists:** the Mercury GTM docs and `v2.56` closeout now
 justify one bounded post-qualification activation motion, but they do not
 justify a generic onboarding suite, CRM workflow, channel marketplace, or
-ARC-side commercial substrate.
+Chio-side commercial substrate.
 
 **Research and decision basis:**
 - `docs/mercury/GO_TO_MARKET.md`
@@ -1061,7 +1061,7 @@ ARC-side commercial substrate.
 - Integer phases 237-240: completed `v2.57` Mercury selective account
   activation, controlled delivery, and claim containment
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into selective-account activation rather than generic
 commercial tooling.
 
@@ -1081,12 +1081,12 @@ commercial tooling.
 existing controlled-adoption package. The next honest step therefore remains
 Mercury-specific: use one approved reference-backed bundle to support one
 selective broader-distribution readiness motion without widening into generic
-sales tooling, CRM workflows, merged shells, or ARC commercial surfaces.
+sales tooling, CRM workflows, merged shells, or Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury broader-distribution lane over
 the existing reference-distribution package so Mercury can use one approved
 reference-backed bundle to support selective account qualification without
-widening into generic sales tooling, CRM workflows, merged shells, or ARC
+widening into generic sales tooling, CRM workflows, merged shells, or Chio
 commercial surfaces.
 
 **Status:** complete locally 2026-04-04; phases `233` through `236` are
@@ -1094,7 +1094,7 @@ implemented, verified, audited, and archived locally.
 
 **Why this now exists:** the Mercury GTM docs and `v2.55` closeout now
 justify one bounded broader-distribution readiness motion, but they do not
-justify a generic sales platform, CRM workflow, merged shell, or ARC-side
+justify a generic sales platform, CRM workflow, merged shell, or Chio-side
 commercial substrate.
 
 **Research and decision basis:**
@@ -1110,7 +1110,7 @@ commercial substrate.
 - Integer phases 233-236: completed `v2.56` Mercury broader distribution
   readiness, selective account qualification, and claim governance
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into broader-distribution readiness rather than generic
 commercial tooling.
 
@@ -1130,12 +1130,12 @@ commercial tooling.
 release-readiness package. The next honest step therefore remains Mercury-
 specific: turn one referenceable win into one explicit landed-account
 expansion motion without widening into generic sales tooling, merged shells,
-or ARC commercial surfaces.
+or Chio commercial surfaces.
 
 **Milestone Goal:** Qualify one bounded Mercury reference-distribution and
 landed-account expansion lane over the existing controlled-adoption package so
 Mercury can turn one referenceable win into a repeatable expansion motion
-without widening into generic sales tooling, merged shells, or ARC generic
+without widening into generic sales tooling, merged shells, or Chio generic
 commercial surfaces.
 
 **Status:** complete locally 2026-04-03; phases `229` through `232` are
@@ -1143,7 +1143,7 @@ implemented, verified, audited, and archived locally.
 
 **Why this now exists:** the Mercury docs and `v2.54` closeout now justify one
 bounded post-adoption expansion motion, but they do not justify a generic
-sales platform, merged shell, or ARC-side commercial substrate.
+sales platform, merged shell, or Chio-side commercial substrate.
 
 **Research and decision basis:**
 - `docs/mercury/GO_TO_MARKET.md`
@@ -1158,7 +1158,7 @@ sales platform, merged shell, or ARC-side commercial substrate.
 - Integer phases 229-232: completed `v2.55` Mercury reference distribution,
   landed-account expansion, and claim discipline
 
-This completed ladder keeps ARC generic and Mercury opinionated while pushing
+This completed ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into reference-backed account expansion rather than
 generic commercial tooling.
 
@@ -1178,12 +1178,12 @@ generic commercial tooling.
 proof, inquiry, assurance, and trust-network stack. The next honest step is
 therefore still Mercury-specific: qualify one post-launch adoption lane for
 renewal and reference evidence instead of widening Mercury into new delivery
-surfaces, merged shells, or ARC generic release tooling.
+surfaces, merged shells, or Chio generic release tooling.
 
 **Milestone Goal:** Qualify one bounded post-launch Mercury adoption lane over
 the existing release-readiness package so Mercury can prove renewal and
 reference readiness without widening into new product lines, merged shells, or
-ARC generic release surfaces.
+Chio generic release surfaces.
 
 **Status:** complete locally 2026-04-03; phases `225` through `228` are
 implemented, verified, audited, and archived locally.
@@ -1206,7 +1206,7 @@ buyer-reference readiness.
 - Integer phases 225-228: completed `v2.54` Mercury controlled adoption,
   renewal evidence, and reference readiness
 
-This activated ladder keeps ARC generic and Mercury opinionated while pushing
+This activated ladder keeps Chio generic and Mercury opinionated while pushing
 the next bounded step into post-launch adoption evidence rather than new
 delivery or product surfaces.
 
@@ -1222,22 +1222,22 @@ delivery or product surfaces.
 
 ### v2.53 MERCURY Release Readiness, Partner Delivery, and Controlled Adoption
 
-`v2.52` restored ARC purity by removing ARC-side Mercury and ARC-Wall coupling
-from generic ARC crates. The next honest step is therefore Mercury-specific
+`v2.52` restored Chio purity by removing Chio-side Mercury and Chio-Wall coupling
+from generic Chio crates. The next honest step is therefore Mercury-specific
 again: package Mercury's existing dedicated app surface into one bounded
-release-readiness program without pushing product logic back into ARC.
+release-readiness program without pushing product logic back into Chio.
 
 **Milestone Goal:** Package Mercury's dedicated app surface into one bounded
 release-readiness lane over the existing pilot, supervised-live, downstream,
 governance, assurance, embedded-OEM, and trust-network artifacts without
-pulling product logic back into ARC or widening into a new product line.
+pulling product logic back into Chio or widening into a new product line.
 
 **Status:** completed locally 2026-04-03; phases `221` through `224` are
 implemented and verified locally.
 
-**Why this now exists:** the ARC substrate boundary is corrected again, so the
+**Why this now exists:** the Chio substrate boundary is corrected again, so the
 next repo-native work must happen on Mercury's own app surface rather than in
-generic ARC crates.
+generic Chio crates.
 
 **Research and decision basis:**
 - `docs/mercury/GO_TO_MARKET.md`
@@ -1247,12 +1247,12 @@ generic ARC crates.
 - `.planning/v2.52-MILESTONE-AUDIT.md`
 
 **Phase Numbering:**
-- Integer phases 217-220: completed `v2.52` ARC purity restoration, boundary
+- Integer phases 217-220: completed `v2.52` Chio purity restoration, boundary
   cleanup, and qualification
 - Integer phases 221-224: completed `v2.53` Mercury release readiness,
   partner delivery, and controlled adoption
 
-This completed ladder keeps ARC generic and Mercury opinionated while turning
+This completed ladder keeps Chio generic and Mercury opinionated while turning
 Mercury's existing product lanes into one bounded release-ready package.
 
 **Completed phases:**
@@ -1264,83 +1264,83 @@ Mercury's existing product lanes into one bounded release-ready package.
 - Phase `224` complete: Mercury release-readiness validation, launch decision,
   and expansion boundary.
 
-### v2.52 MERCURY Extensions ARC Purity Restoration, Boundary Cleanup, and Qualification
+### v2.52 MERCURY Extensions Chio Purity Restoration, Boundary Cleanup, and Qualification
 
-`v2.51` froze a shared-service and governance posture, but the ARC-side
+`v2.51` froze a shared-service and governance posture, but the Chio-side
 `product-surface` direction that followed violated the repo's core boundary:
-ARC must stay generic and Mercury must stay product-specific. `v2.52` exists
+Chio must stay generic and Mercury must stay product-specific. `v2.52` exists
 to correct that direction before any further Mercury work proceeds.
 
-**Milestone Goal:** Restore ARC's generic substrate boundary by removing
-product-specific Mercury and ARC-Wall logic from ARC control-plane, CLI,
+**Milestone Goal:** Restore Chio's generic substrate boundary by removing
+product-specific Mercury and Chio-Wall logic from Chio control-plane, CLI,
 query, and store surfaces, then validate the resulting purity pass with
 low-memory regression checks.
 
 **Status:** complete locally 2026-04-03; phases `217` through `220` are
 implemented, verified, and audited.
 
-**Why this now exists:** the user explicitly required ARC purity, and the repo
-still contained ARC-side Mercury/ARC-Wall coupling after `v2.51`.
+**Why this now exists:** the user explicitly required Chio purity, and the repo
+still contained Chio-side Mercury/Chio-Wall coupling after `v2.51`.
 
 **Research and decision basis:**
-- the ARC purity correction from 2026-04-03 user direction
-- `crates/arc-control-plane/src/product_surface.rs` prior to removal
-- `crates/arc-kernel/src/receipt_query.rs`
-- `crates/arc-cli/src/main.rs`
-- `crates/arc-cli/src/trust_control.rs`
-- `crates/arc-store-sqlite/src/receipt_store.rs`
+- the Chio purity correction from 2026-04-03 user direction
+- `crates/chio-control-plane/src/product_surface.rs` prior to removal
+- `crates/chio-kernel/src/receipt_query.rs`
+- `crates/chio-cli/src/main.rs`
+- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-store-sqlite/src/receipt_store.rs`
 
 **Phase Numbering:**
 - Integer phases 213-216: completed `v2.51` multi-product service
   boundaries, cross-product governance, and platform hardening definition
-- Integer phases 217-220: completed `v2.52` ARC purity restoration, boundary
+- Integer phases 217-220: completed `v2.52` Chio purity restoration, boundary
   cleanup, and qualification
 
-This completed ladder removes ARC-side product coupling and restores the
+This completed ladder removes Chio-side product coupling and restores the
 principle that Mercury-specific retrieval and packaging work belongs on
 Mercury's own app surface.
 
 **Completed phases:**
-- Phase `217` complete: ARC substrate purity boundary correction.
+- Phase `217` complete: Chio substrate purity boundary correction.
 - Phase `218` complete: generic receipt query surface cleanup.
 - Phase `219` complete: SQLite receipt store decoupling from Mercury.
-- Phase `220` complete: ARC purity validation and milestone closeout.
+- Phase `220` complete: Chio purity validation and milestone closeout.
 
 ### v2.51 MERCURY Extensions Shared Service Boundaries, Cross-Product Governance, and Platform Hardening
 
-`v2.50` validated one bounded ARC-Wall companion-product lane on ARC. The
+`v2.50` validated one bounded Chio-Wall companion-product lane on Chio. The
 next repo-native step from the Mercury expansion ladder is `E-026`, which
 hardens shared service boundaries and operating governance across the now-
 validated product set before any additional buyer or product expansion begins.
 
 **Milestone Goal:** Define the shared-service, release-governance, and trust-
-material boundaries across the validated MERCURY and ARC-Wall products on
-ARC, then publish one bounded platform-hardening backlog for sustained multi-
-product operation without collapsing the products together or widening ARC's
+material boundaries across the validated MERCURY and Chio-Wall products on
+Chio, then publish one bounded platform-hardening backlog for sustained multi-
+product operation without collapsing the products together or widening Chio's
 generic substrate.
 
 **Status:** complete locally 2026-04-03; phases `213` through `216` are
 implemented, verified, audited, and archived.
 
-**Why this now exists:** ARC-Wall is now validated, and the repo's own
+**Why this now exists:** Chio-Wall is now validated, and the repo's own
 dependency graph in `E-026` places multi-product platform hardening after
-ARC-Wall rather than before it.
+Chio-Wall rather than before it.
 
 **Research and decision basis:**
 - `docs/mercury/epics/MASTER_PROJECT.md`
 - `docs/mercury/epics/PHASE_4_5_TICKETS.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/GO_TO_MARKET.md`
-- `docs/arc-wall/README.md`
+- `docs/chio-wall/README.md`
 - `.planning/v2.50-MILESTONE-AUDIT.md`
 
 **Phase Numbering:**
-- Integer phases 209-212: completed `v2.50` ARC-Wall companion-product core,
+- Integer phases 209-212: completed `v2.50` Chio-Wall companion-product core,
   guard evidence, and buyer motion
 - Integer phases 213-216: completed `v2.51` multi-product service
   boundaries, cross-product governance, and platform hardening
 
-This activated ladder keeps ARC generic, MERCURY opinionated, and ARC-Wall
+This activated ladder keeps Chio generic, MERCURY opinionated, and Chio-Wall
 separate while making the shared-service, release-governance, and hardening
 seams explicit before any further product spread.
 
@@ -1354,28 +1354,28 @@ seams explicit before any further product spread.
 - Phase `216` complete: multi-product validation, operating decision, and
   next-step boundary.
 
-### v2.50 ARC-Wall Companion Product Core, Guard Evidence, and Buyer Motion
+### v2.50 Chio-Wall Companion Product Core, Guard Evidence, and Buyer Motion
 
 `v2.49` validated one bounded trust-network lane over the same Mercury proof
-chain. The next repo-native Phase 5 step is ARC-Wall, but it stays a
-companion product on ARC rather than another Mercury lane or an immediate
+chain. The next repo-native Phase 5 step is Chio-Wall, but it stays a
+companion product on Chio rather than another Mercury lane or an immediate
 multi-product hardening program.
 
-**Milestone Goal:** Deliver one bounded ARC-Wall companion-product lane on
-ARC, reusing the same checkpoint, publication, and verification substrate
+**Milestone Goal:** Deliver one bounded Chio-Wall companion-product lane on
+Chio, reusing the same checkpoint, publication, and verification substrate
 while freezing one buyer motion, one information-domain evidence contract, and
-one control-path guard surface without turning MERCURY into ARC-Wall or
+one control-path guard surface without turning MERCURY into Chio-Wall or
 widening immediately into multi-product hardening.
 
 **Status:** complete locally 2026-04-03; phases `209` through `212` are
 implemented, verified, audited, and archived.
 
 **Why this now exists:** the trust-network lane is now validated, and the
-repo's own Phase 5 dependency graph still puts ARC-Wall after Trust Network
+repo's own Phase 5 dependency graph still puts Chio-Wall after Trust Network
 and before multi-product platform hardening.
 
 **Research and decision basis:**
-- `docs/mercury/ARC_WALL_BRIEF.md`
+- `docs/mercury/CHIO_WALL_BRIEF.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
@@ -1386,34 +1386,34 @@ and before multi-product platform hardening.
 **Phase Numbering:**
 - Integer phases 205-208: completed `v2.49` trust network witness,
   publication, and proof-profile interoperability
-- Integer phases 209-212: completed `v2.50` ARC-Wall companion-product core,
+- Integer phases 209-212: completed `v2.50` Chio-Wall companion-product core,
   guard evidence, and buyer motion
 
-This completed ladder keeps ARC-Wall as a companion product on ARC and
+This completed ladder keeps Chio-Wall as a companion product on Chio and
 explicitly defers multi-product hardening, generic barrier-platform breadth,
-and any attempt to collapse ARC-Wall back into MERCURY.
+and any attempt to collapse Chio-Wall back into MERCURY.
 
 **Completed phases:**
-- Phase `209` complete: ARC-Wall scope lock and buyer boundary freeze.
-- Phase `210` complete: information-domain evidence schema and ARC-Wall
+- Phase `209` complete: Chio-Wall scope lock and buyer boundary freeze.
+- Phase `210` complete: information-domain evidence schema and Chio-Wall
   contract.
 - Phase `211` complete: control-path guard surface and companion-product
   packaging path.
-- Phase `212` complete: ARC-Wall validation, buyer packaging, and expansion
+- Phase `212` complete: Chio-Wall validation, buyer packaging, and expansion
   decision.
 
 ### v2.49 MERCURY Trust Network Witness, Publication, and Proof-Profile Interoperability
 
 `v2.48` validated one bounded embedded OEM distribution path over the same
 Mercury proof chain. The next Mercury ladder keeps Phase 5 bounded by moving
-into one trust-network lane before any ARC-Wall or multi-product hardening
+into one trust-network lane before any Chio-Wall or multi-product hardening
 program begins.
 
 **Milestone Goal:** Deliver one bounded trust-network lane over the existing
 MERCURY proof, inquiry, publication, supervised-live, downstream, governance,
 assurance, and embedded-OEM artifacts, covering one shared trust-anchor and
 witness continuity contract, one proof-profile interoperability surface, and
-one explicit rollout boundary without widening into ARC-Wall, multi-network
+one explicit rollout boundary without widening into Chio-Wall, multi-network
 trust services, or generic ecosystem infrastructure.
 
 **Status:** complete locally 2026-04-03; phases `205` through `208` are
@@ -1421,7 +1421,7 @@ implemented, verified, audited, and archived.
 
 **Why this now exists:** the embedded OEM lane is now validated, and the
 repo's own Phase 5 dependency graph still puts Trust Network after Embedded
-OEM and before ARC-Wall.
+OEM and before Chio-Wall.
 
 **Research and decision basis:**
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
@@ -1440,7 +1440,7 @@ OEM and before ARC-Wall.
   publication, and proof-profile interoperability
 
 This completed ladder keeps MERCURY on one trust-network path and explicitly
-defers ARC-Wall, multi-product hardening, multi-network trust services, and
+defers Chio-Wall, multi-product hardening, multi-network trust services, and
 generic ecosystem infrastructure work.
 
 **Completed phases:**
@@ -1456,7 +1456,7 @@ generic ecosystem infrastructure work.
 
 `v2.47` validated one bounded assurance-suite lane over the same Mercury proof
 chain. The next Mercury ladder keeps expansion bounded in Phase 5 by moving
-into one embedded OEM distribution path before any trust-network or ARC-Wall
+into one embedded OEM distribution path before any trust-network or Chio-Wall
 program begins.
 
 **Milestone Goal:** Deliver one bounded embedded OEM distribution lane over the
@@ -1471,7 +1471,7 @@ implemented, verified, audited, and archived.
 **Why this now exists:** the downstream and assurance lanes that feed embedded
 distribution are now both validated, and the repo's own Phase 5 dependency
 graph still puts Embedded OEM Distribution ahead of trust-network and
-ARC-Wall work.
+Chio-Wall work.
 
 **Research and decision basis:**
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
@@ -1489,7 +1489,7 @@ ARC-Wall work.
   partner packaging, and bounded SDK surface
 
 This completed ladder keeps MERCURY on one embedded OEM path and explicitly
-defers multi-partner OEM breadth, trust-network services, ARC-Wall, and
+defers multi-partner OEM breadth, trust-network services, Chio-Wall, and
 generic SDK platform work.
 
 **Completed phases:**
@@ -1663,7 +1663,7 @@ without broadening into generic connector or expansion work.
 
 **Milestone Goal:** Move the same controlled release, rollback, and inquiry
 workflow from replay/shadow into supervised-live operation while existing
-customer execution systems remain primary and ARC stays the generic substrate.
+customer execution systems remain primary and Chio stays the generic substrate.
 
 **Status:** complete locally 2026-04-02; phases `185` through `188` are
 implemented, verified, audited, and archived.
@@ -1695,7 +1695,7 @@ expansion until the post-pilot bridge closes cleanly.
   model, and proceed/defer/stop decision artifact are now frozen across the
   canonical Mercury docs.
 - Phase `186` complete: MERCURY now accepts typed live or mirrored captures for
-  the same workflow and exports them through the existing ARC evidence and
+  the same workflow and exports them through the existing Chio evidence and
   proof-package path.
 - Phase `187` complete: supervised-live capture now carries explicit control
   state, export fails closed when coverage is degraded or unsafe, and the
@@ -1712,7 +1712,7 @@ partner-facing end-to-end web3 qualification gaps. `v2.42` closes the next
 truth-and-sustainability gap across release docs, protocol naming, planning
 tooling, assurance artifacts, and runtime ownership boundaries.
 
-**Milestone Goal:** Make ARC's release governance, authoritative docs,
+**Milestone Goal:** Make Chio's release governance, authoritative docs,
 planning tooling, and late-phase assurance artifacts as trustworthy as the
 runtime stack they describe.
 
@@ -1731,9 +1731,9 @@ drift must now become executable work rather than residual commentary.
 - `docs/release/PARTNER_PROOF.md`
 - `docs/release/GA_CHECKLIST.md`
 - `spec/PROTOCOL.md`
-- `crates/arc-cli/src/trust_control.rs`
-- `crates/arc-mcp-edge/src/runtime.rs`
-- `crates/arc-kernel/src/lib.rs`
+- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-mcp-edge/src/runtime.rs`
+- `crates/chio-kernel/src/lib.rs`
 
 **Phase Numbering:**
 - Integer phases 169-172: completed `v2.40` runtime integrity, evidence
@@ -1746,31 +1746,31 @@ drift must now become executable work rather than residual commentary.
   foundation
 
 This appended post-`v2.39` ladder now focuses on release truth and
-sustainability rather than widening ARC's public boundary again.
+sustainability rather than widening Chio's public boundary again.
 
 ### v2.43 MERCURY Evidence Productization Foundation
 
-`v2.42` closes ARC's release-truth and planning-integrity drift. The next
-ladder packages ARC's signed-evidence substrate into MERCURY, the first
-finance-specific product layer built on ARC.
+`v2.42` closes Chio's release-truth and planning-integrity drift. The next
+ladder packages Chio's signed-evidence substrate into MERCURY, the first
+finance-specific product layer built on Chio.
 
-**Milestone Goal:** Turn ARC's receipt/checkpoint/export substrate into a
+**Milestone Goal:** Turn Chio's receipt/checkpoint/export substrate into a
 design-partner-ready MERCURY evidence platform for governed AI trading
 workflows, starting with controlled release, rollback, and inquiry handling.
 
 **Status:** complete locally 2026-04-02; phases `181` through `184` are
 implemented, verified, and audited.
 
-**Why this now exists:** ARC's technical moat is already in the repo, but the
+**Why this now exists:** Chio's technical moat is already in the repo, but the
 commercially coherent MERCURY wedge still needs executable planning that maps
-product claims onto the real ARC modules, proof contracts, and pilot surfaces.
+product claims onto the real Chio modules, proof contracts, and pilot surfaces.
 
 **Research and decision basis:**
 - `docs/mercury/PRODUCT_BRIEF.md`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/PHASE_0_1_BUILD_CHECKLIST.md`
-- `docs/mercury/ARC_MODULE_MAPPING.md`
+- `docs/mercury/CHIO_MODULE_MAPPING.md`
 - `docs/STRATEGIC_ROADMAP.md`
 
 **Phase Numbering:**
@@ -1779,7 +1779,7 @@ product claims onto the real ARC modules, proof contracts, and pilot surfaces.
 - Integer phases 181-184: completed `v2.43` MERCURY evidence productization
   foundation
 
-This completed ladder keeps ARC broad as the platform thesis while making
+This completed ladder keeps Chio broad as the platform thesis while making
 MERCURY the first finance-specific implementation lane.
 
 ## Latest Completed Milestone
@@ -1827,7 +1827,7 @@ decision artifact.
 
 **Milestone Goal:** Move the same controlled release, rollback, and inquiry
 workflow from replay/shadow into supervised-live operation while existing
-customer execution systems remain primary and ARC stays the generic substrate.
+customer execution systems remain primary and Chio stays the generic substrate.
 
 **Status:** complete locally 2026-04-02; phases `185` through `188` are
 implemented, verified, audited, and archived.
@@ -1854,7 +1854,7 @@ implemented, verified, audited, and archived.
 the sustainability pass so release truth, protocol truth, planning truth, and
 runtime ownership all line up with the shipped code.
 
-**Milestone Goal:** Make ARC's release governance, authoritative docs,
+**Milestone Goal:** Make Chio's release governance, authoritative docs,
 planning tooling, and late-phase assurance artifacts as trustworthy as the
 runtime stack they describe.
 
@@ -1866,9 +1866,9 @@ implemented, verified, and audited.
 - `docs/release/RELEASE_AUDIT.md`
 - `docs/release/QUALIFICATION.md`
 - `spec/PROTOCOL.md`
-- `crates/arc-cli/src/trust_control.rs`
-- `crates/arc-mcp-edge/src/runtime.rs`
-- `crates/arc-kernel/src/lib.rs`
+- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-mcp-edge/src/runtime.rs`
+- `crates/chio-kernel/src/lib.rs`
 
 **Phase Numbering:**
 - Integer phases 173-176: completed `v2.41` hosted qualification, deployment
@@ -1886,23 +1886,23 @@ stack. The next gap was no longer local correctness; it was hosted proof,
 promotion discipline, operator-exercisable control, and partner-reviewable
 end-to-end qualification.
 
-**Milestone Goal:** Turn ARC's bounded web3-runtime stack from a locally
+**Milestone Goal:** Turn Chio's bounded web3-runtime stack from a locally
 qualified surface into one with hosted proof, reproducible promotion, and
 exercised operator controls.
 
 **Status:** complete locally 2026-04-02; phases `173` through `176` are
 implemented, verified, and audited.
 
-**Why this now exists:** ARC's own release docs still held external
+**Why this now exists:** Chio's own release docs still held external
 publication on hosted qualification, deployment-runner availability, generated
 monitoring artifacts, and operator-real control exercises. Those gates now
 exist as completed executable work rather than residual commentary.
 
 **Research basis:**
 - `.planning/v2.41-MILESTONE-AUDIT.md`
-- `docs/release/ARC_WEB3_READINESS_AUDIT.md`
-- `docs/release/ARC_WEB3_DEPLOYMENT_PROMOTION.md`
-- `docs/standards/ARC_WEB3_DEPLOYMENT_POLICY.json`
+- `docs/release/CHIO_WEB3_READINESS_AUDIT.md`
+- `docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md`
+- `docs/standards/CHIO_WEB3_DEPLOYMENT_POLICY.json`
 - `docs/release/RELEASE_CANDIDATE.md`
 - `.github/workflows/release-qualification.yml`
 - `scripts/qualify-release.sh`
@@ -1942,11 +1942,11 @@ promotion and longer-term sustainability work.
   and maximal-endgame qualification (completed locally 2026-03-31)
 - `v2.34` phases `145` through `148`: completed official web3 runtime
   contracts and deployment harness (completed locally 2026-04-01)
-- `v2.35` phases `149` through `152`: completed `arc-link` oracle runtime and
+- `v2.35` phases `149` through `152`: completed `chio-link` oracle runtime and
   cross-currency budget enforcement (completed locally 2026-04-01)
-- `v2.36` phases `153` through `156`: completed `arc-anchor` multi-chain
+- `v2.36` phases `153` through `156`: completed `chio-anchor` multi-chain
   anchoring and proof verification (completed locally 2026-04-01)
-- `v2.37` phases `157` through `160`: completed `arc-settle` on-chain
+- `v2.37` phases `157` through `160`: completed `chio-settle` on-chain
   settlement, escrow, and bond runtime (completed locally 2026-04-01)
 - `v2.38` phases `161` through `164`: completed web3 automation, cross-chain
   transport, and agent payment interop (completed locally 2026-04-02)
@@ -1969,37 +1969,37 @@ on disk.
 
 **Status:** complete locally 2026-03-31.
 
-**Goal:** Freeze ARC's extension model so the project can ship one official ARC
+**Goal:** Freeze Chio's extension model so the project can ship one official Chio
 stack while allowing custom implementations at named extension points under
-ARC-owned contracts.
+Chio-owned contracts.
 
 **Why this exists:** The codebase already has adapter traits, stores, and
 registry-style seams, but the trust boundary does not yet define which
 surfaces are replaceable, which are canonical, how extensions negotiate
-versions, or how third-party implementations qualify without redefining ARC
+versions, or how third-party implementations qualify without redefining Chio
 truth.
 
 **Research basis:**
-- `docs/research/DEEP_RESEARCH_1.md` on ARC as a portable trust and economic
+- `docs/research/DEEP_RESEARCH_1.md` on Chio as a portable trust and economic
   control plane whose enforcement or ecosystem adapters can vary without
   mutating canonical proof semantics
 - `.planning/research/POST_V2_28_MAXIMAL_ENDGAME_ROADMAP.md` on the
   post-`v2.28` maximal-endgame ladder that now needs a formal extension
   substrate before web3 execution hardens
-- current adapter and registry seams in `crates/arc-control-plane`,
-  `crates/arc-kernel`, and `crates/arc-cli`
+- current adapter and registry seams in `crates/chio-control-plane`,
+  `crates/chio-kernel`, and `crates/chio-cli`
 
 **Planned scope:**
 - extension-point inventory and stability classification
 - plugin/extension manifest, version negotiation, and compatibility contracts
-- official ARC stack packaging over canonical first-party implementations
+- official Chio stack packaging over canonical first-party implementations
 - qualification rules proving extensions cannot silently widen trust or mutate
   signed truth
 
 ### v2.30 Web3 Settlement Rail Dispatch and External Capital Execution
 
 **Goal:** Build the first real rail stack on top of the official extension
-substrate, converting ARC from custody-neutral execution intent into real
+substrate, converting Chio from custody-neutral execution intent into real
 external rail dispatch for capital, reserve, payout, and settlement flows.
 
 **Why this exists:** The current shipped boundary still stops at signed
@@ -2009,14 +2009,14 @@ automatic external capital dispatch.
 **Research basis:**
 - `docs/research/DEEP_RESEARCH_1.md` on authorization-to-spend,
   settlement-truth, and governed economic execution
-- `docs/research/ARC_WEB3_TRUST_BOUNDARY_DECISIONS.md`
-- `docs/research/ARC_WEB3_CONTRACT_ARCHITECTURE.md`
-- `docs/research/ARC_SETTLE_RESEARCH.md`
-- `docs/research/ARC_SETTLE_PROTOCOL_DECISIONS.md`
-- `docs/research/ARC_ANCHOR_RESEARCH.md`
-- `docs/research/ARC_LINK_RESEARCH.md`
-- `docs/research/ARC_LINK_FUTURE_TRACKS.md`
-- `docs/release/RELEASE_CANDIDATE.md` and `spec/PROTOCOL.md` on ARC's current
+- `docs/research/CHIO_WEB3_TRUST_BOUNDARY_DECISIONS.md`
+- `docs/research/CHIO_WEB3_CONTRACT_ARCHITECTURE.md`
+- `docs/research/CHIO_SETTLE_RESEARCH.md`
+- `docs/research/CHIO_SETTLE_PROTOCOL_DECISIONS.md`
+- `docs/research/CHIO_ANCHOR_RESEARCH.md`
+- `docs/research/CHIO_LINK_RESEARCH.md`
+- `docs/research/CHIO_LINK_FUTURE_TRACKS.md`
+- `docs/release/RELEASE_CANDIDATE.md` and `spec/PROTOCOL.md` on Chio's current
   explicit stop at bounded live-capital orchestration rather than real rail
   execution
 - `.planning/research/POST_V2_28_MAXIMAL_ENDGAME_ROADMAP.md` on the
@@ -2024,14 +2024,14 @@ automatic external capital dispatch.
 
 **Planned scope:**
 - real external rail adapter contracts
-- dispatch and settlement proofs reconciled back to ARC truth
+- dispatch and settlement proofs reconciled back to Chio truth
 - reversal, partial-settlement, and rail-failure lifecycle semantics
 - regulated-role and custody-boundary documentation
-- first-party web3 stack shipped as the official ARC reference implementation
+- first-party web3 stack shipped as the official Chio reference implementation
 
 ### v2.31 Autonomous Pricing, Capital Pools, and Insurance Automation
 
-**Goal:** Expand ARC from delegated pricing and bounded bind logic into
+**Goal:** Expand Chio from delegated pricing and bounded bind logic into
 bounded autonomous pricing, reserve strategy, and insurer-grade capital
 automation.
 
@@ -2056,7 +2056,7 @@ autonomous insurer pricing and public capital-market automation.
 
 **Status:** complete locally 2026-03-31.
 
-**Goal:** Move ARC from local trust activation into cross-operator trust
+**Goal:** Move Chio from local trust activation into cross-operator trust
 federation, more open market admission, and shared portable-reputation
 networking.
 
@@ -2081,7 +2081,7 @@ permissionless trust network or universal reputation layer.
 
 **Status:** complete locally 2026-03-31.
 
-**Goal:** Broaden ARC from bounded public portable-identity interop into a
+**Goal:** Broaden Chio from bounded public portable-identity interop into a
 multi-network identity and wallet fabric, then close the strongest possible
 reading of the research thesis with one final qualification pass.
 
@@ -2092,7 +2092,7 @@ final milestone closed the activated roadmap.
 **Research basis:**
 - `docs/research/DEEP_RESEARCH_1.md` on portable credentials, cross-org
   passports, and the broader interoperability vision
-- `docs/release/RELEASE_CANDIDATE.md` and `spec/PROTOCOL.md` on ARC's current
+- `docs/release/RELEASE_CANDIDATE.md` and `spec/PROTOCOL.md` on Chio's current
   bounded interop claim
 - `.planning/research/POST_V2_28_MAXIMAL_ENDGAME_ROADMAP.md`
 
@@ -2117,20 +2117,20 @@ instead.
 
 **Status:** complete locally 2026-04-01.
 
-**Goal:** Convert ARC's frozen official web3 package into compilable Solidity
+**Goal:** Convert Chio's frozen official web3 package into compilable Solidity
 contracts, reproducible deployments, and generated bindings that runtime
 services can actually target.
 
 **Why this exists:** `v2.30` froze one contract package and chain
 configuration, but the repo still lacks real Solidity contracts, Foundry/Alloy
 generation, deployment manifests, and parity tests between contract events and
-ARC artifact semantics.
+Chio artifact semantics.
 
 **Research basis:**
-- `docs/research/ARC_WEB3_CONTRACT_ARCHITECTURE.md`
-- `docs/research/ARC_WEB3_TRUST_BOUNDARY_DECISIONS.md`
-- `docs/standards/ARC_WEB3_CONTRACT_PACKAGE.json`
-- `docs/standards/ARC_WEB3_CHAIN_CONFIGURATION.json`
+- `docs/research/CHIO_WEB3_CONTRACT_ARCHITECTURE.md`
+- `docs/research/CHIO_WEB3_TRUST_BOUNDARY_DECISIONS.md`
+- `docs/standards/CHIO_WEB3_CONTRACT_PACKAGE.json`
+- `docs/standards/CHIO_WEB3_CHAIN_CONFIGURATION.json`
 
 **Planned scope:**
 - Solidity implementations for root registry, escrow, bond vault, identity
@@ -2148,23 +2148,23 @@ ARC artifact semantics.
 - Phase 148: gas, storage, security qualification, and contract package
   release
 
-### v2.35 arc-link Oracle Runtime and Cross-Currency Budget Enforcement
+### v2.35 chio-link Oracle Runtime and Cross-Currency Budget Enforcement
 
 **Status:** complete locally 2026-04-01; phases `149` through `152`
 implemented, verified, and audited.
 
-**Goal:** Productize `arc-link` into a real oracle runtime for cross-currency
+**Goal:** Productize `chio-link` into a real oracle runtime for cross-currency
 budget enforcement with explicit provenance, cache policy, and fail-closed
 fallback behavior.
 
-**Why this exists:** ARC already models oracle-evidence artifacts, but it does
+**Why this exists:** Chio already models oracle-evidence artifacts, but it does
 not yet ship a real Chainlink/Pyth client, feed configuration, TWAP handling,
 or runtime spend gate tied back to that evidence.
 
 **Research basis:**
-- `docs/research/ARC_LINK_RESEARCH.md`
-- `docs/research/ARC_LINK_FUTURE_TRACKS.md`
-- `docs/standards/ARC_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json`
+- `docs/research/CHIO_LINK_RESEARCH.md`
+- `docs/research/CHIO_LINK_FUTURE_TRACKS.md`
+- `docs/standards/CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json`
 
 **Planned scope:**
 - Chainlink primary and Pyth or equivalent fallback adapters
@@ -2179,26 +2179,26 @@ or runtime spend gate tied back to that evidence.
   integration
 - Phase 151 complete: Base/Arbitrum operator configuration, monitoring, and
   circuit-breaker controls
-- Phase 152 complete: `arc-link` qualification, failure drills, and boundary
+- Phase 152 complete: `chio-link` qualification, failure drills, and boundary
   documentation
 
-### v2.36 arc-anchor Multi-Chain Anchoring and Proof Verification
+### v2.36 chio-anchor Multi-Chain Anchoring and Proof Verification
 
 **Status:** complete locally 2026-04-01; phases `153` through `156`
 implemented, verified, and audited.
 
-**Goal:** Productize `arc-anchor` as a real publication and verification
+**Goal:** Productize `chio-anchor` as a real publication and verification
 service over Base/Arbitrum, Bitcoin OpenTimestamps, and Solana-normalized
 proof bundles.
 
-**Why this exists:** `v2.30` modeled anchor proofs, but ARC does not yet ship
+**Why this exists:** `v2.30` modeled anchor proofs, but Chio does not yet ship
 the multi-chain publisher, independent verifier, or operator discovery flow
 described in the anchoring research.
 
 **Research basis:**
-- `docs/research/ARC_ANCHOR_RESEARCH.md`
-- `docs/research/ARC_WEB3_TRUST_BOUNDARY_DECISIONS.md`
-- `docs/standards/ARC_ANCHOR_INCLUSION_PROOF_EXAMPLE.json`
+- `docs/research/CHIO_ANCHOR_RESEARCH.md`
+- `docs/research/CHIO_WEB3_TRUST_BOUNDARY_DECISIONS.md`
+- `docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json`
 
 **Planned scope:**
 - Base/Arbitrum root publication service and inclusion-proof verification
@@ -2212,25 +2212,25 @@ described in the anchoring research.
 - Phase 154: Bitcoin OpenTimestamps secondary anchoring and verification
 - Phase 155: Solana anchor publication, proof normalization, and shared proof
   bundle
-- Phase 156: `arc-anchor` discovery, operations, compliance notes, and
+- Phase 156: `chio-anchor` discovery, operations, compliance notes, and
   multi-chain qualification
 
-### v2.37 arc-settle On-Chain Settlement, Escrow, and Bond Runtime
+### v2.37 chio-settle On-Chain Settlement, Escrow, and Bond Runtime
 
 **Status:** complete locally 2026-04-01.
 
-**Goal:** Realize `arc-settle` as a Rust execution engine that turns approved
-ARC capital instructions into real on-chain escrow, release, refund, dispute,
+**Goal:** Realize `chio-settle` as a Rust execution engine that turns approved
+Chio capital instructions into real on-chain escrow, release, refund, dispute,
 and bond state transitions.
 
 **Why this exists:** `v2.30` froze settlement-dispatch and receipt artifacts,
-but ARC still lacks the real dispatcher, settlement observer, and multi-chain
+but Chio still lacks the real dispatcher, settlement observer, and multi-chain
 execution engine described by the settlement research.
 
 **Research basis:**
-- `docs/research/ARC_SETTLE_RESEARCH.md`
-- `docs/research/ARC_SETTLE_PROTOCOL_DECISIONS.md`
-- `docs/research/ARC_WEB3_CONTRACT_ARCHITECTURE.md`
+- `docs/research/CHIO_SETTLE_RESEARCH.md`
+- `docs/research/CHIO_SETTLE_PROTOCOL_DECISIONS.md`
+- `docs/research/CHIO_WEB3_CONTRACT_ARCHITECTURE.md`
 
 **Planned scope:**
 - transaction builder for escrow, bond, and settlement flows
@@ -2246,7 +2246,7 @@ execution engine described by the settlement research.
   bond lifecycle
 - Phase 159: Solana settlement path, Ed25519-native verification, and
   multi-chain consistency
-- Phase 160: `arc-settle` qualification, custody boundary, and regulated-role
+- Phase 160: `chio-settle` qualification, custody boundary, and regulated-role
   runbooks
 
 ### v2.38 Web3 Automation, Cross-Chain Transport, and Agent Payment Interop
@@ -2258,15 +2258,15 @@ implemented, verified, and audited.
 leaving them as vague backlog: Chainlink Functions, Chainlink Automation,
 CCIP, x402, Circle nanopayments, and ERC-4337/paymaster compatibility.
 
-**Why this exists:** `ARC_LINK_FUTURE_TRACKS.md` explicitly scoped these out of
+**Why this exists:** `CHIO_LINK_FUTURE_TRACKS.md` explicitly scoped these out of
 `v2.30`, but they are part of the full technical ambition behind the late-
 March research set and need their own bounded implementation wave.
 
 **Research basis:**
-- `docs/research/ARC_LINK_FUTURE_TRACKS.md`
-- `docs/research/ARC_LINK_RESEARCH.md`
-- `docs/research/ARC_SETTLE_RESEARCH.md`
-- `docs/standards/ARC_WEB3_CONTRACT_PACKAGE.json`
+- `docs/research/CHIO_LINK_FUTURE_TRACKS.md`
+- `docs/research/CHIO_LINK_RESEARCH.md`
+- `docs/research/CHIO_SETTLE_RESEARCH.md`
+- `docs/standards/CHIO_WEB3_CONTRACT_PACKAGE.json`
 
 **Planned scope:**
 - Chainlink Functions or equivalent bounded EVM-side proof verification path
@@ -2288,18 +2288,18 @@ March research set and need their own bounded implementation wave.
 
 **Status:** complete locally 2026-04-02.
 
-**Goal:** Turn the new web3 runtime stack into something ARC can operate,
+**Goal:** Turn the new web3 runtime stack into something Chio can operate,
 qualify, and describe publicly without hiding residual risk, test gaps, or
 unsupported flows.
 
-**Why this exists:** The research papers assume a real operated stack. ARC
+**Why this exists:** The research papers assume a real operated stack. Chio
 needs observability, incident handling, rollout controls, external partner
 proof, and final boundary rewrites before claiming that stack honestly.
 
 **Research basis:**
-- `docs/research/ARC_ANCHOR_RESEARCH.md`
-- `docs/research/ARC_SETTLE_RESEARCH.md`
-- `docs/research/ARC_LINK_RESEARCH.md`
+- `docs/research/CHIO_ANCHOR_RESEARCH.md`
+- `docs/research/CHIO_SETTLE_RESEARCH.md`
+- `docs/research/CHIO_LINK_RESEARCH.md`
 - `docs/release/RELEASE_CANDIDATE.md`
 - `spec/PROTOCOL.md`
 
@@ -2324,7 +2324,7 @@ proof, and final boundary rewrites before claiming that stack honestly.
 **Status:** complete locally 2026-04-02; phases `169` through `172` are
 implemented, verified, and audited.
 
-**Goal:** Make ARC's bounded web3 runtime concurrency-safe, evidence-mandatory,
+**Goal:** Make Chio's bounded web3 runtime concurrency-safe, evidence-mandatory,
 and internally consistent across kernel, runtime, bindings, and contracts.
 
 **Why this exists:** The shipped stack is broad enough to claim bounded web3
@@ -2335,11 +2335,11 @@ implicit follow-on work.
 
 **Research basis:**
 - `.planning/v2.39-MILESTONE-AUDIT.md`
-- `docs/release/ARC_WEB3_READINESS_AUDIT.md`
+- `docs/release/CHIO_WEB3_READINESS_AUDIT.md`
 - `docs/release/RELEASE_CANDIDATE.md`
 - `spec/PROTOCOL.md`
-- `contracts/src/ArcEscrow.sol`
-- `contracts/src/ArcBondVault.sol`
+- `contracts/src/ChioEscrow.sol`
+- `contracts/src/ChioBondVault.sol`
 
 **Planned scope:**
 - concurrency-safe escrow and bond identity derivation
@@ -2362,19 +2362,19 @@ implicit follow-on work.
 **Status:** complete locally 2026-04-02; `v2.40` is complete locally, phases
 `173` through `176` are implemented, verified, and audited.
 
-**Goal:** Turn ARC's bounded web3-runtime stack from a locally qualified
+**Goal:** Turn Chio's bounded web3-runtime stack from a locally qualified
 surface into one with hosted proof, reproducible promotion, and exercised
 operator controls.
 
-**Why this exists:** ARC's own release docs still hold external publication on
+**Why this exists:** Chio's own release docs still hold external publication on
 hosted qualification, operator approval, and deployment readiness. Those gaps
 must become explicit executable work rather than residual comments in audits
 and runbooks.
 
 **Research basis:**
-- `docs/release/ARC_WEB3_READINESS_AUDIT.md`
-- `docs/release/ARC_WEB3_DEPLOYMENT_PROMOTION.md`
-- `docs/standards/ARC_WEB3_DEPLOYMENT_POLICY.json`
+- `docs/release/CHIO_WEB3_READINESS_AUDIT.md`
+- `docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md`
+- `docs/standards/CHIO_WEB3_DEPLOYMENT_POLICY.json`
 - `docs/release/RELEASE_CANDIDATE.md`
 - `.github/workflows/release-qualification.yml`
 - `scripts/qualify-release.sh`
@@ -2410,7 +2410,7 @@ and runbooks.
 **Status:** complete locally 2026-04-02; phases `177` through `180` are
 implemented, verified, and audited.
 
-**Goal:** Make ARC's release governance, authoritative docs, planning tooling,
+**Goal:** Make Chio's release governance, authoritative docs, planning tooling,
 and late-phase assurance artifacts as trustworthy as the runtime stack they
 describe.
 
@@ -2426,9 +2426,9 @@ future work and confuse external review if it remains implicit.
 - `docs/release/PARTNER_PROOF.md`
 - `docs/release/GA_CHECKLIST.md`
 - `spec/PROTOCOL.md`
-- `crates/arc-cli/src/trust_control.rs`
-- `crates/arc-mcp-edge/src/runtime.rs`
-- `crates/arc-kernel/src/lib.rs`
+- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-mcp-edge/src/runtime.rs`
+- `crates/chio-kernel/src/lib.rs`
 
 **Planned scope:**
 - release governance, audit, and candidate-truth repair
@@ -2446,23 +2446,23 @@ future work and confuse external review if it remains implicit.
 
 ### Phase 93: Portable Claim Catalog and Governed Auth Binding
 
-**Goal**: Define ARC's broader portable claim catalog and align subject or
+**Goal**: Define Chio's broader portable claim catalog and align subject or
 issuer binding with governed request-time authorization semantics.
 **Depends on**: Phase 92
 **Requirements**: STDFAB-01, STDFAB-02
-**Why first**: ARC cannot broaden its standards claim honestly while portable
+**Why first**: Chio cannot broaden its standards claim honestly while portable
 identity and request-time authorization still use separate provenance and
 binding models.
 
 **Primary surfaces:**
-- portable claim catalog over ARC passport truth
-- ARC provenance identity, portable issuer identity, and portable subject
+- portable claim catalog over Chio passport truth
+- Chio provenance identity, portable issuer identity, and portable subject
   binding rules
 - governed intent and request-time authorization binding semantics
 - fail-closed handling for unsupported or ambiguous rebinding
 
 **Success Criteria**:
-1. ARC has one explicit portable claim catalog instead of one ad hoc
+1. Chio has one explicit portable claim catalog instead of one ad hoc
    projection exception.
 2. Subject and issuer binding are machine-readable and auditable across
    portable and hosted auth surfaces.
@@ -2481,12 +2481,12 @@ Plans:
 
 ### Phase 94: Multi-Format Credential Profiles and Verification
 
-**Goal**: Broaden ARC from one narrow projected credential lane into a small,
+**Goal**: Broaden Chio from one narrow projected credential lane into a small,
 standards-legible multi-format credential family over one canonical passport
 truth.
 **Depends on**: Phase 93
 **Requirements**: STDFAB-01, STDFAB-05
-**Why second**: Broader wallet and verifier interop is unsafe until ARC can
+**Why second**: Broader wallet and verifier interop is unsafe until Chio can
 project more than one bounded format without drifting into multiple competing
 credential truths.
 
@@ -2497,7 +2497,7 @@ credential truths.
 - fail-closed handling for unsupported or mixed-format requests
 
 **Success Criteria**:
-1. ARC supports more than one standards-legible portable credential profile.
+1. Chio supports more than one standards-legible portable credential profile.
 2. Profile negotiation and verification are explicit and deterministic.
 3. Broader format support does not create a second trust root.
 
@@ -2509,17 +2509,17 @@ Plans:
   profiles.
 - [x] 94-02: Define verification behavior and negative-path rules for each
   supported profile.
-- [x] 94-03: Preserve ARC provenance and compatibility while broadening
+- [x] 94-03: Preserve Chio provenance and compatibility while broadening
   portable formats.
 
 ### Phase 95: Hosted Request-Time Authorization and Resource Convergence
 
-**Goal**: Turn ARC's current review-oriented OAuth-family projection into a
+**Goal**: Turn Chio's current review-oriented OAuth-family projection into a
 bounded live request-time authorization contract that still derives from
-governed ARC truth.
+governed Chio truth.
 **Depends on**: Phase 93
 **Requirements**: STDFAB-03, STDFAB-05
-**Why third**: ARC needs a coherent request-time hosted contract before it can
+**Why third**: Chio needs a coherent request-time hosted contract before it can
 add richer sender-constrained, transaction-token, or wallet-exchange
 semantics.
 
@@ -2531,7 +2531,7 @@ semantics.
 - fail-closed metadata-drift behavior
 
 **Success Criteria**:
-1. ARC can represent governed request semantics at request time in one bounded
+1. Chio can represent governed request semantics at request time in one bounded
    standards-facing contract.
 2. Hosted metadata aligns with actual protected-resource behavior.
 3. Reviewer evidence cannot be replayed as runtime authorization.
@@ -2540,7 +2540,7 @@ semantics.
 **Plans**: 3 plans
 
 Plans:
-- [x] 95-01: Define ARC's bounded request-time authorization contract.
+- [x] 95-01: Define Chio's bounded request-time authorization contract.
 - [x] 95-02: Align protected-resource and authorization-server metadata with
   actual behavior.
 - [x] 95-03: Sharpen runtime artifact boundaries across auth, approval, and
@@ -2549,11 +2549,11 @@ Plans:
 ### Phase 96: Portable Status, Revocation, Metadata, and Live Discovery Alignment
 
 **Goal**: Converge portable credential lifecycle truth and live hosted
-metadata so ARC's broader standards fabric has one fail-closed status and
+metadata so Chio's broader standards fabric has one fail-closed status and
 discovery story.
 **Depends on**: Phases 94 and 95
 **Requirements**: STDFAB-04, STDFAB-05
-**Why last**: ARC should not widen into wallet exchange or sender-constrained
+**Why last**: Chio should not widen into wallet exchange or sender-constrained
 flows until credential lifecycle and live hosted metadata tell one consistent
 story under rotation, revocation, and stale-state conditions.
 
@@ -2581,12 +2581,12 @@ Plans:
 
 ### Phase 97: Wallet Exchange Descriptor and Transport-Neutral Transaction State
 
-**Goal**: Define ARC's wallet exchange descriptor and canonical transaction
+**Goal**: Define Chio's wallet exchange descriptor and canonical transaction
 state so holder, verifier, and relay flows can share one replay-safe
 transport-neutral contract.
 **Depends on**: Phases 95 and 96
 **Requirements**: WALLETX-01, WALLETX-05
-**Why first**: ARC cannot add continuity or sender-constrained proofs until
+**Why first**: Chio cannot add continuity or sender-constrained proofs until
 wallet transactions have one canonical state machine and descriptor shape.
 
 **Primary surfaces:**
@@ -2596,7 +2596,7 @@ wallet transactions have one canonical state machine and descriptor shape.
 - fail-closed handling for ambiguous or duplicated transaction state
 
 **Success Criteria**:
-1. ARC has one transport-neutral wallet exchange descriptor.
+1. Chio has one transport-neutral wallet exchange descriptor.
 2. Verifier transaction state is replay-safe and explicit across transport
    modes.
 3. Unsupported or contradictory exchange state fails closed.
@@ -2627,7 +2627,7 @@ transaction model rather than creating a second session contract.
 - fail-closed handling for stale, mismatched, or replayed assertions
 
 **Success Criteria**:
-1. ARC supports one optional continuity lane without making identity
+1. Chio supports one optional continuity lane without making identity
    assertions mandatory.
 2. Session continuity stays bound to canonical wallet transaction state.
 3. Invalid or unsupported assertions fail closed.
@@ -2642,7 +2642,7 @@ Plans:
 
 ### Phase 99: DPoP, mTLS, and Attestation-Bound Sender-Constrained Authorization
 
-**Goal**: Turn ARC's hosted authorization contract into bounded live
+**Goal**: Turn Chio's hosted authorization contract into bounded live
 sender-constrained behavior over DPoP, mTLS, and one explicitly constrained
 attestation-bound profile.
 **Depends on**: Phases 97 and 98
@@ -2657,7 +2657,7 @@ optional continuity model rather than preceding them.
 - fail-closed proof continuity and authority-narrowing semantics
 
 **Success Criteria**:
-1. ARC supports bounded DPoP and mTLS sender-constrained runtime behavior.
+1. Chio supports bounded DPoP and mTLS sender-constrained runtime behavior.
 2. Any attestation-bound sender semantics remain explicitly limited and never
    widen authority from attestation alone.
 3. Missing, stale, or mismatched sender proof fails closed.
@@ -2676,7 +2676,7 @@ Plans:
 optional identity assertion, and sender-constrained runtime behavior.
 **Depends on**: Phases 97, 98, and 99
 **Requirements**: WALLETX-05
-**Why last**: ARC should not claim wallet and sender-constrained interop until
+**Why last**: Chio should not claim wallet and sender-constrained interop until
 the whole flow is qualified across transport modes and negative cases.
 
 **Primary surfaces:**
@@ -2686,7 +2686,7 @@ the whole flow is qualified across transport modes and negative cases.
 - release and partner-boundary updates
 
 **Success Criteria**:
-1. ARC has end-to-end qualification for the supported wallet exchange modes.
+1. Chio has end-to-end qualification for the supported wallet exchange modes.
 2. Sender-constrained failures are explicitly tested and documented.
 3. `v2.22` can close with an honest public boundary.
 
@@ -2700,12 +2700,12 @@ Plans:
 
 ### Phase 101: Common Appraisal Schema Split and Artifact Inventory
 
-**Goal**: Define ARC's outward-facing appraisal artifact surface, separate raw
+**Goal**: Define Chio's outward-facing appraisal artifact surface, separate raw
 evidence from normalized appraisal truth, and inventory the migration boundary
 for existing verifier families.
 **Depends on**: Phase 100
 **Requirements**: APPX-01
-**Why first**: ARC cannot claim portable appraisal interop until it has one
+**Why first**: Chio cannot claim portable appraisal interop until it has one
 shared artifact contract across the verifier families it already ships.
 
 **Primary surfaces:**
@@ -2715,7 +2715,7 @@ shared artifact contract across the verifier families it already ships.
 - migration and backward-compatibility guardrails
 
 **Success Criteria**:
-1. ARC has one explicit outward-facing appraisal artifact.
+1. Chio has one explicit outward-facing appraisal artifact.
 2. Existing verifier outputs map into the new artifact without hidden joins.
 3. The schema split stays conservative and auditable.
 
@@ -2733,7 +2733,7 @@ Plans:
 across verifier families.
 **Depends on**: Phase 101
 **Requirements**: APPX-02
-**Why second**: The common appraisal shell is not enough unless ARC also says
+**Why second**: The common appraisal shell is not enough unless Chio also says
 what its normalized claims and reason codes mean across heterogeneous
 providers.
 
@@ -2744,7 +2744,7 @@ providers.
 - fail-closed handling for contradictory or lossy normalization
 
 **Success Criteria**:
-1. ARC has one portable claim vocabulary.
+1. Chio has one portable claim vocabulary.
 2. Reason codes are consistent enough for policy and audit use.
 3. Unsupported normalization cases fail closed.
 
@@ -2762,7 +2762,7 @@ Plans:
 policy mapping rules.
 **Depends on**: Phases 101 and 102
 **Requirements**: APPX-03, APPX-04
-**Why third**: Portable appraisal results only matter once ARC can exchange
+**Why third**: Portable appraisal results only matter once Chio can exchange
 them safely and say exactly how imported results affect local trust posture.
 
 **Primary surfaces:**
@@ -2772,7 +2772,7 @@ them safely and say exactly how imported results affect local trust posture.
 - replay, staleness, and unsupported-claim rejection
 
 **Success Criteria**:
-1. ARC can export and import one bounded signed appraisal result contract.
+1. Chio can export and import one bounded signed appraisal result contract.
 2. Imported results only affect policy through explicit local mapping.
 3. Existing verifier bridges remain compatible and conservative.
 
@@ -2781,12 +2781,12 @@ them safely and say exactly how imported results affect local trust posture.
 
 Plans:
 - [x] 103-01: Define the signed appraisal export and import artifacts.
-- [x] 103-02: Define local policy mapping from imported appraisal results into ARC trust posture.
+- [x] 103-02: Define local policy mapping from imported appraisal results into Chio trust posture.
 - [x] 103-03: Document import or export guardrails and compatibility behavior.
 
 ### Phase 104: Mixed-Provider Appraisal Qualification and Boundary Rewrite
 
-**Goal**: Qualify ARC's mixed-provider appraisal contract end to end and
+**Goal**: Qualify Chio's mixed-provider appraisal contract end to end and
 rewrite the public boundary honestly.
 **Depends on**: Phases 101, 102, and 103
 **Requirements**: APPX-05
@@ -2818,7 +2818,7 @@ Plans:
 ambient federation trust.
 **Depends on**: Phase 104
 **Requirements**: FEDX-01
-**Why first**: ARC cannot broaden issuer portability until it has one explicit
+**Why first**: Chio cannot broaden issuer portability until it has one explicit
 model for multi-issuer composition and migration.
 
 **Primary surfaces:**
@@ -2828,7 +2828,7 @@ model for multi-issuer composition and migration.
 - explicit local activation and attenuation rules
 
 **Success Criteria**:
-1. ARC can represent multi-issuer portfolios explicitly.
+1. Chio can represent multi-issuer portfolios explicitly.
 2. Trust packs preserve issuer provenance and signature boundaries.
 3. Visibility never implies federation admission.
 
@@ -2874,7 +2874,7 @@ Plans:
 keeping local policy import and runtime admission explicit.
 **Depends on**: Phases 105 and 106
 **Requirements**: FEDX-03, FEDX-05
-**Why third**: ARC can widen discovery now, but it must keep discovery
+**Why third**: Chio can widen discovery now, but it must keep discovery
 visibility separate from trust activation.
 
 **Primary surfaces:**
@@ -2912,7 +2912,7 @@ same substrate and the policy effects are qualified.
 - milestone qualification and boundary closure
 
 **Success Criteria**:
-1. ARC supports wider provider coverage on one portable substrate.
+1. Chio supports wider provider coverage on one portable substrate.
 2. Imported portable assurance affects policy only through explicit local rules.
 3. `v2.24` closes with honest docs and qualification evidence.
 
@@ -2926,12 +2926,12 @@ Plans:
 
 ### Phase 109: Capital Book and Source-of-Funds Ledger
 
-**Goal**: Turn ARC's facility, reserve, and bond posture into an explicit live
+**Goal**: Turn Chio's facility, reserve, and bond posture into an explicit live
 capital-book model with attributable sources of funds.
 **Depends on**: Phase 108
 **Requirements**: CAPX-01
 **Why first**: Live capital allocation is impossible to claim honestly until
-ARC has one deterministic capital ledger.
+Chio has one deterministic capital ledger.
 
 **Primary surfaces:**
 - capital-book artifacts and balances
@@ -2940,7 +2940,7 @@ ARC has one deterministic capital ledger.
 - mixed-currency and missing-counterparty rejection
 
 **Success Criteria**:
-1. ARC has one explicit capital-book model.
+1. Chio has one explicit capital-book model.
 2. Sources of funds are attributable and auditable.
 3. Ledger semantics remain conservative and role-bounded.
 
@@ -2958,7 +2958,7 @@ Plans:
 the live capital book.
 **Depends on**: Phase 109
 **Requirements**: CAPX-02
-**Why second**: Once capital posture is explicit, ARC needs portable
+**Why second**: Once capital posture is explicit, Chio needs portable
 instruction semantics before it can allocate funds live.
 
 **Primary surfaces:**
@@ -2968,7 +2968,7 @@ instruction semantics before it can allocate funds live.
 - fail-closed reconciliation handling
 
 **Success Criteria**:
-1. ARC can express reserve and escrow intent explicitly.
+1. Chio can express reserve and escrow intent explicitly.
 2. Counterparties and execution windows are auditable.
 3. Stale or mismatched execution fails closed.
 
@@ -2985,7 +2985,7 @@ Plans:
 **Goal**: Map governed actions to explicit live capital-allocation decisions.
 **Depends on**: Phases 109 and 110
 **Requirements**: CAPX-03
-**Why third**: ARC can only claim live capital participation once governed
+**Why third**: Chio can only claim live capital participation once governed
 approvals produce deterministic allocation decisions.
 
 **Primary surfaces:**
@@ -3010,7 +3010,7 @@ Plans:
 ### Phase 112: Capital Execution Qualification and Regulated-Role Baseline
 
 **Goal**: Qualify the live capital execution surface and formalize the
-regulated-role baseline ARC assumes.
+regulated-role baseline Chio assumes.
 **Depends on**: Phases 109, 110, and 111
 **Requirements**: CAPX-04, CAPX-05
 **Why last**: `v2.25` only counts if the role topology, failure paths, and
@@ -3149,7 +3149,7 @@ Plans:
 
 ### Phase 117: Generic Listing Artifact and Namespace Model
 
-**Goal**: Generalize ARC's curated discovery surfaces into one generic listing
+**Goal**: Generalize Chio's curated discovery surfaces into one generic listing
 and namespace model.
 **Depends on**: Phase 116
 **Requirements**: OPENX-01
@@ -3163,7 +3163,7 @@ before it can reason about mirrors, admission, or governance.
 - fail-closed handling for conflicting listings
 
 **Success Criteria**:
-1. ARC has one generic listing substrate for market actors.
+1. Chio has one generic listing substrate for market actors.
 2. Namespace ownership is explicit and auditable.
 3. Listing visibility does not imply trust admission.
 
@@ -3266,7 +3266,7 @@ preserving issuer provenance and local weighting.
 **Depends on**: Phase 120
 **Requirements**: ENDX-01
 **Why first**: The open-market endgame needs portable market-discipline
-signals, but ARC must keep them provenance-preserving and locally weighted.
+signals, but Chio must keep them provenance-preserving and locally weighted.
 
 **Primary surfaces:**
 - portable reputation artifacts
@@ -3321,7 +3321,7 @@ Plans:
 conditions without collapsing visibility or imported evidence into trust.
 **Depends on**: Phases 117, 118, 119, 120, 121, and 122
 **Requirements**: ENDX-03
-**Why third**: The endgame claim is not credible unless ARC can show the
+**Why third**: The endgame claim is not credible unless Chio can show the
 open-market model under adversarial multi-operator behavior.
 
 **Primary surfaces:**
@@ -3346,7 +3346,7 @@ Plans:
 ### Phase 124: Partner Proof, Release Boundary, and Honest Endgame Claim Closure
 
 **Goal**: Close the full research endgame with final partner proof,
-release-boundary updates, and an honest claim about what ARC now supports.
+release-boundary updates, and an honest claim about what Chio now supports.
 **Depends on**: Phases 121, 122, and 123
 **Requirements**: ENDX-04, ENDX-05
 **Why last**: The roadmap only counts as complete if the public protocol,
@@ -3359,7 +3359,7 @@ release docs, and proof artifacts match the widened endgame claim.
 - explicit non-goals and external publication dependencies
 
 **Success Criteria**:
-1. ARC can claim the research endgame honestly and specifically.
+1. Chio can claim the research endgame honestly and specifically.
 2. Residual boundaries remain explicit and reviewable.
 3. The final roadmap state closes without missing executable work.
 
@@ -3373,11 +3373,11 @@ Plans:
 
 ### Phase 125: Extension-Point Inventory and Canonical Boundary Classes
 
-**Goal**: Define ARC's named extension points and classify which surfaces are
+**Goal**: Define Chio's named extension points and classify which surfaces are
 canonical truth versus replaceable adapters.
 **Depends on**: Phase 124
 **Requirements**: EXTMAX-01
-**Why first**: The extension stack only works if ARC first freezes which
+**Why first**: The extension stack only works if Chio first freezes which
 contracts are authoritative and which seams are safely replaceable.
 
 **Primary surfaces:**
@@ -3387,7 +3387,7 @@ contracts are authoritative and which seams are safely replaceable.
 - trust-boundary guardrails for replaceable seams
 
 **Success Criteria**:
-1. ARC has one explicit inventory of extension points.
+1. Chio has one explicit inventory of extension points.
 2. Canonical truth surfaces are distinct from pluggable adapters.
 3. Later extension work cannot blur that boundary.
 
@@ -3402,22 +3402,22 @@ Plans:
 ### Phase 126: Extension Manifests, Negotiation, and Official Stack Packaging
 
 **Goal**: Define machine-readable extension manifests, capability negotiation,
-versioning, and one official ARC stack package over first-party components.
+versioning, and one official Chio stack package over first-party components.
 **Depends on**: Phase 125
 **Requirements**: EXTMAX-02, EXTMAX-03
-**Why second**: Once extension points are known, ARC needs a compatibility
+**Why second**: Once extension points are known, Chio needs a compatibility
 contract and a default packaged stack before third-party implementations are
 allowed in.
 
 **Primary surfaces:**
 - extension manifest schema
 - version and capability negotiation
-- official ARC stack package layout
+- official Chio stack package layout
 - compatibility declarations and fail-closed mismatch handling
 
 **Success Criteria**:
 1. Extensions declare capabilities and versions in one machine-readable form.
-2. ARC can distinguish the official stack from custom implementations.
+2. Chio can distinguish the official stack from custom implementations.
 3. Mismatched or unsupported extensions fail closed.
 
 **Status**: complete
@@ -3425,16 +3425,16 @@ allowed in.
 
 Plans:
 - [x] 126-01: Define extension manifest and negotiation contracts.
-- [x] 126-02: Package the first-party official ARC stack over canonical implementations.
+- [x] 126-02: Package the first-party official Chio stack over canonical implementations.
 - [x] 126-03: Define compatibility, versioning, and fail-closed mismatch rules.
 
 ### Phase 127: Trust-Preserving Adapter Runtime and Policy Enforcement
 
-**Goal**: Define how custom adapters execute and how ARC prevents them from
+**Goal**: Define how custom adapters execute and how Chio prevents them from
 silently widening trust, mutating signed truth, or bypassing policy.
 **Depends on**: Phases 125 and 126
 **Requirements**: EXTMAX-04
-**Why third**: ARC needs runtime enforcement semantics before it can trust any
+**Why third**: Chio needs runtime enforcement semantics before it can trust any
 custom execution, evidence, or transport plugin.
 
 **Primary surfaces:**
@@ -3444,7 +3444,7 @@ custom execution, evidence, or transport plugin.
 - isolation and privilege envelopes for custom implementations
 
 **Success Criteria**:
-1. Extensions cannot redefine ARC truth.
+1. Extensions cannot redefine Chio truth.
 2. External evidence remains policy-visible and bounded.
 3. Runtime isolation and privilege rules are explicit.
 
@@ -3458,12 +3458,12 @@ Plans:
 
 ### Phase 128: Extension Qualification, Compatibility Matrix, and Boundary Closure
 
-**Goal**: Qualify custom extensions against the official ARC stack and close
+**Goal**: Qualify custom extensions against the official Chio stack and close
 the milestone with an honest extension-boundary claim.
 **Depends on**: Phases 125, 126, and 127
 **Requirements**: EXTMAX-05
 **Why last**: The extension milestone only closes once custom implementations
-can be tested against the official stack without weakening ARC's trust model.
+can be tested against the official stack without weakening Chio's trust model.
 
 **Primary surfaces:**
 - qualification matrix
@@ -3474,7 +3474,7 @@ can be tested against the official stack without weakening ARC's trust model.
 **Success Criteria**:
 1. Official and custom extensions can interoperate under one contract.
 2. Qualification proves the trust boundary survives extension replacement.
-3. ARC can honestly claim an official stack plus extension SDK.
+3. Chio can honestly claim an official stack plus extension SDK.
 
 **Status**: complete
 **Plans**: 3 plans
@@ -3490,7 +3490,7 @@ Plans:
 bundle format, dispute posture, and multichain consistency rules.
 **Depends on**: Phase 128
 **Requirements**: RAILMAX-04
-**Why first**: Web3 execution should not begin until ARC commits to its trust
+**Why first**: Web3 execution should not begin until Chio commits to its trust
 boundary and on-chain/off-chain authority semantics.
 
 **Primary surfaces:**
@@ -3500,7 +3500,7 @@ boundary and on-chain/off-chain authority semantics.
 - multichain consistency and failure-recovery rules
 
 **Success Criteria**:
-1. ARC has one explicit web3 trust boundary.
+1. Chio has one explicit web3 trust boundary.
 2. Identity binding and evidence semantics are frozen before contract work.
 3. Regulated-role and custody assumptions remain explicit.
 
@@ -3514,11 +3514,11 @@ Plans:
 
 ### Phase 130: Unified Contract Interfaces, Bindings, and Chain Configuration
 
-**Goal**: Define the unified on-chain contract set, ARC bindings, and official
+**Goal**: Define the unified on-chain contract set, Chio bindings, and official
 chain configuration for the first web3 execution stack.
 **Depends on**: Phase 129
 **Requirements**: RAILMAX-01
-**Why second**: After the boundary is frozen, ARC needs one canonical contract
+**Why second**: After the boundary is frozen, Chio needs one canonical contract
 surface and deployment model before anchoring or settlement logic can land.
 
 **Primary surfaces:**
@@ -3528,7 +3528,7 @@ surface and deployment model before anchoring or settlement logic can land.
 - gas and compatibility assumptions
 
 **Success Criteria**:
-1. ARC has one canonical contract interface set.
+1. Chio has one canonical contract interface set.
 2. Bindings and chain configuration are reproducible.
 3. The official web3 stack has one reviewable deployment model.
 
@@ -3557,7 +3557,7 @@ substrates before real rail dispatch can claim reconciled truth.
 
 **Success Criteria**:
 1. Receipt roots can be externally anchored and verified.
-2. Oracle evidence is explicit and provenance-preserving in ARC artifacts.
+2. Oracle evidence is explicit and provenance-preserving in Chio artifacts.
 3. Settlement can depend on shared anchor and oracle truth.
 
 **Status**: complete
@@ -3574,7 +3574,7 @@ Plans:
 including reversal, chargeback, partial-settlement, and qualification proof.
 **Depends on**: Phases 129, 130, and 131
 **Requirements**: RAILMAX-01, RAILMAX-03, RAILMAX-05
-**Why last**: `v2.30` only closes once ARC can actually dispatch and reconcile
+**Why last**: `v2.30` only closes once Chio can actually dispatch and reconcile
 real settlement behavior over the first official web3 stack.
 
 **Primary surfaces:**
@@ -3584,7 +3584,7 @@ real settlement behavior over the first official web3 stack.
 - end-to-end web3 qualification
 
 **Success Criteria**:
-1. ARC can dispatch and reconcile one real rail stack.
+1. Chio can dispatch and reconcile one real rail stack.
 2. Reversal and failure paths are explicit and auditable.
 3. `v2.30` closes with honest web3 execution docs and proof.
 
@@ -3602,7 +3602,7 @@ Plans:
 envelopes under which pricing automation may act.
 **Depends on**: Phase 132
 **Requirements**: INSMAX-01
-**Why first**: ARC cannot automate insurer-like behavior until pricing outputs
+**Why first**: Chio cannot automate insurer-like behavior until pricing outputs
 and authority boundaries are explicit signed surfaces.
 
 **Primary surfaces:**
@@ -3612,7 +3612,7 @@ and authority boundaries are explicit signed surfaces.
 - explainability and approval hooks
 
 **Success Criteria**:
-1. ARC has one signed autonomous pricing artifact family.
+1. Chio has one signed autonomous pricing artifact family.
 2. Pricing automation stays inside explicit authority envelopes.
 3. Model inputs are provenance-preserving and reviewable.
 
@@ -3658,7 +3658,7 @@ Plans:
 over the pricing and capital substrate.
 **Depends on**: Phases 133 and 134
 **Requirements**: INSMAX-03
-**Why third**: ARC only reaches insurer-grade automation once pricing outputs
+**Why third**: Chio only reaches insurer-grade automation once pricing outputs
 can drive controlled execution rather than remaining advisory.
 
 **Primary surfaces:**
@@ -3668,7 +3668,7 @@ can drive controlled execution rather than remaining advisory.
 - lifecycle evidence for automated decisions
 
 **Success Criteria**:
-1. ARC can automate core pricing decisions within approved limits.
+1. Chio can automate core pricing decisions within approved limits.
 2. Human interruption and rollback points remain explicit.
 3. Automated execution produces reviewable signed evidence.
 
@@ -3686,7 +3686,7 @@ Plans:
 explain itself, and roll back without hidden widening.
 **Depends on**: Phases 133, 134, and 135
 **Requirements**: INSMAX-04, INSMAX-05
-**Why last**: `v2.31` only closes once ARC can qualify autonomous pricing as a
+**Why last**: `v2.31` only closes once Chio can qualify autonomous pricing as a
 bounded, reversible, operator-reviewable lane.
 
 **Primary surfaces:**
@@ -3724,7 +3724,7 @@ not with mirrors or reputation scores.
 - local import and attenuation semantics
 
 **Success Criteria**:
-1. ARC can express cross-operator trust activation explicitly.
+1. Chio can express cross-operator trust activation explicitly.
 2. Federation does not bypass local operator import control.
 3. Shared activation artifacts stay provenance-preserving.
 
@@ -3780,7 +3780,7 @@ federation and replication contracts are explicit.
 - anti-sybil and anti-oracle weighting controls
 
 **Success Criteria**:
-1. ARC supports bounded open admission without ambient runtime trust.
+1. Chio supports bounded open admission without ambient runtime trust.
 2. Shared reputation remains attack-aware and provenance-preserving.
 3. Stake and bond participation classes are explicit and machine-readable.
 
@@ -3798,7 +3798,7 @@ Plans:
 portable governance and abuse-resistance proof.
 **Depends on**: Phases 137, 138, and 139
 **Requirements**: TRUSTMAX-05
-**Why last**: `v2.32` only closes if ARC can prove cross-operator federation
+**Why last**: `v2.32` only closes if Chio can prove cross-operator federation
 under hostile publishers, conflicting trust, and shared-reputation abuse.
 
 **Primary surfaces:**
@@ -3822,7 +3822,7 @@ Plans:
 
 ### Phase 141: Broader DID/VC Method Support and Identity Profiles
 
-**Goal**: Extend ARC beyond its bounded ARC-first profile into broader DID/VC
+**Goal**: Extend Chio beyond its bounded Chio-first profile into broader DID/VC
 method and credential-family interoperability.
 **Depends on**: Phase 140
 **Requirements**: IDMAX-01
@@ -3836,7 +3836,7 @@ credential-family support, not with directory semantics.
 - trust-boundary preservation for broader identity input
 
 **Success Criteria**:
-1. ARC can name broader supported DID/VC methods explicitly.
+1. Chio can name broader supported DID/VC methods explicitly.
 2. Cross-family credential handling remains bounded and reviewable.
 3. Broader identity support does not erase trust-boundary semantics.
 
@@ -3854,7 +3854,7 @@ Plans:
 broadened public identity network.
 **Depends on**: Phase 141
 **Requirements**: IDMAX-02
-**Why second**: Once methods are broader, ARC needs one explicit public wallet
+**Why second**: Once methods are broader, Chio needs one explicit public wallet
 routing layer rather than ad hoc discovery behavior.
 
 **Primary surfaces:**
@@ -3864,7 +3864,7 @@ routing layer rather than ad hoc discovery behavior.
 - trust-preserving lookup behavior
 
 **Success Criteria**:
-1. ARC has one explicit wallet directory and routing model.
+1. Chio has one explicit wallet directory and routing model.
 2. Discovery semantics remain informative rather than ambient trust.
 3. Routing inputs are reproducible and reviewable.
 
@@ -3882,7 +3882,7 @@ Plans:
 flows over the broadened identity network.
 **Depends on**: Phases 141 and 142
 **Requirements**: IDMAX-03, IDMAX-04
-**Why third**: Broader identity support only matters if ARC can prove complex
+**Why third**: Broader identity support only matters if Chio can prove complex
 presentation flows without silently widening trust.
 
 **Primary surfaces:**
@@ -3892,7 +3892,7 @@ presentation flows without silently widening trust.
 - replay-safe and mismatch failure paths
 
 **Success Criteria**:
-1. ARC can qualify end-to-end interop across the expanded identity surface.
+1. Chio can qualify end-to-end interop across the expanded identity surface.
 2. Trust and admission boundaries remain explicit in multi-party flows.
 3. Replay, mismatch, or unsupported network behavior fails closed.
 
@@ -3910,7 +3910,7 @@ Plans:
 final partner proof, release boundary rewrite, and milestone closure.
 **Depends on**: Phases 141, 142, and 143
 **Requirements**: IDMAX-05
-**Why last**: The maximal-endgame ladder only closes once ARC can claim the
+**Why last**: The maximal-endgame ladder only closes once Chio can claim the
 broader extension, web3, autonomy, federation, and identity thesis honestly.
 
 **Primary surfaces:**
@@ -3920,7 +3920,7 @@ broader extension, web3, autonomy, federation, and identity thesis honestly.
 - explicit residual non-goals and publication dependencies
 
 **Success Criteria**:
-1. ARC can claim the strongest plausible thesis honestly and specifically.
+1. Chio can claim the strongest plausible thesis honestly and specifically.
 2. Residual non-goals remain explicit and reviewable.
 3. The maximal-endgame roadmap closes without hidden executable work.
 
@@ -3938,7 +3938,7 @@ Plans:
 contracts with canonical events and fail-closed state transitions.
 **Depends on**: Phase 144
 **Requirements**: W3STACK-01, W3STACK-03
-**Why first**: ARC cannot claim runtime web3 execution until the official
+**Why first**: Chio cannot claim runtime web3 execution until the official
 contract family exists as code rather than only as artifact descriptors.
 
 **Primary surfaces:**
@@ -3949,7 +3949,7 @@ contract family exists as code rather than only as artifact descriptors.
 
 **Success Criteria**:
 1. The full official contract family compiles locally.
-2. Canonical events and state transitions map back to ARC artifacts explicitly.
+2. Canonical events and state transitions map back to Chio artifacts explicitly.
 3. Ambiguous or unsupported settlement transitions revert fail closed.
 
 **Status**: complete
@@ -3990,22 +3990,22 @@ Plans:
 
 ### Phase 147: DID/Key Binding, Verifier Discovery, and Contract-to-Artifact Parity
 
-**Goal**: Tie contract behavior back to ARC identity binding, verifier
+**Goal**: Tie contract behavior back to Chio identity binding, verifier
 discovery, and the existing web3 artifact model.
 **Depends on**: Phases 145 and 146
 **Requirements**: W3STACK-03, W3STACK-05
 **Why third**: Runtime contracts are not enough unless their identity and
-discovery semantics stay aligned with ARC's frozen trust boundary.
+discovery semantics stay aligned with Chio's frozen trust boundary.
 
 **Primary surfaces:**
 - key-binding certificate registration flow
 - DID-service and canonical-registry discovery parity
-- contract event to ARC artifact projection
+- contract event to Chio artifact projection
 - negative-path validation for mismatched identity or discovery data
 
 **Success Criteria**:
-1. Contract-side identity binding matches ARC's certificate and discovery rules.
-2. Contract events can be projected into ARC artifacts without ambiguity.
+1. Contract-side identity binding matches Chio's certificate and discovery rules.
+2. Contract events can be projected into Chio artifacts without ambiguity.
 3. Cross-operator or cross-chain discovery mismatches fail closed.
 
 **Status**: complete
@@ -4013,7 +4013,7 @@ discovery semantics stay aligned with ARC's frozen trust boundary.
 
 Plans:
 - [x] 147-01: Implement identity-binding and discovery parity checks against the official contracts.
-- [x] 147-02: Map contract events and state into ARC web3 artifact projections.
+- [x] 147-02: Map contract events and state into Chio web3 artifact projections.
 - [x] 147-03: Add negative-path coverage for mismatched DID, address, or discovery inputs.
 
 ### Phase 148: Gas, Storage, Security Qualification, and Contract Package Release
@@ -4046,7 +4046,7 @@ Plans:
 
 ### Phase 149: Chainlink/Pyth Oracle Adapters, Cache, TWAP, and Divergence Policy
 
-**Goal**: Build the core `arc-link` oracle clients and policy layer for
+**Goal**: Build the core `chio-link` oracle clients and policy layer for
 cross-currency budget enforcement.
 **Depends on**: Phase 148
 **Requirements**: LINKX-01, LINKX-03
@@ -4060,7 +4060,7 @@ and manipulation-resistant policy before kernel integration.
 - Base-first operator configuration
 
 **Success Criteria**:
-1. `arc-link` can read supported feeds with explicit normalization.
+1. `chio-link` can read supported feeds with explicit normalization.
 2. Stale, divergent, or unsupported feeds are detected deterministically.
 3. The feed policy layer is explicit enough for later kernel enforcement.
 
@@ -4075,7 +4075,7 @@ Plans:
 ### Phase 150: Oracle Evidence Artifacts, Kernel Budget Enforcement, and Receipt Integration
 
 **Goal**: Enforce cross-currency budgets using explicit oracle evidence without
-mutating canonical ARC receipt truth.
+mutating canonical Chio receipt truth.
 **Depends on**: Phase 149
 **Requirements**: LINKX-02
 **Why second**: Feed reads are only useful once they drive actual budget gates
@@ -4103,7 +4103,7 @@ Plans:
 ### Phase 151: Base/Arbitrum Operator Configuration, Monitoring, and Circuit-Breaker Controls
 
 **Goal**: Add the operator controls and runtime observability needed to run
-`arc-link` safely in practice.
+`chio-link` safely in practice.
 **Depends on**: Phases 149 and 150
 **Requirements**: LINKX-04
 **Why third**: Live oracle enforcement is unsafe until operators can pin
@@ -4128,13 +4128,13 @@ Plans:
 - [x] 151-02: Build monitoring, alerting, and degraded-mode behavior for oracle runtime.
 - [x] 151-03: Implement circuit-breaker controls and operator override semantics.
 
-### Phase 152: arc-link Qualification, Failure Drills, and Boundary Documentation
+### Phase 152: chio-link Qualification, Failure Drills, and Boundary Documentation
 
-**Goal**: Qualify `arc-link` across stale, divergent, manipulated, and missing
+**Goal**: Qualify `chio-link` across stale, divergent, manipulated, and missing
 oracle conditions and close the milestone honestly.
 **Depends on**: Phases 149, 150, and 151
 **Requirements**: LINKX-05
-**Why last**: ARC can only claim cross-currency budget enforcement once the
+**Why last**: Chio can only claim cross-currency budget enforcement once the
 failure cases are proven and documented.
 
 **Primary surfaces:**
@@ -4146,20 +4146,20 @@ failure cases are proven and documented.
 **Success Criteria**:
 1. Qualification proves allow and deny behavior under the key oracle failures.
 2. Operators have concrete drills and recovery guidance.
-3. `v2.35` closes with honest `arc-link` runtime claims.
+3. `v2.35` closes with honest `chio-link` runtime claims.
 
 **Status**: complete
 **Plans**: 3 plans
 
 Plans:
 - [x] 152-01: Build qualification coverage for stale, divergent, manipulated, and missing oracle inputs.
-- [x] 152-02: Publish operator runbooks and failure drills for `arc-link`.
+- [x] 152-02: Publish operator runbooks and failure drills for `chio-link`.
 - [x] 152-03: Close `v2.35` with audit and boundary-document updates.
 
 ### Phase 153: Base/Arbitrum Root Publication Service and Inclusion Proof Verifier
 
-**Goal**: Implement the primary `arc-anchor` publication service for the
-official EVM/L2 environment and prove inclusion against ARC checkpoints.
+**Goal**: Implement the primary `chio-anchor` publication service for the
+official EVM/L2 environment and prove inclusion against Chio checkpoints.
 **Depends on**: Phase 152
 **Requirements**: ANCHORX-01
 **Why first**: Anchoring starts with the primary EVM path that later settlement
@@ -4172,8 +4172,8 @@ and external verifiers will consume.
 - replay and sequencing controls
 
 **Success Criteria**:
-1. ARC can publish checkpoint roots to the official root registry.
-2. Third parties can verify inclusion proofs back to ARC checkpoints.
+1. Chio can publish checkpoint roots to the official root registry.
+2. Third parties can verify inclusion proofs back to Chio checkpoints.
 3. Publication sequencing and replay handling are explicit and fail closed.
 
 **Status**: complete locally 2026-04-01
@@ -4181,7 +4181,7 @@ and external verifiers will consume.
 
 Plans:
 - [x] 153-01: Implement Base/Arbitrum checkpoint publication against the official registry.
-- [x] 153-02: Build inclusion-proof verification back to ARC checkpoint truth.
+- [x] 153-02: Build inclusion-proof verification back to Chio checkpoint truth.
 - [x] 153-03: Add sequencing, replay, and operator-identity controls for publication.
 
 ### Phase 154: Bitcoin OpenTimestamps Secondary Anchoring and Verification
@@ -4200,8 +4200,8 @@ top of the primary EVM anchor model.
 - operator and verifier guidance for the secondary lane
 
 **Success Criteria**:
-1. ARC can produce verifiable Bitcoin-backed timestamp proofs.
-2. OTS proofs link cleanly back to ARC checkpoint statements.
+1. Chio can produce verifiable Bitcoin-backed timestamp proofs.
+2. OTS proofs link cleanly back to Chio checkpoint statements.
 3. The Bitcoin lane remains explicit as a secondary evidence surface.
 
 **Status**: complete locally 2026-04-01
@@ -4209,7 +4209,7 @@ top of the primary EVM anchor model.
 
 Plans:
 - [x] 154-01: Implement OpenTimestamps publication for checkpoint roots.
-- [x] 154-02: Build verification and linkage from ARC checkpoints to Bitcoin proofs.
+- [x] 154-02: Build verification and linkage from Chio checkpoints to Bitcoin proofs.
 - [x] 154-03: Document secondary-lane semantics and operator handling for OTS anchors.
 
 ### Phase 155: Solana Anchor Publication, Proof Normalization, and Shared Proof Bundle
@@ -4240,9 +4240,9 @@ Plans:
 - [x] 155-02: Normalize EVM, Bitcoin, and Solana proofs into a shared bundle.
 - [x] 155-03: Add verifier rules for supported and unsupported multi-lane proof combinations.
 
-### Phase 156: arc-anchor Discovery, Operations, Compliance Notes, and Multi-Chain Qualification
+### Phase 156: chio-anchor Discovery, Operations, Compliance Notes, and Multi-Chain Qualification
 
-**Goal**: Close `arc-anchor` with discovery, operations, compliance notes, and
+**Goal**: Close `chio-anchor` with discovery, operations, compliance notes, and
 qualification across all supported lanes.
 **Depends on**: Phases 153, 154, and 155
 **Requirements**: ANCHORX-04, ANCHORX-05
@@ -4264,17 +4264,17 @@ root ownership, and multi-chain verification are all explicit and tested.
 **Plans**: 3 plans
 
 Plans:
-- [x] 156-01: Document discovery, root-ownership, and operational semantics for `arc-anchor`.
+- [x] 156-01: Document discovery, root-ownership, and operational semantics for `chio-anchor`.
 - [x] 156-02: Build multi-chain qualification and independent-verifier coverage.
 - [x] 156-03: Close `v2.36` with audit, compliance notes, and boundary updates.
 
 ### Phase 157: Settlement Dispatch Builder and Escrow/Bond Transaction Orchestration
 
-**Goal**: Implement the first real `arc-settle` dispatcher over the official
+**Goal**: Implement the first real `chio-settle` dispatcher over the official
 escrow and bond contracts.
 **Depends on**: Phase 156
 **Requirements**: SETTLEX-01
-**Why first**: Settlement runtime begins by turning approved ARC capital
+**Why first**: Settlement runtime begins by turning approved Chio capital
 instructions into actual chain transactions.
 
 **Primary surfaces:**
@@ -4284,7 +4284,7 @@ instructions into actual chain transactions.
 - fail-closed precondition checks
 
 **Success Criteria**:
-1. Approved ARC instructions can become real escrow and bond transactions.
+1. Approved Chio instructions can become real escrow and bond transactions.
 2. Unsupported or unsafe dispatch attempts fail closed before submission.
 3. Dispatch artifacts reconcile deterministically to on-chain intent.
 
@@ -4292,17 +4292,17 @@ instructions into actual chain transactions.
 **Plans**: 3 plans
 
 Plans:
-- [x] 157-01: Implement the `arc-settle` client and transaction builder for escrow and bond flows.
+- [x] 157-01: Implement the `chio-settle` client and transaction builder for escrow and bond flows.
 - [x] 157-02: Map signed dispatch artifacts to concrete chain transaction sequences.
 - [x] 157-03: Add fail-closed precondition checks for unsafe or unsupported dispatch.
 
 ### Phase 158: Settlement Observer, Dispute Windows, Refunds, Reversals, and Bond Lifecycle
 
 **Goal**: Observe on-chain settlement outcomes and project them into explicit
-ARC lifecycle state.
+Chio lifecycle state.
 **Depends on**: Phase 157
 **Requirements**: SETTLEX-02
-**Why second**: Dispatch is incomplete until ARC can see finality, dispute,
+**Why second**: Dispatch is incomplete until Chio can see finality, dispute,
 timeout, reversal, and bond outcomes accurately.
 
 **Primary surfaces:**
@@ -4312,7 +4312,7 @@ timeout, reversal, and bond outcomes accurately.
 - bond lifecycle updates and recovery semantics
 
 **Success Criteria**:
-1. On-chain settlement states reconcile into ARC lifecycle state explicitly.
+1. On-chain settlement states reconcile into Chio lifecycle state explicitly.
 2. Dispute windows, timeouts, and reorgs are observable and auditable.
 3. Bond state transitions remain explicit instead of hidden off-chain logic.
 
@@ -4321,13 +4321,13 @@ timeout, reversal, and bond outcomes accurately.
 
 Plans:
 - [x] 158-01: Implement settlement observation and finality monitoring.
-- [x] 158-02: Project refund, reversal, timeout, and reorg outcomes into ARC state.
+- [x] 158-02: Project refund, reversal, timeout, and reorg outcomes into Chio state.
 - [x] 158-03: Add bond lifecycle observation and recovery semantics.
 
 ### Phase 159: Solana Settlement Path, Ed25519-Native Verification, and Multi-Chain Consistency
 
 **Goal**: Add the Solana-native settlement path and solve the Ed25519-side
-verification problem within ARC's bounded trust model.
+verification problem within Chio's bounded trust model.
 **Depends on**: Phases 157 and 158
 **Requirements**: SETTLEX-03
 **Why third**: The Solana lane and Ed25519-native verification broaden
@@ -4340,7 +4340,7 @@ settlement only after the EVM path is stable.
 - multi-chain consistency and proof equivalence rules
 
 **Success Criteria**:
-1. ARC supports one explicit Solana settlement path.
+1. Chio supports one explicit Solana settlement path.
 2. Ed25519-native verification is bounded and reproducible where supported.
 3. Multi-chain settlement semantics remain consistent and fail closed on drift.
 
@@ -4352,13 +4352,13 @@ Plans:
 - [x] 159-02: Add Ed25519-native verification and path-selection logic.
 - [x] 159-03: Qualify multi-chain consistency between EVM and Solana settlement lanes.
 
-### Phase 160: arc-settle Qualification, Custody Boundary, and Regulated-Role Runbooks
+### Phase 160: chio-settle Qualification, Custody Boundary, and Regulated-Role Runbooks
 
-**Goal**: Close `arc-settle` with full lifecycle qualification and explicit
+**Goal**: Close `chio-settle` with full lifecycle qualification and explicit
 custody and regulated-role documentation.
 **Depends on**: Phases 157, 158, and 159
 **Requirements**: SETTLEX-04, SETTLEX-05
-**Why last**: ARC cannot claim on-chain settlement honestly until the runtime,
+**Why last**: Chio cannot claim on-chain settlement honestly until the runtime,
 regulatory, and recovery boundaries are proven and documented.
 
 **Primary surfaces:**
@@ -4370,14 +4370,14 @@ regulatory, and recovery boundaries are proven and documented.
 **Success Criteria**:
 1. End-to-end settlement passes across success and recovery cases.
 2. Custody and regulated-role assumptions remain explicit in runtime and docs.
-3. `v2.37` closes with honest `arc-settle` runtime claims.
+3. `v2.37` closes with honest `chio-settle` runtime claims.
 
 **Status**: complete locally 2026-04-01
 **Plans**: 3 plans
 
 Plans:
 - [x] 160-01: Build full-lifecycle settlement qualification across supported rails.
-- [x] 160-02: Publish custody, recovery, and regulated-role runbooks for `arc-settle`.
+- [x] 160-02: Publish custody, recovery, and regulated-role runbooks for `chio-settle`.
 - [x] 160-03: Close `v2.37` with audit and public-boundary updates.
 
 ### Phase 161: Chainlink Functions Proof Verification and EVM Ed25519 Fallback Strategy
@@ -4396,7 +4396,7 @@ bounded EVM-side proof verification.
 - qualification for supported fallback paths
 
 **Success Criteria**:
-1. ARC has one explicit bounded EVM fallback for Ed25519-constrained proofs.
+1. Chio has one explicit bounded EVM fallback for Ed25519-constrained proofs.
 2. The fallback does not silently widen trust beyond the declared boundary.
 3. Unsupported verification paths remain explicit non-goals.
 
@@ -4424,7 +4424,7 @@ runtime surfaces exist.
 - explicit override and replay controls
 
 **Success Criteria**:
-1. ARC can schedule bounded automation over anchor and settlement jobs.
+1. Chio can schedule bounded automation over anchor and settlement jobs.
 2. Duplicate or delayed automation does not create hidden state drift.
 3. Operators retain explicit override and incident-response control.
 
@@ -4439,7 +4439,7 @@ Plans:
 ### Phase 163: CCIP Delegation/Settlement Transport and Cross-Chain Receipt Reconciliation
 
 **Goal**: Add bounded CCIP transport for cross-chain delegation or settlement
-coordination and reconcile those messages back to ARC truth.
+coordination and reconcile those messages back to Chio truth.
 **Depends on**: Phases 161 and 162
 **Requirements**: WEBAUTO-03
 **Why third**: Cross-chain transport should only land after the local runtime
@@ -4452,22 +4452,22 @@ and automation surfaces are stable.
 - duplicate, delayed, and unsupported-chain handling
 
 **Success Criteria**:
-1. ARC can transport one bounded cross-chain message family via CCIP.
-2. Message execution reconciles back to canonical ARC receipts explicitly.
+1. Chio can transport one bounded cross-chain message family via CCIP.
+2. Message execution reconciles back to canonical Chio receipts explicitly.
 3. Unsupported or duplicate cross-chain execution fails closed.
 
 **Status**: complete locally 2026-04-02
 **Plans**: 3 plans
 
 Plans:
-- [x] 163-01: Define the bounded CCIP message and routing model for ARC.
+- [x] 163-01: Define the bounded CCIP message and routing model for Chio.
 - [x] 163-02: Implement receipt reconciliation for cross-chain execution or coordination messages.
 - [x] 163-03: Add failure handling for duplicate, delayed, and unsupported-chain delivery.
 
 ### Phase 164: x402 Surface, Circle Nanopayments, and ERC-4337 Paymaster Compatibility
 
 **Goal**: Add bounded machine-payment and gas-abstraction compatibility where
-those surfaces improve ARC settlement without replacing ARC truth.
+those surfaces improve Chio settlement without replacing Chio truth.
 **Depends on**: Phases 157 and 163
 **Requirements**: WEBAUTO-04, WEBAUTO-05
 **Why last**: These interop layers are useful extensions, but they should ride
@@ -4480,8 +4480,8 @@ on top of the explicit contract and settlement substrate rather than define it.
 - interoperability qualification and failure boundaries
 
 **Success Criteria**:
-1. ARC can interoperate with the selected payment/gas-abstraction surfaces explicitly.
-2. Those surfaces do not replace or mutate canonical ARC truth.
+1. Chio can interoperate with the selected payment/gas-abstraction surfaces explicitly.
+2. Those surfaces do not replace or mutate canonical Chio truth.
 3. `v2.38` closes with clear supported and unsupported interoperability claims.
 
 **Status**: complete locally 2026-04-02
@@ -4526,7 +4526,7 @@ Plans:
 promotion from local to deployed environments.
 **Depends on**: Phase 165
 **Requirements**: W3OPS-02, W3OPS-03
-**Why second**: ARC should not attempt broader qualification or partner proof
+**Why second**: Chio should not attempt broader qualification or partner proof
 until security and rollout gates are explicit.
 
 **Primary surfaces:**
@@ -4554,7 +4554,7 @@ Plans:
 semi-external environments.
 **Depends on**: Phases 165 and 166
 **Requirements**: W3OPS-04
-**Why third**: ARC's web3 runtime claim only becomes credible once partner-
+**Why third**: Chio's web3 runtime claim only becomes credible once partner-
 visible qualification covers more than local harnesses.
 
 **Primary surfaces:**
@@ -4565,7 +4565,7 @@ visible qualification covers more than local harnesses.
 
 **Success Criteria**:
 1. The full stack passes at least one external or partner-visible qualification lane.
-2. Reviewers can trace end-to-end runtime behavior back to ARC truth.
+2. Reviewers can trace end-to-end runtime behavior back to Chio truth.
 3. Remaining external dependencies are explicit and bounded.
 
 **Status**: complete
@@ -4578,7 +4578,7 @@ Plans:
 
 ### Phase 168: Final Protocol/Release Boundary Rewrite and Post-Research Claim Closure
 
-**Goal**: Rewrite ARC's public boundary around the implemented web3 runtime
+**Goal**: Rewrite Chio's public boundary around the implemented web3 runtime
 stack and close the post-research ladder honestly.
 **Depends on**: Phases 165, 166, and 167
 **Requirements**: W3OPS-05
@@ -4592,7 +4592,7 @@ qualification, not before them.
 - explicit residual non-goals and external publication dependencies
 
 **Success Criteria**:
-1. ARC's public docs claim only the runtime capabilities that now exist.
+1. Chio's public docs claim only the runtime capabilities that now exist.
 2. Residual non-goals and remaining external gates are explicit.
 3. The late-March 2026 web3 research ladder closes without hidden backlog.
 
@@ -4621,7 +4621,7 @@ settlement identity is concurrency-safe and on-chain truthful.
 - regression coverage for interleaving, duplicate replay, and prior nonce-drift failure modes
 
 **Success Criteria**:
-1. `arc-settle` no longer treats mutable nonce-derived precomputations as the
+1. `chio-settle` no longer treats mutable nonce-derived precomputations as the
    authoritative escrow or bond identity.
 2. Escrow and vault identity remain consistent across dispatch, observation,
    release, refund, and recovery under retries or parallelism.
@@ -4655,7 +4655,7 @@ exists by construction rather than as a best-effort runtime option.
 **Success Criteria**:
 1. Web3-enabled deployments fail closed if durable receipt storage or
    checkpoint issuance is missing.
-2. `arc-anchor` and merkle-settlement flows consume the same canonical
+2. `chio-anchor` and merkle-settlement flows consume the same canonical
    checkpoint and inclusion-proof boundary.
 3. Qualification proves missing, stale, or contradictory evidence substrate
    state cannot silently degrade behavior.
@@ -4675,12 +4675,12 @@ bindings, kernel logic, and settlement runtime tell one truthful money-handling
 story.
 **Depends on**: Phases 169 and 170
 **Requirements**: W3INT-03, W3INT-05
-**Why third**: ARC should not harden hosted release and deployment promotion
+**Why third**: Chio should not harden hosted release and deployment promotion
 while reserve semantics and oracle authority remain split across layers.
 
 **Primary surfaces:**
 - reserve versus collateral semantics
-- oracle authority model across `arc-link`, kernel, and contracts
+- oracle authority model across `chio-link`, kernel, and contracts
 - settlement config and bindings parity
 - invariant and regression coverage for money and FX flows
 
@@ -4697,7 +4697,7 @@ while reserve semantics and oracle authority remain split across layers.
 
 Plans:
 - [x] 171-01: Reconcile bond reserve semantics across contracts, bindings, runtime, and docs.
-- [x] 171-02: Choose and implement one canonical oracle authority path across `arc-link`, kernel, and contracts.
+- [x] 171-02: Choose and implement one canonical oracle authority path across `chio-link`, kernel, and contracts.
 - [x] 171-03: Add invariant and regression coverage for FX-backed settlement and bond-accounting parity.
 
 ### Phase 172: Secondary-Lane Verification, Generated Bindings, and Contract/Runtime Parity Qualification
@@ -4707,7 +4707,7 @@ parity drift across the official contract and runtime stack.
 **Depends on**: Phases 170 and 171
 **Requirements**: W3INT-04, W3INT-05
 **Why last**: Once the core identity, evidence, and money contracts are
-truthful, ARC can harden remaining parity and verification drift without
+truthful, Chio can harden remaining parity and verification drift without
 baking inconsistencies forward.
 
 **Primary surfaces:**
@@ -4779,7 +4779,7 @@ advance after hosted qualification is in place.
 - reproducible promotion documentation and checks
 
 **Success Criteria**:
-1. ARC can drive one bounded live deployment runner from reviewed manifests.
+1. Chio can drive one bounded live deployment runner from reviewed manifests.
 2. Promotion to broader environments is approval-gated and reproducible.
 3. Rollback and failed-promotion behavior are explicit and testable.
 
@@ -4802,14 +4802,14 @@ reflect the hosted, promotion-ready stack rather than static examples alone.
 
 **Primary surfaces:**
 - generated runtime-report artifacts from qualification lanes
-- persisted operator mode changes for `arc-link`, `arc-anchor`, and `arc-settle`
+- persisted operator mode changes for `chio-link`, `chio-anchor`, and `chio-settle`
 - incident audit artifacts and control-plane traces
 - runbook alignment around exercised controls
 
 **Success Criteria**:
 1. Qualification emits real runtime reports rather than only syntax-checking
    example JSON.
-2. Emergency modes for `arc-link`, `arc-anchor`, and `arc-settle` are
+2. Emergency modes for `chio-link`, `chio-anchor`, and `chio-settle` are
    operator-exercisable, persisted, and auditable.
 3. Runbooks and qualification artifacts reflect the same live control surface.
 
@@ -4837,7 +4837,7 @@ deployment control, and live operator surfaces are real.
 - partner and reviewer evidence package
 
 **Success Criteria**:
-1. ARC passes one integrated end-to-end qualification lane over FX-backed and
+1. Chio passes one integrated end-to-end qualification lane over FX-backed and
    dual-sign settlement behavior.
 2. Recovery paths for reorg, refund, impair, and expiry are asserted in the
    same qualification family.
@@ -4954,7 +4954,7 @@ boundaries without reintroducing dependency cycles or shell-heavy orchestration.
 validation are stable so ownership changes do not hide unresolved drift.
 
 **Primary surfaces:**
-- `trust_control.rs`, `remote_mcp.rs`, `arc-mcp-edge/src/runtime.rs`, and `arc-kernel/src/lib.rs`
+- `trust_control.rs`, `remote_mcp.rs`, `chio-mcp-edge/src/runtime.rs`, and `chio-kernel/src/lib.rs`
 - dependency-cycle and layering guards
 - smaller ownership-oriented modules
 - tests and docs around moved runtime boundaries
@@ -4962,7 +4962,7 @@ validation are stable so ownership changes do not hide unresolved drift.
 **Success Criteria**:
 1. The largest runtime entrypoints are split into clearer responsibility
    boundaries.
-2. ARC avoids new dependency cycles or a larger `arc-cli` shell while
+2. Chio avoids new dependency cycles or a larger `chio-cli` shell while
    refactoring.
 3. The resulting module boundaries are documented and regression-covered.
 
@@ -4974,27 +4974,27 @@ Plans:
 - [x] 180-02: Add dependency and layering guards so refactors do not recreate giant shells or cycles.
 - [x] 180-03: Document and regression-cover the new runtime boundary structure.
 
-### Phase 181: MERCURY Scope Lock, ARC Reuse Map, and Workflow Freeze
+### Phase 181: MERCURY Scope Lock, Chio Reuse Map, and Workflow Freeze
 
-**Goal**: Freeze the first MERCURY workflow, ARC reuse boundary, and product
+**Goal**: Freeze the first MERCURY workflow, Chio reuse boundary, and product
 contract so implementation starts from one coherent wedge instead of parallel
 theories.
 **Depends on**: Phase 180
 **Requirements**: MERC-01, MERC-06
-**Why first**: MERCURY should start by packaging ARC correctly, not by coding
+**Why first**: MERCURY should start by packaging Chio correctly, not by coding
 before the product boundary, proof boundary, and workflow sentence are fixed.
 
 **Primary surfaces:**
 - `docs/mercury/PRODUCT_BRIEF.md`, `IMPLEMENTATION_ROADMAP.md`, and
   `EXTERNAL_PACKAGE.md`
 - `docs/mercury/PHASE_0_1_BUILD_CHECKLIST.md`
-- `docs/mercury/ARC_MODULE_MAPPING.md`
+- `docs/mercury/CHIO_MODULE_MAPPING.md`
 - first workflow sentence and pilot corpus boundary
 
 **Success Criteria**:
 1. The first supported workflow is frozen as one release, rollback, and
    inquiry evidence path.
-2. ARC reuse versus MERCURY net-new work is explicit at the crate/module
+2. Chio reuse versus MERCURY net-new work is explicit at the crate/module
    level.
 3. Product, GTM, pilot, and engineering docs point at the same first wedge.
 
@@ -5003,24 +5003,24 @@ before the product boundary, proof boundary, and workflow sentence are fixed.
 
 Plans:
 - [x] 181-01: Freeze the first MERCURY workflow sentence, proof boundary, and pilot topology.
-- [x] 181-02: Publish the ARC reuse map and Mercury-specific net-new build boundary.
+- [x] 181-02: Publish the Chio reuse map and Mercury-specific net-new build boundary.
 - [x] 181-03: Normalize external package, build checklist, and planning docs around the same wedge.
 
 ### Phase 182: MERCURY Core Evidence Model, Metadata, and Query Indexing
 
 **Goal**: Build the typed MERCURY evidence layer and indexed retrieval
-foundation on top of ARC receipts and SQLite persistence.
+foundation on top of Chio receipts and SQLite persistence.
 **Depends on**: Phase 181
 **Requirements**: MERC-01, MERC-02, MERC-03
 **Why second**: Proof packaging is only credible after the underlying metadata
 and retrieval contract are frozen and queryable.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-core/src/receipt.rs`
-- `crates/arc-store-sqlite/src/receipt_store.rs`
-- `crates/arc-kernel/src/receipt_query.rs` and
-  `crates/arc-store-sqlite/src/receipt_query.rs`
+- `crates/chio-mercury-core`
+- `crates/chio-core/src/receipt.rs`
+- `crates/chio-store-sqlite/src/receipt_store.rs`
+- `crates/chio-kernel/src/receipt_query.rs` and
+  `crates/chio-store-sqlite/src/receipt_query.rs`
 
 **Success Criteria**:
 1. MERCURY-specific receipt metadata is typed, serialized, and fixture-covered.
@@ -5033,28 +5033,28 @@ and retrieval contract are frozen and queryable.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 182-01: Create `arc-mercury-core` and define typed receipt metadata, chronology, provenance, and bundle references.
+- [x] 182-01: Create `chio-mercury-core` and define typed receipt metadata, chronology, provenance, and bundle references.
 - [x] 182-02: Extend SQLite persistence with extracted MERCURY identifier indexes and retention/disclosure state.
-- [x] 182-03: Extend ARC receipt query surfaces for MERCURY business identifiers and approval-state retrieval.
+- [x] 182-03: Extend Chio receipt query surfaces for MERCURY business identifiers and approval-state retrieval.
 
 ### Phase 183: MERCURY Proof Package, Inquiry Package, and Verifier Path
 
 **Goal**: Layer MERCURY's portable proof and reviewed-export contracts on top
-of ARC evidence export and ship one supported verification path.
+of Chio evidence export and ship one supported verification path.
 **Depends on**: Phase 182
 **Requirements**: MERC-01, MERC-04
-**Why third**: `Proof Package v1` should wrap real ARC export truth and the
+**Why third**: `Proof Package v1` should wrap real Chio export truth and the
 new MERCURY query/index layer, not precede them.
 
 **Primary surfaces:**
-- `crates/arc-kernel/src/evidence_export.rs`
-- `crates/arc-store-sqlite/src/evidence_export.rs`
-- `crates/arc-cli/src/evidence_export.rs`
-- `crates/arc-control-plane/src/lib.rs`
-- `crates/arc-mercury-core` proof/inquiry package modules
+- `crates/chio-kernel/src/evidence_export.rs`
+- `crates/chio-store-sqlite/src/evidence_export.rs`
+- `crates/chio-cli/src/evidence_export.rs`
+- `crates/chio-control-plane/src/lib.rs`
+- `crates/chio-mercury-core` proof/inquiry package modules
 
 **Success Criteria**:
-1. `Proof Package v1` is assembled from ARC receipts, checkpoints, lineage,
+1. `Proof Package v1` is assembled from Chio receipts, checkpoints, lineage,
    inclusion proofs, and retained MERCURY evidence metadata.
 2. `Inquiry Package v1` is derived from the underlying proof package plus
    disclosure and approval state without mutating truth.
@@ -5064,7 +5064,7 @@ new MERCURY query/index layer, not precede them.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 183-01: Wrap ARC evidence export into `Proof Package v1` with Mercury-specific manifest semantics.
+- [x] 183-01: Wrap Chio evidence export into `Proof Package v1` with Mercury-specific manifest semantics.
 - [x] 183-02: Implement `Inquiry Package v1`, disclosure/redaction metadata, and reviewed-export fixtures.
 - [x] 183-03: Add the first MERCURY verifier command path with gold package validation.
 
@@ -5099,37 +5099,37 @@ Plans:
 - [x] 184-02: Produce the design-partner pilot package, demo storyboard, and evaluator-facing verification flow.
 - [x] 184-03: Validate pilot readiness against the Mercury roadmap and hand off to the supervised-live bridge decision.
 
-### Phase 184.1: Mercury app boundary extraction from arc-cli (INSERTED)
+### Phase 184.1: Mercury app boundary extraction from chio-cli (INSERTED)
 
-**Goal**: Move MERCURY's operator surface out of `arc-cli` and into a
-dedicated app crate so ARC stays generic while MERCURY remains the
-finance-specific product layer on top of ARC.
+**Goal**: Move MERCURY's operator surface out of `chio-cli` and into a
+dedicated app crate so Chio stays generic while MERCURY remains the
+finance-specific product layer on top of Chio.
 **Requirements**: MERC-01, MERC-04, MERC-05, MERC-06
 **Depends on:** Phase 184
 **Why now**: phases `183` and `184` proved the package and pilot contracts,
-but the first shipped command surface widened `arc-cli`. Correct the boundary
+but the first shipped command surface widened `chio-cli`. Correct the boundary
 before treating the milestone as truly closed.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
-- `crates/arc-control-plane/src/lib.rs`
-- `crates/arc-cli/src/main.rs`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-control-plane/src/lib.rs`
+- `crates/chio-cli/src/main.rs`
 - `docs/mercury`
 
 **Success Criteria**:
-1. MERCURY ships as a dedicated app/binary built on ARC's generic substrate.
-2. `arc-cli` no longer exposes MERCURY-specific commands or dependencies.
+1. MERCURY ships as a dedicated app/binary built on Chio's generic substrate.
+2. `chio-cli` no longer exposes MERCURY-specific commands or dependencies.
 3. The pilot, verifier docs, and milestone audit all describe MERCURY as an
-   app on ARC rather than an ARC subcommand.
+   app on Chio rather than an Chio subcommand.
 
 **Status**: complete locally 2026-04-02
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 184.1-01: Create the dedicated `arc-mercury` app crate and move MERCURY command execution into it.
-- [x] 184.1-02: Remove MERCURY command wiring and MERCURY-only dependencies from `arc-cli` and generic ARC crates.
-- [x] 184.1-03: Update MERCURY docs, roadmap, and milestone state so they describe the corrected ARC/MERCURY boundary truthfully.
+- [x] 184.1-01: Create the dedicated `chio-mercury` app crate and move MERCURY command execution into it.
+- [x] 184.1-02: Remove MERCURY command wiring and MERCURY-only dependencies from `chio-cli` and generic Chio crates.
+- [x] 184.1-03: Update MERCURY docs, roadmap, and milestone state so they describe the corrected Chio/MERCURY boundary truthfully.
 
 ### Phase 185: MERCURY Supervised-Live Scope Lock, Entry Criteria, and Operating Envelope
 
@@ -5167,7 +5167,7 @@ Plans:
 ### Phase 186: MERCURY Live/Mirrored Workflow Intake and Proof Continuity
 
 **Goal**: Extend the same workflow from replay/shadow into supervised-live
-event intake while preserving ARC truth and the existing MERCURY proof
+event intake while preserving Chio truth and the existing MERCURY proof
 contracts.
 **Depends on**: Phase 185
 **Requirements**: SLIVE-01, SLIVE-02
@@ -5175,14 +5175,14 @@ contracts.
 operator controls and qualification can mean anything.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
-- `crates/arc-control-plane/src/lib.rs`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-control-plane/src/lib.rs`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 
 **Success Criteria**:
 1. Live or mirrored events for the same workflow can be captured without
-   redefining ARC's evidence substrate.
+   redefining Chio's evidence substrate.
 2. Proof and inquiry packages remain verifiable over the supervised-live path.
 3. Source identifiers and retained-artifact continuity survive the new intake
    path.
@@ -5191,7 +5191,7 @@ operator controls and qualification can mean anything.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 186-01: Add live or mirrored event intake for the same governed workflow without redefining the ARC evidence substrate.
+- [x] 186-01: Add live or mirrored event intake for the same governed workflow without redefining the Chio evidence substrate.
 - [x] 186-02: Preserve retained source-artifact and business-identifier continuity from live intake through proof/inquiry packaging.
 - [x] 186-03: Qualify the supervised-live capture path against the existing pilot corpus and contract expectations.
 
@@ -5209,7 +5209,7 @@ partner-facing use.
 - `docs/mercury/SUPERVISED_LIVE_BRIDGE.md`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/README.md`
-- `crates/arc-mercury`
+- `crates/chio-mercury`
 
 **Success Criteria**:
 1. Approval, interruption, and rollback controls are explicit and auditable.
@@ -5298,14 +5298,14 @@ acknowledgement semantics.
 connector or reviewer assurance hardening can stay bounded.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/SUPERVISED_LIVE_QUALIFICATION_PACKAGE.md`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 
 **Success Criteria**:
 1. One downstream distribution package/profile wraps the existing proof,
-   inquiry, and reviewer artifacts without redefining ARC truth.
+   inquiry, and reviewer artifacts without redefining Chio truth.
 2. Delivery metadata, disclosure posture, and acknowledgement or failure
    semantics are machine-readable and auditable.
 3. The package contract stays generic enough for one selected consumer lane
@@ -5330,8 +5330,8 @@ artifacts.
 connector path and reviewer export surface be added without bespoke drift.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/README.md`
 
@@ -5349,7 +5349,7 @@ connector path and reviewer export surface be added without bespoke drift.
 Plans:
 - [x] 191-01: Implement one bounded downstream export command/path for the selected archive/review/case-management consumer.
 - [x] 191-02: Extend reviewer-assurance packaging for internal and external review populations while preserving verification and disclosure controls.
-- [x] 191-03: Add regression coverage proving downstream export and reviewer packages remain rooted in the same ARC/MERCURY truth artifacts.
+- [x] 191-03: Add regression coverage proving downstream export and reviewer packages remain rooted in the same Chio/MERCURY truth artifacts.
 
 ### Phase 192: MERCURY Downstream Validation, Operations, and Expansion Decision
 
@@ -5425,14 +5425,14 @@ and publication model.
 approval and exception workflows can stay bounded and auditable.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/SUPERVISED_LIVE_DECISION_RECORD.md`
 
 **Success Criteria**:
 1. One change-review artifact/profile wraps existing proof and publication
-   truth without redefining ARC.
+   truth without redefining Chio.
 2. Change classes, reviewer state, approval semantics, and fail-closed
    escalation rules are machine-readable and auditable.
 3. The contract stays limited to one governed workflow and does not imply a
@@ -5458,8 +5458,8 @@ concrete operational workflow and reviewer surface be added without bespoke
 drift.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/README.md`
 
@@ -5477,7 +5477,7 @@ drift.
 Plans:
 - [x] 195-01: Implement one bounded governance-workbench command/path for governed change review and approval state.
 - [x] 195-02: Extend governance-facing reviewer packages or exports for workflow owners and control teams while preserving verification and disclosure controls.
-- [x] 195-03: Add regression coverage proving governance workflow state remains rooted in the same ARC/MERCURY truth artifacts.
+- [x] 195-03: Add regression coverage proving governance workflow state remains rooted in the same Chio/MERCURY truth artifacts.
 
 ### Phase 196: MERCURY Governance Validation, Operations, and Expansion Decision
 
@@ -5554,14 +5554,14 @@ existing proof and publication model.
 exports and investigation packaging can stay bounded and auditable.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/GOVERNANCE_WORKBENCH_DECISION_RECORD.md`
 
 **Success Criteria**:
 1. One assurance package family wraps existing proof, inquiry, reviewer, and
-   qualification truth without redefining ARC.
+   qualification truth without redefining Chio.
 2. Reviewer populations, disclosure profiles, redaction semantics, and
    verifier-equivalence rules are machine-readable and auditable.
 3. The contract stays limited to one assurance-suite lane and does not imply a
@@ -5586,8 +5586,8 @@ disclosure boundary.
 reviewer export path and investigation package be added without bespoke drift.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/README.md`
 
@@ -5605,7 +5605,7 @@ reviewer export path and investigation package be added without bespoke drift.
 Plans:
 - [x] 199-01: Implement one bounded assurance-suite command/path for reviewer-ready package generation and investigation packaging.
 - [x] 199-02: Extend reviewer-facing assurance exports for internal, auditor, and counterparty populations while preserving disclosure and verification controls.
-- [x] 199-03: Add regression coverage proving assurance surfaces remain rooted in the same ARC/MERCURY truth artifacts and do not imply a generic portal product.
+- [x] 199-03: Add regression coverage proving assurance surfaces remain rooted in the same Chio/MERCURY truth artifacts and do not imply a generic portal product.
 
 ### Phase 200: MERCURY Assurance Validation, Reviewer Operations, and Expansion Decision
 
@@ -5661,7 +5661,7 @@ before packaging or SDK semantics are widened.
 1. One embedded OEM path is selected and broader white-label, multi-partner,
    or SDK-platform breadth are explicit non-goals for this milestone.
 2. Intended partner boundary, ownership, and support line are explicit.
-3. The milestone stays bounded away from trust-network, ARC-Wall, and
+3. The milestone stays bounded away from trust-network, Chio-Wall, and
    multi-product platform work.
 
 **Status**: complete locally 2026-04-03
@@ -5670,7 +5670,7 @@ before packaging or SDK semantics are widened.
 Plans:
 - [ ] 201-01: Freeze one embedded OEM target and partner boundary across product, GTM, and technical docs.
 - [ ] 201-02: Define partner ownership, intended embedded surface, and support boundary for OEM artifacts.
-- [ ] 201-03: Record milestone entry criteria and acceptance boundary for embedded OEM expansion without widening into trust-network, ARC-Wall, or generic SDK scope.
+- [ ] 201-03: Record milestone entry criteria and acceptance boundary for embedded OEM expansion without widening into trust-network, Chio-Wall, or generic SDK scope.
 
 ### Phase 202: MERCURY Embedded Packaging Profile and OEM Contract
 
@@ -5682,14 +5682,14 @@ contract over the existing proof, review, governance, and assurance model.
 surface implementation can stay bounded and auditable.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/ASSURANCE_SUITE_DECISION_RECORD.md`
 
 **Success Criteria**:
 1. One embedded packaging profile wraps existing proof, inquiry, reviewer,
-   governance, and assurance truth without redefining ARC.
+   governance, and assurance truth without redefining Chio.
 2. Partner boundary, disclosure posture, packaging semantics, and fail-closed
    rules are machine-readable and auditable.
 3. The contract stays limited to one embedded OEM lane and does not imply a
@@ -5714,8 +5714,8 @@ packaging boundary.
 partner packaging path be added without generic SDK drift.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/README.md`
 
@@ -5733,7 +5733,7 @@ partner packaging path be added without generic SDK drift.
 Plans:
 - [ ] 203-01: Implement one bounded embedded-OEM command/path for partner-ready package generation and delivery packaging.
 - [ ] 203-02: Extend partner-facing packaging for the selected embedded surface while preserving disclosure and fail-closed controls.
-- [ ] 203-03: Add regression coverage proving the embedded OEM surface remains rooted in the same ARC/MERCURY truth artifacts and does not imply a generic SDK platform.
+- [ ] 203-03: Add regression coverage proving the embedded OEM surface remains rooted in the same Chio/MERCURY truth artifacts and does not imply a generic SDK platform.
 
 ### Phase 204: MERCURY OEM Validation, Operating Model, and Expansion Decision
 
@@ -5757,7 +5757,7 @@ validation, and the next boundary are explicit.
 2. Partner operations, support ownership, and failure recovery for the
    embedded lane are documented and reviewable.
 3. The milestone closes with one explicit next-step boundary rather than
-   silently widening into trust-network, ARC-Wall, or multi-partner OEM
+   silently widening into trust-network, Chio-Wall, or multi-partner OEM
    scope.
 
 **Status**: complete locally 2026-04-03
@@ -5766,7 +5766,7 @@ validation, and the next boundary are explicit.
 Plans:
 - [ ] 204-01: Generate an embedded OEM validation corpus and walkthrough for the selected partner packaging surface.
 - [ ] 204-02: Publish embedded-OEM partner operations, support ownership, and failure-recovery guidance.
-- [ ] 204-03: Close the milestone with one explicit decision on whether to widen to another OEM partner surface, trust-network work, or ARC-Wall.
+- [ ] 204-03: Close the milestone with one explicit decision on whether to widen to another OEM partner surface, trust-network work, or Chio-Wall.
 
 ### Phase 205: MERCURY Trust-Network Scope Lock and Sponsor Boundary Freeze
 
@@ -5785,11 +5785,11 @@ set before publication or witness semantics are widened.
 - `docs/mercury/README.md`
 
 **Success Criteria**:
-1. One trust-network path is selected and broader ecosystem, ARC-Wall, or
+1. One trust-network path is selected and broader ecosystem, Chio-Wall, or
    multi-network breadth are explicit non-goals for this milestone.
 2. Intended sponsor boundary, reviewer or firm sharing model, and support line
    are explicit.
-3. The milestone stays bounded away from ARC-Wall, multi-product hardening,
+3. The milestone stays bounded away from Chio-Wall, multi-product hardening,
    and generic ecosystem infrastructure.
 
 **Status**: complete locally 2026-04-03
@@ -5798,7 +5798,7 @@ set before publication or witness semantics are widened.
 Plans:
 - [ ] 205-01: Freeze one trust-network target and sponsor boundary across product, GTM, and technical docs.
 - [ ] 205-02: Define reviewer or firm sharing model, ownership, and support boundary for trust-network artifacts.
-- [ ] 205-03: Record milestone entry criteria and acceptance boundary for trust-network expansion without widening into ARC-Wall or generic ecosystem scope.
+- [ ] 205-03: Record milestone entry criteria and acceptance boundary for trust-network expansion without widening into Chio-Wall or generic ecosystem scope.
 
 ### Phase 206: MERCURY Trust-Anchor, Witness, and Publication Continuity Contract
 
@@ -5810,18 +5810,18 @@ continuity contract over the existing proof, inquiry, and publication model.
 interoperability or reviewer-sharing surfaces can stay bounded and auditable.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/EMBEDDED_OEM_DECISION_RECORD.md`
 
 **Success Criteria**:
 1. One trust-network contract wraps existing proof, inquiry, publication, and
-   witness truth without redefining ARC.
+   witness truth without redefining Chio.
 2. Trust-anchor roles, witness steps, publication continuity, and fail-closed
    rules are machine-readable and auditable.
 3. The contract stays limited to one trust-network lane and does not imply a
-   generic ecosystem service or ARC-Wall product.
+   generic ecosystem service or Chio-Wall product.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
@@ -5842,8 +5842,8 @@ boundary.
 concrete interoperability path be added without ecosystem-service drift.
 
 **Primary surfaces:**
-- `crates/arc-mercury`
-- `crates/arc-mercury-core`
+- `crates/chio-mercury`
+- `crates/chio-mercury-core`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/README.md`
 
@@ -5853,7 +5853,7 @@ concrete interoperability path be added without ecosystem-service drift.
 2. The interoperability path can consume the same underlying proof and inquiry
    artifacts through one bounded trust-network package family.
 3. The implementation stays bounded to one trust-network lane and does not
-   imply a generic ecosystem service, multi-network broker, or ARC-Wall
+   imply a generic ecosystem service, multi-network broker, or Chio-Wall
    product.
 
 **Status**: complete locally 2026-04-03
@@ -5862,7 +5862,7 @@ concrete interoperability path be added without ecosystem-service drift.
 Plans:
 - [ ] 207-01: Implement one bounded trust-network command/path for shared proof-profile generation and reviewer or partner distribution packaging.
 - [ ] 207-02: Extend interoperability packaging for the selected trust-network surface while preserving disclosure and fail-closed controls.
-- [ ] 207-03: Add regression coverage proving the trust-network surface remains rooted in the same ARC/MERCURY truth artifacts and does not imply a generic ecosystem service.
+- [ ] 207-03: Add regression coverage proving the trust-network surface remains rooted in the same Chio/MERCURY truth artifacts and does not imply a generic ecosystem service.
 
 ### Phase 208: MERCURY Trust-Network Rollout Plan, Operating Model, and Expansion Decision
 
@@ -5886,7 +5886,7 @@ validation, and the next boundary are explicit.
 2. Sponsor and reviewer operations, support ownership, and failure recovery
    for the trust-network lane are documented and reviewable.
 3. The milestone closes with one explicit next-step boundary rather than
-   silently widening into ARC-Wall or multi-product hardening work.
+   silently widening into Chio-Wall or multi-product hardening work.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
@@ -5894,44 +5894,44 @@ validation, and the next boundary are explicit.
 Plans:
 - [ ] 208-01: Generate a trust-network validation corpus and walkthrough for the selected sharing and interoperability surface.
 - [ ] 208-02: Publish trust-network operations, support ownership, and failure-recovery guidance for sponsor and reviewer use.
-- [ ] 208-03: Close the milestone with one explicit decision on whether to widen to ARC-Wall, multi-product hardening, or further trust-network breadth.
+- [ ] 208-03: Close the milestone with one explicit decision on whether to widen to Chio-Wall, multi-product hardening, or further trust-network breadth.
 
-### Phase 209: ARC-Wall Scope Lock and Buyer Boundary Freeze
+### Phase 209: Chio-Wall Scope Lock and Buyer Boundary Freeze
 
-**Goal**: Freeze one ARC-Wall buyer motion, control-team boundary, and
+**Goal**: Freeze one Chio-Wall buyer motion, control-team boundary, and
 explicit non-goals before new information-domain evidence or guard behavior
 lands.
 **Depends on**: Phase 208
 **Requirements**: AWALL-01
-**Why first**: after the trust-network lane is validated, ARC-Wall still
+**Why first**: after the trust-network lane is validated, Chio-Wall still
 needs one named buyer path, one owner boundary, and one non-goal set before
 guard or packaging semantics are widened.
 
 **Primary surfaces:**
-- `docs/mercury/ARC_WALL_BRIEF.md`
+- `docs/mercury/CHIO_WALL_BRIEF.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/epics/MASTER_PROJECT.md`
 
 **Success Criteria**:
-1. One ARC-Wall buyer motion is selected and broader barrier-platform or
+1. One Chio-Wall buyer motion is selected and broader barrier-platform or
    multi-product breadth are explicit non-goals for this milestone.
 2. Intended buyer boundary, control-team owner, and support line are explicit.
-3. The milestone stays bounded away from folding ARC-Wall into MERCURY or
+3. The milestone stays bounded away from folding Chio-Wall into MERCURY or
    widening into `E-026` platform hardening.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 209-01: Freeze one ARC-Wall buyer motion and control-team boundary across product, GTM, and technical docs.
-- [ ] 209-02: Define buyer ownership, target domain-separation surface, and support boundary for ARC-Wall artifacts.
-- [ ] 209-03: Record milestone entry criteria and acceptance boundary for ARC-Wall without widening into generic barrier-platform or multi-product-hardening scope.
+- [ ] 209-01: Freeze one Chio-Wall buyer motion and control-team boundary across product, GTM, and technical docs.
+- [ ] 209-02: Define buyer ownership, target domain-separation surface, and support boundary for Chio-Wall artifacts.
+- [ ] 209-03: Record milestone entry criteria and acceptance boundary for Chio-Wall without widening into generic barrier-platform or multi-product-hardening scope.
 
-### Phase 210: Information-Domain Evidence Schema and ARC-Wall Contract
+### Phase 210: Information-Domain Evidence Schema and Chio-Wall Contract
 
 **Goal**: Define one machine-readable information-domain evidence contract
-over the existing ARC receipt, checkpoint, publication, and verification
+over the existing Chio receipt, checkpoint, publication, and verification
 substrate.
 **Depends on**: Phase 209
 **Requirements**: AWALL-02
@@ -5939,49 +5939,49 @@ substrate.
 or buyer package can stay bounded and auditable.
 
 **Primary surfaces:**
-- `crates/arc-kernel`
-- `crates/arc-control-plane`
+- `crates/chio-kernel`
+- `crates/chio-control-plane`
 - `spec/PROTOCOL.md`
-- `docs/mercury/ARC_WALL_BRIEF.md`
+- `docs/mercury/CHIO_WALL_BRIEF.md`
 
 **Success Criteria**:
-1. One information-domain evidence contract wraps existing ARC truth without
-   redefining ARC or MERCURY semantics.
+1. One information-domain evidence contract wraps existing Chio truth without
+   redefining Chio or MERCURY semantics.
 2. Domain context, policy references, allow/deny outcomes, retained
    configuration references, and fail-closed rules are machine-readable and
    auditable.
-3. The contract stays limited to one ARC-Wall lane and does not imply generic
+3. The contract stays limited to one Chio-Wall lane and does not imply generic
    barrier services or multi-product hardening.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 210-01: Define one information-domain evidence schema rooted in ARC receipt, checkpoint, publication, and verification artifacts.
+- [ ] 210-01: Define one information-domain evidence schema rooted in Chio receipt, checkpoint, publication, and verification artifacts.
 - [ ] 210-02: Encode domain context, policy references, allow or deny outcomes, retained configuration references, and fail-closed evaluation rules.
-- [ ] 210-03: Qualify the ARC-Wall evidence contract against one representative information-domain separation scenario before guard implementation.
+- [ ] 210-03: Qualify the Chio-Wall evidence contract against one representative information-domain separation scenario before guard implementation.
 
 ### Phase 211: Control-Path Guard Surface and Companion-Product Packaging Path
 
-**Goal**: Implement one bounded ARC-Wall control-path guard and buyer-facing
-packaging surface over the same ARC evidence boundary.
+**Goal**: Implement one bounded Chio-Wall control-path guard and buyer-facing
+packaging surface over the same Chio evidence boundary.
 **Depends on**: Phase 210
 **Requirements**: AWALL-03, AWALL-04
 **Why third**: only after the evidence contract is frozen can one concrete
 guard and packaging path be added without product-boundary drift.
 
 **Primary surfaces:**
-- `crates/arc-kernel`
-- `crates/arc-control-plane`
+- `crates/chio-kernel`
+- `crates/chio-control-plane`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
-- `docs/mercury/ARC_WALL_BRIEF.md`
+- `docs/mercury/CHIO_WALL_BRIEF.md`
 
 **Success Criteria**:
-1. One supported ARC-Wall path can evaluate a named information-domain guard
+1. One supported Chio-Wall path can evaluate a named information-domain guard
    and emit bounded allow or deny evidence.
-2. The buyer-facing surface consumes the same underlying ARC truth through one
+2. The buyer-facing surface consumes the same underlying Chio truth through one
    companion-product packaging path.
-3. The implementation stays bounded to ARC-Wall on ARC and does not imply a
+3. The implementation stays bounded to Chio-Wall on Chio and does not imply a
    MERCURY feature expansion, generic barrier platform, or `E-026`
    multi-product hardening.
 
@@ -5989,31 +5989,31 @@ guard and packaging path be added without product-boundary drift.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 211-01: Implement one bounded ARC-Wall command or surface for information-domain guard evaluation and evidence export.
-- [ ] 211-02: Extend buyer-facing packaging for the selected ARC-Wall surface while preserving policy visibility and fail-closed controls.
-- [ ] 211-03: Add regression coverage proving ARC-Wall stays a companion product on ARC rather than a MERCURY lane or generic barrier platform.
+- [ ] 211-01: Implement one bounded Chio-Wall command or surface for information-domain guard evaluation and evidence export.
+- [ ] 211-02: Extend buyer-facing packaging for the selected Chio-Wall surface while preserving policy visibility and fail-closed controls.
+- [ ] 211-03: Add regression coverage proving Chio-Wall stays a companion product on Chio rather than a MERCURY lane or generic barrier platform.
 
-### Phase 212: ARC-Wall Validation, Buyer Packaging, and Expansion Decision
+### Phase 212: Chio-Wall Validation, Buyer Packaging, and Expansion Decision
 
-**Goal**: Validate the ARC-Wall lane end to end, document buyer and
+**Goal**: Validate the Chio-Wall lane end to end, document buyer and
 control-team operations, and close the milestone with one explicit next-step
 decision.
 **Depends on**: Phase 211
 **Requirements**: AWALL-05
-**Why last**: ARC-Wall counts only if the buyer package, operating model, and
+**Why last**: Chio-Wall counts only if the buyer package, operating model, and
 next boundary are explicit.
 
 **Primary surfaces:**
-- `docs/mercury/ARC_WALL_BRIEF.md`
+- `docs/mercury/CHIO_WALL_BRIEF.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/PARTNERSHIP_STRATEGY.md`
 - `docs/mercury/README.md`
 
 **Success Criteria**:
-1. One representative ARC-Wall workflow is validated end to end with repo-
+1. One representative Chio-Wall workflow is validated end to end with repo-
    native artifacts.
 2. Buyer and control-team operations, support ownership, and failure recovery
-   for the ARC-Wall lane are documented and reviewable.
+   for the Chio-Wall lane are documented and reviewable.
 3. The milestone closes with one explicit next-step boundary rather than
    silently widening into `E-026` platform hardening or generic buyer-sprawl
    scope.
@@ -6022,29 +6022,29 @@ next boundary are explicit.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 212-01: Generate an ARC-Wall validation corpus and walkthrough for the selected buyer motion and guard surface.
-- [ ] 212-02: Publish ARC-Wall operations, ownership, and failure-recovery guidance for buyer and control teams.
-- [ ] 212-03: Close the milestone with one explicit decision on whether to widen to multi-product hardening, another ARC-Wall buyer motion, or defer.
+- [ ] 212-01: Generate an Chio-Wall validation corpus and walkthrough for the selected buyer motion and guard surface.
+- [ ] 212-02: Publish Chio-Wall operations, ownership, and failure-recovery guidance for buyer and control teams.
+- [ ] 212-03: Close the milestone with one explicit decision on whether to widen to multi-product hardening, another Chio-Wall buyer motion, or defer.
 
 ### Phase 213: Shared Service Boundary Review and Product Ownership Freeze
 
-**Goal**: Freeze what remains shared versus product-specific across ARC,
-MERCURY, and ARC-Wall before any multi-product hardening work is sequenced.
+**Goal**: Freeze what remains shared versus product-specific across Chio,
+MERCURY, and Chio-Wall before any multi-product hardening work is sequenced.
 **Depends on**: Phase 212
 **Requirements**: MPH-01
 **Why first**: multi-product hardening is only credible once the repo names
-the shared ARC substrate seams and the product-owned surfaces that must stay
+the shared Chio substrate seams and the product-owned surfaces that must stay
 separate.
 
 **Primary surfaces:**
 - `docs/mercury/README.md`
-- `docs/arc-wall/README.md`
+- `docs/chio-wall/README.md`
 - `docs/mercury/epics/MASTER_PROJECT.md`
 - `spec/PROTOCOL.md`
 
 **Success Criteria**:
-1. Shared ARC substrate seams and product-owned surfaces are explicit across
-   MERCURY and ARC-Wall.
+1. Shared Chio substrate seams and product-owned surfaces are explicit across
+   MERCURY and Chio-Wall.
 2. Product ownership, support boundaries, and non-goals are explicit for the
    current product set.
 3. The milestone stays bounded away from new buyer motions, new connector
@@ -6054,15 +6054,15 @@ separate.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 213-01: Freeze shared-vs-product-specific service boundaries across ARC, MERCURY, and ARC-Wall surfaces.
+- [ ] 213-01: Freeze shared-vs-product-specific service boundaries across Chio, MERCURY, and Chio-Wall surfaces.
 - [ ] 213-02: Define product ownership, support boundaries, and non-goals for the current multi-product set.
 - [ ] 213-03: Record milestone entry criteria and acceptance boundary for cross-product hardening without reopening new buyer or connector lanes.
 
 ### Phase 214: Cross-Product Governance, Release, and Trust-Material Operating Model
 
 **Goal**: Define one cross-product governance and operating model for release,
-incident, and trust-material ownership over the current ARC, MERCURY, and
-ARC-Wall surface set.
+incident, and trust-material ownership over the current Chio, MERCURY, and
+Chio-Wall surface set.
 **Depends on**: Phase 213
 **Requirements**: MPH-02, MPH-03
 **Why second**: governance only stays truthful after the shared-versus-
@@ -6071,13 +6071,13 @@ product boundary is frozen and product-merger drift is ruled out.
 **Primary surfaces:**
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/GO_TO_MARKET.md`
-- `docs/arc-wall/OPERATIONS.md`
+- `docs/chio-wall/OPERATIONS.md`
 - `.planning/v2.50-MILESTONE-AUDIT.md`
 
 **Success Criteria**:
 1. Release, rollback, incident, and trust-material ownership are explicit
-   across shared ARC substrate and product-specific services.
-2. The governance model keeps MERCURY and ARC-Wall separate apps while
+   across shared Chio substrate and product-specific services.
+2. The governance model keeps MERCURY and Chio-Wall separate apps while
    defining shared control points honestly.
 3. The operating model does not imply a merged shell, generic platform
    console, or new product expansion.
@@ -6086,14 +6086,14 @@ product boundary is frozen and product-merger drift is ruled out.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 214-01: Define the cross-product governance and approval matrix for the current ARC, MERCURY, and ARC-Wall product set.
+- [ ] 214-01: Define the cross-product governance and approval matrix for the current Chio, MERCURY, and Chio-Wall product set.
 - [ ] 214-02: Define release, incident, and trust-material ownership plus escalation boundaries across shared and product-specific surfaces.
 - [ ] 214-03: Record the fail-closed cross-product control posture and non-goals without implying a merged product shell.
 
 ### Phase 215: Platform Hardening Backlog, Dependency Map, and Qualification Envelope
 
 **Goal**: Publish one bounded hardening backlog for sustained multi-product
-operation over the current MERCURY and ARC-Wall product set on ARC.
+operation over the current MERCURY and Chio-Wall product set on Chio.
 **Depends on**: Phase 214
 **Requirements**: MPH-04
 **Why third**: a hardening backlog is only honest after the shared boundary
@@ -6116,7 +6116,7 @@ and governance model are explicit.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 215-01: Inventory shared-service hardening gaps exposed by the validated MERCURY and ARC-Wall lanes.
+- [ ] 215-01: Inventory shared-service hardening gaps exposed by the validated MERCURY and Chio-Wall lanes.
 - [ ] 215-02: Publish one prioritized backlog with dependency order, acceptance boundary, and owner hints for sustained multi-product operation.
 - [ ] 215-03: Define the qualification envelope and explicit non-goals for the hardening backlog before execution begins.
 
@@ -6132,12 +6132,12 @@ validation package, and next decision are explicit.
 
 **Primary surfaces:**
 - `docs/mercury/README.md`
-- `docs/arc-wall/README.md`
+- `docs/chio-wall/README.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 
 **Success Criteria**:
-1. One representative MERCURY plus ARC-Wall operating scenario is validated at
+1. One representative MERCURY plus Chio-Wall operating scenario is validated at
    the boundary and ownership level with repo-native artifacts.
 2. Cross-product operations, support ownership, and recovery posture are
    documented and reviewable.
@@ -6148,59 +6148,59 @@ validation package, and next decision are explicit.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [ ] 216-01: Generate a multi-product validation package and walkthrough for the current MERCURY plus ARC-Wall operating boundary.
-- [ ] 216-02: Publish cross-product operations, support ownership, and failure-recovery guidance for the shared ARC substrate and product apps.
+- [ ] 216-01: Generate a multi-product validation package and walkthrough for the current MERCURY plus Chio-Wall operating boundary.
+- [ ] 216-02: Publish cross-product operations, support ownership, and failure-recovery guidance for the shared Chio substrate and product apps.
 - [ ] 216-03: Close the milestone with one explicit decision on whether to harden further, widen another product lane, or defer.
 
-### Phase 217: ARC Substrate Purity Boundary Correction
+### Phase 217: Chio Substrate Purity Boundary Correction
 
-**Goal**: Remove ARC-side product-specific boundary packaging so ARC generic
-crates no longer enumerate Mercury or ARC-Wall as first-class products.
+**Goal**: Remove Chio-side product-specific boundary packaging so Chio generic
+crates no longer enumerate Mercury or Chio-Wall as first-class products.
 **Depends on**: Phase 216
 **Requirements**: MAP-01
-**Why first**: the ARC purity violation started with ARC-side
+**Why first**: the Chio purity violation started with Chio-side
 `product-surface` entrypoints, so that coupling had to be removed before the
 rest of the substrate cleanup could be truthful.
 
 **Primary surfaces:**
-- `crates/arc-control-plane/src/lib.rs`
-- `crates/arc-cli/src/main.rs`
-- `crates/arc-control-plane/src/product_surface.rs`
-- `crates/arc-cli/tests/product_surface.rs`
+- `crates/chio-control-plane/src/lib.rs`
+- `crates/chio-cli/src/main.rs`
+- `crates/chio-control-plane/src/product_surface.rs`
+- `crates/chio-cli/tests/product_surface.rs`
 
 **Success Criteria**:
-1. Generic ARC crates do not expose Mercury- or ARC-Wall-specific
+1. Generic Chio crates do not expose Mercury- or Chio-Wall-specific
    `product-surface` commands.
-2. ARC control-plane no longer hardcodes product-specific manifests, owners, or
+2. Chio control-plane no longer hardcodes product-specific manifests, owners, or
    packaging flows.
-3. Mercury and ARC-Wall remain separate app-owned surfaces outside ARC generic
+3. Mercury and Chio-Wall remain separate app-owned surfaces outside Chio generic
    crates.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 217-01: Audit ARC control-plane and generic CLI surfaces for product-specific entrypoints.
-- [x] 217-02: Remove ARC-side `product-surface` module wiring and tests from generic crates.
-- [x] 217-03: Reconfirm that Mercury and ARC-Wall stay app-owned rather than ARC-owned.
+- [x] 217-01: Audit Chio control-plane and generic CLI surfaces for product-specific entrypoints.
+- [x] 217-02: Remove Chio-side `product-surface` module wiring and tests from generic crates.
+- [x] 217-03: Reconfirm that Mercury and Chio-Wall stay app-owned rather than Chio-owned.
 
 ### Phase 218: Generic Receipt Query Surface Cleanup
 
-**Goal**: Remove Mercury-only receipt filters from ARC's generic receipt-query
+**Goal**: Remove Mercury-only receipt filters from Chio's generic receipt-query
 and trust-control surfaces.
 **Depends on**: Phase 217
 **Requirements**: MAP-02
-**Why second**: once ARC-side product packaging was gone, the next remaining
-product coupling was ARC's generic receipt query API naming Mercury directly.
+**Why second**: once Chio-side product packaging was gone, the next remaining
+product coupling was Chio's generic receipt query API naming Mercury directly.
 
 **Primary surfaces:**
-- `crates/arc-kernel/src/receipt_query.rs`
-- `crates/arc-cli/src/main.rs`
-- `crates/arc-cli/src/trust_control.rs`
+- `crates/chio-kernel/src/receipt_query.rs`
+- `crates/chio-cli/src/main.rs`
+- `crates/chio-cli/src/trust_control.rs`
 
 **Success Criteria**:
-1. ARC generic receipt-query types do not expose Mercury-only fields.
-2. ARC generic CLI and trust-control HTTP query surfaces do not name Mercury
+1. Chio generic receipt-query types do not expose Mercury-only fields.
+2. Chio generic CLI and trust-control HTTP query surfaces do not name Mercury
    filters.
 3. The cleanup does not weaken generic receipt filtering or pagination.
 
@@ -6208,27 +6208,27 @@ product coupling was ARC's generic receipt query API naming Mercury directly.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 218-01: Remove Mercury-only fields from the generic ARC receipt-query model.
+- [x] 218-01: Remove Mercury-only fields from the generic Chio receipt-query model.
 - [x] 218-02: Remove Mercury-only receipt flags from the generic `arc` CLI and trust-control API.
 - [x] 218-03: Revalidate generic receipt-list and query behavior without Mercury-specific parameters.
 
 ### Phase 219: SQLite Receipt Store Decoupling From Mercury
 
-**Goal**: Remove Mercury-only indexing and crate dependency from ARC's generic
+**Goal**: Remove Mercury-only indexing and crate dependency from Chio's generic
 SQLite receipt store.
 **Depends on**: Phase 218
 **Requirements**: MAP-03
-**Why third**: ARC's SQLite store still depended on `arc-mercury-core` and a
+**Why third**: Chio's SQLite store still depended on `chio-mercury-core` and a
 Mercury-only receipt index after the generic query surface had been cleaned up.
 
 **Primary surfaces:**
-- `crates/arc-store-sqlite/Cargo.toml`
-- `crates/arc-store-sqlite/src/receipt_store.rs`
-- `crates/arc-store-sqlite/src/receipt_query.rs`
+- `crates/chio-store-sqlite/Cargo.toml`
+- `crates/chio-store-sqlite/src/receipt_store.rs`
+- `crates/chio-store-sqlite/src/receipt_query.rs`
 
 **Success Criteria**:
-1. ARC's generic SQLite store does not depend on `arc-mercury-core`.
-2. ARC's generic SQLite store does not maintain or backfill a Mercury-only
+1. Chio's generic SQLite store does not depend on `chio-mercury-core`.
+2. Chio's generic SQLite store does not maintain or backfill a Mercury-only
    receipt index.
 3. Generic receipt query coverage continues to pass under low-memory validation.
 
@@ -6236,30 +6236,30 @@ Mercury-only receipt index after the generic query surface had been cleaned up.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 219-01: Remove the Mercury-only dependency edge from `arc-store-sqlite`.
+- [x] 219-01: Remove the Mercury-only dependency edge from `chio-store-sqlite`.
 - [x] 219-02: Remove Mercury-only receipt-index creation, backfill, and upsert logic from the generic store.
 - [x] 219-03: Trim Mercury-specific store tests and keep generic receipt-query coverage green.
 
-### Phase 220: ARC Purity Validation and Milestone Closeout
+### Phase 220: Chio Purity Validation and Milestone Closeout
 
-**Goal**: Re-run the ARC purity audit, validate the cleanup with low-memory
+**Goal**: Re-run the Chio purity audit, validate the cleanup with low-memory
 checks, and close the milestone with one explicit decision.
 **Depends on**: Phase 219
 **Requirements**: MAP-04, MAP-05
-**Why last**: the milestone only counts if the repo-wide ARC audit and
-regression checks both agree that ARC generic crates no longer embed Mercury or
-ARC-Wall product logic.
+**Why last**: the milestone only counts if the repo-wide Chio audit and
+regression checks both agree that Chio generic crates no longer embed Mercury or
+Chio-Wall product logic.
 
 **Primary surfaces:**
-- `crates/arc-control-plane/src/lib.rs`
-- `crates/arc-cli/src/main.rs`
-- `crates/arc-kernel/src/receipt_query.rs`
-- `crates/arc-cli/src/trust_control.rs`
-- `crates/arc-store-sqlite/src/receipt_store.rs`
-- `crates/arc-store-sqlite/src/receipt_query.rs`
+- `crates/chio-control-plane/src/lib.rs`
+- `crates/chio-cli/src/main.rs`
+- `crates/chio-kernel/src/receipt_query.rs`
+- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-store-sqlite/src/receipt_store.rs`
+- `crates/chio-store-sqlite/src/receipt_query.rs`
 
 **Success Criteria**:
-1. A repo-wide scan of generic ARC crates returns no Mercury or ARC-Wall
+1. A repo-wide scan of generic Chio crates returns no Mercury or Chio-Wall
    references outside dedicated app crates.
 2. Low-memory `cargo check` plus targeted store and CLI receipt-query tests
    pass.
@@ -6270,9 +6270,9 @@ ARC-Wall product logic.
 **Plans**: 3/3 plans complete
 
 Plans:
-- [x] 220-01: Re-run the non-product-crate ARC purity audit and capture the result.
+- [x] 220-01: Re-run the non-product-crate Chio purity audit and capture the result.
 - [x] 220-02: Validate the cleanup with low-memory `cargo check` and targeted receipt-query tests.
-- [x] 220-03: Close the milestone with an explicit decision to keep ARC generic and Mercury opinionated.
+- [x] 220-03: Close the milestone with an explicit decision to keep Chio generic and Mercury opinionated.
 
 ### Phase 221: Mercury Release Readiness Scope Lock and Boundary Freeze
 
@@ -6280,28 +6280,28 @@ Plans:
 over the existing Mercury app surface.
 **Depends on**: Phase 220
 **Requirements**: MRR-01
-**Why first**: Mercury release packaging only stays honest after the ARC
+**Why first**: Mercury release packaging only stays honest after the Chio
 substrate boundary is corrected and the release-readiness audience is frozen.
 
 **Primary surfaces:**
 - `docs/mercury/README.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/PILOT_RUNBOOK.md`
-- `crates/arc-mercury/src/main.rs`
+- `crates/chio-mercury/src/main.rs`
 
 **Success Criteria**:
 1. Mercury freezes one release-readiness scope over its existing dedicated app
    surface.
 2. The audience and non-goals are explicit for reviewer, partner, and operator
    consumers.
-3. The phase does not reopen ARC generic-boundary work.
+3. The phase does not reopen Chio generic-boundary work.
 
 **Status**: completed locally 2026-04-03; implemented and verified
 **Plans**: 3/3 plans complete
 
 Plans:
 - [x] 221-01: Define the bounded Mercury release-readiness audience and artifact set.
-- [x] 221-02: Freeze Mercury-vs-ARC ownership and non-goals for this release lane.
+- [x] 221-02: Freeze Mercury-vs-Chio ownership and non-goals for this release lane.
 - [x] 221-03: Sequence the Mercury-only delivery path that later phases will package and validate.
 
 ### Phase 222: Mercury Reviewer and Partner Delivery Package Contract
@@ -6314,15 +6314,15 @@ and partners.
 audience, and non-goals are frozen.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury/src/commands.rs`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury/src/commands.rs`
 - `docs/mercury`
 
 **Success Criteria**:
 1. Mercury defines one bounded reviewer and partner delivery package family.
 2. The package roots in existing Mercury proof, inquiry, assurance, and trust-
    network artifacts.
-3. The package does not imply a new generic ARC export surface.
+3. The package does not imply a new generic Chio export surface.
 
 **Status**: completed locally 2026-04-03; implemented and verified
 **Plans**: 3/3 plans complete
@@ -6343,12 +6343,12 @@ delivery package rather than invented before the package contract exists.
 
 **Primary surfaces:**
 - `docs/mercury`
-- `crates/arc-mercury/src/main.rs`
-- `crates/arc-mercury/src/commands.rs`
+- `crates/chio-mercury/src/main.rs`
+- `crates/chio-mercury/src/commands.rs`
 
 **Success Criteria**:
 1. Mercury defines one operator-facing release and escalation path.
-2. Support ownership stays product-owned rather than being pushed into ARC
+2. Support ownership stays product-owned rather than being pushed into Chio
    generic crates.
 3. The handoff remains bounded to Mercury's current release-readiness lane.
 
@@ -6370,7 +6370,7 @@ milestone with one explicit launch or hold decision.
 operator handoff artifacts exist.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -6378,7 +6378,7 @@ operator handoff artifacts exist.
 1. Mercury validates one release-readiness package end to end.
 2. The milestone closes with one explicit launch or hold decision for Mercury
    itself.
-3. The decision keeps ARC generic and Mercury product-specific.
+3. The decision keeps Chio generic and Mercury product-specific.
 
 **Status**: completed locally 2026-04-03; implemented and verified
 **Plans**: 3/3 plans complete
@@ -6401,21 +6401,21 @@ freezes which cohort, success boundary, and non-goals count for this lane.
 - `docs/mercury/RELEASE_READINESS.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/README.md`
-- `crates/arc-mercury/src/main.rs`
+- `crates/chio-mercury/src/main.rs`
 
 **Success Criteria**:
 1. Mercury freezes one controlled-adoption cohort over its existing dedicated
    app surface.
 2. The scope and non-goals are explicit for post-launch renewal and reference
    evidence.
-3. The phase does not reopen ARC generic-boundary work.
+3. The phase does not reopen Chio generic-boundary work.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
 
 Plans:
 - [x] 225-01: Define the bounded post-launch cohort, success window, and artifact set.
-- [x] 225-02: Freeze Mercury-vs-ARC ownership and non-goals for this adoption lane.
+- [x] 225-02: Freeze Mercury-vs-Chio ownership and non-goals for this adoption lane.
 - [x] 225-03: Sequence the Mercury-only renewal and reference path that later phases will package and validate.
 
 ### Phase 226: Mercury Adoption Evidence and Renewal Package Contract
@@ -6428,15 +6428,15 @@ contract.
 scope, and non-goals are frozen.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury/src/commands.rs`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury/src/commands.rs`
 - `docs/mercury`
 
 **Success Criteria**:
 1. Mercury defines one bounded adoption-evidence package family.
 2. The package roots in existing release-readiness, trust-network, assurance,
    proof, and inquiry artifacts.
-3. The package does not imply a new generic ARC export or release surface.
+3. The package does not imply a new generic Chio export or release surface.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
@@ -6458,12 +6458,12 @@ exists.
 
 **Primary surfaces:**
 - `docs/mercury`
-- `crates/arc-mercury/src/main.rs`
-- `crates/arc-mercury/src/commands.rs`
+- `crates/chio-mercury/src/main.rs`
+- `crates/chio-mercury/src/commands.rs`
 
 **Success Criteria**:
 1. Mercury defines one customer-success and reference-readiness path.
-2. Support ownership stays product-owned rather than being pushed into ARC
+2. Support ownership stays product-owned rather than being pushed into Chio
    generic crates.
 3. The handoff remains bounded to Mercury's current controlled-adoption lane.
 
@@ -6485,7 +6485,7 @@ milestone with one explicit scale or defer decision.
 artifacts exist.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -6493,7 +6493,7 @@ artifacts exist.
 1. Mercury validates one controlled-adoption package end to end.
 2. The milestone closes with one explicit scale or defer decision for broader
    Mercury rollout.
-3. The decision keeps ARC generic and Mercury product-specific.
+3. The decision keeps Chio generic and Mercury product-specific.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
@@ -6510,7 +6510,7 @@ expansion motion over the validated controlled-adoption package.
 **Depends on**: Phase 228
 **Requirements**: MRE-01, MRE-05
 **Why first**: Mercury cannot honestly package expansion evidence until the
-account motion, target buyer path, and Mercury-versus-ARC ownership boundary
+account motion, target buyer path, and Mercury-versus-Chio ownership boundary
 are explicit.
 
 **Primary surfaces:**
@@ -6521,16 +6521,16 @@ are explicit.
 1. Mercury defines one explicit reference-distribution and landed-account
    expansion motion anchored in the existing controlled-adoption package.
 2. The account-motion freeze makes the Mercury-owned scope, buyer path, and
-   ARC non-goals explicit.
+   Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
 
 Plans:
 - [x] 229-01: Freeze the reference-distribution and landed-account target motion in Mercury docs and planning context.
-- [x] 229-02: Define the Mercury-owned scope, buyer path, and explicit ARC non-goals for the milestone.
+- [x] 229-02: Define the Mercury-owned scope, buyer path, and explicit Chio non-goals for the milestone.
 - [x] 229-03: Close the phase with one approved sequencing path for the reference-expansion lane.
 
 ### Phase 230: Mercury Reference Package and Expansion Evidence Contract
@@ -6544,8 +6544,8 @@ freeze says exactly which reference and expansion claims Mercury is allowed to
 make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -6555,7 +6555,7 @@ make.
 2. The expansion-evidence contract makes required inputs, bundle outputs, and
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic sales
-   tooling or ARC-side commercial surfaces.
+   tooling or Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-03
 **Plans**: 3/3 plans complete
@@ -6563,7 +6563,7 @@ make.
 Plans:
 - [x] 230-01: Define the reference-package inputs, outputs, and bounded data contract.
 - [x] 230-02: Add the Mercury export surface and docs for the expansion-evidence package.
-- [x] 230-03: Lock the non-goals so the package does not imply generic sales tooling or ARC commercial control surfaces.
+- [x] 230-03: Lock the non-goals so the package does not imply generic sales tooling or Chio commercial control surfaces.
 
 ### Phase 231: Mercury Claim Discipline, Buyer-Reference Approval, and Sales Handoff
 
@@ -6604,7 +6604,7 @@ milestone with one explicit proceed or defer decision.
 package, approval model, and handoff path exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -6612,7 +6612,7 @@ package, approval model, and handoff path exist together.
 1. Mercury validates one reference-backed expansion package end to end.
 2. The milestone closes with one explicit proceed or defer decision for
    broader landed-account distribution.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic sales-tooling claims.
 
 **Status**: complete locally 2026-04-03
@@ -6631,7 +6631,7 @@ package.
 **Depends on**: Phase 232
 **Requirements**: MBD-01, MBD-05
 **Why first**: Mercury cannot honestly package broader-distribution readiness
-until the target-account criteria, qualification path, and Mercury-versus-ARC
+until the target-account criteria, qualification path, and Mercury-versus-Chio
 ownership boundary are explicit.
 
 **Primary surfaces:**
@@ -6643,16 +6643,16 @@ ownership boundary are explicit.
    qualification motion anchored in the existing reference-distribution
    package.
 2. The target-account freeze makes the Mercury-owned scope, qualification
-   path, and ARC non-goals explicit.
+   path, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 233-01: Freeze the broader-distribution and target-account qualification motion in Mercury docs and planning context.
-- [x] 233-02: Define the Mercury-owned scope, qualification path, and explicit ARC non-goals for the milestone.
+- [x] 233-02: Define the Mercury-owned scope, qualification path, and explicit Chio non-goals for the milestone.
 - [x] 233-03: Close the phase with one approved sequencing path for the broader-distribution lane.
 
 ### Phase 234: Mercury Qualification Package and Governed Distribution Contract
@@ -6666,8 +6666,8 @@ account motion freeze says exactly which broader-distribution claims Mercury
 is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -6677,7 +6677,7 @@ is allowed to make.
 2. The governed-distribution contract makes required inputs, bundle outputs,
    and non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic sales
-   tooling, CRM workflows, or ARC-side commercial surfaces.
+   tooling, CRM workflows, or Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
@@ -6685,7 +6685,7 @@ is allowed to make.
 Plans:
 - [x] 234-01: Define the qualification-package inputs, outputs, and bounded data contract.
 - [x] 234-02: Add the Mercury export surface and docs for the governed-distribution package.
-- [x] 234-03: Lock the non-goals so the package does not imply generic sales tooling, CRM workflows, or ARC commercial control surfaces.
+- [x] 234-03: Lock the non-goals so the package does not imply generic sales tooling, CRM workflows, or Chio commercial control surfaces.
 
 ### Phase 235: Mercury Claim Governance, Selective Account Approval, and Distribution Handoff
 
@@ -6728,7 +6728,7 @@ milestone with one explicit proceed or defer decision.
 package, approval model, and handoff path exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -6736,7 +6736,7 @@ package, approval model, and handoff path exist together.
 1. Mercury validates one broader-distribution package end to end.
 2. The milestone closes with one explicit proceed or defer decision for
    broader Mercury distribution.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic sales-tooling claims.
 
 **Status**: complete locally 2026-04-04
@@ -6754,7 +6754,7 @@ renewal-gate motion over the validated selective-account-activation package.
 **Depends on**: Phase 240
 **Requirements**: MDC-01, MDC-05
 **Why first**: Mercury cannot honestly package controlled-delivery continuity
-until the delivered-account boundary, renewal gate, and Mercury-versus-ARC
+until the delivered-account boundary, renewal gate, and Mercury-versus-Chio
 ownership line are explicit.
 
 **Primary surfaces:**
@@ -6765,16 +6765,16 @@ ownership line are explicit.
 1. Mercury defines one explicit controlled-delivery continuity and renewal-
    gate motion anchored in the existing selective-account-activation package.
 2. The account boundary freeze makes the Mercury-owned continuity scope,
-   escalation posture, and ARC non-goals explicit.
+   escalation posture, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 241-01: Freeze the controlled-delivery continuity and renewal-gate motion in Mercury docs and planning context.
-- [x] 241-02: Define the Mercury-owned account boundary, continuity path, and explicit ARC non-goals for the milestone.
+- [x] 241-02: Define the Mercury-owned account boundary, continuity path, and explicit Chio non-goals for the milestone.
 - [x] 241-03: Close the phase with one approved sequencing path for the controlled-delivery continuity lane.
 
 ### Phase 242: Mercury Delivery Continuity Package and Outcome Evidence Contract
@@ -6788,8 +6788,8 @@ freeze says exactly which continuity and renewal claims Mercury is allowed to
 make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -6801,7 +6801,7 @@ make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic
    onboarding tooling, CRM workflows, support desks, channel marketplaces, or
-   ARC-side commercial surfaces.
+   Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
@@ -6809,7 +6809,7 @@ make.
 Plans:
 - [x] 242-01: Define the delivery-continuity package inputs, outputs, and bounded data contract.
 - [x] 242-02: Add the Mercury export surface and docs for the outcome-evidence package.
-- [x] 242-03: Lock the non-goals so the package does not imply generic onboarding tooling, CRM workflows, support desks, channel marketplaces, or ARC commercial control surfaces.
+- [x] 242-03: Lock the non-goals so the package does not imply generic onboarding tooling, CRM workflows, support desks, channel marketplaces, or Chio commercial control surfaces.
 
 ### Phase 243: Mercury Renewal Gate, Delivery Escalation, and Customer Evidence Handoff
 
@@ -6852,14 +6852,14 @@ the milestone with one explicit proceed or defer renewal decision.
 renewal-gate model, and customer-evidence handoff path exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
 **Success Criteria**:
 1. Mercury validates one controlled-delivery continuity package end to end.
 2. The milestone closes with one explicit proceed or defer renewal decision.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic onboarding or customer-platform claims.
 
 **Status**: complete locally 2026-04-04
@@ -6877,7 +6877,7 @@ motion over the validated delivery-continuity package.
 **Depends on**: Phase 244
 **Requirements**: MRN-01, MRN-05
 **Why first**: Mercury cannot honestly package renewal qualification until the
-renewal decision boundary, account scope, and Mercury-versus-ARC ownership
+renewal decision boundary, account scope, and Mercury-versus-Chio ownership
 line are explicit.
 
 **Primary surfaces:**
@@ -6888,16 +6888,16 @@ line are explicit.
 1. Mercury defines one explicit renewal qualification and outcome-review
    motion anchored in the existing delivery-continuity package.
 2. The renewal boundary freeze makes the Mercury-owned renewal scope,
-   retained-evidence posture, and ARC non-goals explicit.
+   retained-evidence posture, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 245-01: Freeze the renewal qualification and outcome-review motion in Mercury docs and planning context.
-- [x] 245-02: Define the Mercury-owned renewal boundary, retained-evidence path, and explicit ARC non-goals for the milestone.
+- [x] 245-02: Define the Mercury-owned renewal boundary, retained-evidence path, and explicit Chio non-goals for the milestone.
 - [x] 245-03: Close the phase with one approved sequencing path for the renewal lane.
 
 ### Phase 246: Mercury Renewal Package and Outcome Review Contract
@@ -6911,8 +6911,8 @@ freeze says exactly which renewal and retained-outcome claims Mercury is
 allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -6924,7 +6924,7 @@ allowed to make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic customer-
    success tooling, CRM workflows, account-management platforms, channel
-   marketplaces, or ARC-side commercial surfaces.
+   marketplaces, or Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
@@ -6932,7 +6932,7 @@ allowed to make.
 Plans:
 - [x] 246-01: Define the renewal-package inputs, outputs, and bounded data contract.
 - [x] 246-02: Add the Mercury export surface and docs for the outcome-review package.
-- [x] 246-03: Lock the non-goals so the package does not imply generic customer-success tooling, CRM workflows, account-management platforms, channel marketplaces, or ARC commercial control surfaces.
+- [x] 246-03: Lock the non-goals so the package does not imply generic customer-success tooling, CRM workflows, account-management platforms, channel marketplaces, or Chio commercial control surfaces.
 
 ### Phase 247: Mercury Renewal Approval, Reference Reuse Discipline, and Expansion Boundary Handoff
 
@@ -6974,7 +6974,7 @@ one explicit renew or defer decision.
 approval model, and expansion boundary handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -6982,7 +6982,7 @@ approval model, and expansion boundary handoff exist together.
 1. Mercury validates one renewal package end to end.
 2. The milestone closes with one explicit renew or defer decision for the
    bounded renewal lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic customer-success or account-platform claims.
 
 **Status**: complete locally 2026-04-04
@@ -7000,7 +7000,7 @@ motion over the validated second-account-expansion package.
 **Depends on**: Phase 252
 **Requirements**: MPP-01, MPP-05
 **Why first**: Mercury cannot honestly package a bounded multi-account
-program until the program boundary, account scope, and Mercury-versus-ARC
+program until the program boundary, account scope, and Mercury-versus-Chio
 ownership line are explicit.
 
 **Primary surfaces:**
@@ -7011,16 +7011,16 @@ ownership line are explicit.
 1. Mercury defines one explicit portfolio-program and program-review motion
    anchored in the existing second-account-expansion package.
 2. The multi-account boundary freeze makes the Mercury-owned program scope,
-   retained-evidence posture, and ARC non-goals explicit.
+   retained-evidence posture, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 253-01: Freeze the portfolio-program and program-review motion in Mercury docs and planning context.
-- [x] 253-02: Define the Mercury-owned multi-account boundary, evidence reuse path, and explicit ARC non-goals for the milestone.
+- [x] 253-02: Define the Mercury-owned multi-account boundary, evidence reuse path, and explicit Chio non-goals for the milestone.
 - [x] 253-03: Close the phase with one approved sequencing path for the bounded portfolio-program lane.
 
 ### Phase 254: Mercury Portfolio Program Package and Program Review Contract
@@ -7034,8 +7034,8 @@ multi-account boundary freeze says exactly which program and evidence-reuse
 claims Mercury is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7048,7 +7048,7 @@ claims Mercury is allowed to make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic customer-
    success tooling, account-management platforms, revenue operations systems,
-   channel marketplaces, or ARC-side commercial surfaces.
+   channel marketplaces, or Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
@@ -7056,7 +7056,7 @@ claims Mercury is allowed to make.
 Plans:
 - [x] 254-01: Define the portfolio-program package inputs, outputs, and bounded data contract.
 - [x] 254-02: Add the Mercury export surface and docs for the program-review package.
-- [x] 254-03: Lock the non-goals so the package does not imply generic customer-success tooling, account-management platforms, revenue operations systems, channel marketplaces, or ARC commercial control surfaces.
+- [x] 254-03: Lock the non-goals so the package does not imply generic customer-success tooling, account-management platforms, revenue operations systems, channel marketplaces, or Chio commercial control surfaces.
 
 ### Phase 255: Mercury Portfolio Approval, Revenue Operations Guardrails, and Program Handoff
 
@@ -7099,7 +7099,7 @@ milestone with one explicit proceed or defer decision.
 package, approval model, and program handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7107,7 +7107,7 @@ package, approval model, and program handoff exist together.
 1. Mercury validates one portfolio-program package end to end.
 2. The milestone closes with one explicit proceed or defer decision for the
    bounded portfolio-program lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic customer-success, account-management, or revenue-platform claims.
 
 **Status**: complete locally 2026-04-04
@@ -7125,7 +7125,7 @@ reuse motion over the validated second-portfolio-program package.
 **Depends on**: Phase 260
 **Requirements**: MTP-01, MTP-05
 **Why first**: Mercury cannot honestly package a third program until the
-repeatability boundary, allowed multi-program claims, and Mercury-versus-ARC
+repeatability boundary, allowed multi-program claims, and Mercury-versus-Chio
 ownership line are explicit.
 
 **Primary surfaces:**
@@ -7136,16 +7136,16 @@ ownership line are explicit.
 1. Mercury defines one explicit third-program and repeated portfolio-reuse
    motion anchored in the existing second-portfolio-program package.
 2. The repeatability boundary freeze makes the Mercury-owned adjacent-
-   program scope, retained-evidence posture, and ARC non-goals explicit.
+   program scope, retained-evidence posture, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 plans complete
 
 Plans:
 - [x] 261-01: Freeze the third-program and repeated portfolio-reuse motion in Mercury docs and planning context.
-- [x] 261-02: Define the Mercury-owned repeatability boundary, evidence reuse path, and explicit ARC non-goals for the milestone.
+- [x] 261-02: Define the Mercury-owned repeatability boundary, evidence reuse path, and explicit Chio non-goals for the milestone.
 - [x] 261-03: Close the phase with one approved sequencing path for the bounded third-program lane.
 
 ### Phase 262: Mercury Third Program Package and Repeated Portfolio Reuse Contract
@@ -7159,8 +7159,8 @@ repeatability boundary freeze says exactly which additional adjacent program
 and reuse claims Mercury is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7173,7 +7173,7 @@ and reuse claims Mercury is allowed to make.
    outputs, and non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic
    portfolio-management tooling, revenue operations systems, forecasting
-   stacks, billing platforms, channel programs, or ARC-side commercial
+   stacks, billing platforms, channel programs, or Chio-side commercial
    surfaces.
 
 **Status**: complete locally 2026-04-04
@@ -7182,7 +7182,7 @@ and reuse claims Mercury is allowed to make.
 Plans:
 - [x] 262-01: Define the third-program package inputs, outputs, and bounded data contract.
 - [x] 262-02: Add the Mercury export surface and docs for the repeated portfolio-reuse package.
-- [x] 262-03: Lock the non-goals so the package does not imply generic portfolio-management tooling, revenue operations systems, forecasting stacks, billing platforms, channel programs, or ARC commercial control surfaces.
+- [x] 262-03: Lock the non-goals so the package does not imply generic portfolio-management tooling, revenue operations systems, forecasting stacks, billing platforms, channel programs, or Chio commercial control surfaces.
 
 ### Phase 263: Mercury Third-Program Approval Refresh, Multi-Program Guardrails, and Handoff
 
@@ -7224,7 +7224,7 @@ with one explicit proceed or defer decision.
 package, approval-refresh model, and handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7232,7 +7232,7 @@ package, approval-refresh model, and handoff exist together.
 1. Mercury validates one third-program package end to end.
 2. The milestone closes with one explicit proceed or defer decision for the
    bounded third-program lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic portfolio-management, revenue-platform, or commercial-shell
    claims.
 
@@ -7252,7 +7252,7 @@ over the planned third-program package.
 **Requirements**: MPF-01, MPF-05
 **Why first**: Mercury cannot honestly package a named small program family
 until the shared-review boundary, allowed family claims, and Mercury-versus-
-ARC ownership line are explicit.
+Chio ownership line are explicit.
 
 **Primary surfaces:**
 - `docs/mercury`
@@ -7262,16 +7262,16 @@ ARC ownership line are explicit.
 1. Mercury defines one explicit program-family and shared-review motion
    anchored in the planned third-program package.
 2. The family boundary freeze makes the named family scope, retained-
-   evidence posture, and ARC non-goals explicit.
+   evidence posture, and Chio non-goals explicit.
 3. The queued sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 plans complete
 
 Plans:
 - [x] 265-01: Freeze the program-family and shared-review motion in Mercury docs and planning context.
-- [x] 265-02: Define the Mercury-owned family boundary, retained-evidence path, and explicit ARC non-goals for the queued milestone.
+- [x] 265-02: Define the Mercury-owned family boundary, retained-evidence path, and explicit Chio non-goals for the queued milestone.
 - [x] 265-03: Close the phase with one approved sequencing path for the bounded program-family lane.
 
 ### Phase 266: Mercury Program Family Package and Shared Review Contract
@@ -7285,8 +7285,8 @@ boundary freeze says exactly which named family and shared-review claims
 Mercury is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7296,7 +7296,7 @@ Mercury is allowed to make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic
    portfolio-management tooling, revenue operations systems, forecasting
-   stacks, billing platforms, channel programs, or ARC-side commercial
+   stacks, billing platforms, channel programs, or Chio-side commercial
    surfaces.
 
 **Status**: complete locally 2026-04-04
@@ -7305,7 +7305,7 @@ Mercury is allowed to make.
 Plans:
 - [x] 266-01: Define the program-family package inputs, outputs, and bounded data contract.
 - [x] 266-02: Add the Mercury export surface and docs for the shared-review package.
-- [x] 266-03: Lock the non-goals so the package does not imply generic portfolio-management tooling, revenue operations systems, forecasting stacks, billing platforms, channel programs, or ARC commercial control surfaces.
+- [x] 266-03: Lock the non-goals so the package does not imply generic portfolio-management tooling, revenue operations systems, forecasting stacks, billing platforms, channel programs, or Chio commercial control surfaces.
 
 ### Phase 267: Mercury Program Family Approval, Portfolio Claim Discipline, and Family Handoff
 
@@ -7348,7 +7348,7 @@ milestone with one explicit proceed or defer decision.
 package, approval model, and handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7356,7 +7356,7 @@ package, approval model, and handoff exist together.
 1. Mercury validates one program-family package end to end.
 2. The queued milestone closes with one explicit proceed or defer decision
    for the bounded program-family lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic portfolio-management, revenue-platform, or commercial-shell
    claims.
 
@@ -7375,7 +7375,7 @@ motion over the planned program-family package.
 **Depends on**: Phase 268
 **Requirements**: MRB-01, MRB-05
 **Why first**: Mercury cannot honestly package a named commercial handoff
-until the revenue boundary, allowed commercial claims, and Mercury-versus-ARC
+until the revenue boundary, allowed commercial claims, and Mercury-versus-Chio
 ownership line are explicit.
 
 **Primary surfaces:**
@@ -7386,16 +7386,16 @@ ownership line are explicit.
 1. Mercury defines one explicit revenue-boundary and commercial-handoff
    motion anchored in the planned program-family package.
 2. The commercial boundary freeze makes the named handoff scope, retained-
-   evidence posture, and ARC non-goals explicit.
+   evidence posture, and Chio non-goals explicit.
 3. The queued sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 plans complete
 
 Plans:
 - [x] 269-01: Freeze the revenue-boundary and commercial-handoff motion in Mercury docs and planning context.
-- [x] 269-02: Define the Mercury-owned commercial boundary, retained-evidence path, and explicit ARC non-goals for the queued milestone.
+- [x] 269-02: Define the Mercury-owned commercial boundary, retained-evidence path, and explicit Chio non-goals for the queued milestone.
 - [x] 269-03: Close the phase with one approved sequencing path for the bounded revenue-boundary lane.
 
 ### Phase 270: Mercury Revenue Boundary Package and Commercial Review Contract
@@ -7409,8 +7409,8 @@ boundary freeze says exactly which named handoff and commercial claims Mercury
 is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7420,7 +7420,7 @@ is allowed to make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic revenue
    operations systems, forecasting stacks, billing platforms, channel
-   programs, or ARC-side commercial surfaces.
+   programs, or Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 plans complete
@@ -7428,7 +7428,7 @@ is allowed to make.
 Plans:
 - [x] 270-01: Define the revenue-boundary package inputs, outputs, and bounded data contract.
 - [x] 270-02: Add the Mercury export surface and docs for the commercial-review package.
-- [x] 270-03: Lock the non-goals so the package does not imply generic revenue operations systems, forecasting stacks, billing platforms, channel programs, or ARC commercial control surfaces.
+- [x] 270-03: Lock the non-goals so the package does not imply generic revenue operations systems, forecasting stacks, billing platforms, channel programs, or Chio commercial control surfaces.
 
 ### Phase 271: Mercury Commercial Approval, Channel Boundary Rules, and Handoff
 
@@ -7470,7 +7470,7 @@ milestone with one explicit proceed or defer decision.
 package, commercial-approval model, and handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7478,7 +7478,7 @@ package, commercial-approval model, and handoff exist together.
 1. Mercury validates one revenue-boundary package end to end.
 2. The queued milestone closes with one explicit proceed or defer decision
    for the bounded revenue-boundary lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic revenue-platform, channel-program, or commercial-shell claims.
 
 **Status**: complete locally 2026-04-04
@@ -7497,7 +7497,7 @@ portfolio-reuse motion over the validated portfolio-program package.
 **Requirements**: MSP-01, MSP-05
 **Why first**: Mercury cannot honestly package a second portfolio program
 until the program-reuse boundary, allowed portfolio claims, and Mercury-
-versus-ARC ownership line are explicit.
+versus-Chio ownership line are explicit.
 
 **Primary surfaces:**
 - `docs/mercury`
@@ -7507,16 +7507,16 @@ versus-ARC ownership line are explicit.
 1. Mercury defines one explicit second-portfolio-program and portfolio-reuse
    motion anchored in the existing portfolio-program package.
 2. The program-reuse boundary freeze makes the Mercury-owned adjacent-
-   program scope, retained-evidence posture, and ARC non-goals explicit.
+   program scope, retained-evidence posture, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 257-01: Freeze the second-portfolio-program and portfolio-reuse motion in Mercury docs and planning context.
-- [x] 257-02: Define the Mercury-owned program-reuse boundary, evidence reuse path, and explicit ARC non-goals for the milestone.
+- [x] 257-02: Define the Mercury-owned program-reuse boundary, evidence reuse path, and explicit Chio non-goals for the milestone.
 - [x] 257-03: Close the phase with one approved sequencing path for the bounded second-portfolio-program lane.
 
 ### Phase 258: Mercury Second Portfolio Program Package and Portfolio Reuse Contract
@@ -7530,8 +7530,8 @@ program-reuse boundary freeze says exactly which adjacent program and
 evidence-reuse claims Mercury is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7544,7 +7544,7 @@ evidence-reuse claims Mercury is allowed to make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic
    portfolio-management tooling, revenue operations systems, forecasting
-   stacks, billing platforms, channel programs, or ARC-side commercial
+   stacks, billing platforms, channel programs, or Chio-side commercial
    surfaces.
 
 **Status**: complete locally 2026-04-04
@@ -7553,7 +7553,7 @@ evidence-reuse claims Mercury is allowed to make.
 Plans:
 - [x] 258-01: Define the second-portfolio-program package inputs, outputs, and bounded data contract.
 - [x] 258-02: Add the Mercury export surface and docs for the portfolio-reuse package.
-- [x] 258-03: Lock the non-goals so the package does not imply generic portfolio-management tooling, revenue operations systems, forecasting stacks, billing platforms, channel programs, or ARC commercial control surfaces.
+- [x] 258-03: Lock the non-goals so the package does not imply generic portfolio-management tooling, revenue operations systems, forecasting stacks, billing platforms, channel programs, or Chio commercial control surfaces.
 
 ### Phase 259: Mercury Portfolio Reuse Approval, Revenue Boundary Guardrails, and Second-Program Handoff
 
@@ -7596,7 +7596,7 @@ the milestone with one explicit proceed or defer decision.
 program package, approval model, and handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7604,7 +7604,7 @@ program package, approval model, and handoff exist together.
 1. Mercury validates one second-portfolio-program package end to end.
 2. The milestone closes with one explicit proceed or defer decision for the
    bounded second-portfolio-program lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic portfolio-management, revenue-platform, or commercial-shell
    claims.
 
@@ -7623,7 +7623,7 @@ review motion over the validated renewal-qualification package.
 **Depends on**: Phase 248
 **Requirements**: MEX-01, MEX-05
 **Why first**: Mercury cannot honestly package second-account expansion until
-the portfolio boundary, account scope, and Mercury-versus-ARC ownership line
+the portfolio boundary, account scope, and Mercury-versus-Chio ownership line
 are explicit.
 
 **Primary surfaces:**
@@ -7634,16 +7634,16 @@ are explicit.
 1. Mercury defines one explicit second-account expansion and portfolio-review
    motion anchored in the existing renewal-qualification package.
 2. The portfolio boundary freeze makes the Mercury-owned second-account
-   scope, retained-evidence posture, and ARC non-goals explicit.
+   scope, retained-evidence posture, and Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 249-01: Freeze the second-account expansion and portfolio-review motion in Mercury docs and planning context.
-- [x] 249-02: Define the Mercury-owned portfolio boundary, evidence reuse path, and explicit ARC non-goals for the milestone.
+- [x] 249-02: Define the Mercury-owned portfolio boundary, evidence reuse path, and explicit Chio non-goals for the milestone.
 - [x] 249-03: Close the phase with one approved sequencing path for the expansion lane.
 
 ### Phase 250: Mercury Expansion-Readiness Package and Portfolio Review Contract
@@ -7657,8 +7657,8 @@ boundary freeze says exactly which second-account and evidence-reuse claims
 Mercury is allowed to make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7670,7 +7670,7 @@ Mercury is allowed to make.
    non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic customer-
    success tooling, account-management platforms, multi-account renewal
-   programs, channel marketplaces, or ARC-side commercial surfaces.
+   programs, channel marketplaces, or Chio-side commercial surfaces.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
@@ -7678,7 +7678,7 @@ Mercury is allowed to make.
 Plans:
 - [x] 250-01: Define the expansion-package inputs, outputs, and bounded data contract.
 - [x] 250-02: Add the Mercury export surface and docs for the portfolio-review package.
-- [x] 250-03: Lock the non-goals so the package does not imply generic customer-success tooling, account-management platforms, multi-account renewal programs, channel marketplaces, or ARC commercial control surfaces.
+- [x] 250-03: Lock the non-goals so the package does not imply generic customer-success tooling, account-management platforms, multi-account renewal programs, channel marketplaces, or Chio commercial control surfaces.
 
 ### Phase 251: Mercury Expansion Approval, Reuse Governance, and Second-Account Handoff
 
@@ -7720,7 +7720,7 @@ milestone with one explicit proceed or defer decision.
 approval model, and second-account handoff exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7728,7 +7728,7 @@ approval model, and second-account handoff exist together.
 1. Mercury validates one second-account expansion package end to end.
 2. The milestone closes with one explicit proceed or defer decision for the
    bounded expansion lane.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic customer-success or account-platform claims.
 
 **Status**: complete locally 2026-04-04
@@ -7746,7 +7746,7 @@ controlled-delivery motion over the validated broader-distribution package.
 **Depends on**: Phase 236
 **Requirements**: MSA-01, MSA-05
 **Why first**: Mercury cannot honestly package selective-account activation
-until the delivery motion, account boundary, and Mercury-versus-ARC ownership
+until the delivery motion, account boundary, and Mercury-versus-Chio ownership
 line are explicit.
 
 **Primary surfaces:**
@@ -7757,16 +7757,16 @@ line are explicit.
 1. Mercury defines one explicit selective-account activation and controlled-
    delivery motion anchored in the existing broader-distribution package.
 2. The delivery freeze makes the Mercury-owned scope, activation path, and
-   ARC non-goals explicit.
+   Chio non-goals explicit.
 3. The milestone sequencing clearly preserves Mercury as the product surface
-   and ARC as the generic substrate.
+   and Chio as the generic substrate.
 
 **Status**: complete locally 2026-04-04
 **Plans**: 3/3 complete
 
 Plans:
 - [x] 237-01: Freeze the selective-account activation and controlled-delivery motion in Mercury docs and planning context.
-- [x] 237-02: Define the Mercury-owned scope, activation path, and explicit ARC non-goals for the milestone.
+- [x] 237-02: Define the Mercury-owned scope, activation path, and explicit Chio non-goals for the milestone.
 - [x] 237-03: Close the phase with one approved sequencing path for the selective-account activation lane.
 
 ### Phase 238: Mercury Activation Package and Controlled Delivery Contract
@@ -7780,8 +7780,8 @@ account freeze says exactly which activation claims Mercury is allowed to
 make.
 
 **Primary surfaces:**
-- `crates/arc-mercury-core`
-- `crates/arc-mercury`
+- `crates/chio-mercury-core`
+- `crates/chio-mercury`
 - `docs/mercury`
 
 **Success Criteria**:
@@ -7791,7 +7791,7 @@ make.
 2. The controlled-delivery contract makes required inputs, bundle outputs,
    and non-goals explicit.
 3. The contract remains Mercury-specific and does not imply generic
-   onboarding tooling, CRM workflows, channel marketplaces, or ARC-side
+   onboarding tooling, CRM workflows, channel marketplaces, or Chio-side
    commercial surfaces.
 
 **Status**: complete locally 2026-04-04
@@ -7800,7 +7800,7 @@ make.
 Plans:
 - [x] 238-01: Define the activation-package inputs, outputs, and bounded data contract.
 - [x] 238-02: Add the Mercury export surface and docs for the controlled-delivery package.
-- [x] 238-03: Lock the non-goals so the package does not imply generic onboarding tooling, CRM workflows, channel marketplaces, or ARC commercial control surfaces.
+- [x] 238-03: Lock the non-goals so the package does not imply generic onboarding tooling, CRM workflows, channel marketplaces, or Chio commercial control surfaces.
 
 ### Phase 239: Mercury Claim Containment, Activation Approval Refresh, and Customer Handoff
 
@@ -7843,7 +7843,7 @@ the milestone with one explicit proceed or defer decision.
 approval-refresh model, and handoff path exist together.
 
 **Primary surfaces:**
-- `crates/arc-mercury/tests`
+- `crates/chio-mercury/tests`
 - `docs/mercury`
 - `.planning`
 
@@ -7851,7 +7851,7 @@ approval-refresh model, and handoff path exist together.
 1. Mercury validates one selective-account activation package end to end.
 2. The milestone closes with one explicit proceed or defer decision for
    selective-account activation.
-3. The decision keeps ARC generic, Mercury product-specific, and avoids
+3. The decision keeps Chio generic, Mercury product-specific, and avoids
    generic onboarding-tooling claims.
 
 **Status**: complete locally 2026-04-04
@@ -7864,26 +7864,26 @@ Plans:
 
 ### Phase 65: OID4VP Verifier Profile and Request Transport
 
-**Goal**: Make ARC a real OID4VP verifier for the ARC SD-JWT VC profile using
+**Goal**: Make Chio a real OID4VP verifier for the Chio SD-JWT VC profile using
 one narrow, auditable transport and response contract.
 **Depends on**: Phase 64
 **Requirements**: PVP-01, PVP-03, PVP-05
-**Why first**: ARC cannot honestly claim verifier portability until it can
+**Why first**: Chio cannot honestly claim verifier portability until it can
 issue signed verifier requests, persist transaction state, and verify a
-standards-native presentation response without falling back to ARC-native
+standards-native presentation response without falling back to Chio-native
 challenge artifacts.
 
 **Primary surfaces:**
 - OID4VP request-object creation and signing
 - replay-safe verifier transaction storage
 - `request_uri` publication and same-device plus cross-device launch output
-- `direct_post.jwt` response handling for ARC SD-JWT VC
+- `direct_post.jwt` response handling for Chio SD-JWT VC
 - fail-closed nonce, audience, state, replay, and disclosure validation
 
 **Success Criteria**:
-1. ARC can create one explicit verifier request contract for the ARC SD-JWT VC
+1. Chio can create one explicit verifier request contract for the Chio SD-JWT VC
    profile.
-2. ARC can verify a standards-native response without relying on ARC-native
+2. Chio can verify a standards-native response without relying on Chio-native
    holder challenge transport.
 3. Replay, stale, mismatched, or unsupported responses fail closed.
 
@@ -7891,7 +7891,7 @@ challenge artifacts.
 **Plans**: 3 plans
 
 Plans:
-- [x] 65-01: Define ARC's narrow OID4VP verifier profile and signed
+- [x] 65-01: Define Chio's narrow OID4VP verifier profile and signed
   request-object contract.
 - [x] 65-02: Implement replay-safe verifier transaction storage plus request
   transport.
@@ -7899,43 +7899,43 @@ Plans:
 
 ### Phase 66: Wallet / Holder Distribution Adapters
 
-**Goal**: Add one reference holder adapter and wallet launch surface so ARC
+**Goal**: Add one reference holder adapter and wallet launch surface so Chio
 can prove same-device and cross-device use without becoming a wallet vendor.
 **Depends on**: Phase 65
 **Requirements**: PVP-03, PVP-04, PVP-05
-**Why second**: Once verifier transport exists, ARC needs a bounded holder-side
+**Why second**: Once verifier transport exists, Chio needs a bounded holder-side
 path that exercises the supported flow against real portable credentials and
-shows how OID4VP coexists with the ARC-native challenge lane.
+shows how OID4VP coexists with the Chio-native challenge lane.
 
 **Primary surfaces:**
 - minimal reference holder adapter for qualification and partner demos
 - same-device launch artifacts
 - cross-device QR handoff
-- coexistence rules between ARC-native presentation and OID4VP
+- coexistence rules between Chio-native presentation and OID4VP
 
 **Success Criteria**:
-1. ARC ships one usable reference holder path for demos and tests.
+1. Chio ships one usable reference holder path for demos and tests.
 2. Same-device and cross-device launches are explicit, bounded, and testable.
-3. The OID4VP lane coexists with ARC-native challenge transport without
+3. The OID4VP lane coexists with Chio-native challenge transport without
    silently widening portability claims.
 
 **Status**: complete
 **Plans**: 3 plans
 
 Plans:
-- [x] 66-01: Add a reference holder adapter for the ARC SD-JWT VC profile.
+- [x] 66-01: Add a reference holder adapter for the Chio SD-JWT VC profile.
 - [x] 66-02: Publish same-device and cross-device launch artifacts.
 - [x] 66-03: Define coexistence and fail-closed boundaries between OID4VP and
-  ARC-native holder transport.
+  Chio-native holder transport.
 
 ### Phase 67: Public Verifier Trust and Discovery Model
 
-**Goal**: Define how public ARC verifier deployments authenticate themselves
+**Goal**: Define how public Chio verifier deployments authenticate themselves
 and publish trust-bootstrap material without overclaiming generic federation.
 **Depends on**: Phase 65
 **Requirements**: PVP-02, PVP-05
 **Why third**: Wallet interop is incomplete if the holder cannot evaluate
-verifier identity. ARC needs one concrete verifier-authentication profile that
+verifier identity. Chio needs one concrete verifier-authentication profile that
 fits its operator-scoped web deployment model and rotation rules.
 
 **Primary surfaces:**
@@ -7945,7 +7945,7 @@ fits its operator-scoped web deployment model and rotation rules.
 - explicit acceptance and rejection boundaries for verifier identity schemes
 
 **Success Criteria**:
-1. ARC has one public verifier identity model suitable for deployment.
+1. Chio has one public verifier identity model suitable for deployment.
 2. Trust bootstrap and rotation behavior are explicit and auditable.
 3. Unsupported verifier identity schemes fail closed.
 
@@ -7953,7 +7953,7 @@ fits its operator-scoped web deployment model and rotation rules.
 **Plans**: 3 plans
 
 Plans:
-- [x] 67-01: Choose and document ARC's first public verifier authentication
+- [x] 67-01: Choose and document Chio's first public verifier authentication
   profile.
 - [x] 67-02: Implement verifier trust publication and rotation semantics.
 - [x] 67-03: Add regression coverage and docs for verifier trust bootstrap and
@@ -7966,7 +7966,7 @@ portability-boundary rewrites, and milestone evidence strong enough to say
 verifier-side portable interop is no longer missing.
 **Depends on**: Phases 66 and 67
 **Requirements**: PVP-01, PVP-02, PVP-03, PVP-04, PVP-05
-**Why last**: ARC should not claim OID4VP and wallet interop until the path is
+**Why last**: Chio should not claim OID4VP and wallet interop until the path is
 exercised end to end, the negative paths are fail-closed, and the docs stop
 describing verifier portability as absent.
 
@@ -7994,12 +7994,12 @@ Plans:
 
 ### Phase 69: Common Appraisal Contract and Adapter Interface
 
-**Goal**: Define ARC's typed appraisal contract and verifier-adapter
+**Goal**: Define Chio's typed appraisal contract and verifier-adapter
 interface so raw evidence, verifier identity, normalized assertions, and
 vendor-scoped claims are explicit instead of adapter-specific.
 **Depends on**: Phase 60
 **Requirements**: RATS-02
-**Why first**: ARC cannot widen beyond Azure safely until every verifier
+**Why first**: Chio cannot widen beyond Azure safely until every verifier
 family emits one canonical appraisal shape and one explicit normalization
 boundary.
 
@@ -8011,7 +8011,7 @@ boundary.
 - fail-closed handling for malformed or partial appraisals
 
 **Success Criteria**:
-1. ARC has one canonical appraisal contract instead of verifier-specific
+1. Chio has one canonical appraisal contract instead of verifier-specific
    blobs.
 2. Normalized assertions are bounded and auditable.
 3. Unknown or incomplete appraisal inputs fail closed.
@@ -8020,17 +8020,17 @@ boundary.
 **Plans**: 3 plans
 
 Plans:
-- [x] 69-01: Define the canonical ARC appraisal contract.
+- [x] 69-01: Define the canonical Chio appraisal contract.
 - [x] 69-02: Define the verifier-adapter interface and registration boundary.
 - [x] 69-03: Document and test the normalization boundary for appraisals.
 
 ### Phase 70: AWS Nitro Verifier Adapter
 
-**Goal**: Add a real AWS Nitro verifier path that emits the canonical ARC
+**Goal**: Add a real AWS Nitro verifier path that emits the canonical Chio
 appraisal contract.
 **Depends on**: Phase 69
 **Requirements**: RATS-01
-**Why second**: The shared contract only matters if ARC can prove it against a
+**Why second**: The shared contract only matters if Chio can prove it against a
 materially different verifier family than Azure.
 
 **Primary surfaces:**
@@ -8040,7 +8040,7 @@ materially different verifier family than Azure.
 - adapter-specific tests and operator guidance
 
 **Success Criteria**:
-1. ARC supports one non-Azure verifier family end to end.
+1. Chio supports one non-Azure verifier family end to end.
 2. Nitro evidence is projected through the canonical appraisal contract.
 3. Replay, stale, malformed, or unknown Nitro evidence fails closed.
 
@@ -8048,7 +8048,7 @@ materially different verifier family than Azure.
 **Plans**: 3 plans
 
 Plans:
-- [x] 70-01: Define the AWS Nitro evidence mapping into ARC appraisal
+- [x] 70-01: Define the AWS Nitro evidence mapping into Chio appraisal
   semantics.
 - [x] 70-02: Implement the AWS Nitro verifier adapter.
 - [x] 70-03: Add regression coverage and operator guidance for the Nitro
@@ -8060,7 +8060,7 @@ Plans:
 over canonical appraisals from multiple verifier families.
 **Depends on**: Phase 69
 **Requirements**: RATS-03, RATS-04, RATS-06
-**Why third**: Multi-cloud support is incomplete until ARC can normalize a
+**Why third**: Multi-cloud support is incomplete until Chio can normalize a
 second non-Azure verifier family and express explicit policy semantics over
 mixed appraisal inputs.
 
@@ -8071,7 +8071,7 @@ mixed appraisal inputs.
 - issuance, governed-execution, and underwriting integration
 
 **Success Criteria**:
-1. ARC supports a second non-Azure verifier family without pretending claim
+1. Chio supports a second non-Azure verifier family without pretending claim
    equivalence.
 2. Trusted-verifier policy becomes adapter-aware and fail-closed.
 3. Appraisals influence issuance, execution, and underwriting only through
@@ -8093,7 +8093,7 @@ Plans:
 multi-adapter qualification evidence, and honest boundary docs.
 **Depends on**: Phases 70 and 71
 **Requirements**: RATS-05, RATS-07
-**Why last**: ARC should not claim multi-cloud appraisal support until
+**Why last**: Chio should not claim multi-cloud appraisal support until
 operators can inspect one canonical appraisal artifact and the cross-family
 failure modes are proven.
 
@@ -8116,9 +8116,9 @@ Plans:
 - [x] 72-02: Build qualification evidence for multi-cloud appraisal behavior.
 - [x] 72-03: Close `v2.15` and advance planning state.
 
-### Phase 73: ARC OAuth Authorization Profile
+### Phase 73: Chio OAuth Authorization Profile
 
-**Goal**: Publish ARC's first normative enterprise-facing authorization
+**Goal**: Publish Chio's first normative enterprise-facing authorization
 profile over governed intents, approvals, and transaction context.
 **Depends on**: Phase 48
 **Requirements**: IAM-01
@@ -8132,26 +8132,26 @@ profile instead of a loose collection of implementation mappings.
 - fail-closed profile validation
 
 **Success Criteria**:
-1. ARC has one standards-facing authorization profile.
-2. Governed ARC truth remains the authoritative source behind the profile.
+1. Chio has one standards-facing authorization profile.
+2. Governed Chio truth remains the authoritative source behind the profile.
 3. Unsupported authorization shapes fail closed.
 
 **Status**: complete
 **Plans**: 3 plans
 
 Plans:
-- [x] 73-01: Define the normative ARC authorization semantics profile.
+- [x] 73-01: Define the normative Chio authorization semantics profile.
 - [x] 73-02: Implement profile-bound projection and validation surfaces.
 - [x] 73-03: Document the authorization profile for external reviewers.
 
 ### Phase 74: Sender-Constrained and Discovery Contracts
 
-**Goal**: Make ARC's authorization profile legible for sender-constrained and
+**Goal**: Make Chio's authorization profile legible for sender-constrained and
 metadata-driven enterprise deployment.
 **Depends on**: Phase 73
 **Requirements**: IAM-02
 **Why second**: Enterprise IAM reviewers need explicit semantics for sender
-binding and metadata discovery before ARC can package reviewer evidence.
+binding and metadata discovery before Chio can package reviewer evidence.
 
 **Primary surfaces:**
 - sender-constrained semantics profile
@@ -8160,7 +8160,7 @@ binding and metadata discovery before ARC can package reviewer evidence.
 - fail-closed mismatch handling
 
 **Success Criteria**:
-1. ARC has one explicit sender-binding story for the enterprise profile.
+1. Chio has one explicit sender-binding story for the enterprise profile.
 2. Discovery metadata is machine-readable and bounded.
 3. Missing proof or mismatched discovery data fails closed.
 
@@ -8168,18 +8168,18 @@ binding and metadata discovery before ARC can package reviewer evidence.
 **Plans**: 3 plans
 
 Plans:
-- [x] 74-01: Define ARC's sender-constrained authorization semantics.
+- [x] 74-01: Define Chio's sender-constrained authorization semantics.
 - [x] 74-02: Publish machine-readable discovery and metadata contracts.
 - [x] 74-03: Add negative-path coverage for sender and discovery mismatch
   behavior.
 
 ### Phase 75: Enterprise IAM Adapters, Metadata, and Reviewer Packs
 
-**Goal**: Package ARC's enterprise authorization profile into metadata and
+**Goal**: Package Chio's enterprise authorization profile into metadata and
 reviewer-facing evidence bundles.
 **Depends on**: Phase 74
 **Requirements**: IAM-03, IAM-04
-**Why third**: Once the profile and discovery semantics are stable, ARC can
+**Why third**: Once the profile and discovery semantics are stable, Chio can
 turn them into reviewable artifacts that tie back to signed receipt truth.
 
 **Primary surfaces:**
@@ -8209,7 +8209,7 @@ Plans:
 and a standards-facing proof package.
 **Depends on**: Phase 75
 **Requirements**: IAM-05
-**Why last**: ARC should not claim enterprise IAM legibility until the
+**Why last**: Chio should not claim enterprise IAM legibility until the
 profile, sender semantics, metadata, and evidence packs are proven under
 qualification.
 
@@ -8235,7 +8235,7 @@ Plans:
 
 ### Phase 77: Certification Criteria and Conformance Evidence Profiles
 
-**Goal**: Version ARC certification criteria and evidence packages so public
+**Goal**: Version Chio certification criteria and evidence packages so public
 discovery can rest on reproducible conformance artifacts.
 **Depends on**: Phase 40
 **Requirements**: CERT-01
@@ -8249,7 +8249,7 @@ certification artifacts are versioned, comparable, and provenance-preserving.
 - fail-closed handling for incomplete evidence
 
 **Success Criteria**:
-1. ARC Certify exposes one reproducible certification evidence contract.
+1. Chio Certify exposes one reproducible certification evidence contract.
 2. Independent operators can publish comparable evidence packages.
 3. Incomplete or unverifiable certification evidence fails closed.
 
@@ -8259,7 +8259,7 @@ certification artifacts are versioned, comparable, and provenance-preserving.
 Plans:
 - [x] 77-01: Define versioned certification criteria and evidence-package
   structure.
-- [x] 77-02: Implement conformance evidence profiles in ARC Certify.
+- [x] 77-02: Implement conformance evidence profiles in Chio Certify.
 - [x] 77-03: Document certification-profile boundaries and failure semantics.
 
 ### Phase 78: Public Operator Identity and Discovery Metadata
@@ -8299,7 +8299,7 @@ operator-controlled.
 **Depends on**: Phase 78
 **Requirements**: CERT-03
 **Why third**: Search and transparency are the point where marketplace
-visibility could be confused with trust, so ARC needs an explicit consumption
+visibility could be confused with trust, so Chio needs an explicit consumption
 boundary.
 
 **Primary surfaces:**
@@ -8326,7 +8326,7 @@ Plans:
 ### Phase 80: Governance, Dispute Semantics, and Marketplace Qualification
 
 **Goal**: Close `v2.17` with explicit governance, dispute, and qualification
-semantics for ARC's public certification marketplace.
+semantics for Chio's public certification marketplace.
 **Depends on**: Phases 78 and 79
 **Requirements**: CERT-04, CERT-05
 **Why last**: Marketplace-grade discovery is incomplete until disputes,
@@ -8356,12 +8356,12 @@ Plans:
 
 ### Phase 81: Exposure Ledger and Economic Position Model
 
-**Goal**: Define ARC's canonical exposure ledger and signed economic-position
+**Goal**: Define Chio's canonical exposure ledger and signed economic-position
 state over governed actions, premiums, reserves, losses, recoveries, and
 settlement truth.
 **Depends on**: Phase 52
 **Requirements**: CREDIT-01
-**Why first**: Credit and facility policy are not defensible unless ARC first
+**Why first**: Credit and facility policy are not defensible unless Chio first
 defines one canonical economic-position model instead of inferring exposure
 from scattered underwriting, settlement, and receipt views.
 
@@ -8372,7 +8372,7 @@ from scattered underwriting, settlement, and receipt views.
 - currency and evidence-boundary rules
 
 **Success Criteria**:
-1. ARC has one canonical exposure ledger over existing economic truth.
+1. Chio has one canonical exposure ledger over existing economic truth.
 2. Exposure artifacts are signed, explainable, and evidence-backed.
 3. Mixed, partial, or ambiguous position inputs fail closed.
 
@@ -8401,7 +8401,7 @@ watchlist substrate before they can allocate risk or constrain execution.
 - fail-closed handling for sparse or contradictory evidence
 
 **Success Criteria**:
-1. ARC can produce one explainable scorecard over exposure truth.
+1. Chio can produce one explainable scorecard over exposure truth.
 2. Probation and anomaly posture are explicit instead of ad hoc operator
    interpretation.
 3. Unsupported or insufficient evidence does not silently produce a confident
@@ -8423,7 +8423,7 @@ Plans:
 allocation policy that can later support bonded autonomy and provider review.
 **Depends on**: Phase 82
 **Requirements**: CREDIT-03
-**Why third**: The project cannot claim capital-allocation readiness until ARC
+**Why third**: The project cannot claim capital-allocation readiness until Chio
 can issue explicit facility artifacts rather than just scoring agents.
 
 **Primary surfaces:**
@@ -8433,7 +8433,7 @@ can issue explicit facility artifacts rather than just scoring agents.
 - fail-closed issuance and supersession rules
 
 **Success Criteria**:
-1. ARC issues one signed facility-policy artifact tied to score and exposure.
+1. Chio issues one signed facility-policy artifact tied to score and exposure.
 2. Capital ceilings and prerequisites are explicit and bounded.
 3. Missing score, assurance, or certification prerequisites fail closed.
 
@@ -8451,7 +8451,7 @@ Plans:
 risk package strong enough to justify external capital review.
 **Depends on**: Phases 81, 82, and 83
 **Requirements**: CREDIT-04
-**Why last**: ARC should not claim a credit-grade economic layer until the
+**Why last**: Chio should not claim a credit-grade economic layer until the
 ledger, score, and facility outputs are qualified and packaged honestly for
 reviewers.
 
@@ -8462,7 +8462,7 @@ reviewers.
 - milestone audit and planning-state advancement into `v2.19`
 
 **Success Criteria**:
-1. ARC can replay and inspect the credit layer under simulation or backtest.
+1. Chio can replay and inspect the credit layer under simulation or backtest.
 2. External-capital reviewers get one bounded risk package over signed truth.
 3. `v2.18` closes with audit evidence and truthful boundary docs.
 
@@ -8477,7 +8477,7 @@ Plans:
 
 ### Phase 85: Bond Contracts, Reserve Locks, and Collateral State
 
-**Goal**: Define ARC's signed bond, reserve-lock, and collateral-state
+**Goal**: Define Chio's signed bond, reserve-lock, and collateral-state
 artifacts as the economic backing for autonomous execution.
 **Depends on**: Phase 84
 **Requirements**: BOND-01
@@ -8491,7 +8491,7 @@ before delegation, slashing, or loss recovery can be enforced truthfully.
 - fail-closed reserve accounting
 
 **Success Criteria**:
-1. ARC has one signed bond and reserve-state contract.
+1. Chio has one signed bond and reserve-state contract.
 2. Collateral lifecycle is explicit and auditable.
 3. Reserve mismatches or unsupported lock states fail closed.
 
@@ -8509,7 +8509,7 @@ Plans:
 gates so economically sensitive execution fails closed without prerequisites.
 **Depends on**: Phase 85
 **Requirements**: BOND-02
-**Why second**: Bond state only matters if ARC can actually use it to permit
+**Why second**: Bond state only matters if Chio can actually use it to permit
 or deny higher-risk autonomous execution paths.
 
 **Primary surfaces:**
@@ -8519,7 +8519,7 @@ or deny higher-risk autonomous execution paths.
 - fail-closed execution denial reasons
 
 **Success Criteria**:
-1. ARC can gate autonomy tiers on bond, reserve, and assurance state.
+1. Chio can gate autonomy tiers on bond, reserve, and assurance state.
 2. Delegation bonds are explicit rather than inferred from capability lineage.
 3. Missing or stale prerequisites deny sensitive execution fail closed.
 
@@ -8538,7 +8538,7 @@ Plans:
 write-off state over bond-backed execution.
 **Depends on**: Phases 85 and 86
 **Requirements**: BOND-03
-**Why third**: Bonded autonomy is incomplete until ARC can record and explain
+**Why third**: Bonded autonomy is incomplete until Chio can record and explain
 what happens when economic backing is consumed, impaired, or restored.
 
 **Primary surfaces:**
@@ -8568,7 +8568,7 @@ Plans:
 sandboxed integration path over bonded execution.
 **Depends on**: Phases 86 and 87
 **Requirements**: BOND-04
-**Why last**: ARC should not claim bonded autonomy until the reserve, gating,
+**Why last**: Chio should not claim bonded autonomy until the reserve, gating,
 and loss-recovery paths are reproducible and operator-visible.
 
 **Primary surfaces:**
@@ -8597,7 +8597,7 @@ classes, jurisdictions, currencies, and evidence requirements.
 **Depends on**: Phase 88
 **Requirements**: MARKET-01
 **Why first**: Liability-market orchestration requires explicit provider and
-jurisdiction constraints before ARC can quote, bind, or adjudicate anything.
+jurisdiction constraints before Chio can quote, bind, or adjudicate anything.
 
 **Primary surfaces:**
 - provider registry schema
@@ -8606,7 +8606,7 @@ jurisdiction constraints before ARC can quote, bind, or adjudicate anything.
 - curated provider admission rules
 
 **Success Criteria**:
-1. ARC has one curated provider registry over explicit policy and evidence.
+1. Chio has one curated provider registry over explicit policy and evidence.
 2. Coverage classes and jurisdictions are machine-readable and bounded.
 3. Unsupported providers or jurisdictions fail closed.
 
@@ -8626,7 +8626,7 @@ Plans:
 bound-coverage artifacts over one signed risk package.
 **Depends on**: Phase 89
 **Requirements**: MARKET-02
-**Why second**: Provider selection is not useful unless ARC can actually ask
+**Why second**: Provider selection is not useful unless Chio can actually ask
 for quotes and represent bound coverage over canonical evidence.
 
 **Primary surfaces:**
@@ -8636,7 +8636,7 @@ for quotes and represent bound coverage over canonical evidence.
 - fail-closed quote expiry and mismatch handling
 
 **Success Criteria**:
-1. ARC can model quote and bind flows over a canonical risk package.
+1. Chio can model quote and bind flows over a canonical risk package.
 2. Placement semantics remain provider-neutral and auditable.
 3. Expired, mismatched, or unsupported quote state fails closed.
 
@@ -8660,7 +8660,7 @@ Plans:
 adjudication evidence linked back to receipts, exposure, and bond state.
 **Depends on**: Phase 90
 **Requirements**: MARKET-03
-**Why third**: A liability-market claim is incomplete until ARC can represent
+**Why third**: A liability-market claim is incomplete until Chio can represent
 what was claimed, how a provider responded, and how disputes are adjudicated.
 
 **Primary surfaces:**
@@ -8672,7 +8672,7 @@ what was claimed, how a provider responded, and how disputes are adjudicated.
 **Success Criteria**:
 1. Claim packages are immutable and evidence-backed.
 2. Provider responses and disputes are explicit, auditable state transitions.
-3. Claim adjudication cannot drift from the underlying signed ARC evidence.
+3. Claim adjudication cannot drift from the underlying signed Chio evidence.
 
 **Status**: complete
 **Plans**: 3 plans
@@ -8690,7 +8690,7 @@ Plans:
 truthful public boundary update for the liability-market surface.
 **Depends on**: Phases 89, 90, and 91
 **Requirements**: MARKET-04
-**Why last**: ARC should not claim liability-market orchestration until quote,
+**Why last**: Chio should not claim liability-market orchestration until quote,
 bind, claim, and dispute flows are proven and the public boundary is updated
 honestly.
 
@@ -8701,7 +8701,7 @@ honestly.
 - final milestone audit and planning-state closeout
 
 **Success Criteria**:
-1. ARC proves one multi-provider quote, bind, claim, and dispute flow end to
+1. Chio proves one multi-provider quote, bind, claim, and dispute flow end to
    end.
 2. Partner and operator artifacts explain the bounded marketplace posture
    honestly.
@@ -8722,10 +8722,10 @@ Plans:
 **Milestone Goal:** Enforce capital-backed autonomy with reserves, delegation
 bonds, delinquency state, and bounded facility execution.
 
-**Why it mattered:** ARC already shipped signed exposure, facility, backtest,
+**Why it mattered:** Chio already shipped signed exposure, facility, backtest,
 and provider-risk-package artifacts, but the research endgame still required
 those credit surfaces to become bounded runtime capital posture. `v2.19` is
-the step where ARC can gate delegated or autonomous execution on reserve
+the step where Chio can gate delegated or autonomous execution on reserve
 state, record delinquency explicitly, and let operators simulate bonded
 execution controls before runtime use.
 
@@ -8745,7 +8745,7 @@ execution controls before runtime use.
 **Milestone Goal:** Expand certification into a public discovery and
 transparency layer with explicit governance, provenance, and dispute semantics.
 
-**Why it mattered:** ARC already shipped signed certification artifacts and
+**Why it mattered:** Chio already shipped signed certification artifacts and
 bounded operator discovery, but the research endgame still required a governed
 public marketplace surface with versioned evidence profiles, provenance-aware
 metadata, searchable transparency, and dispute semantics that do not silently
@@ -8766,7 +8766,7 @@ turn listing visibility into runtime trust.
 typed appraisal contract plus multiple concrete verifier adapters and
 policy-visible normalization rules.
 
-**Why it mattered:** `v2.12` proved ARC could bridge workload identity and
+**Why it mattered:** `v2.12` proved Chio could bridge workload identity and
 cloud attestation into runtime trust, but the verifier boundary remained too
 Azure-shaped. `v2.15` added a canonical appraisal contract, AWS and Google
 verifier families, and one signed appraisal export surface.
@@ -8775,7 +8775,7 @@ verifier families, and one signed appraisal export surface.
 - `docs/research/DEEP_RESEARCH_1.md` on SPIFFE, RATS, EAT, and cloud
   attestation as inputs into bounded trust decisions
 - `docs/WORKLOAD_IDENTITY_RUNBOOK.md` and
-  `docs/standards/ARC_PORTABLE_TRUST_PROFILE.md` on the verifier bridge
+  `docs/standards/CHIO_PORTABLE_TRUST_PROFILE.md` on the verifier bridge
   boundary
 - `.planning/research/POST_V2_12_RESEARCH_COMPLETION_SYNTHESIS.md` on the
   remaining multi-cloud appraisal gap after `v2.12`
@@ -8794,35 +8794,35 @@ verifier families, and one signed appraisal export surface.
 
 ### Phase 61: External Credential Projection and Identity Strategy
 
-**Goal**: Define ARC's first standards-native external credential projection
-and the identity strategy that preserves ARC truth while making portable
+**Goal**: Define Chio's first standards-native external credential projection
+and the identity strategy that preserves Chio truth while making portable
 verification possible.
 **Depends on**: Phase 60
 **Requirements**: PVC-01, PVC-03, PVC-05
-**Why first**: ARC cannot add standards-native issuance safely until the
+**Why first**: Chio cannot add standards-native issuance safely until the
 external credential shape, issuer identity, and projection semantics are
 explicit and bounded.
 
 **Primary surfaces:**
-- external ARC passport projection over current passport truth
+- external Chio passport projection over current passport truth
 - issuer identity, keying, and type-metadata strategy
 - projection rules for provenance, enterprise identity, and runtime-assurance
   claims
-- validation and docs for the dual-path ARC-native plus standards-native model
+- validation and docs for the dual-path Chio-native plus standards-native model
 
 **Success Criteria**:
-1. ARC defines one external portable credential profile without replacing the
+1. Chio defines one external portable credential profile without replacing the
    native `AgentPassport` lane.
 2. The external identity strategy stays explicit about which semantics remain
-   ARC-native only.
+   Chio-native only.
 3. Unsupported or ambiguous projection requests fail closed.
 
 **Plans**: 3 plans
 
 Plans:
-- [x] 61-01: Define the external ARC passport projection and identity
+- [x] 61-01: Define the external Chio passport projection and identity
   strategy.
-- [x] 61-02: Thread the external projection through ARC credential and
+- [x] 61-02: Thread the external projection through Chio credential and
   issuance surfaces.
 - [x] 61-03: Document and validate the dual-path identity boundary.
 
@@ -8832,7 +8832,7 @@ Plans:
 policy-visible selective disclosure.
 **Depends on**: Phase 61
 **Requirements**: PVC-01, PVC-02, PVC-05
-**Why second**: Once the external projection exists, ARC needs a real
+**Why second**: Once the external projection exists, Chio needs a real
 standards-native issuance format before it can claim broader passport
 portability.
 
@@ -8843,22 +8843,22 @@ portability.
 - fail-closed validation for unsupported or over-broad requests
 
 **Success Criteria**:
-1. ARC can issue a standards-native external credential deterministically.
+1. Chio can issue a standards-native external credential deterministically.
 2. Selective disclosure is explicit, bounded, and regression-covered.
-3. The SD-JWT VC path preserves ARC trust boundaries instead of widening them.
+3. The SD-JWT VC path preserves Chio trust boundaries instead of widening them.
 
 **Plans**: 3 plans
 
 Plans:
 - [x] 62-01: Implement SD-JWT VC issuance on top of the external projection.
-- [x] 62-02: Define the selective-disclosure contract for ARC portable
+- [x] 62-02: Define the selective-disclosure contract for Chio portable
   credentials.
 - [x] 62-03: Add regression coverage for issuance and disclosure failure
   paths.
 
 ### Phase 63: Portable Status, Revocation, and Type Metadata
 
-**Goal**: Project ARC lifecycle truth into verifier-facing portable status,
+**Goal**: Project Chio lifecycle truth into verifier-facing portable status,
 revocation, supersession, and metadata artifacts.
 **Depends on**: Phase 62
 **Requirements**: PVC-03, PVC-04
@@ -8872,8 +8872,8 @@ type, issuer, and lifecycle state through stable metadata and status surfaces.
 - validation and docs for verifier-facing lifecycle semantics
 
 **Success Criteria**:
-1. Verifiers can discover and validate the ARC external portable profile.
-2. Revocation and supersession project from ARC truth without a second mutable
+1. Verifiers can discover and validate the Chio external portable profile.
+2. Revocation and supersession project from Chio truth without a second mutable
    trust root.
 3. Metadata and status failure cases remain explicit and fail closed.
 
@@ -8882,7 +8882,7 @@ type, issuer, and lifecycle state through stable metadata and status surfaces.
 Plans:
 - [x] 63-01: Publish portable issuer and type metadata for the external
   profile.
-- [x] 63-02: Map ARC lifecycle truth into portable status and revocation
+- [x] 63-02: Map Chio lifecycle truth into portable status and revocation
   artifacts.
 - [x] 63-03: Add validation and documentation for metadata and status
   handling.
@@ -8893,7 +8893,7 @@ Plans:
 language for the new standards-native credential lane.
 **Depends on**: Phase 63
 **Requirements**: PVC-02, PVC-03, PVC-04, PVC-05
-**Why last**: ARC should not claim the portable credential gap is closed until
+**Why last**: Chio should not claim the portable credential gap is closed until
 the new lane is externally legible, regression-covered, and clearly documented
 alongside the existing native path.
 
@@ -8933,16 +8933,16 @@ policy-visible normalization rules.
 
 ### v2.16 Enterprise Authorization and IAM Standards Profiles
 
-**Milestone Goal:** Publish a normative ARC profile for authorization details,
+**Milestone Goal:** Publish a normative Chio profile for authorization details,
 transaction context, sender-constrained semantics, and enterprise reviewer
 evidence.
 
-- Phase 73: ARC OAuth Authorization Profile
+- Phase 73: Chio OAuth Authorization Profile
 - Phase 74: Sender-Constrained and Discovery Contracts
 - Phase 75: Enterprise IAM Adapters, Metadata, and Reviewer Packs
 - Phase 76: Conformance, Qualification, and Standards-Facing Proof
 
-### v2.17 ARC Certify Public Discovery Marketplace and Governance
+### v2.17 Chio Certify Public Discovery Marketplace and Governance
 
 **Milestone Goal:** Expand certification into a public discovery and
 transparency layer with explicit governance, provenance, and dispute semantics.
@@ -8975,7 +8975,7 @@ slashing, loss, and recovery state.
 ### v2.20 Liability Marketplace and Claims Network
 
 **Milestone Goal:** Add provider-neutral quote, bind, claim, and dispute
-workflows so ARC can orchestrate insured agent actions across organizational
+workflows so Chio can orchestrate insured agent actions across organizational
 boundaries.
 
 - Phase 89 complete: Provider Registry, Coverage Classes, and Jurisdiction
@@ -9010,12 +9010,12 @@ boundaries.
 
 ## Completed Milestone: v2.10 Underwriting and Risk Decisioning
 
-**Milestone Goal:** Convert ARC from a truthful risk-evidence exporter into a
+**Milestone Goal:** Convert Chio from a truthful risk-evidence exporter into a
 bounded runtime underwriting and risk-decisioning system.
 
 **Why now:** `docs/research/DEEP_RESEARCH_1.md` explicitly moves from receipts
 and reputation into runtime underwriting once standardized cost semantics,
-authorization context, and runtime trust are in place. ARC now has those
+authorization context, and runtime trust are in place. Chio now has those
 substrates from `v2.7` through `v2.9`, but `spec/PROTOCOL.md` still states the
 behavioral feed is evidence export rather than underwriting. `v2.10` is where
 that product boundary changes on purpose.
@@ -9052,10 +9052,10 @@ that product boundary changes on purpose.
 ### Phase 49: Underwriting Taxonomy and Policy Inputs
 
 **Goal**: Define the signed underwriting policy-input contract and canonical
-risk taxonomy over ARC's existing evidence surfaces.
+risk taxonomy over Chio's existing evidence surfaces.
 **Depends on**: Phase 48
 **Requirements**: UW-01
-**Why first**: ARC cannot make underwriting decisions safely until the input
+**Why first**: Chio cannot make underwriting decisions safely until the input
 contract is explicit about which evidence counts, how risk classes are named,
 and which policy constraints can influence a decision.
 
@@ -9066,7 +9066,7 @@ and which policy constraints can influence a decision.
 - docs that separate underwriting policy truth from receipt truth
 
 **Success Criteria**:
-1. ARC defines one typed underwriting-input contract over receipts,
+1. Chio defines one typed underwriting-input contract over receipts,
    reputation, certification, runtime assurance, and payment-side evidence.
 2. Risk classes, evidence references, and decision reasons are explicit and
    bounded rather than inferred ad hoc by callers.
@@ -9085,11 +9085,11 @@ Plans:
 
 ### Phase 50: Runtime Underwriting Decision Engine
 
-**Goal**: Produce bounded runtime underwriting decisions from canonical ARC
+**Goal**: Produce bounded runtime underwriting decisions from canonical Chio
 evidence rather than partner-specific ad hoc logic.
 **Depends on**: Phase 49
 **Requirements**: UW-02
-**Why second**: Once inputs are canonical, ARC needs a deterministic evaluator
+**Why second**: Once inputs are canonical, Chio needs a deterministic evaluator
 that can emit explainable approve, deny, step-up, or reduce-ceiling outcomes.
 
 **Primary surfaces:**
@@ -9099,7 +9099,7 @@ that can emit explainable approve, deny, step-up, or reduce-ceiling outcomes.
 - fail-closed runtime behavior when evidence is stale, absent, or invalid
 
 **Success Criteria**:
-1. ARC can make bounded underwriting decisions from the phase-49 contract.
+1. Chio can make bounded underwriting decisions from the phase-49 contract.
 2. Every decision includes explicit reasons and evidence references.
 3. Missing or invalid inputs degrade safely instead of silently granting more
    favorable outcomes.
@@ -9120,7 +9120,7 @@ Plans:
 budget, premium, and appeal semantics that remain separate from receipt truth.
 **Depends on**: Phase 50
 **Requirements**: UW-03
-**Why third**: Underwriting is not complete when a score exists in memory; ARC
+**Why third**: Underwriting is not complete when a score exists in memory; Chio
 needs durable signed decision artifacts that downstream operators and partners
 can verify independently.
 
@@ -9152,7 +9152,7 @@ Plans:
 and partner-facing documentation for the underwriting surface.
 **Depends on**: Phase 51
 **Requirements**: UW-04, UW-05
-**Why last**: ARC should not claim to ship underwriting until operators can
+**Why last**: Chio should not claim to ship underwriting until operators can
 simulate and explain decisions and the release package proves the boundary
 change clearly.
 
@@ -9166,7 +9166,7 @@ change clearly.
 1. Operators can simulate, inspect, and explain underwriting decisions using
    supported tooling.
 2. Qualification proves the underwriting story end-to-end.
-3. Docs clearly state that ARC now ships underwriting decisioning in addition
+3. Docs clearly state that Chio now ships underwriting decisioning in addition
    to truthful evidence export.
 
 **Plans**: 3 plans
@@ -9180,12 +9180,12 @@ Plans:
 ## Completed Milestone: v2.9 Economic Evidence and Authorization Context Interop
 
 **Milestone Goal:** Standardize truthful cost evidence and external
-authorization context so ARC's governed approvals and receipts can participate
+authorization context so Chio's governed approvals and receipts can participate
 cleanly in IAM, billing, and partner ecosystems.
 
 **Why now:** `docs/research/DEEP_RESEARCH_1.md` makes standardized cost
 semantics and transaction context prerequisites for credible runtime
-underwriting. ARC already separates quote, authorization, and post-execution
+underwriting. Chio already separates quote, authorization, and post-execution
 finalization, but those semantics are still strongest in payment-rail-specific
 flows rather than a general interop layer.
 
@@ -9193,9 +9193,9 @@ flows rather than a general interop layer.
 - `docs/research/DEEP_RESEARCH_1.md` on the two-source cost model, OAuth-family
   authorization details, transaction tokens, and underwriting prerequisites
 - `docs/TOOL_PRICING_GUIDE.md` on quoted price versus enforcement truth
-- `crates/arc-kernel/src/payment.rs` on pre-execution authorization and
+- `crates/chio-kernel/src/payment.rs` on pre-execution authorization and
   post-execution cost finalization
-- `docs/A2A_ADAPTER_GUIDE.md` on ARC's current external auth and mutual-TLS
+- `docs/A2A_ADAPTER_GUIDE.md` on Chio's current external auth and mutual-TLS
   interoperability surface
 
 - [x] **Phase 45: Generic Metered Billing Evidence Contract** - Define a
@@ -9223,7 +9223,7 @@ ACP/shared-payment-token flows.
 **Requirements**: EEI-01
 **Why first**: The rest of the interop stack needs one canonical vocabulary
 for quoted cost, approved cap, measured usage, and settlement evidence before
-ARC can bridge external billing systems safely.
+Chio can bridge external billing systems safely.
 
 **Primary surfaces:**
 - core metered-billing evidence types and schema contracts
@@ -9232,7 +9232,7 @@ ARC can bridge external billing systems safely.
 - docs that distinguish execution truth from economic truth
 
 **Success Criteria**:
-1. ARC can describe quoted cost, approved cap, observed usage, and reconciled
+1. Chio can describe quoted cost, approved cap, observed usage, and reconciled
    cost for non-payment-rail tools without overloading existing payment-only
    structures.
 2. Receipt truth stays canonical for what executed, while economic evidence
@@ -9255,7 +9255,7 @@ Plans:
 rules that preserve canonical execution receipt truth.
 **Depends on**: Phase 45
 **Requirements**: EEI-02
-**Why second**: Once the evidence contract exists, ARC needs concrete adapter
+**Why second**: Once the evidence contract exists, Chio needs concrete adapter
 hooks so external metering systems can produce post-execution truth without
 rewriting what the kernel observed.
 
@@ -9267,7 +9267,7 @@ rewriting what the kernel observed.
 
 **Success Criteria**:
 1. At least one non-rail adapter path can attach post-execution cost evidence
-   to ARC receipts without mutating receipt truth.
+   to Chio receipts without mutating receipt truth.
 2. Reconciliation semantics stay explicit and auditable for operators.
 3. Failure, replay, and missing-evidence cases are documented and fail closed.
 
@@ -9287,7 +9287,7 @@ context structures without silently widening identity, trust, or billing
 scope.
 **Depends on**: Phase 46
 **Requirements**: EEI-03, EEI-04
-**Why third**: Only after cost truth is explicit can ARC safely export its
+**Why third**: Only after cost truth is explicit can Chio safely export its
 governed authorization semantics to external IAM systems and delegated
 call-chain consumers.
 
@@ -9298,7 +9298,7 @@ call-chain consumers.
 - policy validation that rejects silent widening of authority
 
 **Success Criteria**:
-1. ARC can express governed approvals in a standards-legible external context
+1. Chio can express governed approvals in a standards-legible external context
    form.
 2. Delegated call-chain and cost context remain explicit and provenance-backed.
 3. Validation prevents mappings that silently widen authority or billing scope.
@@ -9320,13 +9320,13 @@ and qualification artifacts aimed at IAM, finance, and partner reviewers.
 **Depends on**: Phase 47
 **Requirements**: EEI-05
 **Why last**: This milestone only counts as complete if the new economic and
-authorization context is understandable and defensible outside ARC's own code
+authorization context is understandable and defensible outside Chio's own code
 and docs.
 
 **Primary surfaces:**
 - operator reporting and trust-control tooling for economic context
 - qualification lane additions and partner-facing examples
-- release/research docs that tie the interop story back to ARC's boundaries
+- release/research docs that tie the interop story back to Chio's boundaries
 - milestone closeout evidence
 
 **Success Criteria**:
@@ -9347,21 +9347,21 @@ Plans:
 
 ## Completed Milestone: v2.11 Portable Credential Interop and Wallet Distribution
 
-**Goal:** Expand ARC's portable trust into external VC, wallet, and verifier
+**Goal:** Expand Chio's portable trust into external VC, wallet, and verifier
 ecosystems without inventing synthetic global trust.
 
 **Why now:** `docs/research/DEEP_RESEARCH_1.md` calls for stronger VC,
-OID4VCI, and wallet-mediated portability once ARC already has conservative
+OID4VCI, and wallet-mediated portability once Chio already has conservative
 portable trust, underwriting semantics, and explicit economic boundaries.
-`v2.11` is where ARC stops being only ARC-native in credential delivery and
+`v2.11` is where Chio stops being only Chio-native in credential delivery and
 starts proving external wallet and verifier interop on purpose.
 
 **Research basis:**
 - `docs/research/DEEP_RESEARCH_1.md` on OID4VCI, passport portability, and
   wallet-mediated trust exchange
-- `crates/arc-credentials/src/lib.rs` on the current intentionally simple
-  ARC-native credential format
-- `docs/standards/ARC_PORTABLE_TRUST_PROFILE.md` on current conservative
+- `crates/chio-credentials/src/lib.rs` on the current intentionally simple
+  Chio-native credential format
+- `docs/standards/CHIO_PORTABLE_TRUST_PROFILE.md` on current conservative
   portability boundaries
 
 - [x] **Phase 53: OID4VCI-Compatible Issuance and Delivery** - Add at least
@@ -9376,25 +9376,25 @@ starts proving external wallet and verifier interop on purpose.
 ### Phase 53: OID4VCI-Compatible Issuance and Delivery
 
 **Goal**: Add at least one interoperable credential issuance and delivery path
-for ARC passports or equivalent portable credentials beyond ARC-native file
+for Chio passports or equivalent portable credentials beyond Chio-native file
 exchange.
 **Depends on**: Phase 52
 **Requirements**: VC-01, VC-05
-**Why first**: Wallet and verifier interop cannot be evaluated until ARC can
+**Why first**: Wallet and verifier interop cannot be evaluated until Chio can
 issue credentials in a form and flow that external holders can actually
 receive.
 
 **Primary surfaces:**
-- portable credential envelope and issuance-profile mapping for ARC passports
+- portable credential envelope and issuance-profile mapping for Chio passports
 - OID4VCI-compatible offer or delivery semantics through CLI and trust-control
 - operator configuration for issuance metadata, subject binding, and audience
-- docs that state which external issuance expectations ARC does and does not
+- docs that state which external issuance expectations Chio does and does not
   satisfy
 
 **Success Criteria**:
-1. ARC supports at least one interoperable issuance and delivery flow beyond
-   ARC-native direct file or API retrieval.
-2. Issued credentials preserve issuer provenance, subject binding, and ARC's
+1. Chio supports at least one interoperable issuance and delivery flow beyond
+   Chio-native direct file or API retrieval.
+2. Issued credentials preserve issuer provenance, subject binding, and Chio's
    conservative trust boundaries.
 3. Validation fails closed when issuance metadata, profile selection, or
    subject binding inputs are missing or inconsistent.
@@ -9402,7 +9402,7 @@ receive.
 **Plans**: 3 plans
 
 Plans:
-- [x] 53-01: Define the interoperable credential issuance profile and ARC
+- [x] 53-01: Define the interoperable credential issuance profile and Chio
   passport mapping contract.
 - [x] 53-02: Implement issuance offer and delivery surfaces across CLI and
   trust-control.
@@ -9412,7 +9412,7 @@ Plans:
 ### Phase 54: Credential Status, Revocation, and Distribution Contracts
 
 **Goal**: Make credential status, revocation, supersession, and distribution
-semantics portable to wallet and verifier ecosystems without weakening ARC's
+semantics portable to wallet and verifier ecosystems without weakening Chio's
 current lifecycle guarantees.
 **Depends on**: Phase 53
 **Requirements**: VC-02, VC-05
@@ -9420,14 +9420,14 @@ current lifecycle guarantees.
 verifiers can also observe truthful lifecycle state after issuance.
 
 **Primary surfaces:**
-- portable status and revocation contract for issued ARC credentials
+- portable status and revocation contract for issued Chio credentials
 - operator publication and query surfaces for lifecycle metadata
 - supersession and holder distribution behavior aligned to external consumers
-- docs that clarify how portable lifecycle state relates to ARC-native
+- docs that clarify how portable lifecycle state relates to Chio-native
   passport truth
 
 **Success Criteria**:
-1. ARC publishes portable status and revocation semantics that external
+1. Chio publishes portable status and revocation semantics that external
    wallets or verifiers can consume.
 2. Supersession and revocation remain explicit and auditable without mutating
    canonical receipt or identity truth.
@@ -9447,23 +9447,23 @@ Plans:
 ### Phase 55: Wallet / Holder Presentation Transport Semantics
 
 **Goal**: Define holder-facing credential transport and presentation semantics
-so wallets and remote relying parties can use ARC credentials beyond direct
+so wallets and remote relying parties can use Chio credentials beyond direct
 file exchange.
 **Depends on**: Phase 54
 **Requirements**: VC-03, VC-05
-**Why third**: Once issuance and lifecycle are portable, ARC still needs a
+**Why third**: Once issuance and lifecycle are portable, Chio still needs a
 bounded holder presentation story before external verifier proof is credible.
 
 **Primary surfaces:**
-- wallet or holder transport contracts for importing and presenting ARC
+- wallet or holder transport contracts for importing and presenting Chio
   credentials
 - holder-binding, audience, and replay-sensitive presentation metadata
 - CLI and trust-control presentation request or response surfaces
-- docs that explain which presentation semantics ARC supports and how they
+- docs that explain which presentation semantics Chio supports and how they
   preserve trust boundaries
 
 **Success Criteria**:
-1. Holders can retrieve, transport, or present ARC portable credentials using
+1. Holders can retrieve, transport, or present Chio portable credentials using
    a supported transport semantics beyond raw file delivery.
 2. Presentation behavior preserves explicit audience, holder, and trust
    boundaries rather than silently widening authority.
@@ -9485,7 +9485,7 @@ Plans:
 close the milestone with qualification and partner-facing interop proof.
 **Depends on**: Phase 55
 **Requirements**: VC-04, VC-05
-**Why last**: `v2.11` only counts as real product progress if ARC can show one
+**Why last**: `v2.11` only counts as real product progress if Chio can show one
 concrete external compatibility path rather than only claiming standards
 alignment on paper.
 
@@ -9497,7 +9497,7 @@ alignment on paper.
 - milestone audit and closeout artifacts
 
 **Success Criteria**:
-1. ARC proves at least one external wallet or verifier interop path end to
+1. Chio proves at least one external wallet or verifier interop path end to
    end.
 2. Qualification and docs explain the interoperability boundary clearly
    without overclaiming global trust or unsupported flows.
@@ -9515,28 +9515,28 @@ Plans:
 
 ## Completed Milestone: v2.12 Workload Identity and Attestation Verification Bridges
 
-**Goal:** Bind ARC's runtime-assurance model to concrete workload-identity and
+**Goal:** Bind Chio's runtime-assurance model to concrete workload-identity and
 attestation verifier systems rather than only normalized upstream evidence.
 
-**Why after v2.11:** This sequencing keeps ARC's outward credential and trust
+**Why after v2.11:** This sequencing keeps Chio's outward credential and trust
 interop surface clear before adding the deeper runtime-identity bridges that
 feed stronger assurance into policy.
 
 **Research basis:**
 - `docs/research/DEEP_RESEARCH_1.md` on SPIFFE/SVID, workload identity, and
   attestation-backed runtime trust
-- `crates/arc-core/src/lib.rs` on current opaque handling of SPIFFE-like agent
+- `crates/chio-core/src/lib.rs` on current opaque handling of SPIFFE-like agent
   identifiers
-- `crates/arc-core/src/capability.rs` on normalized runtime-attestation
+- `crates/chio-core/src/capability.rs` on normalized runtime-attestation
   evidence
 - `docs/A2A_ADAPTER_GUIDE.md` on current mutual-TLS support at the edge
 
 - [x] **Phase 57: SPIFFE/SVID Workload Identity Mapping** - Map workload
-  identities into ARC identity and policy surfaces explicitly.
+  identities into Chio identity and policy surfaces explicitly.
 - [x] **Phase 58: Cloud Attestation Verifier Adapters** - Add concrete cloud or
   vendor attestation verifier bridges.
 - [x] **Phase 59: Attestation Trust Policy and Runtime-Assurance Rebinding** -
-  Make verifier trust policy explicit and bind verified evidence back into ARC
+  Make verifier trust policy explicit and bind verified evidence back into Chio
   economic and approval decisions.
 - [x] **Phase 60: Workload Identity Qualification and Operator Runbooks** -
   Close the milestone with qualification, replay/failure documentation, and
@@ -9544,21 +9544,21 @@ feed stronger assurance into policy.
 
 ### Phase 57: SPIFFE/SVID Workload Identity Mapping
 
-**Goal**: Map workload identities into ARC identity and policy surfaces
+**Goal**: Map workload identities into Chio identity and policy surfaces
 explicitly instead of leaving them as opaque upstream metadata.
 **Depends on**: Phase 56
 **Requirements**: ATTEST-01, ATTEST-04
-**Why first**: ARC needs one explicit identity-binding contract before it can
+**Why first**: Chio needs one explicit identity-binding contract before it can
 trust or reason about concrete attestation verifier outputs.
 
 **Primary surfaces:**
 - typed workload-identity mapping contracts
 - runtime and policy-visible identity context binding
 - fail-closed validation for malformed or mismatched workload identities
-- docs that explain what workload identity ARC actually interprets
+- docs that explain what workload identity Chio actually interprets
 
 **Success Criteria**:
-1. ARC can map SPIFFE/SVID-style workload identity into explicit ARC identity
+1. Chio can map SPIFFE/SVID-style workload identity into explicit Chio identity
    context.
 2. Malformed or mismatched workload identities fail closed.
 3. Policy surfaces can consume mapped workload identity without silently
@@ -9578,17 +9578,17 @@ Plans:
 bridge instead of relying only on opaque normalized evidence input.
 **Depends on**: Phase 57
 **Requirements**: ATTEST-02, ATTEST-03
-**Why second**: After workload identity is explicit, ARC can ingest and
+**Why second**: After workload identity is explicit, Chio can ingest and
 normalize one real verifier path with provenance intact.
 
 **Primary surfaces:**
 - concrete attestation verifier adapter contract
-- normalized verifier output into ARC runtime-attestation evidence
+- normalized verifier output into Chio runtime-attestation evidence
 - verifier provenance and validity semantics
 - docs that explain the supported adapter boundary
 
 **Success Criteria**:
-1. ARC supports at least one concrete verifier bridge with explicit
+1. Chio supports at least one concrete verifier bridge with explicit
    provenance.
 2. Unsupported or malformed verifier outputs fail closed.
 3. Normalized verifier output preserves enough evidence to support later trust
@@ -9605,10 +9605,10 @@ Plans:
 ### Phase 59: Attestation Trust Policy and Runtime-Assurance Rebinding
 
 **Goal**: Make attestation trust policy explicit and rebind verified evidence
-back into ARC runtime-assurance and policy decisions.
+back into Chio runtime-assurance and policy decisions.
 **Depends on**: Phase 58
 **Requirements**: ATTEST-03, ATTEST-04
-**Why third**: Real verifier inputs only matter once ARC can say which
+**Why third**: Real verifier inputs only matter once Chio can say which
 verifiers it trusts and how that evidence changes runtime-assurance posture.
 
 **Primary surfaces:**
@@ -9700,7 +9700,7 @@ remain planned as the rest of the research-completion ladder.
 | 70 | v2.15 | AWS Nitro Verifier Adapter | Complete |
 | 71 | v2.15 | Google Attestation Adapter and Runtime-Assurance Policy v2 | Complete |
 | 72 | v2.15 | Appraisal Export, Qualification, and Boundary Closure | Complete |
-| 73 | v2.16 | ARC OAuth Authorization Profile | Complete |
+| 73 | v2.16 | Chio OAuth Authorization Profile | Complete |
 | 74 | v2.16 | Sender-Constrained and Discovery Contracts | Complete |
 | 75 | v2.16 | Enterprise IAM Adapters, Metadata, and Reviewer Packs | Complete |
 | 76 | v2.16 | Conformance, Qualification, and Standards-Facing Proof | Complete |
@@ -9738,23 +9738,23 @@ readiness, and architecture/performance.
 
 ### v2.80 Core Decomposition and Async Kernel (Phases 303-306)
 
-**Milestone Goal:** Break the `arc-core` gravity well into focused crates,
+**Milestone Goal:** Break the `chio-core` gravity well into focused crates,
 decompose the five mega-files into proper module trees, migrate the kernel
 from synchronous `&mut self` to async `&self` with interior mutability, and
 clean up deprecated and duplicated dependencies. This is the structural
 prerequisite for concurrent multi-agent operation and faster development
 iteration.
 
-### Phase 303: arc-core Crate Decomposition
-**Goal**: Split the 32K-line `arc-core` into `arc-core-types` (capabilities, receipts, crypto, canonical JSON) plus domain crates so dependent crates only compile what they need
+### Phase 303: chio-core Crate Decomposition
+**Goal**: Split the 32K-line `chio-core` into `chio-core-types` (capabilities, receipts, crypto, canonical JSON) plus domain crates so dependent crates only compile what they need
 **Depends on**: Nothing (first phase of v2.80)
 **Requirements**: DECOMP-01, DECOMP-02, DECOMP-03, DECOMP-04
 **Success Criteria** (what must be TRUE):
-  1. `arc-core-types` exists as a standalone crate containing capabilities, receipts, cryptographic signing, canonical JSON, and scope types
-  2. Domain types (credit, exposure, facility, bond, liability, market, governance, listing, appraisal, federation) live in separate domain crates that depend on `arc-core-types`
+  1. `chio-core-types` exists as a standalone crate containing capabilities, receipts, cryptographic signing, canonical JSON, and scope types
+  2. Domain types (credit, exposure, facility, bond, liability, market, governance, listing, appraisal, federation) live in separate domain crates that depend on `chio-core-types`
   3. All 25 dependent crates compile and their existing tests pass against the decomposed structure
-  4. A single-file change in `arc-core-types` triggers a measurably faster incremental rebuild than the same change in monolithic `arc-core`
-**Plans**: [303-01-PLAN.md](./phases/303-arc-core-crate-decomposition/303-01-PLAN.md), [303-01-SUMMARY.md](./phases/303-arc-core-crate-decomposition/303-01-SUMMARY.md), [303-02-PLAN.md](./phases/303-arc-core-crate-decomposition/303-02-PLAN.md), [303-02-SUMMARY.md](./phases/303-arc-core-crate-decomposition/303-02-SUMMARY.md), [303-03-PLAN.md](./phases/303-arc-core-crate-decomposition/303-03-PLAN.md), [303-03-SUMMARY.md](./phases/303-arc-core-crate-decomposition/303-03-SUMMARY.md)
+  4. A single-file change in `chio-core-types` triggers a measurably faster incremental rebuild than the same change in monolithic `chio-core`
+**Plans**: [303-01-PLAN.md](./phases/303-chio-core-crate-decomposition/303-01-PLAN.md), [303-01-SUMMARY.md](./phases/303-chio-core-crate-decomposition/303-01-SUMMARY.md), [303-02-PLAN.md](./phases/303-chio-core-crate-decomposition/303-02-PLAN.md), [303-02-SUMMARY.md](./phases/303-chio-core-crate-decomposition/303-02-SUMMARY.md), [303-03-PLAN.md](./phases/303-chio-core-crate-decomposition/303-03-PLAN.md), [303-03-SUMMARY.md](./phases/303-chio-core-crate-decomposition/303-03-SUMMARY.md)
 
 ### Phase 304: Mega-File Module Decomposition
 **Goal**: Decompose the five files exceeding 6,000 lines into focused module trees so no non-test source file exceeds 3,000 lines
@@ -9762,18 +9762,18 @@ iteration.
 **Requirements**: DECOMP-05, DECOMP-06, DECOMP-07, DECOMP-08, DECOMP-09
 **Success Criteria** (what must be TRUE):
   1. `trust_control.rs` is split into focused modules (federation, passport, settlement, SCIM, HTTP routes, types) with no public API changes
-  2. `arc-kernel/src/lib.rs` has its test module in a separate file and kernel subsystems in dedicated modules
-  3. `arc-cli/src/main.rs` is a thin dispatch entry point with per-subcommand modules
+  2. `chio-kernel/src/lib.rs` has its test module in a separate file and kernel subsystems in dedicated modules
+  3. `chio-cli/src/main.rs` is a thin dispatch entry point with per-subcommand modules
   4. `receipt_store.rs` and `runtime.rs` are decomposed into focused modules
   5. `find crates/ -name '*.rs' ! -path '*/tests/*' | xargs wc -l | awk '$1 > 3000'` returns no results
 **Plans**: [304-CONTEXT.md](./phases/304-mega-file-module-decomposition/304-CONTEXT.md), [304-RESEARCH.md](./phases/304-mega-file-module-decomposition/304-RESEARCH.md), [304-VALIDATION.md](./phases/304-mega-file-module-decomposition/304-VALIDATION.md), [304-01-PLAN.md](./phases/304-mega-file-module-decomposition/304-01-PLAN.md), [304-01-SUMMARY.md](./phases/304-mega-file-module-decomposition/304-01-SUMMARY.md), [304-02-PLAN.md](./phases/304-mega-file-module-decomposition/304-02-PLAN.md), [304-02-SUMMARY.md](./phases/304-mega-file-module-decomposition/304-02-SUMMARY.md), [304-03-PLAN.md](./phases/304-mega-file-module-decomposition/304-03-PLAN.md), [304-03-SUMMARY.md](./phases/304-mega-file-module-decomposition/304-03-SUMMARY.md)
 
 ### Phase 305: Async Kernel Migration
-**Goal**: The ARC kernel evaluates tool calls asynchronously on `&self` so multiple agents can be served concurrently without exclusive borrowing
+**Goal**: The Chio kernel evaluates tool calls asynchronously on `&self` so multiple agents can be served concurrently without exclusive borrowing
 **Depends on**: Phase 304 (decomposed kernel modules are easier to migrate)
 **Requirements**: ASYNC-01, ASYNC-02, ASYNC-03, ASYNC-04
 **Success Criteria** (what must be TRUE):
-  1. `ArcKernel::evaluate_tool_call` is `async fn` taking `&self`
+  1. `ChioKernel::evaluate_tool_call` is `async fn` taking `&self`
   2. Session state, receipt log, and budget stores use interior mutability (`RwLock`, `DashMap`, or equivalent)
   3. A test spawns two concurrent tool evaluations from different agents and both complete without deadlock or serialization
   4. The full existing test suite passes with no behavior changes beyond concurrency enablement
@@ -9792,15 +9792,15 @@ iteration.
 
 ---
 
-### v2.81 Deployable ARC and Developer Onboarding (Phases 307-310)
+### v2.81 Deployable Chio and Developer Onboarding (Phases 307-310)
 
-**Milestone Goal:** Make ARC usable by developers who are not building from
+**Milestone Goal:** Make Chio usable by developers who are not building from
 Rust source. Resolve the naming split, publish stable SDKs, provide a
 one-command Docker experience, and write a progressive tutorial that takes a
 developer from zero to a governed tool call in five minutes.
 
 ### Phase 307: Identity Resolution and Scaffolding
-**Goal**: Every user-facing artifact says "ARC" consistently and `arc init` scaffolds a working project
+**Goal**: Every user-facing artifact says "Chio" consistently and `arc init` scaffolds a working project
 **Depends on**: Phase 306 (clean dependency tree for scaffolded projects)
 **Requirements**: ONBOARD-01, ONBOARD-02, ONBOARD-03
 **Success Criteria** (what must be TRUE):
@@ -9814,9 +9814,9 @@ developer from zero to a governed tool call in five minutes.
 **Depends on**: Phase 305 (async kernel enables the SDK client protocol)
 **Requirements**: SDK-01, SDK-02, SDK-03, SDK-04
 **Success Criteria** (what must be TRUE):
-  1. `npm install @arc-protocol/sdk` installs a stable release with TypeScript types
-  2. `pip install arc-sdk` installs a stable release with typed Python classes
-  3. Both SDKs include a working example that connects to a running ARC kernel, requests a capability, invokes a governed tool, and reads the receipt
+  1. `npm install @chio-protocol/sdk` installs a stable release with TypeScript types
+  2. `pip install chio-sdk` installs a stable release with typed Python classes
+  3. Both SDKs include a working example that connects to a running Chio kernel, requests a capability, invokes a governed tool, and reads the receipt
   4. SDK README files document installation, quickstart, and API reference
 **Plans**: 3/3 plans complete
 
@@ -9831,14 +9831,14 @@ developer from zero to a governed tool call in five minutes.
 **Plans**: 2/2 plans complete
 
 ### Phase 310: Progressive Tutorial and Framework Integration
-**Goal**: Documentation guides a developer from ARC concepts through their first delegation, and framework examples use official SDKs
+**Goal**: Documentation guides a developer from Chio concepts through their first delegation, and framework examples use official SDKs
 **Depends on**: Phase 308, Phase 309
 **Requirements**: TUTORIAL-01, TUTORIAL-02, TUTORIAL-03, TUTORIAL-04
 **Success Criteria** (what must be TRUE):
-  1. A tutorial document walks through: ARC concepts, writing a policy, wrapping a tool, executing a governed call, reading a receipt, and delegating a capability
-  2. The Anthropic SDK example imports `@arc-protocol/sdk` and exercises the typed client
-  3. The LangChain example imports `arc-sdk` and exercises the typed client
-  4. An OpenAI-compatible example demonstrates ARC governance over function calling
+  1. A tutorial document walks through: Chio concepts, writing a policy, wrapping a tool, executing a governed call, reading a receipt, and delegating a capability
+  2. The Anthropic SDK example imports `@chio-protocol/sdk` and exercises the typed client
+  3. The LangChain example imports `chio-sdk` and exercises the typed client
+  4. An OpenAI-compatible example demonstrates Chio governance over function calling
 **Plans**: 2/2 plans complete
 
 ---
@@ -9864,8 +9864,8 @@ debug policy and capability issues.
 **Requirements**: PROD-01, PROD-02, PROD-03
 **Success Criteria** (what must be TRUE):
   1. Every crate under `crates/` has at least one file in `tests/` exercising its public API
-  2. arc-credentials, arc-policy, and arc-store-sqlite each have success-path, failure-path, and edge-case integration tests
-  3. arc-a2a-adapter, arc-mcp-adapter, and arc-mcp-edge integration tests exercise real protocol exchanges
+  2. chio-credentials, chio-policy, and chio-store-sqlite each have success-path, failure-path, and edge-case integration tests
+  3. chio-a2a-adapter, chio-mcp-adapter, and chio-mcp-edge integration tests exercise real protocol exchanges
 **Status**: complete locally 2026-04-14
 **Plans**: 3/3 plans complete
 
@@ -9909,7 +9909,7 @@ debug policy and capability issues.
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 303 | v2.80 | arc-core Crate Decomposition | Complete |
+| 303 | v2.80 | chio-core Crate Decomposition | Complete |
 | 304 | v2.80 | Mega-File Module Decomposition | Complete |
 | 305 | v2.80 | Async Kernel Migration | Complete |
 | 306 | v2.80 | Dependency Hygiene and Feature Gating | Complete |
@@ -9930,7 +9930,7 @@ debug policy and capability issues.
 
 ## v3.x Universal Security Kernel Era
 
-**Strategic pivot:** ARC expands from protocol adapter collection to universal
+**Strategic pivot:** Chio expands from protocol adapter collection to universal
 security kernel for the agent economy. One kernel, many substrates. Signed
 receipts across HTTP APIs, agent protocols, and framework middleware.
 
@@ -9944,35 +9944,35 @@ receipts across HTTP APIs, agent protocols, and framework middleware.
 unified configuration schema, and zero-code reverse-proxy entry point that
 all later substrates, SDKs, and framework wrappers depend on.
 
-### Phase 319: arc-http-core Types and Request Model
+### Phase 319: chio-http-core Types and Request Model
 **Goal**: Define the protocol-agnostic HTTP request, session, receipt, and verdict types that every substrate adapter shares
 **Depends on**: Phase 318 (v2.83 production qualification provides the stable kernel foundation)
 **Requirements**: CORE-01, CORE-02, CORE-03, CORE-04
 **Success Criteria** (what must be TRUE):
-  1. `arc-http-core` crate exists with `ArcHttpRequest`, `HttpMethod`, `CallerIdentity`, `AuthMethod`, `SessionContext`, `HttpReceipt`, and `Verdict` types
+  1. `chio-http-core` crate exists with `ChioHttpRequest`, `HttpMethod`, `CallerIdentity`, `AuthMethod`, `SessionContext`, `HttpReceipt`, and `Verdict` types
   2. All types implement `Serialize` and `Deserialize` with canonical JSON for signed payloads
   3. `HttpReceipt` carries Ed25519 signature, request binding, verdict, and guard evidence
-  4. Existing kernel crates compile without changes -- `arc-http-core` is additive
+  4. Existing kernel crates compile without changes -- `chio-http-core` is additive
 **Estimated complexity**: M
 
-### Phase 320: arc-openapi Parsing and Manifest Generation
-**Goal**: Parse OpenAPI 3.x specs and generate ARC tool manifests with default deny-by-default policies for side-effect routes
-**Depends on**: Phase 319 (arc-http-core types define the request/receipt model)
+### Phase 320: chio-openapi Parsing and Manifest Generation
+**Goal**: Parse OpenAPI 3.x specs and generate Chio tool manifests with default deny-by-default policies for side-effect routes
+**Depends on**: Phase 319 (chio-http-core types define the request/receipt model)
 **Requirements**: CORE-05, CORE-06, CORE-07, CORE-08, CORE-09
 **Success Criteria** (what must be TRUE):
-  1. `arc-openapi` crate parses OpenAPI 3.0 and 3.1 specs in both YAML and JSON
+  1. `chio-openapi` crate parses OpenAPI 3.0 and 3.1 specs in both YAML and JSON
   2. Each route becomes a `ToolDefinition` with input_schema from path/query/body params
   3. GET routes default to session-scoped allow; POST/PUT/PATCH/DELETE default to deny without capability
-  4. `x-arc-*` extension fields override default policy per route
+  4. `x-chio-*` extension fields override default policy per route
   5. Running against PetStore spec produces a valid ToolManifest
 **Estimated complexity**: M
 
 ### Phase 321: arc.yaml Unified Configuration
 **Goal**: Implement the arc.yaml configuration schema with env-var interpolation and fail-fast validation
-**Depends on**: Phase 319 (arc-http-core types are referenced in config structs)
+**Depends on**: Phase 319 (chio-http-core types are referenced in config structs)
 **Requirements**: CORE-10, CORE-11, CORE-12, CORE-13
 **Success Criteria** (what must be TRUE):
-  1. `arc-config` module parses `arc.yaml` with kernel, adapters, edges, receipts, and logging sections
+  1. `chio-config` module parses `arc.yaml` with kernel, adapters, edges, receipts, and logging sections
   2. `${VAR}` and `${VAR:-default}` resolve in string fields before typed deserialization
   3. Duplicate IDs, broken references, and missing required fields produce clear error messages at parse time
   4. Minimal config (kernel + one adapter) is accepted; all other sections default sensibly
@@ -9980,7 +9980,7 @@ all later substrates, SDKs, and framework wrappers depend on.
 
 ### Phase 322: arc api protect CLI
 **Goal**: Ship the zero-code reverse-proxy entry point that reads an OpenAPI spec and produces signed receipts for every request
-**Depends on**: Phase 320 (arc-openapi provides manifest generation), Phase 321 (arc.yaml provides config)
+**Depends on**: Phase 320 (chio-openapi provides manifest generation), Phase 321 (arc.yaml provides config)
 **Requirements**: CORE-14, CORE-15, CORE-16, CORE-17, CORE-18
 **Success Criteria** (what must be TRUE):
   1. `arc api protect --upstream URL --spec openapi.yaml` starts a reverse proxy
@@ -9995,15 +9995,15 @@ all later substrates, SDKs, and framework wrappers depend on.
 ## v3.1 Attestation Completion (Phases 323-326)
 
 **Milestone Goal:** Close the ACP attestation gap, implement session
-compliance certificates, and connect ARC to existing observability
+compliance certificates, and connect Chio to existing observability
 infrastructure via OpenTelemetry export.
 
 ### Phase 323: ReceiptSigner and CapabilityChecker Traits
 **Goal**: Define the injection traits that let the ACP proxy produce signed receipts and validate capabilities without hard-coupling to the kernel
-**Depends on**: Phase 319 (arc-http-core receipt model informs trait design)
+**Depends on**: Phase 319 (chio-http-core receipt model informs trait design)
 **Requirements**: ATT-01, ATT-02, ATT-03, ATT-04
 **Success Criteria** (what must be TRUE):
-  1. `ReceiptSigner` and `CapabilityChecker` traits are defined in `arc-acp-proxy`
+  1. `ReceiptSigner` and `CapabilityChecker` traits are defined in `chio-acp-proxy`
   2. Both traits are `Option`-wrapped in `MessageInterceptor`
   3. `AcpProxy::start_with_kernel` accepts injected signer and checker
   4. `AcpProxy::start` continues to work in standalone mode
@@ -10014,7 +10014,7 @@ infrastructure via OpenTelemetry export.
 **Depends on**: Phase 323 (traits define the injection surface)
 **Requirements**: ATT-05, ATT-06, ATT-07, ATT-08
 **Success Criteria** (what must be TRUE):
-  1. Kernel-backed `ReceiptSigner` signs ACP events into `ArcReceipt` with Ed25519 signatures
+  1. Kernel-backed `ReceiptSigner` signs ACP events into `ChioReceipt` with Ed25519 signatures
   2. Kernel-backed `CapabilityChecker` validates tokens for file and terminal operations with fail-closed semantics
   3. Signed ACP receipts appear in the kernel's `ReceiptStore` and Merkle checkpoint batches
   4. `AcpAttestationMode::Required` marks sessions non-compliant when signing fails
@@ -10033,7 +10033,7 @@ infrastructure via OpenTelemetry export.
 **Estimated complexity**: L
 
 ### Phase 326: OpenTelemetry Export
-**Goal**: Export receipt data as OTel spans so ARC integrates with existing observability infrastructure
+**Goal**: Export receipt data as OTel spans so Chio integrates with existing observability infrastructure
 **Depends on**: Phase 325 (compliance certificates generate the span events to export)
 **Requirements**: ATT-13, ATT-14, ATT-15
 **Success Criteria** (what must be TRUE):
@@ -10047,47 +10047,47 @@ infrastructure via OpenTelemetry export.
 ## v3.2 Python Adoption (Phases 327-330)
 
 **Milestone Goal:** Ship Python SDK, ASGI middleware, framework wrappers, and
-LangChain integration so Python developers can adopt ARC with one import.
+LangChain integration so Python developers can adopt Chio with one import.
 
-### Phase 327: arc-sdk-python Core
-**Goal**: Build the Python SDK as a thin HTTP client to the ARC sidecar with typed classes for capabilities, receipts, and guard evaluation
+### Phase 327: chio-sdk-python Core
+**Goal**: Build the Python SDK as a thin HTTP client to the Chio sidecar with typed classes for capabilities, receipts, and guard evaluation
 **Depends on**: Phase 322 (arc api protect validates the HTTP receipt model end-to-end)
 **Requirements**: PY-01, PY-02, PY-03, PY-04
 **Success Criteria** (what must be TRUE):
-  1. `arc-sdk-python` exposes `CapabilityToken`, `ArcReceipt`, `GuardEvidence`, and `Verdict` as typed Python classes
+  1. `chio-sdk-python` exposes `CapabilityToken`, `ChioReceipt`, `GuardEvidence`, and `Verdict` as typed Python classes
   2. Python code can create, validate, and attenuate capability tokens
   3. Python code can verify receipt signatures and chain continuity
-  4. `pip install arc-sdk-python` works as a pure Python package with no native compilation required
+  4. `pip install chio-sdk-python` works as a pure Python package with no native compilation required
 **Estimated complexity**: L
 
-### Phase 328: arc-asgi Middleware
+### Phase 328: chio-asgi Middleware
 **Goal**: Build ASGI middleware that intercepts requests, evaluates capabilities, and signs receipts for any ASGI-compliant framework
 **Depends on**: Phase 327 (Python SDK provides the kernel binding)
 **Requirements**: PY-05, PY-06, PY-07
 **Success Criteria** (what must be TRUE):
-  1. `arc-asgi` middleware extracts caller identity, evaluates capabilities, runs guards, and signs receipts
+  1. `chio-asgi` middleware extracts caller identity, evaluates capabilities, runs guards, and signs receipts
   2. Middleware works via `app.add_middleware()` on FastAPI, Starlette, and Litestar
   3. Every request produces a signed `HttpReceipt` in the configured receipt store
 **Estimated complexity**: M
 
-### Phase 329: arc-fastapi and arc-django Wrappers
+### Phase 329: chio-fastapi and chio-django Wrappers
 **Goal**: Build framework-specific wrappers with decorators and native error responses
 **Depends on**: Phase 328 (ASGI middleware provides the interception layer)
 **Requirements**: PY-08, PY-09, PY-10
 **Success Criteria** (what must be TRUE):
-  1. `arc-fastapi` provides `@arc_requires`, `@arc_approval`, and `@arc_budget` decorators
-  2. `arc-django` middleware works with Django WSGI and DRF
-  3. Both wrappers return framework-native error responses with ARC error codes
+  1. `chio-fastapi` provides `@chio_requires`, `@chio_approval`, and `@chio_budget` decorators
+  2. `chio-django` middleware works with Django WSGI and DRF
+  3. Both wrappers return framework-native error responses with Chio error codes
 **Estimated complexity**: M
 
-### Phase 330: arc-langchain Integration and Conformance
-**Goal**: Wrap ARC-governed tools as LangChain Tool objects and validate cross-language conformance
+### Phase 330: chio-langchain Integration and Conformance
+**Goal**: Wrap Chio-governed tools as LangChain Tool objects and validate cross-language conformance
 **Depends on**: Phase 329 (FastAPI wrapper validates the end-to-end Python path)
 **Requirements**: PY-11, PY-12, PY-13
 **Success Criteria** (what must be TRUE):
-  1. `arc-langchain` wraps ARC tools as LangChain `Tool` objects with kernel-mediated invocation
+  1. `chio-langchain` wraps Chio tools as LangChain `Tool` objects with kernel-mediated invocation
   2. Conformance tests produce byte-identical results between Python SDK and Rust kernel
-  3. End-to-end test: FastAPI app with `arc-fastapi` produces receipts that pass `arc cert verify`
+  3. End-to-end test: FastAPI app with `chio-fastapi` produces receipts that pass `arc cert verify`
 **Estimated complexity**: M
 
 ---
@@ -10095,17 +10095,17 @@ LangChain integration so Python developers can adopt ARC with one import.
 ## v3.3 TypeScript Adoption (Phases 331-334)
 
 **Milestone Goal:** Ship Node/Bun HTTP substrate, Express/Fastify/Elysia
-wrappers, and conformance tests so TypeScript developers can adopt ARC
+wrappers, and conformance tests so TypeScript developers can adopt Chio
 natively.
 
-### Phase 331: @arc-protocol/node-http Substrate
+### Phase 331: @chio-protocol/node-http Substrate
 **Goal**: Build the common HTTP interception substrate for Node and Bun runtimes
 **Depends on**: Phase 322 (arc api protect provides the HTTP kernel surface TypeScript substrates build on)
 **Requirements**: TS-01, TS-02, TS-03
 **Success Criteria** (what must be TRUE):
-  1. `@arc-protocol/node-http` handles `(req, res)` and `Request -> Response` interception
+  1. `@chio-protocol/node-http` handles `(req, res)` and `Request -> Response` interception
   2. Substrate extracts caller identity from Authorization headers, cookies, and API keys
-  3. Substrate produces signed receipts via the ARC sidecar over localhost HTTP
+  3. Substrate produces signed receipts via the Chio sidecar over localhost HTTP
 **Estimated complexity**: L
 
 ### Phase 332: Express and Fastify Wrappers
@@ -10113,9 +10113,9 @@ natively.
 **Depends on**: Phase 331 (node-http substrate provides the interception layer)
 **Requirements**: TS-04, TS-05, TS-06
 **Success Criteria** (what must be TRUE):
-  1. `@arc-protocol/express` provides `app.use(arc(...))` middleware
-  2. `@arc-protocol/fastify` provides `fastify.register(arc, ...)` plugin
-  3. Both wrappers return framework-native error responses with ARC error codes
+  1. `@chio-protocol/express` provides `app.use(arc(...))` middleware
+  2. `@chio-protocol/fastify` provides `fastify.register(arc, ...)` plugin
+  3. Both wrappers return framework-native error responses with Chio error codes
 **Estimated complexity**: M
 
 ### Phase 333: Elysia Wrapper and npm Packaging
@@ -10123,7 +10123,7 @@ natively.
 **Depends on**: Phase 332 (Express/Fastify validate the wrapper pattern)
 **Requirements**: TS-07, TS-08, TS-09
 **Success Criteria** (what must be TRUE):
-  1. `@arc-protocol/elysia` provides `.use(arc(...))` lifecycle hook
+  1. `@chio-protocol/elysia` provides `.use(arc(...))` lifecycle hook
   2. All four packages publish with TypeScript type definitions
   3. Packages support both ESM and CommonJS
 **Estimated complexity**: S
@@ -10151,7 +10151,7 @@ close the gap between "authorized the request" and "governed the outcome."
 **Depends on**: Phase 322 (arc api protect provides the HTTP request pipeline)
 **Requirements**: GUARD-01, GUARD-02, GUARD-03
 **Success Criteria** (what must be TRUE):
-  1. `arc-http-session` maintains per-session journal with request history, data-flow accounting, and delegation depth
+  1. `chio-http-session` maintains per-session journal with request history, data-flow accounting, and delegation depth
   2. Journal is available to all guards in the evaluation pipeline
   3. Journal entries are append-only and hash-chained for tamper detection
 **Estimated complexity**: M
@@ -10202,36 +10202,36 @@ function-calling adapter.
 **Success Criteria** (what must be TRUE):
   1. MCP adapter has 80+ tests covering streaming, errors, templates, nested flows, and OAuth refresh
   2. Partial/chunked tool output generates proper receipts per chunk
-  3. Error paths produce structured denial receipts matching the ARC error taxonomy
+  3. Error paths produce structured denial receipts matching the Chio error taxonomy
 **Estimated complexity**: M
 
 ### Phase 340: OpenAPI-to-MCP Bridge
-**Goal**: Let MCP-speaking agents discover and invoke ARC-governed HTTP APIs as MCP tools
-**Depends on**: Phase 320 (arc-openapi generates manifests), Phase 339 (MCP adapter is complete)
+**Goal**: Let MCP-speaking agents discover and invoke Chio-governed HTTP APIs as MCP tools
+**Depends on**: Phase 320 (chio-openapi generates manifests), Phase 339 (MCP adapter is complete)
 **Requirements**: PROTO-04, PROTO-05, PROTO-06
 **Success Criteria** (what must be TRUE):
-  1. ARC-governed HTTP APIs appear as MCP tool surfaces for MCP clients
+  1. Chio-governed HTTP APIs appear as MCP tool surfaces for MCP clients
   2. Bridge generates `tools/list` entries from the OpenAPI spec
   3. Bridge invocations flow through the kernel with capability validation and receipt signing
 **Estimated complexity**: M
 
 ### Phase 341: A2A and ACP Edge Crates
-**Goal**: Ship arc-a2a-edge and arc-acp-edge so ARC-native tools are consumable via A2A Agent Cards and ACP sessions
+**Goal**: Ship chio-a2a-edge and chio-acp-edge so Chio-native tools are consumable via A2A Agent Cards and ACP sessions
 **Depends on**: Phase 324 (ACP kernel integration provides signed receipts)
 **Requirements**: PROTO-07, PROTO-08, PROTO-09, PROTO-10
 **Success Criteria** (what must be TRUE):
-  1. `arc-a2a-edge` exposes tools as A2A skills with SendMessage and streaming support
+  1. `chio-a2a-edge` exposes tools as A2A skills with SendMessage and streaming support
   2. A2A Agent Card is served at `/.well-known/agent-card.json`
-  3. `arc-acp-edge` exposes tools as ACP capabilities with session/prompt and permission gating
+  3. `chio-acp-edge` exposes tools as ACP capabilities with session/prompt and permission gating
   4. Both edges evaluate `BridgeFidelity` and suppress `Unsupported` tools
 **Estimated complexity**: L
 
-### Phase 342: arc-openai Adapter
-**Goal**: Intercept OpenAI-style function calls through the ARC kernel
+### Phase 342: chio-openai Adapter
+**Goal**: Intercept OpenAI-style function calls through the Chio kernel
 **Depends on**: Phase 339 (MCP adapter completion validates the adapter pattern)
 **Requirements**: PROTO-11, PROTO-12, PROTO-13
 **Success Criteria** (what must be TRUE):
-  1. `arc-openai` intercepts `tool_use` / function-calling requests through the kernel
+  1. `chio-openai` intercepts `tool_use` / function-calling requests through the kernel
   2. Every function call produces a signed receipt
   3. Adapter supports Chat Completions and Responses API formats
 **Estimated complexity**: M
@@ -10256,22 +10256,22 @@ API surfaces.
 **Estimated complexity**: L
 
 ### Phase 344: Kubernetes Controller and Injector
-**Goal**: Ship admission controller and sidecar injector for infrastructure-level ARC enforcement
+**Goal**: Ship admission controller and sidecar injector for infrastructure-level Chio enforcement
 **Depends on**: Phase 322 (arc api protect is the sidecar binary)
 **Requirements**: PLAT-05, PLAT-06, PLAT-07, PLAT-08
 **Success Criteria** (what must be TRUE):
-  1. Admission controller rejects pods without valid ARC capability token annotations
+  1. Admission controller rejects pods without valid Chio capability token annotations
   2. Sidecar injector automatically adds `arc api protect` as a sidecar container
-  3. `ArcPolicy` CRD configures required scopes per namespace or label
+  3. `ChioPolicy` CRD configures required scopes per namespace or label
   4. Sidecar configures upstream URL, spec path, and receipt store from pod annotations
 **Estimated complexity**: L
 
-### Phase 345: arc-tower Rust Middleware
+### Phase 345: chio-tower Rust Middleware
 **Goal**: Ship tower::Layer implementation for Axum and Tonic
-**Depends on**: Phase 319 (arc-http-core provides the types arc-tower wraps)
+**Depends on**: Phase 319 (chio-http-core provides the types chio-tower wraps)
 **Requirements**: PLAT-09, PLAT-10, PLAT-11
 **Success Criteria** (what must be TRUE):
-  1. `arc-tower` implements `tower::Layer` with capability validation and receipt signing
+  1. `chio-tower` implements `tower::Layer` with capability validation and receipt signing
   2. Axum integration test produces signed receipts
   3. Tonic gRPC integration test produces signed receipts
 **Estimated complexity**: M
@@ -10281,8 +10281,8 @@ API surfaces.
 **Depends on**: Phase 322 (arc api protect validates the sidecar HTTP model)
 **Requirements**: PLAT-12, PLAT-13, PLAT-14, PLAT-15
 **Success Criteria** (what must be TRUE):
-  1. `arc-jvm` provides Servlet filter or Spring Boot auto-configuration
-  2. `arc-dotnet` provides ASP.NET Core middleware
+  1. `chio-jvm` provides Servlet filter or Spring Boot auto-configuration
+  2. `chio-dotnet` provides ASP.NET Core middleware
   3. Both communicate with the Rust kernel via sidecar HTTP as the primary model
   4. Conformance tests validate both against Rust kernel for shared test vectors
 **Estimated complexity**: L
@@ -10313,7 +10313,7 @@ cases.
 **Success Criteria** (what must be TRUE):
   1. Receipts carry per-receipt cost attribution metadata (compute, data volume, API cost)
   2. `arc receipts cost` CLI queries cumulative cost by session, agent, tool, or time range
-  3. Monetary budget enforcement uses denominated currency via arc-link oracle
+  3. Monetary budget enforcement uses denominated currency via chio-link oracle
   4. Cost metadata is billing-export compatible
 **Estimated complexity**: L
 
@@ -10322,7 +10322,7 @@ cases.
 **Depends on**: Phase 341 (edge crate pattern validated by A2A/ACP edges)
 **Requirements**: STRAT-09, STRAT-10, STRAT-11
 **Success Criteria** (what must be TRUE):
-  1. `arc-ag-ui-proxy` validates capability tokens for UI-facing actions
+  1. `chio-ag-ui-proxy` validates capability tokens for UI-facing actions
   2. Proxy supports SSE and WebSocket transports
   3. UI-facing receipts include event type, target component, and action classification
 **Estimated complexity**: M
@@ -10355,24 +10355,24 @@ run in parallel after P0 completes.
 ---
 
 ### Phase 351: HTTP Substrate Specification
-**Goal**: Define the normative HTTP substrate surface that all SDKs and middleware consume, including the sidecar evaluation protocol, HttpReceipt schema, and relationship to ArcReceipt
+**Goal**: Define the normative HTTP substrate surface that all SDKs and middleware consume, including the sidecar evaluation protocol, HttpReceipt schema, and relationship to ChioReceipt
 **Depends on**: Phase 350 (all v3.x code is shipped)
 **Requirements**: SPEC-01, SPEC-02, SPEC-03, SPEC-04, SPEC-05
 **Success Criteria** (what must be TRUE):
   1. `spec/HTTP-SUBSTRATE.md` defines the sidecar evaluation protocol: `POST /arc/evaluate`, `POST /arc/verify`, `GET /arc/health` with request/response schemas
   2. `spec/HTTP-SUBSTRATE.md` defines `HttpReceipt` normatively with all fields (request_id, route_pattern, method, caller_identity_hash, session_id, verdict, evidence, response_status, timestamp, content_hash, policy_hash, capability_id, metadata, kernel_key, signature)
-  3. `spec/HTTP-SUBSTRATE.md` defines `ArcHttpRequest`, `CallerIdentity`, `AuthMethod`, `SessionContext`, and `Verdict` (with http_status extension) types
+  3. `spec/HTTP-SUBSTRATE.md` defines `ChioHttpRequest`, `CallerIdentity`, `AuthMethod`, `SessionContext`, and `Verdict` (with http_status extension) types
   4. `spec/HTTP-SUBSTRATE.md` documents the `HttpReceipt.to_arc_receipt()` mapping and its known limitation (signature is not re-signed)
-  5. `spec/schemas/arc-http/v1/` contains JSON Schema documents for HttpReceipt, ArcHttpRequest, CallerIdentity, Verdict, and the sidecar evaluate request/response
+  5. `spec/schemas/chio-http/v1/` contains JSON Schema documents for HttpReceipt, ChioHttpRequest, CallerIdentity, Verdict, and the sidecar evaluate request/response
 **Estimated complexity**: L
 
 ### Phase 352: OpenAPI Integration Specification
-**Goal**: Define how ARC generates tool manifests from OpenAPI specs, the x-arc-* extension vocabulary, default deny-by-method policy, and the arc api protect reverse proxy contract
+**Goal**: Define how Chio generates tool manifests from OpenAPI specs, the x-chio-* extension vocabulary, default deny-by-method policy, and the arc api protect reverse proxy contract
 **Depends on**: Phase 351 (HTTP substrate types are defined)
 **Requirements**: SPEC-06, SPEC-07, SPEC-08, SPEC-09
 **Success Criteria** (what must be TRUE):
-  1. `spec/OPENAPI-INTEGRATION.md` defines the OpenAPI 3.0/3.1 to ARC manifest pipeline: parsing, tool extraction, input_schema derivation, policy assignment
-  2. `spec/OPENAPI-INTEGRATION.md` defines the `x-arc-*` extension vocabulary: `x-arc-sensitivity`, `x-arc-side-effects`, `x-arc-approval-required`, `x-arc-budget-limit`, `x-arc-publish`
+  1. `spec/OPENAPI-INTEGRATION.md` defines the OpenAPI 3.0/3.1 to Chio manifest pipeline: parsing, tool extraction, input_schema derivation, policy assignment
+  2. `spec/OPENAPI-INTEGRATION.md` defines the `x-chio-*` extension vocabulary: `x-chio-sensitivity`, `x-chio-side-effects`, `x-chio-approval-required`, `x-chio-budget-limit`, `x-chio-publish`
   3. `spec/OPENAPI-INTEGRATION.md` defines the default policy: GET/HEAD/OPTIONS = session-scoped allow, POST/PUT/PATCH/DELETE = deny-by-default
   4. `spec/OPENAPI-INTEGRATION.md` defines the `arc api protect` contract: command-line interface, auto-discovery behavior, structured 403 response format, receipt storage
 **Estimated complexity**: M
@@ -10383,8 +10383,8 @@ run in parallel after P0 completes.
 **Requirements**: SPEC-10, SPEC-11, SPEC-12, SPEC-13
 **Success Criteria** (what must be TRUE):
   1. PROTOCOL.md version bumped to 3.0 with a "v3 Addendum" section or restructured into v2 and v3 sections
-  2. Section 6 (Receipt Contract) references HttpReceipt alongside ArcReceipt with a clear relationship description
-  3. Section 7 (Manifest Contract) references OpenAPI-derived manifests alongside arc.manifest.v1
+  2. Section 6 (Receipt Contract) references HttpReceipt alongside ChioReceipt with a clear relationship description
+  3. Section 7 (Manifest Contract) references OpenAPI-derived manifests alongside chio.manifest.v1
   4. Section 8.1 (CLI) adds `arc api protect` and `arc cert generate/verify/inspect` entrypoints
 **Estimated complexity**: M
 
@@ -10416,10 +10416,10 @@ run in parallel after P0 completes.
 **Depends on**: Phase 351 (sidecar protocol is the foundation SDKs consume)
 **Requirements**: SPEC-23, SPEC-24, SPEC-25, SPEC-26
 **Success Criteria** (what must be TRUE):
-  1. `docs/sdk/PYTHON.md` documents arc-sdk-python (client, types), arc-asgi (middleware), arc-fastapi (decorators), arc-django (middleware), and arc-langchain (tool wrapper) with usage examples
-  2. `docs/sdk/TYPESCRIPT.md` documents @arc-protocol/node-http (substrate), express, fastify, elysia (wrappers), and conformance package with usage examples
-  3. `docs/sdk/GO.md` documents arc-go-http middleware with usage examples
-  4. All SDK docs specify the sidecar model explicitly: SDKs communicate with the ARC Rust kernel via localhost HTTP, default URL is 127.0.0.1:9090, configurable via ARC_SIDECAR_URL
+  1. `docs/sdk/PYTHON.md` documents chio-sdk-python (client, types), chio-asgi (middleware), chio-fastapi (decorators), chio-django (middleware), and chio-langchain (tool wrapper) with usage examples
+  2. `docs/sdk/TYPESCRIPT.md` documents @chio-protocol/node-http (substrate), express, fastify, elysia (wrappers), and conformance package with usage examples
+  3. `docs/sdk/GO.md` documents chio-go-http middleware with usage examples
+  4. All SDK docs specify the sidecar model explicitly: SDKs communicate with the Chio Rust kernel via localhost HTTP, default URL is 127.0.0.1:9090, configurable via CHIO_SIDECAR_URL
 **Estimated complexity**: M
 
 ### Phase 357: Protocol Bridge and Edge Documentation
@@ -10440,7 +10440,7 @@ run in parallel after P0 completes.
 **Success Criteria** (what must be TRUE):
   1. `docs/protocols/STRATEGIC-VISION.md` updated: Tier 1/2/3 items marked as shipped where applicable, new "Tier 4: Next Horizon" section added for post-v3.7 work
   2. `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` updated: all 6 build phases marked as shipped, actual crate/package names added
-  3. `docs/sdk/PLATFORM.md` documents arc-tower (Rust middleware), K8s controller/injector (CRD, webhook configs), JVM substrate (Spring Boot), and .NET substrate (ASP.NET Core) with usage examples
+  3. `docs/sdk/PLATFORM.md` documents chio-tower (Rust middleware), K8s controller/injector (CRD, webhook configs), JVM substrate (Spring Boot), and .NET substrate (ASP.NET Core) with usage examples
   4. `spec/WIRE_PROTOCOL.md` updated with a Section 7 referencing the HTTP substrate surface and sidecar evaluation protocol as a fourth cooperating surface alongside native, hosted MCP, and trust-control
 **Estimated complexity**: M
 
@@ -10463,12 +10463,12 @@ Phases 362 and 363 close the harness and documentation drift after the runtime
 changes land.
 
 ### Phase 359: OpenAI Adapter Kernel Execution
-**Goal**: Rework `arc-openai` so OpenAI function calls flow through the ARC kernel and carry real signed receipt artifacts instead of synthetic receipt references
+**Goal**: Rework `chio-openai` so OpenAI function calls flow through the Chio kernel and carry real signed receipt artifacts instead of synthetic receipt references
 **Depends on**: Phase 342 (base adapter exists), Phase 357 (OpenAI bridge spec exists)
 **Requirements**: REM-01, REM-02, REM-03
 **Success Criteria** (what must be TRUE):
-  1. `arc-openai` executes function calls via `ArcKernel::evaluate_tool_call_blocking` using a real `ToolCallRequest`
-  2. Successful and denied OpenAI tool calls expose the kernel-signed `ArcReceipt` and use the actual receipt ID as `receipt_ref`
+  1. `chio-openai` executes function calls via `ChioKernel::evaluate_tool_call_blocking` using a real `ToolCallRequest`
+  2. Successful and denied OpenAI tool calls expose the kernel-signed `ChioReceipt` and use the actual receipt ID as `receipt_ref`
   3. OpenAI adapter tests cover allow, deny, parse failure, unknown function, and tool-server error paths under the kernel-backed execution model
 **Estimated complexity**: M
 
@@ -10482,12 +10482,12 @@ changes land.
 **Estimated complexity**: S
 
 ### Phase 361: HTTP Adapter Request Binding and Capability Validation
-**Goal**: Fix `arc-api-protect` and `arc-tower` so they bind the full request shape into signed receipts and deny invalid capability tokens instead of checking presence only
+**Goal**: Fix `chio-api-protect` and `chio-tower` so they bind the full request shape into signed receipts and deny invalid capability tokens instead of checking presence only
 **Depends on**: Phase 351 (HTTP substrate spec), Phase 352 (OpenAPI integration spec)
 **Requirements**: REM-06, REM-07, REM-08
 **Success Criteria** (what must be TRUE):
-  1. Query parameters are parsed and included in `ArcHttpRequest.content_hash()` inputs for `arc-api-protect` and `arc-tower`
-  2. `capability_id` is carried into `ArcHttpRequest` and `HttpReceipt` when a valid capability token is presented
+  1. Query parameters are parsed and included in `ChioHttpRequest.content_hash()` inputs for `chio-api-protect` and `chio-tower`
+  2. `capability_id` is carried into `ChioHttpRequest` and `HttpReceipt` when a valid capability token is presented
   3. Unsafe requests with malformed, invalid-signature, or expired capability tokens are denied fail-closed instead of being allowed on token presence alone
 **Estimated complexity**: M
 
@@ -10496,7 +10496,7 @@ changes land.
 **Depends on**: Phase 359 (runtime changes broaden workspace coverage), Phase 361 (adapter fixes may affect integration behavior)
 **Requirements**: REM-09, REM-10
 **Success Criteria** (what must be TRUE):
-  1. `crates/arc-cli/tests/mcp_serve.rs` no longer exhibits order-sensitive flake under repeated or concurrent workspace test runs
+  1. `crates/chio-cli/tests/mcp_serve.rs` no longer exhibits order-sensitive flake under repeated or concurrent workspace test runs
   2. Workspace lint configuration documents and enforces the no-`unwrap`/`expect` invariant at the root level in addition to crate-local lints
 **Estimated complexity**: S
 
@@ -10517,7 +10517,7 @@ changes land.
 **Milestone Goal:** Close the remaining HTTP substrate gaps by shipping the
 normative Rust sidecar endpoints, moving Python onto the same `/arc/*`
 contract, aligning cross-language capability presentation semantics, and
-removing the misleading HTTP-receipt-to-ArcReceipt conversion path.
+removing the misleading HTTP-receipt-to-ChioReceipt conversion path.
 
 **Dependency:** v3.9 (first-wave remediation completed; residual HTTP sidecar
 and SDK issues isolated)
@@ -10532,8 +10532,8 @@ the remaining receipt-conversion correctness footgun independently.
 **Depends on**: Phase 351 (HTTP substrate spec), Phase 361 (request binding and capability validation)
 **Requirements**: ALIGN-01, ALIGN-02, ALIGN-03
 **Success Criteria** (what must be TRUE):
-  1. `arc-api-protect` serves `POST /arc/evaluate` with the normative `EvaluateResponse` and `200 OK` for both allow and deny verdicts
-  2. `arc-api-protect` serves `POST /arc/verify` and `GET /arc/health` matching the spec's request/response shapes
+  1. `chio-api-protect` serves `POST /arc/evaluate` with the normative `EvaluateResponse` and `200 OK` for both allow and deny verdicts
+  2. `chio-api-protect` serves `POST /arc/verify` and `GET /arc/health` matching the spec's request/response shapes
   3. `/arc/evaluate` stores signed receipts and routes through the same evaluator/kernel logic the reverse proxy uses
 **Estimated complexity**: M
 
@@ -10542,9 +10542,9 @@ the remaining receipt-conversion correctness footgun independently.
 **Depends on**: Phase 364 (Rust sidecar surface exists), Phase 356 (Python SDK docs exist and can be corrected)
 **Requirements**: ALIGN-04, ALIGN-05, ALIGN-06
 **Success Criteria** (what must be TRUE):
-  1. `arc-sdk-python` uses `/arc/health`, `/arc/verify`, and `/arc/evaluate` for HTTP substrate operations
-  2. Python publishes typed `ArcHttpRequest` and `EvaluateResponse` models, and `evaluate_http_request()` returns `EvaluateResponse`
-  3. `arc-asgi`, `arc-django`, and `arc-fastapi` treat deny verdicts as `200` sidecar responses carrying a deny verdict rather than transport-level `403` responses
+  1. `chio-sdk-python` uses `/arc/health`, `/arc/verify`, and `/arc/evaluate` for HTTP substrate operations
+  2. Python publishes typed `ChioHttpRequest` and `EvaluateResponse` models, and `evaluate_http_request()` returns `EvaluateResponse`
+  3. `chio-asgi`, `chio-django`, and `chio-fastapi` treat deny verdicts as `200` sidecar responses carrying a deny verdict rather than transport-level `403` responses
 **Estimated complexity**: M
 
 ### Phase 366: Cross-SDK Capability Presentation Alignment
@@ -10552,17 +10552,17 @@ the remaining receipt-conversion correctness footgun independently.
 **Depends on**: Phase 364 (Rust sidecar surface exists), Phase 356 (platform SDK docs exist and can be corrected)
 **Requirements**: ALIGN-07, ALIGN-08, ALIGN-09
 **Success Criteria** (what must be TRUE):
-  1. TypeScript, Go, JVM, and .NET adapters no longer forward raw capability-token material inside `ArcHttpRequest.headers`
+  1. TypeScript, Go, JVM, and .NET adapters no longer forward raw capability-token material inside `ChioHttpRequest.headers`
   2. These adapters carry token IDs in `capability_id` when derivable and preserve both header and query-param presentation guidance in deny responses
   3. Platform SDK docs and examples describe capability presentation consistently with `spec/HTTP-SUBSTRATE.md` and `spec/OPENAPI-INTEGRATION.md`
 **Estimated complexity**: M
 
 ### Phase 367: HTTP Receipt Conversion Safety
-**Goal**: Remove the misleading `HttpReceipt -> ArcReceipt` conversion path that returned invalid signatures
+**Goal**: Remove the misleading `HttpReceipt -> ChioReceipt` conversion path that returned invalid signatures
 **Depends on**: Phase 319 (base HTTP receipt types exist)
 **Requirements**: ALIGN-10
 **Success Criteria** (what must be TRUE):
-  1. `HttpReceipt::to_arc_receipt()` fails closed instead of fabricating an `ArcReceipt` with an invalid copied signature
+  1. `HttpReceipt::to_arc_receipt()` fails closed instead of fabricating an `ChioReceipt` with an invalid copied signature
   2. The crate exposes an explicit re-signing-based conversion path for callers that do hold the kernel keypair
 **Estimated complexity**: S
 
@@ -10586,7 +10586,7 @@ residual schema and docs drift independently once the runtime contract is
 final.
 
 ### Phase 368: Shippable `arc api protect` Entrypoint
-**Goal**: Ship the documented CLI/operator contract for launching the ARC HTTP sidecar from the repo's primary `arc` binary
+**Goal**: Ship the documented CLI/operator contract for launching the Chio HTTP sidecar from the repo's primary `arc` binary
 **Depends on**: Phase 364 (sidecar surface exists), Phase 352 (OpenAPI integration spec defines the operator contract)
 **Requirements**: FINAL-01, FINAL-02, FINAL-03
 **Success Criteria** (what must be TRUE):
@@ -10596,12 +10596,12 @@ final.
 **Estimated complexity**: M
 
 ### Phase 369: TypeScript Request-Body Preservation
-**Goal**: Preserve request bodies across TypeScript Node/Web interception so ARC hashing does not consume application-visible request streams
+**Goal**: Preserve request bodies across TypeScript Node/Web interception so Chio hashing does not consume application-visible request streams
 **Depends on**: Phase 368 (shippable sidecar exists), Phase 366 (capability semantics already aligned)
 **Requirements**: FINAL-04, FINAL-05
 **Success Criteria** (what must be TRUE):
-  1. `@arc-protocol/node-http` preserves body-bearing `IncomingMessage` and `Request` objects for downstream consumers after ARC interception
-  2. `@arc-protocol/express` remains safe for downstream handlers on body-bearing requests
+  1. `@chio-protocol/node-http` preserves body-bearing `IncomingMessage` and `Request` objects for downstream consumers after Chio interception
+  2. `@chio-protocol/express` remains safe for downstream handlers on body-bearing requests
   3. TypeScript docs and tests no longer recommend or encode request-interception patterns that irreversibly drain bodies
 **Estimated complexity**: M
 
@@ -10610,7 +10610,7 @@ final.
 **Depends on**: Phase 368 (shippable sidecar exists), Phase 346 (JVM substrate exists)
 **Requirements**: FINAL-06, FINAL-07
 **Success Criteria** (what must be TRUE):
-  1. `ArcFilter` wraps requests so downstream filters and controllers can still read the body after ARC evaluation
+  1. `ChioFilter` wraps requests so downstream filters and controllers can still read the body after Chio evaluation
   2. The JVM body hash is computed from the cached raw bytes rather than a decoded string representation
 **Estimated complexity**: M
 
@@ -10643,19 +10643,19 @@ rather than as speculative planning.
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 319 | v3.0 | arc-http-core Types and Request Model | Implemented / audit pending |
-| 320 | v3.0 | arc-openapi Parsing and Manifest Generation | Implemented / audit pending |
+| 319 | v3.0 | chio-http-core Types and Request Model | Implemented / audit pending |
+| 320 | v3.0 | chio-openapi Parsing and Manifest Generation | Implemented / audit pending |
 | 321 | v3.0 | arc.yaml Unified Configuration | Implemented / audit pending |
 | 322 | v3.0 | arc api protect CLI | Implemented / audit pending |
 | 323 | v3.1 | ReceiptSigner and CapabilityChecker Traits | Implemented / audit pending |
 | 324 | v3.1 | ACP Kernel Integration | Implemented / audit pending |
 | 325 | v3.1 | Session Compliance Certificate | Implemented / audit pending |
 | 326 | v3.1 | OpenTelemetry Export | Implemented / audit pending |
-| 327 | v3.2 | arc-sdk-python Core | Implemented / audit pending |
-| 328 | v3.2 | arc-asgi Middleware | Implemented / audit pending |
-| 329 | v3.2 | arc-fastapi and arc-django Wrappers | Implemented / audit pending |
-| 330 | v3.2 | arc-langchain Integration and Conformance | Implemented / audit pending |
-| 331 | v3.3 | @arc-protocol/node-http Substrate | Implemented / audit pending |
+| 327 | v3.2 | chio-sdk-python Core | Implemented / audit pending |
+| 328 | v3.2 | chio-asgi Middleware | Implemented / audit pending |
+| 329 | v3.2 | chio-fastapi and chio-django Wrappers | Implemented / audit pending |
+| 330 | v3.2 | chio-langchain Integration and Conformance | Implemented / audit pending |
+| 331 | v3.3 | @chio-protocol/node-http Substrate | Implemented / audit pending |
 | 332 | v3.3 | Express and Fastify Wrappers | Implemented / audit pending |
 | 333 | v3.3 | Elysia Wrapper and npm Packaging | Implemented / audit pending |
 | 334 | v3.3 | TypeScript Conformance | Implemented / audit pending |
@@ -10666,10 +10666,10 @@ rather than as speculative planning.
 | 339 | v3.5 | MCP Adapter Completion | Implemented / audit pending |
 | 340 | v3.5 | OpenAPI-to-MCP Bridge | Implemented / audit pending |
 | 341 | v3.5 | A2A and ACP Edge Crates | Implemented / audit pending |
-| 342 | v3.5 | arc-openai Adapter | Implemented / audit pending |
+| 342 | v3.5 | chio-openai Adapter | Implemented / audit pending |
 | 343 | v3.6 | Go SDK and net/http Middleware | Implemented / audit pending |
 | 344 | v3.6 | Kubernetes Controller and Injector | Implemented / audit pending |
-| 345 | v3.6 | arc-tower Rust Middleware | Implemented / audit pending |
+| 345 | v3.6 | chio-tower Rust Middleware | Implemented / audit pending |
 | 346 | v3.6 | JVM and .NET Substrates | Implemented / audit pending |
 | 347 | v3.7 | WASM Guard Runtime | Implemented / audit pending |
 | 348 | v3.7 | Receipt Metering and Economics | Implemented / audit pending |
@@ -10702,7 +10702,7 @@ rather than as speculative planning.
 
 ## v4.0 WASM Guard Runtime Completion (Phases 373-376)
 
-**Milestone Goal:** Complete the arc-wasm-guards host-side runtime that Phase
+**Milestone Goal:** Complete the chio-wasm-guards host-side runtime that Phase
 347 scaffolded. Extend v3.7's WASM guard skeleton into a production-ready,
 HushSpec-aware guard execution surface with proper host functions, security
 hardening, guard manifests, kernel pipeline wiring, receipt metadata, and
@@ -10725,14 +10725,14 @@ runtime surface established by the previous phase.
 **Success Criteria** (what must be TRUE):
   1. All WASM guards loaded by a single WasmGuardRuntime share one wasmtime Engine instance rather than each guard compiling its own
   2. A WASM guest can call `arc.log`, `arc.get_config`, and `arc.get_time_unix_secs` host functions and observe correct host-side behavior (tracing output, config values, monotonic time)
-  3. A WASM guest that exports `arc_alloc` receives request data at the guest-allocated address; a guest without `arc_alloc` still works via the offset-0 fallback
-  4. A WASM guest that exports `arc_deny_reason` can return structured deny reasons; a guest without it falls back to the offset-64K NUL-terminated string convention
+  3. A WASM guest that exports `chio_alloc` receives request data at the guest-allocated address; a guest without `chio_alloc` still works via the offset-0 fallback
+  4. A WASM guest that exports `chio_deny_reason` can return structured deny reasons; a guest without it falls back to the offset-64K NUL-terminated string convention
   5. The WasmHostState carries per-guard config and a bounded log buffer accessible to host function implementations
 **Estimated complexity**: L
 **Plans**: 2 plans
 Plans:
 - [ ] 373-01-PLAN.md -- Shared Arc<Engine>, WasmHostState, host function registration (arc.log, arc.get_config, arc.get_time_unix_secs)
-- [ ] 373-02-PLAN.md -- Guest export detection (arc_alloc, arc_deny_reason) with safe fallbacks
+- [ ] 373-02-PLAN.md -- Guest export detection (chio_alloc, chio_deny_reason) with safe fallbacks
 
 ### Phase 374: Security Hardening and Request Enrichment
 **Goal**: WASM modules are sandboxed against resource abuse and import smuggling, and guards receive host-extracted action context instead of re-deriving it themselves
@@ -10794,7 +10794,7 @@ Plans:
 
 ## v3.12 Cross-Protocol Integrity and Truth Completion (Phases 377-381)
 
-**Milestone Goal:** Close the remaining credibility gap between ARC's shipped
+**Milestone Goal:** Close the remaining credibility gap between Chio's shipped
 kernel/substrate breakthrough and the broader cross-protocol governance vision.
 Finish ACP live-path cryptographic enforcement, make A2A/ACP outward edges
 genuinely kernel-mediated, complete the last operational parity gaps, and
@@ -10809,7 +10809,7 @@ touching shared narrative assets.
 **Parallelism:** Phase 377 establishes the ACP cryptographic enforcement floor.
 Phase 378 extends truthful kernel mediation to the outward A2A/ACP edges.
 Phase 379 closes the remaining operator/runtime parity gaps on sidecar,
-`arc-tower`, and Kubernetes surfaces. Phase 380 reconciles docs, comments, and
+`chio-tower`, and Kubernetes surfaces. Phase 380 reconciles docs, comments, and
 planning to the real implementation state. Phase 381 qualifies the resulting
 claim surface with integration tests and operator-facing verification. The
 phases are sequential because each later phase assumes the prior live-path and
@@ -10817,7 +10817,7 @@ narrative corrections are in place.
 
 ### Phase 377: ACP Live-Path Cryptographic Enforcement
 **Goal**: ACP filesystem and terminal operations enforce kernel-validated capability tokens with real signature verification and fail-closed behavior
-**Depends on**: v3.1 groundwork and the current `arc-acp-proxy` signer/checker extension points already present in-tree
+**Depends on**: v3.1 groundwork and the current `chio-acp-proxy` signer/checker extension points already present in-tree
 **Requirements**: ACPX-01, ACPX-02, ACPX-03
 **Success Criteria** (what must be TRUE):
   1. Filesystem and terminal interception paths call the installed `CapabilityChecker` before built-in allow logic and deny or error closed when validation fails
@@ -10832,9 +10832,9 @@ narrative corrections are in place.
 **Depends on**: Phase 377 (ACP cryptographic enforcement baseline exists)
 **Requirements**: EDGE-01, EDGE-02, EDGE-03
 **Success Criteria** (what must be TRUE):
-  1. `arc-a2a-edge` live send/invoke paths route authority decisions through the ARC kernel instead of directly invoking adapter connections
+  1. `chio-a2a-edge` live send/invoke paths route authority decisions through the Chio kernel instead of directly invoking adapter connections
   2. Allowed, denied, failed, and streaming edge flows expose signed receipt output or truthful receipt references instead of implying kernel mediation without emitting evidence
-  3. `arc-acp-edge` capability invocation surfaces are kernel-mediated with signed receipts, or any remaining discovery-only/non-kernel paths are explicitly documented as outside enforcement claims
+  3. `chio-acp-edge` capability invocation surfaces are kernel-mediated with signed receipts, or any remaining discovery-only/non-kernel paths are explicitly documented as outside enforcement claims
 **Estimated complexity**: L
 **Status**: complete locally 2026-04-14
 **Plans**: 1/1 plan complete
@@ -10844,15 +10844,15 @@ narrative corrections are in place.
 **Depends on**: Phase 378 (truthful live authority path is established at the protocol edges)
 **Requirements**: OPER-01, OPER-02, OPER-03
 **Success Criteria** (what must be TRUE):
-  1. `arc-api-protect` persists signed receipts when `receipt_db` is configured and the persisted history is available across sidecar evaluation/proxy flows
-  2. `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated on real body-bearing requests
-  3. The Kubernetes controller validates ARC capability tokens and scope requirements against kernel-backed logic rather than annotation presence alone
+  1. `chio-api-protect` persists signed receipts when `receipt_db` is configured and the persisted history is available across sidecar evaluation/proxy flows
+  2. `chio-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated on real body-bearing requests
+  3. The Kubernetes controller validates Chio capability tokens and scope requirements against kernel-backed logic rather than annotation presence alone
 **Estimated complexity**: M
 **Status**: complete locally 2026-04-14
 **Plans**: 2/2 plans complete
 
 ### Phase 380: Truth and Narrative Reconciliation
-**Goal**: The repo tells one honest story about what ARC has shipped, what remains partial, and what is still aspirational
+**Goal**: The repo tells one honest story about what Chio has shipped, what remains partial, and what is still aspirational
 **Depends on**: Phase 379 (live runtime truth exists to document)
 **Requirements**: TRUTH-01, TRUTH-02, TRUTH-03, TRUTH-04
 **Success Criteria** (what must be TRUE):
@@ -10865,13 +10865,13 @@ narrative corrections are in place.
 **Plans**: 1/1 plan complete
 
 ### Phase 381: Claim-Gate Qualification
-**Goal**: Prove the narrowed ARC claim with integration tests and operator-facing verification, and explicitly gate any broader claim on concrete evidence
+**Goal**: Prove the narrowed Chio claim with integration tests and operator-facing verification, and explicitly gate any broader claim on concrete evidence
 **Depends on**: Phase 380 (implementation and narrative reconciliation are complete)
 **Requirements**: QUAL-01, QUAL-02, QUAL-03
 **Success Criteria** (what must be TRUE):
   1. Integration tests cover ACP live-path cryptographic enforcement and A2A/ACP edge mediation with allow, deny, invalid-token, and receipt-emission cases
-  2. Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit prerequisites for any stronger "fully realized universal kernel" claim
-  3. Operator-facing verification demonstrates receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
+  2. Milestone closeout artifacts state the narrow truthful breakthrough claim Chio can defend today and the explicit prerequisites for any stronger "fully realized universal kernel" claim
+  3. Operator-facing verification demonstrates receipt persistence, `chio-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
 **Estimated complexity**: M
 **Status**: complete locally 2026-04-14
 **Plans**: 1/1 plan complete
@@ -10892,7 +10892,7 @@ narrative corrections are in place.
 
 ## v3.13 Universal Orchestration Closure (Phases 390-396)
 
-**Milestone Goal:** Close the remaining gap between ARC's shipped
+**Milestone Goal:** Close the remaining gap between Chio's shipped
 kernel/substrate breakthrough and the full original vision by implementing the
 generic cross-protocol orchestrator, unifying authoritative edge paths,
 enforcing truthful bridge-fidelity semantics, and reconciling the late-v3
@@ -10973,19 +10973,19 @@ Plans:
 - [x] 393-01-PLAN.md -- ledger truth repair, stale planning metadata fixes, and narrative/doc reconciliation
 
 ### Phase 394: HTTP Authority and Evidence Convergence
-**Goal**: Close the remaining HTTP-side authority, evidence, and proxy/runtime convergence gaps that still block the strongest production-ready ARC claim
+**Goal**: Close the remaining HTTP-side authority, evidence, and proxy/runtime convergence gaps that still block the strongest production-ready Chio claim
 **Depends on**: Phase 393 (ledger and docs reflect the current truth before runtime closure resumes)
 **Requirements**: HTTP-01, HTTP-02, HTTP-03, HTTP-04
 **Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. HTTP receipt semantics reflect actual downstream response evidence or are explicitly renamed and documented as evaluation-time semantics across the runtime and SDK surfaces
-  2. `arc-api-protect` honors OpenAPI extension-aware policy overrides and forwards the request headers needed for real protected reverse-proxy behavior
-  3. `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator
+  2. `chio-api-protect` honors OpenAPI extension-aware policy overrides and forwards the request headers needed for real protected reverse-proxy behavior
+  3. `chio-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator
   4. The Rust HTTP lane can be described as one coherent authority story rather than a sidecar path plus a divergent in-process path
 **Estimated complexity**: L
 **Plans**: 1/1 plan complete
 Plans:
-- [x] 394-01-PLAN.md -- receipt-status semantics, OpenAPI override enforcement, proxy header fidelity, and arc-tower authority convergence
+- [x] 394-01-PLAN.md -- receipt-status semantics, OpenAPI override enforcement, proxy header fidelity, and chio-tower authority convergence
 
 ### Phase 395: Protocol Lifecycle and Authority-Surface Closure
 **Goal**: Make A2A and ACP lifecycle claims as truthful as their execution authority by either implementing missing lifecycle semantics or narrowing the public surface and docs to what really exists
@@ -11003,13 +11003,13 @@ Plans:
 - [x] 395-01-PLAN.md -- A2A/ACP lifecycle truth, compatibility-surface isolation, and discovery collision handling
 
 ### Phase 396: Claim Upgrade Qualification
-**Goal**: Qualify the strongest honest post-v3 ARC claim with orchestrated end-to-end tests and operator-facing evidence after ledger, HTTP, and lifecycle closure
+**Goal**: Qualify the strongest honest post-v3 Chio claim with orchestrated end-to-end tests and operator-facing evidence after ledger, HTTP, and lifecycle closure
 **Depends on**: Phase 395 (runtime and docs now reflect the strongest truthful implementation state)
 **Requirements**: UPGRADE-01, UPGRADE-02, UPGRADE-03
 **Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
-  1. End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops and the lifecycle/evidence semantics ARC still advertises
-  2. Operator-facing claim-gate docs state the strongest honest claim ARC can make after orchestration and explicitly distinguish the shipped edge-to-native substrate from future full protocol-to-protocol fabric
+  1. End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops and the lifecycle/evidence semantics Chio still advertises
+  2. Operator-facing claim-gate docs state the strongest honest claim Chio can make after orchestration and explicitly distinguish the shipped edge-to-native substrate from future full protocol-to-protocol fabric
   3. Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, receipt continuity, and non-misleading protocol claims under real runtime flows
 **Estimated complexity**: M
 **Plans**: 1/1 plan complete
@@ -11034,7 +11034,7 @@ Plans:
 
 ## v3.14 Universal Fabric and Kernel Convergence (Phases 397-402)
 
-**Milestone Goal:** Close the final documented gap between ARC's current
+**Milestone Goal:** Close the final documented gap between Chio's current
 qualified kernel/substrate claim and the stronger original vision by
 implementing real protocol-to-protocol bridge execution, converging supported
 HTTP/API surfaces on one literal kernel authority story, finishing the
@@ -11054,7 +11054,7 @@ converges the Rust HTTP authority story on a literal kernel path, while Phase
 substrates. Phase 400 closes the remaining A2A/ACP lifecycle and public
 compatibility-surface gaps. Phase 401 repairs the historical milestone,
 requirements, roadmap, and archival truth so planning becomes evidence-grade.
-Phase 402 reruns the qualification gate and decides whether ARC can honestly
+Phase 402 reruns the qualification gate and decides whether Chio can honestly
 upgrade the top-level claim. Phases 397 and 398 can start in parallel; Phase
 399 depends on Phase 398; Phase 400 depends on Phase 397; Phase 401 should
 consume the real runtime/doc outputs of Phases 397-400; Phase 402 depends on
@@ -11080,7 +11080,7 @@ exist)
 **Plans**: 0 plans
 
 ### Phase 398: Kernel-First HTTP Runtime Convergence
-**Goal**: Converge `arc-api-protect` and `arc-tower` on one literal
+**Goal**: Converge `chio-api-protect` and `chio-tower` on one literal
 kernel-backed authority/evidence path instead of parallel local evaluator
 implementations
 **Depends on**: Phase 396 (current HTTP evidence model and qualification lane
@@ -11088,10 +11088,10 @@ exist)
 **Requirements**: KERNEL-01, KERNEL-02
 **Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
-  1. `arc-api-protect` routes authorization and receipt finalization through a
+  1. `chio-api-protect` routes authorization and receipt finalization through a
      shared kernel-backed authority path instead of a local evaluator/signer
-  2. `arc-tower` uses the same shared kernel-backed authority/evidence path as
-     `arc-api-protect`
+  2. `chio-tower` uses the same shared kernel-backed authority/evidence path as
+     `chio-api-protect`
   3. The Rust HTTP lane can be described literally, not figuratively, as one
      kernel authority story
 **Estimated complexity**: L
@@ -11108,13 +11108,13 @@ authority/evidence semantics as the converged Rust HTTP lane
      contract rather than synthesizing misleading local receipt behavior
   2. Synthetic fail-open or non-evidence-grade receipt paths are removed,
      renamed, or explicitly downgraded from evidence claims
-  3. For supported HTTP/API surfaces, ARC can truthfully say governed
+  3. For supported HTTP/API surfaces, Chio can truthfully say governed
      invocations flow through one shared kernel authority story
 **Estimated complexity**: L
 **Plans**: 0 plans
 
 ### Phase 400: Lifecycle-Equivalent Protocol Mediation
-**Goal**: Make A2A and ACP lifecycle claims as strong as ARC's authority claim
+**Goal**: Make A2A and ACP lifecycle claims as strong as Chio's authority claim
 by implementing the richer public lifecycles or narrowing them with no
 remaining compatibility ambiguity
 **Depends on**: Phase 397 (protocol fabric can carry richer lifecycle
@@ -11123,7 +11123,7 @@ semantics)
 **Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. A2A authoritative mediation distinguishes blocking vs streaming/task
-     semantics strongly enough to justify the public surface ARC claims
+     semantics strongly enough to justify the public surface Chio claims
   2. ACP authoritative mediation either supports invoke/stream/cancel/resume
      lifecycle semantics or narrows the official profile with no contradictory
      public behavior
@@ -11155,7 +11155,7 @@ truthful form first)
 
 ### Phase 402: Full-Vision Qualification Gate
 **Goal**: Re-run the claim gate after fabric, kernel, lifecycle, and ledger
-closure to decide whether ARC can now honestly upgrade to the stronger
+closure to decide whether Chio can now honestly upgrade to the stronger
 original vision claim
 **Depends on**: Phase 401 (runtime, docs, and planning truth are reconciled)
 **Requirements**: VISION-01, VISION-02, VISION-03, VISION-04
@@ -11165,7 +11165,7 @@ original vision claim
      unified HTTP/API kernel authority, and the supported A2A/ACP lifecycle
      surfaces without overstating unsupported paths
   2. Protocol, release, standards, and top-level vision docs all make the same
-     strongest honest claim about ARC's current state
+     strongest honest claim about Chio's current state
   3. The repo either upgrades the top-level claim with exact evidence or
      records the precise remaining blockers in one authoritative claim-gate
      surface
@@ -11189,11 +11189,11 @@ original vision claim
 
 ## v3.15 Universal Protocol Fabric Realization (Phases 403-406)
 
-**Milestone Goal:** Close the remaining post-v3.14 gap between ARC's stronger
+**Milestone Goal:** Close the remaining post-v3.14 gap between Chio's stronger
 qualified substrate claim and the full original vision by lifting
 target-protocol selection into shared bridge metadata and registry-driven
 bindings, pushing lifecycle-equivalent mediation on the public A2A/ACP
-surfaces ARC wants to claim as symmetric, and finishing the final v3
+surfaces Chio wants to claim as symmetric, and finishing the final v3
 ledger/archive truth closure before another full-vision qualification pass.
 
 **Dependency:** Follows v3.14's first protocol-to-protocol and
@@ -11265,7 +11265,7 @@ Plans:
 
 ### Phase 406: Full Original-Vision Requalification
 **Goal**: Re-run the strongest claim gate after the protocol-aware routing,
-lifecycle, and ledger/archive closure work to decide whether ARC can now
+lifecycle, and ledger/archive closure work to decide whether Chio can now
 honestly upgrade beyond the narrower substrate claim
 **Depends on**: Phases 404 and 405
 **Requirements**: QUAL2-01, QUAL2-02, QUAL2-03
@@ -11298,7 +11298,7 @@ Plans:
 ## v3.16 Universal Control-Plane Thesis (Phases 407-412)
 
 **Milestone Goal:** Turn the remaining post-v3.15 blocker list into an
-evidence-grade execution lane that either qualifies ARC for the full original
+evidence-grade execution lane that either qualifies Chio for the full original
 technical control-plane thesis or cleanly separates what is still missing. This
 means replacing bounded target defaults with universal registry resolution,
 proving real multi-hop authoritative routing, making route planning
@@ -11306,7 +11306,7 @@ intent-aware, converging lifecycle/fidelity semantics on one shared contract,
 and collecting operator-grade qualification evidence before the final thesis
 gate.
 
-**Dependency:** Follows `v3.15`, which upgraded ARC to a bounded
+**Dependency:** Follows `v3.15`, which upgraded Chio to a bounded
 protocol-aware fabric but explicitly retained blockers around universal
 registry-driven routing, dynamic control-plane semantics, and ecosystem-scale
 proof.
@@ -11402,14 +11402,14 @@ thesis works outside one local in-process runtime seam
 **Plans**: 1 plan
 
 ### Phase 412: Universal Control-Plane Thesis Gate
-**Goal**: Decide whether ARC can now honestly claim the full original
+**Goal**: Decide whether Chio can now honestly claim the full original
 technical-control-plane vision and whether any broader market thesis is
 qualified or still explicitly excluded
 **Depends on**: Phases 409, 410, and 411
 **Requirements**: VISION3-01, VISION3-02
 **Status**: complete locally
 **Success Criteria** (what must be TRUE):
-  1. ARC upgrades to the stronger original-vision claim only if the technical
+  1. Chio upgrades to the stronger original-vision claim only if the technical
      control-plane proof is complete end-to-end
   2. The docs cleanly separate technical control-plane qualification from any
      still-unproved market-position thesis
@@ -11435,14 +11435,14 @@ qualified or still explicitly excluded
 
 ## v3.17 Comptroller Market Position Proof (Phases 413-416)
 
-**Milestone Goal:** Turn ARC's comptroller-capable internal architecture into
+**Milestone Goal:** Turn Chio's comptroller-capable internal architecture into
 an externally operated, partner-visible, federated economic control surface
 that can support a real market-position qualification decision. This lane is
 not about inventing more internal primitives; it is about making the existing
 budget, market, underwriting, settlement, federation, and evidence stack
 operable and depend-able across real external boundaries.
 
-**Dependency:** Follows `v3.16`, which qualified ARC for the stronger
+**Dependency:** Follows `v3.16`, which qualified Chio for the stronger
 technical universal control-plane thesis while still explicitly excluding the
 broader “proved comptroller of the agent economy” market claim.
 
@@ -11450,11 +11450,11 @@ broader “proved comptroller of the agent economy” market claim.
 Phase 414 builds partner-visible receipt, reconciliation, and settlement
 contracts on top of those surfaces. Phase 415 exercises federated
 multi-operator proof over the partner-visible contracts. Phase 416 reruns the
-claim gate and records exactly whether ARC has achieved market proof or still
+claim gate and records exactly whether Chio has achieved market proof or still
 only comptroller-capable architecture.
 
 ### Phase 413: Externally Operated Control Surfaces
-**Goal**: Convert ARC's economic control primitives into explicit
+**Goal**: Convert Chio's economic control primitives into explicit
 operator-facing surfaces that can be deployed, governed, and observed outside a
 single local in-process runtime
 **Depends on**: Phase 412
@@ -11472,7 +11472,7 @@ single local in-process runtime
 **Plans**: 1 plan
 
 ### Phase 414: Partner-Visible Receipt and Settlement Contracts
-**Goal**: Make ARC's governed evidence and economic artifacts consumable as
+**Goal**: Make Chio's governed evidence and economic artifacts consumable as
 stable partner contracts for billing, settlement, dispute, and audit workflows
 **Depends on**: Phase 413
 **Requirements**: PARTNER4-01, PARTNER4-02, PARTNER4-03
@@ -11490,7 +11490,7 @@ stable partner contracts for billing, settlement, dispute, and audit workflows
 **Plans**: 1 plan
 
 ### Phase 415: Federated Multi-Operator Proof
-**Goal**: Prove that independent operators can use ARC-native evidence to
+**Goal**: Prove that independent operators can use Chio-native evidence to
 coordinate trust, settlement, reconciliation, and failure recovery across org
 boundaries
 **Depends on**: Phases 413 and 414
@@ -11508,7 +11508,7 @@ boundaries
 **Plans**: 1 plan
 
 ### Phase 416: Market-Position Qualification Gates
-**Goal**: Decide whether ARC can now honestly claim more than
+**Goal**: Decide whether Chio can now honestly claim more than
 comptroller-capable architecture and record the exact external thresholds that
 separate market proof from internal technical completion
 **Depends on**: Phases 413, 414, and 415
@@ -11537,14 +11537,14 @@ separate market proof from internal technical completion
 
 ---
 
-## v3.18 Bounded ARC Ship Readiness Closure (Phases 417-421)
+## v3.18 Bounded Chio Ship Readiness Closure (Phases 417-421)
 
 **Milestone Goal:** Convert the Track A P0 blocker ladder into one executable
-pre-ship lane so ARC can ship one honest bounded release without overclaiming
+pre-ship lane so Chio can ship one honest bounded release without overclaiming
 stronger recursive delegation, verifier-backed runtime assurance,
 transparency-log semantics, consensus-grade HA, or a proved market position.
 
-**Dependency:** Follows `v3.17`, which qualified ARC as comptroller-capable
+**Dependency:** Follows `v3.17`, which qualified Chio as comptroller-capable
 software on repo-local evidence but also made the remaining bounded-ship
 blockers explicit.
 
@@ -11554,7 +11554,7 @@ profile. Phase 420 closes governed-provenance truth. Phase 421 publishes the
 bounded operational profile, pre-ship checklist, and release gate.
 
 ### Phase 417: Claim Discipline and Planning Truth Closure
-**Goal**: Align ship-facing docs and the live planning stack to one bounded ARC
+**Goal**: Align ship-facing docs and the live planning stack to one bounded Chio
 claim so the release boundary is truthful before any runtime or qualification
 work is signed off
 **Depends on**: Phase 416
@@ -11562,7 +11562,7 @@ work is signed off
 **Status**: complete
 **Success Criteria** (what must be TRUE):
   1. README, qualification docs, review docs, and ship-facing product docs all
-     align to one bounded ARC claim and explicitly exclude stronger unshipped
+     align to one bounded Chio claim and explicitly exclude stronger unshipped
      claims
   2. `.planning/PROJECT.md`, `.planning/MILESTONES.md`,
      `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and
@@ -11611,7 +11611,7 @@ claims match the runtime that ships
 **Plans**: 1 plan
 
 ### Phase 420: Governed Provenance Truth Closure
-**Goal**: Make bounded-release evidence surfaces truthful about what ARC
+**Goal**: Make bounded-release evidence surfaces truthful about what Chio
 observes locally versus what callers merely assert about upstream provenance
 **Depends on**: Phase 417
 **Requirements**: PROV5-01, PROV5-02
@@ -11630,7 +11630,7 @@ observes locally versus what callers merely assert about upstream provenance
 
 ### Phase 421: Bounded Operational Profile and Release Gate
 **Goal**: Publish the bounded operational profile and the authoritative
-pre-ship checklist so bounded ARC can be released on one explicit, truthful
+pre-ship checklist so bounded Chio can be released on one explicit, truthful
 operational contract
 **Depends on**: Phases 417, 418, 419, and 420
 **Requirements**: BOUND5-01, BOUND5-02, BOUND5-03
@@ -11639,7 +11639,7 @@ operational contract
   1. Trust-control, budget, and receipt surfaces publish one bounded
      operational profile that explicitly excludes consensus-grade HA,
      distributed-linearizable spend truth, and transparency-log semantics
-  2. One bounded ARC qualification gate records the exact bounded/non-GA/local
+  2. One bounded Chio qualification gate records the exact bounded/non-GA/local
      status of the relevant runtime surfaces
   3. One authoritative pre-ship checklist maps Track A P0 blockers to
      evidence files, commands, and release sign-off expectations
@@ -11683,11 +11683,11 @@ pack, and install. Phases are sequential: each builds on the surface established
 by the previous phase.
 
 **New crates:**
-- `crates/arc-guard-sdk/` -- guest-side library (`#[no_std]`-friendly types,
+- `crates/chio-guard-sdk/` -- guest-side library (`#[no_std]`-friendly types,
   allocator, host bindings, serde)
-- `crates/arc-guard-sdk-macros/` -- proc-macro crate (`#[arc_guard]` attribute)
+- `crates/chio-guard-sdk-macros/` -- proc-macro crate (`#[chio_guard]` attribute)
 
-**CLI location:** `arc-cli/src/cli/guard.rs` (new module in existing `arc-cli`
+**CLI location:** `chio-cli/src/cli/guard.rs` (new module in existing `chio-cli`
 crate)
 
 ### Phase 382: Guest SDK Core
@@ -11695,30 +11695,30 @@ crate)
 **Depends on**: v4.0 Phase 376 (host runtime is benchmarked and stable)
 **Requirements**: GSDK-01, GSDK-02, GSDK-03, GSDK-04, GSDK-05
 **Success Criteria** (what must be TRUE):
-  1. A guard author can import `arc_guard_sdk::GuardRequest` and `arc_guard_sdk::GuardVerdict` and these types match the JSON schema the host serializes into linear memory
-  2. The SDK exports `arc_alloc` and `arc_free` functions that the host runtime detects and uses for guest memory allocation instead of the offset-0 fallback
-  3. A guard author can call `arc_guard_sdk::log(level, msg)`, `arc_guard_sdk::get_config(key)`, and `arc_guard_sdk::get_time()` and these resolve to the `arc.log`, `arc.get_config`, and `arc.get_time_unix_secs` host imports
+  1. A guard author can import `chio_guard_sdk::GuardRequest` and `chio_guard_sdk::GuardVerdict` and these types match the JSON schema the host serializes into linear memory
+  2. The SDK exports `chio_alloc` and `chio_free` functions that the host runtime detects and uses for guest memory allocation instead of the offset-0 fallback
+  3. A guard author can call `chio_guard_sdk::log(level, msg)`, `chio_guard_sdk::get_config(key)`, and `chio_guard_sdk::get_time()` and these resolve to the `arc.log`, `arc.get_config`, and `arc.get_time_unix_secs` host imports
   4. The SDK deserializes `GuardRequest` from a `(ptr, len)` pair in linear memory and encodes `GuardVerdict` back to the host without the guard author handling raw memory
-  5. When a guard returns `GuardVerdict::deny(reason)`, the SDK exports `arc_deny_reason` with the structured reason string readable by the host
+  5. When a guard returns `GuardVerdict::deny(reason)`, the SDK exports `chio_deny_reason` with the structured reason string readable by the host
 **Estimated complexity**: M
 **Plans**: 2 plans
 Plans:
-- [ ] 382-01-PLAN.md -- crate scaffold, ABI types (GuardRequest, GuardVerdict), Vec-based guest allocator (arc_alloc, arc_free)
-- [ ] 382-02-PLAN.md -- typed host function bindings (log, get_config, get_time), ABI glue (read_request, encode_verdict, arc_deny_reason)
+- [ ] 382-01-PLAN.md -- crate scaffold, ABI types (GuardRequest, GuardVerdict), Vec-based guest allocator (chio_alloc, chio_free)
+- [ ] 382-02-PLAN.md -- typed host function bindings (log, get_config, get_time), ABI glue (read_request, encode_verdict, chio_deny_reason)
 
 ### Phase 383: Proc Macro, Example Guards, and Integration Tests
 **Goal**: Guard authors write a single annotated function and the proc macro generates all ABI exports; example guards demonstrate the SDK surface; integration tests prove the compiled WASM loads and evaluates correctly in the host runtime
 **Depends on**: Phase 382 (guest SDK types, allocator, and host bindings exist)
 **Requirements**: GSDK-06, GEXM-01, GEXM-02, GEXM-03, GEXM-04, GEXM-05
 **Success Criteria** (what must be TRUE):
-  1. A guard author writes `#[arc_guard] fn evaluate(req: GuardRequest) -> GuardVerdict { ... }` and the proc macro generates the `evaluate` ABI export, `arc_alloc`, `arc_free`, and `arc_deny_reason` exports without manual boilerplate
+  1. A guard author writes `#[chio_guard] fn evaluate(req: GuardRequest) -> GuardVerdict { ... }` and the proc macro generates the `evaluate` ABI export, `chio_alloc`, `chio_free`, and `chio_deny_reason` exports without manual boilerplate
   2. Example guards exist that demonstrate: tool-name-based allow/deny, reading enriched `action_type`/`extracted_path` fields, and calling `arc::log` and `arc::get_config` host functions
   3. All example guards compile to `wasm32-unknown-unknown` and produce valid `.wasm` binaries that pass `wasmparser` validation
   4. An integration test loads a compiled example guard `.wasm` into `WasmtimeBackend`, sends test requests, and verifies correct Allow and Deny verdicts including deny reason content
 **Estimated complexity**: L
 **Plans**: 3 plans
 Plans:
-- [ ] 383-01-PLAN.md -- arc-guard-sdk-macros crate with #[arc_guard] proc macro
+- [ ] 383-01-PLAN.md -- chio-guard-sdk-macros crate with #[chio_guard] proc macro
 - [ ] 383-02-PLAN.md -- tool-gate and enriched-inspector example guard crates
 - [ ] 383-03-PLAN.md -- integration tests loading .wasm into WasmtimeBackend
 
@@ -11727,9 +11727,9 @@ Plans:
 **Depends on**: Phase 383 (SDK and proc macro are stable; example guards provide the scaffold template)
 **Requirements**: GCLI-01, GCLI-02, GCLI-03
 **Success Criteria** (what must be TRUE):
-  1. `arc guard new my-guard` creates a directory with `Cargo.toml` (depending on `arc-guard-sdk`), `src/lib.rs` (containing a `#[arc_guard]` skeleton), and `guard-manifest.yaml` (with placeholder metadata and SHA-256 field)
+  1. `arc guard new my-guard` creates a directory with `Cargo.toml` (depending on `chio-guard-sdk`), `src/lib.rs` (containing a `#[chio_guard]` skeleton), and `guard-manifest.yaml` (with placeholder metadata and SHA-256 field)
   2. `arc guard build` in a guard project directory compiles to `wasm32-unknown-unknown` in release mode and reports the output path and binary size
-  3. `arc guard inspect path/to/guard.wasm` reads the WASM binary and prints: exported functions, ABI compatibility status (whether `evaluate`, `arc_alloc`, `arc_deny_reason` are present), and linear memory configuration
+  3. `arc guard inspect path/to/guard.wasm` reads the WASM binary and prints: exported functions, ABI compatibility status (whether `evaluate`, `chio_alloc`, `chio_deny_reason` are present), and linear memory configuration
 **Estimated complexity**: M
 **Plans**: 2 plans
 Plans:
@@ -11786,10 +11786,10 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 389 (conformance suite) depends on all three SDK phases completing.
 
 **New packages:**
-- `wit/arc-guard/` -- WIT interface definition (`arc:guard@0.1.0`)
-- `packages/sdk/arc-guard-ts/` -- TypeScript guard SDK
-- `packages/sdk/arc-guard-py/` -- Python guard SDK
-- `packages/sdk/arc-guard-go/` -- Go guard SDK
+- `wit/chio-guard/` -- WIT interface definition (`arc:guard@0.1.0`)
+- `packages/sdk/chio-guard-ts/` -- TypeScript guard SDK
+- `packages/sdk/chio-guard-py/` -- Python guard SDK
+- `packages/sdk/chio-guard-go/` -- Go guard SDK
 
 **Design authority:** `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 `docs/guards/03-IMPLEMENTATION-PLAN.md` Phase 4.
@@ -11797,8 +11797,8 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 ### Phases
 
 - [x] **Phase 386: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package (completed 2026-04-15)
-- [x] **Phase 387: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation (completed 2026-04-15)
-- [x] **Phase 388: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation (completed 2026-04-15)
+- [x] **Phase 387: TypeScript Guard SDK** - Ship `chio-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation (completed 2026-04-15)
+- [x] **Phase 388: Python and Go Guard SDKs** - Ship `chio-guard-py` (componentize-py) and `chio-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation (completed 2026-04-15)
 - [x] **Phase 389: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation (completed 2026-04-15)
 
 ### Phase 386: WIT Interface and Dual-Mode Host
@@ -11806,10 +11806,10 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 **Depends on**: v4.1 Phase 385 (Rust SDK and raw ABI are stable and validated)
 **Requirements**: WIT-01, WIT-02, WIT-03, WIT-04
 **Success Criteria** (what must be TRUE):
-  1. A WIT package at `wit/arc-guard/world.wit` defines the `arc:guard@0.1.0` world with an `evaluate` function accepting a `guard-request` record and returning a `verdict` variant, and this file is the single source of truth for the guard contract
+  1. A WIT package at `wit/chio-guard/world.wit` defines the `arc:guard@0.1.0` world with an `evaluate` function accepting a `guard-request` record and returning a `verdict` variant, and this file is the single source of truth for the guard contract
   2. The host runtime uses `wasmtime::component::bindgen!` to generate Rust types from the WIT definition and evaluates Component Model guards through the generated bindings without manual ABI glue
   3. When loading a `.wasm` file, the host detects whether it is a core module (legacy raw ABI) or a Component Model component (WIT ABI) and evaluates it through the correct path, with existing raw-ABI guards continuing to work unchanged
-  4. The WIT package under `wit/arc-guard/` includes a versioned world definition with documentation comments that SDK toolchains (jco, componentize-py, TinyGo) can consume to generate guest bindings
+  4. The WIT package under `wit/chio-guard/` includes a versioned world definition with documentation comments that SDK toolchains (jco, componentize-py, TinyGo) can consume to generate guest bindings
 **Estimated complexity**: L
 **Plans**: 2 plans
 Plans:
@@ -11817,14 +11817,14 @@ Plans:
 - [ ] 386-02-PLAN.md -- Dual-mode format detection, create_backend factory, module exports wiring
 
 ### Phase 387: TypeScript Guard SDK
-**Goal**: Guard authors can write policy guards in TypeScript, compile them to WASM components via jco/ComponentizeJS, and load them in the ARC host runtime alongside Rust guards
+**Goal**: Guard authors can write policy guards in TypeScript, compile them to WASM components via jco/ComponentizeJS, and load them in the Chio host runtime alongside Rust guards
 **Depends on**: Phase 386 (WIT interface is defined and Component Model host support is working)
 **Requirements**: TSDK-01, TSDK-02, TSDK-03, TSDK-04
 **Success Criteria** (what must be TRUE):
-  1. A TypeScript guard author imports typed `GuardRequest` and `GuardVerdict` interfaces from `arc-guard-ts` and these types are generated from the WIT definition, not hand-maintained
+  1. A TypeScript guard author imports typed `GuardRequest` and `GuardVerdict` interfaces from `chio-guard-ts` and these types are generated from the WIT definition, not hand-maintained
   2. A TypeScript guard compiles to a WASM component via `jco componentize` and the resulting `.wasm` file is a valid Component Model component that the host loads through the WIT path
   3. An example TypeScript guard exists with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands
-  4. A TypeScript-compiled guard loaded into the ARC host runtime produces correct Allow and Deny verdicts for the same test inputs that the Rust example guards handle
+  4. A TypeScript-compiled guard loaded into the Chio host runtime produces correct Allow and Deny verdicts for the same test inputs that the Rust example guards handle
 **Estimated complexity**: M
 **Plans**: 2 plans
 Plans:
@@ -11832,14 +11832,14 @@ Plans:
 - [ ] 387-02-PLAN.md -- Rust integration test proving host loads TS-compiled WASM
 
 ### Phase 388: Python and Go Guard SDKs
-**Goal**: Guard authors can write policy guards in Python or Go, compile them to WASM components via componentize-py or TinyGo, and load them in the ARC host runtime alongside Rust and TypeScript guards
+**Goal**: Guard authors can write policy guards in Python or Go, compile them to WASM components via componentize-py or TinyGo, and load them in the Chio host runtime alongside Rust and TypeScript guards
 **Depends on**: Phase 386 (WIT interface is defined and Component Model host support is working)
 **Requirements**: PYDK-01, PYDK-02, PYDK-03, PYDK-04, GODK-01, GODK-02, GODK-03, GODK-04
 **Success Criteria** (what must be TRUE):
-  1. A Python guard author imports typed dataclasses from `arc-guard-py` that match the WIT contract, writes an `evaluate` function, and `componentize-py` compiles it to a WASM component that the host loads through the WIT path
-  2. A Go guard author imports typed structs from `arc-guard-go` that match the WIT contract, writes an `Evaluate` function, and TinyGo compiles it to a WASM component via the `wasip2` target that the host loads through the WIT path
+  1. A Python guard author imports typed dataclasses from `chio-guard-py` that match the WIT contract, writes an `evaluate` function, and `componentize-py` compiles it to a WASM component that the host loads through the WIT path
+  2. A Go guard author imports typed structs from `chio-guard-go` that match the WIT contract, writes an `Evaluate` function, and TinyGo compiles it to a WASM component via the `wasip2` target that the host loads through the WIT path
   3. Example guards exist for both Python and Go with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands per language
-  4. Python-compiled and Go-compiled guards loaded into the ARC host runtime produce correct Allow and Deny verdicts for the same test inputs that the Rust and TypeScript example guards handle
+  4. Python-compiled and Go-compiled guards loaded into the Chio host runtime produce correct Allow and Deny verdicts for the same test inputs that the Rust and TypeScript example guards handle
 **Estimated complexity**: L
 **Plans**: 3 plans
 Plans:

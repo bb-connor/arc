@@ -20,8 +20,8 @@ Shipped so far:
 - tool requests now record explicit `Completed`, `Cancelled`, and `Incomplete` terminal states in session history
 - tool receipts now carry explicit cancelled and incomplete decisions instead of flattening those outcomes into generic deny receipts
 - wrapped tool-stream termination can now land as an incomplete, receipted outcome instead of an untyped tool-server failure
-- the native ARC stdio wire can now emit `tool_call_chunk` frames before a terminal streamed tool response
-- the native ARC stdio wire now distinguishes `stream_complete`, `incomplete`, and `cancelled` final tool statuses
+- the native Chio stdio wire can now emit `tool_call_chunk` frames before a terminal streamed tool response
+- the native Chio stdio wire now distinguishes `stream_complete`, `incomplete`, and `cancelled` final tool statuses
 - receipts now carry content hashes for all outcomes plus chunk-hash metadata for streamed tool output
 - the kernel now enforces streamed tool duration and total-byte limits and converts limit breaches into incomplete outcomes
 - wrapped stdio `tools/call` requests can now be cancelled while an upstream tool request is in flight even when no nested client callback is active
@@ -31,7 +31,7 @@ Shipped so far:
 - the MCP edge can now emit `notifications/resources/list_changed` when the host enables that feature
 - wrapped stdio MCP servers can now forward `notifications/resources/updated` and `notifications/resources/list_changed` during active `tools/call` execution and while the outer client is otherwise idle
 - wrapped stdio MCP servers can now forward `notifications/tools/list_changed` and `notifications/prompts/list_changed` during active requests and while the outer client is otherwise idle
-- the MCP edge now has a capability-negotiated experimental stream bridge for native ARC streamed tool output via `notifications/arc/tool_call_chunk`
+- the MCP edge now has a capability-negotiated experimental stream bridge for native Chio streamed tool output via `notifications/arc/tool_call_chunk`
 - the stdio edge now proves chunk notifications are emitted before the final `tools/call` result when that extension is negotiated
 - the MCP edge now supports a first standard task slice for server-side `tools/call`: task-augmented invocation plus `tasks/list`, `tasks/get`, `tasks/result`, and `tasks/cancel`
 - `tools/list` now advertises `execution.taskSupport: "optional"` and `tasks/result` reuses the stream bridge for native streamed tools
@@ -43,8 +43,8 @@ Shipped so far:
 - the direct edge and wrapped stdio path now support URL-mode `elicitation/create`
 - accepted URL-mode elicitation IDs now live in edge-owned pending state instead of request-local scratch state
 - wrapped stdio servers can now forward `notifications/elicitation/complete` during active work and idle periods, and the edge filters those notifications to previously-brokered elicitation IDs
-- end-to-end coverage exists in `crates/arc-cli/tests/mcp_serve.rs`
-  - unit coverage exists in `crates/arc-mcp-adapter/src/edge.rs` for subscription/update fanout
+- end-to-end coverage exists in `crates/chio-cli/tests/mcp_serve.rs`
+  - unit coverage exists in `crates/chio-mcp-adapter/src/edge.rs` for subscription/update fanout
 
 Still missing:
 
@@ -59,7 +59,7 @@ Still missing:
 
 ## Problem
 
-ARC can now cover the major MCP request surfaces on the stdio edge, but it still behaves like a single-shot protocol.
+Chio can now cover the major MCP request surfaces on the stdio edge, but it still behaves like a single-shot protocol.
 
 That breaks down for:
 
@@ -96,11 +96,11 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-core/src/session.rs`
-- `crates/arc-kernel/src/session.rs`
-- `crates/arc-kernel/src/lib.rs`
-- `crates/arc-mcp-adapter/src/edge.rs`
-- `crates/arc-mcp-adapter/src/transport.rs`
+- `crates/chio-core/src/session.rs`
+- `crates/chio-kernel/src/session.rs`
+- `crates/chio-kernel/src/lib.rs`
+- `crates/chio-mcp-adapter/src/edge.rs`
+- `crates/chio-mcp-adapter/src/transport.rs`
 
 ## Task breakdown
 
@@ -123,7 +123,7 @@ Out of scope:
   - incomplete and cancelled tool receipts are now signed and appended like other audited decisions
   - wrapped MCP subprocess termination during a live tool call now maps to an incomplete tool outcome
 - shipped second slice:
-  - the native ARC stdio wire now emits `tool_call_chunk` frames before terminal completion
+  - the native Chio stdio wire now emits `tool_call_chunk` frames before terminal completion
   - terminal tool responses on the native wire now distinguish `stream_complete`, `incomplete`, and `cancelled`
 - shipped third slice:
   - receipts now carry content hashes for all outcomes plus chunk-hash metadata for streamed output
@@ -214,7 +214,7 @@ Out of scope:
 - resource subscriptions and update notifications work on the MCP edge, including the wrapped subprocess path when the upstream server can actually source those events
 - wrapped tool/prompt catalog change notifications survive the wrapped subprocess path during active work and idle periods
 - native `arc run` sessions can now emit chunked tool frames before a terminal streamed response
-- negotiated MCP-edge clients can now receive multi-event streamed tool chunks for native ARC-backed tools
+- negotiated MCP-edge clients can now receive multi-event streamed tool chunks for native Chio-backed tools
 - task-augmented server-side `tools/call` requests are now retrievable via `tasks/get` and `tasks/result`
 - idle stdio task execution can now complete and surface `notifications/tasks/status` without requiring a `tasks/result` waiter
 - nested task-associated sampling/progress/logging messages carry standard related-task metadata

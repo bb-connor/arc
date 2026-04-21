@@ -26,11 +26,11 @@ run() {
 }
 
 run pnpm --dir contracts install --frozen-lockfile
-run env ARC_WEB3_E2E_OUTPUT_DIR="${output_root_abs}" \
-  CARGO_TARGET_DIR=target/arc-web3-e2e-qualification \
+run env CHIO_WEB3_E2E_OUTPUT_DIR="${output_root_abs}" \
+  CARGO_TARGET_DIR=target/chio-web3-e2e-qualification \
   CARGO_INCREMENTAL=0 \
   CARGO_BUILD_JOBS=1 \
-  cargo test -p arc-settle --test web3_e2e_qualification -- --nocapture --test-threads=1
+  cargo test -p chio-settle --test web3_e2e_qualification -- --nocapture --test-threads=1
 
 run jq empty \
   "${output_root}/partner-qualification.json" \

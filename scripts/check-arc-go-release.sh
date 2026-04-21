@@ -2,16 +2,16 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-sdk_dir="${repo_root}/packages/sdk/arc-go"
+sdk_dir="${repo_root}/packages/sdk/chio-go"
 
 if ! command -v go >/dev/null 2>&1; then
-  echo "arc-go release checks require go on PATH" >&2
+  echo "chio-go release checks require go on PATH" >&2
   exit 1
 fi
 
 module_version="$(awk -F'"' '/ModuleVersion/ { print $2; exit }' "${sdk_dir}/version/version.go")"
 if [[ -z "${module_version}" ]]; then
-  echo "failed to determine arc-go module version" >&2
+  echo "failed to determine chio-go module version" >&2
   exit 1
 fi
 release_version="${module_version}"
@@ -19,7 +19,7 @@ if [[ "${release_version}" != v* ]]; then
   release_version="v${release_version}"
 fi
 
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-go-release.XXXXXX")"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-go-release.XXXXXX")"
 consumer_dir="${work_dir}/consumer"
 bin_dir="${work_dir}/bin"
 
@@ -49,9 +49,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/backbay-labs/arc/packages/sdk/arc-go/auth"
-	"github.com/backbay-labs/arc/packages/sdk/arc-go/client"
-	"github.com/backbay-labs/arc/packages/sdk/arc-go/version"
+	"github.com/backbay-labs/arc/packages/sdk/chio-go/auth"
+	"github.com/backbay-labs/arc/packages/sdk/chio-go/client"
+	"github.com/backbay-labs/arc/packages/sdk/chio-go/version"
 )
 
 func main() {
@@ -67,11 +67,11 @@ EOF
 
 (
   cd "${consumer_dir}"
-  go mod init example.com/arc-go-release-smoke
-  go mod edit -require=github.com/backbay-labs/arc/packages/sdk/arc-go@"${release_version}"
-  go mod edit -replace=github.com/backbay-labs/arc/packages/sdk/arc-go="${sdk_dir}"
+  go mod init example.com/chio-go-release-smoke
+  go mod edit -require=github.com/backbay-labs/arc/packages/sdk/chio-go@"${release_version}"
+  go mod edit -replace=github.com/backbay-labs/arc/packages/sdk/chio-go="${sdk_dir}"
   CGO_ENABLED=0 go mod tidy
   CGO_ENABLED=0 go build ./...
 )
 
-echo "arc-go release qualification passed for ${release_version}"
+echo "chio-go release qualification passed for ${release_version}"

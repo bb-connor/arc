@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC HTTP Request",
-  "description": "Protocol-agnostic HTTP request model sent to the ARC sidecar for evaluation.",
+  "title": "Chio HTTP Request",
+  "description": "Protocol-agnostic HTTP request model sent to the Chio sidecar for evaluation.",
   "type": "object",
   "required": ["request_id", "method", "route_pattern", "path", "caller", "timestamp"],
   "properties": {

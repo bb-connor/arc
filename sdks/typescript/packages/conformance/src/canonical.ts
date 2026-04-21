@@ -1,7 +1,7 @@
 /**
  * Canonical JSON serialization (RFC 8785).
  *
- * ARC requires canonical JSON for all signed payloads. This module
+ * Chio requires canonical JSON for all signed payloads. This module
  * implements the same canonical JSON as the Rust kernel so that
  * TypeScript-generated payloads produce byte-identical results.
  *

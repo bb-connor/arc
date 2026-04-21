@@ -1,6 +1,6 @@
 // Lean compiler output
 // Module: Pact.Proofs.Monotonicity
-// Imports: public import Init public import Arc.Core.Capability public import Arc.Core.Scope public import Arc.Core.Revocation public import Arc.Spec.Properties
+// Imports: public import Init public import Chio.Core.Capability public import Chio.Core.Scope public import Chio.Core.Revocation public import Chio.Spec.Properties
 #include <lean/lean.h>
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -14,28 +14,28 @@
 extern "C" {
 #endif
 lean_object* initialize_Init(uint8_t builtin);
-lean_object* initialize_arc_Arc_Core_Capability(uint8_t builtin);
-lean_object* initialize_arc_Arc_Core_Scope(uint8_t builtin);
-lean_object* initialize_arc_Arc_Core_Revocation(uint8_t builtin);
-lean_object* initialize_arc_Arc_Spec_Properties(uint8_t builtin);
+lean_object* initialize_chio_Chio_Core_Capability(uint8_t builtin);
+lean_object* initialize_chio_Chio_Core_Scope(uint8_t builtin);
+lean_object* initialize_chio_Chio_Core_Revocation(uint8_t builtin);
+lean_object* initialize_chio_Chio_Spec_Properties(uint8_t builtin);
 static bool _G_initialized = false;
-LEAN_EXPORT lean_object* initialize_arc_Pact_Proofs_Monotonicity(uint8_t builtin) {
+LEAN_EXPORT lean_object* initialize_chio_Pact_Proofs_Monotonicity(uint8_t builtin) {
 lean_object * res;
 if (_G_initialized) return lean_io_result_mk_ok(lean_box(0));
 _G_initialized = true;
 res = initialize_Init(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_arc_Arc_Core_Capability(builtin);
+res = initialize_chio_Chio_Core_Capability(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_arc_Arc_Core_Scope(builtin);
+res = initialize_chio_Chio_Core_Scope(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_arc_Arc_Core_Revocation(builtin);
+res = initialize_chio_Chio_Core_Revocation(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_arc_Arc_Spec_Properties(builtin);
+res = initialize_chio_Chio_Spec_Properties(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
 return lean_io_result_mk_ok(lean_box(0));

@@ -1,0 +1,13 @@
+{
+  "contractName": "ChioMerkle",
+  "sourceName": "src/lib/ChioMerkle.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "InvalidProofMetadata",
+      "type": "error"
+    }
+  ],
+  "bytecode": "60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea2646970667358221220dfd92b0cfd06c8461bdfa264766e2a460fa4a29dc041ef4343805b84da3dc6d364736f6c634300081e0033",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"InvalidProofMetadata\",\"type\":\"error\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/lib/ChioMerkle.sol\":\"ChioMerkle\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"src/lib/ChioMerkle.sol\":{\"keccak256\":\"0x2672b98dca14fddaedcc851061dfe10a00b47b58bcbf5fcb8c4b9df8490836ad\",\"license\":\"Apache-2.0\",\"urls\":[\"bzz-raw://f7764a63dd055e33787005b061966bb74969b8538d543e106c12033e6096a91b\",\"dweb:/ipfs/QmSiYybwfR47x2vqUdueKpNjdzyMPzqbxig6vk6TD4wHWq\"]}},\"version\":1}"
+}

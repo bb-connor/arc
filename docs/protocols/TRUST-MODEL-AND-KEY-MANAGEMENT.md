@@ -6,13 +6,13 @@
 
 > **Purpose**: Several protocol docs use a simplified "single kernel keypair"
 > model to explain local deployments. This document defines the broader trust
-> model needed for hosted, federated, and auditor-facing ARC deployments.
+> model needed for hosted, federated, and auditor-facing Chio deployments.
 
 ---
 
 ## 1. Why This Document Exists
 
-ARC makes stronger claims than a normal observability layer:
+Chio makes stronger claims than a normal observability layer:
 
 - receipts are signed, not merely logged
 - compliance certificates are verifiable by third parties
@@ -28,11 +28,11 @@ This document fills that gap.
 
 ## 2. Core Trust Assertions
 
-ARC intends to support the following assertions:
+Chio intends to support the following assertions:
 
-1. A verifier can determine which keys are allowed to sign which ARC artifacts.
+1. A verifier can determine which keys are allowed to sign which Chio artifacts.
 2. Historical artifacts remain verifiable after routine key rotation.
-3. Hosted ARC infrastructure cannot silently substitute its own trust root for
+3. Hosted Chio infrastructure cannot silently substitute its own trust root for
    the customer's trust root.
 4. Cross-org federation requires explicit trust-bundle exchange; no ambient
    trust is implied by protocol connectivity alone.
@@ -43,7 +43,7 @@ ARC intends to support the following assertions:
 
 ## 3. Key Roles
 
-ARC should treat these as logically distinct roles even when a local
+Chio should treat these as logically distinct roles even when a local
 single-binary deployment collapses them onto one physical keypair.
 
 ### 3.1 Verifier Trust Bundle
@@ -53,7 +53,7 @@ verifier which issuers are trusted for which artifact classes.
 
 Minimum contents:
 
-- trusted root or intermediate ARC issuer keys
+- trusted root or intermediate Chio issuer keys
 - issuer metadata: tenant, environment, validity interval, purpose
 - revocation or retirement metadata for old keys
 - artifact-scope constraints, such as "may sign receipts but not capability
@@ -63,7 +63,7 @@ Minimum contents:
 
 Used to sign:
 
-- `ArcReceipt`
+- `ChioReceipt`
 - session compliance certificates
 - other kernel-issued evidence artifacts
 
@@ -75,7 +75,7 @@ session.
 Used to sign:
 
 - capability tokens
-- delegated or attenuated grants when ARC is the issuing authority
+- delegated or attenuated grants when Chio is the issuing authority
 
 This key represents authorization, not execution. It may be the same as the
 kernel signer in local deployments, but they should be modeled separately.
@@ -226,7 +226,7 @@ deployments.
 | Artifact | Primary signer | Verification requirement |
 |----------|----------------|--------------------------|
 | Capability token | Capability authority key | Verifier trusts issuer for authorization artifacts |
-| ARC receipt | Kernel signing key | Verifier trusts issuer for execution evidence |
+| Chio receipt | Kernel signing key | Verifier trusts issuer for execution evidence |
 | Session compliance certificate | Kernel signing key | Verifier trusts issuer for compliance artifacts and, ideally, can also inspect the receipt bundle |
 | Checkpoint manifest | Checkpoint publisher key | Verifier trusts issuer for append-only publication |
 
@@ -237,7 +237,7 @@ artifact model should not require that collapse.
 
 ## 8. Hosted Signing Requirements
 
-If ARC offers hosted managed service, the docs and product must answer:
+If Chio offers hosted managed service, the docs and product must answer:
 
 - Who controls the signing key material?
 - Can the customer rotate or revoke the issuer independently of the host?
@@ -255,7 +255,7 @@ Minimum requirement for trustworthy hosted signing:
 
 ## 9. Degraded Evidence States
 
-ARC must distinguish these states explicitly:
+Chio must distinguish these states explicitly:
 
 - `fully_attested`
 - `policy_enforced_but_unsigned`
@@ -289,7 +289,7 @@ Other docs in `docs/protocols/` should follow these rules:
 ## 11. Open Questions
 
 - Should verifier trust bundles be expressed as signed JSON, JWKS, or both?
-- Should ARC define separate artifact-purpose claims in key metadata?
+- Should Chio define separate artifact-purpose claims in key metadata?
 - How should remote attestation evidence be bound to the kernel signing key in
   hosted environments?
 - Which rotation events should invalidate future certificate issuance versus

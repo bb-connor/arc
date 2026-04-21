@@ -1,6 +1,6 @@
 # Native Adoption Guide
 
-This guide closes the gap between the current wrapped-MCP path and the first supported native ARC authoring path.
+This guide closes the gap between the current wrapped-MCP path and the first supported native Chio authoring path.
 
 ## Supported coding-agent start
 
@@ -22,10 +22,10 @@ For new policy authoring, use HushSpec.
 - `examples/policies/hushspec-guard-heavy.yaml` exercises the full shipped guard surface.
 - the legacy PACT YAML format remains supported as a compatibility input for existing operators and tests, but it is no longer the recommended authoring path for new work
 
-Both inputs compile into the same runtime policy materialization inside `arc-cli`.
+Both inputs compile into the same runtime policy materialization inside `chio-cli`.
 The difference is product guidance, not an execution split.
 
-## Migration path: wrapped MCP to native ARC
+## Migration path: wrapped MCP to native Chio
 
 1. Keep the same policy intent, but move policy authoring to HushSpec.
 2. Start from the wrapped path you already have with `arc mcp serve` or `arc mcp serve-http`.
@@ -36,7 +36,7 @@ That lets a team migrate one server at a time without changing the trust, receip
 
 ## Minimal native authoring surface
 
-`arc-mcp-adapter` now ships a small higher-level native service builder:
+`chio-mcp-adapter` now ships a small higher-level native service builder:
 
 - `NativeArcServiceBuilder`
 - `NativeTool`
@@ -45,7 +45,7 @@ That lets a team migrate one server at a time without changing the trust, receip
 
 The builder creates one service value that:
 
-- emits a valid ARC manifest
+- emits a valid Chio manifest
 - implements `ToolServerConnection`
 - implements `ResourceProvider`
 - implements `PromptProvider`
@@ -53,7 +53,7 @@ The builder creates one service value that:
 
 Advanced users can still drop to the lower-level kernel traits directly for custom streaming, resource templates, or transport-specific behavior.
 
-When you expose a native service through an ARC edge, the runtime contract does
+When you expose a native service through an Chio edge, the runtime contract does
 not change:
 
 - stdio and hosted edges still require `initialize` followed by `notifications/initialized`

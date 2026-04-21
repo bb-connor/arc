@@ -59,7 +59,7 @@
   {
     "scenarioId": "prompts-list",
     "peer": "js",
-    "peerRole": "arc_client_to_server",
+    "peerRole": "chio_client_to_server",
     "deploymentMode": "wrapped_stdio",
     "transport": "stdio",
     "specVersion": "2025-11-25",
@@ -78,12 +78,12 @@
   },
   {
     "scenarioId": "deny-receipt-emitted",
-    "peer": "arc-self",
+    "peer": "chio-self",
     "peerRole": "client_to_arc_server",
     "deploymentMode": "wrapped_stdio",
     "transport": "stdio",
     "specVersion": "2026-03-19",
-    "category": "arc-extension",
+    "category": "chio-extension",
     "status": "pass",
     "durationMs": 18,
     "assertions": [

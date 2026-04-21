@@ -1,6 +1,6 @@
 # hello-acp
 
-Minimal ACP example using [`crates/arc-acp-edge`](../../crates/arc-acp-edge/).
+Minimal ACP example using [`crates/chio-acp-edge`](../../crates/chio-acp-edge/).
 
 ## What It Demonstrates
 

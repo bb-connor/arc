@@ -1,0 +1,94 @@
+{
+  "schema": "chio.identity-interop-qualification-matrix.v1",
+  "profileRef": {
+    "kind": "public_identity_profile",
+    "schema": "chio.public-identity-profile.v1",
+    "artifactId": "pip-1",
+    "operatorId": "arc",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "uri": "https://arc.dev/standards/public-identity-profile"
+  },
+  "directoryEntryRef": {
+    "kind": "public_wallet_directory_entry",
+    "schema": "chio.public-wallet-directory-entry.v1",
+    "artifactId": "wde-1",
+    "operatorId": "wallet-operator-1",
+    "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "uri": "https://wallet.example/directory/wde-1"
+  },
+  "routingManifestRef": {
+    "kind": "public_wallet_routing_manifest",
+    "schema": "chio.public-wallet-routing-manifest.v1",
+    "artifactId": "wrm-1",
+    "operatorId": "wallet-operator-1",
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "uri": "https://wallet.example/routes/wrm-1"
+  },
+  "cases": [
+    {
+      "id": "method-support",
+      "name": "Unsupported DID methods fail closed",
+      "requirementIds": [
+        "IDMAX-01"
+      ],
+      "scenario": "unsupported_did_method",
+      "expectedOutcome": "fail_closed",
+      "observedOutcome": "fail_closed",
+      "notes": [
+        "Unsupported method families are rejected explicitly."
+      ]
+    },
+    {
+      "id": "directory-poisoning",
+      "name": "Directory poisoning fails closed",
+      "requirementIds": [
+        "IDMAX-02"
+      ],
+      "scenario": "directory_poisoning",
+      "expectedOutcome": "fail_closed",
+      "observedOutcome": "fail_closed",
+      "notes": [
+        "Directory entries stay verifier-bound and non-ambient."
+      ]
+    },
+    {
+      "id": "multi-wallet",
+      "name": "Multi-wallet selection remains replay safe",
+      "requirementIds": [
+        "IDMAX-03"
+      ],
+      "scenario": "multi_wallet_selection",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": [
+        "Supported multi-wallet routing completes inside explicit guardrails."
+      ]
+    },
+    {
+      "id": "cross-operator-boundary",
+      "name": "Cross-operator issuer mismatch fails closed",
+      "requirementIds": [
+        "IDMAX-04"
+      ],
+      "scenario": "cross_operator_issuer_mismatch",
+      "expectedOutcome": "fail_closed",
+      "observedOutcome": "fail_closed",
+      "notes": [
+        "Issuer and admission boundaries remain explicit."
+      ]
+    },
+    {
+      "id": "release-closure",
+      "name": "Release boundary stays honest",
+      "requirementIds": [
+        "IDMAX-05"
+      ],
+      "scenario": "release_boundary_closure",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": [
+        "Final public claim remains bounded and specific."
+      ]
+    }
+  ]
+}

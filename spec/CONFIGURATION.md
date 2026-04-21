@@ -1,10 +1,10 @@
-# ARC Configuration
+# Chio Configuration
 
 **Version:** 1.0
 **Date:** 2026-04-14
 **Status:** Normative
 
-This specification defines the `arc.yaml` configuration file format for ARC
+This specification defines the `chio.yaml` configuration file format for Chio
 runtimes. Implementations MUST accept configuration conforming to this schema
 and MUST reject configuration that violates the rules described herein.
 
@@ -15,11 +15,11 @@ The design rationale and migration guide are in
 
 ## 1. File Format
 
-The configuration file is YAML and MUST be named `arc.yaml` by convention.
-The file is consumed by ARC runtimes and commands that explicitly opt into
-`arc.yaml` configuration via their own flags or programmatic APIs. This
-repository does not currently ship a universal `arc start` entrypoint, so
-implementations MUST NOT document `arc start --config arc.yaml` as a required
+The configuration file is YAML and MUST be named `chio.yaml` by convention.
+The file is consumed by Chio runtimes and commands that explicitly opt into
+`chio.yaml` configuration via their own flags or programmatic APIs. This
+repository does not currently ship a universal `chio start` entrypoint, so
+implementations MUST NOT document `chio start --config chio.yaml` as a required
 or normative command path.
 
 Implementations MUST apply `deny_unknown_fields` semantics to every section.
@@ -56,7 +56,7 @@ identity and receipt storage.
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `signing_key` | string | Yes | -- | Ed25519 signing key in hex, or the literal `"generate"` for dev mode |
-| `receipt_store` | string | No | `"sqlite:///var/arc/receipts.db"` | URI for the receipt store backend |
+| `receipt_store` | string | No | `"sqlite:///var/chio/receipts.db"` | URI for the receipt store backend |
 | `log_level` | string | No | `"info"` | Log level override for the kernel subsystem |
 
 The `signing_key` field MUST NOT be empty. The value `"generate"` instructs
@@ -119,7 +119,7 @@ how long they are retained.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `store` | string | No | `"sqlite:///var/arc/receipts.db"` | Store URI |
+| `store` | string | No | `"sqlite:///var/chio/receipts.db"` | Store URI |
 | `checkpoint_interval` | u64 | No | `100` | Number of receipts between Merkle checkpoints |
 | `retention_days` | u64 | No | `90` | Days to retain receipts before expiry |
 
@@ -150,7 +150,7 @@ OpenTelemetry span export configuration.
 |-------|------|----------|---------|-------------|
 | `enabled` | bool | No | `false` | Whether OTel export is active |
 | `endpoint` | string | No | `""` | Collector endpoint (e.g., `"http://localhost:4317"`) |
-| `service_name` | string | No | `"arc-acp-proxy"` | Service name reported to the collector |
+| `service_name` | string | No | `"chio-acp-proxy"` | Service name reported to the collector |
 | `include_parameters` | bool | No | `false` | Include receipt parameters in span attributes |
 | `batch_size` | usize | No | `0` | Span batch size; `0` exports each span immediately |
 
@@ -241,8 +241,8 @@ debugging.
 
 ```yaml
 kernel:
-  signing_key: "${ARC_SIGNING_KEY}"
-  log_level: "${ARC_LOG_LEVEL:-info}"
+  signing_key: "${CHIO_SIGNING_KEY}"
+  log_level: "${CHIO_LOG_LEVEL:-info}"
 
 adapters:
   - id: petstore
@@ -302,7 +302,7 @@ and unsupported fields at load time rather than silently ignoring them.
 
 ## 13. Minimal Configuration
 
-The smallest valid `arc.yaml` requires only a kernel and one adapter:
+The smallest valid `chio.yaml` requires only a kernel and one adapter:
 
 ```yaml
 kernel:
@@ -316,7 +316,7 @@ adapters:
 
 All optional sections use their documented defaults. The logging level
 defaults to `"info"` with `"json"` format. The receipt store defaults to
-`sqlite:///var/arc/receipts.db` with 100-receipt checkpoint intervals and
+`sqlite:///var/chio/receipts.db` with 100-receipt checkpoint intervals and
 90-day retention. Telemetry export is disabled. No guards or WASM modules
 are loaded.
 
@@ -326,8 +326,8 @@ are loaded.
 
 ```yaml
 kernel:
-  signing_key: "${ARC_SIGNING_KEY}"
-  receipt_store: "sqlite:///var/arc/receipts.db"
+  signing_key: "${CHIO_SIGNING_KEY}"
+  receipt_store: "sqlite:///var/chio/receipts.db"
   log_level: "debug"
 
 adapters:
@@ -356,7 +356,7 @@ edges:
     expose_from: internal-api
 
 receipts:
-  store: "sqlite:///var/arc/receipts.db"
+  store: "sqlite:///var/chio/receipts.db"
   checkpoint_interval: 50
   retention_days: 30
 
@@ -367,7 +367,7 @@ logging:
 telemetry:
   enabled: true
   endpoint: "http://localhost:4317"
-  service_name: "my-arc-deployment"
+  service_name: "my-chio-deployment"
   include_parameters: false
   batch_size: 100
 

@@ -1,0 +1,42 @@
+{
+  "schema": "chio.extension-manifest.v1",
+  "extension_id": "sample.pg-receipt-store",
+  "display_name": "Sample Postgres Receipt Store",
+  "version": "1.0.0",
+  "distribution": "third_party_custom",
+  "extension_point_id": "arc.kernel.receipt_store",
+  "capabilities": [
+    "receipt_append",
+    "receipt_query",
+    "checkpoint_replay_safe"
+  ],
+  "supported_profiles": [
+    "shared_control_plane"
+  ],
+  "compatibility": {
+    "chio_contract_version": "2.0",
+    "official_stack_package_id": "arc.official-stack",
+    "supported_component_ids": [
+      "arc.remote-receipt-store"
+    ],
+    "supported_contract_schemas": [
+      "chio.extension-manifest.v1",
+      "chio.receipt.v1",
+      "chio.checkpoint.v1"
+    ]
+  },
+  "runtime": {
+    "isolation": "remote_service",
+    "allowed_privileges": [
+      "network_egress",
+      "filesystem_read"
+    ],
+    "evidence_mode": "none",
+    "requires_subject_binding": false,
+    "requires_signer_verification": false,
+    "requires_freshness_check": false,
+    "requires_local_policy_activation": false,
+    "allows_truth_mutation": false,
+    "allows_trust_widening": false
+  }
+}

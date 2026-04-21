@@ -1,5 +1,5 @@
 // Package reconciler contains the controller-runtime reconciler that mints
-// and releases ARC capability grants for governed Kubernetes Jobs.
+// and releases Chio capability grants for governed Kubernetes Jobs.
 package reconciler
 
 import (
@@ -25,50 +25,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	arcapi "github.com/backbay/arc-k8s-controller/internal/arc"
+	chioapi "github.com/backbay/chio-k8s-controller/internal/chio"
 )
 
 // Label and annotation keys used to coordinate with governed Jobs.
 const (
-	// LabelGoverned marks a Job as requiring ARC capability governance.
+	// LabelGoverned marks a Job as requiring Chio capability governance.
 	// Only Jobs with this label set to "true" are reconciled.
-	LabelGoverned = "arc.protocol/governed"
+	LabelGoverned = "chio.protocol/governed"
 
 	// AnnotationScopes is a comma-separated list of scopes the Job wants.
-	AnnotationScopes = "arc.protocol/scopes"
+	AnnotationScopes = "chio.protocol/scopes"
 
 	// AnnotationCapabilityID records the ID of the minted capability.
-	AnnotationCapabilityID = "arc.protocol/capability-id"
+	AnnotationCapabilityID = "chio.protocol/capability-id"
 
 	// AnnotationCapabilityToken stores the serialized capability token on the
 	// governed pod template so admission can validate the spawned Pods.
-	AnnotationCapabilityToken = "arc.protocol/capability-token"
+	AnnotationCapabilityToken = "chio.protocol/capability-token"
 
 	// AnnotationCapabilityExpiresAt records the capability expiry (RFC3339).
-	AnnotationCapabilityExpiresAt = "arc.protocol/capability-expires-at"
+	AnnotationCapabilityExpiresAt = "chio.protocol/capability-expires-at"
 
 	// AnnotationReleased marks a Job as having had its capability released.
-	AnnotationReleased = "arc.protocol/released-at"
+	AnnotationReleased = "chio.protocol/released-at"
 
 	// AnnotationReceiptID records the ID of the submitted JobReceipt.
-	AnnotationReceiptID = "arc.protocol/receipt-id"
+	AnnotationReceiptID = "chio.protocol/receipt-id"
 
 	// PodAnnotationReceipt is read from governed Job pods to harvest receipts.
-	PodAnnotationReceipt = "arc.protocol/receipt"
+	PodAnnotationReceipt = "chio.protocol/receipt"
 
 	// FinalizerName keeps the Job resource alive until we have released
 	// the capability and emitted a JobReceipt.
-	FinalizerName = "arc.protocol/capability-finalizer"
+	FinalizerName = "chio.protocol/capability-finalizer"
 )
 
-// ArcClient is the subset of arc.Client methods the reconciler needs.
+// ChioClient is the subset of arc.Client methods the reconciler needs.
 //
 // Declared as an interface so tests can inject a stub without taking a
 // dependency on net/http.
-type ArcClient interface {
-	Mint(ctx context.Context, req arcapi.MintRequest) (*arcapi.CapabilityToken, error)
-	Release(ctx context.Context, req arcapi.ReleaseRequest) error
-	SubmitReceipt(ctx context.Context, receipt arcapi.JobReceipt) (string, error)
+type ChioClient interface {
+	Mint(ctx context.Context, req chioapi.MintRequest) (*chioapi.CapabilityToken, error)
+	Release(ctx context.Context, req chioapi.ReleaseRequest) error
+	SubmitReceipt(ctx context.Context, receipt chioapi.JobReceipt) (string, error)
 }
 
 // RetryPolicy configures bounded exponential backoff for sidecar submission.
@@ -91,13 +91,13 @@ func DefaultRetryPolicy() RetryPolicy {
 	}
 }
 
-// JobReconciler reconciles batch/v1 Job objects and mediates ARC capability
+// JobReconciler reconciles batch/v1 Job objects and mediates Chio capability
 // grants across the Job lifecycle.
 type JobReconciler struct {
 	client.Client
 
 	Scheme   *runtime.Scheme
-	Arc      ArcClient
+	Arc      ChioClient
 	Recorder record.EventRecorder
 	Retry    RetryPolicy
 
@@ -111,7 +111,7 @@ type JobReconciler struct {
 	// submission retries do NOT consume the release retry budget (and
 	// vice versa) — a flaky release path would otherwise exhaust
 	// MaxAttempts before the first SubmitReceipt runs and land the Job
-	// in ArcReceiptDropped without ever attempting the receipt.
+	// in ChioReceiptDropped without ever attempting the receipt.
 	// attemptsMu guards concurrent access from multiple Reconcile workers
 	// when MaxConcurrentReconciles > 1; without it, concurrent writes on
 	// the plain map trigger Go's fatal "concurrent map writes" panic and
@@ -135,7 +135,7 @@ const (
 )
 
 // NewJobReconciler constructs a JobReconciler with default state.
-func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ArcClient, recorder record.EventRecorder) *JobReconciler {
+func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ChioClient, recorder record.EventRecorder) *JobReconciler {
 	return &JobReconciler{
 		Client:   c,
 		Scheme:   scheme,
@@ -152,7 +152,7 @@ func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ArcClient, re
 // carry the governed label, or (b) they still hold our finalizer. The
 // finalizer branch is load-bearing: if the governed label is removed from a
 // previously-governed Job, deletion events still need to reach Reconcile so
-// the ARC finalizer + capability can be cleaned up — otherwise the Job can be
+// the Chio finalizer + capability can be cleaned up — otherwise the Job can be
 // stuck terminating forever. Pods owned by a governed Job are watched so
 // receipt annotations trigger reconciliation while the Job is still running.
 func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -209,7 +209,7 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Handle deletion first so that if the governed label was removed
 	// post-admission on a Job we had already finalized, we still run the
 	// release + finalizer cleanup. Otherwise the Job would stay stuck
-	// terminating with a dangling ARC finalizer.
+	// terminating with a dangling Chio finalizer.
 	if !job.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(&job, FinalizerName) {
 			return r.handleDeletion(ctx, logger, &job)
@@ -254,12 +254,12 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-// mintGrant requests a capability grant from the ARC sidecar and persists the
+// mintGrant requests a capability grant from the Chio sidecar and persists the
 // result on the Job via annotations. On sidecar-unreachable it records an
 // event and requeues.
 func (r *JobReconciler) mintGrant(ctx context.Context, logger logr.Logger, job *batchv1.Job) (ctrl.Result, error) {
 	scopes := parseScopes(job.Annotations[AnnotationScopes])
-	req := arcapi.MintRequest{
+	req := chioapi.MintRequest{
 		Subject: fmt.Sprintf("job/%s/%s", job.Namespace, job.Name),
 		Scopes:  scopes,
 		Labels:  job.Labels,
@@ -268,12 +268,12 @@ func (r *JobReconciler) mintGrant(ctx context.Context, logger logr.Logger, job *
 
 	token, err := r.Arc.Mint(ctx, req)
 	if err != nil {
-		if errors.Is(err, arcapi.ErrSidecarUnreachable) {
-			r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
+		if errors.Is(err, chioapi.ErrSidecarUnreachable) {
+			r.event(job, corev1.EventTypeWarning, "ChioSidecarUnreachable",
 				"failed to mint capability; requeueing: "+err.Error())
 			return ctrl.Result{RequeueAfter: r.Retry.BaseDelay}, nil
 		}
-		r.event(job, corev1.EventTypeWarning, "ArcMintFailed", err.Error())
+		r.event(job, corev1.EventTypeWarning, "ChioMintFailed", err.Error())
 		return ctrl.Result{}, fmt.Errorf("mint capability: %w", err)
 	}
 
@@ -293,7 +293,7 @@ func (r *JobReconciler) mintGrant(ctx context.Context, logger logr.Logger, job *
 	}
 
 	logger.Info("minted capability", "capability_id", token.ID, "scopes", scopes)
-	r.event(job, corev1.EventTypeNormal, "ArcCapabilityMinted",
+	r.event(job, corev1.EventTypeNormal, "ChioCapabilityMinted",
 		fmt.Sprintf("minted capability %s with %d scope(s)", token.ID, len(scopes)))
 	return ctrl.Result{}, nil
 }
@@ -305,18 +305,18 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 
 	// Release capability if still outstanding.
 	if capID != "" && job.Annotations[AnnotationReleased] == "" {
-		err := r.Arc.Release(ctx, arcapi.ReleaseRequest{
+		err := r.Arc.Release(ctx, chioapi.ReleaseRequest{
 			CapabilityID: capID,
 			JobUID:       string(job.UID),
 			Reason:       outcome,
 		})
 		if err != nil {
-			if errors.Is(err, arcapi.ErrSidecarUnreachable) {
-				r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
+			if errors.Is(err, chioapi.ErrSidecarUnreachable) {
+				r.event(job, corev1.EventTypeWarning, "ChioSidecarUnreachable",
 					"release deferred; requeueing: "+err.Error())
 				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 			}
-			r.event(job, corev1.EventTypeWarning, "ArcReleaseFailed", err.Error())
+			r.event(job, corev1.EventTypeWarning, "ChioReleaseFailed", err.Error())
 			return ctrl.Result{}, fmt.Errorf("release capability: %w", err)
 		}
 
@@ -329,7 +329,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 			return ctrl.Result{}, fmt.Errorf("persist release annotation: %w", err)
 		}
 		logger.Info("released capability", "capability_id", capID, "outcome", outcome)
-		r.event(job, corev1.EventTypeNormal, "ArcCapabilityReleased",
+		r.event(job, corev1.EventTypeNormal, "ChioCapabilityReleased",
 			fmt.Sprintf("released capability %s (outcome=%s)", capID, outcome))
 	}
 
@@ -340,7 +340,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 			return ctrl.Result{}, fmt.Errorf("collect pod receipts: %w", err)
 		}
 
-		receipt := arcapi.JobReceipt{
+		receipt := chioapi.JobReceipt{
 			JobName:      job.Name,
 			Namespace:    job.Namespace,
 			JobUID:       string(job.UID),
@@ -353,7 +353,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 
 		id, err := r.Arc.SubmitReceipt(ctx, receipt)
 		if err != nil {
-			if errors.Is(err, arcapi.ErrSidecarUnreachable) {
+			if errors.Is(err, chioapi.ErrSidecarUnreachable) {
 				// Increment attempts first, THEN check the cap. Otherwise
 				// the counter stays one behind the actual number of
 				// attempts and a MaxAttempts=5 policy would schedule a
@@ -362,16 +362,16 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 				// independent.
 				backoff := r.backoffFor(job.UID, retryPhaseReceipt)
 				if r.attemptExceeded(job.UID, retryPhaseReceipt) {
-					r.event(job, corev1.EventTypeWarning, "ArcReceiptDropped",
+					r.event(job, corev1.EventTypeWarning, "ChioReceiptDropped",
 						"exceeded max receipt submission attempts; giving up")
 					// Fall through to finalizer removal so the Job can be deleted.
 				} else {
-					r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
+					r.event(job, corev1.EventTypeWarning, "ChioSidecarUnreachable",
 						"receipt submission deferred; requeueing: "+err.Error())
 					return ctrl.Result{RequeueAfter: backoff}, nil
 				}
 			} else {
-				r.event(job, corev1.EventTypeWarning, "ArcReceiptFailed", err.Error())
+				r.event(job, corev1.EventTypeWarning, "ChioReceiptFailed", err.Error())
 				return ctrl.Result{}, fmt.Errorf("submit receipt: %w", err)
 			}
 		} else {
@@ -384,7 +384,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 				return ctrl.Result{}, fmt.Errorf("persist receipt annotation: %w", err)
 			}
 			logger.Info("submitted job receipt", "receipt_id", id, "steps", len(steps))
-			r.event(job, corev1.EventTypeNormal, "ArcReceiptSubmitted",
+			r.event(job, corev1.EventTypeNormal, "ChioReceiptSubmitted",
 				fmt.Sprintf("submitted JobReceipt %s (%d steps)", id, len(steps)))
 		}
 	}
@@ -409,18 +409,18 @@ func (r *JobReconciler) handleDeletion(ctx context.Context, logger logr.Logger, 
 
 	capID := job.Annotations[AnnotationCapabilityID]
 	if capID != "" && job.Annotations[AnnotationReleased] == "" {
-		err := r.Arc.Release(ctx, arcapi.ReleaseRequest{
+		err := r.Arc.Release(ctx, chioapi.ReleaseRequest{
 			CapabilityID: capID,
 			JobUID:       string(job.UID),
 			Reason:       "deleted",
 		})
 		if err != nil {
-			if errors.Is(err, arcapi.ErrSidecarUnreachable) {
-				r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
+			if errors.Is(err, chioapi.ErrSidecarUnreachable) {
+				r.event(job, corev1.EventTypeWarning, "ChioSidecarUnreachable",
 					"release on delete deferred; requeueing: "+err.Error())
 				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 			}
-			r.event(job, corev1.EventTypeWarning, "ArcReleaseFailed", err.Error())
+			r.event(job, corev1.EventTypeWarning, "ChioReleaseFailed", err.Error())
 			logger.Error(err, "release on delete failed; keeping finalizer and requeueing")
 			return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 		}
@@ -441,14 +441,14 @@ func (r *JobReconciler) handleDeletion(ctx context.Context, logger logr.Logger, 
 // controller sets by default on most clusters but is not part of the
 // stable contract) because a label-only filter would fail on fake clients
 // and on clusters that customize the label.
-func (r *JobReconciler) collectStepReceipts(ctx context.Context, job *batchv1.Job) ([]arcapi.StepReceipt, error) {
+func (r *JobReconciler) collectStepReceipts(ctx context.Context, job *batchv1.Job) ([]chioapi.StepReceipt, error) {
 	var pods corev1.PodList
 	if err := r.List(ctx, &pods, client.InNamespace(job.Namespace)); err != nil {
 		return nil, err
 	}
 
 	now := time.Now().UTC()
-	steps := make([]arcapi.StepReceipt, 0, len(pods.Items))
+	steps := make([]chioapi.StepReceipt, 0, len(pods.Items))
 	for i := range pods.Items {
 		p := &pods.Items[i]
 		if !isOwnedByJob(p, job) {
@@ -458,7 +458,7 @@ func (r *JobReconciler) collectStepReceipts(ctx context.Context, job *batchv1.Jo
 		if payload == "" {
 			continue
 		}
-		steps = append(steps, arcapi.StepReceipt{
+		steps = append(steps, chioapi.StepReceipt{
 			PodName:    p.Name,
 			Phase:      string(p.Status.Phase),
 			Payload:    payload,
@@ -478,7 +478,7 @@ func (r *JobReconciler) event(obj client.Object, eventType, reason, message stri
 // backoffFor returns an exponentially growing delay keyed by (Job UID,
 // phase). Each phase keeps an independent retry budget so a flaky
 // release path cannot consume the receipt budget and trigger a
-// premature ArcReceiptDropped.
+// premature ChioReceiptDropped.
 func (r *JobReconciler) backoffFor(uid types.UID, phase retryPhase) time.Duration {
 	r.attemptsMu.Lock()
 	defer r.attemptsMu.Unlock()

@@ -1,8 +1,8 @@
 {
-  "name": "@arc-protocol/express",
+  "name": "@chio-protocol/express",
   "version": "1.0.0",
   "type": "module",
-  "description": "ARC protocol middleware for Express.js",
+  "description": "Chio protocol middleware for Express.js",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -26,7 +26,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@arc-protocol/node-http": "file:../node-http"
+    "@chio-protocol/node-http": "file:../node-http"
   },
   "peerDependencies": {
     "express": ">=4.18.0"

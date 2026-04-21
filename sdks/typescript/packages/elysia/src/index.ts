@@ -1,15 +1,15 @@
 /**
- * @arc-protocol/elysia
+ * @chio-protocol/elysia
  *
- * Elysia lifecycle hook for the ARC protocol. Provides:
+ * Elysia lifecycle hook for the Chio protocol. Provides:
  *
- * - `arc()` plugin that evaluates requests against the ARC sidecar
- * - Structured ARC error responses
+ * - `arc()` plugin that evaluates requests against the Chio sidecar
+ * - Structured Chio error responses
  *
  * @example
  * ```ts
  * import { Elysia } from "elysia";
- * import { arc } from "@arc-protocol/elysia";
+ * import { chio } from "@chio-protocol/elysia";
  *
  * const app = new Elysia()
  *   .use(arc({ config: "arc.yaml" }))
@@ -17,15 +17,15 @@
  * ```
  */
 
-export { arc, type ArcElysiaConfig } from "./plugin.js";
+export { chio, type ChioElysiaConfig } from "./plugin.js";
 
 // Re-export key types from node-http for convenience
 export type {
-  ArcConfig,
+  ChioConfig,
   EvaluateResponse,
   HttpReceipt,
   Verdict,
   CallerIdentity,
   GuardEvidence,
-  ArcErrorResponse,
-} from "@arc-protocol/node-http";
+  ChioErrorResponse,
+} from "@chio-protocol/node-http";

@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import http from "node:http";
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
-import { arc } from "../src/index.js";
-import type { EvaluateResponse } from "@arc-protocol/node-http";
+import { chio } from "../src/index.js";
+import type { EvaluateResponse } from "@chio-protocol/node-http";
 
 function allowResponse(): EvaluateResponse {
   return {
@@ -79,7 +79,7 @@ describe("arc fastify plugin", () => {
     await fastify.close();
   });
 
-  it("skipped routes bypass ARC evaluation", async () => {
+  it("skipped routes bypass Chio evaluation", async () => {
     const fastify = Fastify();
     await fastify.register(arc, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
@@ -103,7 +103,7 @@ describe("arc fastify plugin", () => {
   it("denies requests when sidecar is unreachable (fail-closed)", async () => {
     const fastify = Fastify();
 
-    // Register ARC plugin
+    // Register Chio plugin
     await fastify.register(arc, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       timeoutMs: 1000,
@@ -124,7 +124,7 @@ describe("arc fastify plugin", () => {
     // the plugin should return 502.
     expect(response.statusCode).toBe(502);
     const body = JSON.parse(response.body);
-    expect(body.error).toBe("arc_sidecar_unreachable");
+    expect(body.error).toBe("chio_sidecar_unreachable");
     await fastify.close();
   });
 

@@ -10,9 +10,9 @@ LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
-ARC_BIN="$(ensure_arc_bin)"
-SERVICE_TOKEN="${ARC_SERVICE_TOKEN:-demo-token}"
-EDGE_TOKEN="${ARC_EDGE_TOKEN:-demo-token}"
+CHIO_BIN="$(ensure_arc_bin)"
+SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+EDGE_TOKEN="${CHIO_EDGE_TOKEN:-demo-token}"
 
 TRUST_PORT="$(pick_free_port)"
 PROVIDER_PORT="$(pick_free_port)"
@@ -32,8 +32,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ARC trust-control
-"${ARC_BIN}" trust serve \
+# Chio trust-control
+"${CHIO_BIN}" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" --service-token "${SERVICE_TOKEN}" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
   --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
@@ -45,10 +45,10 @@ BG_PIDS+=($!)
 wait_for_http "${CONTROL_URL}/health"
 
 # Provider MCP edge (arc mcp serve-http wrapping the review server)
-ARC_BIN="${ARC_BIN}" \
-ARC_CONTROL_URL="${CONTROL_URL}" \
-ARC_CONTROL_TOKEN="${SERVICE_TOKEN}" \
-ARC_EDGE_TOKEN="${EDGE_TOKEN}" \
+CHIO_BIN="${CHIO_BIN}" \
+CHIO_CONTROL_URL="${CONTROL_URL}" \
+CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" \
+CHIO_EDGE_TOKEN="${EDGE_TOKEN}" \
 PROVIDER_EDGE_LISTEN="127.0.0.1:${PROVIDER_PORT}" \
 PROVIDER_SESSION_DB="${STATE_DIR}/provider-sessions.sqlite3" \
   "${EXAMPLE_ROOT}/provider/run-edge.sh" \
@@ -68,9 +68,9 @@ BG_PIDS+=($!)
 wait_for_http "${BUYER_API_URL}/healthz"
 
 # Buyer sidecar (arc api protect)
-ARC_BIN="${ARC_BIN}" \
-ARC_CONTROL_URL="${CONTROL_URL}" \
-ARC_CONTROL_TOKEN="${SERVICE_TOKEN}" \
+CHIO_BIN="${CHIO_BIN}" \
+CHIO_CONTROL_URL="${CONTROL_URL}" \
+CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" \
 BUYER_UPSTREAM_URL="${BUYER_API_URL}" \
 BUYER_SIDECAR_LISTEN="127.0.0.1:${BUYER_SIDECAR_PORT}" \
 BUYER_RECEIPT_STORE="${STATE_DIR}/buyer-receipts.sqlite3" \

@@ -1,18 +1,18 @@
-name: arc-docker-quickstart
+name: chio-docker-quickstart
 
 services:
-  arc-trust-demo:
-    image: arc-trust-demo:local
+  chio-trust-demo:
+    image: chio-trust-demo:local
     build:
       context: ../..
       dockerfile: Dockerfile
-      target: arc-trust-demo
+      target: chio-trust-demo
     environment:
-      ARC_SERVICE_TOKEN: ${ARC_SERVICE_TOKEN:-demo-token}
+      CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-token}
     ports:
-      - "${ARC_TRUST_PORT:-8940}:8940"
+      - "${CHIO_TRUST_PORT:-8940}:8940"
     volumes:
-      - arc_demo_state:/var/lib/arc
+      - chio_demo_state:/var/lib/arc
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8940/health >/dev/null 2>&1"]
       interval: 5s
@@ -20,21 +20,21 @@ services:
       retries: 20
       start_period: 5s
 
-  arc-mcp-demo:
-    image: arc-mcp-demo:local
+  chio-mcp-demo:
+    image: chio-mcp-demo:local
     build:
       context: ../..
       dockerfile: Dockerfile
-      target: arc-mcp-demo
+      target: chio-mcp-demo
     environment:
-      ARC_AUTH_TOKEN: ${ARC_AUTH_TOKEN:-demo-token}
-      ARC_CONTROL_URL: http://arc-trust-demo:8940
-      ARC_CONTROL_TOKEN: ${ARC_SERVICE_TOKEN:-demo-token}
+      CHIO_AUTH_TOKEN: ${CHIO_AUTH_TOKEN:-demo-token}
+      CHIO_CONTROL_URL: http://chio-trust-demo:8940
+      CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-token}
     ports:
-      - "${ARC_EDGE_PORT:-8931}:8931"
+      - "${CHIO_EDGE_PORT:-8931}:8931"
     depends_on:
-      arc-trust-demo:
+      chio-trust-demo:
         condition: service_healthy
 
 volumes:
-  arc_demo_state:
+  chio_demo_state:

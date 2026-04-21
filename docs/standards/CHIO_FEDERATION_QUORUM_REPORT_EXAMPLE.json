@@ -1,0 +1,105 @@
+{
+  "schema": "chio.federation-quorum-report.v1",
+  "reportId": "fqr-1",
+  "generatedAt": 1743552060,
+  "namespace": "registry.arc.example/liability",
+  "listingId": "listing-liability-provider-1",
+  "originOperatorId": "origin-operator",
+  "quorumThreshold": 2,
+  "maxReplicaAgeSecs": 300,
+  "publishers": [
+    {
+      "publisher": {
+        "role": "origin",
+        "operatorId": "origin-operator",
+        "operatorName": "Origin Operator",
+        "registryUrl": "https://origin.arc.example/registry",
+        "upstreamRegistryUrls": []
+      },
+      "reportRef": {
+        "kind": "listing_report",
+        "schema": "arc.registry.listing-report.v1",
+        "artifactId": "report-origin-1",
+        "operatorId": "origin-operator",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "uri": "https://origin-operator.arc.example/artifacts/report-origin-1"
+      },
+      "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "freshness": {
+        "state": "fresh",
+        "ageSecs": 30,
+        "maxAgeSecs": 300,
+        "validUntil": 1743552360,
+        "generatedAt": 1743552030
+      },
+      "observedAt": 1743552030,
+      "upstreamHopCount": 0
+    },
+    {
+      "publisher": {
+        "role": "mirror",
+        "operatorId": "mirror-operator-a",
+        "operatorName": "Mirror Operator A",
+        "registryUrl": "https://mirror-a.arc.example/registry",
+        "upstreamRegistryUrls": [
+          "https://origin.arc.example/registry"
+        ]
+      },
+      "reportRef": {
+        "kind": "listing_report",
+        "schema": "arc.registry.listing-report.v1",
+        "artifactId": "report-mirror-a-1",
+        "operatorId": "mirror-operator-a",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "uri": "https://mirror-operator-a.arc.example/artifacts/report-mirror-a-1"
+      },
+      "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "freshness": {
+        "state": "fresh",
+        "ageSecs": 40,
+        "maxAgeSecs": 300,
+        "validUntil": 1743552360,
+        "generatedAt": 1743552020
+      },
+      "observedAt": 1743552020,
+      "upstreamHopCount": 1
+    },
+    {
+      "publisher": {
+        "role": "indexer",
+        "operatorId": "indexer-operator-a",
+        "operatorName": "Indexer Operator A",
+        "registryUrl": "https://indexer-a.arc.example/registry",
+        "upstreamRegistryUrls": [
+          "https://origin.arc.example/registry"
+        ]
+      },
+      "reportRef": {
+        "kind": "listing_report",
+        "schema": "arc.registry.listing-report.v1",
+        "artifactId": "report-indexer-a-1",
+        "operatorId": "indexer-operator-a",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "uri": "https://indexer-operator-a.arc.example/artifacts/report-indexer-a-1"
+      },
+      "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "freshness": {
+        "state": "fresh",
+        "ageSecs": 45,
+        "maxAgeSecs": 300,
+        "validUntil": 1743552360,
+        "generatedAt": 1743552015
+      },
+      "observedAt": 1743552015,
+      "upstreamHopCount": 1
+    }
+  ],
+  "antiEclipsePolicy": {
+    "minimumDistinctOperators": 2,
+    "requireOriginPublisher": true,
+    "requireIndexerObservation": true,
+    "maxUpstreamHops": 1
+  },
+  "finalState": "converged",
+  "note": "Requires origin plus independent mirror/indexer observation before a remote listing is treated as converged."
+}

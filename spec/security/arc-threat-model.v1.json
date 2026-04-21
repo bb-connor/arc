@@ -1,5 +1,5 @@
 {
-  "schema": "arc.threat-model.v1",
+  "schema": "chio.threat-model.v1",
   "updatedAt": "2026-04-13",
   "boundary": {
     "focus": "agent-kernel-tool trust boundary",
@@ -35,7 +35,7 @@
         },
         {
           "status": "existing",
-          "control": "ARC-native DPoP can be required per grant, and hosted sender-constrained sessions can bind to DPoP or mTLS continuity."
+          "control": "Chio-native DPoP can be required per grant, and hosted sender-constrained sessions can bind to DPoP or mTLS continuity."
         },
         {
           "status": "planned",
@@ -62,7 +62,7 @@
         },
         {
           "status": "planned",
-          "control": "Operators should distribute and pin ARC verifier keys, service certificates, or equivalent trust anchors with stricter rotation discipline."
+          "control": "Operators should distribute and pin Chio verifier keys, service certificates, or equivalent trust anchors with stricter rotation discipline."
         }
       ],
       "residualRisk": "Plaintext local-development modes intentionally do not provide peer authenticity, and receipt trust still depends on deployment-specific trust-anchor distribution."
@@ -84,10 +84,10 @@
         },
         {
           "status": "planned",
-          "control": "Operators should pair ARC mediation with OS or container sandboxing, least-privilege filesystem access, and outbound-network restrictions."
+          "control": "Operators should pair Chio mediation with OS or container sandboxing, least-privilege filesystem access, and outbound-network restrictions."
         }
       ],
-      "residualRisk": "ARC mediation does not by itself sandbox arbitrary tool-server code; a compromised tool process can still abuse whatever host privileges the operator granted it."
+      "residualRisk": "Chio mediation does not by itself sandbox arbitrary tool-server code; a compromised tool process can still abuse whatever host privileges the operator granted it."
     },
     {
       "id": "native_channel_replay",
@@ -98,7 +98,7 @@
       "mitigations": [
         {
           "status": "existing",
-          "control": "ARC-native DPoP can bind a request to capability id, tool target, action hash, freshness, sender key, and nonce uniqueness."
+          "control": "Chio-native DPoP can bind a request to capability id, tool target, action hash, freshness, sender key, and nonce uniqueness."
         },
         {
           "status": "existing",
@@ -131,7 +131,7 @@
         },
         {
           "status": "planned",
-          "control": "Operators should bound retained replay buffers, queues, and per-session state and pair ARC with upstream load shedding."
+          "control": "Operators should bound retained replay buffers, queues, and per-session state and pair Chio with upstream load shedding."
         }
       ],
       "residualRisk": "Size checks and lifecycle rules reduce but do not eliminate asymmetric workload attacks, and authenticated callers can still consume their own allowed quota share."
@@ -151,7 +151,7 @@
         },
         {
           "status": "existing",
-          "control": "ARC core exposes delegation-chain and attenuation validators and the runtime already carries revocation state."
+          "control": "Chio core exposes delegation-chain and attenuation validators and the runtime already carries revocation state."
         },
         {
           "status": "planned",

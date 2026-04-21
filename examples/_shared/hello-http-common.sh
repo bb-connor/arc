@@ -56,11 +56,11 @@ PY
 }
 
 ensure_arc_bin() {
-  local arc_bin="${ROOT}/target/debug/arc"
-  if [[ ! -x "${arc_bin}" ]]; then
+  local chio_bin="${ROOT}/target/debug/arc"
+  if [[ ! -x "${chio_bin}" ]]; then
     (cd "${ROOT}" && cargo build --bin arc >/dev/null)
   fi
-  printf '%s\n' "${arc_bin}"
+  printf '%s\n' "${chio_bin}"
 }
 
 issue_demo_capability() {

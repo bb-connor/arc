@@ -7,7 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { HttpReceipt, Verdict, GuardEvidence } from "@arc-protocol/node-http";
+import type { HttpReceipt, Verdict, GuardEvidence } from "@chio-protocol/node-http";
 import { canonicalJsonString } from "./canonical.js";
 
 /**

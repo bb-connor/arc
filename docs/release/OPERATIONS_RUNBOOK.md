@@ -1,7 +1,7 @@
 # Operations Runbook
 
 This runbook covers the supported self-hosted operator surfaces for the current
-bounded ARC release candidate:
+bounded Chio release candidate:
 
 - `arc trust serve` for the trust-control plane
 - `arc mcp serve-http` for a hosted remote MCP edge
@@ -86,12 +86,12 @@ Bounded hosted/auth recommendation:
 
 Hosted session lifecycle tuning now uses these canonical env names:
 
-- `ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS`
-- `ARC_MCP_SESSION_DRAIN_GRACE_MILLIS`
-- `ARC_MCP_SESSION_REAPER_INTERVAL_MILLIS`
-- `ARC_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS`
+- `CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS`
+- `CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS`
+- `CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS`
+- `CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS`
 
-Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
+Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
 
 ## 2. Initial Deployment Procedure
 
@@ -111,7 +111,7 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
    ```bash
    arc trust serve \
      --listen 127.0.0.1:8940 \
-     --service-token "$ARC_SERVICE_TOKEN" \
+     --service-token "$CHIO_SERVICE_TOKEN" \
      --receipt-db /var/lib/arc/receipts.sqlite3 \
      --revocation-db /var/lib/arc/revocations.sqlite3 \
      --authority-db /var/lib/arc/authority.sqlite3 \
@@ -126,7 +126,7 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $ARC_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    ```
 
@@ -139,8 +139,8 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
      --policy examples/policies/canonical-hushspec.yaml \
      --server-id demo-server \
      --listen 127.0.0.1:8931 \
-     --auth-token "$ARC_EDGE_TOKEN" \
-     --admin-token "$ARC_ADMIN_TOKEN" \
+     --auth-token "$CHIO_EDGE_TOKEN" \
+     --admin-token "$CHIO_ADMIN_TOKEN" \
      --receipt-db /var/lib/arc/edge-receipts.sqlite3 \
      --revocation-db /var/lib/arc/edge-revocations.sqlite3 \
      --authority-db /var/lib/arc/edge-authority.sqlite3 \
@@ -152,15 +152,15 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
 2. Initialize one session and confirm the admin diagnostics surface:
 
    ```bash
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
 ### Dashboard
 
-The dashboard is served by `arc trust serve` from `crates/arc-cli/dashboard/dist`.
+The dashboard is served by `arc trust serve` from `crates/chio-cli/dashboard/dist`.
 Build it before deployment:
 
 ```bash
@@ -193,9 +193,9 @@ Minimum deploy-time smoke checks:
 ```bash
 ./scripts/check-release-inputs.sh
 ./scripts/check-dashboard-release.sh
-./scripts/check-arc-ts-release.sh
-./scripts/check-arc-py-release.sh
-./scripts/check-arc-go-release.sh
+./scripts/check-chio-ts-release.sh
+./scripts/check-chio-py-release.sh
+./scripts/check-chio-go-release.sh
 ```
 
 ### Launch And Partner Evidence Handoff
@@ -210,8 +210,8 @@ Before promoting a candidate outside the operator boundary, archive and attach:
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 - [RELEASE_AUDIT.md](RELEASE_AUDIT.md)
 - [PARTNER_PROOF.md](PARTNER_PROOF.md)
-- [ARC_RECEIPTS_PROFILE.md](../standards/ARC_RECEIPTS_PROFILE.md)
-- [ARC_PORTABLE_TRUST_PROFILE.md](../standards/ARC_PORTABLE_TRUST_PROFILE.md)
+- [CHIO_RECEIPTS_PROFILE.md](../standards/CHIO_RECEIPTS_PROFILE.md)
+- [CHIO_PORTABLE_TRUST_PROFILE.md](../standards/CHIO_PORTABLE_TRUST_PROFILE.md)
 
 Do not promote from local qualification evidence alone. Hosted `CI` and
 `Release Qualification` workflow results are still required before external
@@ -255,11 +255,11 @@ Record the binary version and git commit used for the backup snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $ARC_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
@@ -269,7 +269,7 @@ Record the binary version and git commit used for the backup snapshot.
 2. Build or obtain the exact candidate binary set.
 3. Take backups using the backup procedure above.
 4. Stop write traffic or drain external callers.
-5. Stop the running ARC processes.
+5. Stop the running Chio processes.
 6. Replace the binary with the qualified candidate.
 7. Restart `arc trust serve` first, then any dependent `arc mcp serve-http`
    edges.
@@ -277,20 +277,20 @@ Record the binary version and git commit used for the backup snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $ARC_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/internal/cluster/status | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
 9. If SDK artifacts are being published with the same release, run:
 
    ```bash
-   ./scripts/check-arc-ts-release.sh
-   ./scripts/check-arc-py-release.sh
-   ./scripts/check-arc-go-release.sh
+   ./scripts/check-chio-ts-release.sh
+   ./scripts/check-chio-py-release.sh
+   ./scripts/check-chio-go-release.sh
    ```
 
 ## 7. Rollback Procedure

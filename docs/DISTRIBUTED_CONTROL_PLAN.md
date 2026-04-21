@@ -26,7 +26,7 @@ The previous trust story was strong inside one process, but weak across a fleet:
 
 That was enough for single-node hosting. It was not enough for a real distributed deployment.
 
-The rewrite target was to move ARC from:
+The rewrite target was to move Chio from:
 
 - embedded trust persistence attached to one runtime
 
@@ -38,11 +38,11 @@ to:
 
 The codebase already had the right extension points:
 
-- `CapabilityAuthority` in `crates/arc-kernel/src/authority.rs`
-- `RevocationStore` in `crates/arc-kernel/src/lib.rs`
-- `ReceiptStore` in `crates/arc-kernel/src/lib.rs`
-- hosted admin surfaces in `crates/arc-cli/src/remote_mcp.rs`
-- centralized CLI/runtime wiring in `crates/arc-cli/src/main.rs`
+- `CapabilityAuthority` in `crates/chio-kernel/src/authority.rs`
+- `RevocationStore` in `crates/chio-kernel/src/lib.rs`
+- `ReceiptStore` in `crates/chio-kernel/src/lib.rs`
+- hosted admin surfaces in `crates/chio-cli/src/remote_mcp.rs`
+- centralized CLI/runtime wiring in `crates/chio-cli/src/main.rs`
 
 That meant the rewrite did not need a new kernel model. It needed a new control-plane implementation behind the existing interfaces.
 
@@ -50,7 +50,7 @@ That meant the rewrite did not need a new kernel model. It needed a new control-
 
 ### 1. Shared trust-control service
 
-The service lives in `crates/arc-cli/src/trust_control.rs` and exposes:
+The service lives in `crates/chio-cli/src/trust_control.rs` and exposes:
 
 - `GET /health`
 - `GET /v1/authority`
@@ -73,7 +73,7 @@ Hosted runtimes now attach remote-backed implementations for:
 - `RevocationStore`
 - `ReceiptStore`
 
-Those clients are also in `crates/arc-cli/src/trust_control.rs`.
+Those clients are also in `crates/chio-cli/src/trust_control.rs`.
 
 The runtime selection rule is:
 

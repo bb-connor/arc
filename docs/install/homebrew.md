@@ -1,4 +1,4 @@
-# Homebrew Tap for ARC
+# Homebrew Tap for Chio
 
 ## One-line install
 

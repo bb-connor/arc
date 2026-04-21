@@ -5,10 +5,10 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 
-PACKAGE="${ARC_REBUILD_PACKAGE:-hello-tool}"
-BASELINE_TOUCH="${ARC_REBUILD_BASELINE_TOUCH:-crates/arc-core/src/capability.rs}"
-SPLIT_TOUCH="${ARC_REBUILD_SPLIT_TOUCH:-crates/arc-core-types/src/capability.rs}"
-SPLIT_REF="${ARC_REBUILD_SPLIT_REF:-HEAD}"
+PACKAGE="${CHIO_REBUILD_PACKAGE:-hello-tool}"
+BASELINE_TOUCH="${CHIO_REBUILD_BASELINE_TOUCH:-crates/chio-core/src/capability.rs}"
+SPLIT_TOUCH="${CHIO_REBUILD_SPLIT_TOUCH:-crates/chio-core-types/src/capability.rs}"
+SPLIT_REF="${CHIO_REBUILD_SPLIT_REF:-HEAD}"
 
 FIRST_SPLIT_COMMIT=$(
     git -C "$REPO_ROOT" log \
@@ -22,9 +22,9 @@ if [[ -z "$FIRST_SPLIT_COMMIT" ]]; then
     exit 1
 fi
 
-BASELINE_REF="${ARC_REBUILD_BASELINE_REF:-${FIRST_SPLIT_COMMIT}^}"
+BASELINE_REF="${CHIO_REBUILD_BASELINE_REF:-${FIRST_SPLIT_COMMIT}^}"
 
-TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/arc-core-rebuild.XXXXXX")
+TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/chio-core-rebuild.XXXXXX")
 BASELINE_DIR="$TMP_ROOT/baseline"
 SPLIT_DIR="$TMP_ROOT/split"
 

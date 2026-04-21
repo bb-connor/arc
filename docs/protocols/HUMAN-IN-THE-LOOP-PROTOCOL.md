@@ -4,14 +4,14 @@
 > **Priority**: Critical -- review found that 6 of 10 production agent patterns
 > require human-in-the-loop (customer support, CRM, infrastructure, SecOps,
 > trading, data analysis). Elevating from P2 to P0.
-> **Depends on**: `arc-core-types` (GovernedApprovalToken, GovernedTransactionIntent,
-> RequireApprovalAbove, GovernedAutonomyTier), `arc-kernel` (Verdict, Guard trait)
+> **Depends on**: `chio-core-types` (GovernedApprovalToken, GovernedTransactionIntent,
+> RequireApprovalAbove, GovernedAutonomyTier), `chio-kernel` (Verdict, Guard trait)
 
 ---
 
 ## 1. Motivation
 
-ARC governs tool calls with a fail-closed guard pipeline: every invocation
+Chio governs tool calls with a fail-closed guard pipeline: every invocation
 is evaluated against capability grants and guard policies before execution.
 Today the pipeline produces a binary verdict -- Allow or Deny -- synchronously.
 There is no mechanism for a guard to say "this needs a human decision before
@@ -24,17 +24,17 @@ and a human reviews later. Pending approval blocks execution.
 
 ### Existing Primitives
 
-ARC already has the building blocks but no protocol connecting them:
+Chio already has the building blocks but no protocol connecting them:
 
 | Primitive | Location | Role |
 |-----------|----------|------|
-| `RequireApprovalAbove { threshold_units }` | `Constraint` enum in `arc-core-types` | Grant-level policy: calls above threshold need approval |
-| `GovernedAutonomyTier` (Direct, Delegated, Autonomous) | `arc-core-types` | Classifies how much autonomy the agent has |
-| `GovernedTransactionIntent` | `arc-core-types` | Structured intent bound to a governed call |
-| `GovernedApprovalToken` | `arc-core-types` | Signed approval artifact bound to one intent and one request |
-| `GovernedApprovalDecision` (Approved, Denied) | `arc-core-types` | Decision enum on the token |
-| `Verdict` (Allow, Deny) | `arc-kernel::runtime` | Kernel's internal evaluation result |
-| `Decision` (Allow, Deny, Cancelled, Incomplete) | `arc-core-types::receipt` | Receipt-level decision record |
+| `RequireApprovalAbove { threshold_units }` | `Constraint` enum in `chio-core-types` | Grant-level policy: calls above threshold need approval |
+| `GovernedAutonomyTier` (Direct, Delegated, Autonomous) | `chio-core-types` | Classifies how much autonomy the agent has |
+| `GovernedTransactionIntent` | `chio-core-types` | Structured intent bound to a governed call |
+| `GovernedApprovalToken` | `chio-core-types` | Signed approval artifact bound to one intent and one request |
+| `GovernedApprovalDecision` (Approved, Denied) | `chio-core-types` | Decision enum on the token |
+| `Verdict` (Allow, Deny) | `chio-kernel::runtime` | Kernel's internal evaluation result |
+| `Decision` (Allow, Deny, Cancelled, Incomplete) | `chio-core-types::receipt` | Receipt-level decision record |
 
 This protocol connects these primitives into a complete async approval flow.
 
@@ -321,7 +321,7 @@ pub struct ApprovalRequest {
 The human's decision is encoded in the existing `GovernedApprovalToken`:
 
 ```rust
-/// Already exists in arc-core-types::capability.
+/// Already exists in chio-core-types::capability.
 pub struct GovernedApprovalToken {
     pub id: String,
     pub approver: PublicKey,
@@ -433,7 +433,7 @@ pub struct ChannelHandle {
 | `WebhookChannel` | HTTP POST to configured endpoint | Low | Custom dashboards, internal tools |
 | `SlackChannel` | Slack Block Kit message with approve/deny buttons | Low | Teams already on Slack |
 | `EmailChannel` | Email with signed action links | Medium | Compliance-heavy environments |
-| `DashboardChannel` | WebSocket push to ARC dashboard | Low | Ops teams monitoring in real time |
+| `DashboardChannel` | WebSocket push to Chio dashboard | Low | Ops teams monitoring in real time |
 | `ApiPollChannel` | Stores request; human polls `/approvals/pending` | Varies | Programmatic approval workflows |
 
 ### Webhook Channel Example
@@ -456,12 +456,12 @@ impl ApprovalChannel for WebhookChannel {
             callback_url: format!("/approvals/{}/respond", request.id),
         };
 
-        // Sign the payload so the receiver can verify it came from ARC.
+        // Sign the payload so the receiver can verify it came from Chio.
         let signature = self.signing_key.sign_canonical(&payload)?;
 
         let response = self.http_client
             .post(self.endpoint.clone())
-            .header("X-ARC-Signature", signature.to_hex())
+            .header("X-Chio-Signature", signature.to_hex())
             .json(&payload)
             .send()
             .await?;
@@ -964,17 +964,17 @@ LangGraph's `interrupt()` maps directly to `Verdict::PendingApproval`:
 
 ```python
 from langgraph.types import interrupt
-from arc_langgraph import ArcNodeContext
+from chio_langgraph import ChioNodeContext
 
 async def tool_node(state, config):
-    arc_ctx = ArcNodeContext.from_config(config)
-    result = await arc_ctx.call_tool("charge", {"amount": 450})
+    chio_ctx = ChioNodeContext.from_config(config)
+    result = await chio_ctx.call_tool("charge", {"amount": 450})
 
     if result.verdict == "pending_approval":
         # LangGraph interrupt() suspends the graph.
         # The approval request is stored in graph state.
         approval = interrupt({
-            "type": "arc_approval",
+            "type": "chio_approval",
             "approval_request": result.approval_request,
             "action_url": result.approval_request.action_url,
         })
@@ -984,7 +984,7 @@ async def tool_node(state, config):
 
         # Graph resumes here after human approves.
         # Re-submit with the approval token.
-        result = await arc_ctx.call_tool(
+        result = await chio_ctx.call_tool(
             "charge",
             {"amount": 450},
             approval_token=approval["token"],
@@ -993,10 +993,10 @@ async def tool_node(state, config):
     return {"result": result.output}
 ```
 
-The `arc_langgraph` SDK handles this automatically in `arc_approval_node`:
+The `chio_langgraph` SDK handles this automatically in `chio_approval_node`:
 
 ```python
-@arc_approval_node(
+@chio_approval_node(
     scope="tools:payment",
     approval_config={
         "approvers": ["finance-lead"],
@@ -1063,8 +1063,8 @@ Prefect's `pause_flow_run` maps to the approval wait:
 from prefect import flow, task, pause_flow_run
 
 @task
-async def call_tool_with_approval(tool_name, args, arc_client):
-    result = await arc_client.call_tool(tool_name, args)
+async def call_tool_with_approval(tool_name, args, chio_client):
+    result = await chio_client.call_tool(tool_name, args)
 
     if result.verdict == "pending_approval":
         # Prefect suspends the flow run and waits for manual resume.
@@ -1072,14 +1072,14 @@ async def call_tool_with_approval(tool_name, args, arc_client):
         approval = await pause_flow_run(
             wait_for_input=ApprovalInput,
             timeout=result.approval_request.deadline - time.time(),
-            key=f"arc-approval-{result.approval_request.id}",
+            key=f"chio-approval-{result.approval_request.id}",
         )
 
         if approval.decision == "denied":
             raise ToolDeniedError("Human denied the request")
 
         # Resume with approval token
-        result = await arc_client.call_tool(
+        result = await chio_client.call_tool(
             tool_name, args,
             approval_token=approval.token,
         )
@@ -1392,7 +1392,7 @@ mechanisms working together:
    exceeding `MAX_APPROVAL_TTL_SECS` (1 hour). This prevents long-lived
    tokens from outliving the replay store.
 4. **Single-use consumption store** -- an LRU replay store
-   (`approval_replay_store` on `ArcKernel`) records consumed
+   (`approval_replay_store` on `ChioKernel`) records consumed
    `(request_id, intent_hash)` pairs. A token presented a second time is
    rejected with "replay detected". The store's TTL equals
    `MAX_APPROVAL_TTL_SECS`, which is always >= any valid token's lifetime
@@ -1400,7 +1400,7 @@ mechanisms working together:
    it can be evicted from the store, closing the cache-eviction replay
    window.
 
-Implementation: `crates/arc-kernel/src/kernel/mod.rs`, steps 7-8 of
+Implementation: `crates/chio-kernel/src/kernel/mod.rs`, steps 7-8 of
 `validate_governed_approval_token()`.
 
 ### Separation of Concerns
@@ -1472,12 +1472,12 @@ timeout_seconds = 3600
 
 ### Phase 1: Kernel Verdict Extension
 
-1. Add `PendingApproval` variant to `Verdict` in `arc-kernel::runtime`.
+1. Add `PendingApproval` variant to `Verdict` in `chio-kernel::runtime`.
 2. Add `PendingApproval`, `ApprovedAndExecuted`, `HumanDenied` variants
-   to `Decision` in `arc-core-types::receipt`.
+   to `Decision` in `chio-core-types::receipt`.
 3. Update kernel evaluation loop for ternary verdicts.
 4. Add `ApprovalStore` and `BatchApprovalStore` traits.
-5. Add SQLite implementation in `arc-store-sqlite`.
+5. Add SQLite implementation in `chio-store-sqlite`.
 
 ### Phase 2: Approval Guard and HTTP API
 
@@ -1495,16 +1495,16 @@ timeout_seconds = 3600
 
 ### Phase 4: Framework Integration
 
-1. Update `arc-langgraph` with `arc_approval_node` wrapper.
-2. Update `arc-temporal` with Signal-based approval flow.
-3. Update `arc-prefect` with `pause_flow_run` integration.
+1. Update `chio-langgraph` with `chio_approval_node` wrapper.
+2. Update `chio-temporal` with Signal-based approval flow.
+3. Update `chio-prefect` with `pause_flow_run` integration.
 4. Publish SDK updates with approval-aware `call_tool` methods.
 
 ---
 
 ## 18. Open Questions
 
-1. **Multi-approver quorum.** Should ARC support "2 of 3 must approve"
+1. **Multi-approver quorum.** Should Chio support "2 of 3 must approve"
    policies? The current design is single-approver. Quorum adds complexity
    but is required for high-value operations in regulated environments.
 
@@ -1517,7 +1517,7 @@ timeout_seconds = 3600
    the approval token to carry amended parameters and the kernel to
    re-bind the intent.
 
-4. **Cross-kernel approval.** In federated ARC deployments, can an approval
+4. **Cross-kernel approval.** In federated Chio deployments, can an approval
    from kernel A satisfy a pending request on kernel B? This requires
    cross-kernel trust roots.
 

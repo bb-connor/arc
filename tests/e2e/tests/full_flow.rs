@@ -1,19 +1,19 @@
-//! End-to-end integration tests for the ARC runtime stack.
+//! End-to-end integration tests for the Chio runtime stack.
 //!
 //! Each test exercises the full pipeline: kernel + guards + capability
 //! validation + receipt signing, all in-process with no I/O.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use arc_core::capability::{
-    ArcScope, CapabilityToken, CapabilityTokenBody, DelegationLink, DelegationLinkBody, Operation,
+use chio_core::capability::{
+    ChioScope, CapabilityToken, CapabilityTokenBody, DelegationLink, DelegationLinkBody, Operation,
     ToolGrant,
 };
-use arc_core::crypto::Keypair;
-use arc_core::receipt::{ArcReceipt, ChildRequestReceipt};
-use arc_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
-use arc_kernel::{
-    ArcKernel, CapabilitySnapshot, Guard, GuardContext, KernelConfig, KernelError, ReceiptStore,
+use chio_core::crypto::Keypair;
+use chio_core::receipt::{ChioReceipt, ChildRequestReceipt};
+use chio_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
+use chio_kernel::{
+    ChioKernel, CapabilitySnapshot, Guard, GuardContext, KernelConfig, KernelError, ReceiptStore,
     ReceiptStoreError, ToolCallOutput, ToolCallRequest, ToolServerConnection, Verdict,
 };
 use std::collections::HashMap;
@@ -31,7 +31,7 @@ impl InMemoryReceiptStore {
 }
 
 impl ReceiptStore for InMemoryReceiptStore {
-    fn append_arc_receipt(&mut self, _receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_arc_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
@@ -73,7 +73,7 @@ impl ReceiptStore for InMemoryReceiptStore {
 // Test helpers
 /// Create a kernel with the default guard pipeline (forbidden_path +
 /// shell_command + egress_allowlist) and an echo tool server on "srv".
-fn make_kernel_with_guards() -> (ArcKernel, Keypair) {
+fn make_kernel_with_guards() -> (ChioKernel, Keypair) {
     let kp = Keypair::generate();
     let config = KernelConfig {
         keypair: kp.clone(),
@@ -83,13 +83,13 @@ fn make_kernel_with_guards() -> (ArcKernel, Keypair) {
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
-        max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
-        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
-    let mut kernel = ArcKernel::new(config);
+    let mut kernel = ChioKernel::new(config);
     kernel.set_receipt_store(Box::new(InMemoryReceiptStore::new()));
     kernel.register_tool_server(Box::new(EchoServer("srv")));
     kernel.add_guard(Box::new(GuardPipeline::default_pipeline()));
@@ -97,7 +97,7 @@ fn make_kernel_with_guards() -> (ArcKernel, Keypair) {
 }
 
 /// Create a bare kernel (no guards) with an echo tool server on "srv".
-fn make_kernel_bare() -> (ArcKernel, Keypair) {
+fn make_kernel_bare() -> (ChioKernel, Keypair) {
     let kp = Keypair::generate();
     let config = KernelConfig {
         keypair: kp.clone(),
@@ -107,24 +107,24 @@ fn make_kernel_bare() -> (ArcKernel, Keypair) {
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
-        max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
-        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
-    let mut kernel = ArcKernel::new(config);
+    let mut kernel = ChioKernel::new(config);
     kernel.set_receipt_store(Box::new(InMemoryReceiptStore::new()));
     kernel.register_tool_server(Box::new(EchoServer("srv")));
     (kernel, kp)
 }
 
 /// Issue a capability from the kernel granting wildcard access on "srv".
-fn issue_wildcard_cap(kernel: &ArcKernel, agent_pk: &arc_core::PublicKey) -> CapabilityToken {
+fn issue_wildcard_cap(kernel: &ChioKernel, agent_pk: &chio_core::PublicKey) -> CapabilityToken {
     kernel
         .issue_capability(
             agent_pk,
-            ArcScope {
+            ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: "*".to_string(),
@@ -135,7 +135,7 @@ fn issue_wildcard_cap(kernel: &ArcKernel, agent_pk: &arc_core::PublicKey) -> Cap
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..ArcScope::default()
+                ..ChioScope::default()
             },
             300,
         )
@@ -144,15 +144,15 @@ fn issue_wildcard_cap(kernel: &ArcKernel, agent_pk: &arc_core::PublicKey) -> Cap
 
 /// Issue a capability scoped to a single tool on "srv".
 fn issue_tool_cap(
-    kernel: &ArcKernel,
-    agent_pk: &arc_core::PublicKey,
+    kernel: &ChioKernel,
+    agent_pk: &chio_core::PublicKey,
     tool: &str,
     ttl: u64,
 ) -> CapabilityToken {
     kernel
         .issue_capability(
             agent_pk,
-            ArcScope {
+            ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: tool.to_string(),
@@ -163,7 +163,7 @@ fn issue_tool_cap(
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..ArcScope::default()
+                ..ChioScope::default()
             },
             ttl,
         )
@@ -207,7 +207,7 @@ impl ToolServerConnection for EchoServer {
         &self,
         tool_name: &str,
         arguments: serde_json::Value,
-        _nested_flow_bridge: Option<&mut dyn arc_kernel::NestedFlowBridge>,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
         Ok(serde_json::json!({
             "tool": tool_name,
@@ -384,7 +384,7 @@ async fn full_flow_revocation_cascade() {
     let cap_a = kernel
         .issue_capability(
             &agent_a_kp.public_key(),
-            ArcScope {
+            ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: "*".to_string(),
@@ -395,7 +395,7 @@ async fn full_flow_revocation_cascade() {
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..ArcScope::default()
+                ..ChioScope::default()
             },
             300,
         )
@@ -421,7 +421,7 @@ async fn full_flow_revocation_cascade() {
         id: format!("cap-delegated-{now}"),
         issuer: ca_kp.public_key(),
         subject: agent_b_kp.public_key(),
-        scope: ArcScope {
+        scope: ChioScope {
             grants: vec![ToolGrant {
                 server_id: "srv".to_string(),
                 tool_name: "*".to_string(),
@@ -432,7 +432,7 @@ async fn full_flow_revocation_cascade() {
                 max_total_cost: None,
                 dpop_required: None,
             }],
-            ..ArcScope::default()
+            ..ChioScope::default()
         },
         issued_at: now,
         expires_at: now + 300,
@@ -594,13 +594,13 @@ async fn full_flow_guard_pipeline_mixed_verdicts() {
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
-        max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
-        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
-    let mut kernel = ArcKernel::new(config);
+    let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
 
     // Add only the forbidden-path and shell-command guards.
@@ -663,7 +663,7 @@ async fn full_flow_budget_exhaustion() {
     let cap = kernel
         .issue_capability(
             &agent_kp.public_key(),
-            ArcScope {
+            ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: "echo".to_string(),
@@ -674,7 +674,7 @@ async fn full_flow_budget_exhaustion() {
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..ArcScope::default()
+                ..ChioScope::default()
             },
             300,
         )
@@ -760,7 +760,7 @@ async fn full_flow_untrusted_issuer() {
         id: "cap-rogue".to_string(),
         issuer: rogue_kp.public_key(),
         subject: agent_kp.public_key(),
-        scope: ArcScope {
+        scope: ChioScope {
             grants: vec![ToolGrant {
                 server_id: "srv".to_string(),
                 tool_name: "*".to_string(),
@@ -771,7 +771,7 @@ async fn full_flow_untrusted_issuer() {
                 max_total_cost: None,
                 dpop_required: None,
             }],
-            ..ArcScope::default()
+            ..ChioScope::default()
         },
         issued_at: now,
         expires_at: now + 300,

@@ -1,0 +1,194 @@
+//! OCSF exporter for Chio receipts.
+//!
+//! This exporter transforms each [`SiemEvent`] into an OCSF 1.3.0
+//! Authorization event (class_uid 3002) using [`receipt_to_ocsf`] and forwards
+//! the resulting JSON to a configurable HTTPS sink (for example, AWS Security
+//! Lake's custom source ingestion endpoint or a Splunk OCSF add-on receiver).
+//!
+//! The exporter emits one JSON object per receipt. Two on-the-wire payload
+//! modes are supported:
+//!
+//! - [`OcsfPayloadFormat::JsonArray`]: the batch is sent as a single JSON
+//!   array.
+//! - [`OcsfPayloadFormat::Ndjson`]: the batch is sent as newline-delimited
+//!   JSON (one object per line) -- the format expected by the Splunk HEC
+//!   `/services/collector/raw` endpoint and by Fluent Bit's `http` output.
+//!
+//! The exporter can also be used purely as a formatter: call
+//! [`OcsfExporter::format_events`] to get the per-event JSON objects without
+//! making any network calls.
+
+use crate::event::SiemEvent;
+use crate::exporter::{ExportError, ExportFuture, Exporter};
+use crate::ocsf::receipt_to_ocsf;
+
+/// Payload serialization format for the OCSF exporter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OcsfPayloadFormat {
+    /// Send the batch as a single JSON array: `[{...}, {...}]`.
+    JsonArray,
+    /// Send the batch as newline-delimited JSON objects.
+    #[default]
+    Ndjson,
+}
+
+/// Configuration for the OCSF exporter.
+#[derive(Debug, Clone, Default)]
+pub struct OcsfExporterConfig {
+    /// HTTPS endpoint that accepts OCSF events.
+    ///
+    /// Leave empty when the exporter is used purely as a formatter (tests
+    /// or in-process consumers); in that case [`Exporter::export_batch`]
+    /// will not attempt a network call.
+    pub endpoint: String,
+    /// Optional bearer token sent as `Authorization: Bearer <token>`.
+    pub bearer_token: Option<String>,
+    /// On-the-wire format for the batch payload.
+    pub payload_format: OcsfPayloadFormat,
+    /// Content type sent with the request. When omitted, a sensible default
+    /// is chosen based on [`OcsfPayloadFormat`]:
+    /// `application/json` for [`OcsfPayloadFormat::JsonArray`] and
+    /// `application/x-ndjson` for [`OcsfPayloadFormat::Ndjson`].
+    pub content_type: Option<String>,
+}
+
+/// Exporter that transforms Chio receipts into OCSF 1.3.0 Authorization events
+/// before forwarding them to an HTTPS sink.
+pub struct OcsfExporter {
+    config: OcsfExporterConfig,
+    client: reqwest::Client,
+}
+
+impl OcsfExporter {
+    /// Construct a new [`OcsfExporter`].
+    ///
+    /// Returns an error when the HTTP client cannot be built. If `endpoint`
+    /// is empty the exporter operates as an in-process formatter and will
+    /// short-circuit network delivery in [`Exporter::export_batch`].
+    pub fn new(config: OcsfExporterConfig) -> Result<Self, ExportError> {
+        let client = reqwest::Client::builder()
+            .build()
+            .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
+        Ok(Self { config, client })
+    }
+
+    /// Produce one OCSF JSON object per receipt without performing I/O.
+    ///
+    /// Useful for embedding the OCSF transform into other exporters or for
+    /// tests that want to assert on the mapped shape directly.
+    #[must_use]
+    pub fn format_events(events: &[SiemEvent]) -> Vec<serde_json::Value> {
+        events
+            .iter()
+            .map(|ev| receipt_to_ocsf(&ev.receipt))
+            .collect()
+    }
+
+    /// Serialize a batch of OCSF events into the on-the-wire body for the
+    /// configured [`OcsfPayloadFormat`].
+    fn serialize_body(&self, events: &[SiemEvent]) -> Result<String, ExportError> {
+        let mapped = Self::format_events(events);
+        match self.config.payload_format {
+            OcsfPayloadFormat::JsonArray => serde_json::to_string(&mapped).map_err(|e| {
+                ExportError::SerializationError(format!(
+                    "failed to serialize OCSF JSON array batch: {e}"
+                ))
+            }),
+            OcsfPayloadFormat::Ndjson => {
+                let mut body = String::new();
+                for value in mapped {
+                    let line = serde_json::to_string(&value).map_err(|e| {
+                        ExportError::SerializationError(format!(
+                            "failed to serialize OCSF event: {e}"
+                        ))
+                    })?;
+                    body.push_str(&line);
+                    body.push('\n');
+                }
+                Ok(body)
+            }
+        }
+    }
+
+    fn default_content_type(&self) -> &'static str {
+        match self.config.payload_format {
+            OcsfPayloadFormat::JsonArray => "application/json",
+            OcsfPayloadFormat::Ndjson => "application/x-ndjson",
+        }
+    }
+}
+
+impl Exporter for OcsfExporter {
+    fn name(&self) -> &str {
+        "ocsf"
+    }
+
+    fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
+        Box::pin(async move {
+            if events.is_empty() {
+                return Ok(0);
+            }
+
+            let body = self.serialize_body(events)?;
+
+            // Formatter-only mode: endpoint is empty, so skip the network
+            // call. The serialize step above still validates that every
+            // event maps cleanly.
+            if self.config.endpoint.is_empty() {
+                return Ok(events.len());
+            }
+
+            let content_type = self
+                .config
+                .content_type
+                .as_deref()
+                .unwrap_or_else(|| self.default_content_type())
+                .to_string();
+
+            let mut request = self
+                .client
+                .post(&self.config.endpoint)
+                .header("Content-Type", content_type)
+                .body(body);
+
+            if let Some(token) = &self.config.bearer_token {
+                request = request.header("Authorization", format!("Bearer {token}"));
+            }
+
+            let response = request
+                .send()
+                .await
+                .map_err(|e| ExportError::HttpError(format!("OCSF sink request failed: {e}")))?;
+
+            let status = response.status();
+            if !status.is_success() {
+                let body_text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "<unreadable body>".to_string());
+                return Err(ExportError::HttpError(format!(
+                    "OCSF sink returned {status}: {body_text}"
+                )));
+            }
+
+            Ok(events.len())
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_payload_format_is_ndjson() {
+        assert_eq!(OcsfPayloadFormat::default(), OcsfPayloadFormat::Ndjson);
+    }
+
+    #[test]
+    fn default_config_has_empty_endpoint() {
+        let cfg = OcsfExporterConfig::default();
+        assert!(cfg.endpoint.is_empty());
+        assert!(cfg.bearer_token.is_none());
+    }
+}

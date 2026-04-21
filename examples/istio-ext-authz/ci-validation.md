@@ -25,7 +25,7 @@ kubeconform \
   -kubernetes-version 1.28.0 \
   -schema-location default \
   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-  examples/istio-ext-authz/00-arc-sidecar-deployment.yaml \
+  examples/istio-ext-authz/00-chio-sidecar-deployment.yaml \
   examples/istio-ext-authz/01-meshconfig-patch.yaml \
   examples/istio-ext-authz/02-authorization-policy.yaml \
   examples/istio-ext-authz/03-demo-workload.yaml

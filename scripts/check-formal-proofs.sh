@@ -114,7 +114,7 @@ except ModuleNotFoundError:
 
 manifest_text = manifest_path.read_text(encoding="utf-8")
 manifest = tomllib.loads(manifest_text) if tomllib else parse_manifest_subset(manifest_text)
-if manifest.get("schema") != "arc.proof-manifest.v1":
+if manifest.get("schema") != "chio.proof-manifest.v1":
     raise SystemExit("proof manifest schema mismatch")
 
 for rel in manifest.get("root_modules", []):
@@ -126,7 +126,7 @@ for rel in manifest.get("covered_rust_modules", []):
         raise SystemExit(f"proof manifest covered module missing: {rel}")
 
 inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-if inventory.get("schema") != "arc.theorem-inventory.v1":
+if inventory.get("schema") != "chio.theorem-inventory.v1":
     raise SystemExit("theorem inventory schema mismatch")
 
 assumptions = inventory.get("assumptions", [])

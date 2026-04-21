@@ -1,4 +1,4 @@
-ARC evidence export
+Chio evidence export
 
 This directory is a local SQLite export assembled by `arc evidence export`.
 It contains signed receipts, checkpoints, inclusion proofs, capability lineage,

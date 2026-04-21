@@ -1,19 +1,19 @@
 /-
   Proofs for capability monotonicity (P1) and related properties.
-  Mirrors: arc-core/src/capability.rs (is_subset_of)
+  Mirrors: chio-kernel-core/src/capability.rs (is_subset_of)
 -/
 
-import Arc.Core.Capability
-import Arc.Core.Scope
-import Arc.Core.Revocation
-import Arc.Spec.Properties
+import Chio.Core.Capability
+import Chio.Core.Scope
+import Chio.Core.Revocation
+import Chio.Spec.Properties
 
 set_option autoImplicit false
 
-namespace Arc.Proofs
+namespace Chio.Proofs
 
-open Arc.Core
-open Arc.Spec
+open Chio.Core
+open Chio.Spec
 
 private theorem any_eq_true_of_mem {α : Type} [BEq α] [LawfulBEq α]
     {x : α} {xs : List α} (h_mem : x ∈ xs) :
@@ -46,12 +46,12 @@ theorem list_isSubsetOf_trans {α : Type} [BEq α] [DecidableEq α] [LawfulBEq �
   exact ⟨z, h_z_mem, beq_iff_eq.mpr (h_xy_eq.trans h_yz_eq)⟩
 
 /-- If child.grants is a sublist of parent.grants (in the subset sense),
-    then ArcScope.isSubsetOf holds. This is the key structural lemma. -/
-theorem scope_subset_of_grants_subset (child parent : ArcScope)
+    then ChioScope.isSubsetOf holds. This is the key structural lemma. -/
+theorem scope_subset_of_grants_subset (child parent : ChioScope)
     (h : ∀ g, g ∈ child.grants →
       ∃ pg, pg ∈ parent.grants ∧ g.isSubsetOf pg = true) :
     child.isSubsetOf parent = true := by
-  unfold ArcScope.isSubsetOf
+  unfold ChioScope.isSubsetOf
   apply List.all_eq_true.mpr
   intro g h_mem
   have ⟨pg, h_pg_mem, h_sub⟩ := h g h_mem
@@ -112,9 +112,9 @@ theorem added_constraint_is_subset
 /-- A delegation chain where each step attenuates produces monotonically
     narrowing scopes. For every adjacent step, every child grant is covered
     by some parent grant. This is the bounded chain-integrity property used
-    by ARC's delegation model today. -/
+    by Chio's delegation model today. -/
 theorem delegation_chain_integrity
-    (scopes : List ArcScope)
+    (scopes : List ChioScope)
     (h_chain : ∀ (i : Nat) (h_next : i + 1 < scopes.length),
       ∀ (h_parent : i < scopes.length),
         (scopes.get ⟨i + 1, h_next⟩).isSubsetOf
@@ -130,4 +130,4 @@ theorem delegation_chain_integrity
     (scopes.get ⟨i + 1, h_next⟩)
     (h_chain i h_next h_parent)
 
-end Arc.Proofs
+end Chio.Proofs

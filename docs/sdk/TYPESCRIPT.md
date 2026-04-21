@@ -1,27 +1,27 @@
-# ARC TypeScript SDK Reference
+# Chio TypeScript SDK Reference
 
-This document covers all five ARC TypeScript packages. Each package communicates with the ARC Rust kernel via a localhost HTTP sidecar. All packages are ESM-first and work with Node.js 18+ and Bun.
+This document covers all five Chio TypeScript packages. Each package communicates with the Chio Rust kernel via a localhost HTTP sidecar. All packages are ESM-first and work with Node.js 18+ and Bun.
 
 ## Quick Start
 
 ```bash
 # Core HTTP substrate (required by framework packages)
-npm install @arc-protocol/node-http
+npm install @chio-protocol/node-http
 
 # Pick your framework integration
-npm install @arc-protocol/express    # Express.js
-npm install @arc-protocol/fastify    # Fastify
-npm install @arc-protocol/elysia     # Elysia (Bun)
+npm install @chio-protocol/express    # Express.js
+npm install @chio-protocol/fastify    # Fastify
+npm install @chio-protocol/elysia     # Elysia (Bun)
 
 # Testing and conformance utilities
-npm install @arc-protocol/conformance --save-dev
+npm install @chio-protocol/conformance --save-dev
 ```
 
 Minimal Express example:
 
 ```ts
 import express from "express";
-import { arc } from "@arc-protocol/express";
+import { arc } from "@chio-protocol/express";
 
 const app = express();
 app.use(arc({ config: "arc.yaml" }));
@@ -36,28 +36,28 @@ app.listen(3000);
 
 ## Sidecar Communication Model
 
-All ARC TypeScript SDKs communicate with the ARC Rust kernel through localhost HTTP. The kernel runs as a sidecar process alongside your application.
+All Chio TypeScript SDKs communicate with the Chio Rust kernel through localhost HTTP. The kernel runs as a sidecar process alongside your application.
 
 - **Default URL**: `http://127.0.0.1:9090`
-- **Configurable via**: `ARC_SIDECAR_URL` environment variable or the `sidecarUrl` config option
+- **Configurable via**: `CHIO_SIDECAR_URL` environment variable or the `sidecarUrl` config option
 - **No native compilation or FFI**: pure TypeScript/JavaScript over HTTP (uses `fetch`)
-- **Fail-closed by default**: when the sidecar is unreachable, requests receive a 502 response. Set `onSidecarError: "allow"` to forward the request without synthesizing an ARC receipt.
+- **Fail-closed by default**: when the sidecar is unreachable, requests receive a 502 response. Set `onSidecarError: "allow"` to forward the request without synthesizing an Chio receipt.
 
 ---
 
-## 1. @arc-protocol/node-http
+## 1. @chio-protocol/node-http
 
 The core HTTP substrate. Provides types, identity extraction, the sidecar client, and request interceptors. All framework packages depend on this.
 
 ### Installation
 
 ```bash
-npm install @arc-protocol/node-http
+npm install @chio-protocol/node-http
 ```
 
 ### Types
 
-All types mirror the Rust `arc-http-core` crate.
+All types mirror the Rust `chio-http-core` crate.
 
 **HttpMethod**
 
@@ -115,7 +115,7 @@ interface HttpReceipt {
   session_id?: string;
   verdict: Verdict;
   evidence: GuardEvidence[];
-  response_status: number; // ARC evaluation-time HTTP status, not guaranteed downstream response evidence for allow-path receipts
+  response_status: number; // Chio evaluation-time HTTP status, not guaranteed downstream response evidence for allow-path receipts
   timestamp: number;
   content_hash: string;
   policy_hash: string;
@@ -136,10 +136,10 @@ interface GuardEvidence {
 }
 ```
 
-**ArcHttpRequest** (sent to sidecar for evaluation)
+**ChioHttpRequest** (sent to sidecar for evaluation)
 
 ```ts
-interface ArcHttpRequest {
+interface ChioHttpRequest {
   request_id: string;
   method: HttpMethod;
   route_pattern: string;
@@ -165,11 +165,11 @@ interface EvaluateResponse {
 }
 ```
 
-**ArcConfig**
+**ChioConfig**
 
 ```ts
-interface ArcConfig {
-  sidecarUrl?: string;             // Default: ARC_SIDECAR_URL env or "http://127.0.0.1:9090"
+interface ChioConfig {
+  sidecarUrl?: string;             // Default: CHIO_SIDECAR_URL env or "http://127.0.0.1:9090"
   config?: string;                 // Path to arc.yaml config file
   identityExtractor?: IdentityExtractor;
   routePatternResolver?: RoutePatternResolver;
@@ -182,23 +182,23 @@ interface ArcConfig {
 **Error codes**
 
 ```ts
-const ARC_ERROR_CODES = {
-  ACCESS_DENIED: "arc_access_denied",
-  SIDECAR_UNREACHABLE: "arc_sidecar_unreachable",
-  EVALUATION_FAILED: "arc_evaluation_failed",
-  INVALID_RECEIPT: "arc_invalid_receipt",
-  TIMEOUT: "arc_timeout",
+const CHIO_ERROR_CODES = {
+  ACCESS_DENIED: "chio_access_denied",
+  SIDECAR_UNREACHABLE: "chio_sidecar_unreachable",
+  EVALUATION_FAILED: "chio_evaluation_failed",
+  INVALID_RECEIPT: "chio_invalid_receipt",
+  TIMEOUT: "chio_timeout",
 } as const;
 ```
 
-### ArcSidecarClient
+### ChioSidecarClient
 
-HTTP client for the ARC sidecar. Uses the Fetch API internally.
+HTTP client for the Chio sidecar. Uses the Fetch API internally.
 
 ```ts
-import { ArcSidecarClient } from "@arc-protocol/node-http";
+import { ChioSidecarClient } from "@chio-protocol/node-http";
 
-const client = new ArcSidecarClient({
+const client = new ChioSidecarClient({
   sidecarUrl: "http://127.0.0.1:9090",
   timeoutMs: 5000,
 });
@@ -219,7 +219,7 @@ Thrown when the sidecar is unreachable or returns an error:
 
 ```ts
 class SidecarError extends Error {
-  readonly code: string;        // e.g., "arc_sidecar_unreachable", "arc_timeout"
+  readonly code: string;        // e.g., "chio_sidecar_unreachable", "chio_timeout"
   readonly statusCode: number | undefined;
 }
 ```
@@ -234,13 +234,13 @@ The default identity extractor checks headers in this order:
 4. Falls back to anonymous
 
 ```ts
-import { defaultIdentityExtractor, sha256Hex } from "@arc-protocol/node-http";
+import { defaultIdentityExtractor, sha256Hex } from "@chio-protocol/node-http";
 
 // Use directly
 const identity = defaultIdentityExtractor(request.headers);
 
 // Provide a custom extractor via config
-const config: ArcConfig = {
+const config: ChioConfig = {
   identityExtractor: (headers) => ({
     subject: "custom-subject",
     auth_method: { method: "bearer", token_hash: sha256Hex("my-token") },
@@ -256,17 +256,17 @@ Two interceptor patterns are provided for direct use (the framework packages use
 **Node.js `(req, res)` pattern:**
 
 ```ts
-import { interceptNodeRequest, resolveConfig } from "@arc-protocol/node-http";
+import { interceptNodeRequest, resolveConfig } from "@chio-protocol/node-http";
 
 const resolved = resolveConfig({ config: "arc.yaml" });
 
 const outcome = await interceptNodeRequest(req, res, resolved);
 if (!outcome.responseSent) {
   if (outcome.result) {
-    // Request allowed with a real ARC receipt.
+    // Request allowed with a real Chio receipt.
   }
   if (outcome.passthrough) {
-    // Fail-open passthrough. No ARC receipt exists for this request.
+    // Fail-open passthrough. No Chio receipt exists for this request.
   }
 }
 ```
@@ -274,15 +274,15 @@ if (!outcome.responseSent) {
 **Web API `Request -> Response` pattern:**
 
 ```ts
-import { interceptWebRequest, resolveConfig } from "@arc-protocol/node-http";
+import { interceptWebRequest, resolveConfig } from "@chio-protocol/node-http";
 
 const resolved = resolveConfig({ config: "arc.yaml" });
 
 const { response, result, passthrough } = await interceptWebRequest(request, resolved);
 if (result != null) {
-  // Allowed with a real ARC receipt. The original Request body remains readable.
+  // Allowed with a real Chio receipt. The original Request body remains readable.
 } else if (passthrough != null) {
-  // Fail-open passthrough. No ARC receipt exists for this request.
+  // Fail-open passthrough. No Chio receipt exists for this request.
 } else {
   // Denied -- return the error response
   return response;
@@ -292,9 +292,9 @@ if (result != null) {
 ### Helper Functions
 
 ```ts
-import { buildArcHttpRequest, resolveConfig } from "@arc-protocol/node-http";
+import { buildArcHttpRequest, resolveConfig } from "@chio-protocol/node-http";
 
-// Build an ArcHttpRequest from parts
+// Build an ChioHttpRequest from parts
 const arcReq = buildArcHttpRequest({
   method: "POST",
   path: "/api/deploy",
@@ -310,25 +310,25 @@ const arcReq = buildArcHttpRequest({
 
 ---
 
-## 2. @arc-protocol/express
+## 2. @chio-protocol/express
 
-Express.js middleware for ARC protocol evaluation.
+Express.js middleware for Chio protocol evaluation.
 
 ### Installation
 
 ```bash
-npm install @arc-protocol/express
+npm install @chio-protocol/express
 ```
 
 ### Basic Usage
 
 ```ts
 import express from "express";
-import { arc, arcErrorHandler } from "@arc-protocol/express";
+import { arc, chioErrorHandler } from "@chio-protocol/express";
 
 const app = express();
 
-// Evaluate every request against ARC
+// Evaluate every request against Chio
 app.use(arc({ config: "arc.yaml" }));
 
 // Routes
@@ -336,19 +336,19 @@ app.get("/pets", (req, res) => {
   res.json([{ name: "Fido" }]);
 });
 
-// Optional: structured error handler for ARC errors
-app.use(arcErrorHandler);
+// Optional: structured error handler for Chio errors
+app.use(chioErrorHandler);
 
 app.listen(3000);
 ```
 
 ### Configuration
 
-`ArcExpressConfig` extends `ArcConfig` with:
+`ChioExpressConfig` extends `ChioConfig` with:
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `skip` | `Array<string \| RegExp>` | Paths to bypass ARC evaluation |
+| `skip` | `Array<string \| RegExp>` | Paths to bypass Chio evaluation |
 
 ```ts
 app.use(arc({
@@ -362,18 +362,18 @@ app.use(arc({
 
 ### Accessing Results
 
-The evaluation result is attached to the request when ARC evaluation succeeds:
+The evaluation result is attached to the request when Chio evaluation succeeds:
 
 ```ts
-import type { ArcRequest } from "@arc-protocol/express";
+import type { ChioRequest } from "@chio-protocol/express";
 
 app.get("/pets", (req, res) => {
-  const arcReq = req as ArcRequest;
+  const arcReq = req as ChioRequest;
   if (arcReq.arcResult) {
     console.log("Receipt ID:", arcReq.arcResult.receipt.id);
   }
   if (arcReq.arcPassthrough) {
-    console.log("ARC passthrough mode:", arcReq.arcPassthrough.mode);
+    console.log("Chio passthrough mode:", arcReq.arcPassthrough.mode);
   }
   res.json([]);
 });
@@ -381,35 +381,35 @@ app.get("/pets", (req, res) => {
 
 ### Error Handler
 
-`arcErrorHandler` is an Express error middleware that formats ARC-related errors as structured JSON:
+`chioErrorHandler` is an Express error middleware that formats Chio-related errors as structured JSON:
 
 ```ts
-app.use(arcErrorHandler);
-// Errors with an `arc_*` code are returned as { error: "arc_...", message: "..." }
+app.use(chioErrorHandler);
+// Errors with a `chio_*` code are returned as { error: "chio_...", message: "..." }
 // Other errors pass through to the next error handler
 ```
 
 ---
 
-## 3. @arc-protocol/fastify
+## 3. @chio-protocol/fastify
 
-Fastify plugin for ARC protocol evaluation.
+Fastify plugin for Chio protocol evaluation.
 
 ### Installation
 
 ```bash
-npm install @arc-protocol/fastify
+npm install @chio-protocol/fastify
 ```
 
 ### Basic Usage
 
 ```ts
 import Fastify from "fastify";
-import { arc } from "@arc-protocol/fastify";
+import { arc } from "@chio-protocol/fastify";
 
 const fastify = Fastify();
 
-// Register the ARC plugin
+// Register the Chio plugin
 await fastify.register(arc, { config: "arc.yaml" });
 
 fastify.get("/pets", async (request, reply) => {
@@ -421,11 +421,11 @@ await fastify.listen({ port: 3000 });
 
 ### Configuration
 
-`ArcFastifyConfig` extends `ArcConfig` with:
+`ChioFastifyConfig` extends `ChioConfig` with:
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `skip` | `Array<string \| RegExp>` | Paths to bypass ARC evaluation |
+| `skip` | `Array<string \| RegExp>` | Paths to bypass Chio evaluation |
 
 ```ts
 await fastify.register(arc, {
@@ -439,7 +439,7 @@ await fastify.register(arc, {
 
 ### Accessing Results
 
-The ARC evaluation result is available on the Fastify request object when ARC evaluation succeeds:
+The Chio evaluation result is available on the Fastify request object when Chio evaluation succeeds:
 
 ```ts
 fastify.get("/pets", async (request, reply) => {
@@ -460,23 +460,23 @@ The plugin is wrapped with `fastify-plugin` to skip Fastify encapsulation, so ho
 
 ---
 
-## 4. @arc-protocol/elysia
+## 4. @chio-protocol/elysia
 
-Elysia lifecycle hook for ARC protocol evaluation. Designed for Bun.
+Elysia lifecycle hook for Chio protocol evaluation. Designed for Bun.
 
 ### Installation
 
 ```bash
-npm install @arc-protocol/elysia
+npm install @chio-protocol/elysia
 # or
-bun add @arc-protocol/elysia
+bun add @chio-protocol/elysia
 ```
 
 ### Basic Usage
 
 ```ts
 import { Elysia } from "elysia";
-import { arc } from "@arc-protocol/elysia";
+import { arc } from "@chio-protocol/elysia";
 
 const app = new Elysia()
   .use(arc({ config: "arc.yaml" }))
@@ -486,11 +486,11 @@ const app = new Elysia()
 
 ### Configuration
 
-`ArcElysiaConfig` extends `ArcConfig` with:
+`ChioElysiaConfig` extends `ChioConfig` with:
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `skip` | `Array<string \| RegExp>` | Paths to bypass ARC evaluation |
+| `skip` | `Array<string \| RegExp>` | Paths to bypass Chio evaluation |
 
 ```ts
 const app = new Elysia()
@@ -510,28 +510,28 @@ The plugin hooks into Elysia's `onBeforeHandle` lifecycle. For each request it:
 1. Checks skip patterns
 2. Extracts caller identity from headers
 3. Computes a SHA-256 body hash
-4. Sends an evaluation request to the ARC sidecar
+4. Sends an evaluation request to the Chio sidecar
 5. Returns a structured error response on deny, or allows the request to proceed
-6. Attaches `X-Arc-Receipt-Id` to the response
+6. Attaches `X-Chio-Receipt-Id` to the response
 
 ---
 
-## 5. @arc-protocol/conformance
+## 5. @chio-protocol/conformance
 
 Test utilities for verifying that TypeScript SDK behavior matches the Rust kernel. Intended for use in integration and conformance test suites.
 
 ### Installation
 
 ```bash
-npm install @arc-protocol/conformance --save-dev
+npm install @chio-protocol/conformance --save-dev
 ```
 
 ### Canonical JSON (RFC 8785)
 
-ARC requires canonical JSON for all signed payloads. These functions produce byte-identical output to the Rust kernel.
+Chio requires canonical JSON for all signed payloads. These functions produce byte-identical output to the Rust kernel.
 
 ```ts
-import { canonicalJsonString, canonicalJsonBytes } from "@arc-protocol/conformance";
+import { canonicalJsonString, canonicalJsonBytes } from "@chio-protocol/conformance";
 
 // Returns a string with sorted keys, no extra whitespace
 const json = canonicalJsonString({ b: 2, a: 1 });
@@ -551,7 +551,7 @@ RFC 8785 rules enforced:
 ### Receipt Structure Validation
 
 ```ts
-import { validateReceiptStructure } from "@arc-protocol/conformance";
+import { validateReceiptStructure } from "@chio-protocol/conformance";
 
 const errors: string[] = validateReceiptStructure(receipt);
 if (errors.length > 0) {
@@ -576,7 +576,7 @@ Validates:
 Verify that a receipt's content hash matches the expected request content binding:
 
 ```ts
-import { verifyContentHash } from "@arc-protocol/conformance";
+import { verifyContentHash } from "@chio-protocol/conformance";
 
 const matches = verifyContentHash(
   receipt,
@@ -591,7 +591,7 @@ const matches = verifyContentHash(
 ### Verdict Assertion
 
 ```ts
-import { assertVerdictMatch } from "@arc-protocol/conformance";
+import { assertVerdictMatch } from "@chio-protocol/conformance";
 
 const errors = assertVerdictMatch(receipt.verdict, {
   verdict: "deny",
@@ -604,4 +604,4 @@ const errors = assertVerdictMatch(receipt.verdict, {
 
 ### E2E Test Helpers
 
-The conformance package includes end-to-end test examples for Express and Fastify in `test/e2e/`. These demonstrate how to spin up a test server with ARC middleware and validate receipt production.
+The conformance package includes end-to-end test examples for Express and Fastify in `test/e2e/`. These demonstrate how to spin up a test server with Chio middleware and validate receipt production.

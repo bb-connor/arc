@@ -1,8 +1,0 @@
-include README.md
-include pyproject.toml
-recursive-include src/arc *.py
-recursive-include src/arc py.typed
-prune src/arc.egg-info
-prune src/arc_py.egg-info
-global-exclude __pycache__
-global-exclude *.py[cod]

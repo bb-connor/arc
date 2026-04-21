@@ -1,8 +1,8 @@
-// Reference Azure Container Apps deployment with an ARC sidecar.
+// Reference Azure Container Apps deployment with an Chio sidecar.
 //
 // Placeholders:
 //   APP_IMAGE_PLACEHOLDER          -- replace with your application image
-//   ghcr.io/backbay/arc-sidecar    -- replace with the sidecar image you pushed
+//   ghcr.io/backbay/chio-sidecar    -- replace with the sidecar image you pushed
 //   Key Vault secrets must be created before deploy; the Container Apps
 //   environment's managed identity needs GET on those secrets.
 //
@@ -12,10 +12,10 @@
 //     --template-file deploy/azure/container-app.bicep \
 //     --parameters location=eastus ...
 //
-// Startup ordering: the ARC sidecar declares a startupProbe on :9090/arc/health;
+// Startup ordering: the Chio sidecar declares a startupProbe on :9090/arc/health;
 // the app container declares a startupProbe on :8080/healthz that depends on
 // the sidecar URL being reachable. The sidecar fails closed if
-// ARC_KERNEL_CONFIG_PATH cannot be loaded, causing the revision to be marked
+// CHIO_KERNEL_CONFIG_PATH cannot be loaded, causing the revision to be marked
 // unhealthy and recycled.
 
 @description('Azure region for the container app.')
@@ -30,10 +30,10 @@ param managedEnvironmentId string
 @description('Application container image (placeholder, override at deploy time).')
 param appImage string = 'APP_IMAGE_PLACEHOLDER'
 
-@description('ARC sidecar container image.')
-param arcSidecarImage string = 'ghcr.io/backbay/arc-sidecar:latest'
+@description('Chio sidecar container image.')
+param arcSidecarImage string = 'ghcr.io/backbay/chio-sidecar:latest'
 
-@description('Key Vault URI that holds the ARC signing key secret.')
+@description('Key Vault URI that holds the Chio signing key secret.')
 param arcSigningKeySecretUri string
 
 @description('Key Vault URI that holds the capability authority URL secret.')
@@ -46,7 +46,7 @@ param userAssignedIdentityId string
 param arcPolicySource string = 'https://arcconfig.blob.core.windows.net/config/policy.yaml'
 
 @description('Receipt sink destination.')
-param arcReceiptSink string = 'cosmosdb://arc-receipts'
+param arcReceiptSink string = 'cosmosdb://chio-receipts'
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
@@ -69,12 +69,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
       secrets: [
         {
-          name: 'arc-signing-key'
+          name: 'chio-signing-key'
           keyVaultUrl: arcSigningKeySecretUri
           identity: userAssignedIdentityId
         }
         {
-          name: 'arc-capability-authority-url'
+          name: 'chio-capability-authority-url'
           keyVaultUrl: arcCapabilityAuthoritySecretUri
           identity: userAssignedIdentityId
         }
@@ -91,11 +91,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             {
-              name: 'ARC_SIDECAR_URL'
+              name: 'CHIO_SIDECAR_URL'
               value: 'http://localhost:9090'
             }
             {
-              name: 'ARC_SIDECAR_HEALTH_URL'
+              name: 'CHIO_SIDECAR_HEALTH_URL'
               value: 'http://localhost:9090/arc/health'
             }
           ]
@@ -122,7 +122,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           ]
         }
         {
-          name: 'arc-sidecar'
+          name: 'chio-sidecar'
           image: arcSidecarImage
           // The sidecar image's CMD default is `--help`; override with
           // a long-running subcommand so the probes succeed and the
@@ -143,36 +143,36 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             {
-              name: 'ARC_LISTEN_ADDR'
+              name: 'CHIO_LISTEN_ADDR'
               value: '0.0.0.0:9090'
             }
             {
-              name: 'ARC_HEALTH_PATH'
+              name: 'CHIO_HEALTH_PATH'
               value: '/arc/health'
             }
             {
-              name: 'ARC_KERNEL_CONFIG_PATH'
+              name: 'CHIO_KERNEL_CONFIG_PATH'
               value: '/etc/arc/kernel.yaml'
             }
             {
-              name: 'ARC_POLICY_SOURCE'
+              name: 'CHIO_POLICY_SOURCE'
               value: arcPolicySource
             }
             {
-              name: 'ARC_RECEIPT_SINK'
+              name: 'CHIO_RECEIPT_SINK'
               value: arcReceiptSink
             }
             {
-              name: 'ARC_LOG_LEVEL'
+              name: 'CHIO_LOG_LEVEL'
               value: 'info'
             }
             {
-              name: 'ARC_SIGNING_KEY'
-              secretRef: 'arc-signing-key'
+              name: 'CHIO_SIGNING_KEY'
+              secretRef: 'chio-signing-key'
             }
             {
-              name: 'ARC_CAPABILITY_AUTHORITY_URL'
-              secretRef: 'arc-capability-authority-url'
+              name: 'CHIO_CAPABILITY_AUTHORITY_URL'
+              secretRef: 'chio-capability-authority-url'
             }
           ]
           probes: [

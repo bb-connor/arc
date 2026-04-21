@@ -11,7 +11,7 @@ mkdir -p "$ARTIFACT_DIR"
 cleanup_target_dir=""
 cleanup_driver_dir=""
 if [[ -z "${CARGO_TARGET_DIR:-}" ]]; then
-  cleanup_target_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-portable-browser.XXXXXX")"
+  cleanup_target_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-portable-browser.XXXXXX")"
   export CARGO_TARGET_DIR="$cleanup_target_dir"
 else
   export CARGO_TARGET_DIR
@@ -120,7 +120,7 @@ ensure_matching_chromedriver() {
 
   echo "[portable-browser] CHROME_BIN build $chrome_build does not match PATH chromedriver build $driver_build; fetching compatible driver"
   resolved_version="$(curl -fsSL "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${chrome_build}")"
-  cleanup_driver_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-chromedriver.XXXXXX")"
+  cleanup_driver_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-chromedriver.XXXXXX")"
   zip_path="$cleanup_driver_dir/chromedriver-${cft_platform}.zip"
   zip_url="https://storage.googleapis.com/chrome-for-testing-public/${resolved_version}/${cft_platform}/chromedriver-${cft_platform}.zip"
   expected_md5_b64="$(
@@ -180,9 +180,9 @@ echo "[portable-browser] chrome_version=${CHROME_VERSION_DETECTED:-unknown}"
 echo "[portable-browser] chromedriver_version=${CHROMEDRIVER_VERSION_DETECTED:-unknown}"
 
 echo "[portable-browser] building wasm package"
-wasm-pack build --target web --release crates/arc-kernel-browser
+wasm-pack build --target web --release crates/chio-kernel-browser
 
-WASM_ARTIFACT="crates/arc-kernel-browser/pkg/arc_kernel_browser_bg.wasm"
+WASM_ARTIFACT="crates/chio-kernel-browser/pkg/chio_kernel_browser_bg.wasm"
 if [[ ! -f "$WASM_ARTIFACT" ]]; then
   echo "[portable-browser] missing wasm artifact: $WASM_ARTIFACT" >&2
   exit 1
@@ -198,7 +198,7 @@ REPORT_MD="$ARTIFACT_DIR/report.md"
 rm -f "$LOG_FILE"
 
 echo "[portable-browser] running headless browser bindings tests"
-wasm-pack test --release --headless --chrome --chromedriver "$CHROMEDRIVER" crates/arc-kernel-browser -- --nocapture | tee "$LOG_FILE"
+wasm-pack test --release --headless --chrome --chromedriver "$CHROMEDRIVER" crates/chio-kernel-browser -- --nocapture | tee "$LOG_FILE"
 
 LATENCY_LINE="$(grep -o 'qualify_browser_evaluate_latency_ms=[0-9.]*' "$LOG_FILE" | tail -n 1 || true)"
 if [[ -z "$LATENCY_LINE" ]]; then
@@ -236,8 +236,8 @@ import sys
 
 summary_path = sys.argv[1]
 data = {
-    "schema": "arc.browser-kernel-qualification.v1",
-    "wasm_artifact": "crates/arc-kernel-browser/pkg/arc_kernel_browser_bg.wasm",
+    "schema": "chio.browser-kernel-qualification.v1",
+    "wasm_artifact": "crates/chio-kernel-browser/pkg/chio_kernel_browser_bg.wasm",
     "artifact_bytes": int(os.environ["ARTIFACT_BYTES"]),
     "evaluate_latency_ms": float(os.environ["LATENCY_MS"]),
     "cargo_target_dir": os.environ["CARGO_TARGET_DIR"],

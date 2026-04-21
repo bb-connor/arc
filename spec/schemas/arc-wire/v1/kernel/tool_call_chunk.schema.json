@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC KernelMessage tool_call_chunk",
+  "title": "Chio KernelMessage tool_call_chunk",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "id", "chunk_index", "data"],

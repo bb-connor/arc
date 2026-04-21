@@ -1,0 +1,40 @@
+[package]
+name = "chio-kernel-core"
+description = "Portable (no_std + alloc) Chio kernel core: pure verdict evaluation, capability verification, and receipt signing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_kernel_core"
+
+# Phase 14.1 portable kernel core extraction.
+#
+# This crate contains the pure-compute subset of Chio kernel evaluation:
+# capability verification, scope matching, guard pipeline evaluation, and
+# receipt signing. It is a `no_std + alloc` crate by source, which means
+# the crate itself never imports from `std`. The current in-repo proof is
+# `scripts/check-portable-kernel.sh`, which builds `chio-kernel-core` both for
+# the host and for `wasm32-unknown-unknown` with `--no-default-features`.
+#
+# Later portability tickets qualify the browser and mobile adapter crates on
+# top of this core build proof. See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
+[dependencies]
+# Depend on `chio-core-types` with `default-features = false` and forward the
+# `std` feature through our own feature flag so downstream consumers can
+# select between the hosted `std` build and the portable `no_std + alloc`
+# build used by the scripted host + wasm proof.
+chio-core-types = { path = "../chio-core-types", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+[features]
+default = ["std"]
+std = ["chio-core-types/std", "serde/std", "serde_json/std"]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

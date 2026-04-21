@@ -1,4 +1,4 @@
-# ARC Compliance Certificate
+# Chio Compliance Certificate
 
 **Version:** 1.0
 **Date:** 2026-04-14
@@ -16,7 +16,7 @@ The design rationale, regulatory mapping, and integration details are in
 
 ## 1. Purpose
 
-ARC runtimes produce Ed25519-signed receipts for every tool invocation and
+Chio runtimes produce Ed25519-signed receipts for every tool invocation and
 commit them to Merkle-rooted checkpoint batches. A compliance certificate
 composes receipt-level evidence into a single auditor-ready document. A
 third party can verify the certificate without replaying every guard
@@ -266,7 +266,7 @@ summary, anomaly list, and signer key fingerprint.
 ## 7. Serialization
 
 All certificate fields use canonical JSON (RFC 8785 / JCS) for deterministic
-hashing and signature verification. This is consistent with all other ARC
+hashing and signature verification. This is consistent with all other Chio
 signed artifacts.
 
 The signature covers `canonical_json_bytes(&body)`. Verifiers MUST

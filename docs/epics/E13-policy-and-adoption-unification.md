@@ -12,7 +12,7 @@ The supported YAML path now exposes all shipped guards, including `tool_access`,
 
 ## Problem
 
-ARC's runtime is much closer to one canonical policy path than it used to be.
+Chio's runtime is much closer to one canonical policy path than it used to be.
 
 The product surface is still not fully unified:
 
@@ -31,8 +31,8 @@ By the end of E13:
 
 - one policy path is explicitly documented as canonical
 - all shipped guard capabilities are reachable through the supported policy story
-- migration from wrapped MCP to native ARC is documented and example-backed
-- native ARC services can be authored through a higher-level router or service abstraction
+- migration from wrapped MCP to native Chio is documented and example-backed
+- native Chio services can be authored through a higher-level router or service abstraction
 
 ## Scope
 
@@ -52,12 +52,12 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-cli/src/policy.rs`
-- `crates/arc-policy/src/`
-- `crates/arc-guards/src/`
+- `crates/chio-cli/src/policy.rs`
+- `crates/chio-policy/src/`
+- `crates/chio-guards/src/`
 - `examples/policies/`
 - `examples/hello-tool/`
-- `crates/arc-mcp-adapter`
+- `crates/chio-mcp-adapter`
 - `docs/`
 - new SDK or helper crate if added
 
@@ -91,7 +91,7 @@ Responsibilities:
 
 Requirements:
 
-- document wrapped MCP to native ARC migration
+- document wrapped MCP to native Chio migration
 - provide small, maintained examples that show the recommended path
 
 Responsibilities:
@@ -158,11 +158,11 @@ Responsibilities:
 
 - docs identify one canonical policy authoring path
 - all shipped guards are configurable through the supported story
-- migration docs exist for wrapped MCP to native ARC adoption
+- migration docs exist for wrapped MCP to native Chio adoption
 - at least one higher-level native authoring example exists and is test-covered
 
 ## Definition of done
 
 - implementation and docs merged
 - the review finding about split policy surface is materially addressed
-- teams evaluating ARC can tell what to author, how to migrate, and how to build a native service without reading internal crates first
+- teams evaluating Chio can tell what to author, how to migrate, and how to build a native service without reading internal crates first

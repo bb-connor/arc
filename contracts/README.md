@@ -1,16 +1,16 @@
-# ARC Web3 Contracts
+# Chio Web3 Contracts
 
-This package is the phase `145` realization of ARC's official web3 contract
+This package is the phase `145` realization of Chio's official web3 contract
 family:
 
-- `ArcRootRegistry`
-- `ArcEscrow`
-- `ArcBondVault`
-- `ArcIdentityRegistry`
-- `ArcPriceResolver`
+- `ChioRootRegistry`
+- `ChioEscrow`
+- `ChioBondVault`
+- `ChioIdentityRegistry`
+- `ChioPriceResolver`
 
 The source shapes come from
-`docs/research/ARC_WEB3_CONTRACT_ARCHITECTURE.md`, but the implementation
+`docs/research/CHIO_WEB3_CONTRACT_ARCHITECTURE.md`, but the implementation
 tightens three research-era gaps deliberately:
 
 1. RFC6962 proof verification needs `leafIndex` and `treeSize`. The research
@@ -20,22 +20,22 @@ tightens three research-era gaps deliberately:
 2. Signature-based escrow release must bind `escrowId`, `settledAmount`, and
    chain context into the signed payload. Verifying a bare `receiptHash` would
    leave the amount under-specified.
-3. Root publication supports explicit delegate publishers so ARC can authorize
+3. Root publication supports explicit delegate publishers so Chio can authorize
    automation or HA anchoring infrastructure without widening operator trust.
 
 The compiled interface artifacts under `contracts/artifacts/interfaces/` are
-also the canonical binding input for `crates/arc-web3-bindings/`. ARC now
+also the canonical binding input for `crates/chio-web3-bindings/`. Chio now
 derives the Rust Alloy surface from those compiled interface artifacts instead
 of maintaining a second handwritten contract interface inventory.
 
 The money-handling boundary is intentionally narrow:
 
-- `ArcBondVault` locks collateral on-chain and preserves reserve requirement
-  metadata from the signed ARC bond artifact for parity checks; it does not
+- `ChioBondVault` locks collateral on-chain and preserves reserve requirement
+  metadata from the signed Chio bond artifact for parity checks; it does not
   create a second on-chain reserve ledger.
-- `ArcPriceResolver` is an auxiliary on-chain feed reader for bounded contract
+- `ChioPriceResolver` is an auxiliary on-chain feed reader for bounded contract
   parity and review. The canonical runtime FX authority remains the off-chain
-  `arc-link` receipt-evidence path.
+  `chio-link` receipt-evidence path.
 
 Compile locally with:
 

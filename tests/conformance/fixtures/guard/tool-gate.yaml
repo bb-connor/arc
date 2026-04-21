@@ -4,7 +4,7 @@
 # deny-list logic: tools named "dangerous_tool", "rm_rf", or "drop_database"
 # are denied with reason "blocked by policy"; everything else is allowed.
 #
-# Each fixture uses the TestFixture shape from arc-cli/src/guard.rs.
+# Each fixture uses the TestFixture shape from chio-cli/src/guard.rs.
 
 - name: "allow_safe_tool"
   request:

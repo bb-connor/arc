@@ -3,10 +3,10 @@
  *
  * Verifies that the Fastify plugin correctly:
  * 1. Extracts caller identity from request headers
- * 2. Builds a valid ArcHttpRequest
+ * 2. Builds a valid ChioHttpRequest
  * 3. Handles sidecar responses (allow/deny)
- * 4. Produces receipts that conform to the ARC receipt schema
- * 5. Returns structured error responses with ARC error codes
+ * 4. Produces receipts that conform to the Chio receipt schema
+ * 5. Returns structured error responses with Chio error codes
  *
  * These tests run against a mock sidecar server that returns
  * predetermined verdicts and receipts, allowing verification
@@ -17,8 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Fastify from "fastify";
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
-import { arc } from "@arc-protocol/fastify";
-import type { HttpReceipt, EvaluateResponse, Verdict } from "@arc-protocol/node-http";
+import { chio } from "@chio-protocol/fastify";
+import type { HttpReceipt, EvaluateResponse, Verdict } from "@chio-protocol/node-http";
 import { validateReceiptStructure, assertVerdictMatch } from "../../src/verify.js";
 import { canonicalJsonString } from "../../src/canonical.js";
 
@@ -74,7 +74,7 @@ function createMockSidecar(): {
 }
 
 function createMockReceipt(
-  arcReq: { request_id: string; method: string; route_pattern: string; path: string; query: Record<string, string>; caller: { subject: string } },
+  chioReq: { request_id: string; method: string; route_pattern: string; path: string; query: Record<string, string>; caller: { subject: string } },
   mode: "allow" | "deny",
 ): HttpReceipt {
   const verdict: Verdict =
@@ -89,24 +89,24 @@ function createMockReceipt(
 
   const binding = {
     body_hash: null,
-    method: arcReq.method,
-    path: arcReq.path,
-    query: arcReq.query,
-    route_pattern: arcReq.route_pattern,
+    method: chioReq.method,
+    path: chioReq.path,
+    query: chioReq.query,
+    route_pattern: chioReq.route_pattern,
   };
   const contentHash = createHash("sha256")
     .update(canonicalJsonString(binding))
     .digest("hex");
 
   const callerHash = createHash("sha256")
-    .update(canonicalJsonString({ auth_method: { method: "anonymous" }, subject: arcReq.caller.subject, verified: false }))
+    .update(canonicalJsonString({ auth_method: { method: "anonymous" }, subject: chioReq.caller.subject, verified: false }))
     .digest("hex");
 
   return {
     id: `receipt-${randomUUID()}`,
-    request_id: arcReq.request_id,
-    route_pattern: arcReq.route_pattern,
-    method: arcReq.method as "GET",
+    request_id: chioReq.request_id,
+    route_pattern: chioReq.route_pattern,
+    method: chioReq.method as "GET",
     caller_identity_hash: callerHash,
     verdict,
     evidence: [
@@ -135,7 +135,7 @@ describe("Fastify E2E conformance", () => {
     // Start mock sidecar
     await new Promise<void>((resolve) => mock.server.listen(0, resolve));
 
-    // Create Fastify app with ARC plugin
+    // Create Fastify app with Chio plugin
     fastify = Fastify();
     await fastify.register(arc, {
       sidecarUrl: `http://127.0.0.1:${mock.port()}`,
@@ -161,7 +161,7 @@ describe("Fastify E2E conformance", () => {
     mock.server.close();
   });
 
-  it("GET /health bypasses ARC evaluation", async () => {
+  it("GET /health bypasses Chio evaluation", async () => {
     const resp = await fastify.inject({
       method: "GET",
       url: "/health",
@@ -179,12 +179,12 @@ describe("Fastify E2E conformance", () => {
     expect(resp.statusCode).toBe(200);
 
     // Receipt ID should be in the response headers
-    const receiptId = resp.headers["x-arc-receipt-id"];
+    const receiptId = resp.headers["x-chio-receipt-id"];
     expect(receiptId).toBeDefined();
     expect(typeof receiptId).toBe("string");
   });
 
-  it("sidecar receives correct ArcHttpRequest for GET /pets", async () => {
+  it("sidecar receives correct ChioHttpRequest for GET /pets", async () => {
     mock.setVerdictMode("allow");
     await fastify.inject({
       method: "GET",
@@ -225,12 +225,12 @@ describe("Fastify E2E conformance", () => {
     expect(resp.statusCode).toBe(403);
 
     const body = JSON.parse(resp.body);
-    expect(body.error).toBe("arc_access_denied");
+    expect(body.error).toBe("chio_access_denied");
     expect(body.receipt_id).toBeDefined();
     expect(body.suggestion).toBeDefined();
   });
 
-  it("deny response contains proper ARC error structure", async () => {
+  it("deny response contains proper Chio error structure", async () => {
     mock.setVerdictMode("deny");
     const resp = await fastify.inject({
       method: "POST",
@@ -239,7 +239,7 @@ describe("Fastify E2E conformance", () => {
     expect(resp.statusCode).toBe(403);
 
     const body = JSON.parse(resp.body);
-    expect(body.error).toBe("arc_access_denied");
+    expect(body.error).toBe("chio_access_denied");
     expect(typeof body.message).toBe("string");
     expect(typeof body.receipt_id).toBe("string");
     expect(typeof body.suggestion).toBe("string");
@@ -269,7 +269,7 @@ describe("Fastify E2E conformance", () => {
       method: "GET",
       url: "/pets",
     });
-    const receiptId = resp.headers["x-arc-receipt-id"];
+    const receiptId = resp.headers["x-chio-receipt-id"];
     expect(typeof receiptId).toBe("string");
     // Receipt ID should contain UUID-like characters
     expect(receiptId).toMatch(/^receipt-[0-9a-f-]+$/);

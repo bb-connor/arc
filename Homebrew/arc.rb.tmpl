@@ -1,12 +1,12 @@
 # typed: strict
 # frozen_string_literal: true
 
-# Homebrew formula template for the ARC sidecar binary.
+# Homebrew formula template for the Chio sidecar binary.
 #
 # The release workflow renders this file into the `arc.rb` GitHub release
 # asset with concrete version and checksum values.
 class Arc < Formula
-  desc "Provable Agent Capability Transport sidecar runtime"
+  desc "Chio sidecar runtime"
   homepage "https://github.com/__ARC_GITHUB_REPO__"
   version "__ARC_VERSION__"
   license "Apache-2.0"
@@ -35,7 +35,7 @@ class Arc < Formula
 
   def install
     candidate = Dir["arc", "arc-#{version}-*/arc"].find { |path| File.file?(path) }
-    odie "ARC archive did not contain an installable binary" unless candidate
+    odie "Chio archive did not contain an installable binary" unless candidate
     bin.install candidate
   end
 

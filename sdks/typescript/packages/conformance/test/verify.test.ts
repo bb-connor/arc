@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { HttpReceipt, Verdict } from "@arc-protocol/node-http";
+import type { HttpReceipt, Verdict } from "@chio-protocol/node-http";
 import {
   validateReceiptStructure,
   verifyContentHash,
@@ -117,7 +117,7 @@ describe("validateReceiptStructure", () => {
 
 describe("verifyContentHash", () => {
   it("matches when content binding is correct", () => {
-    // Build the same content binding that buildArcHttpRequest uses
+    // Build the same content binding that buildChioHttpRequest uses
     const result = verifyContentHash(
       makeValidReceipt(),
       "GET",

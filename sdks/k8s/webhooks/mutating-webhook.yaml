@@ -1,18 +1,18 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: arc-mutating-webhook
+  name: chio-mutating-webhook
   labels:
-    app.kubernetes.io/name: arc-admission-controller
+    app.kubernetes.io/name: chio-admission-controller
     app.kubernetes.io/component: mutating-webhook
 webhooks:
-  - name: mutate.arc.backbay.io
+  - name: mutate.chio.backbay.io
     admissionReviewVersions:
       - v1
     clientConfig:
       service:
-        name: arc-admission-controller
-        namespace: arc-system
+        name: chio-admission-controller
+        namespace: chio-system
         path: /mutate
         port: 443
       # caBundle should be injected by cert-manager or manually set.
@@ -29,4 +29,4 @@ webhooks:
     timeoutSeconds: 10
     namespaceSelector:
       matchLabels:
-        arc.backbay.io/inject: "true"
+        chio.backbay.io/inject: "true"

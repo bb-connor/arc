@@ -1,10 +1,10 @@
 {
-  "schema": "arc.theorem-inventory.v1",
-  "rootModule": "formal/lean4/Pact/Arc.lean",
+  "schema": "chio.theorem-inventory.v1",
+  "rootModule": "formal/lean4/Pact/Chio.lean",
   "assumptions": [
     {
       "id": "assumption.crypto.verify_capability_signature",
-      "leanName": "Arc.Core.verifyCapabilitySignature",
+      "leanName": "Chio.Core.verifyCapabilitySignature",
       "file": "formal/lean4/Pact/Pact/Core/Revocation.lean",
       "kind": "axiom",
       "rootImported": true,
@@ -15,17 +15,17 @@
   "theorems": [
     {
       "id": "core.scope.empty_isSubsetOf",
-      "leanName": "Arc.Core.ArcScope.empty_isSubsetOf",
+      "leanName": "Chio.Core.ChioScope.empty_isSubsetOf",
       "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "mapsTo": ["P1"],
-      "notes": "Structural empty-scope attenuation lemma over the bounded ArcScope model."
+      "notes": "Structural empty-scope attenuation lemma over the bounded ChioScope model."
     },
     {
       "id": "core.tool_grant.isSubsetOf_refl",
-      "leanName": "Arc.Core.ToolGrant.isSubsetOf_refl",
+      "leanName": "Chio.Core.ToolGrant.isSubsetOf_refl",
       "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -35,17 +35,17 @@
     },
     {
       "id": "spec.capability_monotonicity",
-      "leanName": "Arc.Spec.capability_monotonicity",
+      "leanName": "Chio.Spec.capability_monotonicity",
       "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "mapsTo": ["P1"],
-      "notes": "Primary attenuation theorem over ArcScope grants only; no Rust refinement proof yet."
+      "notes": "Primary attenuation theorem over ChioScope grants only; no Rust refinement proof yet."
     },
     {
       "id": "spec.empty_scope_monotonicity",
-      "leanName": "Arc.Spec.empty_scope_monotonicity",
+      "leanName": "Chio.Spec.empty_scope_monotonicity",
       "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -55,7 +55,7 @@
     },
     {
       "id": "spec.scope_budgets_nonnegative",
-      "leanName": "Arc.Spec.scope_budgets_nonnegative",
+      "leanName": "Chio.Spec.scope_budgets_nonnegative",
       "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -65,7 +65,7 @@
     },
     {
       "id": "proof.list_isSubsetOf_trans",
-      "leanName": "Arc.Proofs.list_isSubsetOf_trans",
+      "leanName": "Chio.Proofs.list_isSubsetOf_trans",
       "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -75,17 +75,17 @@
     },
     {
       "id": "proof.scope_subset_of_grants_subset",
-      "leanName": "Arc.Proofs.scope_subset_of_grants_subset",
+      "leanName": "Chio.Proofs.scope_subset_of_grants_subset",
       "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "mapsTo": ["P1"],
-      "notes": "Bridges grant-wise subset assumptions into ArcScope subset truth."
+      "notes": "Bridges grant-wise subset assumptions into ChioScope subset truth."
     },
     {
       "id": "proof.wildcard_subsumes",
-      "leanName": "Arc.Proofs.wildcard_subsumes",
+      "leanName": "Chio.Proofs.wildcard_subsumes",
       "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -95,7 +95,7 @@
     },
     {
       "id": "proof.reduced_budget_is_subset",
-      "leanName": "Arc.Proofs.reduced_budget_is_subset",
+      "leanName": "Chio.Proofs.reduced_budget_is_subset",
       "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -105,7 +105,7 @@
     },
     {
       "id": "proof.added_constraint_is_subset",
-      "leanName": "Arc.Proofs.added_constraint_is_subset",
+      "leanName": "Chio.Proofs.added_constraint_is_subset",
       "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -115,7 +115,7 @@
     },
     {
       "id": "proof.delegation_chain_integrity",
-      "leanName": "Arc.Proofs.delegation_chain_integrity",
+      "leanName": "Chio.Proofs.delegation_chain_integrity",
       "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -125,7 +125,7 @@
     },
     {
       "id": "proof.applyProof_append",
-      "leanName": "Arc.Proofs.applyProof_append",
+      "leanName": "Chio.Proofs.applyProof_append",
       "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -135,7 +135,7 @@
     },
     {
       "id": "proof.membership_proof_sound",
-      "leanName": "Arc.Proofs.membership_proof_sound",
+      "leanName": "Chio.Proofs.membership_proof_sound",
       "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -145,7 +145,7 @@
     },
     {
       "id": "proof.membership_proof_verifies",
-      "leanName": "Arc.Proofs.membership_proof_verifies",
+      "leanName": "Chio.Proofs.membership_proof_verifies",
       "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -155,7 +155,7 @@
     },
     {
       "id": "proof.checkpoint_consistency",
-      "leanName": "Arc.Proofs.checkpoint_consistency",
+      "leanName": "Chio.Proofs.checkpoint_consistency",
       "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -165,7 +165,7 @@
     },
     {
       "id": "proof.receipt_sign_then_verify",
-      "leanName": "Arc.Proofs.receipt_sign_then_verify",
+      "leanName": "Chio.Proofs.receipt_sign_then_verify",
       "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
@@ -175,7 +175,7 @@
     },
     {
       "id": "proof.receipt_immutability",
-      "leanName": "Arc.Proofs.receipt_immutability",
+      "leanName": "Chio.Proofs.receipt_immutability",
       "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,

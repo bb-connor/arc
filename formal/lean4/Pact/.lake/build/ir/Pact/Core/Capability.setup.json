@@ -1,5 +1,5 @@
 {"plugins": [],
- "package": "arc",
+ "package": "chio",
  "options": {"autoImplicit": false},
  "name": "Pact.Core.Capability",
  "isModule": false,

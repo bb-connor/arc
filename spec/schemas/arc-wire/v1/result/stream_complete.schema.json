@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC ToolCallResult stream_complete",
+  "title": "Chio ToolCallResult stream_complete",
   "type": "object",
   "additionalProperties": false,
   "required": ["status", "total_chunks"],

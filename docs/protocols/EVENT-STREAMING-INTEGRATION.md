@@ -3,15 +3,15 @@
 > **Status**: Proposed April 2026
 > **Priority**: High -- event-driven agent architectures lack a governance
 > layer. Orchestration has a coordinator to wrap; choreography does not.
-> ARC fills the governance gap for agents that react autonomously to event
+> Chio fills the governance gap for agents that react autonomously to event
 > streams. Covers Kafka, NATS, Pulsar, EventBridge, Pub/Sub, Redis Streams.
 
-## 1. Why Event Streaming Matters for ARC
+## 1. Why Event Streaming Matters for Chio
 
-The initial instinct was to skip event streaming: "ARC operates at
+The initial instinct was to skip event streaming: "Chio operates at
 tool-call granularity, not message routing." That framing was wrong.
 
-The real pattern is not ARC routing messages. The real pattern is:
+The real pattern is not Chio routing messages. The real pattern is:
 
 ```
 Event arrives on topic
@@ -37,17 +37,17 @@ consumer group is an autonomous agent with its own capability scope,
 making its own decisions about what tools to call.
 
 This is the hardest governance problem in multi-agent systems. And it is
-exactly where ARC provides the most value -- because without a protocol
-like ARC, choreography-based agent systems are structurally ungovernable.
+exactly where Chio provides the most value -- because without a protocol
+like Chio, choreography-based agent systems are structurally ungovernable.
 
-### What ARC Adds to Event-Driven Agents
+### What Chio Adds to Event-Driven Agents
 
-| Event streaming alone | Event streaming + ARC |
+| Event streaming alone | Event streaming + Chio |
 |-----------------------|-----------------------|
 | Agents consume events freely | Agents need capabilities to process event types |
 | No audit of what agents did in response | Signed receipts on every tool call triggered by events |
 | Consumer groups scale horizontally | Budget shared across consumer group, enforced per-consumer |
-| Schema Registry governs data shape | ARC governs what agents DO with the data |
+| Schema Registry governs data shape | Chio governs what agents DO with the data |
 | Dead letter = processing failed | Dead letter = processing unauthorized (security signal) |
 | Exactly-once = no duplicate processing | Exactly-once + receipt = no duplicate AND attested processing |
 | No cross-consumer coordination | Shared capability grants scope the entire consumer group |
@@ -56,7 +56,7 @@ like ARC, choreography-based agent systems are structurally ungovernable.
 
 ### 2.1 Consumer-Side Enforcement
 
-ARC evaluates at the point where the agent acts on an event -- not at the
+Chio evaluates at the point where the agent acts on an event -- not at the
 broker level. The broker remains untouched. Governance happens inside the
 consumer:
 
@@ -72,7 +72,7 @@ Kafka / NATS / Pulsar Broker
 |    event = consumer.poll()                    |
 |         |                                     |
 |         v                                     |
-|    ARC: evaluate(                             |
+|    Chio: evaluate(                             |
 |      tool = event.topic,                      |
 |      scope = derive_scope(event),             |
 |      identity = consumer.group_id,            |
@@ -87,7 +87,7 @@ Kafka / NATS / Pulsar Broker
 |  event                                        |
 |    |                                          |
 |    v                                          |
-|  tool_calls (each ARC-evaluated)              |
+|  tool_calls (each Chio-evaluated)              |
 |    |                                          |
 |    v                                          |
 |  produce result events (receipt attached)     |
@@ -95,7 +95,7 @@ Kafka / NATS / Pulsar Broker
 |    v                                          |
 |  commit offset + receipt (transactional)      |
 |                                               |
-|  ARC Sidecar (:9090) <---------------------->  |
+|  Chio Sidecar (:9090) <---------------------->  |
 +-----------------------------------------------+
 ```
 
@@ -111,16 +111,16 @@ There are two distinct capability boundaries per event:
 ```
 Event: order.placed (topic: orders)
   |
-  +-- ARC evaluate: scope="events:consume:orders"  (can this agent see orders?)
+  +-- Chio evaluate: scope="events:consume:orders"  (can this agent see orders?)
   |
   +-- Agent decides: need to check inventory
-  |     +-- ARC evaluate: scope="tools:inventory:read"  (can it read inventory?)
+  |     +-- Chio evaluate: scope="tools:inventory:read"  (can it read inventory?)
   |
   +-- Agent decides: need to charge payment
-  |     +-- ARC evaluate: scope="tools:payment:charge"  (can it charge?)
+  |     +-- Chio evaluate: scope="tools:payment:charge"  (can it charge?)
   |
   +-- Agent produces: order.confirmed -> topic: order-events
-        +-- ARC evaluate: scope="events:produce:order-events"  (can it write here?)
+        +-- Chio evaluate: scope="events:produce:order-events"  (can it write here?)
         +-- Receipt attached to produced event headers
 ```
 
@@ -133,7 +133,7 @@ Kafka Transaction:
   1. consume(event, offset=42)
   2. arc.evaluate(tool, scope) -> receipt_id
   3. process(event) -> result
-  4. produce(result_event, headers={"X-Arc-Receipt": receipt_id})
+  4. produce(result_event, headers={"X-Chio-Receipt": receipt_id})
   5. commit(offset=42)  // atomic with produce
 
 If any step fails, the transaction aborts:
@@ -148,16 +148,16 @@ If any step fails, the transaction aborts:
 
 ```python
 from confluent_kafka import Consumer, Producer, KafkaError
-from arc_streaming import ArcConsumerMiddleware, ArcProducerMiddleware
+from chio_streaming import ChioConsumerMiddleware, ChioProducerMiddleware
 
-# Wrap a Kafka consumer with ARC governance
+# Wrap a Kafka consumer with Chio governance
 consumer = Consumer({
     "bootstrap.servers": "localhost:9092",
     "group.id": "research-agents",
     "enable.auto.commit": False,
 })
 
-arc_consumer = ArcConsumerMiddleware(
+chio_consumer = ChioConsumerMiddleware(
     consumer=consumer,
     sidecar_url="http://127.0.0.1:9090",
     # Map topics to capability scopes
@@ -168,23 +168,23 @@ arc_consumer = ArcConsumerMiddleware(
     # Consumer group identity used for capability evaluation
     identity="research-agent-group",
     # Events the agent is not authorized to process go here
-    dlq_topic="arc-denied-events",
+    dlq_topic="chio-denied-events",
 )
 
-# Usage -- same consumer interface, ARC-governed
+# Usage -- same consumer interface, Chio-governed
 while True:
-    event = arc_consumer.poll(timeout=1.0)
+    event = chio_consumer.poll(timeout=1.0)
     if event is None:
         continue
 
-    # If we get here, ARC authorized consumption of this event
-    # event.arc_receipt_id is set
+    # If we get here, Chio authorized consumption of this event
+    # event.chio_receipt_id is set
     process(event)
 
-    # Tool calls within processing are separately ARC-evaluated
-    # (via the standard arc-sdk-python / arc-fastapi / etc.)
+    # Tool calls within processing are separately Chio-evaluated
+    # (via the standard chio-sdk-python / chio-fastapi / etc.)
 
-    arc_consumer.commit(event)
+    chio_consumer.commit(event)
 ```
 
 ### 3.2 Producer Middleware
@@ -194,7 +194,7 @@ Outbound events carry receipts:
 ```python
 producer = Producer({"bootstrap.servers": "localhost:9092"})
 
-arc_producer = ArcProducerMiddleware(
+chio_producer = ChioProducerMiddleware(
     producer=producer,
     sidecar_url="http://127.0.0.1:9090",
     scope_map={
@@ -203,21 +203,21 @@ arc_producer = ArcProducerMiddleware(
     },
 )
 
-# Produce with ARC evaluation
-arc_producer.produce(
+# Produce with Chio evaluation
+chio_producer.produce(
     topic="order-events",
     value=json.dumps({"order_id": "123", "status": "confirmed"}),
     # Receipt automatically attached as message header
-    # Headers: {"X-Arc-Receipt": "rcpt_abc123", "X-Arc-Scope": "events:produce:order-events"}
+    # Headers: {"X-Chio-Receipt": "rcpt_abc123", "X-Chio-Scope": "events:produce:order-events"}
 )
 ```
 
 ### 3.3 Transactional Consumer-Producer (Exactly-Once + Receipts)
 
 ```python
-from arc_streaming.kafka import ArcTransactionalProcessor
+from chio_streaming.kafka import ChioTransactionalProcessor
 
-processor = ArcTransactionalProcessor(
+processor = ChioTransactionalProcessor(
     bootstrap_servers="localhost:9092",
     group_id="order-agents",
     consume_topics=["orders"],
@@ -233,7 +233,7 @@ async def handle_order(event, ctx):
     """Process an order event. Runs inside a Kafka transaction."""
     order = json.loads(event.value())
 
-    # Tool call -- separately ARC-evaluated
+    # Tool call -- separately Chio-evaluated
     inventory = await ctx.arc.invoke(
         tool="check-inventory",
         scope="tools:inventory:read",
@@ -257,13 +257,13 @@ processor.run()
 
 ### 3.4 Consumer Group as Agent Swarm
 
-A consumer group is structurally an agent swarm. ARC provides swarm-level
+A consumer group is structurally an agent swarm. Chio provides swarm-level
 governance:
 
 ```python
-from arc_streaming.kafka import ArcConsumerGroup
+from chio_streaming.kafka import ChioConsumerGroup
 
-group = ArcConsumerGroup(
+group = ChioConsumerGroup(
     group_id="research-swarm",
     topics=["research-tasks"],
     sidecar_url="http://127.0.0.1:9090",
@@ -294,13 +294,13 @@ group = ArcConsumerGroup(
 )
 ```
 
-### 3.5 Schema Registry + ARC: Noun + Verb Governance
+### 3.5 Schema Registry + Chio: Noun + Verb Governance
 
-Schema Registry governs what the data LOOKS LIKE. ARC governs what agents
+Schema Registry governs what the data LOOKS LIKE. Chio governs what agents
 DO with the data. They are complementary:
 
 ```
-Schema Registry                    ARC
+Schema Registry                    Chio
 +--------------------------+       +--------------------------+
 | "orders" topic schema:   |       | "orders" topic policy:   |
 |   order_id: string       |       |   consume:               |
@@ -339,36 +339,36 @@ map cleanly:
 
 ```python
 import nats
-from arc_streaming.nats import ArcNatsMiddleware
+from chio_streaming.nats import ChioNatsMiddleware
 
 async def main():
     nc = await nats.connect("nats://localhost:4222")
     js = nc.jetstream()
 
-    arc_sub = ArcNatsMiddleware(
+    chio_sub = ChioNatsMiddleware(
         jetstream=js,
         sidecar_url="http://127.0.0.1:9090",
     )
 
-    # Subscribe with ARC governance
-    @arc_sub.subscribe(
+    # Subscribe with Chio governance
+    @chio_sub.subscribe(
         subject="tasks.research.*",
         scope="events:consume:tasks.research",
         durable="research-agent",
     )
     async def handle_research(msg):
-        # ARC authorized this subscription and this specific message
+        # Chio authorized this subscription and this specific message
         data = json.loads(msg.data)
         result = await process_research(data)
         await msg.ack()
 
-    # NATS request-reply with ARC
-    @arc_sub.service(
+    # NATS request-reply with Chio
+    @chio_sub.service(
         subject="tools.search",
         scope="tools:search",
     )
     async def search_handler(msg):
-        # Both the request consumption and the reply are ARC-evaluated
+        # Both the request consumption and the reply are Chio-evaluated
         query = json.loads(msg.data)
         results = await search(query)
         await msg.respond(json.dumps(results).encode())
@@ -379,13 +379,13 @@ async def main():
 NATS JetStream Key-Value can serve as a distributed capability cache:
 
 ```python
-from arc_streaming.nats import ArcNatsCapabilityStore
+from chio_streaming.nats import ChioNatsCapabilityStore
 
 # Use NATS KV as the capability token store
 # Grants are replicated across NATS cluster nodes
-cap_store = ArcNatsCapabilityStore(
+cap_store = ChioNatsCapabilityStore(
     jetstream=js,
-    bucket="arc-capabilities",
+    bucket="chio-capabilities",
     # Capabilities expire with NATS KV TTL
     ttl=3600,
 )
@@ -393,16 +393,16 @@ cap_store = ArcNatsCapabilityStore(
 
 ## 5. Amazon EventBridge Integration
 
-EventBridge is serverless event routing. ARC integrates at the target
+EventBridge is serverless event routing. Chio integrates at the target
 Lambda/consumer level:
 
 ```python
-from arc_streaming.eventbridge import ArcEventBridgeHandler
+from chio_streaming.eventbridge import ChioEventBridgeHandler
 
-handler = ArcEventBridgeHandler(
+handler = ChioEventBridgeHandler(
     sidecar_url="http://127.0.0.1:9090",
     scope_map={
-        # Map EventBridge detail-type to ARC scopes
+        # Map EventBridge detail-type to Chio scopes
         "OrderPlaced": "events:consume:order-placed",
         "IncidentDetected": "events:consume:incident",
     },
@@ -434,30 +434,30 @@ def lambda_handler(event, context):
 }
 ```
 
-This rule triggers when ARC denies 5+ events -- enabling automated
+This rule triggers when Chio denies 5+ events -- enabling automated
 circuit-breaking via EventBridge's native pattern matching.
 
 ## 6. Google Pub/Sub Integration
 
 ```python
 from google.cloud import pubsub_v1
-from arc_streaming.pubsub import ArcPubSubMiddleware
+from chio_streaming.pubsub import ChioPubSubMiddleware
 
 subscriber = pubsub_v1.SubscriberClient()
-arc_sub = ArcPubSubMiddleware(
+chio_sub = ChioPubSubMiddleware(
     subscriber=subscriber,
     sidecar_url="http://127.0.0.1:9090",
 )
 
 def callback(message):
-    # ArcPubSubMiddleware wraps the callback
+    # ChioPubSubMiddleware wraps the callback
     # Evaluates capability before callback executes
     # Attaches receipt to message attributes on ack
     data = json.loads(message.data)
     process(data)
     message.ack()
 
-arc_sub.subscribe(
+chio_sub.subscribe(
     subscription="projects/my-project/subscriptions/agent-tasks",
     scope="events:consume:agent-tasks",
     callback=callback,
@@ -468,11 +468,11 @@ arc_sub.subscribe(
 
 ```python
 import redis.asyncio as redis
-from arc_streaming.redis import ArcRedisStreamConsumer
+from chio_streaming.redis import ChioRedisStreamConsumer
 
 r = redis.Redis()
 
-consumer = ArcRedisStreamConsumer(
+consumer = ChioRedisStreamConsumer(
     redis=r,
     sidecar_url="http://127.0.0.1:9090",
     group="agent-swarm",
@@ -485,7 +485,7 @@ consumer = ArcRedisStreamConsumer(
 async def process():
     async for stream, messages in consumer.read("task-stream"):
         for msg_id, fields in messages:
-            # ARC evaluated before yielding
+            # Chio evaluated before yielding
             result = await handle_task(fields)
             await consumer.ack("task-stream", msg_id)
             # Receipt committed with ack
@@ -493,7 +493,7 @@ async def process():
 
 ## 8. Dead Letter Governance
 
-DLQ in an ARC-governed streaming system serves a fundamentally different
+DLQ in an Chio-governed streaming system serves a fundamentally different
 purpose than traditional DLQ. It is a security audit trail, not just an
 error recovery mechanism:
 
@@ -502,8 +502,8 @@ Traditional DLQ:
   Event -> Consumer -> Processing failed -> DLQ
   Meaning: "We tried and couldn't"
 
-ARC-governed DLQ:
-  Event -> Consumer -> ARC denied -> DLQ + denial receipt
+Chio-governed DLQ:
+  Event -> Consumer -> Chio denied -> DLQ + denial receipt
   Meaning: "We were not authorized to process this"
 
 The DLQ becomes a security signal:
@@ -513,8 +513,8 @@ The DLQ becomes a security signal:
 ```
 
 ```python
-class ArcDeadLetterProducer:
-    """Route denied events to DLQ with full ARC context."""
+class ChioDeadLetterProducer:
+    """Route denied events to DLQ with full Chio context."""
 
     async def send_to_dlq(self, event, verdict):
         dlq_event = {
@@ -522,7 +522,7 @@ class ArcDeadLetterProducer:
             "original_key": event.key(),
             "original_value": event.value(),
             "original_timestamp": event.timestamp(),
-            "arc_denial": {
+            "chio_denial": {
                 "receipt_id": verdict.receipt_id,
                 "reason": verdict.reason,
                 "scope_requested": verdict.scope,
@@ -536,9 +536,9 @@ class ArcDeadLetterProducer:
             topic=self.dlq_topic,
             value=json.dumps(dlq_event),
             headers={
-                "X-Arc-Receipt": verdict.receipt_id,
-                "X-Arc-Denial-Reason": verdict.reason,
-                "X-Arc-Original-Topic": event.topic(),
+                "X-Chio-Receipt": verdict.receipt_id,
+                "X-Chio-Denial-Reason": verdict.reason,
+                "X-Chio-Original-Topic": event.topic(),
             },
         )
 ```
@@ -548,13 +548,13 @@ class ArcDeadLetterProducer:
 ```sql
 -- BigQuery / Redshift: analyze denial patterns
 SELECT
-    json_extract_scalar(arc_denial, '$.reason') AS denial_reason,
-    json_extract_scalar(arc_denial, '$.scope_requested') AS scope,
-    json_extract_scalar(arc_denial, '$.identity') AS agent_id,
+    json_extract_scalar(chio_denial, '$.reason') AS denial_reason,
+    json_extract_scalar(chio_denial, '$.scope_requested') AS scope,
+    json_extract_scalar(chio_denial, '$.identity') AS agent_id,
     COUNT(*) AS denial_count,
     MIN(event_timestamp) AS first_seen,
     MAX(event_timestamp) AS last_seen
-FROM arc_dlq_events
+FROM chio_dlq_events
 WHERE event_date >= CURRENT_DATE - INTERVAL 7 DAY
 GROUP BY 1, 2, 3
 ORDER BY denial_count DESC;
@@ -570,7 +570,7 @@ Agent A (order-service)                  Agent B (payment-service)
   |                                        |
   | produce: order.placed                  |
   | receipt: rcpt_001                      |
-  | header: X-Arc-Receipt=rcpt_001         |
+  | header: X-Chio-Receipt=rcpt_001         |
   |                                        |
   +------> [topic: orders] ------>---------+
                                            |
@@ -585,8 +585,8 @@ Agent A (order-service)                  Agent B (payment-service)
                                            |
                                     produce: payment.charged
                                     receipt: rcpt_004
-                                    header: X-Arc-Receipt=rcpt_004
-                                    header: X-Arc-Chain=rcpt_001->rcpt_002->rcpt_003->rcpt_004
+                                    header: X-Chio-Receipt=rcpt_004
+                                    header: X-Chio-Chain=rcpt_001->rcpt_002->rcpt_003->rcpt_004
                                            |
   +------> [topic: payments] <----<--------+
   |
@@ -612,15 +612,15 @@ arc receipt chain rcpt_005 --direction backward
 # Traces back to the original order.placed event
 ```
 
-## 10. Rust Substrate: `arc-streaming-core`
+## 10. Rust Substrate: `chio-streaming-core`
 
 A Rust crate providing the core streaming evaluation model, used by the
 Python/TS/Go SDK wrappers:
 
 ```rust
-//! Core types for ARC event streaming integration.
+//! Core types for Chio event streaming integration.
 
-use arc_core::{CapabilityToken, Receipt, Scope};
+use chio_core::{CapabilityToken, Receipt, Scope};
 use serde::{Deserialize, Serialize};
 
 /// Evaluation context for an event consumption or production.
@@ -668,37 +668,37 @@ pub struct StreamReceiptMeta {
 
 ```
 crates/
-  arc-streaming-core/
-    Cargo.toml              # deps: arc-core
+  chio-streaming-core/
+    Cargo.toml              # deps: chio-core
     src/
       lib.rs                # StreamEventContext, StreamReceiptMeta
       evaluate.rs           # Event-to-evaluation mapping
       chain.rs              # Receipt chain traversal
 
-sdks/python/arc-streaming/
-  pyproject.toml            # deps: arc-sdk-python
-  src/arc_streaming/
+sdks/python/chio-streaming/
+  pyproject.toml            # deps: chio-sdk-python
+  src/chio_streaming/
     __init__.py
     kafka/
       __init__.py
-      consumer.py           # ArcConsumerMiddleware
-      producer.py           # ArcProducerMiddleware
-      transactional.py      # ArcTransactionalProcessor
-      group.py              # ArcConsumerGroup (swarm model)
+      consumer.py           # ChioConsumerMiddleware
+      producer.py           # ChioProducerMiddleware
+      transactional.py      # ChioTransactionalProcessor
+      group.py              # ChioConsumerGroup (swarm model)
     nats/
       __init__.py
-      middleware.py          # ArcNatsMiddleware
+      middleware.py          # ChioNatsMiddleware
       capability_store.py   # NATS KV capability store
     pubsub/
       __init__.py
-      middleware.py          # ArcPubSubMiddleware
+      middleware.py          # ChioPubSubMiddleware
     eventbridge/
       __init__.py
-      handler.py            # ArcEventBridgeHandler
+      handler.py            # ChioEventBridgeHandler
     redis/
       __init__.py
-      consumer.py           # ArcRedisStreamConsumer
-    dlq.py                  # ArcDeadLetterProducer
+      consumer.py           # ChioRedisStreamConsumer
+    dlq.py                  # ChioDeadLetterProducer
     chain.py                # Receipt chain utilities
   tests/
     test_kafka_consumer.py
@@ -707,8 +707,8 @@ sdks/python/arc-streaming/
     test_dlq.py
     test_receipt_chain.py
 
-sdks/typescript/arc-streaming/
-  package.json              # deps: @arc-protocol/node-http
+sdks/typescript/chio-streaming/
+  package.json              # deps: @chio-protocol/node-http
   src/
     kafka/                  # kafkajs integration
     nats/                   # nats.js integration
@@ -718,7 +718,7 @@ sdks/typescript/arc-streaming/
 ## 12. Open Questions
 
 1. **Broker-level enforcement.** This design evaluates at the consumer,
-   not the broker. Should ARC offer a Kafka interceptor plugin or NATS
+   not the broker. Should Chio offer a Kafka interceptor plugin or NATS
    authorization callout that evaluates at the broker level? Pro: earlier
    enforcement. Con: broker coupling, latency on the hot path.
 
@@ -731,15 +731,15 @@ sdks/typescript/arc-streaming/
    Linking replicate events across clusters. Should receipts replicate
    with the events, or should each cluster maintain its own receipt chain?
 
-4. **Backpressure.** If ARC denies a high volume of events, the DLQ may
+4. **Backpressure.** If Chio denies a high volume of events, the DLQ may
    become a bottleneck. Should the consumer apply backpressure to the
    source topic, or should denial rate trigger consumer group shutdown?
 
 5. **Event replay.** Kafka consumers can reset offsets to replay events.
-   Should ARC re-evaluate capabilities on replay (they may have changed),
+   Should Chio re-evaluate capabilities on replay (they may have changed),
    or honor the original evaluation from the receipt chain?
 
 6. **Windowed aggregations.** Kafka Streams / Flink windowed aggregations
-   consume many events to produce one result. Should ARC evaluate per-event
+   consume many events to produce one result. Should Chio evaluate per-event
    or per-window? Per-window is more practical but loses per-event
    granularity.

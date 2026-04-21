@@ -131,7 +131,7 @@
       ],
       "signature": "7f27fed6083baaf391984aa08c0976bbd9edf46edada2abd58af8663aa0655497b242fc0264831675b49895f7b8804e36396c41a6f287d22ba84ea8d9b569b0b"
     },
-    "arc_receipt_id": null,
+    "chio_receipt_id": null,
     "execution": {
       "verdict": "allow",
       "cost_charged": 500,
@@ -150,8 +150,8 @@
       "requested_service": "inference-gateway",
       "requested_rule": "geo-restrict-v42",
       "approval_token_id": null,
-      "arc_mediated": true,
-      "arc_receipt_id": null,
+      "chio_mediated": true,
+      "chio_receipt_id": null,
       "provider_operation": {
         "action": "disabled",
         "executed_at": 1776300794,

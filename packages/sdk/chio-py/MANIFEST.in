@@ -1,0 +1,8 @@
+include README.md
+include pyproject.toml
+recursive-include src/chio *.py
+recursive-include src/chio py.typed
+prune src/chio.egg-info
+prune src/chio_py.egg-info
+global-exclude __pycache__
+global-exclude *.py[cod]

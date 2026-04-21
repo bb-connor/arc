@@ -1,0 +1,104 @@
+{
+  "matrixId": "arc.web3-external-qualification.v1",
+  "generatedAt": "2026-04-02T23:15:00Z",
+  "lanes": [
+    {
+      "id": "contracts.local-devnet",
+      "scope": "official contract family",
+      "status": "qualified_locally",
+      "evidence": [
+        "contracts/reports/local-devnet-qualification.json",
+        "contracts/reports/CHIO_WEB3_CONTRACT_SECURITY_REVIEW.md",
+        "contracts/reports/CHIO_WEB3_CONTRACT_GAS_AND_STORAGE.md"
+      ]
+    },
+    {
+      "id": "oracle.runtime",
+      "scope": "chio-link plus kernel cross-currency enforcement",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/CHIO_LINK_PROFILE.md",
+        "target/release-qualification/web3-runtime/ops/runtime-reports/chio-link-runtime-report.json",
+        "target/release-qualification/web3-runtime/ops/control-state/chio-link-control-state.json",
+        "docs/standards/CHIO_LINK_KERNEL_RECEIPT_POLICY.md"
+      ]
+    },
+    {
+      "id": "anchor.runtime",
+      "scope": "chio-anchor publication, discovery, proof bundles, and ops controls",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/CHIO_ANCHOR_PROFILE.md",
+        "target/release-qualification/web3-runtime/ops/runtime-reports/chio-anchor-runtime-report.json",
+        "target/release-qualification/web3-runtime/ops/control-state/chio-anchor-control-state.json",
+        "docs/standards/CHIO_WEB3_OPERATIONS_PROFILE.md"
+      ]
+    },
+    {
+      "id": "settlement.runtime",
+      "scope": "chio-settle dispatch, observation, reorg recovery, and ops controls",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/CHIO_SETTLE_PROFILE.md",
+        "target/release-qualification/web3-runtime/e2e/partner-qualification.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/fx-dual-sign-settlement.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/reorg-recovery.json",
+        "target/release-qualification/web3-runtime/ops/runtime-reports/chio-settle-runtime-report.json",
+        "target/release-qualification/web3-runtime/ops/control-state/chio-settle-control-state.json",
+        "crates/chio-settle/tests/runtime_devnet.rs"
+      ]
+    },
+    {
+      "id": "interop.overlays",
+      "scope": "Functions fallback, automation, CCIP coordination, and payment interop",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/CHIO_FUNCTIONS_FALLBACK_PROFILE.md",
+        "docs/standards/CHIO_AUTOMATION_PROFILE.md",
+        "docs/standards/CHIO_CCIP_PROFILE.md",
+        "docs/standards/CHIO_PAYMENT_INTEROP_PROFILE.md"
+      ]
+    },
+    {
+      "id": "promotion.and.ops",
+      "scope": "web3 qualification script, readiness audit, and promotion gates",
+      "status": "partner_visible",
+      "evidence": [
+        "scripts/qualify-web3-runtime.sh",
+        "scripts/qualify-web3-e2e.sh",
+        "scripts/qualify-web3-ops-controls.sh",
+        "scripts/qualify-web3-promotion.sh",
+        ".github/workflows/release-qualification.yml",
+        "scripts/stage-web3-release-artifacts.sh",
+        "target/release-qualification/web3-runtime/artifact-manifest.json",
+        "target/release-qualification/web3-runtime/logs/qualification.log",
+        "target/release-qualification/web3-runtime/logs/e2e-qualification.log",
+        "target/release-qualification/web3-runtime/logs/ops-qualification.log",
+        "target/release-qualification/web3-runtime/logs/promotion-qualification.log",
+        "target/release-qualification/web3-runtime/e2e/partner-qualification.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/timeout-refund-recovery.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/bond-impair-recovery.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/bond-expiry-recovery.json",
+        "target/release-qualification/web3-runtime/ops/incident-audit.json",
+        "target/release-qualification/web3-runtime/ops/control-traces/chio-link-control-trace.json",
+        "target/release-qualification/web3-runtime/ops/control-traces/chio-anchor-control-trace.json",
+        "target/release-qualification/web3-runtime/ops/control-traces/chio-settle-control-trace.json",
+        "target/release-qualification/web3-runtime/promotion/promotion-qualification.json",
+        "contracts/deployments/local-devnet.reviewed.json",
+        "docs/standards/CHIO_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json",
+        "docs/standards/CHIO_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json",
+        "docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json",
+        "docs/standards/CHIO_WEB3_OPERATIONS_QUALIFICATION_MATRIX.json",
+        "docs/release/CHIO_WEB3_READINESS_AUDIT.md",
+        "docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md",
+        "docs/release/CHIO_WEB3_PARTNER_PROOF.md",
+        "docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md"
+      ]
+    }
+  ],
+  "remainingExternalDependencies": [
+    "hosted CI and release-qualification observation on the candidate revision",
+    "operator-filled reviewed chain manifests and approval records for the target environment",
+    "operator-owned RPC, deployer key material, and predeployed CREATE2 factory for the target chain"
+  ]
+}

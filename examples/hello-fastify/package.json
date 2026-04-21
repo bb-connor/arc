@@ -6,7 +6,7 @@
     "start": "node server.mjs"
   },
   "dependencies": {
-    "@arc-protocol/fastify": "file:../../sdks/typescript/packages/fastify",
+    "@chio-protocol/fastify": "file:../../sdks/typescript/packages/fastify",
     "fastify": "^5.3.3"
   }
 }

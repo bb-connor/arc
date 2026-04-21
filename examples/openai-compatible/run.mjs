@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { ArcClient, ReceiptQueryClient } from "@arc-protocol/sdk";
+import { ChioClient, ReceiptQueryClient } from "@chio-protocol/sdk";
 
 const DEFAULT_ARC_BASE_URL = "http://127.0.0.1:8931";
 const DEFAULT_ARC_CONTROL_URL = "http://127.0.0.1:8940";
@@ -12,9 +12,9 @@ const model = process.env.OPENAI_MODEL ?? "gpt-5-mini";
 
 function arcConfig() {
   return {
-    baseUrl: process.env.ARC_BASE_URL ?? DEFAULT_ARC_BASE_URL,
-    controlUrl: process.env.ARC_CONTROL_URL ?? DEFAULT_ARC_CONTROL_URL,
-    authToken: process.env.ARC_AUTH_TOKEN ?? DEFAULT_ARC_AUTH_TOKEN,
+    baseUrl: process.env.CHIO_BASE_URL ?? DEFAULT_ARC_BASE_URL,
+    controlUrl: process.env.CHIO_CONTROL_URL ?? DEFAULT_ARC_CONTROL_URL,
+    authToken: process.env.CHIO_AUTH_TOKEN ?? DEFAULT_ARC_AUTH_TOKEN,
   };
 }
 
@@ -45,7 +45,7 @@ async function latestReceipt(controlUrl, authToken, capabilityId) {
   return receipt;
 }
 
-function openAiToolsFromArc(tools) {
+function openAiToolsFromChio(tools) {
   return tools.map((tool) => ({
     type: "function",
     function: {
@@ -71,9 +71,9 @@ function renderToolResult(result) {
 
 async function main() {
   const { baseUrl, controlUrl, authToken } = arcConfig();
-  const client = ArcClient.withStaticBearer(baseUrl, authToken);
+  const client = ChioClient.withStaticBearer(baseUrl, authToken);
   const session = await client.initialize({
-    clientInfo: { name: "arc-openai-compatible-example", version: "0.1.0" },
+    clientInfo: { name: "chio-openai-compatible-example", version: "0.1.0" },
   });
 
   try {
@@ -124,7 +124,7 @@ async function main() {
       },
       { role: "user", content: livePrompt },
     ];
-    const toolDefinitions = openAiToolsFromArc(tools);
+    const toolDefinitions = openAiToolsFromChio(tools);
     let lastToolResult = null;
 
     while (true) {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC AgentMessage tool_call_request",
+  "title": "Chio AgentMessage tool_call_request",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "id", "capability_token", "server_id", "tool", "params"],

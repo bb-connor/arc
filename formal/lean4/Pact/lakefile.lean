@@ -1,13 +1,13 @@
 import Lake
 open Lake DSL
 
-package arc where
+package chio where
   leanOptions := #[
     ⟨`autoImplicit, false⟩
   ]
 
 @[default_target]
-lean_lib Arc where
+lean_lib Chio where
   srcDir := "."
 
 lean_lib Pact where

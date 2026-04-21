@@ -1,30 +1,30 @@
-# `did:arc` Method
+# `did:chio` Method
 
 **Status:** shipped in v2 portable-trust lane  
 **Date:** 2026-03-23
 
-**Transition note:** Phase 29 of the ARC rename freezes `did:arc` as a legacy
-compatibility method for already-issued ARC artifacts. The planned ARC
+**Transition note:** Phase 29 of the Chio rename freezes `did:chio` as a legacy
+compatibility method for already-issued Chio artifacts. The planned Chio
 transition is documented in
-`docs/standards/ARC_IDENTITY_TRANSITION.md`.
+`docs/standards/CHIO_IDENTITY_TRANSITION.md`.
 
 ---
 
 ## Overview
 
-`did:arc` is ARC's currently shipped self-certifying DID method for Ed25519
+`did:chio` is Chio's currently shipped self-certifying DID method for Ed25519
 identities already used by agents, kernels, and capability authorities.
 
 Format:
 
 ```text
-did:arc:{64-hex-character-ed25519-public-key}
+did:chio:{64-hex-character-ed25519-public-key}
 ```
 
 Example:
 
 ```text
-did:arc:80f2b577472e6662f46ac2e029f4b2d1300f889bc767b3de1f7b63a4c562fd8f
+did:chio:80f2b577472e6662f46ac2e029f4b2d1300f889bc767b3de1f7b63a4c562fd8f
 ```
 
 The DID is self-certifying. Basic resolution requires no registry lookup: the
@@ -32,10 +32,10 @@ method-specific identifier is the public key.
 
 ## Resolution
 
-The resolver lives in the `arc-did` crate and is exposed in the CLI via:
+The resolver lives in the `chio-did` crate and is exposed in the CLI via:
 
 ```text
-arc did resolve --did did:arc:...
+arc did resolve --did did:chio:...
 arc did resolve --public-key <hex>
 ```
 
@@ -50,9 +50,9 @@ The verification method shape is:
 
 ```json
 {
-  "id": "did:arc:...#key-1",
+  "id": "did:chio:...#key-1",
   "type": "Ed25519VerificationKey2020",
-  "controller": "did:arc:...",
+  "controller": "did:chio:...",
   "publicKeyMultibase": "z..."
 }
 ```
@@ -65,15 +65,15 @@ the standard multicodec prefix `0xed01`.
 Resolvers may attach receipt-log service endpoints when the local environment
 knows where a subject's receipt log is published.
 
-ARC currently ships one service type here:
+Chio currently ships one service type here:
 
-- `ArcReceiptLogService`
+- `ChioReceiptLogService`
 
 CLI example:
 
 ```text
 arc did resolve \
-  --did did:arc:... \
+  --did did:chio:... \
   --receipt-log-url https://trust.example.com/v1/receipts
 ```
 
@@ -81,8 +81,8 @@ That produces a `service` entry like:
 
 ```json
 {
-  "id": "did:arc:...#receipt-log",
-  "type": "ArcReceiptLogService",
+  "id": "did:chio:...#receipt-log",
+  "type": "ChioReceiptLogService",
   "serviceEndpoint": "https://trust.example.com/v1/receipts"
 }
 ```
@@ -95,13 +95,13 @@ deterministically as `#receipt-log`, `#receipt-log-2`, and so on.
 Shipped now:
 
 - self-certifying DID parsing and canonicalization
-- DID document resolution for any ARC Ed25519 public key
+- DID document resolution for any Chio Ed25519 public key
 - stable `Ed25519VerificationKey2020` verification method output
 - optional receipt-log service attachment
-- Agent Passport alpha verification on top of `did:arc`
+- Agent Passport alpha verification on top of `did:chio`
 
 Not shipped yet:
 
-- `did:arc:update` receipt flows
+- `did:chio:update` receipt flows
 - key rotation receipts
 - external DID-method registration work

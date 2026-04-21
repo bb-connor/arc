@@ -1,4 +1,4 @@
-# ARC Changelog
+# Chio Changelog
 
 ---
 
@@ -68,7 +68,7 @@
 
 - **Signed verifier policy artifacts** (`arc-credentials`, `arc-cli`):
   verifier policy is now a signed reusable document with schema
-  `arc.passport-verifier-policy.v1`, explicit `policy_id`, verifier binding,
+  `chio.passport-verifier-policy.v1`, explicit `policy_id`, verifier binding,
   validity window, and signer public key. Operators can manage these artifacts
   locally or remotely with `arc passport policy create|verify|list|get|upsert|delete`
   and trust-control verifier policy CRUD endpoints.
@@ -117,7 +117,7 @@
 
 - **DPoP proof-of-possession** (`arc-kernel`): Added `DpopProof`,
   `DpopProofBody`, `DpopNonceStore`, and `verify_dpop_proof`. The 8-field
-  ARC-native DPoP format (`arc.dpop_proof.v1`) binds each invocation to the
+  Chio-native DPoP format (`arc.dpop_proof.v1`) binds each invocation to the
   agent's Ed25519 private key. Enabled per-grant via
   `ToolGrant::dpop_required: Option<bool>`. Default TTL 300s, clock skew
   tolerance 30s, LRU nonce cache capacity 8192.
@@ -183,7 +183,7 @@
   `GET /v1/lineage/{capability_id}/chain` for querying delegation chain
   snapshots.
 
-- **`ARC Certify` alpha CLI** (`arc-cli`, `arc-conformance`): New
+- **`Chio Certify` alpha CLI** (`arc-cli`, `arc-conformance`): New
   `arc certify check` command evaluates a conformance scenario/result corpus
   against the fail-closed `conformance-all-pass-v1` profile and emits a signed
   `arc.certify.check.v1` pass/fail artifact. Optional markdown report output
@@ -264,7 +264,7 @@
 
 - **`did:arc` method + resolver** (`arc-did`, `arc-cli`): Added the new
   `arc-did` workspace crate with self-certifying `did:arc` parsing,
-  canonicalization, and DID Document resolution for any ARC Ed25519 public
+  canonicalization, and DID Document resolution for any Chio Ed25519 public
   key. The resolved document emits a stable `Ed25519VerificationKey2020`
   method, canonical `publicKeyMultibase`, and optional validated
   `ArcReceiptLogService` endpoints. The CLI now exposes this via
@@ -308,16 +308,16 @@
 - **A2A adapter skeleton** (`arc-a2a-adapter`): Added the new
   `arc-a2a-adapter` workspace crate with A2A v1.0.0 Agent Card discovery,
   preferred-interface selection, and blocking `SendMessage` mediation for both
-  `JSONRPC` and `HTTP+JSON`. The adapter exposes one ARC tool per advertised
+  `JSONRPC` and `HTTP+JSON`. The adapter exposes one Chio tool per advertised
   A2A skill, routes skill intent through the explicit
   `metadata.arc.targetSkillId` convention, requires HTTPS except for
   localhost test targets, and is verified by direct adapter tests plus an
   end-to-end kernel receipt test.
 
 - **A2A task follow-up support** (`arc-a2a-adapter`): Extended the A2A
-  adapter with adapter-local `get_task` follow-up mode so the same ARC
+  adapter with adapter-local `get_task` follow-up mode so the same Chio
   skill-scoped tool can poll A2A `GetTask` over both `JSONRPC` and
-  `HTTP+JSON` after a non-terminal `SendMessage` response. The public ARC
+  `HTTP+JSON` after a non-terminal `SendMessage` response. The public Chio
   tool contract now truthfully exposes snake_case follow-up fields while still
   accepting camelCase aliases for compatibility, rejects mixed send/follow-up
   inputs fail-closed, and is verified by direct transport tests plus a kernel
@@ -340,7 +340,7 @@
   interface tenant metadata into `SendMessage` and HTTP `GetTask` requests.
 
 - **A2A subscribe-task support** (`arc-a2a-adapter`): Extended the A2A
-  adapter with adapter-local `subscribe_task` follow-up mode so the same ARC
+  adapter with adapter-local `subscribe_task` follow-up mode so the same Chio
   tool can reattach to live task updates through A2A `SubscribeToTask` over
   both `JSONRPC` and `HTTP+JSON`. The HTTP transport now follows the current
   A2A proto's tenant path semantics instead of a query-string shim, and
@@ -386,7 +386,7 @@
   the A2A lifecycle surface so `historyLength` is only sent on `SendMessage`
   and `GetTask` when the Agent Card explicitly advertises
   `capabilities.stateTransitionHistory = true`. This closes a protocol-truth
-  gap where ARC previously parsed the capability but did not enforce it. The
+  gap where Chio previously parsed the capability but did not enforce it. The
   shipped tests now cover both supported history paths and fail-closed local
   denial when the capability is absent.
 
@@ -407,7 +407,7 @@
   retry logic so the full verification/test signal is repeatable again.
 
 - **Identity federation alpha** (`arc-cli`): JWT-authenticated
-  `arc mcp serve-http` sessions can now derive a stable ARC subject from the
+  `arc mcp serve-http` sessions can now derive a stable Chio subject from the
   authenticated enterprise principal when `--identity-federation-seed-file` is
   configured. Principals are canonicalized as `oidc:<issuer>#sub:<sub>` or
   `oidc:<issuer>#client:<client_id>`, the edge derives a deterministic subject

@@ -12,7 +12,7 @@ Slice A research and planning are now documented in:
 
 The first implementation slice is now scaffolded:
 
-- `crates/arc-conformance` exists as the scenario/result/report model crate
+- `crates/chio-conformance` exists as the scenario/result/report model crate
 - `tests/conformance/` now contains the initial Wave 1 scenario catalog
 - JS and Python peer directories now exist as explicit harness targets
 - the repo can already generate a Markdown compatibility matrix from JSON result artifacts
@@ -21,8 +21,8 @@ The next live execution slice is now shipped:
 
 - `tests/conformance/fixtures/wave1/` contains a reusable upstream MCP fixture and policy
 - the JS and Python peers now execute real Wave 1 Streamable HTTP client scenarios
-- `arc-conformance-runner` boots `arc mcp serve-http`, runs both peers, collects JSON artifacts, and generates a Markdown matrix
-- `crates/arc-conformance/tests/wave1_live.rs` validates the end-to-end harness against a live local ARC edge
+- `chio-conformance-runner` boots `arc mcp serve-http`, runs both peers, collects JSON artifacts, and generates a Markdown matrix
+- `crates/chio-conformance/tests/wave1_live.rs` validates the end-to-end harness against a live local Chio edge
 
 The next compatibility-expansion slice is now underway:
 
@@ -36,7 +36,7 @@ The next auth/discovery slice is now shipped:
 - `tests/conformance/scenarios/wave3/` covers remote HTTP authorization behavior
 - the conformance runner now supports `--auth-mode oauth-local`
 - the JS and Python peers now execute protected-resource metadata discovery, authorization-server metadata discovery, auth-code + PKCE session initialization, token-exchange session initialization, and unauthenticated challenge validation
-- `crates/arc-conformance/tests/wave3_auth_live.rs` validates the end-to-end OAuth-backed remote edge against live JS and Python peers
+- `crates/chio-conformance/tests/wave3_auth_live.rs` validates the end-to-end OAuth-backed remote edge against live JS and Python peers
 - the generated Wave 3 matrix is green at `tests/conformance/reports/generated/wave3-auth.md`
 
 The next notification/subscription slice is now shipped:
@@ -44,7 +44,7 @@ The next notification/subscription slice is now shipped:
 - `tests/conformance/scenarios/wave4/` covers remote HTTP notifications and resource subscriptions
 - the wrapped fixture now advertises `resources.subscribe`, resource `listChanged`, prompt `listChanged`, and tool `listChanged`, and emits upstream notifications through a real wrapped tool path
 - the JS and Python peers now validate `resources/subscribe`, forwarded `notifications/resources/updated`, and forwarded resource/tool/prompt `list_changed` notifications
-- `crates/arc-conformance/tests/wave4_notifications_live.rs` validates the end-to-end notification slice against live JS and Python peers
+- `crates/chio-conformance/tests/wave4_notifications_live.rs` validates the end-to-end notification slice against live JS and Python peers
 - the generated Wave 4 matrix is green at `tests/conformance/reports/generated/wave4-notifications.md`
 
 The next nested-flow slice is now shipped:
@@ -52,7 +52,7 @@ The next nested-flow slice is now shipped:
 - `tests/conformance/scenarios/wave5/` covers remote HTTP nested-flow interoperability
 - the wrapped fixture now issues live `sampling/createMessage`, form-mode `elicitation/create`, URL-mode `elicitation/create`, `notifications/elicitation/complete`, and `roots/list` requests through real wrapped tool calls
 - the JS and Python peers now respond to nested sampling, elicitation, and roots callbacks over remote HTTP and validate the resulting tool outputs
-- `crates/arc-conformance/tests/wave5_nested_flows_live.rs` validates the end-to-end nested-flow slice against live JS and Python peers
+- `crates/chio-conformance/tests/wave5_nested_flows_live.rs` validates the end-to-end nested-flow slice against live JS and Python peers
 - the generated Wave 5 matrix is green at `tests/conformance/reports/generated/wave5-nested-flows.md`
 - the remote HTTP runtime now allows notification/response POSTs to temporarily own a stream when no request stream is active, which closes the `notifications/initialized` -> `roots/list` gap that was blocking remote nested-flow coverage
 
@@ -66,7 +66,7 @@ Preconditions expected before starting:
 What this epic is for:
 
 - prove compatibility claims against real peers
-- make native ARC server authoring cheaper than low-level trait wiring
+- make native Chio server authoring cheaper than low-level trait wiring
 - publish migration paths instead of expecting users to reverse-engineer them from tests
 
 ## Suggested issue title
@@ -75,22 +75,22 @@ What this epic is for:
 
 ## Problem
 
-ARC now has a strong local implementation story, but its compatibility and adoption story still depends too much on repo-local confidence.
+Chio now has a strong local implementation story, but its compatibility and adoption story still depends too much on repo-local confidence.
 
 That blocks:
 
 - credible claims against existing MCP ecosystems
 - easy regression detection across client/server implementations
-- third-party native ARC adoption
+- third-party native Chio adoption
 
 ## Outcome
 
 By the end of E8:
 
 - compatibility claims are generated from tests and fixtures
-- ARC has a published interop matrix against real MCP peers
-- native ARC providers can be authored through a higher-level service/router model
-- migration from wrapped MCP servers to native ARC servers is documented and example-backed
+- Chio has a published interop matrix against real MCP peers
+- native Chio providers can be authored through a higher-level service/router model
+- migration from wrapped MCP servers to native Chio servers is documented and example-backed
 
 ## Scope
 
@@ -110,8 +110,8 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-mcp-adapter`
-- `crates/arc-kernel`
+- `crates/chio-mcp-adapter`
+- `crates/chio-kernel`
 - new SDK or helper crates if added
 - `tests`
 - `docs`
@@ -143,23 +143,23 @@ Requirements:
 
 Responsibilities:
 
-- test both wrapped MCP flows and native ARC-backed MCP edge flows
+- test both wrapped MCP flows and native Chio-backed MCP edge flows
 - make failures easy to localize by surface area
 
 More detailed execution guidance now exists:
 
-- keep the current `crates/arc-cli/tests` suite as the fast local integration layer
+- keep the current `crates/chio-cli/tests` suite as the fast local integration layer
 - add a dedicated conformance harness above it, not inside it
 - start with a small Wave 1 matrix before expanding to auth and advanced notifications
-- separate MCP-core scenarios from ARC-extension scenarios in the generated report
+- separate MCP-core scenarios from Chio-extension scenarios in the generated report
 
 ### Slice B: migration fixtures
 
 Requirements:
 
 - representative wrapped-server deployments
-- migration docs from MCP server to wrapped ARC edge
-- migration docs from wrapped MCP server to native ARC provider
+- migration docs from MCP server to wrapped Chio edge
+- migration docs from wrapped MCP server to native Chio provider
 
 Responsibilities:
 
@@ -206,7 +206,7 @@ Recommended execution order inside `T8.1`:
 ### `T8.3` Migration docs and fixtures
 
 - wrapped MCP deployment replacement guide
-- native ARC provider example set
+- native Chio provider example set
 - explicit “when to wrap vs when to port” guidance
 
 ### `T8.4` Native authoring SDK
@@ -223,7 +223,7 @@ Useful references to study, not copy blindly:
 - RMCP’s published compatibility reporting style
 - RMCP’s service/handler layering for server authoring ergonomics
 
-ARC should take the harness discipline and SDK ergonomics, not import another runtime’s assumptions wholesale.
+Chio should take the harness discipline and SDK ergonomics, not import another runtime’s assumptions wholesale.
 
 ## Dependencies
 
@@ -232,7 +232,7 @@ ARC should take the harness discipline and SDK ergonomics, not import another ru
 
 ## Risks
 
-- writing a compatibility matrix that overfits ARC’s own behavior instead of the spec
+- writing a compatibility matrix that overfits Chio’s own behavior instead of the spec
 - building a high-level SDK before the runtime contract is stable
 - adding abstractions that hide security-critical details from authors
 
@@ -246,7 +246,7 @@ ARC should take the harness discipline and SDK ergonomics, not import another ru
 
 - compatibility matrix is generated from tests, not hand-written
 - at least one JS peer and one Python peer are exercised in CI
-- migration docs cover both wrapped MCP and native ARC paths
+- migration docs cover both wrapped MCP and native Chio paths
 - native authoring examples use a higher-level service abstraction instead of only low-level traits
 
 ## Definition of done

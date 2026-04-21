@@ -16,16 +16,16 @@ for the full policy stack.
   ClawdStrike            (reference engine: compiles rules to guards)
        |
        v
-  arc-guards             (ARC-native Guard trait impls, adapted from ClawdStrike)
+  chio-guards             (Chio-native Guard trait impls, adapted from ClawdStrike)
        |
        v
-  ArcKernel.guards       (Vec<Box<dyn Guard>>, evaluated in registration order)
+  ChioKernel.guards       (Vec<Box<dyn Guard>>, evaluated in registration order)
 ```
 
 A HushSpec document defines declarative rules (forbidden_paths, egress, secret
 patterns, tool access, etc.). ClawdStrike compiles these into its async Guard
-trait implementations. The `arc-guards` crate adapts 11+ ClawdStrike guards
-to ARC's synchronous `Guard` trait. These get registered on the kernel.
+trait implementations. The `chio-guards` crate adapts 11+ ClawdStrike guards
+to Chio's synchronous `Guard` trait. These get registered on the kernel.
 
 WASM guards must slot into this stack without duplicating it.
 
@@ -55,7 +55,7 @@ external lookups via host functions, stateful pattern matching).
 WASM guards run in the same `Vec<Box<dyn Guard>>` as everything else. The
 recommended registration order:
 
-1. HushSpec-compiled guards (via `arc_policy::compiler::compile_policy()`)
+1. HushSpec-compiled guards (via `chio_policy::compiler::compile_policy()`)
 2. WASM guards -- custom programmatic guards
 3. `AdvisoryPipeline` -- non-blocking observations (last, since they never deny)
 
@@ -67,7 +67,7 @@ This ordering matters because:
 
 > **Correction:** `GuardPipeline::default_pipeline()` creates guards with
 > hard-coded default configs, ignoring any HushSpec policy. The real HushSpec
-> bridge is `arc_policy::compiler::compile_policy()`, which reads a HushSpec
+> bridge is `chio_policy::compiler::compile_policy()`, which reads a HushSpec
 > document and produces a `GuardPipeline` configured from the policy's rule
 > blocks (patterns, allowlists, thresholds, enabled flags, etc.).
 >
@@ -78,7 +78,7 @@ This ordering matters because:
 The startup code should enforce this ordering:
 
 ```rust
-use arc_policy::compiler::compile_policy;
+use chio_policy::compiler::compile_policy;
 
 // 1. HushSpec-compiled guards (respects policy config)
 let compiled = compile_policy(&hushspec)?;
@@ -107,7 +107,7 @@ WASM guards complement vs. overlap:
 
 ### No overlap needed (HushSpec handles these well)
 
-| HushSpec Rule | ClawdStrike Guard | ARC Guard | WASM needed? |
+| HushSpec Rule | ClawdStrike Guard | Chio Guard | WASM needed? |
 |---------------|------------------|-----------|-------------|
 | `forbidden_paths` | ForbiddenPathGuard | ForbiddenPathGuard | No |
 | `path_allowlist` | PathAllowlistGuard | PathAllowlistGuard | No |
@@ -171,13 +171,13 @@ pub trait Detector: Send + Sync {
 ```
 
 This is registered via `DetectorRegistry` and used by the Detection extension.
-It runs during HushSpec evaluation, not in the ARC kernel guard pipeline.
+It runs during HushSpec evaluation, not in the Chio kernel guard pipeline.
 
 **Should WASM guards also be usable as HushSpec detectors?**
 
 No. Keep the boundaries clean:
 - HushSpec detectors run during HushSpec evaluation (in ClawdStrike)
-- WASM guards run during ARC kernel guard evaluation
+- WASM guards run during Chio kernel guard evaluation
 - They serve different layers of the stack
 
 However, the **Detection extension thresholds** in HushSpec (prompt injection,
@@ -197,11 +197,11 @@ This is a future host function, not a launch requirement.
 
 ---
 
-## 4. ClawdStrike Guard Trait vs. ARC Guard Trait
+## 4. ClawdStrike Guard Trait vs. Chio Guard Trait
 
-ClawdStrike and ARC have slightly different guard interfaces:
+ClawdStrike and Chio have slightly different guard interfaces:
 
-| | ClawdStrike | ARC |
+| | ClawdStrike | Chio |
 |-|-------------|-----|
 | Trait | `Guard` (async) | `Guard` (sync) |
 | Method | `check(&self, action, context)` | `evaluate(&self, ctx)` |
@@ -210,11 +210,11 @@ ClawdStrike and ARC have slightly different guard interfaces:
 | Verdict | Allowed / Denied (with message) | Allow / Deny |
 | Async | Yes (`#[async_trait]`) | No |
 
-WASM guards implement ARC's `Guard` trait, not ClawdStrike's. This is correct
-because WASM guards run inside the ARC kernel, not inside ClawdStrike.
+WASM guards implement Chio's `Guard` trait, not ClawdStrike's. This is correct
+because WASM guards run inside the Chio kernel, not inside ClawdStrike.
 
 But the `GuardRequest` type sent to WASM guests (defined in
-`arc-wasm-guards/src/abi.rs`) should include enough context for the guest to
+`chio-wasm-guards/src/abi.rs`) should include enough context for the guest to
 make decisions that ClawdStrike's richer `GuardAction` enables. Currently
 `GuardRequest` has:
 
@@ -280,7 +280,7 @@ A future schema change would add an inline `config` map to `WasmGuardEntry`,
 letting operators override manifest defaults per deployment:
 
 ```rust
-// Proposed for v1.1 -- requires schema change in arc-config/src/schema.rs
+// Proposed for v1.1 -- requires schema change in chio-config/src/schema.rs
 pub struct WasmGuardEntry {
     pub name: String,
     pub path: String,
@@ -345,20 +345,20 @@ Not needed for v1, but the architecture should not preclude it.
 
 ## 7. Receipt and Audit Integration
 
-Both ClawdStrike and ARC sign receipts. WASM guard decisions need to flow into
+Both ClawdStrike and Chio sign receipts. WASM guard decisions need to flow into
 the same audit trail:
 
 | System | Receipt type | What it records |
 |--------|-------------|-----------------|
 | ClawdStrike | Ed25519-signed `GuardResult` | Verdict, severity, guard name, message |
-| ARC | Signed `Decision` in receipt log | Allow/Deny, guard name, denial reason |
+| Chio | Signed `Decision` in receipt log | Allow/Deny, guard name, denial reason |
 | HushSpec | `DecisionReceipt` (via `evaluate_audited`) | Decision, matched rule, reason, rule trace |
 
 WASM guard denials already flow through `KernelError::GuardDenied` and get
-recorded in ARC's receipt log. But the receipt should include:
+recorded in Chio's receipt log. But the receipt should include:
 
 - Guard name (already captured)
-- Denial reason (available via `arc_deny_reason` or offset-64K protocol)
+- Denial reason (available via `chio_deny_reason` or offset-64K protocol)
 - Fuel consumed (proposed in 03-IMPLEMENTATION-PLAN.md Section 8.3)
 - **Guard manifest hash** -- which exact `.wasm` binary made the decision
 
@@ -427,7 +427,7 @@ to `WasmGuardEntry` (see Section 5, Option A above).
 | No guidance on when to use HushSpec vs. WASM | Users might write WASM guards for things HushSpec handles | [FIXED] This document Section 2 |
 | Guard pipeline ordering not specified | WASM guards could run before cheap guards | [FIXED] Section 1 now specifies ordering via `compile_policy()` |
 | Doc 01 wrongly claimed priority sorting existed | Plans built on non-existent feature | [FIXED] Doc 01 now notes sorting is not implemented |
-| Doc 04 used `default_pipeline()` instead of `compile_policy()` | Would bypass HushSpec-specific config | [FIXED] Section 1 now uses `arc_policy::compiler` |
+| Doc 04 used `default_pipeline()` instead of `compile_policy()` | Would bypass HushSpec-specific config | [FIXED] Section 1 now uses `chio_policy::compiler` |
 | Config `config` field not in schema | Example YAML would fail to parse | [FIXED] Section 5 now documents the schema gap |
 | Docs 02 and 03 disagreed on ABI platform | Risk of building two ecosystems | [FIXED] Doc 02 Section 3.5 now says raw ABI v1, WIT v2 |
 | Use cases ahead of runtime model | Promised capabilities the sync/stateless design can't deliver | [FIXED] Section 2 now separates near-term vs. deferred |

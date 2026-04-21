@@ -1,6 +1,6 @@
 hushspec: "0.1.0"
 name: canonical-code-agent
-description: Supported starting point for coding-agent stacks in ARC.
+description: Supported starting point for coding-agent stacks in Chio.
 
 rules:
   forbidden_paths:

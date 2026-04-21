@@ -1,12 +1,12 @@
 /-
-  Core type definitions: CapabilityToken, ArcScope, ToolGrant, Operation,
+  Core type definitions: CapabilityToken, ChioScope, ToolGrant, Operation,
   Constraint, DelegationLink, Attenuation.
-  Mirrors: arc-core/src/capability.rs
+  Mirrors: chio-kernel-core/src/capability.rs
 -/
 
 set_option autoImplicit false
 
-namespace Arc.Core
+namespace Chio.Core
 
 abbrev ServerId := String
 abbrev ToolName := String
@@ -41,8 +41,8 @@ structure ToolGrant where
   maxInvocations : Option Nat
   deriving Repr, BEq, ReflBEq, LawfulBEq
 
-/-- Mirrors: ArcScope in capability.rs -/
-structure ArcScope where
+/-- Mirrors: ChioScope in capability.rs -/
+structure ChioScope where
   grants : List ToolGrant
   deriving Repr, BEq, ReflBEq, LawfulBEq
 
@@ -69,7 +69,7 @@ structure CapabilityToken where
   id : CapabilityId
   issuer : PublicKeyHex
   subject : PublicKeyHex
-  scope : ArcScope
+  scope : ChioScope
   issuedAt : Timestamp
   expiresAt : Timestamp
   delegationChain : List DelegationLink
@@ -86,4 +86,4 @@ def CapabilityToken.isExpiredAt (cap : CapabilityToken) (now : Timestamp) : Bool
 /-- Mirrors: KernelConfig.max_delegation_depth (default). -/
 def maxDelegationDepth : Nat := 32
 
-end Arc.Core
+end Chio.Core

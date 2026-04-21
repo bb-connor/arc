@@ -1,8 +1,8 @@
-# ARC Protocol
+# Chio Protocol
 
 **Version:** 3.0
 **Date:** 2026-04-14
-**Status:** Current bounded ARC release profile
+**Status:** Current bounded Chio release profile
 
 v3.0 is a backward-compatible extension of v2.0. All v2 artifacts, wire
 formats, and verification rules remain valid. v3 adds the HTTP substrate
@@ -13,7 +13,7 @@ changing existing contract semantics.
 
 ## 1. Purpose
 
-ARC is a capability-scoped mediation and evidence system for agent tool use.
+Chio is a capability-scoped mediation and evidence system for agent tool use.
 In this repository it ships as:
 
 - a native agent-to-kernel protocol for signed capability evaluation
@@ -23,15 +23,15 @@ In this repository it ships as:
   federation state
 - hosted MCP-compatible edges and adapters that keep the same trust contract
 - machine-readable official-stack, extension-manifest, negotiation, and
-  qualification artifacts over ARC's named extension points
+  qualification artifacts over Chio's named extension points
 - machine-readable web3 trust, anchoring, oracle, and settlement artifacts
   for one official external rail stack
-- one bounded off-chain `arc-link` oracle runtime plus operator and
+- one bounded off-chain `chio-link` oracle runtime plus operator and
   qualification artifacts for conservative cross-currency budget enforcement
-- one bounded `arc-anchor` runtime plus discovery, proof-bundle, and
+- one bounded `chio-anchor` runtime plus discovery, proof-bundle, and
   qualification artifacts for multi-lane checkpoint anchoring over that
   official web3 stack
-- one bounded `arc-settle` runtime plus finality, Solana-preparation, and
+- one bounded `chio-settle` runtime plus finality, Solana-preparation, and
   qualification artifacts for real settlement dispatch over that official web3
   stack
 - one bounded Functions fallback, automation-job, CCIP settlement-
@@ -42,7 +42,7 @@ In this repository it ships as:
   qualification artifacts for one bounded insurance-automation lane
 - machine-readable public identity-profile, wallet-directory, routing, and
   qualification artifacts for one bounded public identity network
-- portable trust artifacts for `did:arc`, ARC-branded schema issuance,
+- portable trust artifacts for `did:chio`, Chio-branded schema issuance,
   challenge/response presentation, evidence export, and certification
 
 This document describes the protocol and artifact contract that the code in
@@ -57,25 +57,25 @@ The shipped `v2` contract covers:
 - wrapped and hosted MCP mediation
 - trust-control HTTP APIs for authority, receipts, revocation, budgets,
   federation, reputation comparison, and certification
-- `did:arc`
+- `did:chio`
 - Agent Passport artifacts and verifier-policy distribution
 - federated evidence export/import and cross-org delegation continuation
-- A2A v1.0.0 mediation through `arc-a2a-adapter`
+- A2A v1.0.0 mediation through `chio-a2a-adapter`
 - signed certification checks plus operator-scoped registry and discovery-network
   surfaces
-- one machine-readable extension inventory plus an official ARC stack package,
+- one machine-readable extension inventory plus an official Chio stack package,
   custom extension manifest contract, fail-closed negotiation report, and
   extension qualification matrix
 - one machine-readable web3 trust profile, contract package, chain
   configuration, anchor-proof, oracle-evidence, dispatch, settlement-receipt,
   and qualification artifact family for the official web3 rail
-- one bounded `arc-link` runtime profile, operator configuration, runtime
+- one bounded `chio-link` runtime profile, operator configuration, runtime
   report, receipt policy, and qualification artifact family for conservative
   cross-currency budget enforcement over that official web3 stack
-- one bounded `arc-anchor` runtime profile, discovery artifact, imported
+- one bounded `chio-anchor` runtime profile, discovery artifact, imported
   OpenTimestamps and Solana memo secondary-lane contract, shared proof-bundle
   contract, and qualification artifact family over the official web3 stack
-- one bounded `arc-settle` runtime profile, finality report, Solana release
+- one bounded `chio-settle` runtime profile, finality report, Solana release
   example, qualification artifact family, and runbook over the official web3
   stack
 - one bounded Functions fallback profile plus request/response examples, one
@@ -100,16 +100,16 @@ The shipped `v2` contract does not claim:
 - automatic SCIM provisioning lifecycle
 - synthetic cross-issuer passport scoring
 - full theorem-prover completion for every security property
-- arbitrary plugins that can redefine signed ARC truth or widen trust outside
+- arbitrary plugins that can redefine signed Chio truth or widen trust outside
   named extension points
 - permissionless public identity or wallet discovery that widens local trust
 - generic OID4VP, SIOP, DIDComm, or permissionless wallet-network
-  compatibility beyond ARC's documented public identity-profile and routing
+  compatibility beyond Chio's documented public identity-profile and routing
   contract
-- permissionless anchor discovery or arbitrary chain anchoring beyond ARC's
+- permissionless anchor discovery or arbitrary chain anchoring beyond Chio's
   documented EVM, OpenTimestamps, and Solana memo lanes
 - arbitrary cross-chain fund routing, generic keeper authority, or direct fund
-  release from Functions or paymaster infrastructure beyond ARC's documented
+  release from Functions or paymaster infrastructure beyond Chio's documented
   bounded web3 interop surfaces
 - a replacement of MCP or A2A at the wire-protocol ecosystem level
 
@@ -118,10 +118,10 @@ The shipped `v2` contract does not claim:
 The `v3` contract extends the `v2` scope with:
 
 - an HTTP substrate sidecar protocol for protecting arbitrary HTTP APIs through
-  ARC policy evaluation, typed HTTP receipts, and structured verdicts (see
+  Chio policy evaluation, typed HTTP receipts, and structured verdicts (see
   [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md))
-- an OpenAPI-to-manifest pipeline that derives `arc.manifest.v1` tool
-  definitions from OpenAPI specifications with `x-arc-*` policy extensions (see
+- an OpenAPI-to-manifest pipeline that derives `chio.manifest.v1` tool
+  definitions from OpenAPI specifications with `x-chio-*` policy extensions (see
   [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md))
 - a reverse-proxy entrypoint (`arc api protect`) that combines OpenAPI
   ingestion, sidecar evaluation, and live traffic enforcement
@@ -130,7 +130,7 @@ The `v3` contract extends the `v2` scope with:
 
 These surfaces share the same core receipt, capability, and policy primitives
 documented in v2 sections below. The HTTP substrate's `HttpReceipt` maps
-deterministically to `ArcReceipt` so all existing receipt verification,
+deterministically to `ChioReceipt` so all existing receipt verification,
 checkpoint, and evidence-export workflows continue to apply.
 
 Compatibility rule:
@@ -143,7 +143,7 @@ Compatibility rule:
 
 ## 3. Components And Trust Boundaries
 
-ARC in this repository uses these roles:
+Chio in this repository uses these roles:
 
 | Component | Role |
 | --- | --- |
@@ -161,14 +161,14 @@ The security boundary that matters is constant across these surfaces:
   session state
 - denials are explicit, signed, and auditable
 - extensions may replace only named seams and must still preserve local policy
-  activation plus signed ARC truth
+  activation plus signed Chio truth
 - registry and artifact mismatches fail closed instead of degrading silently
 
 ## 4. Serialization And Identity
 
 ### 4.1 Canonical JSON
 
-Signed ARC artifacts use canonical JSON serialization before Ed25519 signing.
+Signed Chio artifacts use canonical JSON serialization before Ed25519 signing.
 This includes capability tokens, receipts, manifests, checkpoints, verifier
 policies, passport presentations, and certification artifacts.
 
@@ -176,7 +176,7 @@ policies, passport presentations, and certification artifacts.
 
 The native agent-to-kernel protocol uses length-prefixed JSON messages with a
 `type` discriminator. The core messages are defined by `AgentMessage` and
-`KernelMessage` in `crates/arc-core/src/message.rs`.
+`KernelMessage` in `crates/chio-core/src/message.rs`.
 
 The normative wire definition for this shipped surface now lives in
 [WIRE_PROTOCOL.md](WIRE_PROTOCOL.md).
@@ -219,17 +219,17 @@ describe it literally:
 - shared-owner hosted deployments may reuse one upstream subprocess, but task
   handles and late notifications remain scoped to the originating session.
 - caller-supplied model metadata is preserved on the request path, but its
-  provenance enters ARC as `asserted` until a trusted subsystem upgrades it.
+  provenance enters Chio as `asserted` until a trusted subsystem upgrades it.
 
 ### 4.4 Identity
 
-ARC uses Ed25519 keys as the primary cryptographic identity primitive.
+Chio uses Ed25519 keys as the primary cryptographic identity primitive.
 
-`did:arc` remains the shipped self-certifying DID method for those keys in
+`did:chio` remains the shipped self-certifying DID method for those keys in
 this release:
 
 ```text
-did:arc:{64-hex-ed25519-public-key}
+did:chio:{64-hex-ed25519-public-key}
 ```
 
 Resolution is local and self-certifying. Optional service endpoints, such as a
@@ -237,15 +237,15 @@ receipt-log URL, may be attached by the resolving environment.
 
 Broader public identity profiles may also name `did:web`, `did:key`, and
 `did:jwk` as compatibility inputs for wallet or issuer interoperability, but
-those methods do not replace `did:arc` as ARC's canonical provenance anchor in
+those methods do not replace `did:chio` as Chio's canonical provenance anchor in
 this release.
 
 ## 5. Capability Contract
 
 The shipped capability token is `CapabilityToken` from
-`crates/arc-core/src/capability.rs`.
+`crates/chio-core/src/capability.rs`.
 
-Unlike several other ARC artifacts, capability tokens do not carry a `schema`
+Unlike several other Chio artifacts, capability tokens do not carry a `schema`
 field today. The signed body is:
 
 | Field | Meaning |
@@ -325,24 +325,24 @@ Approval tokens are verified against trusted authority keys and are bound to:
 - the canonical hash of the attached governed intent
 - approval-token `issued_at` and `expires_at` time bounds
 
-ARC's normative provenance model now distinguishes three evidence classes:
+Chio's normative provenance model now distinguishes three evidence classes:
 
-- `asserted`: caller-supplied context that ARC preserves but has not
+- `asserted`: caller-supplied context that Chio preserves but has not
   independently authenticated
-- `observed`: local lineage facts ARC directly observed inside one authenticated
+- `observed`: local lineage facts Chio directly observed inside one authenticated
   session
-- `verified`: lineage ARC checked against signed artifacts such as
-  `arc.session_anchor.v1`, `arc.receipt_lineage_statement.v1`, or
-  `arc.call_chain_continuation.v1`
+- `verified`: lineage Chio checked against signed artifacts such as
+  `chio.session_anchor.v1`, `chio.receipt_lineage_statement.v1`, or
+  `chio.call_chain_continuation.v1`
 
 The Phase 1 provenance substrate uses these versioned artifacts:
 
-- `arc.session_anchor.v1`: signed anchor binding `session_id`, `agent_id`,
+- `chio.session_anchor.v1`: signed anchor binding `session_id`, `agent_id`,
   transport/auth context, proof-binding material, and auth epoch
-- `arc.request_lineage_record.v1`: persisted request node keyed by
+- `chio.request_lineage_record.v1`: persisted request node keyed by
   `request_id`, carrying session-anchor and capability lineage joins
-- `arc.receipt_lineage_statement.v1`: signed parent/child receipt edge
-- `arc.call_chain_continuation.v1`: signed cross-kernel continuation token
+- `chio.receipt_lineage_statement.v1`: signed parent/child receipt edge
+- `chio.call_chain_continuation.v1`: signed cross-kernel continuation token
 
 The current bounded release emits session anchors and request-lineage records
 for local continuity and nested-flow provenance. Receipt-lineage statements and
@@ -356,7 +356,7 @@ input during migration, but the stronger continuation artifact for new work is
 
 If `governed_intent.call_chain` is present, the kernel rejects empty fields and
 self-referential `parent_request_id == request_id` bindings. That input is
-always `asserted` provenance at admission time. ARC may only upgrade it to
+always `asserted` provenance at admission time. Chio may only upgrade it to
 `observed` or `verified` when the runtime binds it to local request lineage,
 a signed receipt-lineage statement, or a verified continuation token scoped by
 the relevant session anchor. Reports and exports must preserve that evidence
@@ -405,7 +405,7 @@ The current launch-candidate safety inventory is:
 - `P10` report truthfulness: enterprise/report/export surfaces never label
   `asserted` lineage as `verified`
 
-ARC intentionally distinguishes evidence classes for these claims:
+Chio intentionally distinguishes evidence classes for these claims:
 
 - executable differential tests in `formal/diff-tests` are the release gate for
   scope-attenuation semantics
@@ -415,7 +415,7 @@ ARC intentionally distinguishes evidence classes for these claims:
 - conformance and release-qualification lanes verify mediated protocol
   behavior, packaging, and clustered operator workflows
 
-ARC does not currently claim theorem-prover completion for every protocol
+Chio does not currently claim theorem-prover completion for every protocol
 property. The Lean tree under `formal/lean4` is informative and useful for
 ongoing proof work, but standalone proof modules that are not root-imported or
 still contain `sorry` are not part of the shipped release gate or launch
@@ -428,16 +428,16 @@ The current bounded verified-core contract is defined in
 
 That manifest names the Rust symbols inside the present proof-facing boundary:
 
-- `arc_kernel_core::capability_verify::{verify_capability, verify_capability_with_trusted}`
-- `arc_kernel_core::scope::{resolve_matching_grants, resolve_capability_grants}`
-- `arc_kernel_core::evaluate::evaluate`
-- `arc_kernel_core::receipts::sign_receipt`
+- `chio_kernel_core::capability_verify::{verify_capability, verify_capability_with_trusted}`
+- `chio_kernel_core::scope::{resolve_matching_grants, resolve_capability_grants}`
+- `chio_kernel_core::evaluate::evaluate`
+- `chio_kernel_core::receipts::sign_receipt`
 
 It also names the two shell entrypoints that may claim direct use of that pure
 core today:
 
-- `arc_kernel::ArcKernel::evaluate_portable_verdict`
-- `arc_kernel::ArcKernel::build_and_sign_receipt`
+- `chio_kernel::ChioKernel::evaluate_portable_verdict`
+- `chio_kernel::ChioKernel::build_and_sign_receipt`
 
 Anything outside that manifest is outside the current bounded proof boundary,
 including revocation-store queries, budget mutation, DPoP, governed approvals,
@@ -446,8 +446,8 @@ external settlement rails.
 
 ## 6. Receipt Contract
 
-The shipped receipt envelope is `ArcReceipt` from
-`crates/arc-core/src/receipt.rs`.
+The shipped receipt envelope is `ChioReceipt` from
+`crates/chio-core/src/receipt.rs`.
 
 | Field | Meaning |
 | --- | --- |
@@ -538,10 +538,10 @@ assurance tier after any configured verifier trust-policy rebinding, not just
 the raw tier carried by the upstream attestation payload.
 
 When present, `governed_transaction.call_chain` records the strongest
-provenance projection ARC is willing to sign for that receipt. The flattened
+provenance projection Chio is willing to sign for that receipt. The flattened
 `chainId`, `parentRequestId`, `parentReceiptId`, `originSubject`, and
 `delegatorSubject` fields describe the effective observed or verified
-projection. If ARC also needs to preserve the original caller assertion, it
+projection. If Chio also needs to preserve the original caller assertion, it
 stores that separately under `assertedContext`; downstream consumers must not
 collapse `assertedContext` into verified truth.
 
@@ -553,10 +553,10 @@ keyed by `receipt_id` and reports it separately from the signed
 The `governed_transaction.metered_billing` block preserves the quoted estimate
 and, when later available, a post-execution `usageEvidence` reference. This is
 separate from `metadata.financial`, which continues to record the kernel's
-charged or attempted amount. ARC does not collapse quoted cost, actual charge,
+charged or attempted amount. Chio does not collapse quoted cost, actual charge,
 and external usage evidence into one field.
 
-When post-execution metered evidence arrives from an external adapter, ARC
+When post-execution metered evidence arrives from an external adapter, Chio
 stores that record in a mutable sidecar keyed by `receipt_id`, carrying the
 adapter identity, evidence record identity, observed units, billed amount, and
 operator reconciliation state. That sidecar is queryable and exportable, but
@@ -575,7 +575,7 @@ surfaces project different slices of it:
 
 Receipts prove kernel-observed evaluation events. Receipt-lineage statements
 and continuation tokens prove authenticated linkage between those events. None
-of these artifacts alone prove external real-world side effects beyond ARC's
+of these artifacts alone prove external real-world side effects beyond Chio's
 observation boundary.
 
 ### 6.4 Checkpoints
@@ -583,12 +583,12 @@ observation boundary.
 Receipt batches can be committed to a Merkle checkpoint with primary schema:
 
 ```text
-arc.checkpoint_statement.v1
+chio.checkpoint_statement.v1
 ```
 
-Legacy `arc.checkpoint_statement.v1` checkpoints remain valid for verification
+Legacy `chio.checkpoint_statement.v1` checkpoints remain valid for verification
 and evidence import. Checkpoint verification is part of exported evidence and
-compliance-oriented operator reporting. ARC's web3 anchoring and settlement
+compliance-oriented operator reporting. Chio's web3 anchoring and settlement
 lanes additionally require durable local receipt storage and kernel-signed
 checkpoint issuance; append-only remote receipt mirrors are insufficient when
 the runtime claims Merkle or Solana evidence readiness.
@@ -609,14 +609,14 @@ intended publication surface and verifier root family. These fields remain
 descriptive until a verifier independently checks the declared publication path;
 they do not by themselves prove witness acceptance, immutable publication, or
 external real-world side effects.
-When all three validate, ARC may say that the checkpoint was published under
+When all three validate, Chio may say that the checkpoint was published under
 declared trust anchors and publication policy. That is a trust-anchored
 publication statement, not an `append_only` promotion.
 
 In claim-boundary terms, `audit_only` remains local signed checkpoint evidence,
 `transparency_preview` remains the default continuity class for bounded preview
 surfaces, and trust-anchored publication is a narrower descriptive boundary
-inside that preview tier unless the full append-only gate is met. ARC MUST NOT
+inside that preview tier unless the full append-only gate is met. Chio MUST NOT
 use public append-only or strong non-repudiation language until the published
 surface is claim-complete, child-receipt-complete, anti-equivocation-capable,
 and qualified under the declared verifier policy.
@@ -625,15 +625,15 @@ and qualified under the declared verifier policy.
 
 The HTTP substrate (see [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md)) introduces
 `HttpReceipt`, a domain-specific receipt type for HTTP-layer policy evaluations.
-`HttpReceipt` captures HTTP-specific context that `ArcReceipt` does not natively
+`HttpReceipt` captures HTTP-specific context that `ChioReceipt` does not natively
 model, including the evaluated HTTP method, path, query parameters, request
 headers, caller identity, authentication method, and the sidecar verdict.
 
 `HttpReceipt` is the receipt format returned by the sidecar evaluation endpoint.
-`ArcReceipt` remains the unified storage and verification format for all ARC
+`ChioReceipt` remains the unified storage and verification format for all Chio
 receipt workflows, including checkpoints, evidence export, and federation.
 
-The deterministic mapping from `HttpReceipt` to `ArcReceipt` is defined in
+The deterministic mapping from `HttpReceipt` to `ChioReceipt` is defined in
 [HTTP-SUBSTRATE.md Section 5](HTTP-SUBSTRATE.md). That mapping preserves:
 
 - `receipt_id` as the stable identifier across both formats
@@ -641,19 +641,19 @@ The deterministic mapping from `HttpReceipt` to `ArcReceipt` is defined in
   configuration
 - `tool_name` derived from the matched `operationId`
 - `decision` mapped from the sidecar verdict
-- HTTP-specific evaluation context projected into `ArcReceipt.metadata`
+- HTTP-specific evaluation context projected into `ChioReceipt.metadata`
 - `policy_hash` and `content_hash` carried through unchanged
 
 This mapping is deterministic: the same `HttpReceipt` always produces the same
-`ArcReceipt`. Operators may store either or both formats, but checkpoint
-signing and evidence export always operate on the `ArcReceipt` representation.
+`ChioReceipt`. Operators may store either or both formats, but checkpoint
+signing and evidence export always operate on the `ChioReceipt` representation.
 
 ## 7. Manifest Contract
 
 Tool discovery currently uses the frozen manifest schema:
 
 ```text
-arc.manifest.v1
+chio.manifest.v1
 ```
 
 The manifest defines:
@@ -664,30 +664,30 @@ The manifest defines:
 - operator-facing descriptions and metadata
 
 This manifest is the authoritative discovery contract for native tool servers
-and for mediated adapters that synthesize an ARC tool surface from another
-protocol. `arc.manifest.v1` remains frozen in this release for compatibility.
+and for mediated adapters that synthesize an Chio tool surface from another
+protocol. `chio.manifest.v1` remains frozen in this release for compatibility.
 
 ### 7.1 OpenAPI-Derived Manifests
 
-ARC v3 adds an automated pipeline for deriving `arc.manifest.v1` tool
+Chio v3 adds an automated pipeline for deriving `chio.manifest.v1` tool
 definitions from OpenAPI 3.0.x and 3.1.x specifications. Each HTTP operation
 (method + path pair) in the OpenAPI spec becomes one `ToolDefinition`. The full
 pipeline is specified in [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md).
 
-The `x-arc-*` extension vocabulary provides the policy overlay for OpenAPI
+The `x-chio-*` extension vocabulary provides the policy overlay for OpenAPI
 specs. Extensions may appear at the operation, path, or root level and control:
 
-- `x-arc-scope`: capability scope required for the operation
-- `x-arc-guard`: guard expressions evaluated during policy admission
-- `x-arc-rate-limit`: per-operation rate constraints
-- `x-arc-require-auth`: authentication requirements beyond the OpenAPI
+- `x-chio-scope`: capability scope required for the operation
+- `x-chio-guard`: guard expressions evaluated during policy admission
+- `x-chio-rate-limit`: per-operation rate constraints
+- `x-chio-require-auth`: authentication requirements beyond the OpenAPI
   `securitySchemes`
 
-When no `x-arc-*` extensions are present, the pipeline applies a default
+When no `x-chio-*` extensions are present, the pipeline applies a default
 deny-by-method policy that assigns conservative scope requirements based on
 the HTTP method. This ensures fail-closed behavior for undecorated specs.
 
-The derived `arc.manifest.v1` output is identical in structure to hand-authored
+The derived `chio.manifest.v1` output is identical in structure to hand-authored
 manifests. Downstream consumers (the kernel, trust-control, and receipt
 pipeline) do not distinguish between hand-authored and OpenAPI-derived
 manifests.
@@ -703,9 +703,9 @@ The repository ships these primary runtime entrypoints:
 - `arc mcp serve`
 - `arc mcp serve-http`
 - `arc trust serve`
-- `arc api protect` -- reverse proxy that enforces ARC policy over an HTTP API using an OpenAPI spec
-- `arc cert generate` -- generate TLS or signing certificates for ARC operator use
-- `arc cert verify` -- verify a certificate chain or signing material against ARC trust roots
+- `arc api protect` -- reverse proxy that enforces Chio policy over an HTTP API using an OpenAPI spec
+- `arc cert generate` -- generate TLS or signing certificates for Chio operator use
+- `arc cert verify` -- verify a certificate chain or signing material against Chio trust roots
 - `arc cert inspect` -- display certificate metadata, expiry, and key bindings
 
 These surfaces intentionally share the same core receipt, capability,
@@ -713,7 +713,7 @@ revocation, and policy primitives rather than defining separate trust models.
 
 ### 8.2 MCP Compatibility
 
-ARC does not claim to replace MCP. It ships an MCP-compatible mediation layer
+Chio does not claim to replace MCP. It ships an MCP-compatible mediation layer
 that currently covers:
 
 - tools
@@ -826,19 +826,19 @@ treated as sender-bound truth when backed by observed local lineage, a signed
 receipt-lineage statement, or a verified continuation token scoped by the
 relevant session anchor.
 
-The report now declares ARC's first normative enterprise-facing profile over
+The report now declares Chio's first normative enterprise-facing profile over
 that projection:
 
 - report `schema`: `arc.oauth.authorization-context-report.v1`
 - profile `schema`: `arc.oauth.authorization-profile.v1`
-- profile `id`: `arc-governed-rar-v1`
+- profile `id`: `chio-governed-rar-v1`
 
-This profile is intentionally narrow. ARC claims one RFC-9396-style
+This profile is intentionally narrow. Chio claims one RFC-9396-style
 authorization-details mapping over governed receipt truth plus a separate
 transaction-context block carrying the approval-bound intent hash, approval
 evidence, runtime-assurance posture, delegated call-chain context, and one
 optional identity assertion continuity object. If a governed receipt cannot be
-projected into that profile truthfully, ARC fails closed and does not emit a
+projected into that profile truthfully, Chio fails closed and does not emit a
 partial authorization-context report.
 
 Each authorization-context row now also carries explicit sender-bound
@@ -853,7 +853,7 @@ semantics:
 - `senderConstraint.runtimeAssuranceBound`
 - `senderConstraint.delegatedCallChainBound`
 
-ARC resolves that sender truth from receipt attribution plus persisted
+Chio resolves that sender truth from receipt attribution plus persisted
 capability lineage. If the capability snapshot is missing, the grant cannot be
 resolved, the subject binding is inconsistent, or a required DPoP proof shape
 cannot be represented, the report fails closed instead of degrading silently.
@@ -862,35 +862,35 @@ delegated call-chain fields into independently verified upstream provenance,
 and `senderConstraint.delegatedCallChainBound` is reserved for observed or
 verified lineage only.
 
-ARC's hosted authorization edge now publishes and enforces the same bounded
-contract at request time. The published `arc_authorization_profile` includes:
+Chio's hosted authorization edge now publishes and enforces the same bounded
+contract at request time. The published `chio_authorization_profile` includes:
 
 - one request-time contract naming `authorization_details` and
-  `arc_transaction_context` as the only supported ARC request parameters and
+  `chio_transaction_context` as the only supported Chio request parameters and
   access-token claims
 - one resource-binding contract requiring the OAuth `resource` parameter to
   match the protected-resource metadata and requiring bearer admission to match
   the same protected resource through `aud`, `resource`, or both
 - one artifact-boundary contract stating that access tokens are runtime
-  authorization artifacts while approval tokens, ARC capabilities, and review
+  authorization artifacts while approval tokens, Chio capabilities, and review
   evidence remain non-bearer artifacts
 
-At request time, ARC only accepts the bounded governed detail family
-`arc_governed_tool`, `arc_governed_commerce`, and
-`arc_governed_metered_billing`, and at least one governed-tool row must be
+At request time, Chio only accepts the bounded governed detail family
+`chio_governed_tool`, `chio_governed_commerce`, and
+`chio_governed_metered_billing`, and at least one governed-tool row must be
 present. Malformed transaction context, unsupported detail types, mismatched
 resource indicators, stale identity assertions, mismatched verifier bindings,
 request-binding mismatches, or ambiguous approval/runtime-assurance/call-chain
 fragments fail closed before token issuance.
 
-ARC also supports one bounded sender-constrained continuation contract on that
+Chio also supports one bounded sender-constrained continuation contract on that
 same hosted authorization path. The request may carry:
 
-- `arc_sender_dpop_public_key`
-- `arc_sender_mtls_thumbprint_sha256`
-- `arc_sender_attestation_sha256`
+- `chio_sender_dpop_public_key`
+- `chio_sender_mtls_thumbprint_sha256`
+- `chio_sender_attestation_sha256`
 
-If ARC approves the request, the resulting sender constraint is persisted on
+If Chio approves the request, the resulting sender constraint is persisted on
 the authorization code and then projected into access tokens through `cnf`:
 
 - `cnf.arcSenderKey`
@@ -903,12 +903,12 @@ Runtime admission then enforces the same bound sender proof continuity:
   on protected-resource admission, including nonce, `jti`, `htm`, and `htu`
   checks over the actual runtime request
 - mTLS-bound flows must present a matching
-  `x-arc-mtls-thumbprint-sha256` header
+  `x-chio-mtls-thumbprint-sha256` header
 - attestation-bound flows must present a matching
-  `x-arc-runtime-attestation-sha256` header, and that digest must also match
-  `arc_transaction_context.runtimeAssuranceEvidenceSha256`
+  `x-chio-runtime-attestation-sha256` header, and that digest must also match
+  `chio_transaction_context.runtimeAssuranceEvidenceSha256`
 
-Attestation alone never authorizes a sender. ARC only accepts the
+Attestation alone never authorizes a sender. Chio only accepts the
 attestation-bound profile when it is paired with DPoP or mTLS continuity over
 the same request. Missing, stale, replayed, or mismatched sender proof fails
 closed as `invalid_request`, `invalid_grant`, or bearer denial depending on
@@ -920,19 +920,19 @@ documents:
 - `/.well-known/oauth-protected-resource/mcp`
 - `/.well-known/oauth-authorization-server/{issuer-path}`
 
-Both documents include `arc_authorization_profile`, which mirrors the
+Both documents include `chio_authorization_profile`, which mirrors the
 canonical profile id/schema, sender-constraint expectations, request-time
 parameter names, resource-binding rules, and artifact-boundary expectations.
-Discovery is informational only. ARC does not widen trust from discovery
+Discovery is informational only. Chio does not widen trust from discovery
 documents alone, and the edge fails closed if protected-resource and
-authorization-server metadata disagree about the advertised ARC profile or
+authorization-server metadata disagree about the advertised Chio profile or
 authorization-server issuer.
 
 `/v1/reports/authorization-profile-metadata` packages that same profile into a
 machine-readable artifact for enterprise review. The report publishes:
 
 - metadata `schema`: `arc.oauth.authorization-metadata.v1`
-- canonical ARC profile `id` and `schema`
+- canonical Chio profile `id` and `schema`
 - the authorization-context report schema
 - supported discovery paths
 - explicit support boundaries
@@ -947,19 +947,19 @@ Each returned record includes:
 
 - the derived `authorization_context` row
 - the typed `governed_transaction` metadata block
-- the full signed `ArcReceipt`
+- the full signed `ChioReceipt`
 
 This pack exists so enterprise IAM reviewers can trace one governed action from
 approval-bound intent through standards-legible projection back to canonical
-receipt truth without bespoke ARC-specific joins.
+receipt truth without bespoke Chio-specific joins.
 
-ARC also validates assurance-bound and delegated-call-chain projection
+Chio also validates assurance-bound and delegated-call-chain projection
 integrity fail closed. If a row claims runtime assurance, the projection must
 also carry the accepted schema, verifier family, verifier, and evidence
 digest. If a row claims delegated call-chain context, the projection must
 carry non-empty `chainId`, `parentRequestId`, `originSubject`, and
 `delegatorSubject` values, plus a non-empty `parentReceiptId` when present.
-ARC does not emit partial or degraded enterprise-profile rows when that
+Chio does not emit partial or degraded enterprise-profile rows when that
 projection cannot be represented truthfully.
 
 `/v1/capabilities/issue` accepts the same typed capability-issuance contract
@@ -980,11 +980,11 @@ maximum evidence age, attestation-type, and required-assertion constraints. If
 trusted-verifier rules are configured, carried attestation evidence must match
 one rule and satisfy its freshness and claim constraints or the request fails
 closed. If no
-trusted-verifier rules are configured, ARC continues to use the normalized raw
+trusted-verifier rules are configured, Chio continues to use the normalized raw
 attestation tier after validating evidence time bounds and workload-identity
 binding.
 
-When `runtimeAttestation` carries workload identity, ARC currently recognizes
+When `runtimeAttestation` carries workload identity, Chio currently recognizes
 one normalized mapping shape:
 
 - explicit `workloadIdentity { scheme, credentialKind, uri, trustDomain, path }`
@@ -992,14 +992,14 @@ one normalized mapping shape:
 - `credentialKind: uri | x509_svid | jwt_svid`
 
 If only the legacy raw `runtimeIdentity` field is present and it is a valid
-SPIFFE URI, ARC derives the same normalized mapping for policy, governed
-validation, and receipt metadata. If `runtimeIdentity` is non-SPIFFE, ARC
+SPIFFE URI, Chio derives the same normalized mapping for policy, governed
+validation, and receipt metadata. If `runtimeIdentity` is non-SPIFFE, Chio
 preserves it as opaque verifier metadata and does not invent a typed identity
 projection. If an explicit `workloadIdentity` conflicts with `runtimeIdentity`,
 or if a claimed SPIFFE identifier is malformed, issuance and governed
 execution fail closed.
 
-ARC's first concrete verifier bridge is Azure Attestation JWT normalization.
+Chio's first concrete verifier bridge is Azure Attestation JWT normalization.
 That bridge verifies a signed Azure MAA token against operator-supplied or
 metadata-resolved RSA signing material, preserves vendor claims under
 `claims.azureMaa`, optionally projects one configured
@@ -1008,7 +1008,7 @@ rules above, and normalizes the raw verifier output to `attested`. That raw
 output can only rebind to `verified` or another effective runtime tier through
 explicit `trusted_verifiers` policy.
 
-ARC's second concrete verifier bridge is AWS Nitro attestation document
+Chio's second concrete verifier bridge is AWS Nitro attestation document
 verification. That bridge verifies an AWS Nitro `COSE_Sign1` document with
 `ES384`, validates certificate anchoring against operator-configured trusted
 roots, enforces `SHA384` PCR expectations, freshness, optional nonce matching,
@@ -1016,7 +1016,7 @@ and debug-mode denial by default, preserves vendor claims under
 `claims.awsNitro`, and likewise normalizes the raw verifier output to
 `attested` until later trust policy rebinding says otherwise.
 
-ARC's third concrete verifier bridge is Google Confidential VM JWT
+Chio's third concrete verifier bridge is Google Confidential VM JWT
 normalization. That bridge verifies a signed Google attestation token against
 metadata-resolved `JWKS` material, enforces issuer, audience, hardware-model,
 and secure-boot constraints, preserves vendor claims under
@@ -1028,7 +1028,7 @@ artifact over the same evidence. The appraisal contract separates:
 
 - evidence identity (`schema`, `verifier`, time bounds, evidence digest)
 - verifier-family and adapter identity
-- normalized assertions ARC is willing to compare across verifier families
+- normalized assertions Chio is willing to compare across verifier families
 - vendor-scoped claims preserved without claiming cross-vendor equivalence
 - explicit reason codes and the effective runtime tier carried forward
 
@@ -1037,12 +1037,12 @@ components:
 
 - `evidence` for raw evidence identity and freshness metadata
 - `verifier` for adapter and verifier-family identity
-- `claims` for normalized ARC-visible assertions, structured normalized claim
+- `claims` for normalized Chio-visible assertions, structured normalized claim
   descriptors, and preserved vendor-scoped claims
 - `policy` for verdict, carried-forward effective tier, reason codes, and the
   corresponding structured reason descriptors
 
-ARC's normalized claim vocabulary is now explicit and versioned. The current
+Chio's normalized claim vocabulary is now explicit and versioned. The current
 portable claim catalog covers:
 
 - `attestation_type`
@@ -1065,7 +1065,7 @@ Each structured normalized claim carries:
 - claim `provenance`
 - normalized `value`
 
-ARC's reason taxonomy is also explicit and versioned. Structured reasons carry:
+Chio's reason taxonomy is also explicit and versioned. Structured reasons carry:
 
 - reason `code`
 - reason `group`
@@ -1074,22 +1074,22 @@ ARC's reason taxonomy is also explicit and versioned. Structured reasons carry:
 
 The current shared reason taxonomy includes pass, warn, deny, degrade, and
 unknown dispositions over verification, compatibility, freshness,
-measurement, debug-posture, and policy groups. ARC preserves the flat
+measurement, debug-posture, and policy groups. Chio preserves the flat
 `reasonCodes` array for compatibility, but the structured reason objects are
 the portable contract going forward.
 
-ARC also carries one migration inventory over the current concrete bridges. At
+Chio also carries one migration inventory over the current concrete bridges. At
 this stage that inventory is fixed to Azure MAA, AWS Nitro, Google
-Confidential VM, and ARC's signed `enterprise_verifier` family, and it makes
+Confidential VM, and Chio's signed `enterprise_verifier` family, and it makes
 the vendor claim namespace plus normalized key set, normalized claim codes,
 and default reason codes explicit for each bridge without claiming generic
 cross-vendor standardization.
 
-ARC treats that appraisal contract as the stable adapter boundary. New
+Chio treats that appraisal contract as the stable adapter boundary. New
 verifier families must project into the same appraisal shape instead of
 inventing new policy-specific blobs.
 
-ARC now also externalizes one signed appraisal-result contract over that same
+Chio now also externalizes one signed appraisal-result contract over that same
 artifact boundary. The signed result carries:
 
 - result `schema`: `arc.runtime-attestation.appraisal-result.v1`
@@ -1103,7 +1103,7 @@ artifact boundary. The signed result carries:
 
 The signed envelope authenticates the result body with the exporter's signing
 key, but that signature does not itself widen local trust. Imported appraisal
-results must still pass one explicit local import policy. ARC's import-policy
+results must still pass one explicit local import policy. Chio's import-policy
 surface carries:
 
 - trusted `issuer` identifiers
@@ -1115,12 +1115,12 @@ surface carries:
 - required portable normalized-claim values
 
 Import evaluation yields one structured local outcome with disposition
-`allow`, `attenuate`, or `reject`. ARC rejects fail closed when:
+`allow`, `attenuate`, or `reject`. Chio rejects fail closed when:
 
 - no explicit local import policy is present
 - the signed result fails signature verification
 - the result or nested artifact schema is unsupported
-- the evidence schema and declared verifier family do not match ARC's bounded
+- the evidence schema and declared verifier family do not match Chio's bounded
   appraisal bridge inventory
 - the result is stale
 - the underlying evidence is stale
@@ -1130,18 +1130,18 @@ Import evaluation yields one structured local outcome with disposition
 - a required portable claim is missing or mismatched
 
 If the imported result is otherwise acceptable but exceeds the locally allowed
-effective runtime-assurance tier, ARC attenuates the tier explicitly instead
+effective runtime-assurance tier, Chio attenuates the tier explicitly instead
 of rejecting the result silently or widening local authority.
 
-ARC now locally qualifies that appraisal-result boundary across the shipped
+Chio now locally qualifies that appraisal-result boundary across the shipped
 Azure MAA, AWS Nitro, Google Confidential VM, and bounded
 `enterprise_verifier` bridges. The qualified negative paths include stale
 results, stale evidence, unsupported verifier-family policy, and contradictory
-portable claims. ARC does not currently claim one-time consume or
+portable claims. Chio does not currently claim one-time consume or
 replay-registry semantics for imported results; the current replay defense at
 this boundary is explicit signature plus freshness validation.
 
-ARC now also defines one bounded verifier-federation metadata layer over that
+Chio now also defines one bounded verifier-federation metadata layer over that
 same appraisal boundary. The portable artifacts are:
 
 - signed verifier descriptor
@@ -1157,7 +1157,7 @@ without collapsing it into local policy. The descriptor carries:
 - stable `descriptorId`
 - verifier `verifier` identifier
 - verifier `verifierFamily`
-- concrete ARC adapter `adapter`
+- concrete Chio adapter `adapter`
 - bounded compatible `attestationSchemas`
 - canonical `appraisalArtifactSchema`
 - canonical `appraisalResultSchema`
@@ -1189,7 +1189,7 @@ The signed trust bundle is the portable distribution artifact. It carries:
 - one bounded set of signed verifier descriptors
 - one bounded set of signed reference-value sets
 
-ARC fails closed when trust-bundle material is stale, not yet valid, unsigned,
+Chio fails closed when trust-bundle material is stale, not yet valid, unsigned,
 partially signed, internally contradictory, or outside the declared verifier
 contract. The fail-closed conditions include:
 
@@ -1206,24 +1206,24 @@ identity, signer material, and reference values portable and signed, but
 operators must still decide explicitly how or whether those artifacts inform
 local trust admission.
 
-When ARC emits governed receipt metadata or underwriting evidence derived from
+When Chio emits governed receipt metadata or underwriting evidence derived from
 trusted runtime attestation, it carries the accepted attestation `schema`,
 optional `verifierFamily`, resolved effective tier, verifier identifier, and
 evidence digest so downstream consumers can audit why a stronger trust posture
 was available.
 
-`POST /v1/reports/runtime-attestation-appraisal` is ARC's operator-facing
+`POST /v1/reports/runtime-attestation-appraisal` is Chio's operator-facing
 export surface for that same contract. It returns a signed appraisal report
 containing:
 
 - the canonical appraisal document over one carried runtime-attestation input
 - one policy-visible outcome describing whether configured trusted-verifier
-  rules accepted the evidence and which effective tier ARC resolved
+  rules accepted the evidence and which effective tier Chio resolved
 - one immutable signature over the export body so operators and downstream
   reviewers can exchange the artifact without re-querying the live verifier
 
 That report is intentionally narrower than a generic attestation-results or
-EAT federation protocol. ARC claims one canonical appraisal contract plus
+EAT federation protocol. Chio claims one canonical appraisal contract plus
 concrete Azure, AWS Nitro, and Google Confidential VM bridges, not universal
 cross-vendor attestation interoperability.
 
@@ -1255,7 +1255,7 @@ to emit:
   reason codes
 - one canonical evidence snapshot covering receipt summaries plus optional
   reputation, certification, and runtime-assurance summaries
-- derived risk signals that reference existing ARC evidence identifiers rather
+- derived risk signals that reference existing Chio evidence identifiers rather
   than inventing a second mutable telemetry stream
 
 This underwriting-input artifact is a signed input contract, not yet a final
@@ -1264,7 +1264,7 @@ typed, auditable evidence package instead of ad hoc partner JSON.
 
 `/v1/reports/underwriting-decision` is the deterministic operator-facing
 runtime underwriting surface. It evaluates the canonical underwriting-input
-snapshot against ARC's default decision policy and returns:
+snapshot against Chio's default decision policy and returns:
 
 - one bounded outcome in the vocabulary `approve`, `reduce_ceiling`,
   `step_up`, or `deny`
@@ -1290,7 +1290,7 @@ underwriting artifact. The signed decision envelope carries:
   `preserve`/`reduce`/`hold`/`deny`
 - one premium state in the bounded vocabulary
   `quoted`/`withheld`/`not_applicable`, plus basis points and a quoted amount
-  when ARC can truthfully price exposure; mixed-currency governed exposure
+  when Chio can truthfully price exposure; mixed-currency governed exposure
   withholds the amount quote rather than comparing raw units across currencies
 - one optional `supersedesDecisionId` reference that links a replacement
   decision without rewriting the original signed record
@@ -1315,7 +1315,7 @@ against the same canonical evidence snapshot used by the default runtime
 evaluator and returns:
 
 - the canonical underwriting-input evidence package used for the comparison
-- the default ARC decision evaluation for that evidence
+- the default Chio decision evaluation for that evidence
 - the simulated decision evaluation for the supplied policy
 - one explicit delta showing whether the outcome or risk class changed and
   which normalized reason labels were added or removed
@@ -1324,7 +1324,7 @@ The simulation surface does not persist or supersede any underwriting
 decision. It exists so operators can inspect policy changes before or after
 deployment without mutating signed decision artifacts.
 
-`GET /v1/reports/exposure-ledger` is ARC's signed economic-position surface
+`GET /v1/reports/exposure-ledger` is Chio's signed economic-position surface
 over the same governed receipt, settlement, metered-billing, and persisted
 underwriting-decision truth. It returns:
 
@@ -1337,17 +1337,17 @@ underwriting-decision truth. It returns:
 - per-currency aggregate positions covering governed maximum exposure,
   reserved, settled, pending, failed, provisional-loss, recovered, quoted
   premium, and active quoted-premium totals
-- one explicit support-boundary block describing what ARC does and does not
+- one explicit support-boundary block describing what Chio does and does not
   claim about the projected ledger
 
 This ledger is intentionally narrower than a full claims or recovery system.
-ARC does not currently claim cross-currency netting, claim-adjudication
+Chio does not currently claim cross-currency netting, claim-adjudication
 closure, or finalized recovery lifecycle semantics in the signed export.
-Mixed or contradictory row truth fails closed: if ARC cannot represent one
+Mixed or contradictory row truth fails closed: if Chio cannot represent one
 receipt row truthfully inside one currency position, it rejects the report
 instead of fabricating a blended exposure row.
 
-`GET /v1/reports/economic-completion-flow` is ARC's deterministic operator
+`GET /v1/reports/economic-completion-flow` is Chio's deterministic operator
 bundle for reviewing one canonical `metering -> underwriting -> credit ->
 settlement` path over persisted local artifacts. It returns:
 
@@ -1358,14 +1358,14 @@ settlement` path over persisted local artifacts. It returns:
 - persisted underwriting decisions, credit facilities, and credit bonds over
   that same filter surface
 - one summary that surfaces the latest underwriting, facility, and bond stage
-  ARC can name truthfully without rewriting any underlying signed artifact
+  Chio can name truthfully without rewriting any underlying signed artifact
 
 This bundle is intentionally narrower than finalized settlement provenance.
 It shows one deterministic local completion view over persisted artifacts, but
 it does not yet claim that every settlement row is bound to exactly one
 completion-flow row. That stricter provenance claim remains downstream work.
 
-`GET /v1/reports/credit-scorecard` is ARC's signed, subject-scoped credit
+`GET /v1/reports/credit-scorecard` is Chio's signed, subject-scoped credit
 posture surface built from that same exposure ledger plus the canonical local
 reputation inspection. It returns:
 
@@ -1387,7 +1387,7 @@ decision.
 
 `POST /v1/reputation/portable/summaries/issue`,
 `POST /v1/reputation/portable/events/issue`, and
-`POST /v1/reputation/portable/evaluate` are ARC's portable market-discipline
+`POST /v1/reputation/portable/evaluate` are Chio's portable market-discipline
 exchange surfaces. They sign one portable reputation-summary artifact and one
 portable negative-event artifact over explicit issuer, subject, evidence, and
 issuance or freshness state, then evaluate imported artifacts only through one
@@ -1398,8 +1398,8 @@ duplicate, blocked, or contradictory inputs fail closed. This is portable
 evidence, not a universal trust oracle, global trust score, or automatic
 runtime-admission path.
 
-ARC now also defines one bounded shared-clearing lane over those imported
-artifacts through `arc.federation-reputation-clearing.v1`. That clearing
+Chio now also defines one bounded shared-clearing lane over those imported
+artifacts through `chio.federation-reputation-clearing.v1`. That clearing
 contract references one local weighting policy, one federated admission
 policy, one bounded operator set, and one explicit anti-sybil policy. Accepted
 positive reputation inputs must come from independent issuers, per-issuer input
@@ -1409,7 +1409,7 @@ universal oracle or automatic runtime admission.
 
 `POST /v1/registry/market/fees/issue`,
 `POST /v1/registry/market/penalties/issue`, and
-`POST /v1/registry/market/penalties/evaluate` are ARC's bounded open-market
+`POST /v1/registry/market/penalties/evaluate` are Chio's bounded open-market
 economics surfaces. They sign one fee-schedule artifact over explicit
 namespace, actor-kind, operator-id, and admission-class scope plus publication,
 dispute, and market-participation fees and bond requirements, then sign one
@@ -1434,24 +1434,24 @@ same report as a facility artifact, and `GET /v1/reports/facilities` projects
 current lifecycle state over persisted facility rows. These surfaces make the
 following operator claims explicit:
 
-- ARC can grant one bounded single-currency credit limit with utilization,
+- Chio can grant one bounded single-currency credit limit with utilization,
   reserve, concentration, and TTL terms when score, assurance, and
   certification posture are sufficient
-- ARC can deny allocation explicitly when runtime assurance or required
+- Chio can deny allocation explicitly when runtime assurance or required
   certification evidence is missing
-- ARC can force manual review when the book is mixed-currency or still carries
-  settlement-risk posture that ARC will not auto-net or auto-price away
-- ARC can also force manual review when runtime-assurance evidence spans
-  multiple verifier families, because ARC will not auto-allocate capital from
+- Chio can force manual review when the book is mixed-currency or still carries
+  settlement-risk posture that Chio will not auto-net or auto-price away
+- Chio can also force manual review when runtime-assurance evidence spans
+  multiple verifier families, because Chio will not auto-allocate capital from
   heterogeneous assurance provenance alone
 - supersession and expiry change operator-visible lifecycle state without
   rewriting the previously signed facility artifact
 
-This is still a bounded policy surface, not a live capital market. ARC does
+This is still a bounded policy surface, not a live capital market. Chio does
 not lock collateral, execute bonds, slash reserves, clear external capital, or
 claim autonomous insurer pricing from this phase alone.
 
-`GET /v1/reports/credit-backtest` is ARC's replay and qualification surface for
+`GET /v1/reports/credit-backtest` is Chio's replay and qualification surface for
 that same credit layer. It evaluates one subject-scoped historical window set
 over signed exposure, scorecard, and facility-policy logic and returns:
 
@@ -1464,10 +1464,10 @@ over signed exposure, scorecard, and facility-policy logic and returns:
   counts suitable for qualification reports and milestone audits
 
 Backtests are intentionally deterministic and fail closed on missing subject
-scope or invalid window ranges. They replay ARC's current bounded policy over
+scope or invalid window ranges. They replay Chio's current bounded policy over
 historical evidence; they do not invent a second mutable actuarial store.
 
-`GET /v1/reports/provider-risk-package` is ARC's signed provider-facing capital
+`GET /v1/reports/provider-risk-package` is Chio's signed provider-facing capital
 review package. It returns:
 
 - one signed exposure ledger and one signed credit scorecard over the same
@@ -1482,11 +1482,11 @@ review package. It returns:
   review without re-querying live operator state
 
 This package is still a bounded review artifact rather than a live financing
-contract. ARC can now package honest credit posture for external capital review,
+contract. Chio can now package honest credit posture for external capital review,
 but it still does not bind external capital, execute reserves, or run a
 liability market from `v2.18` alone.
 
-`GET /v1/reports/capital-book` is ARC's signed live source-of-funds ledger for
+`GET /v1/reports/capital-book` is Chio's signed live source-of-funds ledger for
 that same bounded credit layer. It returns:
 
 - one subject-scoped capital-book summary over receipts, facilities, bonds, and
@@ -1496,7 +1496,7 @@ that same bounded credit layer. It returns:
 - one event stream over committed, held, drawn, disbursed, released, repaid,
   and impaired capital state linked back to facility, bond, loss-lifecycle, and
   receipt evidence
-- one explicit support boundary that says ARC is authoritative about the source
+- one explicit support boundary that says Chio is authoritative about the source
   attribution it emits but still does not auto-net across currencies or execute
   external custody movement
 
@@ -1506,7 +1506,7 @@ the selected book spans multiple currencies, more than one live facility or
 bond would need to be blended into one source-of-funds story, or no active
 granted facility exists to explain committed capital.
 
-`POST /v1/capital/instructions/issue` is ARC's custody-neutral reserve and
+`POST /v1/capital/instructions/issue` is Chio's custody-neutral reserve and
 escrow instruction surface over that same capital book. It signs one explicit
 instruction artifact carrying:
 
@@ -1519,7 +1519,7 @@ instruction artifact carrying:
 - one explicit authority chain with role, principal, approval time, and
   expiry for each approving or executing actor
 - one explicit execution window plus one custody-neutral rail descriptor
-- one separate intended-state versus reconciled-state projection so ARC never
+- one separate intended-state versus reconciled-state projection so Chio never
   claims external execution from intent alone
 - one bounded evidence set tying the instruction back to facility, bond, and
   capital-book event provenance
@@ -1541,14 +1541,14 @@ This surface is also intentionally conservative. It fails closed when:
 - observed external execution falls outside the execution window or does not
   match the intended amount exactly
 
-ARC signs the instruction contract it emits. By itself, this endpoint remains a
+Chio signs the instruction contract it emits. By itself, this endpoint remains a
 custody-neutral intent surface and does not prove external execution. Under
 the shipped official web3 stack, a separate
 `arc.web3-settlement-dispatch.v1` artifact may bind that instruction to one
 escrow and bond-vault lane, but observed settlement still must reconcile
 through explicit proof artifacts.
 
-`POST /v1/capital/allocations/issue` is ARC's simulation-first live
+`POST /v1/capital/allocations/issue` is Chio's simulation-first live
 capital-allocation surface for governed actions over that same capital book. It
 signs one explicit allocation-decision artifact carrying:
 
@@ -1561,7 +1561,7 @@ signs one explicit allocation-decision artifact carrying:
 - one current outstanding, reserve, utilization, and concentration view tied
   back to active facility terms when a live facility already exists
 - one bounded instruction-draft set describing the transfer and reserve actions
-  ARC would take if the allocation can proceed
+  Chio would take if the allocation can proceed
 
 This surface is intentionally conservative too. It fails closed when:
 
@@ -1576,16 +1576,16 @@ This surface is intentionally conservative too. It fails closed when:
 - reserve backing would need to be created implicitly rather than tied to one
   explicit reserve book
 - concentration or utilization posture prevents immediate allocation, in which
-  case ARC emits an explicit `deny` or `queue` decision instead of inferring
+  case Chio emits an explicit `deny` or `queue` decision instead of inferring
   execution
 
-ARC signs the allocation decision it emits, but the allocation artifact itself
+Chio signs the allocation decision it emits, but the allocation artifact itself
 is not proof of external execution. Under the shipped official web3 stack,
 execution remains a separate dispatch-plus-settlement-receipt artifact family,
 so allocation stays the deterministic operator and counterparty contract for
-what ARC would allocate and why.
+what Chio would allocate and why.
 
-This is ARC's current live-capital boundary. ARC now proves explicit
+This is Chio's current live-capital boundary. Chio now proves explicit
 source-of-funds state, custody-neutral instruction contracts, simulation-first
 governed allocation, and one bounded official web3 execution surface over
 canonical economic evidence while keeping regulated-role assumptions explicit
@@ -1594,41 +1594,41 @@ instead of ambient.
 The shipped official web3 execution surface is artifact-driven rather than
 permissionless. It consists of `arc.web3-trust-profile.v1`,
 `arc.web3-contract-package.v1`, `arc.web3-chain-configuration.v1`,
-`arc.anchor-inclusion-proof.v1`, `arc.oracle-conversion-evidence.v1`,
+`chio.anchor-inclusion-proof.v1`, `chio.oracle-conversion-evidence.v1`,
 `arc.web3-settlement-dispatch.v1`,
 `arc.web3-settlement-execution-receipt.v1`, and
 `arc.web3-qualification-matrix.v1`. Those artifacts bind one official
-Base-first escrow and bond-vault lane back to ARC receipts, checkpoints, and
+Base-first escrow and bond-vault lane back to Chio receipts, checkpoints, and
 capital state without mutating prior signed truth or hiding custody
 assumptions. That surface is now backed locally by one packaged Solidity
 contract family in `contracts/`, one artifact-derived Rust Alloy bindings
-target in `crates/arc-web3-bindings/`, and one bounded local-devnet
+target in `crates/chio-web3-bindings/`, and one bounded local-devnet
 qualification run. Four contracts in that package are immutable; the one
 exception is `IArcIdentityRegistry`, which remains owner-managed and mutable
-for operator registration and key-binding changes. ARC therefore does not
+for operator registration and key-binding changes. Chio therefore does not
 claim universal immutability for every contract surface in the package.
 
-The shipped bounded `arc-link` oracle-runtime surface is explicit rather than
-ambient. It consists of one `arc-link` runtime profile plus a pinned operator
+The shipped bounded `chio-link` oracle-runtime surface is explicit rather than
+ambient. It consists of one `chio-link` runtime profile plus a pinned operator
 configuration artifact, one runtime-report schema instance,
 one receipt-boundary policy note, and one qualification matrix. That surface
 binds cross-currency budget enforcement to pinned Chainlink or Pyth inputs,
 trusted Base and standby Arbitrum chain inventory, sequencer downtime and
 recovery gating, explicit operator pause or disable controls, and
 conservative conversion margins recorded back into receipt financial metadata.
-`arc_link_runtime_v1` is the only supported runtime FX authority model on this
+`chio_link_runtime_v1` is the only supported runtime FX authority model on this
 surface; backend labels such as Chainlink or Pyth remain subordinate source
 details inside that authority envelope. It is backed locally by
-`crates/arc-link/`, kernel integration in `crates/arc-kernel/`, and
+`crates/chio-link/`, kernel integration in `crates/chio-kernel/`, and
 deterministic qualification coverage rather than live external infrastructure.
-The auxiliary `ArcPriceResolver` contract is a contract-side reference reader,
+The auxiliary `ChioPriceResolver` contract is a contract-side reference reader,
 not a replacement authority for kernel charging or settlement receipts. This
 surface is not a universal oracle network, automatic cross-chain execution
 lane, or justification to widen spend beyond configured pair, chain, and
 freshness policy.
 
-The shipped bounded `arc-settle` runtime surface is also explicit rather than
-ambient. It consists of one `arc-settle` runtime profile, one representative
+The shipped bounded `chio-settle` runtime surface is also explicit rather than
+ambient. It consists of one `chio-settle` runtime profile, one representative
 finality-report artifact, one representative Solana settlement-preparation
 artifact, one qualification matrix, and one operator runbook. That surface
 binds approved capital instructions to explicit ERC-20 approval, escrow
@@ -1638,17 +1638,17 @@ tiered confirmation and dispute-window policy; preserves reserve requirement
 metadata from signed bond artifacts while only locking collateral on-chain in
 the bond vault; and keeps Solana support
 bounded to Ed25519 verification plus canonical instruction preparation rather
-than live broadcast. It is backed locally by `crates/arc-settle/`, the shared
+than live broadcast. It is backed locally by `crates/chio-settle/`, the shared
 official contracts in `contracts/`, and one runtime-devnet qualification lane.
-Those lanes are only claimed when ARC also has local durable receipt storage,
+Those lanes are only claimed when Chio also has local durable receipt storage,
 kernel-signed checkpoints, and evidence exports that keep checkpoint signer
 truth bound to the receipt kernel key.
 It is not permissionless settlement routing, automatic dispute adjudication,
-cross-chain fund movement, gas sponsorship, or a claim that ARC itself is the
+cross-chain fund movement, gas sponsorship, or a claim that Chio itself is the
 custodian or regulated insurer.
 
 The shipped bounded web3-operations surface is explicit rather than ambient.
-It consists of one `ARC_WEB3_OPERATIONS_PROFILE.md`, one anchor runtime-report
+It consists of one `CHIO_WEB3_OPERATIONS_PROFILE.md`, one anchor runtime-report
 example, one settlement runtime-report example, one operations qualification
 matrix, one deployment-promotion policy, one focused readiness audit, and one
 reviewer-facing external qualification matrix plus partner-proof package. That
@@ -1662,16 +1662,16 @@ public-release claim.
 
 The shipped bounded autonomous insurance-automation surface is also
 artifact-driven rather than ambient. It consists of
-`arc.autonomous-pricing-input.v1`,
-`arc.autonomous-pricing-authority-envelope.v1`,
-`arc.autonomous-pricing-decision.v1`,
-`arc.capital-pool-optimization.v1`,
-`arc.capital-pool-simulation-report.v1`,
-`arc.autonomous-execution-decision.v1`,
-`arc.autonomous-rollback-plan.v1`,
-`arc.autonomous-comparison-report.v1`,
-`arc.autonomous-drift-report.v1`, and
-`arc.autonomous-qualification-matrix.v1`. Those artifacts bind one bounded
+`chio.autonomous-pricing-input.v1`,
+`chio.autonomous-pricing-authority-envelope.v1`,
+`chio.autonomous-pricing-decision.v1`,
+`chio.capital-pool-optimization.v1`,
+`chio.capital-pool-simulation-report.v1`,
+`chio.autonomous-execution-decision.v1`,
+`chio.autonomous-rollback-plan.v1`,
+`chio.autonomous-comparison-report.v1`,
+`chio.autonomous-drift-report.v1`, and
+`chio.autonomous-qualification-matrix.v1`. Those artifacts bind one bounded
 autonomous pricing lane back to underwriting, credit, capital, liability, and
 official-web3 truth while keeping execution subordinate to explicit authority
 envelopes, rollback plans, human interrupt contacts, and operator-visible
@@ -1683,7 +1683,7 @@ signs and persists that same report as a bond artifact, and
 `GET /v1/reports/bonds` projects current lifecycle state over persisted bond
 rows. These surfaces make the following operator claims explicit:
 
-- ARC can express reserve posture as one typed `lock`, `hold`, `release`, or
+- Chio can express reserve posture as one typed `lock`, `hold`, `release`, or
   `impair` decision over canonical exposure and the latest active facility
 - bond artifacts preserve collateral amount, reserve requirement, outstanding
   exposure, coverage ratio, and capital-source provenance back to the active
@@ -1694,11 +1694,11 @@ rows. These surfaces make the following operator claims explicit:
   previously signed bond artifact
 
 This is now reserve-backed runtime autonomy gating with an intentionally
-bounded execution scope. ARC can require an explicit autonomy context plus an
+bounded execution scope. Chio can require an explicit autonomy context plus an
 active signed delegation bond before delegated or autonomous governed
 execution proceeds, and it fails closed when bond lifecycle, support boundary,
 reserve disposition, call-chain, or runtime-assurance prerequisites are
-missing. ARC still does not slash reserves, execute external escrow, or claim
+missing. Chio still does not slash reserves, execute external escrow, or claim
 complete loss or recovery lifecycle semantics from phases `85` and `86`
 alone.
 
@@ -1709,7 +1709,7 @@ immutable lifecycle artifact, and `GET /v1/reports/bond-losses` projects the
 current event stream for operator review. These surfaces make the following
 claims explicit:
 
-- ARC records delinquency, recovery, reserve-release, reserve-slash, and
+- Chio records delinquency, recovery, reserve-release, reserve-slash, and
   write-off as
   separate immutable signed artifacts instead of mutating bond, facility, or
   receipt rows in place
@@ -1730,17 +1730,17 @@ This is still bounded lifecycle accounting rather than a claims network or
 live escrow engine. Phases `87`, `113`, `115`, and `116` now make bond-backed
 loss and recovery state auditable and add a bounded claims-payment plus
 settlement lane through explicit payout instructions, payout receipts,
-settlement instructions, and settlement receipts, but ARC still does not
+settlement instructions, and settlement receipts, but Chio still does not
 execute insurer placement or open-ended cross-organization recovery clearing
 from reserve-control state alone.
 
 ### 9.1 Launch And Standards Boundary
 
-The current launch and standards-facing ARC profile is intentionally bounded to
+The current launch and standards-facing Chio profile is intentionally bounded to
 shipping evidence plus deterministic operator-visible runtime evaluation:
 
 - signed receipts, checkpoints, and evidence-export primitives
-- ARC portable-trust and certification surfaces
+- Chio portable-trust and certification surfaces
 - signed behavioral-feed export
 - signed underwriting-input snapshot
 - deterministic underwriting-decision report over canonical evidence
@@ -1786,7 +1786,7 @@ shipping evidence plus deterministic operator-visible runtime evaluation:
   amount-mismatch handling
 - runtime-assurance-aware issuance and governed-execution constraints
 
-The current liability-market claim is intentionally bounded: ARC now proves a
+The current liability-market claim is intentionally bounded: Chio now proves a
 curated provider-admission, delegated pricing-authority, quote/bind, and
 claim/dispute/adjudication/payout-and-settlement orchestration layer over
 canonical evidence, but not an insurer network, open-ended recovery-clearing
@@ -1806,38 +1806,38 @@ surface, or theorem-prover completion beyond the boundary defined in Section
 
 ### 10.1 Agent Passport
 
-ARC now issues these primary portable-trust schema identifiers while still
+Chio now issues these primary portable-trust schema identifiers while still
 accepting legacy `arc.*` artifacts:
 
 | Artifact | Schema |
 | --- | --- |
-| Agent passport | `arc.agent-passport.v1` |
-| Verifier policy | `arc.passport-verifier-policy.v1` |
-| Presentation challenge | `arc.agent-passport-presentation-challenge.v1` |
-| Presentation response | `arc.agent-passport-presentation-response.v1` |
-| Cross-issuer portfolio | `arc.cross-issuer-portfolio.v1` |
-| Cross-issuer trust pack | `arc.cross-issuer-trust-pack.v1` |
-| Cross-issuer migration | `arc.cross-issuer-migration.v1` |
+| Agent passport | `chio.agent-passport.v1` |
+| Verifier policy | `chio.passport-verifier-policy.v1` |
+| Presentation challenge | `chio.agent-passport-presentation-challenge.v1` |
+| Presentation response | `chio.agent-passport-presentation-response.v1` |
+| Cross-issuer portfolio | `chio.cross-issuer-portfolio.v1` |
+| Cross-issuer trust pack | `chio.cross-issuer-trust-pack.v1` |
+| Cross-issuer migration | `chio.cross-issuer-migration.v1` |
 
 The current shipped semantics are:
 
-- issuer and subject identities inside shipped ARC passport artifacts
-  currently remain `did:arc`
+- issuer and subject identities inside shipped Chio passport artifacts
+  currently remain `did:chio`
 - a passport may contain multiple credentials from different issuers as long as
   they all bind to one subject
 - verifier evaluation remains per credential
 - acceptance requires at least one credential to satisfy the verifier policy
-- ARC now also defines one bounded cross-issuer portfolio contract over those
+- Chio now also defines one bounded cross-issuer portfolio contract over those
   existing passport artifacts
 - portfolio visibility, possession, and local trust activation remain separate
 - cross-subject or cross-issuer rebinding requires one explicit signed
-  migration artifact; ARC does not infer continuity from overlapping display
+  migration artifact; Chio does not infer continuity from overlapping display
   claims or discovery visibility
 - local portfolio activation requires one explicit signed trust pack and still
   evaluates per entry rather than inventing a synthetic cross-issuer trust
   score
 - replay-safe challenge verification can be backed by durable SQLite state
-- ARC may expose one public holder transport over stored challenge state:
+- Chio may expose one public holder transport over stored challenge state:
   `GET /v1/public/passport/challenges/{challenge_id}` and
   `POST /v1/public/passport/challenges/verify`
 - legacy `arc.*` passport, verifier-policy, challenge, and response documents
@@ -1845,7 +1845,7 @@ The current shipped semantics are:
 
 ### 10.1.1 OID4VCI-Compatible Passport Issuance
 
-ARC now ships one conservative OID4VCI-compatible issuance lane for the
+Chio now ships one conservative OID4VCI-compatible issuance lane for the
 existing passport artifact. The transport surface is:
 
 - `GET /.well-known/openid-credential-issuer`
@@ -1856,28 +1856,28 @@ existing passport artifact. The transport surface is:
 The profile is intentionally narrow:
 
 - `POST /v1/passport/issuance/offers` is operator-authenticated and creates one
-  replay-safe offer over an existing ARC passport artifact
+  replay-safe offer over an existing Chio passport artifact
 - the always-available native credential profile is configuration id
-  `arc_agent_passport` with format `arc-agent-passport+json`
+  `chio_agent_passport` with format `chio-agent-passport+json`
 - when the issuer has an explicit signing key, it may also advertise two
   projected portable profiles:
-  `arc_agent_passport_sd_jwt_vc` with format `application/dc+sd-jwt`, and
-  `arc_agent_passport_jwt_vc_json` with format `jwt_vc_json`
+  `chio_agent_passport_sd_jwt_vc` with format `application/dc+sd-jwt`, and
+  `chio_agent_passport_jwt_vc_json` with format `jwt_vc_json`
 - when any projected portable profile is advertised, the issuer also exposes
   `GET /.well-known/jwks.json`,
-  `GET /.well-known/arc-passport-sd-jwt-vc`, and
-  `GET /.well-known/arc-passport-jwt-vc-json`
+  `GET /.well-known/chio-passport-sd-jwt-vc`, and
+  `GET /.well-known/chio-passport-jwt-vc-json`
 - issuer metadata may advertise `arcProfile.passportStatusDistribution` when
   the operator has configured a public read-only lifecycle resolve plane
-- the native delivered credential remains the existing ARC `AgentPassport`
+- the native delivered credential remains the existing Chio `AgentPassport`
   artifact, so issuer and subject identities inside the credential stay
-  `did:arc`
+  `did:chio`
 - the projected portable credential is derived from the same verified passport
-  truth and does not establish a second ARC identity root
+  truth and does not establish a second Chio identity root
 - the projected `application/dc+sd-jwt` profile keeps `iss`, `sub`, `vct`,
-  `cnf`, `arc_passport_id`, `arc_subject_did`, and `arc_credential_count`
-  anchored in the signed payload and only permits `arc_issuer_dids`,
-  `arc_merkle_roots`, and `arc_enterprise_identity_provenance` as supported
+  `cnf`, `chio_passport_id`, `chio_subject_did`, and `chio_credential_count`
+  anchored in the signed payload and only permits `chio_issuer_dids`,
+  `chio_merkle_roots`, and `chio_enterprise_identity_provenance` as supported
   disclosures
 - the projected `jwt_vc_json` profile keeps `iss`, `sub`, `cnf.jwk`,
   `vc.type`, `vc.credentialSubject.id`,
@@ -1886,8 +1886,8 @@ The profile is intentionally narrow:
   `vc.credentialSubject.arcIssuerDids`,
   `vc.credentialSubject.arcMerkleRoots`, and
   `vc.credentialSubject.arcEnterpriseIdentityProvenance` anchored in the
-  signed JWT VC payload, and it declares the same ARC claim catalog with
-  `supportsSelectiveDisclosure=false` so those ARC claims are always disclosed
+  signed JWT VC payload, and it declares the same Chio claim catalog with
+  `supportsSelectiveDisclosure=false` so those Chio claims are always disclosed
   in this profile
 - credential delivery may include an
   `arcCredentialContext.passportStatus` sidecar that binds the delivered
@@ -1902,7 +1902,7 @@ The profile is intentionally narrow:
 - unsupported profile ids, mismatched subjects, mismatched formats, or issuer
   metadata conflicts fail closed
 
-Portable lifecycle resolution itself remains ARC-native and operator-scoped:
+Portable lifecycle resolution itself remains Chio-native and operator-scoped:
 
 - the default trust-control public read surface is
   `GET /v1/public/passport/statuses/resolve/{passport_id}`
@@ -1911,7 +1911,7 @@ Portable lifecycle resolution itself remains ARC-native and operator-scoped:
 - any distributed `resolve_url` must be paired with an explicit
   `cache_ttl_secs`; advertising public lifecycle discovery without a freshness
   bound is invalid
-- the resolution document remains the richer ARC lifecycle shape with
+- the resolution document remains the richer Chio lifecycle shape with
   `active`, `stale`, `superseded`, `revoked`, and `notFound`, plus
   `updated_at` on every non-`notFound` response
 - only `active` is a healthy portable lifecycle state
@@ -1923,7 +1923,7 @@ Portable lifecycle resolution itself remains ARC-native and operator-scoped:
   lifecycle distributions that omit TTL are not healthy states for portable
   consumers
 
-ARC now also ships one bounded public discovery layer over those existing
+Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 
 - `GET /v1/public/passport/discovery/issuer`
@@ -1936,7 +1936,7 @@ That discovery layer is intentionally conservative:
   already-published `/.well-known/openid-credential-issuer` metadata and its
   configured portable lifecycle distribution
 - verifier discovery is one signed, versioned, TTL-bounded projection over the
-  already-published `/.well-known/arc-oid4vp-verifier` metadata, verifier
+  already-published `/.well-known/chio-oid4vp-verifier` metadata, verifier
   `JWKS`, and request-URI prefix
 - transparency is one signed snapshot over the current issuer and verifier
   discovery documents, carrying per-entry hashes plus publication and expiry
@@ -1954,7 +1954,7 @@ That discovery layer is intentionally conservative:
 Cross-issuer portfolio composition remains bounded and explicit:
 
 - a cross-issuer portfolio is a holder- or operator-assembled evidence set over
-  existing ARC passport artifacts, not a new synthetic identity root
+  existing Chio passport artifacts, not a new synthetic identity root
 - a portfolio may contain visible imported entries that are not locally
   activated
 - imported or migrated entries remain distinguishable from native local
@@ -1968,23 +1968,23 @@ Cross-issuer portfolio composition remains bounded and explicit:
 - duplicate migration identifiers, mismatched lifecycle projections, unknown
   migration references, and subject rebinding without an explicit migration all
   fail closed
-- portfolio acceptance remains per entry; ARC may report activated entries and
+- portfolio acceptance remains per entry; Chio may report activated entries and
   activated issuers, but it does not publish a synthetic cross-issuer trust
   score
 
 This protocol does not claim support for generic `ldp_vc`, generic JWT VC
-interoperability beyond ARC's documented passport profile family, generic
-SD-JWT VC interoperability beyond ARC's documented passport profile family, or
+interoperability beyond Chio's documented passport profile family, generic
+SD-JWT VC interoperability beyond Chio's documented passport profile family, or
 permissionless multi-operator issuer, verifier, or wallet discovery beyond
-ARC's documented public identity-profile, wallet-directory, and routing-
+Chio's documented public identity-profile, wallet-directory, and routing-
 manifest contract.
 
 ### 10.1.2 OID4VP Verifier Interop
 
-ARC now ships one narrow verifier-side OID4VP bridge over the projected
+Chio now ships one narrow verifier-side OID4VP bridge over the projected
 passport credential lane. The public transport surface is:
 
-- `GET /.well-known/arc-oid4vp-verifier`
+- `GET /.well-known/chio-oid4vp-verifier`
 - `GET /.well-known/jwks.json`
 - `POST /v1/passport/oid4vp/requests`
 - `GET /v1/public/passport/wallet-exchanges/{request_id}`
@@ -2001,11 +2001,11 @@ the same verifier transaction:
   transaction-state object
 
 The verifier may also opt into one bounded `identityAssertion` object on that
-request. When present, ARC treats it as continuity metadata rather than proof
+request. When present, Chio treats it as continuity metadata rather than proof
 of new authority:
 
 - `verifierId` must match the HTTPS verifier `client_id`
-- `boundRequestId` must match the canonical ARC wallet exchange id and OID4VP
+- `boundRequestId` must match the canonical Chio wallet exchange id and OID4VP
   `request_id`
 - `subject` and `continuityId` carry verifier-local continuity context
 - optional `provider` and `sessionHint` may describe the source of that
@@ -2013,14 +2013,14 @@ of new authority:
 - `issuedAt` and `expiresAt` must remain fresh and must not outlive the parent
   OID4VP request
 - the same canonical object is echoed through the wallet-exchange projection,
-  OID4VP verification result, and hosted `arc_transaction_context` lane when
+  OID4VP verification result, and hosted `chio_transaction_context` lane when
   the verifier chooses to reuse it there
 
 `GET /v1/public/passport/wallet-exchanges/{request_id}` exposes that neutral
 descriptor and current transaction state without widening verifier admin
-authority. The descriptor keeps ARC's trust roots aligned:
+authority. The descriptor keeps Chio's trust roots aligned:
 
-- `exchange_id` is the canonical ARC wallet transaction identifier and is
+- `exchange_id` is the canonical Chio wallet transaction identifier and is
   currently aligned to the OID4VP `request_id`
 - replay anchors are the existing signed verifier request id, nonce, state,
   and request-object hash
@@ -2044,15 +2044,15 @@ The profile is intentionally narrow:
   than introducing a second launch trust root
 - holder responses use `response_type=vp_token` and
   `response_mode=direct_post.jwt`
-- ARC currently supports exactly one requested credential with format
+- Chio currently supports exactly one requested credential with format
   `application/dc+sd-jwt` and type
-  `https://arc.dev/credentials/types/arc-passport-sd-jwt-vc/v1`
-- verifier trust bootstrap is one ARC verifier metadata document plus one
+  `https://arc.dev/credentials/types/chio-passport-sd-jwt-vc/v1`
+- verifier trust bootstrap is one Chio verifier metadata document plus one
   verifier `JWKS`
 - verifier or issuer key rotation may preserve active request and credential
   validation only when the rotated trusted keyset is still published through
   that `JWKS`
-- any identity assertion remains optional and verifier-scoped; ARC does not
+- any identity assertion remains optional and verifier-scoped; Chio does not
   make external identity providers mandatory for wallet presentation
 - missing metadata, stale requests, replayed or contradictory wallet exchange
   state, stale or mismatched identity assertions, unsupported request shapes,
@@ -2060,18 +2060,18 @@ The profile is intentionally narrow:
 
 This protocol does not claim generic OID4VP wallet compatibility, SIOP,
 DIDComm, or permissionless verifier marketplace semantics beyond this
-ARC-specific verifier profile plus the bounded public identity-network routing
+Chio-specific verifier profile plus the bounded public identity-network routing
 contract.
 
 ### 10.1.3 Holder Presentation Transport
 
-ARC now ships one conservative holder-facing transport over the existing
+Chio now ships one conservative holder-facing transport over the existing
 passport presentation artifacts. The proof objects do not change:
 
 - the verifier/admin still creates the signed
-  `arc.agent-passport-presentation-challenge.v1`
+  `chio.agent-passport-presentation-challenge.v1`
 - the holder still signs the existing
-  `arc.agent-passport-presentation-response.v1`
+  `chio.agent-passport-presentation-response.v1`
 - verifier replay truth still lives in the durable challenge store
 
 The transport surface is intentionally narrow:
@@ -2086,7 +2086,7 @@ The transport surface is intentionally narrow:
   `POST /v1/public/passport/challenges/verify`
 
 When trust-control returns transport metadata for a created challenge, it uses
-one ARC-native contract with:
+one Chio-native contract with:
 
 - `challengeId`
 - `challengeUrl`
@@ -2104,31 +2104,31 @@ The contract is challenge-bound, not session-marketplace state:
   stored challenge state, or holder submissions that do not match stored
   verifier truth fail closed
 
-This transport is ARC-specific. It coexists with the separate OID4VP verifier
+This transport is Chio-specific. It coexists with the separate OID4VP verifier
 profile above, but it does not itself imply generic OID4VP, DIDComm, or other
 wallet transport compatibility claims beyond the bounded public identity-
 network contract described below.
 
 ### 10.1.4 Public Identity Network Artifacts
 
-ARC now also ships one bounded public identity-network artifact family over
+Chio now also ships one bounded public identity-network artifact family over
 the existing passport, projected credential, discovery, verifier, federation,
 and cross-issuer substrate:
 
 | Artifact | Schema |
 | --- | --- |
-| Public identity profile | `arc.public-identity-profile.v1` |
-| Public wallet-directory entry | `arc.public-wallet-directory-entry.v1` |
-| Public wallet-routing manifest | `arc.public-wallet-routing-manifest.v1` |
-| Identity interop qualification matrix | `arc.identity-interop-qualification-matrix.v1` |
+| Public identity profile | `chio.public-identity-profile.v1` |
+| Public wallet-directory entry | `chio.public-wallet-directory-entry.v1` |
+| Public wallet-routing manifest | `chio.public-wallet-routing-manifest.v1` |
+| Identity interop qualification matrix | `chio.identity-interop-qualification-matrix.v1` |
 
 The bounded semantics are:
 
-- every public identity profile must preserve `did:arc` as the provenance
+- every public identity profile must preserve `did:chio` as the provenance
   anchor while making any broader `did:web`, `did:key`, or `did:jwk`
   compatibility input explicit
-- public identity profiles must preserve the existing ARC-native
-  `arc-agent-passport+json` lane plus the projected `application/dc+sd-jwt`
+- public identity profiles must preserve the existing Chio-native
+  `chio-agent-passport+json` lane plus the projected `application/dc+sd-jwt`
   and `jwt_vc_json` passport families; they do not imply support for
   arbitrary VC formats
 - wallet-directory entries are verifier-bound references over existing
@@ -2142,23 +2142,23 @@ The bounded semantics are:
 - the qualification matrix must cover supported and fail-closed scenarios for
   unsupported DID methods, unsupported credential families, directory
   poisoning, route replay, multi-wallet selection, and cross-operator issuer
-  mismatch before ARC claims broader public identity interoperability
+  mismatch before Chio claims broader public identity interoperability
 
 This artifact family does not claim generic OID4VP, SIOP, DIDComm, universal
 wallet-network routing, automatic subject rebinding, or universal cross-issuer
-trust. It is the strongest bounded public identity and wallet claim ARC makes
+trust. It is the strongest bounded public identity and wallet claim Chio makes
 in this release.
 
 ### 10.2 Federation Artifacts
 
-The shipped cross-org artifact schemas now use ARC-primary identifiers:
+The shipped cross-org artifact schemas now use Chio-primary identifiers:
 
 | Artifact | Schema |
 | --- | --- |
-| Evidence export manifest | `arc.evidence_export_manifest.v1` |
-| Federation policy | `arc.federation-policy.v1` |
-| Federated evidence share | `arc.federated-evidence-share.v1` |
-| Federated delegation policy | `arc.federated-delegation-policy.v1` |
+| Evidence export manifest | `chio.evidence_export_manifest.v1` |
+| Federation policy | `chio.federation-policy.v1` |
+| Federated evidence share | `chio.federated-evidence-share.v1` |
+| Federated delegation policy | `chio.federated-delegation-policy.v1` |
 
 The supported contract includes:
 
@@ -2186,7 +2186,7 @@ admission.
 
 ## 11. A2A Adapter Contract
 
-`arc-a2a-adapter` is a thin bridge for A2A v1.0.0, not a new A2A wire
+`chio-a2a-adapter` is a thin bridge for A2A v1.0.0, not a new A2A wire
 standard.
 
 The current shipped behavior includes:
@@ -2205,7 +2205,7 @@ The current shipped behavior includes:
 - explicit partner-admission policy by tenant, skill, security scheme, and
   allowed interface origin
 
-ARC currently uses a frozen adapter-local metadata convention to route a call
+Chio currently uses a frozen adapter-local metadata convention to route a call
 to one A2A
 skill:
 
@@ -2222,7 +2222,7 @@ That convention is explicit and is not presented as a core A2A protocol field.
 
 ## 12. Certification Contract
 
-ARC ships signed certification checks with primary schema:
+Chio ships signed certification checks with primary schema:
 
 ```text
 arc.certify.check.v1
@@ -2271,7 +2271,7 @@ than public transparency-log semantics. It is not a permissionless trust
 oracle, global mutable trust network, or automatic runtime-admission
 mechanism.
 
-ARC now also ships one bounded generic public registry substrate over those
+Chio now also ships one bounded generic public registry substrate over those
 existing operator-owned surfaces:
 
 - `GET /v1/public/registry/namespace`
@@ -2310,7 +2310,7 @@ existing operator-owned surfaces:
   weighting, independent-issuer diversity, and corroborated negative events
 - one signed federation-qualification matrix that covers hostile publisher,
   conflicting activation, insufficient quorum, eclipse, reputation-sybil, and
-  governance-interop cases before ARC claims bounded cross-operator trust
+  governance-interop cases before Chio claims bounded cross-operator trust
 - fail-closed rejection when one namespace resolves to conflicting ownership
   claims or when a projected listing or aggregated replica set is stale,
   divergent, malformed, or otherwise unverifiable
@@ -2366,7 +2366,7 @@ Stable operator surfaces include:
   surfaces
 - operator report and shared-evidence analytics
 - durable A2A task-registry rejection when follow-up correlation is unsafe
-- bounded web3 runtime reports for `arc-link`, `arc-anchor`, and `arc-settle`
+- bounded web3 runtime reports for `chio-link`, `chio-anchor`, and `chio-settle`
   with explicit drift, replay, recovery, and emergency-mode state
 
 Field additions are allowed. Silent fail-open downgrades are not.
@@ -2375,7 +2375,7 @@ For operational guidance, see:
 
 - `docs/release/OBSERVABILITY.md`
 - `docs/release/OPERATIONS_RUNBOOK.md`
-- `docs/release/ARC_WEB3_OPERATIONS_RUNBOOK.md`
+- `docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md`
 
 ## 14. Explicit Gaps
 
@@ -2385,7 +2385,7 @@ The following are intentionally outside the shipped `v3` contract:
   marketplace semantics
 - permissionless mirror/indexer publication as automatic trust, sanction, or
   market-penalty authority
-- public federation beyond ARC's documented bounded federation-activation
+- public federation beyond Chio's documented bounded federation-activation
   exchange, quorum, open-admission, reputation-clearing, and qualification
   surfaces
 - portable reputation as a universal trust oracle or automatic cross-issuer

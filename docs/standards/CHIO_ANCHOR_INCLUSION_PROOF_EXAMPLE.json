@@ -1,0 +1,104 @@
+{
+  "schema": "chio.anchor-inclusion-proof.v1",
+  "receipt": {
+    "id": "rcpt-web3-1",
+    "timestamp": 1743292800,
+    "capability_id": "cap-web3-1",
+    "tool_server": "chio-settle",
+    "tool_name": "release_escrow",
+    "action": {
+      "parameters": {
+        "amount": 150,
+        "currency": "USDC",
+        "to": "0x2222222222222222222222222222222222222222"
+      },
+      "parameter_hash": "46f33e98c10f37a46625ba93402c262878b694af71ea1d2f35ab89b53404e127"
+    },
+    "decision": {
+      "verdict": "allow"
+    },
+    "content_hash": "1ff0dfe4513af263d73d4cc9dedae5aeb7ecc223cb42529f23c436601403afe5",
+    "policy_hash": "dc6d6cc7acce9b97eb353f08426fefba0b54cc98f38d794dab4f6770252f50df",
+    "metadata": {
+      "financial": {
+        "budget_remaining": 850,
+        "budget_total": 1000,
+        "cost_charged": 150,
+        "currency": "USD",
+        "delegation_depth": 1,
+        "grant_index": 0,
+        "oracle_evidence": {
+          "base": "ETH",
+          "cache_age_seconds": 45,
+          "converted_cost_units": 300,
+          "feed_address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+          "grant_currency": "USD",
+          "max_age_seconds": 3600,
+          "original_cost_units": 100000000000000,
+          "original_currency": "ETH",
+          "quote": "USD",
+          "rate_denominator": 100,
+          "rate_numerator": 300000,
+          "schema": "chio.oracle-conversion-evidence.v1",
+          "source": "chainlink",
+          "updated_at": 1743292740
+        },
+        "payment_reference": "escrow-1",
+        "root_budget_holder": "subject-1",
+        "settlement_status": "pending"
+      }
+    },
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signature": "d761a0b24a676d0abe74e0d44a1dd55e5f72ad80f8187e99303a50eb48803e8f6796db338b43e367df2ae8083a2b48ac2bde18c7cd29cff5ea9940fe91c40707"
+  },
+  "receipt_inclusion": {
+    "checkpoint_seq": 1042,
+    "merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+    "proof": {
+      "tree_size": 1,
+      "leaf_index": 0,
+      "audit_path": []
+    }
+  },
+  "checkpoint_statement": {
+    "schema": "chio.checkpoint_statement.v1",
+    "checkpoint_seq": 1042,
+    "batch_start_seq": 104101,
+    "batch_end_seq": 104200,
+    "tree_size": 1,
+    "merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+    "issued_at": 1743292800,
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signature": "69aadce95f4d6e54c0ac59fcccc47870ff85a1e5dfba74726dc95f7ef1f3b6256b98e8400a983e24a1411a4cb170c04eb9036d33ba29a4217752298122076a07"
+  },
+  "chain_anchor": {
+    "chain_id": "eip155:8453",
+    "contract_address": "0x1000000000000000000000000000000000000001",
+    "operator_address": "0x1111111111111111111111111111111111111111",
+    "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "block_number": 12345678,
+    "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "anchored_merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+    "anchored_checkpoint_seq": 1042
+  },
+  "key_binding_certificate": {
+    "certificate": {
+      "schema": "chio.key-binding-certificate.v1",
+      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "settlement_address": "0x1111111111111111111111111111111111111111",
+      "issued_at": 1743292800,
+      "expires_at": 1774828800,
+      "nonce": "0123456789abcdef0123456789abcdef"
+    },
+    "signature": "d1978bdd761495173d855841000bdc52c9f195ed10b11d14066836541083de955033d52f8cf18c639af08154fde2f63cea483fa2553ab6a5d75f386eb822d505"
+  }
+}

@@ -14,41 +14,41 @@ COPY examples/hello-tool ./examples/hello-tool
 COPY formal/diff-tests ./formal/diff-tests
 COPY tests/e2e ./tests/e2e
 
-RUN cargo build --locked -p arc-cli --bin arc
+RUN cargo build --locked -p chio-cli --bin chio
 
 FROM node:${NODE_VERSION}-alpine AS dashboard-builder
-WORKDIR /workspace/crates/arc-cli/dashboard
+WORKDIR /workspace/crates/chio-cli/dashboard
 
-COPY crates/arc-cli/dashboard/package.json ./
-COPY crates/arc-cli/dashboard/package-lock.json ./
+COPY crates/chio-cli/dashboard/package.json ./
+COPY crates/chio-cli/dashboard/package-lock.json ./
 RUN npm ci --no-fund --no-audit
 
-COPY crates/arc-cli/dashboard/index.html ./
-COPY crates/arc-cli/dashboard/tsconfig.json ./
-COPY crates/arc-cli/dashboard/tsconfig.app.json ./
-COPY crates/arc-cli/dashboard/vite.config.ts ./
-COPY crates/arc-cli/dashboard/src ./src
+COPY crates/chio-cli/dashboard/index.html ./
+COPY crates/chio-cli/dashboard/tsconfig.json ./
+COPY crates/chio-cli/dashboard/tsconfig.app.json ./
+COPY crates/chio-cli/dashboard/vite.config.ts ./
+COPY crates/chio-cli/dashboard/src ./src
 
 RUN npm run build
 
-FROM alpine:${ALPINE_VERSION} AS arc
+FROM alpine:${ALPINE_VERSION} AS chio
 RUN apk add --no-cache ca-certificates libgcc libstdc++
-COPY --from=rust-builder /workspace/target/debug/arc /usr/local/bin/arc
-ENTRYPOINT ["arc"]
+COPY --from=rust-builder /workspace/target/debug/chio /usr/local/bin/chio
+ENTRYPOINT ["chio"]
 CMD ["--help"]
 
-FROM arc AS arc-trust-demo
-WORKDIR /opt/arc
-COPY --from=dashboard-builder /workspace/crates/arc-cli/dashboard/dist ./dashboard/dist
+FROM chio AS chio-trust-demo
+WORKDIR /opt/chio
+COPY --from=dashboard-builder /workspace/crates/chio-cli/dashboard/dist ./dashboard/dist
 EXPOSE 8940
 ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /usr/local/bin/arc --receipt-db /var/lib/arc/receipts.sqlite --revocation-db /var/lib/arc/revocations.sqlite --authority-db /var/lib/arc/authority.sqlite --budget-db /var/lib/arc/budgets.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${ARC_SERVICE_TOKEN:-demo-token}\""]
+CMD ["/bin/sh", "-lc", "exec /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --revocation-db /var/lib/chio/revocations.sqlite --authority-db /var/lib/chio/authority.sqlite --budget-db /var/lib/chio/budgets.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-token}\""]
 
-FROM arc AS arc-mcp-demo
+FROM chio AS chio-mcp-demo
 RUN apk add --no-cache python3
-WORKDIR /opt/arc
+WORKDIR /opt/chio
 COPY examples/docker/mock_mcp_server.py ./examples/mock_mcp_server.py
 COPY examples/docker/policy.yaml ./examples/policy.yaml
 EXPOSE 8931
 ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /usr/local/bin/arc --control-url \"${ARC_CONTROL_URL:-http://arc-trust-demo:8940}\" --control-token \"${ARC_CONTROL_TOKEN:-demo-token}\" mcp serve-http --policy /opt/arc/examples/policy.yaml --server-id wrapped-http-mock --server-name \"Wrapped HTTP Mock\" --listen 0.0.0.0:8931 --auth-token \"${ARC_AUTH_TOKEN:-demo-token}\" -- python3 /opt/arc/examples/mock_mcp_server.py"]
+CMD ["/bin/sh", "-lc", "exec /usr/local/bin/chio --control-url \"${CHIO_CONTROL_URL:-http://chio-trust-demo:8940}\" --control-token \"${CHIO_CONTROL_TOKEN:-demo-token}\" mcp serve-http --policy /opt/chio/examples/policy.yaml --server-id wrapped-http-mock --server-name \"Wrapped HTTP Mock\" --listen 0.0.0.0:8931 --auth-token \"${CHIO_AUTH_TOKEN:-demo-token}\" -- python3 /opt/chio/examples/mock_mcp_server.py"]

@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # -- Issue capability with budget limits --
     # The procurement agent gets a capped budget for provider operations.
-    # ARC's trust-control tracks budget consumption atomically.
+    # Chio's trust-control tracks budget consumption atomically.
     cap = trust.issue_capability(
         subject_pk="00" * 32,
         scope={

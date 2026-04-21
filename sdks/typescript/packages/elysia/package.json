@@ -1,8 +1,8 @@
 {
-  "name": "@arc-protocol/elysia",
+  "name": "@chio-protocol/elysia",
   "version": "1.0.0",
   "type": "module",
-  "description": "ARC protocol lifecycle hook for Elysia",
+  "description": "Chio protocol lifecycle hook for Elysia",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -26,7 +26,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@arc-protocol/node-http": "file:../node-http"
+    "@chio-protocol/node-http": "file:../node-http"
   },
   "peerDependencies": {
     "elysia": ">=1.0.0"

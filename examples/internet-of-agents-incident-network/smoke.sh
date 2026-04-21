@@ -10,9 +10,9 @@ LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
-ARC_BIN="$(ensure_arc_bin)"
-SERVICE_TOKEN="${ARC_SERVICE_TOKEN:-demo-token}"
-ARC_AUTH_TOKEN="${ARC_AUTH_TOKEN:-demo-token}"
+CHIO_BIN="$(ensure_arc_bin)"
+SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
 
 # Ports
 TRUST_PORT="$(pick_free_port)"
@@ -48,8 +48,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# -- ARC trust-control --
-"${ARC_BIN}" trust serve \
+# -- Chio trust-control --
+"${CHIO_BIN}" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" --service-token "${SERVICE_TOKEN}" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
   --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
@@ -58,24 +58,24 @@ trap cleanup EXIT
   >"${LOG_DIR}/trust.log" 2>&1 &
 BG_PIDS+=($!)
 
-# -- ARC MCP edges --
+# -- Chio MCP edges --
 for spec in \
   "mcp-observability:${OBS_PORT}:observability:tools/observability.py" \
   "mcp-github:${GIT_PORT}:github:tools/github.py" \
   "mcp-pagerduty:${PD_PORT}:pagerduty:tools/pagerduty.py" \
   "mcp-provider-ops:${OPS_PORT}:provider-ops:tools/provider_ops.py"; do
   IFS=: read -r sid port policy script <<< "${spec}"
-  "${ARC_BIN}" mcp serve-http \
+  "${CHIO_BIN}" mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/${policy}.yaml" \
     --server-id "${sid}" --listen "127.0.0.1:${port}" \
-    --auth-token "${ARC_AUTH_TOKEN}" --shared-hosted-owner \
+    --auth-token "${CHIO_AUTH_TOKEN}" --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/${script}" \
     >"${LOG_DIR}/arc-${sid}.log" 2>&1 &
   BG_PIDS+=($!)
 done
 
-# -- ARC api protect sidecars (the arc_asgi middleware in services talks to these) --
-"${ARC_BIN}" \
+# -- Chio api protect sidecars (the chio_asgi middleware in services talks to these) --
+"${CHIO_BIN}" \
   --control-url "http://127.0.0.1:${TRUST_PORT}" \
   --control-token "${SERVICE_TOKEN}" \
   api protect \
@@ -83,18 +83,18 @@ done
   --spec "${EXAMPLE_ROOT}/services/coordinator-openapi.yaml" \
   --listen "127.0.0.1:${COORD_SIDECAR_PORT}" \
   --receipt-store "${STATE_DIR}/coordinator-receipts.sqlite3" \
-  >"${LOG_DIR}/arc-coordinator-sidecar.log" 2>&1 &
+  >"${LOG_DIR}/chio-coordinator-sidecar.log" 2>&1 &
 BG_PIDS+=($!)
 
-# Executor does its own ARC validation (capabilities, revocation, budget)
+# Executor does its own Chio validation (capabilities, revocation, budget)
 # and calls tools through arc mcp serve-http. No sidecar needed.
 
-# -- Python services (with arc_asgi middleware pointing to their sidecars) --
+# -- Python services (with chio_asgi middleware pointing to their sidecars) --
 uv run --project "${EXAMPLE_ROOT}" python "${EXAMPLE_ROOT}/services/acp_broker.py" \
   --port "${BROKER_PORT}" >"${LOG_DIR}/acp-broker.log" 2>&1 &
 BG_PIDS+=($!)
 
-ARC_SIDECAR_URL="http://127.0.0.1:${COORD_SIDECAR_PORT}" \
+CHIO_SIDECAR_URL="http://127.0.0.1:${COORD_SIDECAR_PORT}" \
   uv run --project "${EXAMPLE_ROOT}" python "${EXAMPLE_ROOT}/services/coordinator.py" \
   --port "${COORD_PORT}" >"${LOG_DIR}/coordinator.log" 2>&1 &
 BG_PIDS+=($!)
@@ -114,7 +114,7 @@ wait_for_http "http://127.0.0.1:${COORD_PORT}/health"
 wait_for_http "http://127.0.0.1:${EXEC_PORT}/health"
 wait_for_port 127.0.0.1 "${COORD_SIDECAR_PORT}"
 
-# -- Run orchestrator (calls services directly; arc_asgi middleware handles ARC) --
+# -- Run orchestrator (calls services directly; chio_asgi middleware handles Chio) --
 uv run --project "${EXAMPLE_ROOT}" python "${EXAMPLE_ROOT}/orchestrate.py" \
   --control-url "http://127.0.0.1:${TRUST_PORT}" \
   --service-token "${SERVICE_TOKEN}" \
@@ -126,7 +126,7 @@ uv run --project "${EXAMPLE_ROOT}" python "${EXAMPLE_ROOT}/orchestrate.py" \
   --github-mcp-url "http://127.0.0.1:${GIT_PORT}" \
   --pagerduty-mcp-url "http://127.0.0.1:${PD_PORT}" \
   --provider-ops-mcp-url "http://127.0.0.1:${OPS_PORT}" \
-  --arc-auth-token "${ARC_AUTH_TOKEN}" \
+  --chio-auth-token "${CHIO_AUTH_TOKEN}" \
   --artifact-dir "${ARTIFACT_ROOT}" \
   > "${ARTIFACT_ROOT}/run-result.json"
 

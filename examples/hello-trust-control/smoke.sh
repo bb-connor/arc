@@ -10,8 +10,8 @@ LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
-ARC_BIN="$(ensure_arc_bin)"
-SERVICE_TOKEN="${ARC_SERVICE_TOKEN:-demo-token}"
+CHIO_BIN="$(ensure_arc_bin)"
+SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
 TRUST_PORT="$(pick_free_port)"
 CONTROL_URL="http://127.0.0.1:${TRUST_PORT}"
 TRUST_RECEIPT_DB="${STATE_DIR}/trust-receipts.sqlite3"
@@ -31,7 +31,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${ARC_BIN}" trust serve \
+"${CHIO_BIN}" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" \
   --service-token "${SERVICE_TOKEN}" \
   --receipt-db "${TRUST_RECEIPT_DB}" \
@@ -56,7 +56,7 @@ print(payload["capability"]["id"])
 PY
 )"
 
-"${ARC_BIN}" \
+"${CHIO_BIN}" \
   --control-url "${CONTROL_URL}" \
   --control-token "${SERVICE_TOKEN}" \
   trust status \
@@ -74,7 +74,7 @@ assert payload["capability_id"], payload
 assert payload["revoked"] is False, payload
 PY
 
-"${ARC_BIN}" \
+"${CHIO_BIN}" \
   --control-url "${CONTROL_URL}" \
   --control-token "${SERVICE_TOKEN}" \
   trust revoke \
@@ -93,7 +93,7 @@ assert payload["revoked"] is True, payload
 assert payload["newly_revoked"] is True, payload
 PY
 
-"${ARC_BIN}" \
+"${CHIO_BIN}" \
   --control-url "${CONTROL_URL}" \
   --control-token "${SERVICE_TOKEN}" \
   trust status \
@@ -111,7 +111,7 @@ assert payload["capability_id"], payload
 assert payload["revoked"] is True, payload
 PY
 
-"${ARC_BIN}" check \
+"${CHIO_BIN}" check \
   --policy "${EXAMPLE_ROOT}/policy.yaml" \
   --tool read_file \
   --params '{"path":"README.md"}' \
@@ -131,13 +131,13 @@ assert payload["receipt_id"], payload
 assert payload["policy_hash"], payload
 PY
 
-"${ARC_BIN}" receipt --receipt-db "${CHECK_RECEIPT_DB}" list --limit 20 > "${ARTIFACT_ROOT}/receipts.ndjson"
+"${CHIO_BIN}" receipt --receipt-db "${CHECK_RECEIPT_DB}" list --limit 20 > "${ARTIFACT_ROOT}/receipts.ndjson"
 
-"${ARC_BIN}" evidence export \
+"${CHIO_BIN}" evidence export \
   --receipt-db "${CHECK_RECEIPT_DB}" \
   --output "${EVIDENCE_DIR}"
 
-"${ARC_BIN}" evidence verify \
+"${CHIO_BIN}" evidence verify \
   --input "${EVIDENCE_DIR}" \
   --json \
   > "${ARTIFACT_ROOT}/verify.json"

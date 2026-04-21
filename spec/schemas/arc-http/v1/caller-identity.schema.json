@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC CallerIdentity",
+  "title": "Chio CallerIdentity",
   "description": "The identity of the caller as extracted from the HTTP request, including the authentication method.",
   "type": "object",
   "required": ["subject", "auth_method"],

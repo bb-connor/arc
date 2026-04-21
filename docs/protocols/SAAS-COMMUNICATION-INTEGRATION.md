@@ -22,7 +22,7 @@ Without content-level governance:
   on-call rotation at 3am for a non-critical issue.
 - An agent with `github:merge` scope can merge untested code to `main`.
 
-ARC's existing capability model (scoped `ToolGrant`, `Constraint` variants,
+Chio's existing capability model (scoped `ToolGrant`, `Constraint` variants,
 guard pipeline) provides the structural foundation. This document extends it
 with content-aware governance for external SaaS actions.
 
@@ -30,7 +30,7 @@ with content-aware governance for external SaaS actions.
 
 ### 2.1 ToolAction Variant: ExternalApiCall
 
-The existing `ToolAction` enum in `arc-guards/src/action.rs` categorizes
+The existing `ToolAction` enum in `chio-guards/src/action.rs` categorizes
 actions by kind (file access, shell command, network egress). SaaS
 interactions need a new variant that carries service identity and visibility
 classification.
@@ -84,7 +84,7 @@ if let Some(svc) = SAAS_TOOL_REGISTRY.get(tool.as_str()) {
 ### 2.2 New Constraint Variants
 
 Two new `Constraint` variants extend the existing enum in
-`arc-core-types/src/capability.rs`:
+`chio-core-types/src/capability.rs`:
 
 ```rust
 pub enum Constraint {
@@ -202,7 +202,7 @@ configured for 100/hour.
 
 ### 3.3 VelocityGuard Configuration for Communication
 
-The existing `VelocityGuard` (token bucket in `arc-guards/src/velocity.rs`)
+The existing `VelocityGuard` (token bucket in `chio-guards/src/velocity.rs`)
 applies directly. Communication-specific configuration:
 
 ```rust
@@ -630,7 +630,7 @@ Agent requests: create_issue(project: "FINANCE", ...)
 The content-review guard is a new pre-invocation guard type. It inspects
 tool call arguments for outbound content and evaluates it against
 configurable policies. It reuses PII detection patterns from the existing
-`ResponseSanitizationGuard` in `arc-guards/src/response_sanitization.rs`
+`ResponseSanitizationGuard` in `chio-guards/src/response_sanitization.rs`
 but applies them to **inputs** (outbound content) rather than outputs
 (inbound responses).
 
@@ -724,7 +724,7 @@ impl ContentReviewGuard {
 ### 7.4 PII Detection (reuse from response_sanitization)
 
 The content-review guard reuses the same `SensitivePattern` definitions
-from `arc-guards/src/response_sanitization.rs`: SSN, email, phone, credit
+from `chio-guards/src/response_sanitization.rs`: SSN, email, phone, credit
 card, and medical record patterns. The difference is directionality:
 
 - `ResponseSanitizationGuard`: post-invocation, scans tool **output**
@@ -876,7 +876,7 @@ The Python SDK provides decorators that register tools with content-review
 policies and recipient constraints:
 
 ```python
-from arc_sdk import tool, content_review, recipient_allowlist, velocity_limit
+from chio_sdk import tool, content_review, recipient_allowlist, velocity_limit
 
 @tool(server="slack-server")
 @content_review(policy="slack-standard", fields=["text", "blocks"])
@@ -914,7 +914,7 @@ ToolGrant(
 ### 8.2 Financial Tool Decorators
 
 ```python
-from arc_sdk import tool, require_approval_above, max_cost
+from chio_sdk import tool, require_approval_above, max_cost
 
 @tool(server="stripe-server")
 @require_approval_above(threshold_cents=10000)
@@ -937,7 +937,7 @@ async def create_charge(
 ### 8.3 Incident Platform Decorators
 
 ```python
-from arc_sdk import tool, content_review, severity_cap
+from chio_sdk import tool, content_review, severity_cap
 
 @tool(server="pagerduty-server")
 @content_review(policy="incident-validation", fields=["title", "description"])
@@ -961,7 +961,7 @@ async def create_incident(
 ### 8.4 GitHub Decorators
 
 ```python
-from arc_sdk import tool, content_review, protected_branches
+from chio_sdk import tool, content_review, protected_branches
 
 @tool(server="github-server")
 @content_review(policy="github-pr-description", fields=["title", "body"])
@@ -1005,7 +1005,7 @@ specific order. The pipeline runs fail-closed: if any guard denies, the
 request is denied.
 
 ```python
-from arc_guards import (
+from chio_guards import (
     GuardPipeline,
     ContentReviewGuard,
     VelocityGuard,

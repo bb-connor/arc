@@ -1,13 +1,13 @@
-// Package main implements the ARC Kubernetes admission controller and sidecar injector.
+// Package main implements the Chio Kubernetes admission controller and sidecar injector.
 //
 // This controller runs as a Kubernetes admission webhook that:
-//  1. Rejects pods without valid ARC capability tokens issued by configured ARC
+//  1. Rejects pods without valid Chio capability tokens issued by configured Chio
 //     trust anchors.
-//  2. Injects the arc-api-protect sidecar container into pods that have the
-//     arc.backbay.io/inject: "true" annotation.
+//  2. Injects the chio-api-protect sidecar container into pods that have the
+//     chio.backbay.io/inject: "true" annotation.
 //
 // The sidecar container communicates with the application container over
-// localhost, proxying HTTP traffic through the ARC kernel for capability
+// localhost, proxying HTTP traffic through the Chio kernel for capability
 // validation and receipt signing.
 package main
 
@@ -36,7 +36,7 @@ func main() {
 	mux.HandleFunc("/healthz", handleHealthz)
 
 	addr := ":" + port
-	log.Printf("ARC admission controller listening on %s", addr)
+	log.Printf("Chio admission controller listening on %s", addr)
 
 	if certFile != "" && keyFile != "" {
 		server := &http.Server{
@@ -64,8 +64,8 @@ func handleHealthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 // handleValidate is the validating admission webhook handler.
-// It rejects pods that lack the required ARC capability token or whose token
-// does not validate against configured ARC trust anchors.
+// It rejects pods that lack the required Chio capability token or whose token
+// does not validate against configured Chio trust anchors.
 func handleValidate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -88,7 +88,7 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleMutate is the mutating admission webhook handler.
-// It injects the arc-api-protect sidecar into annotated pods.
+// It injects the chio-api-protect sidecar into annotated pods.
 func handleMutate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -110,7 +110,7 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(review)
 }
 
-// validatePod checks whether a pod has the required ARC annotations.
+// validatePod checks whether a pod has the required Chio annotations.
 func validatePod(req AdmissionRequest) AdmissionResponse {
 	var pod PodSpec
 	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
@@ -119,16 +119,16 @@ func validatePod(req AdmissionRequest) AdmissionResponse {
 
 	annotations := pod.Metadata.Annotations
 
-	// Check for required ARC capability token annotation.
+	// Check for required Chio capability token annotation.
 	capToken := annotations[AnnotationCapabilityToken]
 	if capToken == "" {
-		// Check if this namespace has an ArcPolicy that exempts this pod.
+		// Check if this namespace has an ChioPolicy that exempts this pod.
 		if annotations[AnnotationExempt] == "true" {
-			return allowResponse("pod is exempt from ARC capability requirement")
+			return allowResponse("pod is exempt from Chio capability requirement")
 		}
 		return denyResponse(
 			"pod missing required annotation " + AnnotationCapabilityToken +
-				"; provide a valid ARC capability token or set " +
+				"; provide a valid Chio capability token or set " +
 				AnnotationExempt + ": \"true\" to exempt",
 		)
 	}
@@ -142,10 +142,10 @@ func validatePod(req AdmissionRequest) AdmissionResponse {
 		return denyResponse(err.Error())
 	}
 
-	return allowResponse("ARC capability token validated against configured trusted issuers")
+	return allowResponse("Chio capability token validated against configured trusted issuers")
 }
 
-// mutatePod injects the ARC sidecar if the pod has the injection annotation.
+// mutatePod injects the Chio sidecar if the pod has the injection annotation.
 func mutatePod(req AdmissionRequest) AdmissionResponse {
 	var pod PodSpec
 	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
@@ -176,12 +176,12 @@ func mutatePod(req AdmissionRequest) AdmissionResponse {
 		PatchType: &patchType,
 		Patch:     patchBytes,
 		Result: &StatusResult{
-			Message: "ARC sidecar injected",
+			Message: "Chio sidecar injected",
 		},
 	}
 }
 
-// buildSidecarContainer creates the ARC sidecar container spec from pod annotations.
+// buildSidecarContainer creates the Chio sidecar container spec from pod annotations.
 func buildSidecarContainer(annotations map[string]string) Container {
 	image := annotations[AnnotationSidecarImage]
 	if image == "" {
@@ -206,12 +206,12 @@ func buildSidecarContainer(annotations map[string]string) Container {
 	}
 
 	return Container{
-		Name:  "arc-sidecar",
+		Name:  "chio-sidecar",
 		Image: image,
 		Args:  args,
 		Ports: []ContainerPort{
 			{
-				Name:          "arc-proxy",
+				Name:          "chio-proxy",
 				ContainerPort: 9090,
 				Protocol:      "TCP",
 			},

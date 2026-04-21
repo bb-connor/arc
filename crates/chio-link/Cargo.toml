@@ -1,0 +1,37 @@
+[package]
+name = "chio-link"
+description = "Oracle runtime for Chio cross-currency budget enforcement"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_link"
+
+[features]
+default = ["web3"]
+web3 = [
+    "dep:alloy-contract",
+    "dep:alloy-primitives",
+    "dep:alloy-provider",
+    "dep:alloy-sol-types",
+]
+
+[dependencies]
+chio-core = { path = "../chio-core" }
+alloy-contract = { version = "1.8.3", default-features = false, optional = true }
+alloy-primitives = { version = "1.5.7", default-features = false, features = ["std"], optional = true }
+alloy-provider = { version = "1.8.3", default-features = false, features = ["reqwest", "reqwest-rustls-tls"], optional = true }
+alloy-sol-types = { version = "1.5.7", default-features = false, features = ["std"], optional = true }
+reqwest = { workspace = true, features = ["form", "json", "query", "rustls"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

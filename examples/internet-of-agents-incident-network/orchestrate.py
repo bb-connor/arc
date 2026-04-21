@@ -27,7 +27,7 @@ import httpx
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from incident_network.arc import ArcMcpClient, TrustControl
+from incident_network.arc import ChioMcpClient, TrustControl
 from incident_network.capabilities import PublicKey, delegate, gen_identity
 from incident_network.agents import run_agent
 
@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--github-mcp-url")
     p.add_argument("--pagerduty-mcp-url")
     p.add_argument("--provider-ops-mcp-url")
-    p.add_argument("--arc-auth-token", default="demo-token")
+    p.add_argument("--chio-auth-token", default="demo-token")
     p.add_argument("--mode", default="happy-path", choices=[
         "happy-path", "approval-required", "attenuation-deny",
         "revoke-midchain", "expiry-async-failure",
@@ -218,15 +218,15 @@ def main(argv: list[str] | None = None) -> int:
     trust.record_lineage(vendor_cap, root_cap["id"])
     _write(out / "capabilities" / "vendor-liaison-agent.json", vendor_cap)
 
-    # -- Run agents via ARC MCP endpoints --
-    mcp: dict[str, ArcMcpClient] = {}
-    auth = args.arc_auth_token
+    # -- Run agents via Chio MCP endpoints --
+    mcp: dict[str, ChioMcpClient] = {}
+    auth = args.chio_auth_token
     if args.observability_mcp_url:
-        mcp["observability"] = ArcMcpClient(args.observability_mcp_url, auth_token=auth)
+        mcp["observability"] = ChioMcpClient(args.observability_mcp_url, auth_token=auth)
     if args.github_mcp_url:
-        mcp["github"] = ArcMcpClient(args.github_mcp_url, auth_token=auth)
+        mcp["github"] = ChioMcpClient(args.github_mcp_url, auth_token=auth)
     if args.pagerduty_mcp_url:
-        mcp["pagerduty"] = ArcMcpClient(args.pagerduty_mcp_url, auth_token=auth)
+        mcp["pagerduty"] = ChioMcpClient(args.pagerduty_mcp_url, auth_token=auth)
 
     for c in mcp.values():
         c.__enter__()
@@ -300,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     if args.provider_ops_mcp_url:
         coord_req["provider_ops_mcp_url"] = args.provider_ops_mcp_url
-        coord_req["arc_auth_token"] = auth
+        coord_req["chio_auth_token"] = auth
 
     # -- Issue capability for sidecar-protected endpoints --
     sidecar_cap = trust.issue_capability(
@@ -404,7 +404,7 @@ def _run_scenario(args, coord_req, task, vendor_cap, trust, out, cap_header=""):
     """Execute the provider-side scenario and return the result."""
     coord_url = args.provider_coordinator_url.rstrip("/")
     exec_url = args.provider_executor_url.rstrip("/")
-    hdr = {"X-Arc-Capability": cap_header} if cap_header else {}
+    hdr = {"X-Chio-Capability": cap_header} if cap_header else {}
 
     if args.mode == "happy-path":
         r = httpx.post(f"{coord_url}/process-task", json=coord_req, headers=hdr, timeout=30.0)
