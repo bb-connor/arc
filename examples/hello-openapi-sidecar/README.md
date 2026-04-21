@@ -1,6 +1,6 @@
 # hello-openapi-sidecar
 
-Minimal spec-driven HTTP example using `arc api protect` directly in front of a plain upstream app.
+Minimal spec-driven HTTP example using `chio api protect` directly in front of a plain upstream app.
 
 The upstream app has no Chio framework SDK or middleware. All governance, deny behavior, and receipt capture happen in the OpenAPI sidecar.
 

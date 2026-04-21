@@ -67,7 +67,7 @@ BG_PIDS+=($!)
 
 wait_for_http "${BUYER_API_URL}/healthz"
 
-# Buyer sidecar (arc api protect)
+# Buyer sidecar (chio api protect)
 CHIO_BIN="${CHIO_BIN}" \
 CHIO_CONTROL_URL="${CONTROL_URL}" \
 CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" \

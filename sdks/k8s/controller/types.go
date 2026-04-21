@@ -35,7 +35,7 @@ const (
 	AnnotationReceiptStore = "chio.backbay.io/receipt-store"
 
 	// DefaultSidecarImage is the default container image for the Chio sidecar.
-	DefaultSidecarImage = "ghcr.io/backbay/chio:latest"
+	DefaultSidecarImage = "ghcr.io/backbay/chio-sidecar:latest"
 )
 
 // AdmissionReview wraps an admission request and response.

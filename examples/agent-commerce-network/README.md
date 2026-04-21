@@ -7,7 +7,7 @@ capability-based access control, budget enforcement, and receipt signing.
 
 Lattice Platform Security needs a security review for their payments API.
 Vanguard Security provides reviews via an MCP tool server. Chio governs every
-interaction: the buyer's API sits behind `arc api protect`, the provider's
+interaction: the buyer's API sits behind `chio api protect`, the provider's
 MCP server sits behind `arc mcp serve-http`, and trust-control tracks
 budgets, receipts, and capabilities.
 
@@ -20,7 +20,7 @@ approval if the price exceeds the threshold.
 ```
 arc trust serve                     capability authority, budget store
 arc mcp serve-http                  kernel-mediated provider MCP tools
-arc api protect                     buyer API sidecar (receipt signing)
+chio api protect                    buyer API sidecar (receipt signing)
 buyer/app.py                        FastAPI procurement service
 provider/review_server.py           MCP tool server (quote, execute, dispute)
 orchestrate.py                      procurement agent entry point
@@ -39,7 +39,7 @@ deterministic fallback flow (CI mode).
 ## What Chio Governs
 
 - **Budget limits** on capability grants (`maxTotalCost`, `maxCostPerInvocation`)
-- **Receipt signing** for every buyer API call (via `arc api protect`)
+- **Receipt signing** for every buyer API call (via `chio api protect`)
 - **Guard policies** on provider MCP tools (via `arc mcp serve-http`)
 - **Budget tracking** via trust-control's split budget endpoints (`/v1/budgets/authorize-exposure`, `/v1/budgets/release-exposure`, `/v1/budgets/reconcile-spend`)
 - **Financial reports**: exposure ledger, settlement reconciliation
@@ -55,7 +55,7 @@ buyer/
   app.py                    FastAPI procurement service
   policy.yaml               Chio HushSpec policy
   openapi.yaml              API spec with x-chio-* metadata
-  run-sidecar.sh            arc api protect wrapper
+  run-sidecar.sh            chio api protect wrapper
 provider/
   review_server.py          MCP tool server
   policy.yaml               Chio HushSpec policy

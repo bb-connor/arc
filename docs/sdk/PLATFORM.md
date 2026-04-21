@@ -117,35 +117,35 @@ pod deployment time and optionally injects the Chio sidecar container.
 ### Validating Webhook
 
 The validating webhook rejects pods that lack the required
-`arc.backbay.io/capability-token` annotation, unless the pod carries an
-explicit `arc.backbay.io/exempt: "true"` exemption. Presented tokens are
+`chio.protocol/capability-token` annotation, unless the pod carries an
+explicit `chio.backbay.io/exempt: "true"` exemption. Presented tokens are
 parsed as Chio capability tokens, verified cryptographically, checked for time
 validity, and matched against any required scopes before the pod is allowed.
 The controller only trusts issuers configured through
 `CHIO_TRUSTED_ISSUER_KEY` or `CHIO_TRUSTED_ISSUER_KEYS` (comma-separated for key
 rotation). If neither is configured, non-exempt pods fail closed.
 
-The webhook is scoped to namespaces with the `arc.backbay.io/enforce: "true"`
+The webhook is scoped to namespaces with the `chio.backbay.io/enforce: "true"`
 label. It runs on pod CREATE and UPDATE operations.
 
 ### Mutating Webhook
 
 The mutating webhook injects an `chio-sidecar` container when a pod has the
-`arc.backbay.io/inject: "true"` annotation. The sidecar runs `arc api protect`
+`chio.backbay.io/inject: "true"` annotation. The sidecar runs `chio api protect`
 and proxies HTTP traffic through the Chio kernel on port 9090.
 
 ### Pod Annotations
 
 | Annotation | Required | Description |
 |------------|----------|-------------|
-| `arc.backbay.io/capability-token` | Yes (unless exempt) | Chio capability token for the workload, signed by a controller-trusted Chio issuer |
-| `arc.backbay.io/required-scopes` | No | Comma-separated required Chio scopes using the grammar below |
-| `arc.backbay.io/exempt` | No | Set to `"true"` to skip capability validation |
-| `arc.backbay.io/inject` | No | Set to `"true"` to trigger sidecar injection |
-| `arc.backbay.io/sidecar-image` | No | Override the default sidecar image (default: `ghcr.io/backbay-labs/arc:latest`) |
-| `arc.backbay.io/upstream` | No | Upstream URL the sidecar proxies to (default: `http://127.0.0.1:8080`) |
-| `arc.backbay.io/spec-path` | No | Path to the OpenAPI spec file inside the pod |
-| `arc.backbay.io/receipt-store` | No | Receipt storage backend URI |
+| `chio.protocol/capability-token` | Yes (unless exempt) | Chio capability token for the workload, signed by a controller-trusted Chio issuer |
+| `chio.backbay.io/required-scopes` | No | Comma-separated required Chio scopes using the grammar below |
+| `chio.backbay.io/exempt` | No | Set to `"true"` to skip capability validation |
+| `chio.backbay.io/inject` | No | Set to `"true"` to trigger sidecar injection |
+| `chio.backbay.io/sidecar-image` | No | Override the default sidecar image (default: `ghcr.io/backbay/chio-sidecar:latest`) |
+| `chio.backbay.io/upstream` | No | Upstream URL the sidecar proxies to (default: `http://127.0.0.1:8080`) |
+| `chio.backbay.io/spec-path` | No | Path to the OpenAPI spec file inside the pod |
+| `chio.backbay.io/receipt-store` | No | Receipt storage backend URI |
 
 ### Required Scope Grammar
 
@@ -177,7 +177,7 @@ If both are present, the controller trusts the union of those keys.
 The `ChioPolicy` custom resource defines namespace-level capability requirements:
 
 ```yaml
-apiVersion: arc.backbay.io/v1alpha1
+apiVersion: chio.backbay.io/v1alpha1
 kind: ChioPolicy
 metadata:
   name: production-policy
@@ -191,7 +191,7 @@ spec:
       app: my-service
   enforcement: enforce   # enforce | audit | disabled
   sidecarConfig:
-    image: ghcr.io/backbay-labs/arc:v1.0
+    image: ghcr.io/backbay/chio-sidecar:v1.0
     upstream: http://127.0.0.1:8080
     autoInject: true
 ```
@@ -206,8 +206,8 @@ kubectl apply -f sdks/k8s/crds/
 kubectl apply -f sdks/k8s/webhooks/
 
 # Label namespaces for enforcement
-kubectl label namespace my-app arc.backbay.io/enforce=true
-kubectl label namespace my-app arc.backbay.io/inject=true
+kubectl label namespace my-app chio.backbay.io/enforce=true
+kubectl label namespace my-app chio.backbay.io/inject=true
 ```
 
 ---
@@ -224,12 +224,12 @@ the dependency and Chio protection is active with zero code changes.
 In `application.properties` or `application.yml`:
 
 ```properties
-arc.sidecar-url=http://127.0.0.1:9090
-arc.timeout-seconds=5
-arc.on-sidecar-error=deny
-arc.enabled=true
-arc.url-patterns=/*
-arc.filter-order=1
+chio.sidecar-url=http://127.0.0.1:9090
+chio.timeout-seconds=5
+chio.on-sidecar-error=deny
+chio.enabled=true
+chio.url-patterns=/*
+chio.filter-order=1
 ```
 
 Or via `application.yml`:
@@ -246,7 +246,7 @@ arc:
 
 ### @ConfigurationProperties
 
-The `ChioProperties` class maps the `arc.*` prefix:
+The `ChioProperties` class maps the `chio.*` prefix:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -285,7 +285,7 @@ dependencies {
 }
 
 // application.properties
-// arc.sidecar-url=http://127.0.0.1:9090
+// chio.sidecar-url=http://127.0.0.1:9090
 
 // That's it. ChioFilter is auto-registered.
 ```
@@ -305,7 +305,7 @@ Two extension methods cover registration and pipeline insertion.
 var builder = WebApplication.CreateBuilder(args);
 
 // Register Chio services with optional configuration.
-builder.Services.AddArcProtection(options =>
+builder.Services.AddChioProtection(options =>
 {
     options.SidecarUrl = "http://127.0.0.1:9090";
     options.TimeoutSeconds = 5;
@@ -315,7 +315,7 @@ builder.Services.AddArcProtection(options =>
 var app = builder.Build();
 
 // Insert Chio middleware into the request pipeline.
-app.UseArcProtection();
+app.UseChioProtection();
 
 app.MapGet("/pets", () => Results.Ok(new[] { "dog", "cat" }));
 app.Run();
@@ -335,8 +335,8 @@ app.Run();
 
 | Method | Purpose |
 |--------|---------|
-| `services.AddArcProtection()` | Register Chio services and options in the DI container |
-| `app.UseArcProtection()` | Insert `ChioProtectMiddleware` into the ASP.NET Core pipeline |
+| `services.AddChioProtection()` | Register Chio services and options in the DI container |
+| `app.UseChioProtection()` | Insert `ChioProtectMiddleware` into the ASP.NET Core pipeline |
 
 ### What the Middleware Does
 
@@ -353,10 +353,10 @@ app.Run();
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddArcProtection();
+builder.Services.AddChioProtection();
 
 var app = builder.Build();
-app.UseArcProtection();
+app.UseChioProtection();
 app.MapGet("/hello", () => "world");
 app.Run();
 ```
@@ -382,9 +382,9 @@ All four platform SDKs share the same operational model:
 
 4. **Degraded-state visibility.** Representative SDKs expose a receiptless
    passthrough marker on the request/context surface:
-   `req.arcPassthrough` (TypeScript Express), `arc.GetArcPassthrough(r)` (Go),
+   `req.chioPassthrough` (TypeScript Express), `chio.GetChioPassthrough(r)` (Go),
    `request.state.chio_passthrough` or `request.chio_passthrough` (Python),
-   Servlet request attribute `arcPassthrough` (JVM), and
+   Servlet request attribute `chioPassthrough` (JVM), and
    `HttpContext.Items["ChioPassthrough"]` (.NET).
 
 5. **Identity extraction.** Each SDK extracts caller identity from standard

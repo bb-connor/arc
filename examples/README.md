@@ -60,7 +60,7 @@ Use the root runner to list or execute the current smoke set:
 
 | Example | Surface | Runtime | Smoke |
 | --- | --- | --- | --- |
-| [`hello-openapi-sidecar/`](./hello-openapi-sidecar/) | OpenAPI + `arc api protect` sidecar | `./run.sh` | `./smoke.sh` |
+| [`hello-openapi-sidecar/`](./hello-openapi-sidecar/) | OpenAPI + `chio api protect` sidecar | `./run.sh` | `./smoke.sh` |
 | [`hello-fastapi/`](./hello-fastapi/) | FastAPI + `chio-asgi` | `./run.sh` | `./smoke.sh` |
 | [`hello-django/`](./hello-django/) | Django + `chio-django` | `./run.sh` | `./smoke.sh` |
 | [`hello-fastify/`](./hello-fastify/) | Fastify + `@chio-protocol/fastify` | `./run.sh` | `./smoke.sh` |

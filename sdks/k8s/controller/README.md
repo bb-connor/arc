@@ -135,7 +135,7 @@ make docker-build
 
 The test suite uses `sigs.k8s.io/controller-runtime/pkg/client/fake` plus a
 stub `ChioClient` so unit tests run without a live cluster or sidecar. One
-test additionally drives the real `arc.Client` against an `httptest.Server`
+test additionally drives the real Chio client against an `httptest.Server`
 to cover the HTTP wire format.
 
 ## File map

@@ -520,7 +520,7 @@ func TestMutate_InjectSidecar(t *testing.T) {
 func TestMutate_CustomSidecarImage(t *testing.T) {
 	body := buildAdmissionReview(t, map[string]string{
 		AnnotationInject:       "true",
-		AnnotationSidecarImage: "myregistry/arc:v1.0",
+		AnnotationSidecarImage: "myregistry/chio-sidecar:v1.0",
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/mutate", bytes.NewReader(body))
@@ -543,7 +543,7 @@ func TestMutate_CustomSidecarImage(t *testing.T) {
 	var container Container
 	_ = json.Unmarshal(containerBytes, &container)
 
-	if container.Image != "myregistry/arc:v1.0" {
+	if container.Image != "myregistry/chio-sidecar:v1.0" {
 		t.Fatalf("expected custom image, got %s", container.Image)
 	}
 }

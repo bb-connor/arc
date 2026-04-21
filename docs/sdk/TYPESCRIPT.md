@@ -372,8 +372,8 @@ app.get("/pets", (req, res) => {
   if (arcReq.arcResult) {
     console.log("Receipt ID:", arcReq.arcResult.receipt.id);
   }
-  if (arcReq.arcPassthrough) {
-    console.log("Chio passthrough mode:", arcReq.arcPassthrough.mode);
+  if (arcReq.chioPassthrough) {
+    console.log("Chio passthrough mode:", arcReq.chioPassthrough.mode);
   }
   res.json([]);
 });
