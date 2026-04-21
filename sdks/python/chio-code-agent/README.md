@@ -49,7 +49,7 @@ sidecar.
 ## Custom policies
 
 The bundled policy is YAML-driven and identical to the one embedded by
-the Rust `arc mcp serve --preset code-agent` flag. To customize,
+the Rust `chio mcp serve --preset code-agent` flag. To customize,
 compile your own policy and pass it in:
 
 ```python
@@ -61,9 +61,9 @@ agent = CodeAgent(chio_client=client, capability_id="cap-1", policy=policy)
 
 See the bundled `default_policy.yaml` for the schema.
 
-## Relation to `arc mcp serve --preset code-agent`
+## Relation to `chio mcp serve --preset code-agent`
 
-`chio-code-agent` is the Python-embedded flavour; `arc mcp serve
+`chio-code-agent` is the Python-embedded flavour; `chio mcp serve
 --preset code-agent` is the same policy wrapping an MCP server over
 stdio. Pick whichever fits your integration surface -- they deny the
 same set of operations.

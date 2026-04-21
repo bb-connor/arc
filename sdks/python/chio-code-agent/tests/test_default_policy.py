@@ -1,7 +1,7 @@
 """Table tests for the bundled default policy.
 
 The policy is the single source of truth shared with the Rust
-``arc mcp serve --preset code-agent`` flag. These tests pin the
+``chio mcp serve --preset code-agent`` flag. These tests pin the
 behaviour so a drift between the two implementations gets caught
 early.
 """

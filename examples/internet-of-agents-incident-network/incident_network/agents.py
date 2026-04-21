@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-from incident_network.arc import ChioMcpClient, StdioMcpClient
+from incident_network.chio import ChioMcpClient, StdioMcpClient
 
 log = logging.getLogger("incident-network")
 

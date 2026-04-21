@@ -388,7 +388,7 @@ receipt content as authoritative.
 
 ## 5. HttpReceipt to ChioReceipt Mapping
 
-The `to_arc_receipt()` conversion maps an HTTP-layer receipt into the core
+The `to_chio_receipt()` conversion maps an HTTP-layer receipt into the core
 `ChioReceipt` type for unified storage and cross-surface querying.
 
 ### 5.1 Field Mapping

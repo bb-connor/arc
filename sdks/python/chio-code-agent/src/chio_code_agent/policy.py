@@ -5,7 +5,7 @@ This module exposes the zero-config policy shipped with
 
 * :data:`DEFAULT_POLICY_YAML` -- the raw YAML string. The Rust
   ``chio-cli`` crate embeds a byte-identical copy of this file so that
-  ``arc mcp serve --preset code-agent`` runs the same policy.
+  ``chio mcp serve --preset code-agent`` runs the same policy.
 * :data:`DEFAULT_POLICY` -- a parsed :class:`CodeAgentPolicy` dataclass
   used by the Python pre-flight checks (``FileTool``, ``ShellTool``,
   ``GitTool``). The pre-flight rejects calls locally for the cases the
@@ -50,7 +50,7 @@ DEFAULT_POLICY_YAML: str = _load_default_yaml()
 """Raw YAML string of the bundled default policy.
 
 Kept in sync with ``crates/chio-cli/src/policies/code_agent.yaml`` so the
-Python SDK and the ``arc mcp serve --preset code-agent`` flag evaluate
+Python SDK and the ``chio mcp serve --preset code-agent`` flag evaluate
 the same rules.
 """
 

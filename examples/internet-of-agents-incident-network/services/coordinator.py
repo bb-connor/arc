@@ -23,7 +23,7 @@ from chio_asgi import ChioASGIMiddleware, ChioASGIConfig
 from chio_fastapi import get_chio_receipt
 
 from incident_network.capabilities import PublicKey, delegate, from_seed
-from incident_network.arc import TrustControl
+from incident_network.chio import TrustControl
 
 
 class ProcessTaskRequest(BaseModel):

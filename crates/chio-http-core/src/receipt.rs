@@ -198,7 +198,7 @@ impl HttpReceipt {
     }
 
     /// Convert this HTTP receipt into a signed core ChioReceipt for unified storage.
-    pub fn to_arc_receipt_with_keypair(
+    pub fn to_chio_receipt_with_keypair(
         &self,
         keypair: &Keypair,
     ) -> chio_core_types::Result<chio_core_types::ChioReceipt> {
@@ -212,7 +212,7 @@ impl HttpReceipt {
     ///
     /// This method fails closed because a valid ChioReceipt signature cannot be
     /// derived from an HttpReceipt without the kernel signing keypair.
-    pub fn to_arc_receipt(&self) -> chio_core_types::Result<chio_core_types::ChioReceipt> {
+    pub fn to_chio_receipt(&self) -> chio_core_types::Result<chio_core_types::ChioReceipt> {
         Err(chio_core_types::Error::CanonicalJson(
             "cannot convert HttpReceipt into signed ChioReceipt without the kernel keypair"
                 .to_string(),
@@ -325,11 +325,11 @@ mod tests {
     }
 
     #[test]
-    fn to_arc_receipt_conversion() {
+    fn to_chio_receipt_conversion() {
         let kp = test_keypair();
         let body = sample_body(&kp);
         let receipt = HttpReceipt::sign(body, &kp).unwrap();
-        let error = receipt.to_arc_receipt().unwrap_err();
+        let error = receipt.to_chio_receipt().unwrap_err();
         assert!(error
             .to_string()
             .contains("cannot convert HttpReceipt into signed ChioReceipt"));
@@ -380,7 +380,7 @@ mod tests {
         let receipt = HttpReceipt::sign(body, &kp).unwrap();
         assert!(receipt.verify_signature().unwrap());
         assert_eq!(receipt.capability_id.as_deref(), Some("cap-xyz-789"));
-        let chio_receipt = receipt.to_arc_receipt_with_keypair(&kp).unwrap();
+        let chio_receipt = receipt.to_chio_receipt_with_keypair(&kp).unwrap();
         assert_eq!(chio_receipt.capability_id, "cap-xyz-789");
         assert!(chio_receipt.verify_signature().unwrap());
     }

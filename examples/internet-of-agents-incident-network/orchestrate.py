@@ -27,7 +27,7 @@ import httpx
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from incident_network.arc import ChioMcpClient, TrustControl
+from incident_network.chio import ChioMcpClient, TrustControl
 from incident_network.capabilities import PublicKey, delegate, gen_identity
 from incident_network.agents import run_agent
 

@@ -3,7 +3,7 @@
 
 Write-capable server for managing edge rules on the provider side.
 This is the most sensitive tool surface -- it mutates provider
-infrastructure.  Served behind arc mcp serve-http with a strict
+infrastructure.  Served behind chio mcp serve-http with a strict
 policy so every operation is kernel-mediated with receipts.
 """
 from __future__ import annotations

@@ -9,10 +9,10 @@ from typing import Any
 import httpx
 
 
-# -- Chio MCP HTTP client (talks to arc mcp serve-http) -----------------------
+# -- Chio MCP HTTP client (talks to chio mcp serve-http) -----------------------
 
 class ChioMcpClient:
-    """Calls MCP tools through an arc mcp serve-http endpoint.
+    """Calls MCP tools through an chio mcp serve-http endpoint.
 
     The Chio kernel validates capabilities, evaluates guard policies,
     and signs a receipt for every tool invocation.
@@ -155,7 +155,7 @@ class StdioMcpClient:
 # -- Trust-control HTTP client ------------------------------------------------
 
 class TrustControl:
-    """HTTP client for arc trust serve."""
+    """HTTP client for chio trust serve."""
 
     def __init__(self, url: str, token: str):
         self.url = url.rstrip("/")

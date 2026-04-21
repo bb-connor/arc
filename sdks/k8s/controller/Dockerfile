@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Multi-stage Dockerfile for arc-k8s-controller.
+# Multi-stage Dockerfile for chio-k8s-controller.
 #
 # Stage 1: build the manager binary with the module-compatible Go toolchain.
 # Stage 2: ship a distroless static image running as non-root user 65532.

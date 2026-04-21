@@ -1,4 +1,4 @@
-from incident_network.arc import ChioMcpClient, StdioMcpClient
+from incident_network.chio import ChioMcpClient, StdioMcpClient
 from incident_network.capabilities import (
     Identity,
     PublicKey,

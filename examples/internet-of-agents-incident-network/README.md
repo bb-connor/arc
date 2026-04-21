@@ -51,7 +51,7 @@ deterministic fallback (CI mode).
 
 ```
 incident_network/           Python package
-  arc.py                    Chio MCP client, trust-control client
+  chio.py                    Chio MCP client, trust-control client
   capabilities.py           Identity, delegation, signing
   agents.py                 Agent definitions, prompts, runner
   verify.py                 Bundle verification

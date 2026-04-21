@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from commerce_network.agents import run_procurement_agent
-from commerce_network.arc import TrustControl
+from commerce_network.chio import TrustControl
 
 log = logging.getLogger("commerce-network")
 
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--control-url", required=True)
     p.add_argument("--service-token", required=True)
-    p.add_argument("--buyer-url", required=True, help="Buyer sidecar URL (arc api protect)")
+    p.add_argument("--buyer-url", required=True, help="Buyer sidecar URL (chio api protect)")
     p.add_argument("--buyer-auth-token", default="demo-token")
     p.add_argument("--artifact-dir")
     p.add_argument("--scope", default="hotfix-review",

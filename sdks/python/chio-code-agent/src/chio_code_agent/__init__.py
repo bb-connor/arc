@@ -11,7 +11,7 @@ Public surface:
 * :class:`CodeAgent` -- facade bundling all three tools.
 * :data:`DEFAULT_POLICY` -- the bundled, fail-closed default policy.
 * :data:`DEFAULT_POLICY_YAML` -- the raw YAML, byte-identical to the
-  copy embedded by the Rust ``arc mcp serve --preset code-agent``
+  copy embedded by the Rust ``chio mcp serve --preset code-agent``
   flag.
 * :class:`FileTool`, :class:`ShellTool`, :class:`GitTool` -- per-tool
   wrappers for direct use.

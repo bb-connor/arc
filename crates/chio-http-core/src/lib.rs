@@ -2,7 +2,7 @@
 //!
 //! This crate defines the shared types that every HTTP substrate adapter uses:
 //! request model, caller identity, session context, HTTP receipts, and verdicts.
-//! It is the foundation for `chio-openapi`, `chio-config`, `arc api protect`,
+//! It is the foundation for `chio-openapi`, `chio-config`, `chio api protect`,
 //! and all language-specific middleware crates.
 
 pub mod approvals;

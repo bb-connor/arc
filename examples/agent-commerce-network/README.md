@@ -48,7 +48,7 @@ deterministic fallback flow (CI mode).
 
 ```
 commerce_network/           shared package
-  arc.py                    Chio clients (MCP, trust-control)
+  chio.py                    Chio clients (MCP, trust-control)
   agents.py                 procurement agent (Agents SDK / Anthropic)
   verify.py                 bundle verification
 buyer/
