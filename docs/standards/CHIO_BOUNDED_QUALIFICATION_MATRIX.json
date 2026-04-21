@@ -68,7 +68,7 @@
       "summary": "The bounded operational profile records which surfaces are local-only, leader-local, informational-only, or compatibility-only.",
       "witnesses": [
         "docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md",
-        "docs/standards/CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
+        "docs/standards/CHIO_BOUNDED_QUALIFICATION_MATRIX.json"
       ]
     },
     {
@@ -81,11 +81,11 @@
     }
   ],
   "artifactBundle": {
-    "root": "target/release-qualification/bounded-arc",
+    "root": "target/release-qualification/bounded-chio",
     "requiredFiles": [
       "artifact-manifest.json",
       "qualification-report.md",
-      "CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json",
+      "CHIO_BOUNDED_QUALIFICATION_MATRIX.json",
       "CHIO_BOUNDED_OPERATIONAL_PROFILE.md",
       "bounded-chio-pre-ship-checklist.md",
       "SHA256SUMS",
@@ -93,5 +93,5 @@
       "logs/planning-truth.log"
     ]
   },
-  "entrypoint": "./scripts/qualify-bounded-arc.sh"
+  "entrypoint": "./scripts/qualify-bounded-chio.sh"
 }
