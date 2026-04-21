@@ -467,16 +467,16 @@ from fastapi import Depends, Request
 from chio_sdk.client import ChioClient
 from chio_sdk.models import ChioPassthrough, CallerIdentity, HttpReceipt
 from chio_fastapi.dependencies import (
-    get_arc_client,
+    get_chio_client,
+    get_chio_passthrough,
+    get_chio_receipt,
     get_caller_identity,
-    get_arc_passthrough,
-    get_arc_receipt,
-    set_arc_client,
+    set_chio_client,
 )
 
 # Inject the Chio client
 @app.get("/items")
-async def list_items(client: ChioClient = Depends(get_arc_client)):
+async def list_items(client: ChioClient = Depends(get_chio_client)):
     health = await client.health()
     ...
 
@@ -487,7 +487,7 @@ async def whoami(caller: CallerIdentity = Depends(get_caller_identity)):
 
 # Inject receipt (set by middleware or decorators)
 @app.get("/receipt")
-async def show_receipt(receipt: HttpReceipt | None = Depends(get_arc_receipt)):
+async def show_receipt(receipt: HttpReceipt | None = Depends(get_chio_receipt)):
     if receipt is None:
         return {"status": "no receipt"}
     return {"receipt_id": receipt.id}
@@ -495,15 +495,15 @@ async def show_receipt(receipt: HttpReceipt | None = Depends(get_arc_receipt)):
 # Inject explicit fail-open passthrough state
 @app.get("/authority")
 async def show_authority(
-    passthrough: ChioPassthrough | None = Depends(get_arc_passthrough),
+    passthrough: ChioPassthrough | None = Depends(get_chio_passthrough),
 ):
     if passthrough is not None:
         return {"mode": passthrough.mode, "error": passthrough.error}
     return {"mode": "governed"}
 
 # Override the client singleton for testing
-set_arc_client(mock_client)
-set_arc_client(None)  # reset to default
+set_chio_client(mock_client)
+set_chio_client(None)  # reset to default
 ```
 
 ---

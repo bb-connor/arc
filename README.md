@@ -48,7 +48,7 @@ and produces signed receipts for every governed decision.
 Start with the supported policy-backed path:
 
 - scaffold or copy `examples/policies/canonical-hushspec.yaml`
-- run `arc mcp serve --policy ./policy.yaml ...`
+- run `chio mcp serve --policy ./policy.yaml ...`
 - prove one deny, one allow, and one receipt using the migration guide
 
 Guide:
@@ -76,10 +76,10 @@ tool example:
 
 The supported operator and local-development entrypoints are:
 
-- `arc check`: evaluate a single governed tool call and inspect the verdict
-- `arc mcp serve`: wrap an MCP server with Chio governance
-- `arc mcp serve-http`: expose the governed MCP edge over Streamable HTTP
-- `arc trust serve`: run the shared trust-control service
+- `chio check`: evaluate a single governed tool call and inspect the verdict
+- `chio mcp serve`: wrap an MCP server with Chio governance
+- `chio mcp serve-http`: expose the governed MCP edge over Streamable HTTP
+- `chio trust serve`: run the shared trust-control service
 
 Install and verification instructions live in
 [docs/install/README.md](docs/install/README.md).
