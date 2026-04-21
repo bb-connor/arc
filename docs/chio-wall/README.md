@@ -36,7 +36,7 @@ cargo run -p chio-wall -- control-path validate --output target/chio-wall-contro
   claim for the validation package
 - [DECISION_RECORD.md](DECISION_RECORD.md) — explicit expansion decision for
   the bounded Chio-Wall lane
-- [../mercury/CHIO_WALL_BRIEF.md](../mercury/CHIO_WALL_BRIEF.md) — companion-
+- [../mercury/ARC_WALL_BRIEF.md](../mercury/ARC_WALL_BRIEF.md) — companion-
   product brief and problem statement
 - [../mercury/PRODUCT_SURFACE_BOUNDARIES.md](../mercury/PRODUCT_SURFACE_BOUNDARIES.md) —
   shared Chio substrate seams plus the separate MERCURY and Chio-Wall product

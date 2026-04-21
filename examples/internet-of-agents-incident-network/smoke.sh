@@ -10,7 +10,7 @@ LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
-CHIO_BIN="$(ensure_arc_bin)"
+CHIO_BIN="$(ensure_chio_bin)"
 SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
 CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
 

@@ -316,7 +316,7 @@ The sidecar accepts configuration via environment variables:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CHIO_LISTEN_ADDR` | HTTP listen address | `0.0.0.0:9090` |
-| `CHIO_POLICY_SOURCE` | Policy location (file, s3://, gs://) | `/etc/arc/policy.yaml` |
+| `CHIO_POLICY_SOURCE` | Policy location (file, s3://, gs://) | `/etc/chio/policy.yaml` |
 | `CHIO_RECEIPT_SINK` | Receipt destination | `stdout` |
 | `CHIO_LOG_LEVEL` | Log level | `info` |
 | `CHIO_HEALTH_PATH` | Health check endpoint | `/health` |

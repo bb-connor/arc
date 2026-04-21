@@ -31,7 +31,7 @@ Shipped so far:
 - the MCP edge can now emit `notifications/resources/list_changed` when the host enables that feature
 - wrapped stdio MCP servers can now forward `notifications/resources/updated` and `notifications/resources/list_changed` during active `tools/call` execution and while the outer client is otherwise idle
 - wrapped stdio MCP servers can now forward `notifications/tools/list_changed` and `notifications/prompts/list_changed` during active requests and while the outer client is otherwise idle
-- the MCP edge now has a capability-negotiated experimental stream bridge for native Chio streamed tool output via `notifications/arc/tool_call_chunk`
+- the MCP edge now has a capability-negotiated experimental stream bridge for native Chio streamed tool output via `notifications/chio/tool_call_chunk`
 - the stdio edge now proves chunk notifications are emitted before the final `tools/call` result when that extension is negotiated
 - the MCP edge now supports a first standard task slice for server-side `tools/call`: task-augmented invocation plus `tasks/list`, `tasks/get`, `tasks/result`, and `tasks/cancel`
 - `tools/list` now advertises `execution.taskSupport: "optional"` and `tasks/result` reuses the stream bridge for native streamed tools
@@ -130,7 +130,7 @@ Out of scope:
   - the kernel now enforces stream duration and total-byte limits and preserves truncated partial output on incomplete limit breaches
 - shipped fourth slice:
   - the MCP edge now advertises and honors an opt-in `capabilities.experimental.arcToolStreaming.toolCallChunkNotifications` extension
-  - negotiated clients receive `notifications/arc/tool_call_chunk` before the final `tools/call` response
+  - negotiated clients receive `notifications/chio/tool_call_chunk` before the final `tools/call` response
   - non-negotiated clients still receive a collapsed final tool result
 - shipped fifth slice:
   - the MCP edge now accepts task-augmented `tools/call` requests and returns `CreateTaskResult`

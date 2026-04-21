@@ -39,7 +39,7 @@ fn python3_supports_arc_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
-fn ensure_arc_binary(repo_root: &PathBuf) {
+fn ensure_chio_binary(repo_root: &PathBuf) {
     let chio_binary = repo_root.join("target/debug/chio");
     if chio_binary.exists() {
         return;
@@ -69,7 +69,7 @@ fn wave1_remote_http_harness_runs_against_live_js_and_python_peers() {
     }
 
     let mut options = default_run_options();
-    ensure_arc_binary(&options.repo_root);
+    ensure_chio_binary(&options.repo_root);
     let run_dir = unique_run_dir("chio-conformance-wave1");
     options.results_dir = run_dir.join("results");
     options.report_output = run_dir.join("reports/wave1-live.md");

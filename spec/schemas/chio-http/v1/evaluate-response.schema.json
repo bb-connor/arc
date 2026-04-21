@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Chio Evaluate Response",
-  "description": "Response body for POST /arc/evaluate. Contains the verdict, signed receipt, and per-guard evidence.",
+  "description": "Response body for POST /chio/evaluate. Contains the verdict, signed receipt, and per-guard evidence.",
   "type": "object",
   "required": ["verdict", "receipt", "evidence"],
   "properties": {

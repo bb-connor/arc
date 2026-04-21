@@ -29,7 +29,7 @@ orchestrate.py                      procurement agent entry point
 ## Running
 
 ```bash
-cargo build --bin arc
+cargo build --bin chio
 ./smoke.sh
 ```
 

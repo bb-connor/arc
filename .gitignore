@@ -28,18 +28,10 @@ Thumbs.db
 # Generated Python packaging and cache artifacts
 __pycache__/
 *.py[cod]
-packages/sdk/arc-py/build/
-packages/sdk/arc-py/src/*.egg-info/
-packages/sdk/arc-ts/node_modules/
-packages/sdk/arc-ts/dist/
 examples/anthropic-sdk/node_modules/
 examples/openai-compatible/node_modules/
 examples/langchain/*.egg-info/
 examples/langchain/.venv/
-
-# Dashboard node_modules and build output
-crates/arc-cli/dashboard/node_modules/
-crates/arc-cli/dashboard/dist/
 
 # Generated coverage artifacts
 /coverage/*
@@ -62,7 +54,6 @@ crates/chio-cli/dashboard/dist/
 crates/chio-cli/dashboard/node_modules/
 tests/conformance/results/generated/
 tests/conformance/reports/generated/
-__pycache__/
 *.pyc
 *.pyo
 *.pyd

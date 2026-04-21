@@ -76,7 +76,7 @@ chio_kernel = ChioKernelActor.options(
     name="chio-kernel",
     lifetime="detached",
     num_cpus=0.5,
-).remote(policy_path="/etc/arc/policy.yaml")
+).remote(policy_path="/etc/chio/policy.yaml")
 ```
 
 ## 3. Integration Model

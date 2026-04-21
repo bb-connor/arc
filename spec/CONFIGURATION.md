@@ -202,11 +202,11 @@ Example:
 ```yaml
 wasm_guards:
   - name: custom-pii-guard
-    path: /etc/arc/guards/pii_guard.wasm
+    path: /etc/chio/guards/pii_guard.wasm
     fuel_limit: 5000000
     priority: 100
   - name: audit-logger
-    path: /etc/arc/guards/audit.wasm
+    path: /etc/chio/guards/audit.wasm
     advisory: true
 ```
 
@@ -379,11 +379,11 @@ guards:
 
 wasm_guards:
   - name: custom-pii-guard
-    path: /etc/arc/guards/pii_guard.wasm
+    path: /etc/chio/guards/pii_guard.wasm
     fuel_limit: 5000000
     priority: 100
   - name: audit-logger
-    path: /etc/arc/guards/audit.wasm
+    path: /etc/chio/guards/audit.wasm
     advisory: true
 ```
 

@@ -17,7 +17,7 @@ class ChioFilterCapabilityTransportTest {
     fun `query capability token is forwarded to sidecar`() {
         val observedCapability = AtomicReference<String?>()
         val sidecar = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        sidecar.createContext("/arc/evaluate") { exchange ->
+        sidecar.createContext("/chio/evaluate") { exchange ->
             observedCapability.set(exchange.requestHeaders.getFirst("X-Chio-Capability"))
             val body = """
                 {

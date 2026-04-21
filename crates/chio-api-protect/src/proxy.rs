@@ -347,9 +347,9 @@ fn build_app(state: Arc<ProxyState>) -> Router {
         ));
 
     Router::new()
-        .route("/arc/evaluate", post(sidecar_evaluate_handler))
-        .route("/arc/verify", post(sidecar_verify_handler))
-        .route("/arc/health", get(sidecar_health_handler))
+        .route("/chio/evaluate", post(sidecar_evaluate_handler))
+        .route("/chio/verify", post(sidecar_verify_handler))
+        .route("/chio/health", get(sidecar_health_handler))
         .merge(approval_routes)
         .route("/v1/capabilities/mint", post(sidecar_mint_handler))
         .route("/v1/capabilities/release", post(sidecar_release_handler))
@@ -2739,7 +2739,7 @@ paths:
         );
         let request = Request::builder()
             .method("POST")
-            .uri("/arc/evaluate")
+            .uri("/chio/evaluate")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&body).expect("serialize request"),
@@ -2788,7 +2788,7 @@ paths:
         body.capability_id = Some("cap-sidecar".to_string());
         let request = Request::builder()
             .method("POST")
-            .uri("/arc/evaluate")
+            .uri("/chio/evaluate")
             .header("content-type", "application/json")
             .header("x-chio-capability", token)
             .body(Body::from(
@@ -2842,7 +2842,7 @@ paths:
         .expect("sign receipt");
         let request = Request::builder()
             .method("POST")
-            .uri("/arc/verify")
+            .uri("/chio/verify")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&receipt).expect("serialize receipt"),
@@ -3584,7 +3584,7 @@ paths:
         );
         let request = Request::builder()
             .method("POST")
-            .uri("/arc/evaluate")
+            .uri("/chio/evaluate")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&body).expect("serialize request"),

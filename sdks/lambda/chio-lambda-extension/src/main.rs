@@ -307,7 +307,7 @@ async fn handle(
     let path = req.uri().path().to_string();
     let method = req.method().clone();
     let response = match (method.as_str(), path.as_str()) {
-        ("GET", "/health") | ("GET", "/arc/health") => ok_json(&HealthResponse {
+        ("GET", "/health") | ("GET", "/chio/health") => ok_json(&HealthResponse {
             status: "ok",
             extension: EXTENSION_NAME,
         }),

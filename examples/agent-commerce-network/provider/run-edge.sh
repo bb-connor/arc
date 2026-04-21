@@ -42,7 +42,7 @@ if [[ -n "${CHIO_BIN:-}" ]]; then
 fi
 
 if [[ -n "${CHIO_CONTROL_URL:-}" ]]; then
-  exec cargo run --bin arc -- \
+  exec cargo run --bin chio -- \
     --control-url "${CHIO_CONTROL_URL}" \
     --control-token "${CHIO_CONTROL_TOKEN:-demo-token}" \
     mcp serve-http \
@@ -56,7 +56,7 @@ if [[ -n "${CHIO_CONTROL_URL:-}" ]]; then
     python3 "${EXAMPLE_ROOT}/provider/review_server.py"
 fi
 
-exec cargo run --bin arc -- \
+exec cargo run --bin chio -- \
   mcp serve-http \
   --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
   --server-id provider-security-review \

@@ -55,7 +55,7 @@ PY
 control_url="http://127.0.0.1:${control_port}"
 mcp_url="http://127.0.0.1:${mcp_port}"
 
-cargo build -p chio-cli --bin arc >/dev/null
+cargo build -p chio-cli --bin chio >/dev/null
 npm --prefix "${repo_root}/packages/sdk/chio-ts" ci --no-fund --no-audit >/dev/null
 npm --prefix "${repo_root}/packages/sdk/chio-ts" run build >/dev/null
 

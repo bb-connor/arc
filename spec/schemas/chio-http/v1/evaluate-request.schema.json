@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Chio Evaluate Request",
-  "description": "Request body for POST /arc/evaluate. This is an ChioHttpRequest.",
+  "description": "Request body for POST /chio/evaluate. This is an ChioHttpRequest.",
   "$ref": "chio-http-request.schema.json"
 }

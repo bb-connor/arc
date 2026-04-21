@@ -137,7 +137,7 @@ pub fn run_conformance_harness(
     fs::create_dir_all(&logs_dir)?;
 
     let listen = options.listen.unwrap_or_else(reserve_listen_addr);
-    let chio_executable = ensure_arc_executable(&options.repo_root, &options.cargo_binary)?;
+    let chio_executable = ensure_chio_executable(&options.repo_root, &options.cargo_binary)?;
     let server_log_path = logs_dir.join("chio-mcp-serve-http.log");
     let server = spawn_remote_edge(&chio_executable, options, listen, &server_log_path)?;
     let _server_guard = ChildGuard { child: server };
@@ -182,7 +182,7 @@ pub fn run_conformance_harness(
     })
 }
 
-fn ensure_arc_executable(
+fn ensure_chio_executable(
     repo_root: &Path,
     cargo_binary: &OsString,
 ) -> Result<PathBuf, RunnerError> {

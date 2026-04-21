@@ -1008,7 +1008,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(|value| value.get("subscribe"))
             .and_then(Value::as_bool)
             .unwrap_or(false),
-        supports_arc_tool_streaming: experimental
+        supports_chio_tool_streaming: experimental
             .and_then(|value| {
                 value
                     .get(CHIO_TOOL_STREAMING_CAPABILITY_KEY)

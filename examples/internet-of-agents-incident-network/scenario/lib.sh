@@ -14,7 +14,7 @@ prepare_scenario_dir() {
 
 start_live_topology() {
   local bundle_dir="$1"
-  CHIO_BIN="$(ensure_arc_bin)"
+  CHIO_BIN="$(ensure_chio_bin)"
   SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
   CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
   LOG_DIR="${bundle_dir}/logs"

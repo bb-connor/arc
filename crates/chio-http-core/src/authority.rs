@@ -1239,8 +1239,8 @@ mod tests {
             .evaluate(HttpAuthorityInput {
                 request_id: "req-tool-mismatch".to_string(),
                 method: HttpMethod::Post,
-                route_pattern: "/arc/tools/math/increment".to_string(),
-                path: "/arc/tools/math/increment",
+                route_pattern: "/chio/tools/math/increment".to_string(),
+                path: "/chio/tools/math/increment",
                 query: &query,
                 caller: caller(),
                 body_hash: Some("toolhash".to_string()),

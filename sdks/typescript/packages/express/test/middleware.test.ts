@@ -70,7 +70,7 @@ function allowResponse(): EvaluateResponse {
 
 async function startMockSidecar(): Promise<{ server: http.Server; url: string }> {
   const server = http.createServer((req, res) => {
-    if (req.method === "POST" && req.url === "/arc/evaluate") {
+    if (req.method === "POST" && req.url === "/chio/evaluate") {
       req.resume();
       req.on("end", () => {
         res.writeHead(200, { "Content-Type": "application/json" });

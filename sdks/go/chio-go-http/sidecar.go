@@ -57,7 +57,7 @@ func (c *SidecarClient) Evaluate(ctx context.Context, req ChioHTTPRequest, capab
 		}
 	}
 
-	url := c.baseURL + "/arc/evaluate"
+	url := c.baseURL + "/chio/evaluate"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, &SidecarError{
@@ -119,7 +119,7 @@ func (c *SidecarClient) VerifyReceipt(ctx context.Context, receipt HTTPReceipt) 
 		}
 	}
 
-	url := c.baseURL + "/arc/verify"
+	url := c.baseURL + "/chio/verify"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return false, &SidecarError{
@@ -155,7 +155,7 @@ func (c *SidecarClient) VerifyReceipt(ctx context.Context, receipt HTTPReceipt) 
 
 // HealthCheck checks whether the sidecar is running.
 func (c *SidecarClient) HealthCheck(ctx context.Context) (bool, error) {
-	url := c.baseURL + "/arc/health"
+	url := c.baseURL + "/chio/health"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, err

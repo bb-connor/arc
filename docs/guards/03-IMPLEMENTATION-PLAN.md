@@ -280,7 +280,7 @@ The `WasmGuardConfig` currently supports a filesystem `path`. Future options:
 
 | Source | Config field | Notes |
 |--------|-------------|-------|
-| Local file | `path: /etc/arc/guards/pii.wasm` | Current |
+| Local file | `path: /etc/chio/guards/pii.wasm` | Current |
 | HTTP URL | `url: https://registry.arc.dev/guards/pii/1.0.0` | Download + cache |
 | Inline base64 | `wasm_base64: AGFzbQEA...` | Embedded in config (small guards only) |
 | OCI registry | `oci: ghcr.io/org/pii-guard:1.0` | Pull from container registry |
@@ -479,7 +479,7 @@ arc guard new <name>           # Scaffold a new guard project
 arc guard build                # Compile to wasm32-unknown-unknown
 arc guard test                 # Run the guard against test fixtures
 arc guard pack                 # Package into .arcguard
-arc guard install <path|url>   # Install into /etc/arc/guards/
+arc guard install <path|url>   # Install into /etc/chio/guards/
 arc guard list                 # List installed guards
 arc guard inspect <path>       # Print manifest + ABI info
 arc guard bench <path>         # Measure fuel consumption on sample inputs

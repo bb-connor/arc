@@ -58,7 +58,7 @@ public class ChioSidecarClient : IDisposable
         HttpResponseMessage response;
         try
         {
-            using var message = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/arc/evaluate")
+            using var message = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/chio/evaluate")
             {
                 Content = JsonContent.Create(request, options: _jsonOptions)
             };
@@ -101,7 +101,7 @@ public class ChioSidecarClient : IDisposable
         try
         {
             var response = await _httpClient.PostAsJsonAsync(
-                $"{_baseUrl}/arc/verify",
+                $"{_baseUrl}/chio/verify",
                 receipt,
                 _jsonOptions
             );
@@ -125,7 +125,7 @@ public class ChioSidecarClient : IDisposable
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/arc/health");
+            var response = await _httpClient.GetAsync($"{_baseUrl}/chio/health");
             return response.IsSuccessStatusCode;
         }
         catch

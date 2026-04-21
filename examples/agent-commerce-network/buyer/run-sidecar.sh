@@ -21,7 +21,7 @@ if [[ -n "${CHIO_BIN:-}" ]]; then
     --receipt-store "${RECEIPT_STORE}"
 fi
 
-exec cargo run --bin arc -- \
+exec cargo run --bin chio -- \
   --control-url "${CHIO_CONTROL_URL:-http://127.0.0.1:8940}" \
   --control-token "${CHIO_CONTROL_TOKEN:-demo-token}" \
   api protect \

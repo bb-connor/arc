@@ -559,7 +559,7 @@ WASM guards are declared in `chio.yaml`:
 ```yaml
 wasm_guards:
   - name: custom-pii-guard
-    path: /etc/arc/guards/pii_guard.wasm
+    path: /etc/chio/guards/pii_guard.wasm
     fuel_limit: 5000000
     priority: 100
     advisory: false
@@ -751,7 +751,7 @@ guards:
 # WASM custom guards
 wasm_guards:
   - name: custom-compliance
-    path: /etc/arc/guards/compliance.wasm
+    path: /etc/chio/guards/compliance.wasm
     fuel_limit: 5000000
     priority: 200
     advisory: false

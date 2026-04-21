@@ -32,14 +32,14 @@ declared_version = pyproject["project"]["version"]
 declared_name = pyproject["project"]["name"]
 
 version_ns = {}
-exec(Path("packages/sdk/chio-py/src/arc/version.py").read_text(), version_ns)
+exec(Path("packages/sdk/chio-py/src/chio/version.py").read_text(), version_ns)
 module_version = version_ns["__version__"]
 
 if declared_name != "chio-sdk":
     raise SystemExit(f"expected distribution name chio-sdk, found {declared_name}")
 if declared_version != module_version:
     raise SystemExit(
-        f"pyproject version {declared_version} does not match arc.version {module_version}"
+        f"pyproject version {declared_version} does not match chio.version {module_version}"
     )
 print(f"chio-sdk metadata version {declared_version} verified")
 PY
@@ -61,19 +61,19 @@ sdist = next(dist_dir.glob("chio_sdk-*.tar.gz"))
 
 with zipfile.ZipFile(wheel) as archive:
     names = archive.namelist()
-    if not any(name.endswith("arc/py.typed") for name in names):
-        raise SystemExit("wheel is missing arc/py.typed")
+    if not any(name.endswith("chio/py.typed") for name in names):
+        raise SystemExit("wheel is missing chio/py.typed")
     if any("__pycache__/" in name or name.endswith((".pyc", ".pyo")) for name in names):
         raise SystemExit("wheel contains forbidden Python cache artifacts")
 
 with tarfile.open(sdist, "r:gz") as archive:
     names = archive.getnames()
-    if not any(name.endswith("src/arc/py.typed") for name in names):
-        raise SystemExit("sdist is missing src/arc/py.typed")
+    if not any(name.endswith("src/chio/py.typed") for name in names):
+        raise SystemExit("sdist is missing src/chio/py.typed")
     if any("__pycache__/" in name or name.endswith((".pyc", ".pyo")) for name in names):
         raise SystemExit("sdist contains forbidden Python cache artifacts")
-    if any("/src/arc.egg-info/" in name or name.endswith("/src/arc.egg-info") for name in names):
-        raise SystemExit("sdist contains stale src/arc.egg-info metadata")
+    if any("/src/chio.egg-info/" in name or name.endswith("/src/chio.egg-info") for name in names):
+        raise SystemExit("sdist contains stale src/chio.egg-info metadata")
     if any("/src/chio_py.egg-info/" in name or name.endswith("/src/chio_py.egg-info") for name in names):
         raise SystemExit("sdist contains stale src/chio_py.egg-info metadata")
 
@@ -87,13 +87,13 @@ python -m pip install --quiet --upgrade pip
 python -m pip install --quiet "${dist_dir}"/chio_sdk-*.whl
 python - <<'PY'
 import importlib.metadata
-import arc
+import chio
 
-assert importlib.metadata.version("chio-sdk") == arc.__version__
-assert arc.ChioClient is not None
-assert arc.ChioSession is not None
-assert arc.ReceiptQueryClient is not None
-print(f"wheel smoke verified chio-sdk {arc.__version__}")
+assert importlib.metadata.version("chio-sdk") == chio.__version__
+assert chio.ChioClient is not None
+assert chio.ChioSession is not None
+assert chio.ReceiptQueryClient is not None
+print(f"wheel smoke verified chio-sdk {chio.__version__}")
 PY
 deactivate
 
@@ -103,11 +103,11 @@ python -m pip install --quiet --upgrade pip
 python -m pip install --quiet "${dist_dir}"/chio_sdk-*.tar.gz
 python - <<'PY'
 import importlib.metadata
-import arc
+import chio
 
-assert importlib.metadata.version("chio-sdk") == arc.__version__
-assert arc.ChioClient is not None
-assert arc.ChioSession is not None
-assert arc.ReceiptQueryClient is not None
-print(f"sdist smoke verified chio-sdk {arc.__version__}")
+assert importlib.metadata.version("chio-sdk") == chio.__version__
+assert chio.ChioClient is not None
+assert chio.ChioSession is not None
+assert chio.ReceiptQueryClient is not None
+print(f"sdist smoke verified chio-sdk {chio.__version__}")
 PY

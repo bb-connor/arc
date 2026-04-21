@@ -116,10 +116,10 @@ Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
      --revocation-db /var/lib/arc/revocations.sqlite3 \
      --authority-db /var/lib/arc/authority.sqlite3 \
      --budget-db /var/lib/arc/budgets.sqlite3 \
-     --enterprise-providers-file /etc/arc/enterprise-providers.json \
-     --verifier-policies-file /etc/arc/verifier-policies.json \
+     --enterprise-providers-file /etc/chio/enterprise-providers.json \
+     --verifier-policies-file /etc/chio/verifier-policies.json \
      --verifier-challenge-db /var/lib/arc/verifier-challenges.sqlite3 \
-     --certification-registry-file /etc/arc/certifications.json
+     --certification-registry-file /etc/chio/certifications.json
    ```
 
 4. Verify service readiness:
@@ -236,10 +236,10 @@ sqlite3 /var/lib/arc/edge-sessions.sqlite3 ".backup '/var/backups/arc/edge-sessi
 Back up file-backed registries and policies:
 
 ```bash
-cp /etc/arc/enterprise-providers.json /var/backups/arc/
-cp /etc/arc/verifier-policies.json /var/backups/arc/
-cp /etc/arc/certifications.json /var/backups/arc/
-cp /etc/arc/*.yaml /var/backups/arc/
+cp /etc/chio/enterprise-providers.json /var/backups/arc/
+cp /etc/chio/verifier-policies.json /var/backups/arc/
+cp /etc/chio/certifications.json /var/backups/arc/
+cp /etc/chio/*.yaml /var/backups/arc/
 ```
 
 Record the binary version and git commit used for the backup snapshot.

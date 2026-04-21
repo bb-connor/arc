@@ -279,7 +279,7 @@ pub struct ChioA2aEdgeCompatibility<'a> {
 struct A2aCapabilityBridge;
 
 static MCP_TARGET_EXECUTOR: McpTargetExecutor = McpTargetExecutor {
-    peer_supports_arc_tool_streaming: false,
+    peer_supports_chio_tool_streaming: false,
 };
 static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
 
@@ -311,7 +311,7 @@ impl CapabilityBridge for A2aCapabilityBridge {
         request: &Value,
     ) -> Result<Option<CrossProtocolCapabilityRef>, BridgeError> {
         request
-            .pointer("/metadata/arc/capabilityRef")
+            .pointer("/metadata/chio/capabilityRef")
             .cloned()
             .map(serde_json::from_value)
             .transpose()
@@ -323,7 +323,7 @@ impl CapabilityBridge for A2aCapabilityBridge {
         envelope: &mut Value,
         cap_ref: &CrossProtocolCapabilityRef,
     ) -> Result<(), BridgeError> {
-        let chio_metadata = ensure_arc_metadata(envelope)?;
+        let chio_metadata = ensure_chio_metadata(envelope)?;
         chio_metadata.insert(
             "capabilityRef".to_string(),
             serde_json::to_value(cap_ref)
@@ -334,7 +334,7 @@ impl CapabilityBridge for A2aCapabilityBridge {
 
     fn protocol_context(&self, request: &Value) -> Result<Option<Value>, BridgeError> {
         Ok(request
-            .pointer("/metadata/arc/targetSkillId")
+            .pointer("/metadata/chio/targetSkillId")
             .and_then(Value::as_str)
             .map(|skill_id| json!({ "targetSkillId": skill_id })))
     }
@@ -1458,7 +1458,7 @@ fn build_a2a_source_envelope(
 ) -> Result<Value, A2aEdgeError> {
     let mut envelope = serde_json::to_value(request)
         .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
-    let chio_metadata = ensure_arc_metadata(&mut envelope)
+    let chio_metadata = ensure_chio_metadata(&mut envelope)
         .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
     chio_metadata.insert(
         "targetSkillId".to_string(),
@@ -1467,7 +1467,7 @@ fn build_a2a_source_envelope(
     Ok(envelope)
 }
 
-fn ensure_arc_metadata(
+fn ensure_chio_metadata(
     envelope: &mut Value,
 ) -> Result<&mut serde_json::Map<String, Value>, BridgeError> {
     let Some(object) = envelope.as_object_mut() else {

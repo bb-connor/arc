@@ -52,7 +52,7 @@ const CHIO_PROTOCOL_CAPABILITY_KEY: &str = "chioProtocol";
 const CHIO_ERROR_REGISTRY_SCHEMA: &str = "chio.error-registry.v1";
 const CHIO_TOOL_STREAM_KEY: &str = "chioToolStream";
 const LEGACY_PACT_TOOL_STREAM_KEY: &str = "pactToolStream";
-const CHIO_TOOL_STREAMING_NOTIFICATION_METHOD: &str = "notifications/arc/tool_call_chunk";
+const CHIO_TOOL_STREAMING_NOTIFICATION_METHOD: &str = "notifications/chio/tool_call_chunk";
 const TASK_POLL_INTERVAL_MILLIS: u64 = 500;
 const MAX_BACKGROUND_TASKS_PER_TICK: usize = 8;
 const RELATED_TASK_META_KEY: &str = "io.modelcontextprotocol/related-task";
@@ -97,7 +97,7 @@ pub struct BridgeMcpToolCallRequest {
     pub agent_id: String,
     pub model_metadata: Option<ModelMetadata>,
     pub route_selection_metadata: Option<Value>,
-    pub peer_supports_arc_tool_streaming: bool,
+    pub peer_supports_chio_tool_streaming: bool,
 }
 
 /// Bridge-only MCP tool-call execution result.
@@ -111,7 +111,7 @@ pub struct BridgeMcpToolCall {
 /// Default non-native protocol executor for MCP target projections.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct McpTargetExecutor {
-    pub peer_supports_arc_tool_streaming: bool,
+    pub peer_supports_chio_tool_streaming: bool,
 }
 
 impl TargetProtocolExecutor for McpTargetExecutor {
@@ -134,7 +134,7 @@ impl TargetProtocolExecutor for McpTargetExecutor {
                 agent_id: request.execution.agent_id.clone(),
                 model_metadata: request.execution.model_metadata.clone(),
                 route_selection_metadata: Some(route_selection_metadata(request.route_selection)?),
-                peer_supports_arc_tool_streaming: self.peer_supports_arc_tool_streaming,
+                peer_supports_chio_tool_streaming: self.peer_supports_chio_tool_streaming,
             },
         )
         .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
@@ -191,7 +191,7 @@ pub fn execute_bridge_mcp_tool_call(
         reason: response.reason.clone(),
         verdict: response.verdict,
         terminal_state: &response.terminal_state,
-        peer_supports_arc_tool_streaming: request.peer_supports_arc_tool_streaming,
+        peer_supports_chio_tool_streaming: request.peer_supports_chio_tool_streaming,
         related_task_id: None,
     });
 
@@ -2738,10 +2738,10 @@ impl ChioMcpEdge {
         })
     }
 
-    fn peer_supports_arc_tool_streaming(&self, session_id: &SessionId) -> bool {
+    fn peer_supports_chio_tool_streaming(&self, session_id: &SessionId) -> bool {
         self.kernel
             .session(session_id)
-            .map(|session| session.peer_capabilities().supports_arc_tool_streaming)
+            .map(|session| session.peer_capabilities().supports_chio_tool_streaming)
             .unwrap_or(false)
     }
 
@@ -2758,7 +2758,7 @@ impl ChioMcpEdge {
             terminal_state,
             related_task_id,
         } = args;
-        let peer_supports_arc_tool_streaming = self.peer_supports_arc_tool_streaming(session_id);
+        let peer_supports_chio_tool_streaming = self.peer_supports_chio_tool_streaming(session_id);
         let result = kernel_response_to_tool_result(KernelResponseToToolResultArgs {
             pending_notifications: &mut self.pending_notifications,
             request_id: client_request_id,
@@ -2766,7 +2766,7 @@ impl ChioMcpEdge {
             reason,
             verdict,
             terminal_state,
-            peer_supports_arc_tool_streaming,
+            peer_supports_chio_tool_streaming,
             related_task_id,
         });
 

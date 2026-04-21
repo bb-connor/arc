@@ -6,7 +6,7 @@ ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 
 CHIO_BIN="${ROOT}/target/debug/chio"
 if [[ ! -x "${CHIO_BIN}" ]]; then
-  (cd "${ROOT}" && cargo build --bin arc >/dev/null)
+  (cd "${ROOT}" && cargo build --bin chio >/dev/null)
 fi
 
 ARTIFACT_ROOT="${EXAMPLE_ROOT}/.artifacts/$(date -u +"%Y%m%dT%H%M%SZ")"
@@ -62,7 +62,7 @@ import sys
 from pathlib import Path
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-assert payload["code"] == "Chio-CLI-OTHER", payload
+assert payload["code"] == "CHIO-CLI-OTHER", payload
 assert "hash mismatch" in payload["message"] or "hash mismatch" in payload["context"]["detail"], payload
 PY
 

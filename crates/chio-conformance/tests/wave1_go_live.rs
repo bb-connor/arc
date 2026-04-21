@@ -39,7 +39,7 @@ fn python3_supports_arc_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
-fn ensure_arc_binary(repo_root: &PathBuf) {
+fn ensure_chio_binary(repo_root: &PathBuf) {
     let chio_binary = repo_root.join("target/debug/chio");
     if chio_binary.exists() {
         return;
@@ -68,7 +68,7 @@ fn wave1_remote_http_harness_runs_against_live_go_peer() {
     }
 
     let mut options = default_run_options();
-    ensure_arc_binary(&options.repo_root);
+    ensure_chio_binary(&options.repo_root);
     options.peers = vec![PeerTarget::Go];
     let run_dir = unique_run_dir("chio-conformance-wave1-go");
     options.results_dir = run_dir.join("results");

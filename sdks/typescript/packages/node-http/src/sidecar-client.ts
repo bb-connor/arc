@@ -2,7 +2,7 @@
  * Chio sidecar HTTP client.
  *
  * Communicates with the Chio Rust kernel running as a localhost sidecar.
- * The sidecar exposes a POST /arc/evaluate endpoint that accepts an
+ * The sidecar exposes a POST /chio/evaluate endpoint that accepts an
  * ChioHttpRequest and returns an EvaluateResponse with a signed receipt.
  */
 
@@ -60,7 +60,7 @@ export class ChioSidecarClient {
     request: ChioHttpRequest,
     capabilityToken?: string,
   ): Promise<EvaluateResponse> {
-    const url = `${this.baseUrl}/arc/evaluate`;
+    const url = `${this.baseUrl}/chio/evaluate`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers: Record<string, string> = {
@@ -113,7 +113,7 @@ export class ChioSidecarClient {
    * Returns true if the receipt is valid.
    */
   async verifyReceipt(receipt: HttpReceipt): Promise<boolean> {
-    const url = `${this.baseUrl}/arc/verify`;
+    const url = `${this.baseUrl}/chio/verify`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -142,7 +142,7 @@ export class ChioSidecarClient {
    * Health check for the sidecar.
    */
   async healthCheck(): Promise<boolean> {
-    const url = `${this.baseUrl}/arc/health`;
+    const url = `${this.baseUrl}/chio/health`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 

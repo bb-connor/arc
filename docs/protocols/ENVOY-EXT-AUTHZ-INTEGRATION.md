@@ -754,11 +754,11 @@ spec:
               name: http
           env:
             - name: CHIO_POLICY_PATH
-              value: /etc/arc/policy.yaml
+              value: /etc/chio/policy.yaml
             - name: CHIO_KEYPAIR_PATH
-              value: /etc/arc/keypair.pem
+              value: /etc/chio/keypair.pem
             - name: CHIO_RECEIPT_STORE
-              value: sqlite:///var/arc/receipts.db
+              value: sqlite:///var/chio/receipts.db
           volumeMounts:
             - name: chio-policy
               mountPath: /etc/arc

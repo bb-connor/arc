@@ -538,8 +538,8 @@ The demo script that goes on the landing page and in every conference talk:
 ```bash
 # Terminal 1: start the sidecar with coding agent policy
 # NOTE: --policy takes a file path. The Docker image bundles a default
-# policy at /etc/arc/code-agent-policy.yaml for the demo.
-docker run -p 9090:9090 ghcr.io/backbay/chio-sidecar:latest --policy /etc/arc/code-agent-policy.yaml
+# policy at /etc/chio/code-agent-policy.yaml for the demo.
+docker run -p 9090:9090 ghcr.io/backbay/chio-sidecar:latest --policy /etc/chio/code-agent-policy.yaml
 
 # Terminal 2: try safe and unsafe operations
 python -c "

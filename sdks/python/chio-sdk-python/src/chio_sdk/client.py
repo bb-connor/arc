@@ -108,7 +108,7 @@ class ChioClient:
 
     async def health(self) -> dict[str, Any]:
         """Check sidecar health."""
-        return await self._get("/arc/health")
+        return await self._get("/chio/health")
 
     # ------------------------------------------------------------------
     # Capability tokens
@@ -193,7 +193,7 @@ class ChioClient:
     async def verify_http_receipt(self, receipt: HttpReceipt) -> bool:
         """Ask the sidecar to verify an HTTP receipt signature."""
         data = await self._post(
-            "/arc/verify",
+            "/chio/verify",
             receipt.model_dump(exclude_none=True),
         )
         return bool(data.get("valid", False))
@@ -287,7 +287,7 @@ class ChioClient:
         if capability_token is not None:
             request_headers = {"X-Chio-Capability": capability_token}
         data = await self._post(
-            "/arc/evaluate",
+            "/chio/evaluate",
             request_model.model_dump(exclude_none=True),
             headers=request_headers,
         )

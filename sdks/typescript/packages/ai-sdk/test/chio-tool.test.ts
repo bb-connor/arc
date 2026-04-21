@@ -100,7 +100,7 @@ function sidecarAllowEvaluateResponse(id = "r-allow"): Record<string, unknown> {
     receipt: {
       id,
       verdict: { verdict: "allow" },
-      route_pattern: "/arc/tools/math/double",
+      route_pattern: "/chio/tools/math/double",
       method: "POST",
     },
     evidence: [],
@@ -192,12 +192,12 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const result = await wrapped.execute!({ n: 21 });
     expect(result).toEqual({ doubled: 42 });
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toBe("http://127.0.0.1:9090/arc/evaluate");
+    expect(calls[0]!.url).toBe("http://127.0.0.1:9090/chio/evaluate");
     expect(calls[0]!.body).toMatchObject({
       request_id: expect.any(String),
       method: "POST",
-      route_pattern: "/arc/tools/math/double",
-      path: "/arc/tools/math/double",
+      route_pattern: "/chio/tools/math/double",
+      path: "/chio/tools/math/double",
       query: {},
       headers: {
         "content-type": "application/json",

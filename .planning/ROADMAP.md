@@ -1375,7 +1375,7 @@ repo's own Phase 5 dependency graph still puts Chio-Wall after Trust Network
 and before multi-product platform hardening.
 
 **Research and decision basis:**
-- `docs/mercury/CHIO_WALL_BRIEF.md`
+- `docs/mercury/ARC_WALL_BRIEF.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
@@ -1770,7 +1770,7 @@ product claims onto the real Chio modules, proof contracts, and pilot surfaces.
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/PHASE_0_1_BUILD_CHECKLIST.md`
-- `docs/mercury/CHIO_MODULE_MAPPING.md`
+- `docs/mercury/ARC_MODULE_MAPPING.md`
 - `docs/STRATEGIC_ROADMAP.md`
 
 **Phase Numbering:**
@@ -4988,7 +4988,7 @@ before the product boundary, proof boundary, and workflow sentence are fixed.
 - `docs/mercury/PRODUCT_BRIEF.md`, `IMPLEMENTATION_ROADMAP.md`, and
   `EXTERNAL_PACKAGE.md`
 - `docs/mercury/PHASE_0_1_BUILD_CHECKLIST.md`
-- `docs/mercury/CHIO_MODULE_MAPPING.md`
+- `docs/mercury/ARC_MODULE_MAPPING.md`
 - first workflow sentence and pilot corpus boundary
 
 **Success Criteria**:
@@ -5908,7 +5908,7 @@ needs one named buyer path, one owner boundary, and one non-goal set before
 guard or packaging semantics are widened.
 
 **Primary surfaces:**
-- `docs/mercury/CHIO_WALL_BRIEF.md`
+- `docs/mercury/ARC_WALL_BRIEF.md`
 - `docs/mercury/IMPLEMENTATION_ROADMAP.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/epics/MASTER_PROJECT.md`
@@ -5942,7 +5942,7 @@ or buyer package can stay bounded and auditable.
 - `crates/chio-kernel`
 - `crates/chio-control-plane`
 - `spec/PROTOCOL.md`
-- `docs/mercury/CHIO_WALL_BRIEF.md`
+- `docs/mercury/ARC_WALL_BRIEF.md`
 
 **Success Criteria**:
 1. One information-domain evidence contract wraps existing Chio truth without
@@ -5974,7 +5974,7 @@ guard and packaging path be added without product-boundary drift.
 - `crates/chio-kernel`
 - `crates/chio-control-plane`
 - `docs/mercury/TECHNICAL_ARCHITECTURE.md`
-- `docs/mercury/CHIO_WALL_BRIEF.md`
+- `docs/mercury/ARC_WALL_BRIEF.md`
 
 **Success Criteria**:
 1. One supported Chio-Wall path can evaluate a named information-domain guard
@@ -6004,7 +6004,7 @@ decision.
 next boundary are explicit.
 
 **Primary surfaces:**
-- `docs/mercury/CHIO_WALL_BRIEF.md`
+- `docs/mercury/ARC_WALL_BRIEF.md`
 - `docs/mercury/GO_TO_MARKET.md`
 - `docs/mercury/PARTNERSHIP_STRATEGY.md`
 - `docs/mercury/README.md`

@@ -461,7 +461,7 @@ func TestMutate_InjectSidecar(t *testing.T) {
 		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 		AnnotationInject:          "true",
 		AnnotationUpstream:        "http://127.0.0.1:3000",
-		AnnotationSpecPath:        "/etc/arc/openapi.yaml",
+		AnnotationSpecPath:        "/etc/chio/openapi.yaml",
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/mutate", bytes.NewReader(body))

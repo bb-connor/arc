@@ -30,7 +30,7 @@ Anthropic SDK for tool-use loops. Each MCP tool call is wrapped as a
 ## Running
 
 ```bash
-cargo build --bin arc
+cargo build --bin chio
 ./smoke.sh
 ```
 

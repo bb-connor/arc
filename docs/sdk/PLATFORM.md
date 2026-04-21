@@ -5,7 +5,7 @@ controllers that embed Chio evaluation into infrastructure rather than
 application code.
 
 All platform SDKs communicate with the Chio Rust kernel running as a localhost
-sidecar. They send evaluation requests to `POST /arc/evaluate`, enforce the
+sidecar. They send evaluation requests to `POST /chio/evaluate`, enforce the
 returned verdict, and attach the signed receipt to the response. The normative
 sidecar protocol is defined in `spec/HTTP-SUBSTRATE.md`.
 
@@ -264,7 +264,7 @@ The `ChioFilter` is a standard Jakarta Servlet `Filter` that:
 1. Extracts caller identity from request headers
 2. Resolves the route pattern
 3. Hashes the raw request body bytes (SHA-256) while preserving the body for downstream handlers
-4. Builds an `ChioHttpRequest` and sends it to `POST /arc/evaluate`
+4. Builds an `ChioHttpRequest` and sends it to `POST /chio/evaluate`
 5. Attaches `X-Chio-Receipt-Id` to the response
 6. Returns a structured JSON error on deny (403) or sidecar failure (502)
 
@@ -344,7 +344,7 @@ app.Run();
 2. Extracts caller identity (Bearer token, API key, or custom extractor)
 3. Resolves the route pattern
 4. Hashes the raw request body bytes (SHA-256) with buffering enabled
-5. Sends an `ChioHttpRequest` to `POST /arc/evaluate` on the sidecar
+5. Sends an `ChioHttpRequest` to `POST /chio/evaluate` on the sidecar
 6. Attaches `X-Chio-Receipt-Id` to the response
 7. Returns structured JSON errors on deny (403) or sidecar failure (502)
 8. Calls `next(context)` on allow
@@ -368,7 +368,7 @@ app.Run();
 All four platform SDKs share the same operational model:
 
 1. **Sidecar communication.** Every SDK talks to the Chio Rust kernel at
-   `POST /arc/evaluate` on localhost. The kernel handles capability validation,
+   `POST /chio/evaluate` on localhost. The kernel handles capability validation,
    guard evaluation, and receipt signing.
 
 2. **Fail-closed by default.** If the sidecar is unreachable or returns an

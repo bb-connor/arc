@@ -22,7 +22,7 @@
       ],
       "environment": [
         { "name": "CHIO_SIDECAR_URL", "value": "http://localhost:9090" },
-        { "name": "CHIO_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/arc/health" }
+        { "name": "CHIO_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/chio/health" }
       ],
       "dependsOn": [
         { "containerName": "chio-sidecar", "condition": "HEALTHY" }
@@ -57,14 +57,14 @@
         "--upstream",
         "http://127.0.0.1:8080",
         "--spec",
-        "/etc/arc/spec/openapi.yaml",
+        "/etc/chio/spec/openapi.yaml",
         "--listen",
         "0.0.0.0:9090"
       ],
       "environment": [
         { "name": "CHIO_LISTEN_ADDR", "value": "0.0.0.0:9090" },
-        { "name": "CHIO_HEALTH_PATH", "value": "/arc/health" },
-        { "name": "CHIO_KERNEL_CONFIG_PATH", "value": "/etc/arc/kernel.yaml" },
+        { "name": "CHIO_HEALTH_PATH", "value": "/chio/health" },
+        { "name": "CHIO_KERNEL_CONFIG_PATH", "value": "/etc/chio/kernel.yaml" },
         { "name": "CHIO_POLICY_SOURCE", "value": "s3://ACCOUNT_ID-chio-config/policy.yaml" },
         { "name": "CHIO_RECEIPT_SINK", "value": "dynamodb://chio-receipts" },
         { "name": "CHIO_LOG_LEVEL", "value": "info" }
@@ -87,7 +87,7 @@
         }
       ],
       "healthCheck": {
-        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"],
+        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/chio/health"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,

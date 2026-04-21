@@ -32,7 +32,7 @@ impl CapabilityBridge for AcpGuardCapabilityBridge {
         request: &Value,
     ) -> Result<Option<CrossProtocolCapabilityRef>, BridgeError> {
         request
-            .pointer("/metadata/arc/capabilityRef")
+            .pointer("/metadata/chio/capabilityRef")
             .cloned()
             .map(serde_json::from_value)
             .transpose()

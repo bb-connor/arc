@@ -1,7 +1,7 @@
 /**
  * Minimal HTTP client for the Chio sidecar's tool-call evaluation endpoint.
  *
- * The sidecar exposes `POST /arc/evaluate` which accepts an `ChioHttpRequest`
+ * The sidecar exposes `POST /chio/evaluate` which accepts an `ChioHttpRequest`
  * payload. For AI SDK tool calls, this client builds a synthetic HTTP request
  * envelope that carries the tool identity plus arguments while remaining
  * decodable by the sidecar's HTTP substrate. It also normalizes both the
@@ -133,7 +133,7 @@ export class ChioClientError extends Error {
 }
 
 /**
- * Minimal client targeting `POST /arc/evaluate` on the Chio sidecar.
+ * Minimal client targeting `POST /chio/evaluate` on the Chio sidecar.
  *
  * Intentionally distinct from `@chio-protocol/node-http`'s HTTP-substrate
  * client, which evaluates inbound HTTP requests rather than outbound tool
@@ -174,7 +174,7 @@ export class ChioClient {
     body: ChioEvaluateToolCallRequest,
     options: { capabilityToken?: string | undefined } = {},
   ): Promise<ChioReceipt> {
-    const url = `${this.baseUrl}/arc/evaluate`;
+    const url = `${this.baseUrl}/chio/evaluate`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers: Record<string, string> = {
@@ -296,7 +296,7 @@ function buildSidecarRequest(body: ChioEvaluateToolCallRequest): ChioSidecarEval
 }
 
 function buildToolPath(toolServer: string, toolName: string): string {
-  return `/arc/tools/${encodeURIComponent(toolServer)}/${encodeURIComponent(toolName)}`;
+  return `/chio/tools/${encodeURIComponent(toolServer)}/${encodeURIComponent(toolName)}`;
 }
 
 function anonymousCallerIdentity(): ChioCallerIdentity {

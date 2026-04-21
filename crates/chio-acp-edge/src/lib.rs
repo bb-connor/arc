@@ -230,7 +230,7 @@ pub struct ChioAcpEdgeCompatibility<'a> {
 struct AcpCapabilityBridge;
 
 static MCP_TARGET_EXECUTOR: McpTargetExecutor = McpTargetExecutor {
-    peer_supports_arc_tool_streaming: false,
+    peer_supports_chio_tool_streaming: false,
 };
 static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
 
@@ -251,7 +251,7 @@ impl CapabilityBridge for AcpCapabilityBridge {
         request: &Value,
     ) -> Result<Option<CrossProtocolCapabilityRef>, BridgeError> {
         request
-            .pointer("/metadata/arc/capabilityRef")
+            .pointer("/metadata/chio/capabilityRef")
             .cloned()
             .map(serde_json::from_value)
             .transpose()
@@ -263,7 +263,7 @@ impl CapabilityBridge for AcpCapabilityBridge {
         envelope: &mut Value,
         cap_ref: &CrossProtocolCapabilityRef,
     ) -> Result<(), BridgeError> {
-        let chio_metadata = ensure_arc_metadata(envelope)?;
+        let chio_metadata = ensure_chio_metadata(envelope)?;
         chio_metadata.insert(
             "capabilityRef".to_string(),
             serde_json::to_value(cap_ref)
@@ -1317,11 +1317,11 @@ fn build_acp_source_envelope(capability_id: &str, arguments: Value) -> Result<Va
         "capabilityId": capability_id,
         "arguments": arguments,
     });
-    let _ = ensure_arc_metadata(&mut envelope)?;
+    let _ = ensure_chio_metadata(&mut envelope)?;
     Ok(envelope)
 }
 
-fn ensure_arc_metadata(
+fn ensure_chio_metadata(
     envelope: &mut Value,
 ) -> Result<&mut serde_json::Map<String, Value>, BridgeError> {
     let Some(object) = envelope.as_object_mut() else {

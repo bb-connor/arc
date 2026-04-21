@@ -7,7 +7,7 @@ pub(super) struct KernelResponseToToolResultArgs<'a> {
     pub reason: Option<String>,
     pub verdict: Verdict,
     pub terminal_state: &'a OperationTerminalState,
-    pub peer_supports_arc_tool_streaming: bool,
+    pub peer_supports_chio_tool_streaming: bool,
     pub related_task_id: Option<&'a str>,
 }
 
@@ -54,7 +54,7 @@ pub(super) fn kernel_response_to_tool_result(args: KernelResponseToToolResultArg
         reason,
         verdict,
         terminal_state,
-        peer_supports_arc_tool_streaming,
+        peer_supports_chio_tool_streaming,
         related_task_id,
     } = args;
     let is_error = matches!(verdict, Verdict::Deny) || !terminal_state.is_completed();
@@ -65,7 +65,7 @@ pub(super) fn kernel_response_to_tool_result(args: KernelResponseToToolResultArg
     match output {
         Some(ToolCallOutput::Value(value)) if !is_error => value_to_tool_result(value),
         Some(ToolCallOutput::Stream(stream)) => {
-            if peer_supports_arc_tool_streaming {
+            if peer_supports_chio_tool_streaming {
                 queue_tool_stream_chunk_notifications(
                     pending_notifications,
                     request_id,
@@ -766,7 +766,7 @@ pub(super) fn parse_peer_capabilities(params: &Value) -> PeerCapabilities {
             .and_then(|value| value.get("subscribe"))
             .and_then(Value::as_bool)
             .unwrap_or(false),
-        supports_arc_tool_streaming: experimental
+        supports_chio_tool_streaming: experimental
             .and_then(|value| {
                 value
                     .get(CHIO_TOOL_STREAMING_CAPABILITY_KEY)

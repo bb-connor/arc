@@ -741,7 +741,7 @@ fn execute_bridge_mcp_tool_call_preserves_model_metadata() {
                 provenance_class: ProvenanceEvidenceClass::Asserted,
             }),
             route_selection_metadata: None,
-            peer_supports_arc_tool_streaming: false,
+            peer_supports_chio_tool_streaming: false,
         },
     )
     .unwrap();

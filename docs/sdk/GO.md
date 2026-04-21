@@ -60,7 +60,7 @@ Fail-open passthroughs proceed without that header and expose an explicit
 2. Extract caller identity from request headers
 3. Resolve the route pattern
 4. Build an `ChioHTTPRequest` (with body hash, query params, headers)
-5. POST to `{sidecarURL}/arc/evaluate`
+5. POST to `{sidecarURL}/chio/evaluate`
 6. On allow: forward to inner handler with receipt header
 7. On deny: return JSON error with receipt ID and suggestion
 

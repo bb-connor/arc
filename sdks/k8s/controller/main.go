@@ -218,7 +218,7 @@ func buildSidecarContainer(annotations map[string]string) Container {
 		},
 		ReadinessProbe: &Probe{
 			HTTPGet: &HTTPGetAction{
-				Path: "/arc/health",
+				Path: "/chio/health",
 				Port: 9090,
 			},
 			InitialDelaySeconds: 2,

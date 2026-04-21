@@ -10,7 +10,7 @@ LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
-CHIO_BIN="$(ensure_arc_bin)"
+CHIO_BIN="$(ensure_chio_bin)"
 SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
 TRUST_PORT="$(pick_free_port)"
 APP_PORT="$(pick_free_port)"
@@ -64,7 +64,7 @@ wait_for_http "${APP_URL}/healthz"
 ) >"${LOG_DIR}/sidecar.log" 2>&1 &
 SIDECAR_PID=$!
 
-wait_for_http "${SIDECAR_URL}/arc/health"
+wait_for_http "${SIDECAR_URL}/chio/health"
 
 curl -sS -D "${ARTIFACT_ROOT}/hello.headers" "${SIDECAR_URL}/hello" > "${ARTIFACT_ROOT}/hello.json"
 

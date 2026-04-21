@@ -215,7 +215,7 @@ class TestChioToolkit:
                 },
             ],
         }
-        respx.get(f"{BASE}/arc/health").mock(
+        respx.get(f"{BASE}/chio/health").mock(
             return_value=httpx.Response(200, json=health_data)
         )
 
@@ -240,7 +240,7 @@ class TestChioToolkit:
                 },
             ],
         }
-        respx.get(f"{BASE}/arc/health").mock(
+        respx.get(f"{BASE}/chio/health").mock(
             return_value=httpx.Response(200, json=health_data)
         )
 

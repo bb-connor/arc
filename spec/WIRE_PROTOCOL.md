@@ -585,14 +585,14 @@ process and exposes three HTTP endpoints on localhost:
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/arc/evaluate` | POST | Evaluate an HTTP request against loaded policy |
-| `/arc/verify` | POST | Verify a receipt signature |
-| `/arc/health` | GET | Sidecar health check |
+| `/chio/evaluate` | POST | Evaluate an HTTP request against loaded policy |
+| `/chio/verify` | POST | Verify a receipt signature |
+| `/chio/health` | GET | Sidecar health check |
 
 Language-specific middleware (chio-tower for Rust, chio-spring-boot for JVM,
 ChioMiddleware for .NET, and the Python/TypeScript/Go substrate SDKs)
 intercepts incoming HTTP requests, constructs an `ChioHttpRequest`, sends it
-to `POST /arc/evaluate`, and enforces the returned verdict.
+to `POST /chio/evaluate`, and enforces the returned verdict.
 
 ### 7.2 Relationship to Language SDKs
 

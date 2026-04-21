@@ -41,7 +41,7 @@ function createMockSidecar(): {
       const parsed = JSON.parse(body);
       lastReq = parsed;
 
-      if (req.url === "/arc/evaluate") {
+      if (req.url === "/chio/evaluate") {
         const receipt = createMockReceipt(parsed, verdictMode);
         const response: EvaluateResponse = {
           verdict: receipt.verdict,
@@ -50,7 +50,7 @@ function createMockSidecar(): {
         };
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(response));
-      } else if (req.url === "/arc/health") {
+      } else if (req.url === "/chio/health") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));
       } else {

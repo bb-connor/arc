@@ -91,9 +91,9 @@ spec:
             - name: CHIO_HEALTH_PATH
               value: "/health"
             - name: CHIO_KERNEL_CONFIG_PATH
-              value: "/etc/arc/kernel.yaml"
+              value: "/etc/chio/kernel.yaml"
             - name: CHIO_POLICY_SOURCE
-              value: "file:///etc/arc/policy.yaml"
+              value: "file:///etc/chio/policy.yaml"
             - name: CHIO_RECEIPT_SINK
               value: "stdout"
             - name: CHIO_LOG_LEVEL
@@ -173,7 +173,7 @@ data:
     listen: 0.0.0.0:9090
     ext_authz_listen: 0.0.0.0:9091
     receipt_sink: stdout
-    policy_source: file:///etc/arc/policy.yaml
+    policy_source: file:///etc/chio/policy.yaml
   policy.yaml: |
     # Minimal demo policy. Allow requests whose capability token presents the
     # scope `demo.read`; deny everything else. Real deployments load from a

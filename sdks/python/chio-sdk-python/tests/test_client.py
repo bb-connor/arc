@@ -115,7 +115,7 @@ class TestCanonicalJson:
 class TestHealth:
     @respx.mock
     async def test_health(self) -> None:
-        respx.get(f"{BASE}/arc/health").mock(
+        respx.get(f"{BASE}/chio/health").mock(
             return_value=httpx.Response(200, json={"status": "healthy"})
         )
         async with ChioClient(BASE) as client:
@@ -203,7 +203,7 @@ class TestVerifyReceipt:
 class TestVerifyHttpReceipt:
     @respx.mock
     async def test_verify_http(self) -> None:
-        respx.post(f"{BASE}/arc/verify").mock(
+        respx.post(f"{BASE}/chio/verify").mock(
             return_value=httpx.Response(200, json={"valid": True})
         )
         async with ChioClient(BASE) as client:
@@ -271,7 +271,7 @@ class TestEvaluateToolCall:
 class TestEvaluateHttpRequest:
     @respx.mock
     async def test_evaluate_http(self) -> None:
-        respx.post(f"{BASE}/arc/evaluate").mock(
+        respx.post(f"{BASE}/chio/evaluate").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -323,7 +323,7 @@ class TestErrorHandling:
 
     @respx.mock
     async def test_server_error(self) -> None:
-        respx.get(f"{BASE}/arc/health").mock(
+        respx.get(f"{BASE}/chio/health").mock(
             return_value=httpx.Response(500, json={"error": "internal"})
         )
         async with ChioClient(BASE) as client:

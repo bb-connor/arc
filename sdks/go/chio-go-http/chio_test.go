@@ -14,7 +14,7 @@ func mockSidecar(t *testing.T, verdict Verdict) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/arc/evaluate":
+		case "/chio/evaluate":
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				t.Fatalf("failed to read request body: %v", err)
@@ -51,7 +51,7 @@ func mockSidecar(t *testing.T, verdict Verdict) *httptest.Server {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 
-		case "/arc/health":
+		case "/chio/health":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
 

@@ -116,7 +116,7 @@ already has a natural place for config. Do the schema change as a fast
 follow (v1.1) once the manifest format is validated.
 
 **v1 flow:**
-1. `chio.yaml` references the guard: `path: /etc/arc/guards/pii/pii.wasm`
+1. `chio.yaml` references the guard: `path: /etc/chio/guards/pii/pii.wasm`
 2. The loader looks for `guard-manifest.yaml` adjacent to the `.wasm` file
 3. Manifest contains `config:` block
 4. Config is loaded into `WasmHostState` and exposed via `chio.get_config`

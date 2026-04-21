@@ -43,7 +43,7 @@ class ChioSidecarClient(
     fun evaluate(request: ChioHttpRequest, capabilityToken: String? = null): EvaluateResponse {
         val body = objectMapper.writeValueAsString(request)
         val requestBuilder = HttpRequest.newBuilder()
-            .uri(URI.create("$baseUrl/arc/evaluate"))
+            .uri(URI.create("$baseUrl/chio/evaluate"))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(timeoutSeconds))
             .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -76,7 +76,7 @@ class ChioSidecarClient(
     fun verifyReceipt(receipt: HttpReceipt): Boolean {
         val body = objectMapper.writeValueAsString(receipt)
         val httpRequest = HttpRequest.newBuilder()
-            .uri(URI.create("$baseUrl/arc/verify"))
+            .uri(URI.create("$baseUrl/chio/verify"))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(timeoutSeconds))
             .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -95,7 +95,7 @@ class ChioSidecarClient(
     /** Health check for the sidecar. */
     fun healthCheck(): Boolean {
         val httpRequest = HttpRequest.newBuilder()
-            .uri(URI.create("$baseUrl/arc/health"))
+            .uri(URI.create("$baseUrl/chio/health"))
             .timeout(Duration.ofSeconds(timeoutSeconds))
             .GET()
             .build()

@@ -1596,7 +1596,7 @@ allowed to proceed.
 `docs/chio-wall/README.md` define the post-Chio-Wall `E-026` hardening ladder
 as the next bounded step after the first companion-product lane is validated.
 **Current boundary references:** `.planning/v2.50-MILESTONE-AUDIT.md`,
-`docs/mercury/CHIO_WALL_BRIEF.md`,
+`docs/mercury/ARC_WALL_BRIEF.md`,
 `docs/chio-wall/README.md`,
 `crates/chio-mercury/src/main.rs`,
 `crates/chio-wall/src/main.rs`, and
@@ -1627,7 +1627,7 @@ connector families, or collapsing the products into one surface.
 
 ### v2.50 Chio-Wall Companion Product Core, Guard Evidence, and Buyer Motion
 
-**Research basis:** `docs/mercury/CHIO_WALL_BRIEF.md`,
+**Research basis:** `docs/mercury/ARC_WALL_BRIEF.md`,
 `docs/mercury/IMPLEMENTATION_ROADMAP.md`,
 `docs/mercury/GO_TO_MARKET.md`,
 `docs/mercury/TECHNICAL_ARCHITECTURE.md`,
@@ -1637,7 +1637,7 @@ Phase 5 program after trust-network work and frame it as a companion product
 built on Chio rather than part of MERCURY's trading-workflow surface.
 **Current boundary references:** `.planning/v2.49-MILESTONE-AUDIT.md`,
 `docs/mercury/TRUST_NETWORK_DECISION_RECORD.md`,
-`docs/mercury/CHIO_WALL_BRIEF.md`,
+`docs/mercury/ARC_WALL_BRIEF.md`,
 `docs/mercury/README.md`,
 `spec/PROTOCOL.md`, and
 `crates/chio-mercury/src/main.rs` define the validated Chio substrate,
@@ -1906,7 +1906,7 @@ avoid broad connector or expansion programs.
 `docs/mercury/TECHNICAL_ARCHITECTURE.md`,
 `docs/mercury/IMPLEMENTATION_ROADMAP.md`,
 `docs/mercury/PHASE_0_1_BUILD_CHECKLIST.md`, and
-`docs/mercury/CHIO_MODULE_MAPPING.md` define the product wedge, proof
+`docs/mercury/ARC_MODULE_MAPPING.md` define the product wedge, proof
 boundary, build order, and Chio reuse posture.
 **Current boundary references:** `docs/STRATEGIC_ROADMAP.md`,
 `crates/chio-core/src/receipt.rs`,

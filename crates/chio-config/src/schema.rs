@@ -48,7 +48,7 @@ pub struct KernelConfig {
     /// Ed25519 signing key (hex or "generate" for dev mode).
     pub signing_key: String,
 
-    /// Receipt store URI (e.g., "sqlite:///var/arc/receipts.db").
+    /// Receipt store URI (e.g., "sqlite:///var/chio/receipts.db").
     #[serde(default = "default_receipt_store")]
     pub receipt_store: String,
 
@@ -259,7 +259,7 @@ fn default_wasm_priority() -> u32 {
 // -- Default value functions --
 
 fn default_receipt_store() -> String {
-    "sqlite:///var/arc/receipts.db".to_string()
+    "sqlite:///var/chio/receipts.db".to_string()
 }
 
 fn default_log_level() -> String {
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn receipts_default_values() {
         let r = ReceiptsConfig::default();
-        assert_eq!(r.store, "sqlite:///var/arc/receipts.db");
+        assert_eq!(r.store, "sqlite:///var/chio/receipts.db");
         assert_eq!(r.checkpoint_interval, 100);
         assert_eq!(r.retention_days, 90);
     }

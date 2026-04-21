@@ -170,7 +170,7 @@ class ChioDjangoMiddleware:
 
         try:
             resp = httpx.post(
-                f"{self._sidecar_url}/arc/evaluate",
+                f"{self._sidecar_url}/chio/evaluate",
                 json=payload,
                 headers=request_headers,
                 timeout=self._timeout,

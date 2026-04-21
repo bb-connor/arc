@@ -8,13 +8,13 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-output_root="target/release-qualification/bounded-arc"
+output_root="target/release-qualification/bounded-chio"
 log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-matrix_src="docs/standards/CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
-matrix_snapshot="${output_root}/CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json"
+matrix_src="docs/standards/CHIO_BOUNDED_QUALIFICATION_MATRIX.json"
+matrix_snapshot="${output_root}/CHIO_BOUNDED_QUALIFICATION_MATRIX.json"
 profile_src="docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md"
 profile_snapshot="${output_root}/CHIO_BOUNDED_OPERATIONAL_PROFILE.md"
 checklist_src="docs/review/14-bounded-chio-pre-ship-checklist.md"
@@ -133,7 +133,7 @@ Decision:
 
 Executed checks:
 
-- JSON validation of `CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json`
+- JSON validation of `CHIO_BOUNDED_QUALIFICATION_MATRIX.json`
 - bounded claim-discipline grep checks over README and competitive-positioning
   copy
 - planning-truth checks over `.planning/*`
@@ -141,7 +141,7 @@ Executed checks:
 
 Supporting documents:
 
-- `CHIO_BOUNDED_ARC_QUALIFICATION_MATRIX.json`
+- `CHIO_BOUNDED_QUALIFICATION_MATRIX.json`
 - `CHIO_BOUNDED_OPERATIONAL_PROFILE.md`
 - `bounded-chio-pre-ship-checklist.md`
 EOF
@@ -180,9 +180,9 @@ checksum_path.write_text(
 
 manifest = {
     "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-    "scope": "bounded_arc_release_qualification",
-    "decision": "bounded_arc_release_qualified_stronger_claims_demoted_to_addenda",
-    "claimLevel": "bounded_arc_release_candidate",
+    "scope": "bounded_chio_release_qualification",
+    "decision": "bounded_chio_release_qualified_stronger_claims_demoted_to_addenda",
+    "claimLevel": "bounded_chio_release_candidate",
     "artifacts": entries,
 }
 

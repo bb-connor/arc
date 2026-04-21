@@ -122,7 +122,7 @@ fail-closed mode. Fields: `verdict`, `guard`, `reason`, `receiptId`.
 
 ### `ChioClient`
 
-Minimal HTTP client for `POST /arc/evaluate`. Can be shared across many
+Minimal HTTP client for `POST /chio/evaluate`. Can be shared across many
 `chioTool()` instances to amortize construction cost. The client builds an
 `ChioHttpRequest`-compatible payload for tool calls, accepts the sidecar's
 canonical `EvaluateResponse { verdict, receipt, evidence }` shape, and

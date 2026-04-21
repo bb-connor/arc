@@ -15,7 +15,7 @@ same local sidecar model.
 - `GET /hello` is allowed and returns a receipt header
 - `POST /echo` is denied without a capability token
 - `POST /echo` succeeds with a trust-issued capability token and a receipt header
-- the app talks to a real local Chio sidecar over `/arc/evaluate`
+- the app talks to a real local Chio sidecar over `/chio/evaluate`
 - the smoke flow lists persisted receipts from the sidecar SQLite store
 
 ## Files

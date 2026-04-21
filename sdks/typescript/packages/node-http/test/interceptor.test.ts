@@ -36,7 +36,7 @@ async function startMockSidecar(
   onEvaluate?: (body: string) => void,
 ): Promise<{ server: http.Server; url: string }> {
   const server = http.createServer((req, res) => {
-    if (req.method === "POST" && req.url === "/arc/evaluate") {
+    if (req.method === "POST" && req.url === "/chio/evaluate") {
       const chunks: Buffer[] = [];
       req.on("data", (chunk: Buffer) => chunks.push(chunk));
       req.on("end", () => {
@@ -47,7 +47,7 @@ async function startMockSidecar(
       return;
     }
 
-    if (req.method === "GET" && req.url === "/arc/health") {
+    if (req.method === "GET" && req.url === "/chio/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "healthy", version: "1.0.0" }));
       return;

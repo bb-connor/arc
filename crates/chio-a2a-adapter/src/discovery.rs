@@ -326,7 +326,7 @@ fn merge_skill_routing_metadata(
         Some(Value::Object(object)) => object,
         Some(_) => {
             return Err(AdapterError::InvalidToolInput(
-                "`metadata.arc` must be an object when provided".to_string(),
+                "`metadata.chio` must be an object when provided".to_string(),
             ))
         }
     };

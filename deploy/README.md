@@ -3,7 +3,7 @@
 Reference deployment manifests for running the Chio (Chio) kernel as a sidecar
 alongside an application container on managed multi-container platforms.
 
-All manifests assume the sidecar listens on `:9090` and exposes `GET /arc/health`.
+All manifests assume the sidecar listens on `:9090` and exposes `GET /chio/health`.
 The application talks to the kernel over `http://localhost:9090`.
 
 See `docs/protocols/CLOUD-SIDECAR-INTEGRATION.md` for the architectural
@@ -41,11 +41,11 @@ Each manifest wires the following as secret references (never inline):
 
 Additional non-secret configuration:
 
-- `CHIO_KERNEL_CONFIG_PATH` (default `/etc/arc/kernel.yaml`) -- kernel config file inside the image
+- `CHIO_KERNEL_CONFIG_PATH` (default `/etc/chio/kernel.yaml`) -- kernel config file inside the image
 - `CHIO_POLICY_SOURCE` -- policy bundle location (bundled, `gs://`, `s3://`, `https://`)
 - `CHIO_RECEIPT_SINK` -- receipt destination (BigQuery, DynamoDB, Cosmos DB, stdout, ...)
 - `CHIO_LISTEN_ADDR` (default `0.0.0.0:9090`)
-- `CHIO_HEALTH_PATH` (default `/arc/health`)
+- `CHIO_HEALTH_PATH` (default `/chio/health`)
 
 ## Startup ordering
 
@@ -53,14 +53,14 @@ All three platforms enforce that the app container cannot serve traffic until
 the sidecar is healthy:
 
 - **Cloud Run** -- `run.googleapis.com/container-dependencies` annotation plus
-  sidecar `startupProbe` on `:9090/arc/health`.
+  sidecar `startupProbe` on `:9090/chio/health`.
 - **ECS Fargate** -- the app waits for the sidecar process to start, and the
-  sidecar uses the mounted `/etc/arc/spec/openapi.yaml` plus its own
-  `healthCheck` on `:9090/arc/health`. This avoids a startup deadlock where
+  sidecar uses the mounted `/etc/chio/spec/openapi.yaml` plus its own
+  `healthCheck` on `:9090/chio/health`. This avoids a startup deadlock where
   spec auto-discovery would need the app healthy before the sidecar could
   report healthy.
 - **Azure Container Apps** -- sidecar `startupProbe` plus `readinessProbe` on
-  `:9090/arc/health`; the app's own `startupProbe` ensures it does not report
+  `:9090/chio/health`; the app's own `startupProbe` ensures it does not report
   healthy until it can reach the sidecar.
 
 ## Fail-closed behaviour

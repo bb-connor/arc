@@ -16,7 +16,7 @@ fi
 # ci-workspace remains the fast regression gate. The bounded Chio release lane
 # is the ship-facing qualification boundary.
 ./scripts/ci-workspace.sh
-./scripts/qualify-bounded-arc.sh
+./scripts/qualify-bounded-chio.sh
 ./scripts/qualify-trust-control.sh
 ./scripts/qualify-portable-browser.sh
 ./scripts/qualify-mobile-kernel.sh
@@ -51,7 +51,7 @@ run_wave() {
     --results-dir "${wave_dir}/results" \
     --report-output "${report_path}"
 
-  cargo run -p chio-cli --bin arc -- certify check \
+  cargo run -p chio-cli --bin chio -- certify check \
     --scenarios-dir "${scenarios_dir}" \
     --results-dir "${wave_dir}/results" \
     --output "${certification_path}" \
@@ -60,7 +60,7 @@ run_wave() {
     --tool-server-name "Chio Conformance ${wave}" \
     --signing-seed-file "${certify_seed}"
 
-  cargo run -p chio-cli --bin arc -- certify verify \
+  cargo run -p chio-cli --bin chio -- certify verify \
     --input "${certification_path}" >"${verification_path}"
 }
 

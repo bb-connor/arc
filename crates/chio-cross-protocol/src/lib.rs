@@ -1466,7 +1466,7 @@ mod tests {
             request: &Value,
         ) -> Result<Option<CrossProtocolCapabilityRef>, BridgeError> {
             request
-                .pointer("/metadata/arc/capabilityRef")
+                .pointer("/metadata/chio/capabilityRef")
                 .cloned()
                 .map(serde_json::from_value)
                 .transpose()
@@ -1509,7 +1509,7 @@ mod tests {
 
         fn protocol_context(&self, request: &Value) -> Result<Option<Value>, BridgeError> {
             Ok(request
-                .pointer("/metadata/arc/targetSkillId")
+                .pointer("/metadata/chio/targetSkillId")
                 .and_then(Value::as_str)
                 .map(|skill| json!({ "targetSkillId": skill })))
         }

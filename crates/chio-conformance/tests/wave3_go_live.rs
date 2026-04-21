@@ -42,7 +42,7 @@ fn python3_supports_arc_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
-fn ensure_arc_binary(repo_root: &PathBuf) {
+fn ensure_chio_binary(repo_root: &PathBuf) {
     let chio_binary = repo_root.join("target/debug/chio");
     if chio_binary.exists() {
         return;
@@ -81,7 +81,7 @@ fn wave3_auth_harness_runs_against_live_go_peer() {
     }
 
     let mut options = default_run_options();
-    ensure_arc_binary(&options.repo_root);
+    ensure_chio_binary(&options.repo_root);
     options.peers = vec![PeerTarget::Go];
     options.auth_mode = ConformanceAuthMode::LocalOAuth;
     options.scenarios_dir = options.repo_root.join("tests/conformance/scenarios/wave3");

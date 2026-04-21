@@ -276,7 +276,7 @@
   - authorize prepaid payment before execution and deny truthfully on auth failure
   - unwind aborted monetary invocations so tool errors do not leak budget or prepaid settlement
   - reconcile provisional internal debits down to actual reported cost when the rail is not prepaid
-  - verify the bridge with targeted payment tests, full kernel tests, `cargo test -p chio-cli --bin arc`, and `cargo test --workspace`
+  - verify the bridge with targeted payment tests, full kernel tests, `cargo test -p chio-cli --bin chio`, and `cargo test --workspace`
 - Complete delegation-chain cost attribution reporting:
   - add kernel-side cost-attribution report types and aggregation over matching financial receipts
   - expose `GET /v1/reports/cost-attribution` on the trust-control service

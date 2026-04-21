@@ -75,7 +75,7 @@ five attempts, capped well under the ~2 second SHUTDOWN budget.
 The evaluator deliberately speaks a minimal JSON over HTTP/1.1 dialect so
 that any language can call it with the standard library alone.
 
-### `GET /health`, `GET /arc/health`
+### `GET /health`, `GET /chio/health`
 
 ```json
 {"status": "ok", "extension": "chio"}

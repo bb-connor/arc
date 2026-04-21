@@ -29,7 +29,7 @@
 - Internal: [PARTNERSHIP_STRATEGY.md](/Users/connor/Medica/backbay/standalone/arc/docs/mercury/PARTNERSHIP_STRATEGY.md)
 - Internal: [POC_DESIGN.md](/Users/connor/Medica/backbay/standalone/arc/docs/mercury/POC_DESIGN.md)
 - Internal: [FIX_INTEGRATION_RESEARCH.md](/Users/connor/Medica/backbay/standalone/arc/docs/mercury/FIX_INTEGRATION_RESEARCH.md)
-- Internal: [CHIO_WALL_BRIEF.md](/Users/connor/Medica/backbay/standalone/arc/docs/mercury/CHIO_WALL_BRIEF.md)
+- Internal: [CHIO_WALL_BRIEF.md](/Users/connor/Medica/backbay/standalone/arc/docs/mercury/ARC_WALL_BRIEF.md)
 - Internal: [REGULATORY_POSITIONING.md](/Users/connor/Medica/backbay/standalone/arc/docs/mercury/REGULATORY_POSITIONING.md)
 - External: [FCA / Bank of England: AI in UK financial services](https://www.fca.org.uk/publications/research-notes/ai-uk-financial-services)
 - External: [IOSCO: AI in Capital Markets release, March 12, 2025](https://www.iosco.org/news/pdf/IOSCONEWS761.pdf)

@@ -428,8 +428,8 @@ mod tests {
         let mut request = ChioHttpRequest::new(
             "req-sidecar-tool-mismatch".to_string(),
             HttpMethod::Post,
-            "/arc/tools/math/increment".to_string(),
-            "/arc/tools/math/increment".to_string(),
+            "/chio/tools/math/increment".to_string(),
+            "/chio/tools/math/increment".to_string(),
             CallerIdentity::anonymous(),
         );
         request.tool_server = Some("math".to_string());
@@ -477,8 +477,8 @@ mod tests {
         let mut request = ChioHttpRequest::new(
             "req-model-scope".to_string(),
             HttpMethod::Post,
-            "/arc/tools/math/double".to_string(),
-            "/arc/tools/math/double".to_string(),
+            "/chio/tools/math/double".to_string(),
+            "/chio/tools/math/double".to_string(),
             CallerIdentity::anonymous(),
         );
         request.tool_server = Some("math".to_string());

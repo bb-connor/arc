@@ -31,7 +31,7 @@ async function startMockSidecar(
   onEvaluate?: (requestBody: string) => void,
 ): Promise<{ server: http.Server; url: string }> {
   const server = http.createServer((req, res) => {
-    if (req.method === "POST" && req.url === "/arc/evaluate") {
+    if (req.method === "POST" && req.url === "/chio/evaluate") {
       const chunks: Buffer[] = [];
       req.on("data", (chunk: Buffer) => chunks.push(chunk));
       req.on("end", () => {

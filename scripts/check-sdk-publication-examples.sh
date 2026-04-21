@@ -69,7 +69,7 @@ PY
 control_url="http://127.0.0.1:${control_port}"
 mcp_url="http://127.0.0.1:${mcp_port}"
 
-cargo build -p chio-cli --bin arc >/dev/null
+cargo build -p chio-cli --bin chio >/dev/null
 
 "${chio_bin}" \
   --receipt-db "${work_dir}/receipts.sqlite" \

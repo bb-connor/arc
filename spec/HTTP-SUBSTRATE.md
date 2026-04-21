@@ -50,11 +50,11 @@ The sidecar exposes three endpoints:
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/arc/evaluate` | POST | Evaluate an HTTP request against policy |
-| `/arc/verify` | POST | Verify a receipt signature |
-| `/arc/health` | GET | Sidecar health check |
+| `/chio/evaluate` | POST | Evaluate an HTTP request against policy |
+| `/chio/verify` | POST | Verify a receipt signature |
+| `/chio/health` | GET | Sidecar health check |
 
-### 2.3 POST /arc/evaluate
+### 2.3 POST /chio/evaluate
 
 Evaluates an HTTP request against the loaded policy and returns a signed receipt.
 
@@ -81,7 +81,7 @@ HTTP status code of the sidecar response reflects the health of the evaluation
 pipeline, not the policy outcome. The policy outcome is encoded in the `verdict`
 field.
 
-### 2.4 POST /arc/verify
+### 2.4 POST /chio/verify
 
 Verifies the Ed25519 signature on a previously issued `HttpReceipt`.
 
@@ -102,7 +102,7 @@ A receipt with a valid signature but an expired timestamp is still `valid: true`
 from the verification endpoint's perspective. Temporal validity is the caller's
 responsibility.
 
-### 2.5 GET /arc/health
+### 2.5 GET /chio/health
 
 Returns the sidecar's health status.
 
@@ -139,7 +139,7 @@ sequenceDiagram
 
     Client->>MW: HTTP request
     MW->>MW: Extract caller identity, resolve route pattern
-    MW->>Sidecar: POST /arc/evaluate (ChioHttpRequest)
+    MW->>Sidecar: POST /chio/evaluate (ChioHttpRequest)
     Sidecar->>Sidecar: Match route, evaluate guards, sign receipt
     Sidecar-->>MW: 200 { verdict, receipt, evidence }
     alt verdict = allow
@@ -156,7 +156,7 @@ sequenceDiagram
     participant Verifier
     participant Sidecar as Chio Sidecar (127.0.0.1:9090)
 
-    Verifier->>Sidecar: POST /arc/verify (HttpReceipt)
+    Verifier->>Sidecar: POST /chio/verify (HttpReceipt)
     Sidecar->>Sidecar: Extract body, verify Ed25519 signature
     Sidecar-->>Verifier: 200 { valid: true/false }
 ```
@@ -499,5 +499,5 @@ The schema files are:
 | `chio-http-request.schema.json` | `ChioHttpRequest` |
 | `caller-identity.schema.json` | `CallerIdentity` with `AuthMethod` |
 | `verdict.schema.json` | `Verdict` |
-| `evaluate-request.schema.json` | POST `/arc/evaluate` request body (alias for `ChioHttpRequest`) |
-| `evaluate-response.schema.json` | POST `/arc/evaluate` response body (`EvaluateResponse`) |
+| `evaluate-request.schema.json` | POST `/chio/evaluate` request body (alias for `ChioHttpRequest`) |
+| `evaluate-response.schema.json` | POST `/chio/evaluate` response body (`EvaluateResponse`) |
