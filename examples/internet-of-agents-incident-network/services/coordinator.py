@@ -16,11 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel
 
 from chio_asgi import ChioASGIMiddleware, ChioASGIConfig
-from chio_fastapi import get_arc_receipt
+from chio_fastapi import get_chio_receipt
 
 from incident_network.capabilities import PublicKey, delegate, from_seed
 from incident_network.arc import TrustControl
@@ -62,8 +62,11 @@ def create_app() -> FastAPI:
         return {"ok": True, "chio_sidecar": sidecar_url}
 
     @app.post("/process-task")
-    def process_task(payload: ProcessTaskRequest, request: Request) -> dict:
-        receipt = getattr(request.state, "chio_receipt", None)
+    def process_task(
+        payload: ProcessTaskRequest,
+        request: Request,
+        receipt=Depends(get_chio_receipt),
+    ) -> dict:
         task = payload.task
         coordinator_capability = task["provider_coordinator_capability"]
 
