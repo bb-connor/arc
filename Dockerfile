@@ -10,7 +10,7 @@ WORKDIR /workspace
 
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
-COPY examples/hello-tool ./examples/hello-tool
+COPY examples ./examples
 COPY formal/diff-tests ./formal/diff-tests
 COPY tests/e2e ./tests/e2e
 
