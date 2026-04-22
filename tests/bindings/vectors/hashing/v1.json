@@ -19,6 +19,6 @@
       "sha256_hex": "5c57c7deea3998c13730797e592abe72cae55130e8da2923de6374b75b83101b"
     }
   ],
-  "generated_by": "chio-bindings-core",
+  "generated_by": "chio-binding-helpers",
   "version": 1
 }

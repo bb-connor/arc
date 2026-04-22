@@ -1,13 +1,16 @@
 [package]
 name = "hello-a2a"
-version = "0.1.0"
-edition = "2021"
-
-[workspace]
+description = "Example A2A edge wiring the chio-a2a-edge adapter with receipt-bearing task results"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
 
 [dependencies]
 chio-a2a-edge = { path = "../../crates/chio-a2a-edge" }
 chio-core = { path = "../../crates/chio-core" }
 chio-kernel = { path = "../../crates/chio-kernel" }
 chio-manifest = { path = "../../crates/chio-manifest" }
-serde_json = "1"
+serde_json = { workspace = true }

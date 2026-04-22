@@ -1,70 +1,98 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/chio-bindings-core",
-    "crates/chio-anchor",
-    "crates/chio-appraisal",
-    "crates/chio-autonomy",
-    "crates/chio-link",
-    "crates/chio-settle",
-    "crates/chio-web3-bindings",
-    "crates/chio-a2a-adapter",
-    "crates/chio-acp-proxy",
-    "crates/chio-control-plane",
+    # Core & types
     "crates/chio-core",
     "crates/chio-core-types",
-    "crates/chio-credit",
-    "crates/chio-credentials",
-    "crates/chio-did",
-    "crates/chio-envoy-ext-authz",
-    "crates/chio-federation",
-    "crates/chio-governance",
-    "crates/chio-hosted-mcp",
-    "crates/chio-http-core",
-    "crates/chio-openapi",
-    "crates/chio-config",
-    "crates/chio-api-protect",
+    #
+    # Kernel variants
     "crates/chio-kernel",
     "crates/chio-kernel-browser",
     "crates/chio-kernel-core",
     "crates/chio-kernel-mobile",
-    "crates/chio-listing",
-    "crates/chio-market",
-    "crates/chio-mercury",
-    "crates/chio-mercury-core",
-    "crates/chio-open-market",
-    "crates/chio-wall",
-    "crates/chio-wall-core",
-    "crates/chio-store-sqlite",
-    "crates/chio-reputation",
+    #
+    # Guards & policy
+    "crates/chio-data-guards",
+    "crates/chio-external-guards",
     "crates/chio-guard-sdk",
     "crates/chio-guard-sdk-macros",
     "crates/chio-guards",
-    "crates/chio-external-guards",
-    "crates/chio-data-guards",
-    "crates/chio-http-session",
     "crates/chio-policy",
-    "crates/chio-cli",
-    "crates/chio-conformance",
-    "crates/chio-manifest",
-    "crates/chio-mcp-edge",
-    "crates/chio-mcp-adapter",
-    "crates/chio-openapi-mcp-bridge",
-    "crates/chio-cross-protocol",
+    "crates/chio-wasm-guards",
+    #
+    # Protocol adapters & edges
+    "crates/chio-a2a-adapter",
     "crates/chio-a2a-edge",
     "crates/chio-acp-edge",
-    "crates/chio-openai",
-    "crates/chio-tower",
-    "crates/chio-wasm-guards",
-    "crates/chio-metering",
+    "crates/chio-acp-proxy",
     "crates/chio-ag-ui-proxy",
-    "crates/chio-workflow",
-    "crates/chio-siem",
+    "crates/chio-cross-protocol",
+    "crates/chio-envoy-ext-authz",
+    "crates/chio-mcp-adapter",
+    "crates/chio-mcp-edge",
+    "crates/chio-openai",
+    "crates/chio-openapi",
+    "crates/chio-openapi-mcp-bridge",
+    "crates/chio-tower",
+    #
+    # Economics & settlement
+    "crates/chio-anchor",
+    "crates/chio-appraisal",
+    "crates/chio-autonomy",
+    "crates/chio-credit",
+    "crates/chio-link",
+    "crates/chio-listing",
+    "crates/chio-market",
+    "crates/chio-open-market",
+    "crates/chio-settle",
     "crates/chio-underwriting",
     "crates/chio-web3",
+    "crates/chio-web3-bindings",
+    #
+    # Identity, credentials, federation
+    "crates/chio-credentials",
+    "crates/chio-did",
+    "crates/chio-federation",
+    "crates/chio-governance",
+    "crates/chio-reputation",
+    #
+    # Observability & ops
+    "crates/chio-metering",
+    "crates/chio-siem",
+    #
+    # Control plane & storage
+    "crates/chio-config",
+    "crates/chio-control-plane",
+    "crates/chio-manifest",
+    "crates/chio-store-sqlite",
+    "crates/chio-workflow",
+    #
+    # HTTP & session
+    "crates/chio-hosted-mcp",
+    "crates/chio-http-core",
+    "crates/chio-http-session",
+    #
+    # Products
+    "crates/chio-api-protect",
+    "crates/chio-cli",
+    "crates/chio-mercury",
+    "crates/chio-mercury-core",
+    "crates/chio-wall",
+    "crates/chio-wall-core",
+    #
+    # SDK support
+    "crates/chio-binding-helpers",
+    "crates/chio-conformance",
+    #
+    # Examples
     "examples/guards/enriched-inspector",
     "examples/guards/tool-gate",
+    "examples/hello-a2a",
+    "examples/hello-acp",
+    "examples/hello-mcp",
     "examples/hello-tool",
+    #
+    # Tests
     "formal/diff-tests",
     "tests/e2e",
 ]

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chio_bindings_core::{
+use chio_binding_helpers::{
     canonicalize_json_str, capability_body_canonical_json, receipt_body_canonical_json,
     sha256_hex_utf8, sign_json_str_ed25519, sign_utf8_message_ed25519,
     signed_manifest_body_canonical_json, verify_capability, verify_json_str_signature_ed25519,
@@ -72,7 +72,7 @@ fn assert_fixture_matches(path: &Path, actual: &Value) {
 fn canonical_vector_fixture() -> Value {
     json!({
         "version": 1,
-        "generated_by": "chio-bindings-core",
+        "generated_by": "chio-binding-helpers",
         "cases": [
             {
                 "id": "object_key_sorting",
@@ -278,7 +278,7 @@ fn receipt_vector_fixture() -> Value {
 
     json!({
         "version": 1,
-        "generated_by": "chio-bindings-core",
+        "generated_by": "chio-binding-helpers",
         "signing_key_seed_hex": keypair.seed_hex(),
         "cases": receipt_cases(),
     })
@@ -287,7 +287,7 @@ fn receipt_vector_fixture() -> Value {
 fn hashing_vector_fixture() -> Value {
     json!({
         "version": 1,
-        "generated_by": "chio-bindings-core",
+        "generated_by": "chio-binding-helpers",
         "cases": [
             {
                 "id": "empty_utf8",
@@ -358,7 +358,7 @@ fn signing_vector_fixture() -> Value {
 
     json!({
         "version": 1,
-        "generated_by": "chio-bindings-core",
+        "generated_by": "chio-binding-helpers",
         "signing_key_seed_hex": seed_hex,
         "utf8_cases": [
             signing_utf8_case_value(
@@ -618,7 +618,7 @@ fn capability_vector_fixture() -> Value {
 
     json!({
         "version": 1,
-        "generated_by": "chio-bindings-core",
+        "generated_by": "chio-binding-helpers",
         "issuer_seed_hex": issuer.seed_hex(),
         "subject_seed_hex": subject.seed_hex(),
         "delegatee_seed_hex": delegatee.seed_hex(),
@@ -789,7 +789,7 @@ fn manifest_vector_fixture() -> Value {
 
     json!({
         "version": 1,
-        "generated_by": "chio-bindings-core",
+        "generated_by": "chio-binding-helpers",
         "server_seed_hex": server.seed_hex(),
         "alternate_seed_hex": alternate.seed_hex(),
         "cases": manifest_cases(),
