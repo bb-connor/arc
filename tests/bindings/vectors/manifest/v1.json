@@ -372,7 +372,7 @@
       }
     }
   ],
-  "generated_by": "chio-bindings-core",
+  "generated_by": "chio-binding-helpers",
   "server_seed_hex": "1515151515151515151515151515151515151515151515151515151515151515",
   "version": 1
 }

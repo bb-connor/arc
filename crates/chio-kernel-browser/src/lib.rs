@@ -1,11 +1,10 @@
 //! Browser (wasm-bindgen) bindings over the portable Chio kernel core.
 //!
-//! Phase 14.2 of the roadmap. This crate exposes three portable entry
-//! points -- `evaluate`, `sign_receipt`, `verify_capability` -- to browser
-//! JavaScript / TypeScript through `wasm-bindgen`. Each entry point
-//! accepts and returns serde-serialized JSON so the same canonical
-//! `ToolCallRequest` / `Verdict` / `CapabilityToken` / `ChioReceipt`
-//! shapes flow across the wasm boundary unchanged.
+//! This crate exposes portable entry points to browser JavaScript /
+//! TypeScript through `wasm-bindgen`. Each entry point accepts and
+//! returns serde-serialized JSON so the same canonical `ToolCallRequest`
+//! / `Verdict` / `CapabilityToken` / `ChioReceipt` shapes flow across
+//! the wasm boundary unchanged.
 //!
 //! # Platform adapters
 //!

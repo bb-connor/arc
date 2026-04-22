@@ -1,11 +1,11 @@
 //! HTTP-layer verdict type, consistent with the existing Chio Decision enum
 //! in chio-core-types but specialized for the HTTP substrate.
 //!
-//! Phase 0.5 of the roadmap enriches the `Deny` variant with structured
-//! context (tool identity, required vs granted scope, guard name, a stable
-//! reason code, and a next-steps hint) so the HTTP sidecar can tell an SDK
-//! exactly what scope to request. All new fields are `Option<String>` and
-//! default to `None` on serde, preserving wire and constructor back-compat.
+//! The `Deny` variant carries optional structured context (tool identity,
+//! required vs granted scope, guard name, a stable reason code, and a
+//! next-steps hint) so the HTTP sidecar can tell an SDK exactly what scope
+//! to request. All detail fields default to `None` on serde, preserving
+//! wire and constructor back-compat.
 
 use serde::{Deserialize, Serialize};
 
@@ -96,12 +96,12 @@ pub enum Verdict {
         /// Structured deny context: tool identity, required vs granted
         /// scope, a stable reason code, receipt id, and a next-steps
         /// hint. All fields are optional and default to `None`, so this
-        /// field is transparent to wire clients built before Phase 0.5.
+        /// field is transparent to wire clients that ignore deny details.
         ///
         /// Boxed to keep the [`Verdict`] enum compact on the hot allow
         /// path; the structured deny context is only populated on the
         /// (comparatively rare) deny path.
-        #[serde(default, skip_serializing_if = "deny_details_is_empty_boxed")]
+        #[serde(default, skip_serializing_if = "deny_details_is_empty")]
         details: Box<DenyDetails>,
     },
 
@@ -122,7 +122,7 @@ fn default_deny_status() -> u16 {
     403
 }
 
-fn deny_details_is_empty_boxed(details: &DenyDetails) -> bool {
+fn deny_details_is_empty(details: &DenyDetails) -> bool {
     details.is_empty()
 }
 

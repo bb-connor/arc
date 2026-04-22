@@ -31,6 +31,6 @@
       "input_json": "{\"text\":\"line\\n\\\"quoted\\\"\\\\path\"}"
     }
   ],
-  "generated_by": "chio-bindings-core",
+  "generated_by": "chio-binding-helpers",
   "version": 1
 }

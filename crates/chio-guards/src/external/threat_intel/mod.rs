@@ -3,11 +3,11 @@
 //! Three adapters that implement [`super::ExternalGuard`] and plug into
 //! [`super::AsyncGuardAdapter`]:
 //!
-//! * [`virustotal::VirusTotalGuard`] — queries the VirusTotal v3 API for
+//! * [`virustotal::VirusTotalGuard`] - queries the VirusTotal v3 API for
 //!   URL / file-hash reputation.
-//! * [`safe_browsing::SafeBrowsingGuard`] — queries Google Safe Browsing
+//! * [`safe_browsing::SafeBrowsingGuard`] - queries Google Safe Browsing
 //!   v4 `threatMatches:find`.
-//! * [`snyk::SnykGuard`] — queries the Snyk REST API for package
+//! * [`snyk::SnykGuard`] - queries the Snyk REST API for package
 //!   vulnerabilities.
 //!
 //! Each module carries its own config struct (with API keys wrapped in
@@ -22,7 +22,7 @@
 //! * Snyk expects `{"package": "<name>", "version": "<semver>",
 //!   "ecosystem": "<npm|pip|maven|...>"}`.
 //!
-//! The accepted shapes are intentionally minimal — callers can synthesize
+//! The accepted shapes are intentionally minimal - callers can synthesize
 //! them from a richer kernel `GuardContext` at the integration layer.
 
 pub mod safe_browsing;

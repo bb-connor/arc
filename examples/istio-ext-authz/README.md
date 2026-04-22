@@ -38,7 +38,7 @@ action.
   the generic `ghcr.io/backbay/chio-sidecar` image here; that image is the
   HTTP sidecar and does not expose Envoy's gRPC `Authorization/Check`
   service.
-- A capability token issued by an Chio capability authority (or the demo
+- A capability token issued by a Chio capability authority (or the demo
   token the kernel accepts in shadow mode). Export it as
   `CHIO_DEMO_CAPABILITY_TOKEN` before running `test-harness.sh`.
 

@@ -30,7 +30,7 @@ The remaining work after this execution pass is mostly hardening and adoption wo
 
 At the start of this roadmap, the repo already has:
 
-- `crates/chio-bindings-core` with canonical JSON, hashing, signing, receipt, capability, and manifest helpers
+- `crates/chio-binding-helpers` with canonical JSON, hashing, signing, receipt, capability, and manifest helpers
 - checked-in shared vectors under `tests/bindings/vectors/`
 - `packages/sdk/chio-ts` invariant helpers plus a low-level transport/session layer
 - the JS conformance peer importing shared transport code from `chio-ts`
@@ -56,7 +56,7 @@ By the end of this roadmap, Chio should be able to say all of the following with
 
 These constraints hold for the full roadmap:
 
-- `chio-bindings-core` stays invariant-only
+- `chio-binding-helpers` stays invariant-only
 - no session runtime, auth flows, callback routers, or trust-control clients move into Rust bindings
 - WASM, PyO3, CGO, and C ABI work are explicitly deferred unless a milestone says otherwise
 - pure remote-edge usability beats native acceleration in this window
@@ -98,14 +98,14 @@ Objective:
 
 Deliverables:
 
-- `docs/BINDINGS_API.md` or equivalent short API contract for `chio-bindings-core`
+- `docs/BINDINGS_API.md` or equivalent short API contract for `chio-binding-helpers`
 - checked-in SDK feature matrix under `tests/bindings/matrix/`
 - one script or CI lane that names the required parity checks by language
 - explicit alpha support table for TS, Python, and Go
 
 Tasks:
 
-- freeze the current `chio-bindings-core` public surface and stable error taxonomy
+- freeze the current `chio-binding-helpers` public surface and stable error taxonomy
 - define the SDK feature rows:
   - invariants
   - initialize/session
@@ -342,7 +342,7 @@ The main execution risks should be reduced in this order:
 
 Use these rules to keep the roadmap on track:
 
-- if a feature is needed only for byte-sensitive invariant equivalence, prefer `chio-bindings-core`
+- if a feature is needed only for byte-sensitive invariant equivalence, prefer `chio-binding-helpers`
 - if a feature is about transport, callbacks, auth, tasks, or ergonomics, keep it native to the language SDK
 - if a native bridge would delay package-backed remote-edge parity, defer it
 - if Go support would force CGO before remote-edge shape is proven, defer that portion
@@ -352,7 +352,7 @@ Use these rules to keep the roadmap on track:
 
 At the end of this roadmap, the desired project state is:
 
-- `chio-bindings-core` is stable and still small
+- `chio-binding-helpers` is stable and still small
 - `chio-ts` is the real JS/TS remote-edge package for current conformance behavior
 - `chio-py` is the real Python remote-edge package for current conformance behavior
 - `chio-go` exists as a real pure Go SDK foundation

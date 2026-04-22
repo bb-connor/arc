@@ -32,23 +32,27 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::models::{
-    DefaultAction, DetectionLevel, HumanInLoopRule, HushSpec, JailbreakDetection,
-    PromptInjectionDetection, SecretPatternsRule, ThreatIntelDetection, ToolAccessRule,
-    VelocityRule,
+    ComputerUseMode, ComputerUseRule, DefaultAction, DetectionLevel, HumanInLoopRule, HushSpec,
+    InputInjectionRule, JailbreakDetection, PromptInjectionDetection, RemoteDesktopChannelsRule,
+    SecretPatternsRule, ThreatIntelDetection, ToolAccessRule, VelocityRule,
 };
 
 use chio_core::capability::{ChioScope, Constraint, Operation, ToolGrant};
 use chio_guards::{
     agent_velocity::AgentVelocityConfig,
+    computer_use::{ComputerUseConfig, EnforcementMode},
+    input_injection::InputInjectionCapabilityConfig,
     jailbreak::{DetectorConfig as JailbreakDetectorConfig, JailbreakGuardConfig},
     post_invocation::SanitizerHook,
     prompt_injection::PromptInjectionConfig,
+    remote_desktop::RemoteDesktopSideChannelConfig,
     response_sanitization::OutputSanitizerConfig,
     secret_leak::CustomSecretPattern,
     velocity::VelocityConfig,
-    AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
-    InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
-    PatternDb, PostInvocationPipeline, PromptInjectionGuard, SecretLeakGuard, ShellCommandGuard,
+    AgentVelocityGuard, ComputerUseGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
+    InputInjectionCapabilityGuard, InternalNetworkGuard, JailbreakGuard, McpToolGuard,
+    PatchIntegrityGuard, PathAllowlistGuard, PatternDb, PostInvocationPipeline,
+    PromptInjectionGuard, RemoteDesktopSideChannelGuard, SecretLeakGuard, ShellCommandGuard,
     SpiderSenseConfig, SpiderSenseGuard, VelocityGuard,
 };
 
@@ -291,7 +295,122 @@ fn compile_rule_guards(
         }
     }
 
+    // 8. computer_use -> ComputerUseGuard
+    if let Some(cu) = &rules.computer_use {
+        if cu.enabled {
+            builder.add(ComputerUseGuard::with_config(compile_computer_use_rule(cu)));
+        }
+    }
+
+    // 9. remote_desktop_channels -> RemoteDesktopSideChannelGuard
+    if let Some(rd) = &rules.remote_desktop_channels {
+        if rd.enabled {
+            builder.add(RemoteDesktopSideChannelGuard::with_config(
+                compile_remote_desktop_rule(rd),
+            ));
+        }
+    }
+
+    // 10. input_injection -> InputInjectionCapabilityGuard
+    if let Some(ii) = &rules.input_injection {
+        if ii.enabled {
+            builder.add(InputInjectionCapabilityGuard::with_config(
+                compile_input_injection_rule(ii),
+            ));
+        }
+    }
+
+    // 11. browser_automation -> BrowserAutomationGuard
+    if let Some(ba) = &rules.browser_automation {
+        if ba.enabled {
+            let config = compile_browser_automation_rule(ba);
+            builder.add(
+                chio_guards::BrowserAutomationGuard::with_config(config)
+                    .map_err(|error| CompileError::Invalid(error.to_string()))?,
+            );
+        }
+    }
+
+    // 12. code_execution -> CodeExecutionGuard
+    if let Some(ce) = &rules.code_execution {
+        if ce.enabled {
+            let config = compile_code_execution_rule(ce);
+            builder.add(
+                chio_guards::CodeExecutionGuard::with_config(config)
+                    .map_err(|error| CompileError::Invalid(error.to_string()))?,
+            );
+        }
+    }
+
     Ok(())
+}
+
+fn compile_computer_use_rule(rule: &ComputerUseRule) -> ComputerUseConfig {
+    let mode = match rule.mode {
+        ComputerUseMode::Observe => EnforcementMode::Observe,
+        ComputerUseMode::Guardrail => EnforcementMode::Guardrail,
+        ComputerUseMode::FailClosed => EnforcementMode::FailClosed,
+    };
+    ComputerUseConfig {
+        enabled: true,
+        allowed_action_types: rule.allowed_actions.clone(),
+        mode,
+        ..ComputerUseConfig::default()
+    }
+}
+
+fn compile_remote_desktop_rule(rule: &RemoteDesktopChannelsRule) -> RemoteDesktopSideChannelConfig {
+    // HushSpec `remote_desktop_channels` carries per-channel toggles for
+    // clipboard / file_transfer / audio / drive_mapping. It does not
+    // currently model session_share, printing, or transfer size, so we
+    // leave those at the guard's defaults (enabled / no limit).
+    RemoteDesktopSideChannelConfig {
+        enabled: true,
+        clipboard_enabled: rule.clipboard,
+        file_transfer_enabled: rule.file_transfer,
+        audio_enabled: rule.audio,
+        drive_mapping_enabled: rule.drive_mapping,
+        ..RemoteDesktopSideChannelConfig::default()
+    }
+}
+
+fn compile_input_injection_rule(rule: &InputInjectionRule) -> InputInjectionCapabilityConfig {
+    InputInjectionCapabilityConfig {
+        enabled: true,
+        allowed_input_types: rule.allowed_types.clone(),
+        require_postcondition_probe: rule.require_postcondition_probe,
+        ..InputInjectionCapabilityConfig::default()
+    }
+}
+
+fn compile_browser_automation_rule(
+    rule: &crate::models::BrowserAutomationRule,
+) -> chio_guards::BrowserAutomationConfig {
+    chio_guards::BrowserAutomationConfig {
+        enabled: true,
+        allowed_domains: rule.allowed_domains.clone(),
+        blocked_domains: rule.blocked_domains.clone(),
+        allowed_verbs: rule.allowed_verbs.clone(),
+        credential_detection: rule.credential_detection,
+        extra_credential_patterns: rule.extra_credential_patterns.clone(),
+    }
+}
+
+fn compile_code_execution_rule(
+    rule: &crate::models::CodeExecutionRule,
+) -> chio_guards::CodeExecutionConfig {
+    let mut config = chio_guards::CodeExecutionConfig {
+        enabled: true,
+        language_allowlist: rule.language_allowlist.clone(),
+        module_denylist: rule.module_denylist.clone(),
+        network_access: rule.network_access,
+        max_execution_time_ms: rule.max_execution_time_ms,
+        ..chio_guards::CodeExecutionConfig::default()
+    };
+    if let Some(bytes) = rule.max_scan_bytes {
+        config.max_scan_bytes = bytes;
+    }
+    config
 }
 
 // ---------------------------------------------------------------------------
@@ -648,7 +767,7 @@ fn compile_tool_constraints(
 
 /// Translate a `VelocityRule` into optional `VelocityConfig` +
 /// `AgentVelocityConfig`. If no invocation / spend / agent / session limit
-/// is set, returns `(None, None)` — i.e. the guard is effectively a no-op
+/// is set, returns `(None, None)` - i.e. the guard is effectively a no-op
 /// and no guard is pushed onto the pipeline. Wave 1.6 semantics.
 fn compile_velocity_rule(
     rule: &VelocityRule,
@@ -863,6 +982,94 @@ rules:
                 .contains("invalid egress allowlist pattern"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn compile_computer_use_preserves_empty_allowed_actions() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  computer_use:
+    enabled: true
+    mode: fail_closed
+    allowed_actions: []
+"#,
+        )
+        .unwrap();
+        let rule = spec.rules.as_ref().unwrap().computer_use.as_ref().unwrap();
+        let config = compile_computer_use_rule(rule);
+        assert!(config.allowed_action_types.is_empty());
+        assert_eq!(config.mode, EnforcementMode::FailClosed);
+    }
+
+    #[test]
+    fn compile_input_injection_preserves_empty_allowed_types() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  input_injection:
+    enabled: true
+    allowed_types: []
+"#,
+        )
+        .unwrap();
+        let rule = spec
+            .rules
+            .as_ref()
+            .unwrap()
+            .input_injection
+            .as_ref()
+            .unwrap();
+        let config = compile_input_injection_rule(rule);
+        assert!(config.allowed_input_types.is_empty());
+    }
+
+    #[test]
+    fn compile_browser_automation_preserves_empty_allowed_verbs() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  browser_automation:
+    enabled: true
+    allowed_verbs: []
+"#,
+        )
+        .unwrap();
+        let rule = spec
+            .rules
+            .as_ref()
+            .unwrap()
+            .browser_automation
+            .as_ref()
+            .unwrap();
+        let config = compile_browser_automation_rule(rule);
+        assert!(config.allowed_verbs.is_empty());
+    }
+
+    #[test]
+    fn compile_code_execution_preserves_empty_module_denylist() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  code_execution:
+    enabled: true
+    module_denylist: []
+"#,
+        )
+        .unwrap();
+        let rule = spec
+            .rules
+            .as_ref()
+            .unwrap()
+            .code_execution
+            .as_ref()
+            .unwrap();
+        let config = compile_code_execution_rule(rule);
+        assert!(config.module_denylist.is_empty());
     }
 
     #[test]

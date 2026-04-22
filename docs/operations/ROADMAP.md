@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**73 of 73 numbered phases shipped** on `project/full-roadmap`. 🎉 Entire roadmap executed end-to-end. Every phase group complete — Phase 0 (DX), Phase 1 (structural security), Phase 2 (types), Phase 3 (content safety + HITL), Phase 4 (code agent), Phase 5 (guard absorption), Phase 6 (framework SDKs), Phase 7 (data guards), Phase 8 (code exec), Phase 9 (service mesh), Phase 10 (orchestration), Phase 11 (content/streaming/iac), Phase 12 (observability), Phase 13 (external guards), Phase 14 (portable kernel), Phase 15 (compliance), Phase 16 (economics), Phase 17 (workflow orchestrators), Phase 18 (memory), Phase 19 (regulatory), Phase 20 (capstone). Plus adjacent
+**73 of 73 numbered phases shipped** on `project/full-roadmap`. 🎉 Entire roadmap executed end-to-end. Every phase group complete - Phase 0 (DX), Phase 1 (structural security), Phase 2 (types), Phase 3 (content safety + HITL), Phase 4 (code agent), Phase 5 (guard absorption), Phase 6 (framework SDKs), Phase 7 (data guards), Phase 8 (code exec), Phase 9 (service mesh), Phase 10 (orchestration), Phase 11 (content/streaming/iac), Phase 12 (observability), Phase 13 (external guards), Phase 14 (portable kernel), Phase 15 (compliance), Phase 16 (economics), Phase 17 (workflow orchestrators), Phase 18 (memory), Phase 19 (regulatory), Phase 20 (capstone). Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 

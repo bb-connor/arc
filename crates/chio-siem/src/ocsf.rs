@@ -379,8 +379,12 @@ mod tests {
 
     fn test_receipt(id: &str, decision: Decision) -> ChioReceipt {
         let kp = Keypair::generate();
-        let action = ToolCallAction::from_parameters(serde_json::json!({"path": "/etc/passwd"}))
-            .expect("hash receipt parameters");
+        let action = match ToolCallAction::from_parameters(serde_json::json!({
+            "path": "/etc/passwd"
+        })) {
+            Ok(action) => action,
+            Err(error) => panic!("hash receipt parameters: {error}"),
+        };
         let body = ChioReceiptBody {
             id: id.to_string(),
             timestamp: 1_712_345_678,

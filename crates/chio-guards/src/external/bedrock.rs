@@ -7,7 +7,7 @@
 //!
 //! See: <https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ApplyGuardrail.html>
 //!
-//! All HTTP traffic is expected to go through the [`AsyncGuardAdapter`] —
+//! All HTTP traffic is expected to go through the [`AsyncGuardAdapter`] -
 //! this module exposes the single-attempt [`ExternalGuard::eval`] surface
 //! and does not embed retry/caching/rate-limiting of its own. The adapter
 //! composes a [`reqwest::Client`] internally so that the underlying
@@ -160,7 +160,7 @@ struct ApplyGuardrailResponse {
     /// `NONE` or `GUARDRAIL_INTERVENED`.
     #[serde(default)]
     action: String,
-    /// Opaque assessment records — captured verbatim for evidence.
+    /// Opaque assessment records - captured verbatim for evidence.
     #[serde(default)]
     assessments: Vec<serde_json::Value>,
 }

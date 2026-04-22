@@ -89,25 +89,24 @@ fn walk_json_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), LoadErro
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
 
-    fn unique_dir(prefix: &str) -> PathBuf {
+    fn unique_dir(prefix: &str) -> Result<PathBuf, LoadError> {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
+            .map_err(std::io::Error::other)?
             .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+        Ok(std::env::temp_dir().join(format!("{prefix}-{nonce}")))
     }
 
     #[test]
-    fn loads_scenarios_and_results_from_json_directories() {
-        let dir = unique_dir("chio-conformance-load");
-        fs::create_dir_all(dir.join("scenarios")).expect("create scenarios dir");
-        fs::create_dir_all(dir.join("results")).expect("create results dir");
+    fn loads_scenarios_and_results_from_json_directories() -> Result<(), LoadError> {
+        let dir = unique_dir("chio-conformance-load")?;
+        fs::create_dir_all(dir.join("scenarios"))?;
+        fs::create_dir_all(dir.join("results"))?;
 
         fs::write(
             dir.join("scenarios/initialize.json"),
@@ -124,8 +123,7 @@ mod tests {
               "tags": ["wave1"],
               "expected": "pass"
             }"#,
-        )
-        .expect("write scenario");
+        )?;
         fs::write(
             dir.join("results/results.json"),
             r#"[{
@@ -140,15 +138,15 @@ mod tests {
               "durationMs": 12,
               "assertions": [{"name": "initialize_succeeds", "status": "pass"}]
             }]"#,
-        )
-        .expect("write results");
+        )?;
 
-        let scenarios = load_scenarios_from_dir(dir.join("scenarios")).expect("load scenarios");
-        let results = load_results_from_dir(dir.join("results")).expect("load results");
+        let scenarios = load_scenarios_from_dir(dir.join("scenarios"))?;
+        let results = load_results_from_dir(dir.join("results"))?;
 
         assert_eq!(scenarios.len(), 1);
         assert_eq!(results.len(), 1);
         assert_eq!(scenarios[0].id, "initialize");
         assert_eq!(results[0].peer, "js");
+        Ok(())
     }
 }

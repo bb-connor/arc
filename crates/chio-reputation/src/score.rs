@@ -1,4 +1,4 @@
-/// Compute the local Phase 1 reputation scorecard for one agent.
+/// Compute the local reputation scorecard for one agent.
 #[must_use]
 pub fn compute_local_scorecard(
     subject_key: &str,
@@ -265,4 +265,3 @@ fn compute_least_privilege(
         capabilities_observed: weighted_scores.len(),
     }
 }
-

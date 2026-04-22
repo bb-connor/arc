@@ -8,5 +8,5 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-cargo test -p chio-bindings-core
+cargo test -p chio-binding-helpers
 npm --prefix packages/sdk/chio-ts test

@@ -158,8 +158,8 @@ spec:
             # Kubernetes expects an int32 here, not a YAML octal literal.
             defaultMode: 256
 ---
-# Placeholder ConfigMap shipped with the example. Replace with your own
-# kernel.yaml / policy.yaml before applying to a non-demo cluster.
+# Sample ConfigMap shipped with the example. Replace kernel.yaml and
+# policy.yaml before applying to a non-demo cluster.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -199,8 +199,8 @@ metadata:
 type: Opaque
 stringData:
   capability-authority-url: "http://localhost:9192/capabilities"
-  # Replace with a real Ed25519 signing key (base64). This placeholder is
-  # obviously non-secret so demo clusters do not fail to start.
+  # Replace with a real Ed25519 signing key (base64). This demo value is
+  # intentionally non-secret so example clusters do not fail to start.
   signing-key: "REPLACE_WITH_ED25519_SIGNING_KEY"
 ---
 apiVersion: v1

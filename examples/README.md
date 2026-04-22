@@ -116,7 +116,7 @@ hello-<surface>/
 
 ## Adjunct Candidates
 
-The next small examples should avoid reopening placeholder sprawl. The strongest next adjuncts are federation-aware follow-ons rather than more placeholders.
+The next small examples should avoid broadening the matrix with thin variants. The strongest follow-ons are federation-aware surfaces that add a distinct protocol path.
 
 ## Relationship To `agent-commerce-network`
 

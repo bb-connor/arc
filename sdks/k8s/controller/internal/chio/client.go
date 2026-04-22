@@ -15,9 +15,9 @@ import (
 //
 // The sidecar exposes three endpoints that the Job controller cares about:
 //
-//   - POST {base}/v1/capabilities/mint      — mint a capability grant
-//   - POST {base}/v1/capabilities/release   — release a capability grant
-//   - POST {base}/v1/receipts               — submit a JobReceipt
+//   - POST {base}/v1/capabilities/mint      - mint a capability grant
+//   - POST {base}/v1/capabilities/release   - release a capability grant
+//   - POST {base}/v1/receipts               - submit a JobReceipt
 //
 // The client is deliberately small: no retries, no backoff. Retry and
 // backoff policy is driven by the reconciler so that it composes with

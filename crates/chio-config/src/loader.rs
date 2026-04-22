@@ -49,6 +49,13 @@ adapters:
 "#
     }
 
+    fn load_error(result: Result<ChioConfig, ConfigError>) -> ConfigError {
+        match result {
+            Ok(_) => panic!("expected config load error"),
+            Err(error) => error,
+        }
+    }
+
     #[test]
     fn load_minimal_yaml() {
         let config =
@@ -150,7 +157,7 @@ adapters:
     protocol: "openapi"
     upstream: "http://localhost:8000"
 "#;
-        let err = load_from_str(yaml).unwrap_err();
+        let err = load_error(load_from_str(yaml));
         assert!(
             matches!(err, ConfigError::Parse(_)),
             "should be parse error: {err}"
@@ -165,7 +172,7 @@ adapters:
     protocol: "openapi"
     upstream: "http://localhost:8000"
 "#;
-        let err = load_from_str(yaml).unwrap_err();
+        let err = load_error(load_from_str(yaml));
         assert!(
             matches!(err, ConfigError::Parse(_)),
             "should be parse error: {err}"
@@ -192,7 +199,7 @@ adapters:
     #[test]
     fn load_from_nonexistent_file() {
         let path = Path::new("/tmp/chio_config_nonexistent_12345.yaml");
-        let err = load_from_file(path).unwrap_err();
+        let err = load_error(load_from_file(path));
         assert!(
             matches!(err, ConfigError::Io(_)),
             "should be IO error: {err}"
@@ -206,7 +213,7 @@ adapters:
 kernel:
   signing_key: "generate"
 "#;
-        let err = load_from_str(yaml).unwrap_err();
+        let err = load_error(load_from_str(yaml));
         assert!(
             matches!(err, ConfigError::Validation(_)),
             "should be validation error: {err}"

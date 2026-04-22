@@ -636,8 +636,10 @@ mod tests {
 
     #[test]
     fn disabled_detection_returns_the_base_evaluation_unchanged() {
-        let mut config = DetectionConfig::default();
-        config.enabled = false;
+        let config = DetectionConfig {
+            enabled: false,
+            ..DetectionConfig::default()
+        };
 
         let result = evaluate_with_detection(
             &allow_tool_spec(),

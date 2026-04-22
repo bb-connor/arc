@@ -16,11 +16,14 @@ use chio_core::capability::MonetaryAmount;
 use chio_core::crypto::{Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
+/// Supported Chio tool-manifest schema identifier.
+pub const TOOL_MANIFEST_SCHEMA: &str = "chio.manifest.v1";
+
 /// A signed declaration of the tools a Chio tool server provides.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolManifest {
-    /// Schema version. Always `"chio.manifest.v1"`.
+    /// Schema version. Must equal [`TOOL_MANIFEST_SCHEMA`].
     pub schema: String,
 
     /// The server's unique identifier.
@@ -168,7 +171,7 @@ pub enum ManifestError {
 /// Validate that a manifest is well-formed (no duplicate tool names, at least
 /// one tool, supported schema version).
 pub fn validate_manifest(manifest: &ToolManifest) -> Result<(), ManifestError> {
-    if manifest.schema != "chio.manifest.v1" {
+    if manifest.schema != TOOL_MANIFEST_SCHEMA {
         return Err(ManifestError::UnsupportedSchema(manifest.schema.clone()));
     }
     if manifest.tools.is_empty() {
@@ -221,7 +224,7 @@ mod tests {
 
     fn sample_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".into(),
+            schema: TOOL_MANIFEST_SCHEMA.into(),
             server_id: "srv-hello".into(),
             name: "Hello Tool Server".into(),
             description: Some("A demo tool server".into()),

@@ -40,7 +40,7 @@ Supported pricing models:
 
 ## Native Rust Example
 
-The maintained native example in [`examples/hello-tool`](../examples/hello-tool) now publishes pricing directly from `NativeTool`:
+The maintained native example in [`examples/hello-tool`](../../examples/hello-tool) now publishes pricing directly from `NativeTool`:
 
 ```rust
 use chio_mcp_adapter::NativeTool;
@@ -197,4 +197,4 @@ exist yet.
 ## Related Docs
 
 - [MONETARY_BUDGETS_GUIDE.md](MONETARY_BUDGETS_GUIDE.md)
-- [`examples/hello-tool/README.md`](../examples/hello-tool/README.md)
+- [`examples/hello-tool/README.md`](../../examples/hello-tool/README.md)

@@ -4,7 +4,7 @@
 //! `../clawdstrike/crates/libs/clawdstrike/src/async_guards/threat_intel/virustotal.rs`
 //! with the following deviations:
 //!
-//! * The Chio `ExternalGuard` surface is synchronous-in-decision — we
+//! * The Chio `ExternalGuard` surface is synchronous-in-decision - we
 //!   return [`Verdict`] directly rather than the ClawdStrike `warn/block`
 //!   tri-state. Below-threshold detections surface as `Allow`; the
 //!   existing adapter `tracing::warn!`s the suspicious-but-not-blocked

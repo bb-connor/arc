@@ -148,7 +148,7 @@ python3 - <<'PY' \
   "${work_dir}/anthropic.json" \
   "${work_dir}/langchain.json" \
   "${work_dir}/openai.json" \
-  "${repo_root}/docs/PROGRESSIVE_TUTORIAL.md"
+  "${repo_root}/docs/start-here/PROGRESSIVE_TUTORIAL.md"
 from pathlib import Path
 import json
 import sys

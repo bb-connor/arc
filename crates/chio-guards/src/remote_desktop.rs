@@ -1,4 +1,4 @@
-//! RemoteDesktopSideChannelGuard — per-channel enable/disable with
+//! RemoteDesktopSideChannelGuard - per-channel enable/disable with
 //! transfer-size limits for remote desktop / RDP / VNC style sessions.
 //!
 //! Roadmap phase 5.3.  Ported from ClawdStrike's
@@ -21,7 +21,7 @@
 //! - `max_transfer_size_bytes`: when set, `remote.file_transfer` actions
 //!   must include a `transfer_size` / `transferSize` `u64` argument.
 //!   Missing, non-integer, or oversized values are denied.
-//! - **Unknown `remote.*` channels are denied** — the default branch is
+//! - **Unknown `remote.*` channels are denied** - the default branch is
 //!   fail-closed so new side channels are not silently permitted.
 //!
 //! Session-lifecycle actions (`remote.session.connect`,

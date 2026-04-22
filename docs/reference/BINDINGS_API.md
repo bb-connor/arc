@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Freeze the initial `chio-bindings-core` boundary so SDK work can proceed without turning the bindings layer into a second runtime.
+Freeze the initial `chio-binding-helpers` boundary so SDK work can proceed without turning the bindings layer into a second runtime.
 
 This document is intentionally small. It describes the current contract that SDKs may rely on during the SDK parity roadmap.
 
 ## Scope
 
-`chio-bindings-core` is the bindings-friendly Rust facade for deterministic invariant logic only.
+`chio-binding-helpers` is the bindings-friendly Rust facade for deterministic invariant logic only.
 
 It is allowed to own:
 

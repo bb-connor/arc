@@ -42,7 +42,7 @@ try {
 - `@chio-protocol/sdk/invariants` exposes canonical JSON, hashing, signing,
   receipt, capability, and manifest helpers.
 
-The full public reference lives in [docs/SDK_TYPESCRIPT_REFERENCE.md](../../../docs/SDK_TYPESCRIPT_REFERENCE.md).
+The full public reference lives in [docs/reference/SDK_TYPESCRIPT_REFERENCE.md](../../../docs/reference/SDK_TYPESCRIPT_REFERENCE.md).
 
 ## Official Example
 

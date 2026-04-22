@@ -371,13 +371,13 @@ impl JailbreakDetector {
             + model.w_zero_width * x_zw;
         let ml_score = sigmoid(z).clamp(0.0, 1.0);
 
-        // TODO(v2): host-function-driven LLM judge.  A fourth layer that hands
+        // Deferred host-function-driven judge layer: a fourth layer would hand
         // `canonical` to a caller-provided async judge returning a `[0.0,1.0]`
-        // score we then blend into the final verdict.  Deferred because the
-        // Chio `Guard` trait is synchronous, and a judge would require either
-        // a host-function reactor (see chio-wasm-guards) or an async trait
-        // adapter through `AsyncGuardAdapter`.  The `LlmJudgeStub` type below
-        // documents the intended shape.
+        // score we then blend into the final verdict. The Chio `Guard` trait is
+        // synchronous today, so this requires either a host-function reactor
+        // (see chio-wasm-guards) or an async trait adapter through
+        // `AsyncGuardAdapter`. The `LlmJudgeStub` type below documents the
+        // intended shape.
 
         // ---- Blend the three layers ----
         let weights = self.config.layer_weights;

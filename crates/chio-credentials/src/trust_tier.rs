@@ -1,4 +1,4 @@
-//! Phase 20.1 -- trust-tier synthesis for Agent Passports.
+//! Trust-tier synthesis for Agent Passports.
 //!
 //! Collapses the compliance score from `chio_kernel::compliance_score`
 //! and the behavioral-anomaly signal from

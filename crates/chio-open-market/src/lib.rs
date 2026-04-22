@@ -1904,7 +1904,6 @@ mod tests {
 
     #[test]
     fn build_open_market_fee_schedule_artifact_uses_request_issued_at() {
-        let signing_keypair = Keypair::from_seed(&[7_u8; 32]);
         let owner_id = "https://registry.chio.example";
         let mut request = OpenMarketFeeScheduleIssueRequest {
             scope: OpenMarketEconomicsScope {
@@ -1960,7 +1959,6 @@ mod tests {
         )
         .expect("build changed fee schedule");
         assert_ne!(artifact.fee_schedule_id, changed.fee_schedule_id);
-        let _ = signing_keypair;
     }
 
     #[test]

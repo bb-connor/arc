@@ -1,4 +1,4 @@
-//! SpiderSense embedding detector — cosine-similarity anomaly detection.
+//! SpiderSense embedding detector - cosine-similarity anomaly detection.
 //!
 //! Roadmap phase 5.4.  Ported from ClawdStrike's `spider_sense.rs` sync
 //! detector and wrapped in Chio's synchronous [`chio_kernel::Guard`] trait.
@@ -274,7 +274,7 @@ impl SpiderSenseGuard {
             }
             seen += 1;
             if seen >= self.top_k {
-                // We keep scanning — top_k is informational, not a cap on
+                // We keep scanning - top_k is informational, not a cap on
                 // work, because the DB is typically small.  Break only
                 // when the scan has observed at least top_k entries; we
                 // still want the maximum across the full DB.

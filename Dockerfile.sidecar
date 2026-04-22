@@ -1,19 +1,5 @@
 # syntax=docker/dockerfile:1.7
-#
-# Minimal runtime image for the Chio sidecar binary.
-#
-# Build:
-#   docker build -f Dockerfile.sidecar -t chio-sidecar:local .
-#
-# Run:
-#   docker run --rm -p 8939:8939 chio-sidecar:local <subcommand> [args...]
-#
-# There is no useful zero-argument default: the `chio` subcommands require
-# operator input (policy path, wrapped MCP server command, etc.). The
-# image therefore defaults CMD to `--help` so `docker run <image>` prints
-# usage instead of crashing at startup. Production deployments MUST
-# override CMD (or the compose/k8s `args`) with a real subcommand, e.g.
-# `chio mcp serve-http --policy /etc/chio/policy.yaml --server-id my-tool`.
+# Chio sidecar image. See deploy/SIDECAR_BUILD_GUIDE.md for build/run/deployment details.
 
 ARG RUST_VERSION=1.93
 ARG ALPINE_VERSION=3.22

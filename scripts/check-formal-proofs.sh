@@ -42,7 +42,7 @@ from pathlib import Path
 repo = Path(".")
 manifest_path = repo / "formal" / "proof-manifest.toml"
 inventory_path = repo / "formal" / "theorem-inventory.json"
-claim_registry_path = repo / "docs" / "CLAIM_REGISTRY.md"
+claim_registry_path = repo / "docs" / "reference" / "CLAIM_REGISTRY.md"
 
 def parse_string(value):
     return json.loads(value)
@@ -254,7 +254,7 @@ if shadowing_abbrevs:
     raise SystemExit(f"Lean abbrevs shadow approved axioms: {', '.join(shadowing_abbrevs)}")
 
 if not claim_registry_path.exists():
-    raise SystemExit("claim registry missing: docs/CLAIM_REGISTRY.md")
+    raise SystemExit("claim registry missing: docs/reference/CLAIM_REGISTRY.md")
 PY
 
 echo "formal proof check passed"

@@ -1,4 +1,4 @@
-//! Cross-kernel trust establishment via mTLS-style handshake (Phase 20.3).
+//! Cross-kernel trust establishment via mTLS-style handshake.
 //!
 //! Two kernels bootstrap mutual trust by exchanging signed challenges and
 //! pinning each other's kernel signing public keys. Once pinned, the

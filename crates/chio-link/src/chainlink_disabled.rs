@@ -2,16 +2,15 @@ use crate::config::{ChainlinkNetworkConfig, PairConfig};
 use crate::{OracleBackend, OracleBackendKind, OracleFuture, PriceOracleError};
 
 pub struct ChainlinkFeedReader {
-    // Kept so the disabled backend preserves the same constructor/config shape
-    // as the web3-enabled implementation.
-    #[allow(dead_code)]
-    networks: Vec<ChainlinkNetworkConfig>,
+    _networks: Vec<ChainlinkNetworkConfig>,
 }
 
 impl ChainlinkFeedReader {
     #[must_use]
     pub fn new(networks: Vec<ChainlinkNetworkConfig>) -> Self {
-        Self { networks }
+        Self {
+            _networks: networks,
+        }
     }
 }
 

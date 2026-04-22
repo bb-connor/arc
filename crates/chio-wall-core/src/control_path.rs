@@ -493,6 +493,22 @@ fn ensure_fail_closed(field: &'static str, value: bool) -> Result<(), ChioWallCo
 mod tests {
     use super::*;
 
+    fn assert_valid(result: Result<(), ChioWallContractError>, context: &str) {
+        if let Err(error) = result {
+            panic!("{context}: {error}");
+        }
+    }
+
+    fn validation_error(
+        result: Result<(), ChioWallContractError>,
+        context: &str,
+    ) -> ChioWallContractError {
+        match result {
+            Ok(()) => panic!("{context}"),
+            Err(error) => error,
+        }
+    }
+
     fn sample_profile() -> ChioWallControlProfile {
         ChioWallControlProfile {
             schema: CHIO_WALL_CONTROL_PROFILE_SCHEMA.to_string(),
@@ -609,16 +625,14 @@ mod tests {
 
     #[test]
     fn control_profile_validates() {
-        sample_profile().validate().expect("profile validates");
+        assert_valid(sample_profile().validate(), "profile validates");
     }
 
     #[test]
     fn control_profile_rejects_same_domain_boundary() {
         let mut profile = sample_profile();
         profile.protected_domain = ChioWallInformationDomain::Research;
-        let error = profile
-            .validate()
-            .expect_err("same source/protected domain rejected");
+        let error = validation_error(profile.validate(), "same source/protected domain rejected");
         assert!(error.to_string().contains("must differ"));
     }
 
@@ -629,7 +643,7 @@ mod tests {
             "research_news.read".to_string(),
             "research_news.read".to_string(),
         ];
-        let error = snapshot.validate().expect_err("duplicate tool rejected");
+        let error = validation_error(snapshot.validate(), "duplicate tool rejected");
         assert!(error.to_string().contains("duplicate tool name"));
     }
 
@@ -637,9 +651,7 @@ mod tests {
     fn policy_snapshot_rejects_empty_allowed_tool_entries() {
         let mut snapshot = sample_policy_snapshot();
         snapshot.allowed_tools = vec!["research_news.read".to_string(), "   ".to_string()];
-        let error = snapshot
-            .validate()
-            .expect_err("empty allowlist entry rejected");
+        let error = validation_error(snapshot.validate(), "empty allowlist entry rejected");
         assert!(error.to_string().contains("must not contain empty values"));
     }
 
@@ -647,9 +659,7 @@ mod tests {
     fn authorization_context_rejects_same_domain_request() {
         let mut context = sample_authorization_context();
         context.requested_domain = ChioWallInformationDomain::Research;
-        let error = context
-            .validate()
-            .expect_err("same-domain request rejected");
+        let error = validation_error(context.validate(), "same-domain request rejected");
         assert!(error.to_string().contains("must differ"));
     }
 
@@ -659,7 +669,7 @@ mod tests {
         outcome
             .allowed_tools
             .push("execution_oms.submit_order".to_string());
-        let error = outcome.validate().expect_err("invalid denial rejected");
+        let error = validation_error(outcome.validate(), "invalid denial rejected");
         assert!(error.to_string().contains("cannot deny"));
     }
 
@@ -668,18 +678,17 @@ mod tests {
         let mut outcome = sample_denied_outcome();
         outcome.decision = ChioWallGuardDecision::Allow;
         outcome.reason = "operator explicitly allowed bounded workflow".to_string();
-        outcome
-            .validate()
-            .expect("allow outcome remains structurally valid");
+        assert_valid(
+            outcome.validate(),
+            "allow outcome remains structurally valid",
+        );
     }
 
     #[test]
     fn denied_access_record_rejects_same_domain_request() {
         let mut record = sample_denied_access_record();
         record.requested_domain = ChioWallInformationDomain::Research;
-        let error = record
-            .validate()
-            .expect_err("same-domain denied access rejected");
+        let error = validation_error(record.validate(), "same-domain denied access rejected");
         assert!(error.to_string().contains("must differ"));
     }
 
@@ -687,16 +696,15 @@ mod tests {
     fn buyer_review_package_requires_fail_closed_and_non_empty_files() {
         let mut review = sample_buyer_review_package();
         review.control_package_file = " ".to_string();
-        let error = review
-            .validate()
-            .expect_err("empty file path should fail validation");
+        let error = validation_error(review.validate(), "empty file path should fail validation");
         assert!(error.to_string().contains("control_package_file"));
 
         let mut review = sample_buyer_review_package();
         review.fail_closed = false;
-        let error = review
-            .validate()
-            .expect_err("fail_closed=false should fail validation");
+        let error = validation_error(
+            review.validate(),
+            "fail_closed=false should fail validation",
+        );
         assert!(error.to_string().contains("must remain true"));
     }
 
@@ -707,7 +715,7 @@ mod tests {
             artifact_kind: ChioWallArtifactKind::ControlProfile,
             relative_path: "control-profile-copy.json".to_string(),
         });
-        let error = package.validate().expect_err("duplicate artifact rejected");
+        let error = validation_error(package.validate(), "duplicate artifact rejected");
         assert!(error.to_string().contains("duplicate artifact kind"));
     }
 
@@ -715,9 +723,10 @@ mod tests {
     fn control_package_requires_non_empty_artifact_paths() {
         let mut package = sample_control_package();
         package.artifacts[0].relative_path = " ".to_string();
-        let error = package
-            .validate()
-            .expect_err("empty artifact path should fail validation");
+        let error = validation_error(
+            package.validate(),
+            "empty artifact path should fail validation",
+        );
         assert!(error.to_string().contains("relative_path"));
     }
 }

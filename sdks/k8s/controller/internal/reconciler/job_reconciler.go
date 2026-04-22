@@ -109,7 +109,7 @@ type JobReconciler struct {
 
 	// attempts tracks retry counts keyed by (Job UID, phase) so receipt
 	// submission retries do NOT consume the release retry budget (and
-	// vice versa) — a flaky release path would otherwise exhaust
+	// vice versa) - a flaky release path would otherwise exhaust
 	// MaxAttempts before the first SubmitReceipt runs and land the Job
 	// in ChioReceiptDropped without ever attempting the receipt.
 	// attemptsMu guards concurrent access from multiple Reconcile workers
@@ -152,7 +152,7 @@ func NewJobReconciler(c client.Client, scheme *runtime.Scheme, chio ChioClient, 
 // carry the governed label, or (b) they still hold our finalizer. The
 // finalizer branch is load-bearing: if the governed label is removed from a
 // previously-governed Job, deletion events still need to reach Reconcile so
-// the Chio finalizer + capability can be cleaned up — otherwise the Job can be
+// the Chio finalizer + capability can be cleaned up; otherwise the Job can be
 // stuck terminating forever. Pods owned by a governed Job are watched so
 // receipt annotations trigger reconciliation while the Job is still running.
 func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {

@@ -174,7 +174,6 @@ fn find_matrix_value(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use crate::{
         AssertionOutcome, AssertionResult, DeploymentMode, PeerRole, RequiredCapabilities,

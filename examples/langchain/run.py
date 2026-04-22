@@ -48,7 +48,7 @@ def main() -> None:
         tools = tools_result.get("result", {}).get("tools", [])
         capability_id = session_capability_id(base_url, auth_token, session.session_id)
 
-        def echo_via_arc(message: str) -> str:
+        def echo_via_chio(message: str) -> str:
             """Call the Chio-governed echo_text tool and return its text payload."""
 
             result = session.call_tool("echo_text", {"message": message}).get("result", {})
@@ -60,7 +60,7 @@ def main() -> None:
             )
 
         tool = StructuredTool.from_function(
-            func=echo_via_arc,
+            func=echo_via_chio,
             name="chio_echo_text",
             description="Invoke the Chio-governed echo_text MCP tool",
             args_schema=EchoInput,

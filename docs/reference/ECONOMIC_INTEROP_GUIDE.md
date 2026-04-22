@@ -26,7 +26,7 @@ That separation prevents silent widening of billing scope or delegated
 authority through reporting artifacts.
 
 The normative enterprise-facing mapping over that projection is now documented
-in [CHIO_OAUTH_AUTHORIZATION_PROFILE.md](standards/CHIO_OAUTH_AUTHORIZATION_PROFILE.md).
+in [CHIO_OAUTH_AUTHORIZATION_PROFILE.md](../standards/CHIO_OAUTH_AUTHORIZATION_PROFILE.md).
 Chio still treats signed governed receipts as the source of truth; the profile
 only explains how those receipts project into OAuth-family authorization
 details and transaction context.

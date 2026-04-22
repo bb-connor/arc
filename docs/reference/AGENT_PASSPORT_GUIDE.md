@@ -373,7 +373,7 @@ When this flag is enabled:
 - output includes `passportLifecycle` plus human-readable `passportReasons`
   describing the lifecycle denial
 
-See [examples/policies/passport-verifier.yaml](/Users/connor/Medica/backbay/standalone/chio/examples/policies/passport-verifier.yaml).
+See [examples/policies/passport-verifier.yaml](../../examples/policies/passport-verifier.yaml).
 
 ## Reusable Verifier Policy Artifacts
 

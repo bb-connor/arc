@@ -1,5 +1,5 @@
 [package]
-name = "chio-bindings-core"
+name = "chio-binding-helpers"
 description = "Bindings-friendly invariant helpers for Chio SDKs"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [lib]
-name = "chio_bindings_core"
+name = "chio_binding_helpers"
 
 [dependencies]
 serde = { workspace = true }

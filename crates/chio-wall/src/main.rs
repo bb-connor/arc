@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 mod commands;
 
-/// Chio-Wall -- companion-product control-path tooling on top of Chio.
+/// Chio-Wall control-path tooling on top of Chio.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {

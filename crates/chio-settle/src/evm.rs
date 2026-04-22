@@ -294,14 +294,10 @@ pub struct EvmBondSnapshot {
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcEnvelope {
-    // Retained so deserialization keeps enforcing the standard JSON-RPC shape
-    // even though the current client only consumes the payload branches.
-    #[allow(dead_code)]
-    jsonrpc: String,
-    // Retained so deserialization keeps enforcing the standard JSON-RPC shape
-    // even though the current client only consumes the payload branches.
-    #[allow(dead_code)]
-    id: u64,
+    #[serde(rename = "jsonrpc")]
+    _jsonrpc: String,
+    #[serde(rename = "id")]
+    _id: u64,
     result: Option<Value>,
     error: Option<JsonRpcError>,
 }

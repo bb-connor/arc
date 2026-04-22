@@ -9,13 +9,13 @@ pub fn canonicalize_json_str(input: &str) -> Result<String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::canonicalize_json_str;
 
     #[test]
-    fn canonicalize_json_string_input() {
-        let canonical = canonicalize_json_str(r#"{"z":1,"a":2}"#).unwrap();
+    fn canonicalize_json_string_input() -> crate::Result<()> {
+        let canonical = canonicalize_json_str(r#"{"z":1,"a":2}"#)?;
         assert_eq!(canonical, r#"{"a":2,"z":1}"#);
+        Ok(())
     }
 }

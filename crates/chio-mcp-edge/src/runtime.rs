@@ -3240,6 +3240,5 @@ impl ChioMcpEdge {
 }
 
 #[cfg(test)]
-#[cfg(test)]
 #[path = "runtime/runtime_tests.rs"]
 mod runtime_tests;
