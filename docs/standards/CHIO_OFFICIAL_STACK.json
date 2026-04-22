@@ -84,7 +84,7 @@
         "chio.kernel.resource_provider",
         "chio.kernel.prompt_provider"
       ],
-      "crate_path": "crates/chio-mcp-adapter/src/native.rs::NativeArcService",
+      "crate_path": "crates/chio-mcp-adapter/src/native.rs::NativeChioService",
       "implementation_source": "first_party"
     },
     {

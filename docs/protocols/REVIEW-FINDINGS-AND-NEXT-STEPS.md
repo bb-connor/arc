@@ -92,10 +92,10 @@ PyPI. Publish `@chio-protocol/node-http` to npm. Automated CI publishing.
 
 ### 2.2 No Testing Without the Kernel (HIGH)
 
-No `MockArcClient`, no `allow_all()` test fixture, no dry-run mode.
+No `MockChioClient`, no `allow_all()` test fixture, no dry-run mode.
 Every SDK call requires a running Rust binary.
 
-**Fix:** Ship `chio_sdk.testing` module with `MockArcClient` that returns
+**Fix:** Ship `chio_sdk.testing` module with `MockChioClient` that returns
 configurable verdicts without network calls.
 
 ### 2.3 No 5-Minute Quickstart for Python/TS Devs (HIGH)
@@ -243,7 +243,7 @@ Based on all six reviews, the coverage map priorities should shift:
 | Human-in-the-loop protocol | P2 | **P0** | Needed by 6/10 production patterns |
 | PyPI/npm publishing | Not listed | **P0** | Single largest adoption blocker |
 | `chio-code-agent` adapter | P1 (desktop scoping) | **P0** | Best-covered pattern, fastest onboarding |
-| MockArcClient / test fixtures | Not listed | **P0** | Blocks all framework integration work |
+| MockChioClient / test fixtures | Not listed | **P0** | Blocks all framework integration work |
 | Pre-built binary distribution | Not listed | **P1** | Blocks quickstart without Rust toolchain |
 | TOCTOU fix (execution nonces) | Not listed | **P1** | Structural security gap |
 | WASM guard module signing | Not listed | **P1** | Running unsigned code in policy path |

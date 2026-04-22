@@ -101,19 +101,19 @@ roadmap phase.
 
 **Acceptance**: `npm install @chio-protocol/node-http` works.
 
-### 0.3 MockArcClient for Testing [SHIPPED 788f69c]
+### 0.3 MockChioClient for Testing [SHIPPED 788f69c]
 
 **What**: Ship test fixtures so developers can write unit tests without
 a running sidecar.
 
 **Files**:
-- `sdks/python/chio-sdk-python/src/chio_sdk/testing.py` (new: `MockArcClient`, `allow_all()`, `deny_all()`, `with_policy()`)
+- `sdks/python/chio-sdk-python/src/chio_sdk/testing.py` (new: `MockChioClient`, `allow_all()`, `deny_all()`, `with_policy()`)
 - `sdks/python/chio-sdk-python/tests/test_mock_client.py` (new)
 - `sdks/typescript/packages/node-http/src/testing.ts` (new)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 2
 
-**Acceptance**: A pytest test using `MockArcClient` passes without any
+**Acceptance**: A pytest test using `MockChioClient` passes without any
 sidecar process running.
 
 ### 0.4 Pre-Built Binary Distribution [SHIPPED c9650f9]
@@ -574,7 +574,7 @@ functions the WASM module can call.
 ## Phase 6: Agent Framework SDKs
 
 > **Goal**: Ship working packages for the top 4 agent frameworks.
-> **Depends on**: Phase 0 (publishing, MockArcClient), Phase 2 (type extensions).
+> **Depends on**: Phase 0 (publishing, MockChioClient), Phase 2 (type extensions).
 > **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md`
 
 ### 6.1 chio-crewai (Highest Priority) [SHIPPED dfcb780]

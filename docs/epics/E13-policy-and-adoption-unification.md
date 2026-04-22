@@ -4,7 +4,7 @@
 
 Complete.
 
-The supported YAML path now exposes all shipped guards, including `tool_access`, `secret_patterns`, and `patch_integrity`. The canonical authoring path is now explicit for new work: HushSpec is the recommended policy format. The repo now also ships an initial native authoring surface through `NativeArcServiceBuilder` plus a maintained migration guide, canonical HushSpec example, and native example crate.
+The supported YAML path now exposes all shipped guards, including `tool_access`, `secret_patterns`, and `patch_integrity`. The canonical authoring path is now explicit for new work: HushSpec is the recommended policy format. The repo now also ships an initial native authoring surface through `NativeChioServiceBuilder` plus a maintained migration guide, canonical HushSpec example, and native example crate.
 
 ## Suggested issue title
 

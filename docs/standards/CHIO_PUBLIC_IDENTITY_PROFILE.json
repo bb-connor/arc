@@ -54,8 +54,8 @@
     }
   ],
   "bindingPolicy": {
-    "requiresArcSubjectProvenance": true,
-    "requiresArcIssuerProvenance": true,
+    "requiresChioSubjectProvenance": true,
+    "requiresChioIssuerProvenance": true,
     "requiresSameSubjectAcrossCredentials": true,
     "manualSubjectRebindingRequired": true,
     "unsupportedMappingsFailClosed": true

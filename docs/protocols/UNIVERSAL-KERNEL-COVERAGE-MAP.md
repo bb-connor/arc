@@ -15,7 +15,7 @@
 > precedence**. Key changes:
 > - Human-in-the-loop: P2 -> **P0** (needed by 6/10 production patterns)
 > - Package publishing (PyPI/npm): unlisted -> **P0** (adoption blocker)
-> - MockArcClient / test fixtures: unlisted -> **P0** (blocks framework work)
+> - MockChioClient / test fixtures: unlisted -> **P0** (blocks framework work)
 > - chio-code-agent adapter: P1 -> **P0** (best onboarding path)
 > - TOCTOU execution nonces: unlisted -> **P1** (structural security gap)
 > - Emergency kill switch: unlisted -> **P1** (no global circuit breaker)

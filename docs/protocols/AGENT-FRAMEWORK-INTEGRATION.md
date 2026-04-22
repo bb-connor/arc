@@ -714,7 +714,7 @@ using Chio.Protocol.SemanticKernel;
 using Microsoft.SemanticKernel;
 
 var kernel = Kernel.CreateBuilder()
-    .AddArcCapability(new ChioConfig
+    .AddChioCapability(new ChioConfig
     {
         SidecarUrl = "http://127.0.0.1:9090",
         CapabilityId = "cap-agent-001",
@@ -822,7 +822,7 @@ sdks/dotnet/Chio.Protocol.SemanticKernel/
     ChioFunctionFilter.cs     # IFunctionInvocationFilter implementation
     ChioPlanFilter.cs          # Plan-level evaluation
     ChioConfig.cs              # Configuration
-    KernelBuilderExtensions.cs # .AddArcCapability() extension
+    KernelBuilderExtensions.cs # .AddChioCapability() extension
   tests/
     FunctionFilterTests.cs
     PlanEvaluationTests.cs

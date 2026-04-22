@@ -27,7 +27,7 @@ HushSpec is the only documented policy authoring path for new Chio deployments.
 
 1. Keep the same policy intent, but move policy authoring to HushSpec.
 2. Start from the wrapped path you already have with `chio mcp serve` or `chio mcp serve-http`.
-3. Replace the wrapped subprocess with a native service built through `NativeArcServiceBuilder`.
+3. Replace the wrapped subprocess with a native service built through `NativeChioServiceBuilder`.
 4. Register that native service with the kernel and expose it through the same edge surface you already use.
 
 That lets a team migrate one server at a time without changing the trust, receipt, or guard model around it.
@@ -36,7 +36,7 @@ That lets a team migrate one server at a time without changing the trust, receip
 
 `chio-mcp-adapter` now ships a small higher-level native service builder:
 
-- `NativeArcServiceBuilder`
+- `NativeChioServiceBuilder`
 - `NativeTool`
 - `NativeResource`
 - `NativePrompt`
@@ -60,7 +60,7 @@ not change:
 
 ## Example
 
-The maintained example is [examples/hello-tool](/Users/connor/Medica/backbay/standalone/chio/examples/hello-tool), which now uses `NativeArcServiceBuilder` instead of hand-assembling only a manifest.
+The maintained example is [examples/hello-tool](/Users/connor/Medica/backbay/standalone/chio/examples/hello-tool), which now uses `NativeChioServiceBuilder` instead of hand-assembling only a manifest.
 
 The flow is:
 

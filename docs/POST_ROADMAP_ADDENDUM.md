@@ -451,7 +451,7 @@ the enriched Rust contract is visible to users.
 ### 25.2 TypeScript Testing Parity
 
 **What**: Add a TypeScript testing surface comparable to Python's
-`MockArcClient`.
+`MockChioClient`.
 
 **Files**:
 - `packages/sdk/chio-ts/src/testing.ts`
