@@ -62,7 +62,6 @@ fn ensure_chio_binary(repo_root: &PathBuf) {
 }
 
 #[test]
-#[ignore = "flaky on CI: nested cargo build failure under MSRV toolchain"]
 fn wave4_notification_harness_runs_against_live_js_and_python_peers() {
     if !command_available("node") || !python3_supports_chio_sdk() {
         return;
