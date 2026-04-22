@@ -62,6 +62,10 @@ pub fn validate(spec: &HushSpec) -> ValidationResult {
             && rules.computer_use.is_none()
             && rules.remote_desktop_channels.is_none()
             && rules.input_injection.is_none()
+            && rules.browser_automation.is_none()
+            && rules.code_execution.is_none()
+            && rules.velocity.is_none()
+            && rules.human_in_loop.is_none()
         {
             warnings.push("no rules configured".to_string());
         }
@@ -633,6 +637,44 @@ mod tests {
             "expected warning containing {needle:?}, got: {:?}",
             result.warnings
         );
+    }
+
+    fn assert_warning_absent(result: &ValidationResult, needle: &str) {
+        assert!(
+            result
+                .warnings
+                .iter()
+                .all(|warning| !warning.contains(needle)),
+            "expected no warning containing {needle:?}, got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn browser_and_code_rules_count_as_configured_rules() {
+        let browser_only = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  browser_automation:
+    enabled: true
+"#,
+        )
+        .unwrap();
+        let result = validate(&browser_only);
+        assert_warning_absent(&result, "no rules configured");
+
+        let code_only = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  code_execution:
+    enabled: true
+"#,
+        )
+        .unwrap();
+        let result = validate(&code_only);
+        assert_warning_absent(&result, "no rules configured");
     }
 
     #[test]

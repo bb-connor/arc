@@ -386,16 +386,11 @@ fn compile_input_injection_rule(rule: &InputInjectionRule) -> InputInjectionCapa
 fn compile_browser_automation_rule(
     rule: &crate::models::BrowserAutomationRule,
 ) -> chio_guards::BrowserAutomationConfig {
-    let allowed_verbs = if rule.allowed_verbs.is_empty() {
-        chio_guards::browser_automation_default_allowed_verbs()
-    } else {
-        rule.allowed_verbs.clone()
-    };
     chio_guards::BrowserAutomationConfig {
         enabled: true,
         allowed_domains: rule.allowed_domains.clone(),
         blocked_domains: rule.blocked_domains.clone(),
-        allowed_verbs,
+        allowed_verbs: rule.allowed_verbs.clone(),
         credential_detection: rule.credential_detection,
         extra_credential_patterns: rule.extra_credential_patterns.clone(),
     }
@@ -407,13 +402,11 @@ fn compile_code_execution_rule(
     let mut config = chio_guards::CodeExecutionConfig {
         enabled: true,
         language_allowlist: rule.language_allowlist.clone(),
+        module_denylist: rule.module_denylist.clone(),
         network_access: rule.network_access,
         max_execution_time_ms: rule.max_execution_time_ms,
         ..chio_guards::CodeExecutionConfig::default()
     };
-    if !rule.module_denylist.is_empty() {
-        config.module_denylist = rule.module_denylist.clone();
-    }
     if let Some(bytes) = rule.max_scan_bytes {
         config.max_scan_bytes = bytes;
     }
@@ -1031,6 +1024,52 @@ rules:
             .unwrap();
         let config = compile_input_injection_rule(rule);
         assert!(config.allowed_input_types.is_empty());
+    }
+
+    #[test]
+    fn compile_browser_automation_preserves_empty_allowed_verbs() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  browser_automation:
+    enabled: true
+    allowed_verbs: []
+"#,
+        )
+        .unwrap();
+        let rule = spec
+            .rules
+            .as_ref()
+            .unwrap()
+            .browser_automation
+            .as_ref()
+            .unwrap();
+        let config = compile_browser_automation_rule(rule);
+        assert!(config.allowed_verbs.is_empty());
+    }
+
+    #[test]
+    fn compile_code_execution_preserves_empty_module_denylist() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  code_execution:
+    enabled: true
+    module_denylist: []
+"#,
+        )
+        .unwrap();
+        let rule = spec
+            .rules
+            .as_ref()
+            .unwrap()
+            .code_execution
+            .as_ref()
+            .unwrap();
+        let config = compile_code_execution_rule(rule);
+        assert!(config.module_denylist.is_empty());
     }
 
     #[test]
