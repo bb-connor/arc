@@ -1213,7 +1213,6 @@ fn certify_registry_discover_reports_per_operator_public_state() {
 }
 
 #[test]
-#[ignore = "flaky on CI: trust-service handshake timing; passes locally"]
 fn certify_registry_publish_network_and_remote_discover_work() {
     let scenarios_dir = unique_path("chio-certify-network-publish-scenarios", "");
     let results_dir = unique_path("chio-certify-network-publish-results", "");
