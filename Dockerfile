@@ -14,7 +14,7 @@ COPY examples/hello-tool ./examples/hello-tool
 COPY formal/diff-tests ./formal/diff-tests
 COPY tests/e2e ./tests/e2e
 
-RUN cargo build --locked -p chio-cli --bin chio
+RUN cargo build --release --locked -p chio-cli --bin chio
 
 FROM node:${NODE_VERSION}-alpine AS dashboard-builder
 WORKDIR /workspace/crates/chio-cli/dashboard
@@ -33,7 +33,7 @@ RUN npm run build
 
 FROM alpine:${ALPINE_VERSION} AS chio
 RUN apk add --no-cache ca-certificates libgcc libstdc++
-COPY --from=rust-builder /workspace/target/debug/chio /usr/local/bin/chio
+COPY --from=rust-builder /workspace/target/release/chio /usr/local/bin/chio
 ENTRYPOINT ["chio"]
 CMD ["--help"]
 
