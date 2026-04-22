@@ -71,3 +71,4 @@ tests/conformance/reports/generated/
 *.pyc
 *.pyo
 *.pyd
+.codex_agent_runs/
