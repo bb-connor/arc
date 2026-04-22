@@ -103,7 +103,7 @@ The default path should never require native compilation just to talk to a remot
 
 ```text
 crates/
-  chio-bindings-core/
+  chio-binding-helpers/
   chio-bindings-ffi/
   chio-bindings-wasm/
 
@@ -122,7 +122,7 @@ packages/
 
 ## Crate Responsibilities
 
-### `crates/chio-bindings-core`
+### `crates/chio-binding-helpers`
 
 Purpose:
 
@@ -424,7 +424,7 @@ Optional native bridge:
 
 ## What Must Not Go Into Bindings Core
 
-The following should stay out of `chio-bindings-core` in the first rollout:
+The following should stay out of `chio-binding-helpers` in the first rollout:
 
 - full session state machines
 - remote HTTP clients
@@ -456,7 +456,7 @@ Exit criteria:
 - the team can answer "is this SDK behavior parity or invariant parity?"
 - every proposed binding entrypoint has an owning test class
 
-## Phase 1: `chio-bindings-core`
+## Phase 1: `chio-binding-helpers`
 
 Objective:
 
@@ -464,7 +464,7 @@ Objective:
 
 Deliverables:
 
-- `crates/chio-bindings-core`
+- `crates/chio-binding-helpers`
 - vector generator tests
 - stable JSON fixtures under `tests/bindings/vectors/`
 
@@ -557,7 +557,7 @@ Exit criteria:
 
 Tasks:
 
-- add `crates/chio-bindings-core`
+- add `crates/chio-binding-helpers`
 - define a bindings-safe error model
 - add vector generation tests
 - write a short `BINDINGS_API.md` if the surface grows beyond a few modules
@@ -605,7 +605,7 @@ Tasks:
 
 ## Recommended Immediate Next Moves
 
-1. Add `crates/chio-bindings-core` with only canonical JSON, hashing, signature, receipt, capability, and manifest helpers.
+1. Add `crates/chio-binding-helpers` with only canonical JSON, hashing, signature, receipt, capability, and manifest helpers.
 2. Add `tests/bindings/vectors/` and generate the first canonical JSON, hash, and receipt verification fixtures from Rust.
 3. Scaffold `packages/sdk/chio-ts` and route the existing JS peer through it for remote HTTP coverage.
 4. After the TS package shape stabilizes, scaffold `packages/sdk/chio-py` plus a minimal PyO3 module.
