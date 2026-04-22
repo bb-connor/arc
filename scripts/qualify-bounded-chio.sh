@@ -41,7 +41,7 @@ checks = [
         ],
     ),
     (
-        "docs/COMPETITIVE_LANDSCAPE.md",
+        "docs/reference/COMPETITIVE_LANDSCAPE.md",
         [
             "proven in Lean 4",
             "making stolen tokens useless",
