@@ -1,8 +1,8 @@
 /**
- * @arc-protocol/ai-sdk
+ * @chio-protocol/ai-sdk
  *
- * Vercel AI SDK wrapper for the ARC protocol. Provides `arcTool()` which
- * evaluates each tool invocation through the ARC sidecar before delegating
+ * Vercel AI SDK wrapper for the Chio protocol. Provides `chioTool()` which
+ * evaluates each tool invocation through the Chio sidecar before delegating
  * to the underlying `execute`. Streaming return values (`ReadableStream`,
  * async generators) pass through unchanged.
  *
@@ -10,9 +10,9 @@
  * ```ts
  * import { streamText, tool } from "ai";
  * import { z } from "zod";
- * import { arcTool } from "@arc-protocol/ai-sdk";
+ * import { chioTool } from "@chio-protocol/ai-sdk";
  *
- * const searchTool = arcTool({
+ * const searchTool = chioTool({
  *   description: "Search the web",
  *   parameters: z.object({ query: z.string() }),
  *   execute: async ({ query }) => runSearch(query),
@@ -28,21 +28,21 @@
  */
 
 export {
-  arcTool,
-  type ArcToolOptions,
-  type ArcToolScope,
+  chioTool,
+  type ChioToolOptions,
+  type ChioToolScope,
   type CapabilityTokenResolver,
   type ToolLike,
   type ToolExecuteOptions,
-} from "./arc-tool.js";
+} from "./chio-tool.js";
 export {
-  ArcClient,
-  ArcClientError,
+  ChioClient,
+  ChioClientError,
   resolveSidecarUrl,
-  type ArcClientOptions,
-  type ArcDecision,
-  type ArcEvaluateToolCallRequest,
-  type ArcReceipt,
-  type ArcVerdict,
+  type ChioClientOptions,
+  type ChioDecision,
+  type ChioEvaluateToolCallRequest,
+  type ChioReceipt,
+  type ChioVerdict,
 } from "./client.js";
-export { ArcToolError, type ArcToolErrorVerdict } from "./errors.js";
+export { ChioToolError, type ChioToolErrorVerdict } from "./errors.js";

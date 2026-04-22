@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import http, { type IncomingHttpHeaders } from "node:http";
 import { describe, it, expect } from "vitest";
 import {
-  buildArcHttpRequest,
+  buildChioHttpRequest,
   interceptNodeRequest,
   interceptWebRequest,
   resolveConfig,
@@ -36,7 +36,7 @@ async function startMockSidecar(
   onEvaluate?: (body: string) => void,
 ): Promise<{ server: http.Server; url: string }> {
   const server = http.createServer((req, res) => {
-    if (req.method === "POST" && req.url === "/arc/evaluate") {
+    if (req.method === "POST" && req.url === "/chio/evaluate") {
       const chunks: Buffer[] = [];
       req.on("data", (chunk: Buffer) => chunks.push(chunk));
       req.on("end", () => {
@@ -47,7 +47,7 @@ async function startMockSidecar(
       return;
     }
 
-    if (req.method === "GET" && req.url === "/arc/health") {
+    if (req.method === "GET" && req.url === "/chio/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "healthy", version: "1.0.0" }));
       return;
@@ -112,8 +112,8 @@ async function request(
   });
 }
 
-describe("buildArcHttpRequest", () => {
-  it("creates a valid ArcHttpRequest", () => {
+describe("buildChioHttpRequest", () => {
+  it("creates a valid ChioHttpRequest", () => {
     const opts: BuildRequestOptions = {
       method: "GET",
       path: "/pets/42",
@@ -134,7 +134,7 @@ describe("buildArcHttpRequest", () => {
       capabilityId: undefined,
     };
 
-    const req = buildArcHttpRequest(opts);
+    const req = buildChioHttpRequest(opts);
 
     expect(req.method).toBe("GET");
     expect(req.path).toBe("/pets/42");
@@ -155,7 +155,7 @@ describe("buildArcHttpRequest", () => {
       headers: {
         "content-type": "application/json",
         authorization: "Bearer secret",
-        "x-arc-capability": "{\"id\":\"cap-123\"}",
+        "x-chio-capability": "{\"id\":\"cap-123\"}",
         "x-custom-header": "should-not-appear",
       },
       caller: {
@@ -169,10 +169,10 @@ describe("buildArcHttpRequest", () => {
       capabilityId: "cap-123",
     };
 
-    const req = buildArcHttpRequest(opts);
+    const req = buildChioHttpRequest(opts);
 
     expect(req.headers["content-type"]).toBe("application/json");
-    expect(req.headers["x-arc-capability"]).toBeUndefined();
+    expect(req.headers["x-chio-capability"]).toBeUndefined();
     // Authorization should NOT be forwarded (not in allowed set)
     expect(req.headers["authorization"]).toBeUndefined();
     // Custom headers should NOT be forwarded
@@ -287,10 +287,10 @@ describe("request body preservation", () => {
       expect(outcome.result).toBeNull();
       expect(outcome.passthrough).toEqual({
         mode: "allow_without_receipt",
-        error: "arc_sidecar_unreachable",
+        error: "chio_sidecar_unreachable",
         message: expect.stringContaining("sidecar"),
       });
-      expect(res.getHeader("X-Arc-Receipt-Id")).toBeUndefined();
+      expect(res.getHeader("X-Chio-Receipt-Id")).toBeUndefined();
       res.writeHead(204);
       res.end();
     });
@@ -299,7 +299,7 @@ describe("request body preservation", () => {
     try {
       const response = await request(server, "GET", "/health");
       expect(response.status).toBe(204);
-      expect(response.headers["x-arc-receipt-id"]).toBeUndefined();
+      expect(response.headers["x-chio-receipt-id"]).toBeUndefined();
     } finally {
       server.close();
     }
@@ -321,9 +321,9 @@ describe("request body preservation", () => {
     expect(result).toBeNull();
     expect(passthrough).toEqual({
       mode: "allow_without_receipt",
-      error: "arc_sidecar_unreachable",
+      error: "chio_sidecar_unreachable",
       message: expect.stringContaining("sidecar"),
     });
-    expect(response.headers.get("X-Arc-Receipt-Id")).toBeNull();
+    expect(response.headers.get("X-Chio-Receipt-Id")).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
-# @arc-protocol/ai-sdk
+# @chio-protocol/ai-sdk
 
 Streaming-safe wrapper around the [Vercel AI SDK](https://sdk.vercel.ai/)
-`tool()` helper that routes every tool invocation through the ARC sidecar
+`tool()` helper that routes every tool invocation through the Chio sidecar
 for capability-based policy evaluation.
 
 - Gates tool calls at the `execute` entry point before any side effects.
@@ -13,10 +13,10 @@ for capability-based policy evaluation.
 ## Install
 
 ```bash
-npm install @arc-protocol/ai-sdk
+npm install @chio-protocol/ai-sdk
 ```
 
-Requires the ARC sidecar running locally (default
+Requires the Chio sidecar running locally (default
 `http://127.0.0.1:9090`). Peer dependencies: `ai@>=3.4 <6`,
 `zod@>=3.23 <4`.
 
@@ -26,9 +26,9 @@ Requires the ARC sidecar running locally (default
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
-import { arcTool } from "@arc-protocol/ai-sdk";
+import { chioTool } from "@chio-protocol/ai-sdk";
 
-const searchTool = arcTool({
+const searchTool = chioTool({
   description: "Search the web",
   parameters: z.object({
     query: z.string().describe("search query"),
@@ -39,7 +39,7 @@ const searchTool = arcTool({
   scope: {
     toolServer: "web-tools",
     toolName: "search",
-    capabilityToken: process.env.ARC_CAPABILITY_TOKEN!,
+    capabilityToken: process.env.CHIO_CAPABILITY_TOKEN!,
   },
 });
 
@@ -54,19 +54,19 @@ for await (const chunk of result.textStream) {
 }
 ```
 
-If the sidecar denies the call, `execute` throws `ArcToolError`. The
+If the sidecar denies the call, `execute` throws `ChioToolError`. The
 Vercel AI SDK surfaces the error through its standard `onError` /
 `result.error` channels.
 
 ## Streaming example
 
-`arcTool` never buffers the value returned from the underlying
+`chioTool` never buffers the value returned from the underlying
 `execute`. You can return a `ReadableStream` or an async generator and
 the caller (or the Vercel AI SDK streaming pipeline) receives the exact
 same object reference.
 
 ```ts
-const streamingTool = arcTool({
+const streamingTool = chioTool({
   description: "Stream rows from a warehouse query",
   parameters: z.object({ sql: z.string() }),
   execute: async ({ sql }) => {
@@ -78,7 +78,7 @@ const streamingTool = arcTool({
 ```
 
 ```ts
-const progressiveTool = arcTool({
+const progressiveTool = chioTool({
   description: "Yield partial results as they arrive",
   parameters: z.object({ topic: z.string() }),
   execute: async function* ({ topic }) {
@@ -93,17 +93,17 @@ const progressiveTool = arcTool({
 
 ## API
 
-### `arcTool(options)`
+### `chioTool(options)`
 
 | Option            | Type                                  | Description                                                             |
 | ----------------- | ------------------------------------- | ----------------------------------------------------------------------- |
 | `description`     | `string`                              | Forwarded to the Vercel AI SDK tool.                                    |
 | `parameters`      | `ZodSchema`                           | Input schema (AI SDK v3/v4 shape).                                      |
 | `inputSchema`     | `ZodSchema`                           | Input schema (AI SDK v5 shape).                                         |
-| `execute`         | `(params, options?) => T`             | Underlying tool implementation; called when ARC allows the call.        |
-| `scope`           | `ArcToolScope`                        | ARC evaluation binding (`toolServer`, `toolName`, `capabilityToken`, ...). |
-| `client`          | `ArcClient`                           | Optional shared client.                                                 |
-| `clientOptions`   | `ArcClientOptions`                    | Inline client options (`sidecarUrl`, `timeoutMs`, `fetch`, `debug`).    |
+| `execute`         | `(params, options?) => T`             | Underlying tool implementation; called when Chio allows the call.        |
+| `scope`           | `ChioToolScope`                        | Chio evaluation binding (`toolServer`, `toolName`, `capabilityToken`, ...). |
+| `client`          | `ChioClient`                           | Optional shared client.                                                 |
+| `clientOptions`   | `ChioClientOptions`                    | Inline client options (`sidecarUrl`, `timeoutMs`, `fetch`, `debug`).    |
 | `onSidecarError`  | `"deny"` \| `"allow"`                 | Default `"deny"` -- throw on transport failure.                         |
 | `debug`           | `(message, data?) => void`            | Optional debug hook; the wrapper never writes to stdout.                |
 | `resolveCapabilityToken` | `(capabilityId) => token`       | Optional resolver when `scope.capabilityId` is only an indirection key. |
@@ -111,23 +111,23 @@ const progressiveTool = arcTool({
 Returns a tool object with the same structural shape as the input so it
 drops directly into `streamText({ tools: { ... } })`.
 
-`scope.capabilityId` is only a request hint. ARC deny-by-default sidecar
+`scope.capabilityId` is only a request hint. Chio deny-by-default sidecar
 evaluation still requires a signed capability token to be presented via
 `scope.capabilityToken` or `resolveCapabilityToken`.
 
-### `ArcToolError`
+### `ChioToolError`
 
 Thrown when the sidecar denies a tool call or the transport fails in
 fail-closed mode. Fields: `verdict`, `guard`, `reason`, `receiptId`.
 
-### `ArcClient`
+### `ChioClient`
 
-Minimal HTTP client for `POST /arc/evaluate`. Can be shared across many
-`arcTool()` instances to amortize construction cost. The client builds an
-`ArcHttpRequest`-compatible payload for tool calls, accepts the sidecar's
+Minimal HTTP client for `POST /chio/evaluate`. Can be shared across many
+`chioTool()` instances to amortize construction cost. The client builds an
+`ChioHttpRequest`-compatible payload for tool calls, accepts the sidecar's
 canonical `EvaluateResponse { verdict, receipt, evidence }` shape, and
 still normalizes the Lambda evaluator's legacy `{ receipt_id, decision }`
-wire contract into the same `ArcReceipt` API.
+wire contract into the same `ChioReceipt` API.
 
 ## License
 

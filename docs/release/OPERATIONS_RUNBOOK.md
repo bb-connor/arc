@@ -1,10 +1,10 @@
 # Operations Runbook
 
 This runbook covers the supported self-hosted operator surfaces for the current
-bounded ARC release candidate:
+bounded Chio release candidate:
 
-- `arc trust serve` for the trust-control plane
-- `arc mcp serve-http` for a hosted remote MCP edge
+- `chio trust serve` for the trust-control plane
+- `chio mcp serve-http` for a hosted remote MCP edge
 - the receipt dashboard served from the trust-control process
 
 It is intentionally pragmatic and assumes one service owner is operating local
@@ -58,7 +58,7 @@ Clustered deployments additionally require:
 
 Required:
 
-- `arc mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
+- `chio mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
 
 Recommended persistent state:
 
@@ -86,12 +86,12 @@ Bounded hosted/auth recommendation:
 
 Hosted session lifecycle tuning now uses these canonical env names:
 
-- `ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS`
-- `ARC_MCP_SESSION_DRAIN_GRACE_MILLIS`
-- `ARC_MCP_SESSION_REAPER_INTERVAL_MILLIS`
-- `ARC_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS`
+- `CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS`
+- `CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS`
+- `CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS`
+- `CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS`
 
-Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
+Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
 
 ## 2. Initial Deployment Procedure
 
@@ -100,33 +100,33 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
 1. Create a dedicated state directory, for example:
 
    ```bash
-   mkdir -p /var/lib/arc /etc/arc
+   mkdir -p /var/lib/chio /etc/chio
    ```
 
-2. Place policy and registry files under `/etc/arc` and SQLite state under
-   `/var/lib/arc`.
+2. Place policy and registry files under `/etc/chio` and SQLite state under
+   `/var/lib/chio`.
 
 3. Start the service:
 
    ```bash
-   arc trust serve \
+   chio trust serve \
      --listen 127.0.0.1:8940 \
-     --service-token "$ARC_SERVICE_TOKEN" \
-     --receipt-db /var/lib/arc/receipts.sqlite3 \
-     --revocation-db /var/lib/arc/revocations.sqlite3 \
-     --authority-db /var/lib/arc/authority.sqlite3 \
-     --budget-db /var/lib/arc/budgets.sqlite3 \
-     --enterprise-providers-file /etc/arc/enterprise-providers.json \
-     --verifier-policies-file /etc/arc/verifier-policies.json \
-     --verifier-challenge-db /var/lib/arc/verifier-challenges.sqlite3 \
-     --certification-registry-file /etc/arc/certifications.json
+     --service-token "$CHIO_SERVICE_TOKEN" \
+     --receipt-db /var/lib/chio/receipts.sqlite3 \
+     --revocation-db /var/lib/chio/revocations.sqlite3 \
+     --authority-db /var/lib/chio/authority.sqlite3 \
+     --budget-db /var/lib/chio/budgets.sqlite3 \
+     --enterprise-providers-file /etc/chio/enterprise-providers.json \
+     --verifier-policies-file /etc/chio/verifier-policies.json \
+     --verifier-challenge-db /var/lib/chio/verifier-challenges.sqlite3 \
+     --certification-registry-file /etc/chio/certifications.json
    ```
 
 4. Verify service readiness:
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $ARC_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    ```
 
@@ -135,16 +135,16 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
 1. Start the wrapped edge with persistent state and explicit admin auth:
 
    ```bash
-   arc mcp serve-http \
+   chio mcp serve-http \
      --policy examples/policies/canonical-hushspec.yaml \
      --server-id demo-server \
      --listen 127.0.0.1:8931 \
-     --auth-token "$ARC_EDGE_TOKEN" \
-     --admin-token "$ARC_ADMIN_TOKEN" \
-     --receipt-db /var/lib/arc/edge-receipts.sqlite3 \
-     --revocation-db /var/lib/arc/edge-revocations.sqlite3 \
-     --authority-db /var/lib/arc/edge-authority.sqlite3 \
-     --session-db /var/lib/arc/edge-sessions.sqlite3 \
+     --auth-token "$CHIO_EDGE_TOKEN" \
+     --admin-token "$CHIO_ADMIN_TOKEN" \
+     --receipt-db /var/lib/chio/edge-receipts.sqlite3 \
+     --revocation-db /var/lib/chio/edge-revocations.sqlite3 \
+     --authority-db /var/lib/chio/edge-authority.sqlite3 \
+     --session-db /var/lib/chio/edge-sessions.sqlite3 \
      -- \
      python3 tests/conformance/fixtures/wave1/mock_mcp_server.py
    ```
@@ -152,15 +152,15 @@ Legacy `ARC_MCP_SESSION_*` aliases still work for one compatibility cycle.
 2. Initialize one session and confirm the admin diagnostics surface:
 
    ```bash
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
 ### Dashboard
 
-The dashboard is served by `arc trust serve` from `crates/arc-cli/dashboard/dist`.
+The dashboard is served by `chio trust serve` from `crates/chio-cli/dashboard/dist`.
 Build it before deployment:
 
 ```bash
@@ -184,7 +184,7 @@ Run the production qualification lane from the repo root:
 For the ship-facing bounded release gate specifically:
 
 ```bash
-./scripts/qualify-bounded-arc.sh
+./scripts/qualify-bounded-chio.sh
 ./scripts/qualify-trust-control.sh
 ```
 
@@ -193,9 +193,9 @@ Minimum deploy-time smoke checks:
 ```bash
 ./scripts/check-release-inputs.sh
 ./scripts/check-dashboard-release.sh
-./scripts/check-arc-ts-release.sh
-./scripts/check-arc-py-release.sh
-./scripts/check-arc-go-release.sh
+./scripts/check-chio-ts-release.sh
+./scripts/check-chio-py-release.sh
+./scripts/check-chio-go-release.sh
 ```
 
 ### Launch And Partner Evidence Handoff
@@ -210,8 +210,8 @@ Before promoting a candidate outside the operator boundary, archive and attach:
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 - [RELEASE_AUDIT.md](RELEASE_AUDIT.md)
 - [PARTNER_PROOF.md](PARTNER_PROOF.md)
-- [ARC_RECEIPTS_PROFILE.md](../standards/ARC_RECEIPTS_PROFILE.md)
-- [ARC_PORTABLE_TRUST_PROFILE.md](../standards/ARC_PORTABLE_TRUST_PROFILE.md)
+- [CHIO_RECEIPTS_PROFILE.md](../standards/CHIO_RECEIPTS_PROFILE.md)
+- [CHIO_PORTABLE_TRUST_PROFILE.md](../standards/CHIO_PORTABLE_TRUST_PROFILE.md)
 
 Do not promote from local qualification evidence alone. Hosted `CI` and
 `Release Qualification` workflow results are still required before external
@@ -225,28 +225,28 @@ authoritative backups.
 Back up SQLite state:
 
 ```bash
-sqlite3 /var/lib/arc/receipts.sqlite3 ".backup '/var/backups/arc/receipts.sqlite3'"
-sqlite3 /var/lib/arc/revocations.sqlite3 ".backup '/var/backups/arc/revocations.sqlite3'"
-sqlite3 /var/lib/arc/authority.sqlite3 ".backup '/var/backups/arc/authority.sqlite3'"
-sqlite3 /var/lib/arc/budgets.sqlite3 ".backup '/var/backups/arc/budgets.sqlite3'"
-sqlite3 /var/lib/arc/verifier-challenges.sqlite3 ".backup '/var/backups/arc/verifier-challenges.sqlite3'"
-sqlite3 /var/lib/arc/edge-sessions.sqlite3 ".backup '/var/backups/arc/edge-sessions.sqlite3'"
+sqlite3 /var/lib/chio/receipts.sqlite3 ".backup '/var/backups/chio/receipts.sqlite3'"
+sqlite3 /var/lib/chio/revocations.sqlite3 ".backup '/var/backups/chio/revocations.sqlite3'"
+sqlite3 /var/lib/chio/authority.sqlite3 ".backup '/var/backups/chio/authority.sqlite3'"
+sqlite3 /var/lib/chio/budgets.sqlite3 ".backup '/var/backups/chio/budgets.sqlite3'"
+sqlite3 /var/lib/chio/verifier-challenges.sqlite3 ".backup '/var/backups/chio/verifier-challenges.sqlite3'"
+sqlite3 /var/lib/chio/edge-sessions.sqlite3 ".backup '/var/backups/chio/edge-sessions.sqlite3'"
 ```
 
 Back up file-backed registries and policies:
 
 ```bash
-cp /etc/arc/enterprise-providers.json /var/backups/arc/
-cp /etc/arc/verifier-policies.json /var/backups/arc/
-cp /etc/arc/certifications.json /var/backups/arc/
-cp /etc/arc/*.yaml /var/backups/arc/
+cp /etc/chio/enterprise-providers.json /var/backups/chio/
+cp /etc/chio/verifier-policies.json /var/backups/chio/
+cp /etc/chio/certifications.json /var/backups/chio/
+cp /etc/chio/*.yaml /var/backups/chio/
 ```
 
 Record the binary version and git commit used for the backup snapshot.
 
 ## 5. Restore Procedure
 
-1. Stop the affected `arc trust serve` or `arc mcp serve-http` process.
+1. Stop the affected `chio trust serve` or `chio mcp serve-http` process.
 2. Restore the SQLite files into the exact paths expected by the service.
 3. Restore the file-backed registries and policies.
 4. Restart the process with the same command-line arguments used before the
@@ -255,11 +255,11 @@ Record the binary version and git commit used for the backup snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $ARC_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
@@ -269,28 +269,28 @@ Record the binary version and git commit used for the backup snapshot.
 2. Build or obtain the exact candidate binary set.
 3. Take backups using the backup procedure above.
 4. Stop write traffic or drain external callers.
-5. Stop the running ARC processes.
+5. Stop the running Chio processes.
 6. Replace the binary with the qualified candidate.
-7. Restart `arc trust serve` first, then any dependent `arc mcp serve-http`
+7. Restart `chio trust serve` first, then any dependent `chio mcp serve-http`
    edges.
 8. Run post-upgrade smoke checks:
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $ARC_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/internal/cluster/status | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
-   curl -s -H "Authorization: Bearer $ARC_ADMIN_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
 9. If SDK artifacts are being published with the same release, run:
 
    ```bash
-   ./scripts/check-arc-ts-release.sh
-   ./scripts/check-arc-py-release.sh
-   ./scripts/check-arc-go-release.sh
+   ./scripts/check-chio-ts-release.sh
+   ./scripts/check-chio-py-release.sh
+   ./scripts/check-chio-go-release.sh
    ```
 
 ## 7. Rollback Procedure

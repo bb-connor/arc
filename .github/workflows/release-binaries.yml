@@ -16,8 +16,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  BINARY_NAME: arc
-  CARGO_PACKAGE: arc-cli
+  BINARY_NAME: chio
+  CARGO_PACKAGE: chio-cli
 
 jobs:
   build:
@@ -74,7 +74,7 @@ jobs:
           rustup target add "${{ matrix.target }}"
 
       - name: Install protoc
-        # arc-envoy-ext-authz's build.rs invokes tonic-build at compile
+        # chio-envoy-ext-authz's build.rs invokes tonic-build at compile
         # time. ci.yml installs protoc on every lane; the release build
         # needs the same tool or every native (non-cross) job will fail
         # on Linux / macOS / Windows. `cross` images already bundle
@@ -126,7 +126,7 @@ jobs:
           fi
           # Validate tag format: must be vMAJOR.MINOR.PATCH with optional
           # pre-release suffix (e.g. v0.1.0, v1.2.3-rc.1). A malformed tag
-          # produces archive names like `arc--*.tar.gz` that never match
+          # produces archive names like `chio--*.tar.gz` that never match
           # the Homebrew formula URL template and silently publish a
           # broken release.
           if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
@@ -141,14 +141,14 @@ jobs:
         if: matrix.archive == 'tar.gz'
         shell: bash
         env:
-          ARC_BIN_SUFFIX: ${{ matrix.bin_suffix }}
-          ARC_TARGET: ${{ matrix.target }}
-          ARC_VERSION: ${{ steps.version.outputs.version }}
+          CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          CHIO_TARGET: ${{ matrix.target }}
+          CHIO_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          stage_dir="arc-${ARC_VERSION}-${ARC_TARGET}"
+          stage_dir="chio-${CHIO_VERSION}-${CHIO_TARGET}"
           mkdir -p "dist/${stage_dir}"
-          cp "target/${ARC_TARGET}/release/${BINARY_NAME}${ARC_BIN_SUFFIX}" "dist/${stage_dir}/"
+          cp "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}" "dist/${stage_dir}/"
           cp README.md LICENSE "dist/${stage_dir}/" 2>/dev/null || true
           (cd dist && tar czf "${stage_dir}.tar.gz" "${stage_dir}")
           (cd dist && shasum -a 256 "${stage_dir}.tar.gz" > "${stage_dir}.tar.gz.sha256")
@@ -157,14 +157,14 @@ jobs:
         if: matrix.archive == 'zip'
         shell: pwsh
         env:
-          ARC_BIN_SUFFIX: ${{ matrix.bin_suffix }}
-          ARC_TARGET: ${{ matrix.target }}
-          ARC_VERSION: ${{ steps.version.outputs.version }}
+          CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          CHIO_TARGET: ${{ matrix.target }}
+          CHIO_VERSION: ${{ steps.version.outputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $stage = "arc-${env:ARC_VERSION}-${env:ARC_TARGET}"
+          $stage = "chio-${env:CHIO_VERSION}-${env:CHIO_TARGET}"
           New-Item -ItemType Directory -Force -Path "dist/$stage" | Out-Null
-          Copy-Item "target/${env:ARC_TARGET}/release/${env:BINARY_NAME}${env:ARC_BIN_SUFFIX}" "dist/$stage/"
+          Copy-Item "target/${env:CHIO_TARGET}/release/${env:BINARY_NAME}${env:CHIO_BIN_SUFFIX}" "dist/$stage/"
           if (Test-Path README.md) { Copy-Item README.md "dist/$stage/" }
           if (Test-Path LICENSE) { Copy-Item LICENSE "dist/$stage/" }
           Compress-Archive -Path "dist/$stage" -DestinationPath "dist/$stage.zip"
@@ -179,7 +179,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arc-${{ matrix.target }}
+          name: chio-${{ matrix.target }}
           path: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
@@ -217,7 +217,7 @@ jobs:
           fi
           # Validate tag format: must be vMAJOR.MINOR.PATCH with optional
           # pre-release suffix (e.g. v0.1.0, v1.2.3-rc.1). A malformed tag
-          # produces archive names like `arc--*.tar.gz` that never match
+          # produces archive names like `chio--*.tar.gz` that never match
           # the Homebrew formula URL template and silently publish a
           # broken release.
           if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
@@ -255,14 +255,14 @@ jobs:
       - name: Render Homebrew formula
         shell: bash
         env:
-          ARC_GITHUB_REPO: ${{ github.repository }}
-          ARC_VERSION: ${{ steps.version.outputs.version }}
+          CHIO_GITHUB_REPO: ${{ github.repository }}
+          CHIO_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          version="${ARC_VERSION}"
-          repo="${ARC_GITHUB_REPO}"
-          formula_src="Homebrew/arc.rb.tmpl"
-          formula_out="release/arc.rb"
+          version="${CHIO_VERSION}"
+          repo="${CHIO_GITHUB_REPO}"
+          formula_src="Homebrew/chio.rb.tmpl"
+          formula_out="release/chio.rb"
           if [[ ! -f "$formula_src" ]]; then
             echo "formula source missing: $formula_src" >&2
             exit 1
@@ -287,20 +287,20 @@ jobs:
             fi
             printf '%s' "$digest"
           }
-          arm_mac=$(derive_sha256 "release/arc-${version}-aarch64-apple-darwin.tar.gz")
-          x86_mac=$(derive_sha256 "release/arc-${version}-x86_64-apple-darwin.tar.gz")
-          arm_lin=$(derive_sha256 "release/arc-${version}-aarch64-unknown-linux-gnu.tar.gz")
-          x86_lin=$(derive_sha256 "release/arc-${version}-x86_64-unknown-linux-gnu.tar.gz")
-          sed -e "s|__ARC_SHA256_DARWIN_ARM64__|${arm_mac}|" \
-              -e "s|__ARC_SHA256_DARWIN_AMD64__|${x86_mac}|" \
-              -e "s|__ARC_SHA256_LINUX_ARM64__|${arm_lin}|" \
-              -e "s|__ARC_SHA256_LINUX_AMD64__|${x86_lin}|" \
-              -e "s|__ARC_GITHUB_REPO__|${repo}|" \
-              -e "s|__ARC_VERSION__|${version}|" \
+          arm_mac=$(derive_sha256 "release/chio-${version}-aarch64-apple-darwin.tar.gz")
+          x86_mac=$(derive_sha256 "release/chio-${version}-x86_64-apple-darwin.tar.gz")
+          arm_lin=$(derive_sha256 "release/chio-${version}-aarch64-unknown-linux-gnu.tar.gz")
+          x86_lin=$(derive_sha256 "release/chio-${version}-x86_64-unknown-linux-gnu.tar.gz")
+          sed -e "s|__CHIO_SHA256_DARWIN_ARM64__|${arm_mac}|" \
+              -e "s|__CHIO_SHA256_DARWIN_AMD64__|${x86_mac}|" \
+              -e "s|__CHIO_SHA256_LINUX_ARM64__|${arm_lin}|" \
+              -e "s|__CHIO_SHA256_LINUX_AMD64__|${x86_lin}|" \
+              -e "s|__CHIO_GITHUB_REPO__|${repo}|" \
+              -e "s|__CHIO_VERSION__|${version}|" \
               "$formula_src" > "$formula_out"
-          if grep -q "__ARC_" "$formula_out"; then
+          if grep -q "__CHIO_" "$formula_out"; then
             echo "::error::rendered Homebrew formula still contains template placeholders" >&2
-            grep -n "__ARC_" "$formula_out" >&2
+            grep -n "__CHIO_" "$formula_out" >&2
             exit 1
           fi
           echo "updated formula at ${formula_out}:"
@@ -310,24 +310,24 @@ jobs:
         id: notes
         shell: bash
         env:
-          ARC_GITHUB_REPO: ${{ github.repository }}
-          ARC_GITHUB_REPO_OWNER: ${{ github.repository_owner }}
-          ARC_RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          ARC_VERSION: ${{ steps.version.outputs.version }}
+          CHIO_GITHUB_REPO: ${{ github.repository }}
+          CHIO_GITHUB_REPO_OWNER: ${{ github.repository_owner }}
+          CHIO_RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          CHIO_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          arc_ghcr_owner="$(printf '%s' "${ARC_GITHUB_REPO_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          chio_ghcr_owner="$(printf '%s' "${CHIO_GITHUB_REPO_OWNER}" | tr '[:upper:]' '[:lower:]')"
           {
-            echo "## arc ${ARC_RELEASE_TAG}"
+            echo "## chio ${CHIO_RELEASE_TAG}"
             echo
-            echo "Pre-built ARC sidecar binaries. Install via Homebrew, Docker, or by downloading an archive below."
+            echo "Pre-built Chio sidecar binaries. Install via Homebrew, Docker, or by downloading an archive below."
             echo
             echo "### Install"
             echo
             echo '```bash'
-            echo "curl -fsSL -o /tmp/arc.rb https://github.com/${ARC_GITHUB_REPO}/releases/latest/download/arc.rb"
-            echo "brew install --formula /tmp/arc.rb"
-            echo "docker pull ghcr.io/${arc_ghcr_owner}/arc-sidecar:${ARC_VERSION}"
+            echo "curl -fsSL -o /tmp/chio.rb https://github.com/${CHIO_GITHUB_REPO}/releases/latest/download/chio.rb"
+            echo "brew install --formula /tmp/chio.rb"
+            echo "docker pull ghcr.io/${chio_ghcr_owner}/chio-sidecar:${CHIO_VERSION}"
             echo '```'
             echo
             echo "### Verify"
@@ -352,7 +352,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: arc ${{ steps.version.outputs.tag }}
+          name: chio ${{ steps.version.outputs.tag }}
           body_path: release/NOTES.md
           draft: false
           fail_on_unmatched_files: true
@@ -361,4 +361,4 @@ jobs:
             release/*.zip
             release/*.sha256
             release/SHA256SUMS
-            release/arc.rb
+            release/chio.rb

@@ -11,9 +11,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  ARC_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
-  ARC_ELAN_VERSION: v4.2.1
-  ARC_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
+  CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
+  CHIO_ELAN_VERSION: v4.2.1
+  CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
 
 jobs:
   check:
@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.elan
-          key: ${{ runner.os }}-elan-${{ env.ARC_ELAN_VERSION }}-${{ env.ARC_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
+          key: ${{ runner.os }}-elan-${{ env.CHIO_ELAN_VERSION }}-${{ env.CHIO_ELAN_TARBALL_SHA256 }}-${{ hashFiles('formal/lean4/Chio/lean-toolchain') }}
 
       - name: Install Lean 4 toolchain
         if: steps.elan-cache.outputs.cache-hit != 'true'
@@ -43,9 +43,9 @@ jobs:
         run: |
           set -euo pipefail
           curl -fsSL \
-            "https://github.com/leanprover/elan/releases/download/${ARC_ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
+            "https://github.com/leanprover/elan/releases/download/${CHIO_ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
             -o /tmp/elan-x86_64-unknown-linux-gnu.tar.gz
-          echo "${ARC_ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
+          echo "${CHIO_ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
           tar -xzf /tmp/elan-x86_64-unknown-linux-gnu.tar.gz -C /tmp
           /tmp/elan-init -y --default-toolchain none
 
@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
+          toolchain="$(tr -d '\r\n' < formal/lean4/Chio/lean-toolchain)"
           if ! "$HOME/.elan/bin/elan" toolchain list | tr -d '\r' | grep -Fq "$toolchain"; then
             for attempt in 1 2 3 4 5; do
               if "$HOME/.elan/bin/elan" toolchain install "$toolchain"; then
@@ -72,7 +72,7 @@ jobs:
             done
           fi
           (
-            cd formal/lean4/Pact
+            cd formal/lean4/Chio
             "$HOME/.elan/bin/lake" --version
           )
 
@@ -105,7 +105,7 @@ jobs:
       - name: Workspace CI lane
         env:
           CARGO_BUILD_JOBS: "1"
-          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/ci-workspace.sh
 
       - name: Portable browser qualification
@@ -120,7 +120,7 @@ jobs:
 
       - name: SDK parity contract lane
         env:
-          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }}"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }}"
         run: ./scripts/check-sdk-parity.sh
 
   msrv:
@@ -142,17 +142,17 @@ jobs:
       - name: MSRV workspace lane
         env:
           CARGO_BUILD_JOBS: "1"
-          CARGO_TARGET_DIR: ${{ runner.temp }}/arc-msrv-target
-          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-msrv-target
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
           cargo build --workspace
-          cargo test --workspace --exclude arc-conformance --exclude arc-wasm-guards
-          cargo test -p arc-wasm-guards --lib
+          cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards
+          cargo test -p chio-wasm-guards --lib
 
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -172,7 +172,7 @@ jobs:
         # Install tarpaulin on the host so run-coverage.sh takes the
         # local branch instead of falling back to the
         # `xd009642/tarpaulin` docker image (which has no protoc and
-        # therefore breaks arc-envoy-ext-authz's tonic-build).
+        # therefore breaks chio-envoy-ext-authz's tonic-build).
         run: cargo install cargo-tarpaulin --locked --version 0.31.2
 
       - name: Free disk space
@@ -184,12 +184,12 @@ jobs:
       - name: Coverage lane
         env:
           COVERAGE_FAIL_UNDER: "65"
-          COVERAGE_ROOT: ${{ runner.temp }}/arc-coverage
-          TARPAULIN_TARGET_DIR: ${{ runner.temp }}/arc-tarpaulin-target
-          TARPAULIN_LOCAL_LLVM_PROFILE_FILE: ${{ runner.temp }}/arc-tarpaulin-target/build_rs_cov-%p-%m.profraw
+          COVERAGE_ROOT: ${{ runner.temp }}/chio-coverage
+          TARPAULIN_TARGET_DIR: ${{ runner.temp }}/chio-tarpaulin-target
+          TARPAULIN_LOCAL_LLVM_PROFILE_FILE: ${{ runner.temp }}/chio-tarpaulin-target/build_rs_cov-%p-%m.profraw
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/run-coverage.sh
 
       - name: Upload coverage artifacts
@@ -197,5 +197,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: ${{ runner.temp }}/arc-coverage
+          path: ${{ runner.temp }}/chio-coverage
           retention-days: 21

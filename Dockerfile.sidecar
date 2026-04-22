@@ -1,19 +1,19 @@
 # syntax=docker/dockerfile:1.7
 #
-# Minimal runtime image for the ARC sidecar binary.
+# Minimal runtime image for the Chio sidecar binary.
 #
 # Build:
-#   docker build -f Dockerfile.sidecar -t arc-sidecar:local .
+#   docker build -f Dockerfile.sidecar -t chio-sidecar:local .
 #
 # Run:
-#   docker run --rm -p 8939:8939 arc-sidecar:local <subcommand> [args...]
+#   docker run --rm -p 8939:8939 chio-sidecar:local <subcommand> [args...]
 #
-# There is no useful zero-argument default: the `arc` subcommands require
+# There is no useful zero-argument default: the `chio` subcommands require
 # operator input (policy path, wrapped MCP server command, etc.). The
 # image therefore defaults CMD to `--help` so `docker run <image>` prints
 # usage instead of crashing at startup. Production deployments MUST
 # override CMD (or the compose/k8s `args`) with a real subcommand, e.g.
-# `arc mcp serve-http --policy /etc/arc/policy.yaml --server-id my-tool`.
+# `chio mcp serve-http --policy /etc/chio/policy.yaml --server-id my-tool`.
 
 ARG RUST_VERSION=1.93
 ARG ALPINE_VERSION=3.22
@@ -22,24 +22,24 @@ ARG ALPINE_VERSION=3.22
 # Stage 1: build the binary
 ############################
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:3c06253e433c1b2ac2c279a98226d385d25c5f324138ab2861a5414bfa6855f9 AS builder
-# `protoc` is required because arc-envoy-ext-authz (transitively reachable
+# `protoc` is required because chio-envoy-ext-authz (transitively reachable
 # through the workspace) invokes tonic-build at compile time. CI installs
 # `protobuf-compiler` for the same reason; keep this image consistent so
-# any future dep change that pulls arc-envoy-ext-authz into arc-cli's
+# any future dep change that pulls chio-envoy-ext-authz into chio-cli's
 # transitive graph does not silently break the Docker build.
 RUN apk add --no-cache build-base cmake perl pkgconf musl-dev protoc
 WORKDIR /workspace
 
 # Copy the full workspace so path dependencies resolve. Keep this list
 # in sync with anything the Rust build reaches at compile time:
-#   - `wit/` is consumed by arc-wasm-guards via `wasmtime::component::bindgen!`
-#     (arc-cli -> arc-wasm-guards path dep).
+#   - `wit/` is consumed by chio-wasm-guards via `wasmtime::component::bindgen!`
+#     (chio-cli -> chio-wasm-guards path dep).
 #   - `examples/`, `formal/`, `tests/` are declared as workspace members, so
 #     their absence breaks the workspace Cargo.lock resolution.
 #
 # Note on protobuf: the vendored Envoy protos consumed by
-# arc-envoy-ext-authz's tonic-build live under
-# `crates/arc-envoy-ext-authz/proto` (not a top-level `proto/`), so the
+# chio-envoy-ext-authz's tonic-build live under
+# `crates/chio-envoy-ext-authz/proto` (not a top-level `proto/`), so the
 # `COPY crates ./crates` line below covers them transparently -- no
 # separate top-level `COPY proto` needed.
 COPY Cargo.toml Cargo.lock ./
@@ -48,17 +48,17 @@ COPY wit ./wit
 COPY examples ./examples
 # `formal/` is copied so `cargo build --workspace` Cargo.lock
 # resolution stays consistent with CI, but the Docker build only runs
-# `cargo build --package arc-cli --bin arc`. arc-cli does NOT depend
+# `cargo build --package chio-cli --bin chio`. chio-cli does NOT depend
 # on any formal-methods crate, and the current formal/ contents
 # (diff-tests + lean4) have no Rust `build.rs` that invokes `lake`,
 # so Lean/elan does NOT need to be installed in this image. If a
-# formal/ member later declares an arc-cli edge or a Rust build-
+# formal/ member later declares an chio-cli edge or a Rust build-
 # script that shells out to `lake`, install elan alongside protoc in
 # the builder apk step.
 COPY formal ./formal
 COPY tests ./tests
 # `sdks/` holds non-workspace-member SDKs today (Python packages, TS
-# packages, arc-lambda-extension with its own nested workspace), but
+# packages, chio-lambda-extension with its own nested workspace), but
 # the layout is structured to let future Rust members under
 # `sdks/...` join the root workspace without silently breaking this
 # image. Copying the tree keeps the Docker build consistent with
@@ -66,40 +66,40 @@ COPY tests ./tests
 COPY sdks ./sdks
 
 # Build a release binary, locked to the committed Cargo.lock.
-RUN cargo build --release --locked --package arc-cli --bin arc \
- && strip target/release/arc \
- && cp target/release/arc /arc
+RUN cargo build --release --locked --package chio-cli --bin chio \
+ && strip target/release/chio \
+ && cp target/release/chio /chio
 
 ############################
 # Stage 2: minimal runtime
 ############################
 FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601 AS runtime
 
-# The `rust:alpine` builder produces a musl-linked `arc` binary, so the
+# The `rust:alpine` builder produces a musl-linked `chio` binary, so the
 # runtime image only needs CA roots and tini. No dynamic libgcc/libstdc++
 # packages are required in the final layer.
 RUN apk add --no-cache ca-certificates tini \
- && addgroup -S -g 10001 arc \
- && adduser  -S -u 10001 -G arc -h /home/arc -s /sbin/nologin arc \
- && mkdir -p /var/lib/arc /etc/arc \
- && chown -R arc:arc /var/lib/arc /etc/arc /home/arc
+ && addgroup -S -g 10001 chio \
+ && adduser  -S -u 10001 -G chio -h /home/chio -s /sbin/nologin chio \
+ && mkdir -p /var/lib/chio /etc/chio \
+ && chown -R chio:chio /var/lib/chio /etc/chio /home/chio
 
-COPY --from=builder /arc /usr/local/bin/arc
-RUN chmod 0755 /usr/local/bin/arc
+COPY --from=builder /chio /usr/local/bin/chio
+RUN chmod 0755 /usr/local/bin/chio
 
-USER arc:arc
-WORKDIR /home/arc
-ENV ARC_HOME=/var/lib/arc \
+USER chio:chio
+WORKDIR /home/chio
+ENV CHIO_HOME=/var/lib/chio \
     RUST_LOG=info
 
 # OCI metadata (overridden by build workflow).
-LABEL org.opencontainers.image.title="arc-sidecar" \
-      org.opencontainers.image.description="ARC sidecar runtime (capability kernel)" \
+LABEL org.opencontainers.image.title="chio-sidecar" \
+      org.opencontainers.image.description="Chio sidecar runtime (capability kernel)" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/bb-connor/arc"
+      org.opencontainers.image.source="https://github.com/backbay/chio"
 
-ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/arc"]
-# No sensible zero-argument default — `arc run` and `arc mcp serve-http`
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/chio"]
+# No sensible zero-argument default — `chio run` and `chio mcp serve-http`
 # both require `--policy` plus additional positional input. Fall through
 # to `--help` so bare `docker run <image>` prints usage instead of
 # exiting non-zero before the health endpoint opens. Operators override

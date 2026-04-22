@@ -1,0 +1,323 @@
+// Integration tests for the AlertingExporter dispatch pipeline.
+//
+// Uses an in-process RecordingBackend that implements AlertBackend to verify
+// that high-severity denials (and only those) reach the configured backends.
+// Also covers PagerDuty and OpsGenie HTTP dispatch against wiremock.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+
+use chio_core::crypto::Keypair;
+use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, GuardEvidence, ToolCallAction};
+use chio_siem::alerting::{
+    Alert, AlertBackend, AlertSeverity, AlertingConfig, AlertingExporter, OpsGenieBackend,
+    PagerDutyBackend,
+};
+use chio_siem::event::SiemEvent;
+use chio_siem::exporter::ExportError;
+use chio_siem::Exporter;
+use wiremock::matchers::{header, method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+fn allow_receipt(id: &str) -> ChioReceipt {
+    let keypair = Keypair::generate();
+    ChioReceipt::sign(
+        ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1_700_000_000,
+            capability_id: "cap".to_string(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .expect("action parameters serialize"),
+            decision: Decision::Allow,
+            content_hash: "c".to_string(),
+            policy_hash: "p".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: chio_core::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+        },
+        &keypair,
+    )
+    .expect("sign")
+}
+
+fn deny_receipt(id: &str, guard: &str) -> ChioReceipt {
+    let keypair = Keypair::generate();
+    ChioReceipt::sign(
+        ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1_700_000_001,
+            capability_id: "cap".to_string(),
+            tool_server: "python".to_string(),
+            tool_name: "run".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .expect("action parameters serialize"),
+            decision: Decision::Deny {
+                reason: "blocked by policy".to_string(),
+                guard: guard.to_string(),
+            },
+            content_hash: "c".to_string(),
+            policy_hash: "p".to_string(),
+            evidence: vec![GuardEvidence {
+                guard_name: guard.to_string(),
+                verdict: false,
+                details: None,
+            }],
+            metadata: None,
+            trust_level: chio_core::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+        },
+        &keypair,
+    )
+    .expect("sign")
+}
+
+struct RecordingBackend {
+    name: &'static str,
+    alerts: Arc<Mutex<Vec<Alert>>>,
+}
+
+impl RecordingBackend {
+    fn new(name: &'static str) -> (Self, Arc<Mutex<Vec<Alert>>>) {
+        let alerts = Arc::new(Mutex::new(Vec::new()));
+        (
+            Self {
+                name,
+                alerts: alerts.clone(),
+            },
+            alerts,
+        )
+    }
+}
+
+impl AlertBackend for RecordingBackend {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn dispatch<'a>(
+        &'a self,
+        alert: &'a Alert,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+    {
+        let alerts = self.alerts.clone();
+        let alert = alert.clone();
+        Box::pin(async move {
+            alerts.lock().expect("alerts lock").push(alert);
+            Ok(())
+        })
+    }
+}
+
+#[tokio::test]
+async fn high_severity_deny_dispatches_to_backend() {
+    let (backend, recorded) = RecordingBackend::new("test-backend");
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_backend(Box::new(backend))
+        .build();
+
+    let events = vec![
+        SiemEvent::from_receipt(allow_receipt("alert-1")),
+        SiemEvent::from_receipt(deny_receipt("alert-2", "ForbiddenPathGuard")),
+    ];
+    let result = exporter.export_batch(&events).await.expect("ok");
+    assert_eq!(result, 2);
+
+    let recorded = recorded.lock().unwrap();
+    assert_eq!(recorded.len(), 1, "only the deny should be alerted on");
+    assert_eq!(recorded[0].receipt_id, "alert-2");
+    assert_eq!(recorded[0].severity, AlertSeverity::High);
+    assert_eq!(recorded[0].guard, "ForbiddenPathGuard");
+}
+
+#[tokio::test]
+async fn medium_severity_deny_does_not_fire_by_default() {
+    let (backend, recorded) = RecordingBackend::new("test-backend");
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_backend(Box::new(backend))
+        .build();
+
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "alert-med",
+        "CustomGuard",
+    ))];
+    let _ = exporter.export_batch(&events).await.expect("ok");
+
+    assert!(
+        recorded.lock().unwrap().is_empty(),
+        "medium should not page"
+    );
+}
+
+#[tokio::test]
+async fn alerting_without_backends_is_a_no_op() {
+    let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+    assert_eq!(exporter.backend_count(), 0);
+
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "no-backend",
+        "SecretLeakGuard",
+    ))];
+    let n = exporter.export_batch(&events).await.expect("ok");
+    assert_eq!(n, 1);
+}
+
+#[tokio::test]
+async fn lowering_min_severity_catches_medium_denials() {
+    let (backend, recorded) = RecordingBackend::new("test-backend");
+    let cfg = AlertingConfig {
+        min_severity: AlertSeverity::Medium,
+        exclude_guards: Vec::new(),
+        include_guards: Vec::new(),
+    };
+    let exporter = AlertingExporter::builder(cfg)
+        .with_backend(Box::new(backend))
+        .build();
+
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "alert-med-fire",
+        "CustomGuard",
+    ))];
+    let _ = exporter.export_batch(&events).await.expect("ok");
+
+    let recorded = recorded.lock().unwrap();
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(recorded[0].severity, AlertSeverity::Medium);
+}
+
+#[tokio::test]
+async fn pagerduty_backend_posts_to_v2_enqueue() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/v2/enqueue"))
+        .and(header("Content-Type", "application/json"))
+        .respond_with(ResponseTemplate::new(202))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let backend = PagerDutyBackend::with_endpoint("pd-routing-key".to_string(), server.uri());
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_backend(Box::new(backend))
+        .build();
+
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "alert-pd",
+        "SecretLeakGuard",
+    ))];
+    let result = exporter.export_batch(&events).await.expect("ok");
+    assert_eq!(result, 1);
+}
+
+#[tokio::test]
+async fn pagerduty_backend_propagates_http_error() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/v2/enqueue"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+
+    let backend = PagerDutyBackend::with_endpoint("pd".to_string(), server.uri());
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_backend(Box::new(backend))
+        .build();
+
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "alert-pd-fail",
+        "EgressGuard",
+    ))];
+    let result = exporter.export_batch(&events).await;
+    assert!(result.is_err(), "propagate backend failure");
+}
+
+#[tokio::test]
+async fn opsgenie_backend_posts_to_v2_alerts() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/v2/alerts"))
+        .and(header("Authorization", "GenieKey og-api-key"))
+        .and(header("Content-Type", "application/json"))
+        .respond_with(ResponseTemplate::new(202))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let backend = OpsGenieBackend::with_endpoint("og-api-key".to_string(), server.uri());
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_backend(Box::new(backend))
+        .build();
+
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "alert-og",
+        "EgressGuard",
+    ))];
+    let result = exporter.export_batch(&events).await.expect("ok");
+    assert_eq!(result, 1);
+}
+
+#[tokio::test]
+async fn partial_failure_across_two_backends_surfaces_partial_failure_error() {
+    // One backend always succeeds, one always fails.
+    struct Failing(&'static str, Arc<AtomicUsize>);
+    impl AlertBackend for Failing {
+        fn name(&self) -> &str {
+            self.0
+        }
+        fn dispatch<'a>(
+            &'a self,
+            _: &'a Alert,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+        {
+            let counter = self.1.clone();
+            Box::pin(async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Err(ExportError::HttpError("nope".to_string()))
+            })
+        }
+    }
+
+    let (ok_backend, _) = RecordingBackend::new("ok");
+    let failing_calls = Arc::new(AtomicUsize::new(0));
+    let failing = Failing("bad", failing_calls.clone());
+
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_backend(Box::new(ok_backend))
+        .with_backend(Box::new(failing))
+        .build();
+
+    // Two events: one allow (filtered), one High deny.
+    let events = vec![
+        SiemEvent::from_receipt(allow_receipt("alert-pf-allow")),
+        SiemEvent::from_receipt(deny_receipt("alert-pf-deny", "ForbiddenPathGuard")),
+    ];
+    let result = exporter.export_batch(&events).await;
+    match result.unwrap_err() {
+        ExportError::HttpError(msg) => {
+            // All dispatches for a given event failed means HttpError is not reached here;
+            // one backend succeeded so the event had a mixed outcome, classified as a failure.
+            // At least one backend error should be reported.
+            assert!(msg.contains("nope") || msg.contains("bad"), "msg: {msg}");
+        }
+        ExportError::PartialFailure {
+            succeeded, failed, ..
+        } => {
+            assert_eq!(failed, 1, "deny event should count as failed");
+            assert_eq!(succeeded, 1, "filtered allow event counted as success");
+        }
+        other => panic!("unexpected error variant: {other:?}"),
+    }
+    assert_eq!(
+        failing_calls.load(Ordering::SeqCst),
+        1,
+        "failing backend dispatched exactly once"
+    );
+}

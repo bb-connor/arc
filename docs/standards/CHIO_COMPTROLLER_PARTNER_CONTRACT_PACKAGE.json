@@ -1,0 +1,80 @@
+{
+  "version": "2026-04-15",
+  "scope": "comptroller_partner_contract_package",
+  "packages": [
+    {
+      "id": "receipt_checkpoint_proof",
+      "authority": "chio_kernel",
+      "artifacts": [
+        {
+          "name": "http_receipt",
+          "schemaRef": "spec/schemas/chio-http/v1/http-receipt.schema.json",
+          "typeWitness": "crates/chio-http-core/src/receipt.rs"
+        },
+        {
+          "name": "kernel_checkpoint_statement",
+          "typeWitness": "crates/chio-kernel/src/checkpoint.rs"
+        },
+        {
+          "name": "anchor_inclusion_proof_example",
+          "exampleRef": "docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json",
+          "typeWitness": "crates/chio-kernel/src/checkpoint.rs"
+        }
+      ]
+    },
+    {
+      "id": "settlement_reconciliation",
+      "authority": "chio_settle",
+      "artifacts": [
+        {
+          "name": "settlement_profile",
+          "profileRef": "docs/standards/CHIO_SETTLE_PROFILE.md",
+          "typeWitness": "crates/chio-settle/src"
+        },
+        {
+          "name": "settlement_receipt_example",
+          "exampleRef": "docs/standards/CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json",
+          "typeWitness": "crates/chio-settle/src/observe.rs"
+        }
+      ]
+    },
+    {
+      "id": "risk_credit_capital",
+      "authority": "chio_underwriting_and_credit",
+      "artifacts": [
+        {
+          "name": "underwriting_decision_artifact",
+          "typeWitness": "crates/chio-underwriting/src/lib.rs"
+        },
+        {
+          "name": "credit_facility_artifact",
+          "typeWitness": "crates/chio-credit/src/lib.rs"
+        },
+        {
+          "name": "capital_execution_instruction",
+          "typeWitness": "crates/chio-credit/src/credit/capital_and_execution.rs"
+        }
+      ]
+    },
+    {
+      "id": "liability_market",
+      "authority": "chio_market",
+      "artifacts": [
+        {
+          "name": "liability_claim_settlement_receipt",
+          "typeWitness": "crates/chio-market/src/lib.rs"
+        },
+        {
+          "name": "open_market_fee_schedule",
+          "typeWitness": "crates/chio-open-market/src/lib.rs"
+        }
+      ]
+    }
+  ],
+  "degradedPathRule": {
+    "mode": "allow_without_receipt",
+    "authoritative": false,
+    "summary": "Compatibility and degraded passthrough do not satisfy partner billing, settlement, dispute, or audit authority requirements."
+  }
+}
+

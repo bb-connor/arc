@@ -1,0 +1,52 @@
+{
+  "schema": "chio.web3-qualification-matrix.v1",
+  "trust_profile_id": "chio.official-web3-stack",
+  "contract_package_id": "chio.official-web3-contracts",
+  "cases": [
+    {
+      "id": "settled-happy-path",
+      "name": "Anchored escrow release settles cleanly on Base",
+      "requirement_ids": [
+        "RAILMAX-01",
+        "RAILMAX-02"
+      ],
+      "lifecycle_state": "settled",
+      "expected_outcome": "pass",
+      "observed_outcome": "pass",
+      "notes": "Capital instruction, bond state, anchor proof, and settlement receipt reconcile without mutating prior Chio truth."
+    },
+    {
+      "id": "partial-settlement",
+      "name": "Partial settlement remains explicit and auditable",
+      "requirement_ids": [
+        "RAILMAX-03"
+      ],
+      "lifecycle_state": "partially_settled",
+      "expected_outcome": "pass",
+      "observed_outcome": "pass",
+      "notes": "Partial execution is represented as a distinct lifecycle state rather than an overloaded success flag."
+    },
+    {
+      "id": "custody-boundary",
+      "name": "Custody and regulated-role assumptions stay explicit",
+      "requirement_ids": [
+        "RAILMAX-04"
+      ],
+      "lifecycle_state": "settled",
+      "expected_outcome": "pass",
+      "observed_outcome": "pass",
+      "notes": "The trust profile preserves the operator, custodian, and arbitrator role split for the official web3 stack."
+    },
+    {
+      "id": "reversal-recovery",
+      "name": "Reversal and recovery remain bounded and reviewable",
+      "requirement_ids": [
+        "RAILMAX-05"
+      ],
+      "lifecycle_state": "reversed",
+      "expected_outcome": "pass",
+      "observed_outcome": "pass",
+      "notes": "Reversal, chargeback, and timeout semantics are modeled as explicit lifecycle states with preserved evidence."
+    }
+  ]
+}

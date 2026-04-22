@@ -1,0 +1,19 @@
+[package]
+name = "chio-guard-sdk"
+description = "Guest-side SDK for writing Chio WASM guards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_guard_sdk"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

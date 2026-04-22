@@ -714,1048 +714,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
-name = "arc-a2a-adapter"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "arc-manifest",
- "base64 0.22.1",
- "rcgen",
- "rustls-pemfile",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
- "ureq",
- "url",
- "webpki-roots 0.26.11",
-]
-
-[[package]]
-name = "arc-a2a-edge"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "arc-manifest",
- "arc-mcp-edge",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-acp-edge"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "arc-manifest",
- "arc-mcp-edge",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-acp-proxy"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-ag-ui-proxy"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-anchor"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "arc-core",
- "arc-kernel",
- "arc-web3",
- "arc-web3-bindings",
- "base64 0.22.1",
- "hex",
- "opentimestamps",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "arc-api-protect"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-http-core",
- "arc-kernel",
- "arc-openapi",
- "arc-store-sqlite",
- "axum 0.8.8",
- "chrono",
- "hex",
- "hyper",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
- "tower 0.5.3",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "arc-appraisal"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-autonomy"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-market",
- "arc-web3",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-bindings-core"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "arc-manifest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-cli"
-version = "0.1.0"
-dependencies = [
- "arc-acp-proxy",
- "arc-api-protect",
- "arc-appraisal",
- "arc-conformance",
- "arc-control-plane",
- "arc-core",
- "arc-credentials",
- "arc-credit",
- "arc-data-guards",
- "arc-did",
- "arc-external-guards",
- "arc-federation",
- "arc-guards",
- "arc-hosted-mcp",
- "arc-kernel",
- "arc-listing",
- "arc-mcp-adapter",
- "arc-open-market",
- "arc-policy",
- "arc-reputation",
- "arc-siem",
- "arc-store-sqlite",
- "arc-underwriting",
- "arc-wasm-guards",
- "async-stream",
- "axum 0.8.8",
- "base64 0.22.1",
- "chrono",
- "clap",
- "ed25519-dalek",
- "flate2",
- "hex",
- "p256",
- "p384",
- "percent-encoding",
- "rand_core 0.6.4",
- "reqwest",
- "rsa",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "serde_yml",
- "sha2",
- "subtle",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "ureq",
- "url",
- "wasmparser 0.221.3",
- "wiremock",
-]
-
-[[package]]
-name = "arc-config"
-version = "0.1.0"
-dependencies = [
- "regex",
- "serde",
- "serde_yml",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-conformance"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tiny_http",
-]
-
-[[package]]
-name = "arc-control-plane"
-version = "0.1.0"
-dependencies = [
- "arc-anchor",
- "arc-appraisal",
- "arc-conformance",
- "arc-core",
- "arc-credentials",
- "arc-data-guards",
- "arc-did",
- "arc-external-guards",
- "arc-guards",
- "arc-kernel",
- "arc-link",
- "arc-mcp-adapter",
- "arc-policy",
- "arc-reputation",
- "arc-settle",
- "arc-store-sqlite",
- "axum 0.8.8",
- "base64 0.22.1",
- "chrono",
- "ciborium",
- "clap",
- "hex",
- "p384",
- "percent-encoding",
- "rcgen",
- "reqwest",
- "rsa",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "serde_yml",
- "sha2",
- "subtle",
- "thiserror 1.0.69",
- "tokio",
- "tower-http",
- "tracing",
- "ureq",
- "url",
- "x509-cert",
-]
-
-[[package]]
-name = "arc-core"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-autonomy",
- "arc-core-types",
- "arc-credit",
- "arc-federation",
- "arc-governance",
- "arc-listing",
- "arc-market",
- "arc-open-market",
- "arc-underwriting",
- "arc-web3",
- "criterion",
- "ed25519-dalek",
- "hex",
- "percent-encoding",
- "proptest",
- "rand_core 0.6.4",
- "ryu",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "arc-core-types"
-version = "0.1.0"
-dependencies = [
- "aws-lc-rs",
- "ed25519-dalek",
- "getrandom 0.2.17",
- "hex",
- "jsonschema",
- "percent-encoding",
- "rand_core 0.6.4",
- "ryu",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "arc-credentials"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "arc-did",
- "arc-reputation",
- "base64 0.22.1",
- "chrono",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-credit"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core-types",
- "arc-underwriting",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-cross-protocol"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "arc-manifest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-data-guards"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "arc-guards",
- "arc-kernel",
- "arc-metering",
- "regex",
- "serde",
- "serde_json",
- "sqlparser",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-did"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "bs58",
- "serde",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "arc-e2e"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-guards",
- "arc-kernel",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "arc-envoy-ext-authz"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "hex",
- "prost",
- "prost-types",
- "protoc-bin-vendored",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
- "tracing",
-]
-
-[[package]]
-name = "arc-example-enriched-inspector"
-version = "0.1.0"
-dependencies = [
- "arc-guard-sdk",
- "arc-guard-sdk-macros",
-]
-
-[[package]]
-name = "arc-example-tool-gate"
-version = "0.1.0"
-dependencies = [
- "arc-guard-sdk",
- "arc-guard-sdk-macros",
-]
-
-[[package]]
-name = "arc-external-guards"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-guards",
- "arc-kernel",
- "async-trait",
- "base64 0.22.1",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "tracing",
- "url",
- "wiremock",
- "zeroize",
-]
-
-[[package]]
-name = "arc-federation"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-listing",
- "arc-open-market",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-formal-diff-tests"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel-core",
- "proptest",
- "serde_json",
-]
-
-[[package]]
-name = "arc-governance"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-listing",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-guard-sdk"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "arc-guard-sdk-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "arc-guards"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "arc-core-types",
- "arc-http-session",
- "arc-kernel",
- "arc-store-sqlite",
- "async-trait",
- "base64 0.22.1",
- "glob",
- "lru",
- "rand 0.8.5",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "arc-hosted-mcp"
-version = "0.1.0"
-dependencies = [
- "arc-control-plane",
- "arc-core-types",
- "arc-kernel",
- "arc-mcp-adapter",
- "arc-siem",
- "arc-store-sqlite",
- "async-stream",
- "axum 0.8.8",
- "base64 0.22.1",
- "p256",
- "p384",
- "reqwest",
- "rsa",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "subtle",
- "tokio",
- "tracing",
- "ureq",
- "url",
-]
-
-[[package]]
-name = "arc-http-core"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "chrono",
- "ed25519-dalek",
- "hex",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "arc-http-session"
-version = "0.1.0"
-dependencies = [
- "hex",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-kernel"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core",
- "arc-core-types",
- "arc-credit",
- "arc-federation",
- "arc-governance",
- "arc-kernel-core",
- "arc-link",
- "arc-listing",
- "arc-market",
- "arc-open-market",
- "arc-store-sqlite",
- "arc-underwriting",
- "lru",
- "proptest",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "ureq",
- "uuid",
-]
-
-[[package]]
-name = "arc-kernel-browser"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel-core",
- "js-sys",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-test",
- "web-sys",
-]
-
-[[package]]
-name = "arc-kernel-core"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "arc-kernel-mobile"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel-core",
- "getrandom 0.2.17",
- "hex",
- "serde",
- "serde_json",
- "uniffi",
-]
-
-[[package]]
-name = "arc-link"
-version = "0.1.0"
-dependencies = [
- "alloy-contract",
- "alloy-primitives",
- "alloy-provider",
- "alloy-sol-types",
- "arc-core",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "arc-listing"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-manifest"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-market"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core-types",
- "arc-credit",
- "arc-underwriting",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-mcp-adapter"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "arc-manifest",
- "arc-mcp-edge",
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "arc-mcp-edge"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "arc-manifest",
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "arc-mercury"
-version = "0.1.0"
-dependencies = [
- "arc-control-plane",
- "arc-core-types",
- "arc-kernel",
- "arc-mercury-core",
- "arc-store-sqlite",
- "chrono",
- "clap",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "arc-mercury-core"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-metering"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-open-market"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-governance",
- "arc-listing",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-openai-adapter"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "arc-manifest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-openapi"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-http-core",
- "serde",
- "serde_json",
- "serde_yml",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-openapi-mcp-bridge"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "arc-manifest",
- "arc-mcp-edge",
- "arc-openapi",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "arc-policy"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core",
- "arc-guards",
- "arc-kernel",
- "chrono",
- "chrono-tz",
- "hex",
- "regex",
- "serde",
- "serde_json",
- "serde_yml",
- "sha2",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "arc-reputation"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-settle"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "arc-anchor",
- "arc-core",
- "arc-credit",
- "arc-kernel",
- "arc-link",
- "arc-web3",
- "arc-web3-bindings",
- "bs58",
- "hex",
- "reqwest",
- "secp256k1 0.31.1",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "arc-siem"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "wiremock",
- "zeroize",
-]
-
-[[package]]
-name = "arc-store-sqlite"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "r2d2",
- "r2d2_sqlite",
- "rusqlite",
- "serde",
- "serde_json",
- "uuid",
-]
-
-[[package]]
-name = "arc-tower"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-http-core",
- "axum 0.8.8",
- "bytes",
- "chrono",
- "hex",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "pin-project-lite",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "tower 0.5.3",
- "tower-layer",
- "tower-service",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "arc-underwriting"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-wall"
-version = "0.1.0"
-dependencies = [
- "arc-control-plane",
- "arc-core",
- "arc-guards",
- "arc-kernel",
- "arc-siem",
- "arc-store-sqlite",
- "arc-wall-core",
- "chrono",
- "clap",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "arc-wall-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-wasm-guards"
-version = "0.1.0"
-dependencies = [
- "arc-config",
- "arc-core",
- "arc-guards",
- "arc-kernel",
- "criterion",
- "ed25519-dalek",
- "hex",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
- "serde_yml",
- "sha2",
- "tempfile",
- "thiserror 1.0.69",
- "tracing",
- "wasmparser 0.221.3",
- "wasmtime",
- "wat",
-]
-
-[[package]]
-name = "arc-web3"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-credit",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-web3-bindings"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "arc-core",
- "arc-link",
- "arc-web3",
- "serde_json",
-]
-
-[[package]]
-name = "arc-workflow"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
 name = "ark-ff"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2478,6 +1436,1048 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
  "rand_core 0.10.1",
+]
+
+[[package]]
+name = "chio-a2a-adapter"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-manifest",
+ "rcgen",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+ "ureq",
+ "url",
+ "webpki-roots 0.26.11",
+]
+
+[[package]]
+name = "chio-a2a-edge"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "chio-manifest",
+ "chio-mcp-edge",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-acp-edge"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "chio-manifest",
+ "chio-mcp-edge",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-acp-proxy"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-ag-ui-proxy"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-anchor"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "base64 0.22.1",
+ "chio-core",
+ "chio-kernel",
+ "chio-web3",
+ "chio-web3-bindings",
+ "hex",
+ "opentimestamps",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "chio-api-protect"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.8",
+ "chio-core-types",
+ "chio-http-core",
+ "chio-kernel",
+ "chio-openapi",
+ "chio-store-sqlite",
+ "chrono",
+ "hex",
+ "hyper",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower 0.5.3",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "chio-appraisal"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-autonomy"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-market",
+ "chio-web3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-bindings-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "chio-manifest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-cli"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "axum 0.8.8",
+ "base64 0.22.1",
+ "chio-acp-proxy",
+ "chio-api-protect",
+ "chio-appraisal",
+ "chio-conformance",
+ "chio-control-plane",
+ "chio-core",
+ "chio-credentials",
+ "chio-credit",
+ "chio-data-guards",
+ "chio-did",
+ "chio-external-guards",
+ "chio-federation",
+ "chio-guards",
+ "chio-hosted-mcp",
+ "chio-kernel",
+ "chio-listing",
+ "chio-mcp-adapter",
+ "chio-open-market",
+ "chio-policy",
+ "chio-reputation",
+ "chio-siem",
+ "chio-store-sqlite",
+ "chio-underwriting",
+ "chio-wasm-guards",
+ "chrono",
+ "clap",
+ "ed25519-dalek",
+ "flate2",
+ "hex",
+ "p256",
+ "p384",
+ "percent-encoding",
+ "rand_core 0.6.4",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_yml",
+ "sha2",
+ "subtle",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "ureq",
+ "url",
+ "wasmparser 0.221.3",
+ "wiremock",
+]
+
+[[package]]
+name = "chio-config"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_yml",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-conformance"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tiny_http",
+]
+
+[[package]]
+name = "chio-control-plane"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.8",
+ "base64 0.22.1",
+ "chio-anchor",
+ "chio-appraisal",
+ "chio-conformance",
+ "chio-core",
+ "chio-credentials",
+ "chio-data-guards",
+ "chio-did",
+ "chio-external-guards",
+ "chio-guards",
+ "chio-kernel",
+ "chio-link",
+ "chio-mcp-adapter",
+ "chio-policy",
+ "chio-reputation",
+ "chio-settle",
+ "chio-store-sqlite",
+ "chrono",
+ "ciborium",
+ "clap",
+ "hex",
+ "p384",
+ "percent-encoding",
+ "rcgen",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_yml",
+ "sha2",
+ "subtle",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "ureq",
+ "url",
+ "x509-cert",
+]
+
+[[package]]
+name = "chio-core"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-autonomy",
+ "chio-core-types",
+ "chio-credit",
+ "chio-federation",
+ "chio-governance",
+ "chio-listing",
+ "chio-market",
+ "chio-open-market",
+ "chio-underwriting",
+ "chio-web3",
+ "criterion",
+ "ed25519-dalek",
+ "hex",
+ "percent-encoding",
+ "proptest",
+ "rand_core 0.6.4",
+ "ryu",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "chio-core-types"
+version = "0.1.0"
+dependencies = [
+ "aws-lc-rs",
+ "ed25519-dalek",
+ "getrandom 0.2.17",
+ "hex",
+ "jsonschema",
+ "percent-encoding",
+ "rand_core 0.6.4",
+ "ryu",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "chio-credentials"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chio-core",
+ "chio-did",
+ "chio-reputation",
+ "chrono",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-credit"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core-types",
+ "chio-underwriting",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-cross-protocol"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "chio-manifest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-data-guards"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "chio-guards",
+ "chio-kernel",
+ "chio-metering",
+ "regex",
+ "serde",
+ "serde_json",
+ "sqlparser",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-did"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "chio-core",
+ "serde",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "chio-e2e"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-guards",
+ "chio-kernel",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "chio-envoy-ext-authz"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "hex",
+ "prost",
+ "prost-types",
+ "protoc-bin-vendored",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tracing",
+]
+
+[[package]]
+name = "chio-example-enriched-inspector"
+version = "0.1.0"
+dependencies = [
+ "chio-guard-sdk",
+ "chio-guard-sdk-macros",
+]
+
+[[package]]
+name = "chio-example-tool-gate"
+version = "0.1.0"
+dependencies = [
+ "chio-guard-sdk",
+ "chio-guard-sdk-macros",
+]
+
+[[package]]
+name = "chio-external-guards"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "chio-core-types",
+ "chio-guards",
+ "chio-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tracing",
+ "url",
+ "wiremock",
+ "zeroize",
+]
+
+[[package]]
+name = "chio-federation"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-listing",
+ "chio-open-market",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-formal-diff-tests"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel-core",
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-governance"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-listing",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-guard-sdk"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-guard-sdk-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "chio-guards"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "chio-core",
+ "chio-core-types",
+ "chio-http-session",
+ "chio-kernel",
+ "chio-store-sqlite",
+ "glob",
+ "lru",
+ "rand 0.8.5",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "chio-hosted-mcp"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "axum 0.8.8",
+ "base64 0.22.1",
+ "chio-control-plane",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-mcp-adapter",
+ "chio-siem",
+ "chio-store-sqlite",
+ "p256",
+ "p384",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "tokio",
+ "tracing",
+ "ureq",
+ "url",
+]
+
+[[package]]
+name = "chio-http-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "chio-http-session"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-kernel"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core",
+ "chio-core-types",
+ "chio-credit",
+ "chio-federation",
+ "chio-governance",
+ "chio-kernel-core",
+ "chio-link",
+ "chio-listing",
+ "chio-market",
+ "chio-open-market",
+ "chio-store-sqlite",
+ "chio-underwriting",
+ "lru",
+ "proptest",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "ureq",
+ "uuid",
+]
+
+[[package]]
+name = "chio-kernel-browser"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel-core",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "web-sys",
+]
+
+[[package]]
+name = "chio-kernel-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-kernel-mobile"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel-core",
+ "getrandom 0.2.17",
+ "hex",
+ "serde",
+ "serde_json",
+ "uniffi",
+]
+
+[[package]]
+name = "chio-link"
+version = "0.1.0"
+dependencies = [
+ "alloy-contract",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-sol-types",
+ "chio-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "chio-listing"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-manifest"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-market"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core-types",
+ "chio-credit",
+ "chio-underwriting",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-mcp-adapter"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "chio-manifest",
+ "chio-mcp-edge",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "chio-mcp-edge"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "chio-manifest",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "chio-mercury"
+version = "0.1.0"
+dependencies = [
+ "chio-control-plane",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-mercury-core",
+ "chio-store-sqlite",
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-mercury-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-metering"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-open-market"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-governance",
+ "chio-listing",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-openai-adapter"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "chio-manifest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-openapi"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-http-core",
+ "serde",
+ "serde_json",
+ "serde_yml",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-openapi-mcp-bridge"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "chio-manifest",
+ "chio-mcp-edge",
+ "chio-openapi",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-policy"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core",
+ "chio-guards",
+ "chio-kernel",
+ "chrono",
+ "chrono-tz",
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yml",
+ "sha2",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "chio-reputation"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-settle"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "bs58",
+ "chio-anchor",
+ "chio-core",
+ "chio-credit",
+ "chio-kernel",
+ "chio-link",
+ "chio-web3",
+ "chio-web3-bindings",
+ "hex",
+ "reqwest",
+ "secp256k1 0.31.1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "chio-siem"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "wiremock",
+ "zeroize",
+]
+
+[[package]]
+name = "chio-store-sqlite"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "r2d2",
+ "r2d2_sqlite",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "chio-tower"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.8",
+ "bytes",
+ "chio-core-types",
+ "chio-http-core",
+ "chrono",
+ "hex",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "pin-project-lite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tower 0.5.3",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "chio-underwriting"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-wall"
+version = "0.1.0"
+dependencies = [
+ "chio-control-plane",
+ "chio-core",
+ "chio-guards",
+ "chio-kernel",
+ "chio-siem",
+ "chio-store-sqlite",
+ "chio-wall-core",
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "chio-wall-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-wasm-guards"
+version = "0.1.0"
+dependencies = [
+ "chio-config",
+ "chio-core",
+ "chio-guards",
+ "chio-kernel",
+ "criterion",
+ "ed25519-dalek",
+ "hex",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "serde_yml",
+ "sha2",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+ "wasmparser 0.221.3",
+ "wasmtime",
+ "wat",
+]
+
+[[package]]
+name = "chio-web3"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-credit",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-web3-bindings"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "chio-core",
+ "chio-link",
+ "chio-web3",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-workflow"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -3806,10 +3806,10 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-tool"
 version = "0.1.0"
 dependencies = [
- "arc-core-types",
- "arc-kernel",
- "arc-manifest",
- "arc-mcp-adapter",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-manifest",
+ "chio-mcp-adapter",
  "serde",
  "serde_json",
 ]

@@ -1,18 +1,18 @@
 # Demo workload used by test-harness.sh to exercise the allow/deny flow.
 #
 # Deploys a tiny httpbin-style server into the `agent-tools` namespace with
-# the `arc.protocol/secured=true` label so the AuthorizationPolicy from
+# the `chio.protocol/secured=true` label so the AuthorizationPolicy from
 # 02-authorization-policy.yaml applies to it. The Service + VirtualService
 # expose two routes that matter:
 #
 #   GET  /tools/hello    -- allowed when `Authorization: Bearer ...` is set
-#                           and ARC's guard pipeline approves. Responses
-#                           carry an `x-arc-receipt-id` header injected by
+#                           and Chio's guard pipeline approves. Responses
+#                           carry an `x-chio-receipt-id` header injected by
 #                           the ext_authz adapter.
-#   POST /tools/hello    -- allowed when `x-arc-capability-token: ...` is
+#   POST /tools/hello    -- allowed when `x-chio-capability-token: ...` is
 #                           set and the token grants the tool.
 #
-#   GET  /healthz        -- bypasses ARC (ALLOW AuthorizationPolicy) so
+#   GET  /healthz        -- bypasses Chio (ALLOW AuthorizationPolicy) so
 #                           kubelet probes keep working during outages.
 #
 # The namespace opts into Istio sidecar injection; istio-proxy runs next
@@ -24,7 +24,7 @@ metadata:
   name: agent-tools
   labels:
     istio-injection: enabled
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -39,7 +39,7 @@ metadata:
   namespace: agent-tools
   labels:
     app.kubernetes.io/name: demo-tool
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   replicas: 1
   selector:
@@ -51,11 +51,11 @@ spec:
         app.kubernetes.io/name: demo-tool
         # The opt-in label consumed by every AuthorizationPolicy in
         # 02-authorization-policy.yaml. Workloads that omit this label
-        # skip ARC evaluation entirely.
-        arc.protocol/secured: "true"
+        # skip Chio evaluation entirely.
+        chio.protocol/secured: "true"
       annotations:
-        arc.protocol/policy: "demo-tool-policy"
-        arc.protocol/fail-mode: "closed"
+        chio.protocol/policy: "demo-tool-policy"
+        chio.protocol/fail-mode: "closed"
     spec:
       serviceAccountName: demo-tool
       securityContext:
@@ -105,7 +105,7 @@ metadata:
   namespace: agent-tools
   labels:
     app.kubernetes.io/name: demo-tool
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   type: ClusterIP
   selector:
@@ -118,7 +118,7 @@ spec:
       appProtocol: http
 ---
 # VirtualService rewrites external `/hello` into the go-httpbin path
-# `/anything/hello` so the demo can prove ARC's receipt header reaches
+# `/anything/hello` so the demo can prove Chio's receipt header reaches
 # the client end-to-end, not just the upstream pod.
 apiVersion: networking.istio.io/v1
 kind: VirtualService
@@ -126,7 +126,7 @@ metadata:
   name: demo-tool
   namespace: agent-tools
   labels:
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   hosts:
     - demo-tool.agent-tools.svc.cluster.local

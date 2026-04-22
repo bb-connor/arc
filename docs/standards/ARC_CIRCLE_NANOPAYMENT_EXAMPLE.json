@@ -1,9 +1,0 @@
-{
-  "payment_id": "arc-circle-6b8517d146c9a203",
-  "managed_balance_id": "bal_123",
-  "chain_id": "eip155:8453",
-  "amount_minor_units": 150,
-  "currency": "USD",
-  "beneficiary_address": "0x2222222222222222222222222222222222222222",
-  "dispatch_id": "dispatch-web3-1"
-}

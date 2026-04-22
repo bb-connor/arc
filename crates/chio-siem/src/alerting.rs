@@ -1,0 +1,740 @@
+//! Alerting surface for Chio SIEM events.
+//!
+//! This module provides:
+//!
+//! 1. [`AlertSeverity`], a shared severity enum used by Datadog, webhook, and
+//!    alerting exporters.
+//! 2. [`derive_severity`], a deterministic mapping from [`ChioReceipt`] to
+//!    [`AlertSeverity`] based on `decision` and guard evidence.
+//! 3. [`AlertBackend`], a small trait representing a side-channel alerting
+//!    backend (PagerDuty, OpsGenie) that fires on high-severity guard
+//!    denials.
+//! 4. [`AlertingExporter`], an [`Exporter`] implementation that filters a
+//!    batch of events down to those that should trigger alerts and dispatches
+//!    each one to every configured [`AlertBackend`].
+//!
+//! Unlike Splunk HEC or Datadog Logs, alerting is a *trigger*, not a
+//! transport: it only fires on high-severity denials and carries a minimal
+//! payload optimized for on-call ergonomics (short summary, dedup key,
+//! severity).
+//!
+//! # Integration
+//!
+//! Register the exporter through the existing
+//! [`crate::manager::ExporterManager::add_exporter`] surface:
+//!
+//! ```no_run
+//! use chio_siem::alerting::{AlertingConfig, AlertingExporter, PagerDutyBackend};
+//! use chio_siem::manager::{ExporterManager, SiemConfig};
+//!
+//! # fn build() -> Result<(), chio_siem::manager::SiemError> {
+//! let mut manager = ExporterManager::new(SiemConfig::default())?;
+//! let pagerduty = PagerDutyBackend::new("rk_live_xxx".into());
+//! let alerting = AlertingExporter::builder(AlertingConfig::default())
+//!     .with_backend(Box::new(pagerduty))
+//!     .build();
+//! manager.add_exporter(Box::new(alerting));
+//! # Ok(())
+//! # }
+//! ```
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use zeroize::Zeroizing;
+
+use crate::event::SiemEvent;
+use crate::exporter::{ExportError, ExportFuture, Exporter};
+use chio_core::receipt::{ChioReceipt, Decision, GuardEvidence};
+
+// -- Severity -----------------------------------------------------------------
+
+/// Ordered severity levels used by alerting-aware exporters.
+///
+/// The ordering is deliberate: `Info < Low < Medium < High < Critical`. Use
+/// the `PartialOrd`/`Ord` impls to test thresholds like
+/// `severity >= AlertSeverity::High`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AlertSeverity {
+    /// Informational (allow, no warnings).
+    Info,
+    /// Low (allow with soft warnings).
+    Low,
+    /// Medium (generic deny).
+    Medium,
+    /// High (deny on security-sensitive guard).
+    High,
+    /// Critical (deny on secret leak, policy breach, egress to known-bad).
+    Critical,
+}
+
+impl AlertSeverity {
+    /// Lowercase tag label for dashboards and log status fields.
+    pub fn as_tag(self) -> &'static str {
+        match self {
+            AlertSeverity::Info => "info",
+            AlertSeverity::Low => "low",
+            AlertSeverity::Medium => "medium",
+            AlertSeverity::High => "high",
+            AlertSeverity::Critical => "critical",
+        }
+    }
+
+    /// PagerDuty Events API v2 severity string.
+    pub fn as_pagerduty(self) -> &'static str {
+        match self {
+            AlertSeverity::Critical => "critical",
+            AlertSeverity::High => "error",
+            AlertSeverity::Medium => "warning",
+            AlertSeverity::Low | AlertSeverity::Info => "info",
+        }
+    }
+
+    /// OpsGenie Alerts API priority (P1-P5).
+    pub fn as_opsgenie_priority(self) -> &'static str {
+        match self {
+            AlertSeverity::Critical => "P1",
+            AlertSeverity::High => "P2",
+            AlertSeverity::Medium => "P3",
+            AlertSeverity::Low => "P4",
+            AlertSeverity::Info => "P5",
+        }
+    }
+}
+
+/// Derive an [`AlertSeverity`] from a receipt's decision and guard evidence.
+///
+/// The mapping table is:
+///
+/// | Decision | Guard / evidence               | Severity |
+/// |----------|--------------------------------|----------|
+/// | Deny     | `secret` in guard name         | Critical |
+/// | Deny     | `egress`, `firewall`, `exfil`  | Critical |
+/// | Deny     | `path`, `filesystem`, `fs`     | High     |
+/// | Deny     | `financial`, `budget`, `limit` | High     |
+/// | Deny     | (any other)                    | Medium   |
+/// | Cancelled / Incomplete | any             | Low      |
+/// | Allow    | any failed `evidence[]` entry  | Low      |
+/// | Allow    | (clean)                        | Info     |
+pub fn derive_severity(receipt: &ChioReceipt) -> AlertSeverity {
+    match &receipt.decision {
+        Decision::Allow => {
+            if receipt.evidence.iter().any(|g| !g.verdict) {
+                AlertSeverity::Low
+            } else {
+                AlertSeverity::Info
+            }
+        }
+        Decision::Cancelled { .. } | Decision::Incomplete { .. } => AlertSeverity::Low,
+        Decision::Deny { guard, .. } => severity_for_guard(guard, &receipt.evidence),
+    }
+}
+
+fn severity_for_guard(guard: &str, evidence: &[GuardEvidence]) -> AlertSeverity {
+    let guard_lower = guard.to_ascii_lowercase();
+    let mut tokens: Vec<String> = vec![guard_lower.clone()];
+    tokens.extend(evidence.iter().map(|g| g.guard_name.to_ascii_lowercase()));
+
+    let matches = |needles: &[&str]| tokens.iter().any(|t| needles.iter().any(|n| t.contains(n)));
+
+    if matches(&["secret", "credential", "token_leak"]) {
+        return AlertSeverity::Critical;
+    }
+    if matches(&["egress", "firewall", "exfil", "known_bad"]) {
+        return AlertSeverity::Critical;
+    }
+    if matches(&["path", "filesystem", "fs_", "forbidden_path"]) {
+        return AlertSeverity::High;
+    }
+    if matches(&["financial", "budget", "limit", "payment"]) {
+        return AlertSeverity::High;
+    }
+
+    AlertSeverity::Medium
+}
+
+// -- Backend trait ------------------------------------------------------------
+
+/// A side-channel alerting backend (PagerDuty, OpsGenie, etc.).
+///
+/// Implementers do the actual I/O to their respective APIs. The
+/// [`AlertingExporter`] fans each high-severity event out to every
+/// registered backend.
+pub trait AlertBackend: Send + Sync {
+    /// Human-readable backend name for logging and DLQ attribution.
+    fn name(&self) -> &str;
+
+    /// Dispatch a single alert. The implementation owns the HTTP transport.
+    fn dispatch<'a>(
+        &'a self,
+        alert: &'a Alert,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>;
+}
+
+/// A structured alert payload passed to every [`AlertBackend`].
+#[derive(Debug, Clone)]
+pub struct Alert {
+    /// Short, human-readable summary (one line).
+    pub summary: String,
+    /// Severity derived by [`derive_severity`].
+    pub severity: AlertSeverity,
+    /// Stable dedup key for alert grouping (guard + tool + receipt id).
+    pub dedup_key: String,
+    /// Guard name that produced the deny decision (or `"chio.kernel"`).
+    pub guard: String,
+    /// Tool name that was being invoked.
+    pub tool_name: String,
+    /// Tool server that was hosting the tool.
+    pub tool_server: String,
+    /// Receipt identifier for cross-referencing with the receipt log.
+    pub receipt_id: String,
+    /// Full serialized [`ChioReceipt`] for custom details / drill-down.
+    pub receipt_json: serde_json::Value,
+}
+
+// -- PagerDuty backend --------------------------------------------------------
+
+/// PagerDuty Events API v2 backend.
+///
+/// SECURITY: the routing key is wrapped in [`Zeroizing<String>`] so its
+/// bytes are overwritten on drop.
+pub struct PagerDutyBackend {
+    routing_key: Zeroizing<String>,
+    endpoint: String,
+    client: reqwest::Client,
+}
+
+impl PagerDutyBackend {
+    /// Create a new PagerDuty backend with the default endpoint
+    /// (`https://events.pagerduty.com`).
+    pub fn new(routing_key: String) -> Self {
+        Self::with_endpoint(routing_key, "https://events.pagerduty.com".to_string())
+    }
+
+    /// Create a new PagerDuty backend with a custom endpoint. Intended for
+    /// integration tests against `wiremock`.
+    pub fn with_endpoint(routing_key: String, endpoint: String) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+        Self {
+            routing_key: Zeroizing::new(routing_key),
+            endpoint,
+            client,
+        }
+    }
+}
+
+impl AlertBackend for PagerDutyBackend {
+    fn name(&self) -> &str {
+        "pagerduty"
+    }
+
+    fn dispatch<'a>(
+        &'a self,
+        alert: &'a Alert,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+    {
+        Box::pin(async move {
+            let url = format!("{}/v2/enqueue", self.endpoint.trim_end_matches('/'));
+            let payload = serde_json::json!({
+                "routing_key": self.routing_key.as_str(),
+                "event_action": "trigger",
+                "dedup_key": alert.dedup_key,
+                "payload": {
+                    "summary": alert.summary,
+                    "source": "chio.kernel",
+                    "severity": alert.severity.as_pagerduty(),
+                    "component": alert.tool_name,
+                    "group": alert.tool_server,
+                    "class": alert.guard,
+                    "custom_details": alert.receipt_json,
+                }
+            });
+
+            let response = self
+                .client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|e| ExportError::HttpError(format!("PagerDuty request failed: {e}")))?;
+
+            let status = response.status();
+            if status.is_success() || status.as_u16() == 202 {
+                return Ok(());
+            }
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<unreadable body>".to_string());
+            Err(ExportError::HttpError(format!(
+                "PagerDuty returned {status}: {body}"
+            )))
+        })
+    }
+}
+
+// -- OpsGenie backend ---------------------------------------------------------
+
+/// OpsGenie Alerts API v2 backend.
+///
+/// SECURITY: the API key is wrapped in [`Zeroizing<String>`] so its bytes
+/// are overwritten on drop.
+pub struct OpsGenieBackend {
+    api_key: Zeroizing<String>,
+    endpoint: String,
+    client: reqwest::Client,
+    tags: Vec<String>,
+}
+
+impl OpsGenieBackend {
+    /// Create a new OpsGenie backend with the default endpoint
+    /// (`https://api.opsgenie.com`).
+    pub fn new(api_key: String) -> Self {
+        Self::with_endpoint(api_key, "https://api.opsgenie.com".to_string())
+    }
+
+    /// Create a new OpsGenie backend with a custom endpoint. Intended for
+    /// integration tests against `wiremock`.
+    pub fn with_endpoint(api_key: String, endpoint: String) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+        Self {
+            api_key: Zeroizing::new(api_key),
+            endpoint,
+            client,
+            tags: Vec::new(),
+        }
+    }
+
+    /// Attach static tags to every alert dispatched by this backend.
+    #[must_use]
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+}
+
+impl AlertBackend for OpsGenieBackend {
+    fn name(&self) -> &str {
+        "opsgenie"
+    }
+
+    fn dispatch<'a>(
+        &'a self,
+        alert: &'a Alert,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+    {
+        Box::pin(async move {
+            let url = format!("{}/v2/alerts", self.endpoint.trim_end_matches('/'));
+
+            let mut tags = self.tags.clone();
+            tags.push(format!("guard:{}", alert.guard));
+            tags.push(format!("severity:{}", alert.severity.as_tag()));
+            tags.push(format!("tool:{}", alert.tool_name));
+
+            let body = serde_json::json!({
+                "message": alert.summary,
+                "alias": alert.dedup_key,
+                "description": alert.summary,
+                "priority": alert.severity.as_opsgenie_priority(),
+                "tags": tags,
+                "details": alert.receipt_json,
+            });
+
+            let response = self
+                .client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .header(
+                    "Authorization",
+                    format!("GenieKey {}", self.api_key.as_str()),
+                )
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| ExportError::HttpError(format!("OpsGenie request failed: {e}")))?;
+
+            let status = response.status();
+            if status.is_success() || status.as_u16() == 202 {
+                return Ok(());
+            }
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<unreadable body>".to_string());
+            Err(ExportError::HttpError(format!(
+                "OpsGenie returned {status}: {body}"
+            )))
+        })
+    }
+}
+
+// -- AlertingExporter ---------------------------------------------------------
+
+/// Configuration for the [`AlertingExporter`].
+#[derive(Debug, Clone)]
+pub struct AlertingConfig {
+    /// Minimum severity required to dispatch an alert. Default:
+    /// [`AlertSeverity::High`] (so Medium denies do NOT page on-call).
+    pub min_severity: AlertSeverity,
+    /// Guards whose name appears here are never alerted on.
+    pub exclude_guards: Vec<String>,
+    /// When non-empty, only events whose guard matches one of these entries
+    /// are alerted on.
+    pub include_guards: Vec<String>,
+}
+
+impl Default for AlertingConfig {
+    fn default() -> Self {
+        Self {
+            min_severity: AlertSeverity::High,
+            exclude_guards: Vec::new(),
+            include_guards: Vec::new(),
+        }
+    }
+}
+
+/// Builder for [`AlertingExporter`].
+pub struct AlertingExporterBuilder {
+    config: AlertingConfig,
+    backends: Vec<Arc<dyn AlertBackend>>,
+}
+
+impl AlertingExporterBuilder {
+    /// Attach a backend to the builder. Accepts owned `Box<dyn AlertBackend>`
+    /// so the caller keeps full control over the concrete type.
+    #[must_use]
+    pub fn with_backend(mut self, backend: Box<dyn AlertBackend>) -> Self {
+        self.backends.push(Arc::from(backend));
+        self
+    }
+
+    /// Attach an `Arc`-wrapped backend (useful when the backend is shared
+    /// with other callers, e.g. a background heartbeat loop).
+    #[must_use]
+    pub fn with_backend_arc(mut self, backend: Arc<dyn AlertBackend>) -> Self {
+        self.backends.push(backend);
+        self
+    }
+
+    /// Finalize the builder into a usable [`AlertingExporter`].
+    #[must_use]
+    pub fn build(self) -> AlertingExporter {
+        AlertingExporter {
+            config: self.config,
+            backends: self.backends,
+        }
+    }
+}
+
+/// Alerting exporter: filters a batch of SIEM events to those that should
+/// trigger an alert, then fans each one out to every configured
+/// [`AlertBackend`].
+pub struct AlertingExporter {
+    config: AlertingConfig,
+    backends: Vec<Arc<dyn AlertBackend>>,
+}
+
+impl AlertingExporter {
+    /// Start a new builder with the given configuration.
+    #[must_use]
+    pub fn builder(config: AlertingConfig) -> AlertingExporterBuilder {
+        AlertingExporterBuilder {
+            config,
+            backends: Vec::new(),
+        }
+    }
+
+    /// Return the number of configured alert backends.
+    pub fn backend_count(&self) -> usize {
+        self.backends.len()
+    }
+
+    fn should_alert(&self, event: &SiemEvent) -> bool {
+        // Only fire on explicit Deny; Allow/Cancelled/Incomplete never page.
+        let (guard, _reason) = match &event.receipt.decision {
+            Decision::Deny { guard, reason } => (guard.clone(), reason.clone()),
+            _ => return false,
+        };
+
+        if derive_severity(&event.receipt) < self.config.min_severity {
+            return false;
+        }
+        if self.config.exclude_guards.iter().any(|g| g == &guard) {
+            return false;
+        }
+        if !self.config.include_guards.is_empty()
+            && !self.config.include_guards.iter().any(|g| g == &guard)
+        {
+            return false;
+        }
+        true
+    }
+
+    fn build_alert(event: &SiemEvent) -> Result<Alert, ExportError> {
+        let (guard, reason) = match &event.receipt.decision {
+            Decision::Deny { guard, reason } => (guard.clone(), reason.clone()),
+            _ => ("chio.kernel".to_string(), "non-deny event".to_string()),
+        };
+
+        let severity = derive_severity(&event.receipt);
+        let summary = format!(
+            "Chio guard deny: {} ({}) on {}/{}",
+            guard, reason, event.receipt.tool_server, event.receipt.tool_name
+        );
+
+        let dedup_key = format!(
+            "{}::{}::{}",
+            guard, event.receipt.tool_name, event.receipt.id
+        );
+
+        let receipt_json = serde_json::to_value(&event.receipt).map_err(|e| {
+            ExportError::SerializationError(format!(
+                "failed to serialize receipt {}: {e}",
+                event.receipt.id
+            ))
+        })?;
+
+        Ok(Alert {
+            summary,
+            severity,
+            dedup_key,
+            guard,
+            tool_name: event.receipt.tool_name.clone(),
+            tool_server: event.receipt.tool_server.clone(),
+            receipt_id: event.receipt.id.clone(),
+            receipt_json,
+        })
+    }
+}
+
+impl Exporter for AlertingExporter {
+    fn name(&self) -> &str {
+        "alerting"
+    }
+
+    fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
+        Box::pin(async move {
+            if events.is_empty() || self.backends.is_empty() {
+                return Ok(events.len());
+            }
+
+            let mut dispatched = 0usize;
+            let mut failed = 0usize;
+            let mut first_err: Option<String> = None;
+
+            for event in events {
+                if !self.should_alert(event) {
+                    dispatched += 1;
+                    continue;
+                }
+
+                let alert = Self::build_alert(event)?;
+                let mut any_failure = false;
+
+                for backend in &self.backends {
+                    if let Err(err) = backend.dispatch(&alert).await {
+                        any_failure = true;
+                        if first_err.is_none() {
+                            first_err = Some(format!("{}: {}", backend.name(), err));
+                        }
+                        tracing::warn!(
+                            backend = backend.name(),
+                            receipt_id = %event.receipt.id,
+                            error = %err,
+                            "alert backend dispatch failed"
+                        );
+                    }
+                }
+
+                if any_failure {
+                    failed += 1;
+                } else {
+                    dispatched += 1;
+                }
+            }
+
+            if failed == 0 {
+                return Ok(dispatched);
+            }
+
+            if dispatched == 0 {
+                return Err(ExportError::HttpError(first_err.unwrap_or_else(|| {
+                    "alerting exporter: all dispatches failed".to_string()
+                })));
+            }
+
+            Err(ExportError::PartialFailure {
+                succeeded: dispatched,
+                failed,
+                details: first_err
+                    .unwrap_or_else(|| "alerting exporter: partial failure".to_string()),
+            })
+        })
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use chio_core::crypto::Keypair;
+    use chio_core::receipt::{ChioReceiptBody, GuardEvidence, ToolCallAction};
+
+    fn deny_receipt(guard: &str) -> ChioReceipt {
+        let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
+        ChioReceipt::sign(
+            ChioReceiptBody {
+                id: "alert-rcpt-1".to_string(),
+                timestamp: 1_700_000_000,
+                capability_id: "cap".to_string(),
+                tool_server: "shell".to_string(),
+                tool_name: "bash".to_string(),
+                action,
+                decision: Decision::Deny {
+                    reason: "denied".to_string(),
+                    guard: guard.to_string(),
+                },
+                content_hash: "c".to_string(),
+                policy_hash: "p".to_string(),
+                evidence: vec![GuardEvidence {
+                    guard_name: guard.to_string(),
+                    verdict: false,
+                    details: None,
+                }],
+                metadata: None,
+                trust_level: chio_core::TrustLevel::default(),
+                tenant_id: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign")
+    }
+
+    fn allow_receipt() -> ChioReceipt {
+        let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
+        ChioReceipt::sign(
+            ChioReceiptBody {
+                id: "alert-rcpt-2".to_string(),
+                timestamp: 1_700_000_000,
+                capability_id: "cap".to_string(),
+                tool_server: "shell".to_string(),
+                tool_name: "bash".to_string(),
+                action,
+                decision: Decision::Allow,
+                content_hash: "c".to_string(),
+                policy_hash: "p".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: chio_core::TrustLevel::default(),
+                tenant_id: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign")
+    }
+
+    #[test]
+    fn severity_allow_clean_is_info() {
+        assert_eq!(derive_severity(&allow_receipt()), AlertSeverity::Info);
+    }
+
+    #[test]
+    fn severity_deny_secret_is_critical() {
+        assert_eq!(
+            derive_severity(&deny_receipt("SecretLeakGuard")),
+            AlertSeverity::Critical
+        );
+    }
+
+    #[test]
+    fn severity_deny_egress_is_critical() {
+        assert_eq!(
+            derive_severity(&deny_receipt("EgressGuard")),
+            AlertSeverity::Critical
+        );
+    }
+
+    #[test]
+    fn severity_deny_path_is_high() {
+        assert_eq!(
+            derive_severity(&deny_receipt("ForbiddenPathGuard")),
+            AlertSeverity::High
+        );
+    }
+
+    #[test]
+    fn severity_deny_generic_is_medium() {
+        assert_eq!(
+            derive_severity(&deny_receipt("CustomGuard")),
+            AlertSeverity::Medium
+        );
+    }
+
+    #[test]
+    fn allow_never_alerts() {
+        let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+        let event = SiemEvent::from_receipt(allow_receipt());
+        assert!(!exporter.should_alert(&event));
+    }
+
+    #[test]
+    fn medium_deny_does_not_alert_by_default() {
+        let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+        let event = SiemEvent::from_receipt(deny_receipt("CustomGuard"));
+        assert!(!exporter.should_alert(&event));
+    }
+
+    #[test]
+    fn high_deny_alerts_by_default() {
+        let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+        let event = SiemEvent::from_receipt(deny_receipt("ForbiddenPathGuard"));
+        assert!(exporter.should_alert(&event));
+    }
+
+    #[test]
+    fn exclude_guards_suppresses_alerts() {
+        let cfg = AlertingConfig {
+            min_severity: AlertSeverity::Medium,
+            exclude_guards: vec!["NoisyGuard".to_string()],
+            include_guards: Vec::new(),
+        };
+        let exporter = AlertingExporter::builder(cfg).build();
+        let event = SiemEvent::from_receipt(deny_receipt("NoisyGuard"));
+        assert!(!exporter.should_alert(&event));
+    }
+
+    #[test]
+    fn include_guards_restricts_alerts() {
+        let cfg = AlertingConfig {
+            min_severity: AlertSeverity::Medium,
+            exclude_guards: Vec::new(),
+            include_guards: vec!["ForbiddenPathGuard".to_string()],
+        };
+        let exporter = AlertingExporter::builder(cfg).build();
+        let match_event = SiemEvent::from_receipt(deny_receipt("ForbiddenPathGuard"));
+        let miss_event = SiemEvent::from_receipt(deny_receipt("OtherGuard"));
+        assert!(exporter.should_alert(&match_event));
+        assert!(!exporter.should_alert(&miss_event));
+    }
+
+    #[test]
+    fn severity_ordering_is_total() {
+        assert!(AlertSeverity::Critical > AlertSeverity::High);
+        assert!(AlertSeverity::High > AlertSeverity::Medium);
+        assert!(AlertSeverity::Medium > AlertSeverity::Low);
+        assert!(AlertSeverity::Low > AlertSeverity::Info);
+    }
+}

@@ -98,18 +98,17 @@ with (logs / "edge.log").open("w", encoding="utf-8") as edge_log:
 )
 
 assert send_response["result"]["status"] == "completed", send_response
-assert send_response["result"]["metadata"]["arc"]["authorityPath"] == "cross_protocol_orchestrator", send_response
-assert send_response["result"]["metadata"]["arc"]["receiptId"], send_response
+assert send_response["result"]["metadata"]["chio"]["authorityPath"] == "cross_protocol_orchestrator", send_response
+assert send_response["result"]["metadata"]["chio"]["receiptId"], send_response
 
 assert stream_created["result"]["status"] == "working", stream_created
-assert stream_created["result"]["metadata"]["arc"]["receiptPending"] is True, stream_created
+assert stream_created["result"]["metadata"]["chio"]["receiptPending"] is True, stream_created
 
 assert task_resolved["result"]["status"] == "completed", task_resolved
-assert task_resolved["result"]["metadata"]["arc"]["receiptId"], task_resolved
+assert task_resolved["result"]["metadata"]["chio"]["receiptId"], task_resolved
 
 print("hello-a2a smoke passed")
 print(f"artifacts: {artifacts}")
-print(f"send receipt: {send_response['result']['metadata']['arc']['receiptId']}")
-print(f"stream receipt: {task_resolved['result']['metadata']['arc']['receiptId']}")
+print(f"send receipt: {send_response['result']['metadata']['chio']['receiptId']}")
+print(f"stream receipt: {task_resolved['result']['metadata']['chio']['receiptId']}")
 PY
-

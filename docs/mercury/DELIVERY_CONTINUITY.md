@@ -42,7 +42,7 @@ The lane reuses already validated Mercury artifacts:
 - one reviewer package plus qualification report
 
 It does not authorize a generic onboarding suite, CRM workflow, support desk,
-channel marketplace, merged shell, ARC commercial console, or broader Mercury
+channel marketplace, merged shell, Chio commercial console, or broader Mercury
 customer-platform claim.
 
 ---
@@ -81,8 +81,8 @@ unchanged:
 - renewal owner: `mercury-renewal-gate`
 - evidence owner: `mercury-customer-evidence`
 
-Continuity ownership stays inside Mercury. ARC remains the generic substrate
-that Mercury consumes; ARC does not become a customer-success, onboarding, or
+Continuity ownership stays inside Mercury. Chio remains the generic substrate
+that Mercury consumes; Chio does not become a customer-success, onboarding, or
 commercial continuity console.
 
 ---
@@ -107,8 +107,8 @@ Not supported in `v2.58`:
 - multiple continuity motions or surfaces
 - a generic onboarding suite, CRM workflow, or support desk
 - channel marketplaces or multi-account continuity programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury product-family or universal account-health claims
 
 ---
@@ -118,14 +118,14 @@ Not supported in `v2.58`:
 Export the bounded delivery-continuity package and outcome-evidence bundle:
 
 ```bash
-cargo run -p arc-mercury -- delivery-continuity export --output target/mercury-delivery-continuity-export
+cargo run -p chio-mercury -- delivery-continuity export --output target/mercury-delivery-continuity-export
 ```
 
 Generate the validation package and explicit proceed decision:
 
 ```bash
-cargo run -p arc-mercury -- delivery-continuity validate --output target/mercury-delivery-continuity-validation
+cargo run -p chio-mercury -- delivery-continuity validate --output target/mercury-delivery-continuity-validation
 ```
 
 These commands remain Mercury-owned wrappers over existing Mercury artifacts.
-ARC stays generic; Mercury stays opinionated.
+Chio stays generic; Mercury stays opinionated.

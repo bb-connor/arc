@@ -4,9 +4,9 @@ set -euo pipefail
 EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 
-ARC_BIN="${ROOT}/target/debug/arc"
-if [[ ! -x "${ARC_BIN}" ]]; then
-  (cd "${ROOT}" && cargo build --bin arc >/dev/null)
+CHIO_BIN="${ROOT}/target/debug/chio"
+if [[ ! -x "${CHIO_BIN}" ]]; then
+  (cd "${ROOT}" && cargo build --bin chio >/dev/null)
 fi
 
 ARTIFACT_ROOT="${EXAMPLE_ROOT}/.artifacts/$(date -u +"%Y%m%dT%H%M%SZ")"
@@ -17,7 +17,7 @@ mkdir -p "${ARTIFACT_ROOT}"
 cp -R "${EXAMPLE_ROOT}/fixtures/minimal-evidence" "${INPUT_DIR}"
 cp -R "${EXAMPLE_ROOT}/fixtures/minimal-evidence" "${TAMPERED_DIR}"
 
-"${ARC_BIN}" evidence verify --input "${INPUT_DIR}" --json > "${ARTIFACT_ROOT}/verify.json"
+"${CHIO_BIN}" evidence verify --input "${INPUT_DIR}" --json > "${ARTIFACT_ROOT}/verify.json"
 
 python3 - "${ARTIFACT_ROOT}/verify.json" "${INPUT_DIR}/receipts.ndjson" "${INPUT_DIR}/capability-lineage.ndjson" "${ARTIFACT_ROOT}/summary.json" <<'PY'
 import json
@@ -51,7 +51,7 @@ import sys
 Path(sys.argv[1]).write_text('{"tampered":true}\n', encoding="utf-8")
 PY
 
-if "${ARC_BIN}" evidence verify --input "${TAMPERED_DIR}" --json > "${ARTIFACT_ROOT}/tamper-out.json" 2> "${ARTIFACT_ROOT}/tamper-err.json"; then
+if "${CHIO_BIN}" evidence verify --input "${TAMPERED_DIR}" --json > "${ARTIFACT_ROOT}/tamper-out.json" 2> "${ARTIFACT_ROOT}/tamper-err.json"; then
   echo "expected tampered package verification to fail" >&2
   exit 1
 fi
@@ -62,7 +62,7 @@ import sys
 from pathlib import Path
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-assert payload["code"] == "ARC-CLI-OTHER", payload
+assert payload["code"] == "CHIO-CLI-OTHER", payload
 assert "hash mismatch" in payload["message"] or "hash mismatch" in payload["context"]["detail"], payload
 PY
 

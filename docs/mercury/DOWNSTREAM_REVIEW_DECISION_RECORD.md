@@ -37,4 +37,4 @@ Proceed with one bounded downstream case-management review-consumer lane.
 
 The case-management review lane is the narrowest credible downstream expansion
 that strengthens buyer review workflows while preserving MERCURY as an
-evidence layer on ARC rather than a generic connector hub.
+evidence layer on Chio rather than a generic connector hub.

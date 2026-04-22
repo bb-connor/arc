@@ -10,7 +10,7 @@
 `controlled-adoption validate` is the canonical close-out command for the
 bounded Mercury controlled-adoption lane. It generates the adoption package,
 writes the validation report, and emits one explicit scale decision instead of
-implying a generic ARC renewal console, merged shell, or new Mercury product
+implying a generic Chio renewal console, merged shell, or new Mercury product
 surface.
 
 ---
@@ -18,7 +18,7 @@ surface.
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- controlled-adoption validate --output target/mercury-controlled-adoption-validation
+cargo run -p chio-mercury -- controlled-adoption validate --output target/mercury-controlled-adoption-validation
 ```
 
 ---
@@ -59,7 +59,7 @@ This package supports one bounded claim only:
 > Mercury can scale one controlled-adoption lane for
 > `design_partner_renewal` over one `renewal_reference_bundle` built from the
 > existing release-readiness, trust-network, assurance, proof, and inquiry
-> stack without widening ARC or creating a new Mercury surface family.
+> stack without widening Chio or creating a new Mercury surface family.
 
 ---
 
@@ -68,7 +68,7 @@ This package supports one bounded claim only:
 This package does not claim:
 
 - additional adoption cohorts or renewal surfaces
-- a generic ARC renewal console
-- a merged Mercury and ARC-Wall shell
+- a generic Chio renewal console
+- a merged Mercury and Chio-Wall shell
 - broader Mercury product-family scope
 - cross-product packaging unification

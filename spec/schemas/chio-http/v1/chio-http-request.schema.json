@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio HTTP Request",
+  "description": "Protocol-agnostic HTTP request model sent to the Chio sidecar for evaluation.",
+  "type": "object",
+  "required": ["request_id", "method", "route_pattern", "path", "caller", "timestamp"],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique request identifier. UUIDv7 recommended."
+    },
+    "method": {
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+      "description": "HTTP method of the request."
+    },
+    "route_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Matched route pattern (e.g., '/pets/{petId}'). Used for policy matching."
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Actual request path (e.g., '/pets/42')."
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "description": "Query parameters as key-value pairs."
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "description": "Selected request headers relevant to policy evaluation. Must not include raw auth credential headers."
+    },
+    "caller": {
+      "$ref": "caller-identity.schema.json",
+      "description": "Extracted caller identity."
+    },
+    "body_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex hash of the request body. Null for bodyless requests."
+    },
+    "body_length": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Content-Length of the request body in bytes."
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "description": "Session ID this request belongs to."
+    },
+    "capability_id": {
+      "type": ["string", "null"],
+      "description": "Capability token ID presented with this request."
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the request was received."
+    }
+  }
+}

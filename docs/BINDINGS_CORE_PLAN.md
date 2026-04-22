@@ -1,4 +1,4 @@
-# ARC Bindings Core Plan
+# Chio Bindings Core Plan
 
 ## Goal
 
@@ -21,7 +21,7 @@ Short-horizon execution sequencing for this plan lives in
 
 This follows the existing project direction:
 
-- MCP-compatible edge, ARC-native core
+- MCP-compatible edge, Chio-native core
 - evidence-driven compatibility claims
 - native authoring ergonomics without hiding the security model
 
@@ -97,15 +97,15 @@ Native bridges should be optional where possible:
 - Python should work without the native module for remote-edge usage
 - Go should work with `CGO_ENABLED=0` for remote-edge usage
 
-The default path should never require native compilation just to talk to a remote ARC edge.
+The default path should never require native compilation just to talk to a remote Chio edge.
 
 ## Proposed Repository Layout
 
 ```text
 crates/
-  arc-bindings-core/
-  arc-bindings-ffi/
-  arc-bindings-wasm/
+  chio-bindings-core/
+  chio-bindings-ffi/
+  chio-bindings-wasm/
 
 tests/
   bindings/
@@ -114,15 +114,15 @@ tests/
 
 packages/
   sdk/
-    arc-ts/
-    arc-py/
-      arc-native/
-    arc-go/
+    chio-ts/
+    chio-py/
+      chio-native/
+    chio-go/
 ```
 
 ## Crate Responsibilities
 
-### `crates/arc-bindings-core`
+### `crates/chio-bindings-core`
 
 Purpose:
 
@@ -130,14 +130,14 @@ Purpose:
 
 Dependencies:
 
-- `arc-core`
-- `arc-manifest`
-- `arc-policy` only if policy helpers are intentionally included
+- `chio-core`
+- `chio-manifest`
+- `chio-policy` only if policy helpers are intentionally included
 
 Must not depend on:
 
-- `arc-kernel`
-- `arc-cli`
+- `chio-kernel`
+- `chio-cli`
 - transport code
 - remote trust services
 - edge session orchestration
@@ -169,7 +169,7 @@ Example surface:
 - `verify_manifest(manifest_json, trust_roots) -> ManifestVerification`
 - `compile_policy(input_yaml) -> CompiledPolicyArtifact`
 
-### `crates/arc-bindings-ffi`
+### `crates/chio-bindings-ffi`
 
 Purpose:
 
@@ -194,7 +194,7 @@ Should not:
 - expose async flows
 - expose kernel/session runtime state
 
-### `crates/arc-bindings-wasm`
+### `crates/chio-bindings-wasm`
 
 Purpose:
 
@@ -261,7 +261,7 @@ This is distinct from the main conformance harness. It records SDK surface progr
 ### Package layout
 
 ```text
-packages/sdk/arc-ts/
+packages/sdk/chio-ts/
   src/
     client/
     transport/
@@ -317,15 +317,15 @@ Remote-edge SDK:
 ### Package layout
 
 ```text
-packages/sdk/arc-py/
-  src/arc/
+packages/sdk/chio-py/
+  src/chio/
     client/
     session/
     auth/
     tasks/
     nested/
     invariants/
-  arc-native/
+  chio-native/
     Cargo.toml
     pyproject.toml
     src/
@@ -375,7 +375,7 @@ PyO3 native module:
 ### Package layout
 
 ```text
-packages/sdk/arc-go/
+packages/sdk/chio-go/
   client/
   session/
   auth/
@@ -388,7 +388,7 @@ packages/sdk/arc-go/
 ### Recommended implementation model
 
 - pure Go remote-edge SDK is the default
-- optional CGO bridge consumes `arc-bindings-ffi`
+- optional CGO bridge consumes `chio-bindings-ffi`
 - `CGO_ENABLED=0` remains supported for remote-edge usage
 
 ### Go scope by layer
@@ -424,7 +424,7 @@ Optional native bridge:
 
 ## What Must Not Go Into Bindings Core
 
-The following should stay out of `arc-bindings-core` in the first rollout:
+The following should stay out of `chio-bindings-core` in the first rollout:
 
 - full session state machines
 - remote HTTP clients
@@ -456,7 +456,7 @@ Exit criteria:
 - the team can answer "is this SDK behavior parity or invariant parity?"
 - every proposed binding entrypoint has an owning test class
 
-## Phase 1: `arc-bindings-core`
+## Phase 1: `chio-bindings-core`
 
 Objective:
 
@@ -464,14 +464,14 @@ Objective:
 
 Deliverables:
 
-- `crates/arc-bindings-core`
+- `crates/chio-bindings-core`
 - vector generator tests
 - stable JSON fixtures under `tests/bindings/vectors/`
 
 Exit criteria:
 
 - Rust vectors are generated from one crate, not ad hoc per SDK
-- no dependency on `arc-kernel` or edge transport code
+- no dependency on `chio-kernel` or edge transport code
 
 ## Phase 2: TypeScript alpha
 
@@ -483,7 +483,7 @@ Reason to do this first:
 
 Deliverables:
 
-- `packages/sdk/arc-ts`
+- `packages/sdk/chio-ts`
 - invariant helper layer with optional WASM backend
 - remote HTTP client for current conformance waves
 
@@ -503,8 +503,8 @@ Reason to do this second:
 
 Deliverables:
 
-- `packages/sdk/arc-py`
-- `packages/sdk/arc-py/arc-native`
+- `packages/sdk/chio-py`
+- `packages/sdk/chio-py/chio-native`
 - optional native invariants module
 - remote HTTP client for current conformance waves
 
@@ -524,9 +524,9 @@ Reason to do this third:
 
 Deliverables:
 
-- `packages/sdk/arc-go`
+- `packages/sdk/chio-go`
 - pure Go remote-edge client
-- optional `internal/native` bridge using `arc-bindings-ffi`
+- optional `internal/native` bridge using `chio-bindings-ffi`
 
 Exit criteria:
 
@@ -557,7 +557,7 @@ Exit criteria:
 
 Tasks:
 
-- add `crates/arc-bindings-core`
+- add `crates/chio-bindings-core`
 - define a bindings-safe error model
 - add vector generation tests
 - write a short `BINDINGS_API.md` if the surface grows beyond a few modules
@@ -566,7 +566,7 @@ Tasks:
 
 Tasks:
 
-- scaffold `packages/sdk/arc-ts`
+- scaffold `packages/sdk/chio-ts`
 - move current JS peer transport logic into reusable library code
 - add optional WASM loading for invariant helpers
 - run current JS conformance waves through the package
@@ -575,16 +575,16 @@ Tasks:
 
 Tasks:
 
-- scaffold `packages/sdk/arc-py`
+- scaffold `packages/sdk/chio-py`
 - add `httpx` transport and session handling
-- add `arc-native` with `abi3`
+- add `chio-native` with `abi3`
 - run current Python conformance waves through the package
 
 ## Milestone D: ship Go remote-edge package
 
 Tasks:
 
-- scaffold `packages/sdk/arc-go`
+- scaffold `packages/sdk/chio-go`
 - add context-aware remote HTTP client
 - add optional CGO helpers
 - create first Go integration coverage
@@ -605,17 +605,17 @@ Tasks:
 
 ## Recommended Immediate Next Moves
 
-1. Add `crates/arc-bindings-core` with only canonical JSON, hashing, signature, receipt, capability, and manifest helpers.
+1. Add `crates/chio-bindings-core` with only canonical JSON, hashing, signature, receipt, capability, and manifest helpers.
 2. Add `tests/bindings/vectors/` and generate the first canonical JSON, hash, and receipt verification fixtures from Rust.
-3. Scaffold `packages/sdk/arc-ts` and route the existing JS peer through it for remote HTTP coverage.
-4. After the TS package shape stabilizes, scaffold `packages/sdk/arc-py` plus a minimal PyO3 module.
+3. Scaffold `packages/sdk/chio-ts` and route the existing JS peer through it for remote HTTP coverage.
+4. After the TS package shape stabilizes, scaffold `packages/sdk/chio-py` plus a minimal PyO3 module.
 5. Start Go only after the TS and Python packages prove that the bindings-core boundary is small enough.
 
 ## Recommendation
 
 Use "Rust as truth" for invariant logic, not for the whole SDK runtime.
 
-That gives ARC:
+That gives Chio:
 
 - one trustworthy implementation of byte-sensitive security primitives
 - evidence-backed multi-language parity

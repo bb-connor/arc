@@ -3,22 +3,22 @@
 > **Status**: Tier 1 -- proposed April 2026
 > **Priority**: High -- serverless functions are a natural deployment model
 > for tool servers. Lambda Extensions provide a sidecar-equivalent mechanism
-> that can run the ARC kernel alongside each function invocation.
+> that can run the Chio kernel alongside each function invocation.
 
 ## 1. Why Lambda
 
 AWS Lambda is the dominant serverless compute platform. Agent tool servers
 deployed as Lambda functions inherit automatic scaling, pay-per-invocation
 pricing, and zero infrastructure management. But they also lose the ability
-to run a persistent sidecar -- the standard ARC deployment model.
+to run a persistent sidecar -- the standard Chio deployment model.
 
 Lambda Extensions solve this. An Extension runs as a co-process alongside
 the function handler, persists across warm invocations, and can intercept
-the function lifecycle. This is the ARC sidecar model adapted for serverless.
+the function lifecycle. This is the Chio sidecar model adapted for serverless.
 
-### What ARC Adds to Lambda
+### What Chio Adds to Lambda
 
-| Lambda alone | Lambda + ARC |
+| Lambda alone | Lambda + Chio |
 |--------------|--------------|
 | IAM role-based authorization | Capability-scoped, time-bounded, per-tool authorization |
 | CloudWatch logs | Merkle-committed, signed receipt log |
@@ -35,12 +35,12 @@ Lambda Execution Environment
 +----------------------------------------------------------+
 |                                                          |
 |  +------------------+     +---------------------------+  |
-|  | Function Handler |     | ARC Extension             |  |
+|  | Function Handler |     | Chio Extension             |  |
 |  |                  |     |                           |  |
 |  | async def handler|---->| HTTP :9090 (internal)     |  |
-|  |   arc.evaluate() |     | Capability | Guard | Rcpt |  |
+|  |   chio.evaluate() |     | Capability | Guard | Rcpt |  |
 |  |   ... do work ...|     |                           |  |
-|  |   arc.receipt()  |     | Lifecycle hooks:          |  |
+|  |   chio.receipt()  |     | Lifecycle hooks:          |  |
 |  +------------------+     |   INVOKE -> pre-evaluate  |  |
 |                           |   SHUTDOWN -> flush rcpts |  |
 |                           +---------------------------+  |
@@ -55,7 +55,7 @@ Lambda Execution Environment
 
 Lambda Extensions participate in three lifecycle phases:
 
-1. **INIT** -- The ARC extension starts, loads policy from S3/SSM/bundled
+1. **INIT** -- The Chio extension starts, loads policy from S3/SSM/bundled
    config, initializes the kernel, and opens the local HTTP listener on
    port 9090. This happens once per cold start.
 
@@ -65,18 +65,18 @@ Lambda Extensions participate in three lifecycle phases:
    extension via HTTP.
 
 3. **SHUTDOWN** -- The extension flushes any buffered receipts to the
-   configured receipt sink (S3, DynamoDB, or remote ARC control plane)
+   configured receipt sink (S3, DynamoDB, or remote Chio control plane)
    before the execution environment is recycled.
 
 ### 2.3 Cold Start Optimization
 
-The ARC kernel is a small Rust binary. Compiled as a Lambda Extension
+The Chio kernel is a small Rust binary. Compiled as a Lambda Extension
 Layer, it adds minimal cold start overhead:
 
 ```
 Component                Cold start delta
 ----------------------------------------------
-ARC kernel binary        ~15ms (precompiled ARM64)
+Chio kernel binary        ~15ms (precompiled ARM64)
 Policy load (bundled)    ~2ms
 Policy load (S3)         ~40-80ms (cached after first)
 Guard WASM init          ~10-30ms per guard
@@ -96,10 +96,10 @@ The extension intercepts every invocation automatically. No code changes
 to the handler:
 
 ```yaml
-# arc-policy.yaml (bundled in layer or loaded from S3)
+# chio-policy.yaml (bundled in layer or loaded from S3)
 mode: transparent
 evaluation:
-  # Map Lambda event fields to ARC evaluation context
+  # Map Lambda event fields to Chio evaluation context
   identity_field: "requestContext.authorizer.principalId"
   tool_field: "resource"         # API Gateway resource path
   scope_field: "httpMethod"      # GET -> read, POST -> write
@@ -118,18 +118,18 @@ policy:
 
 ### 3.2 Explicit Mode (Handler SDK)
 
-The handler calls ARC explicitly for fine-grained control:
+The handler calls Chio explicitly for fine-grained control:
 
 **Python:**
 
 ```python
-from arc_lambda import ArcLambda
+from chio_lambda import ChioLambda
 
-arc = ArcLambda()  # connects to extension on :9090
+chio = ChioLambda()  # connects to extension on :9090
 
 async def handler(event, context):
     # Evaluate capability before executing tool logic
-    verdict = await arc.evaluate(
+    verdict = await chio.evaluate(
         tool="database-query",
         scope="db:read",
         arguments=event["body"],
@@ -150,7 +150,7 @@ async def handler(event, context):
     result = execute_query(event["body"])
 
     # Record successful execution receipt
-    receipt = await arc.record(
+    receipt = await chio.record(
         verdict=verdict,
         result_hash=sha256(json.dumps(result)),
     )
@@ -158,19 +158,19 @@ async def handler(event, context):
     return {
         "statusCode": 200,
         "body": json.dumps(result),
-        "headers": {"X-Arc-Receipt": receipt.receipt_id},
+        "headers": {"X-Chio-Receipt": receipt.receipt_id},
     }
 ```
 
 **TypeScript/Node:**
 
 ```typescript
-import { ArcLambda } from "@arc-protocol/lambda";
+import { ChioLambda } from "@chio-protocol/lambda";
 
-const arc = new ArcLambda();
+const chio = new ChioLambda();
 
 export const handler = async (event: APIGatewayProxyEvent) => {
-  const verdict = await arc.evaluate({
+  const verdict = await chio.evaluate({
     tool: "database-query",
     scope: "db:read",
     arguments: JSON.parse(event.body ?? "{}"),
@@ -183,7 +183,7 @@ export const handler = async (event: APIGatewayProxyEvent) => {
 
   const result = await executeQuery(event.body);
 
-  const receipt = await arc.record({
+  const receipt = await chio.record({
     verdict,
     resultHash: sha256(JSON.stringify(result)),
   });
@@ -191,18 +191,18 @@ export const handler = async (event: APIGatewayProxyEvent) => {
   return {
     statusCode: 200,
     body: JSON.stringify(result),
-    headers: { "X-Arc-Receipt": receipt.receiptId },
+    headers: { "X-Chio-Receipt": receipt.receiptId },
   };
 };
 ```
 
 ### 3.3 API Gateway Authorizer Mode
 
-ARC can run as a Lambda Authorizer, evaluating capabilities at the API
+Chio can run as a Lambda Authorizer, evaluating capabilities at the API
 Gateway layer before the function is even invoked:
 
 ```
-Client -> API Gateway -> ARC Authorizer Lambda -> Policy decision
+Client -> API Gateway -> Chio Authorizer Lambda -> Policy decision
                               |                        |
                               |                   allow/deny
                               |                        |
@@ -210,10 +210,10 @@ Client -> API Gateway -> ARC Authorizer Lambda -> Policy decision
 ```
 
 ```python
-# arc_authorizer.py -- deployed as a separate Lambda
-from arc_lambda import ArcAuthorizer
+# chio_authorizer.py -- deployed as a separate Lambda
+from chio_lambda import ChioAuthorizer
 
-authorizer = ArcAuthorizer(policy_source="s3://my-bucket/arc-policy.yaml")
+authorizer = ChioAuthorizer(policy_source="s3://my-bucket/chio-policy.yaml")
 
 def handler(event, context):
     return authorizer.evaluate(event)
@@ -232,7 +232,7 @@ before the execution environment is recycled.
 | DynamoDB | ~5ms | High | Per-write |
 | S3 (buffered) | ~50ms | High | Per-object (batch) |
 | SQS -> processor | ~10ms | High | Per-message |
-| ARC Control Plane | ~20-50ms | High | Managed |
+| Chio Control Plane | ~20-50ms | High | Managed |
 
 ### Flush Strategy
 
@@ -252,11 +252,11 @@ Async:
 For distributed tool access at the edge:
 
 ```
-CloudFront -> Lambda@Edge (ARC evaluation) -> Origin (tool server)
+CloudFront -> Lambda@Edge (Chio evaluation) -> Origin (tool server)
 ```
 
 Lambda@Edge constraints: 5s timeout (viewer request), 30s (origin request),
-no VPC access, limited package size. The ARC evaluation must be:
+no VPC access, limited package size. The Chio evaluation must be:
 
 - Bundled policy only (no S3 fetch at edge)
 - Pre-compiled guards (no WASM runtime at edge -- use pre-evaluated policy)
@@ -274,12 +274,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Resources:
-  ArcExtensionLayer:
+  ChioExtensionLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: arc-kernel-extension
-      Description: ARC protocol kernel as Lambda Extension
-      ContentUri: layers/arc-extension/
+      LayerName: chio-kernel-extension
+      Description: Chio protocol kernel as Lambda Extension
+      ContentUri: layers/chio-extension/
       CompatibleRuntimes:
         - python3.12
         - python3.13
@@ -296,11 +296,11 @@ Resources:
       Runtime: python3.13
       Architectures: [arm64]
       Layers:
-        - !Ref ArcExtensionLayer
+        - !Ref ChioExtensionLayer
       Environment:
         Variables:
-          ARC_POLICY_SOURCE: !Sub "s3://${PolicyBucket}/arc-policy.yaml"
-          ARC_RECEIPT_TABLE: !Ref ReceiptTable
+          CHIO_POLICY_SOURCE: !Sub "s3://${PolicyBucket}/chio-policy.yaml"
+          CHIO_RECEIPT_TABLE: !Ref ReceiptTable
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref PolicyBucket
@@ -310,7 +310,7 @@ Resources:
   ReceiptTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: arc-receipts
+      TableName: chio-receipts
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: receipt_id
@@ -332,10 +332,10 @@ Resources:
 ### CDK (TypeScript)
 
 ```typescript
-import { ArcExtensionLayer } from "@arc-protocol/cdk";
+import { ChioExtensionLayer } from "@chio-protocol/cdk";
 
-const arcLayer = new ArcExtensionLayer(this, "ArcExtension", {
-  policySource: PolicySource.s3(policyBucket, "arc-policy.yaml"),
+const arcLayer = new ChioExtensionLayer(this, "ChioExtension", {
+  policySource: PolicySource.s3(policyBucket, "chio-policy.yaml"),
   receiptSink: ReceiptSink.dynamodb(receiptTable),
 });
 
@@ -350,7 +350,7 @@ const toolFn = new lambda.Function(this, "ToolFunction", {
 
 ```
 sdks/lambda/
-  arc-lambda-extension/
+  chio-lambda-extension/
     Cargo.toml              # Rust binary, compiles to Lambda Extension
     src/
       main.rs               # Extension lifecycle (INIT/INVOKE/SHUTDOWN)
@@ -358,20 +358,20 @@ sdks/lambda/
       receipt_sink.rs       # DynamoDB/S3/SQS flush
     Makefile                # Cross-compile for arm64/x86_64 Lambda
 
-  arc-lambda-python/
-    pyproject.toml          # deps: arc-sdk-python
-    src/arc_lambda/
+  chio-lambda-python/
+    pyproject.toml          # deps: chio-sdk-python
+    src/chio_lambda/
       __init__.py
-      client.py             # ArcLambda, ArcAuthorizer
+      client.py             # ChioLambda, ChioAuthorizer
       transparent.py        # Event-to-evaluation mapping
 
-  arc-lambda-node/
-    package.json            # deps: @arc-protocol/node-http
+  chio-lambda-node/
+    package.json            # deps: @chio-protocol/node-http
     src/
       index.ts
-      client.ts             # ArcLambda class
+      client.ts             # ChioLambda class
 
-  arc-lambda-cdk/
+  chio-lambda-cdk/
     package.json            # CDK constructs
     src/
       extension-layer.ts
@@ -385,7 +385,7 @@ sdks/lambda/
    on a background timer in this mode?
 
 2. **SnapStart (Java).** Lambda SnapStart checkpoints the JVM after INIT.
-   The ARC extension state must be checkpoint-safe -- no open sockets or
+   The Chio extension state must be checkpoint-safe -- no open sockets or
    time-dependent state at checkpoint time.
 
 3. **Function URLs vs. API Gateway.** Function URLs bypass API Gateway.

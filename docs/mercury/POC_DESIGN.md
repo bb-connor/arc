@@ -50,7 +50,7 @@ The exact first workflow sentence is frozen as:
 | Simultaneous multi-platform OMS support | Too much integration surface for a first pilot |
 | Browser portal and SDK parity | Verification UX breadth is not the first constraint |
 | Best-execution or regulatory claims | Outside the product proof boundary |
-| ARC-Wall | Separate expansion track |
+| Chio-Wall | Separate expansion track |
 
 ---
 

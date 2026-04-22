@@ -1,8 +1,0 @@
-{
-  "decision": "engage_external_provider",
-  "reason": "Immediate remediation requires reverting the edge rule 'geo-restrict-v42' from blocking to dry-run mode, but Meridian does not have direct access to production edge policy at StratosNetworks\u2014the external provider. The change needed is urgent (sev-1, major outage), of minimal risk, and narrowly scoped: revert to previous config commit (d7f0a5c2) to restore legitimate customer traffic, as dry-run mode preserves observability and disables the false positive blocking. A broader rollback (full rule removal) would add compliance risk and requires executive approval.",
-  "scope_constraint": "Provider (StratosNetworks) is authorized only to revert 'geo-restrict-v42' from blocking to dry-run mode across all production edge locations (restore exactly previous config, commit d7f0a5c2). No further edge policy changes, broader rule removals, or geo-classification model updates to be performed at this time. Action limited to targeted, low-risk rollback to restore customer traffic; further changes must be separately reviewed.",
-  "role": "commander-agent",
-  "mode": "openai_agents_sdk",
-  "tool_calls": []
-}

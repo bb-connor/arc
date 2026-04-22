@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio ToolCallResult ok",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "value"],
+  "properties": {
+    "status": {
+      "const": "ok"
+    },
+    "value": true
+  }
+}

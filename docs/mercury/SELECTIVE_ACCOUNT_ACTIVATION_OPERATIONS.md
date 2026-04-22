@@ -86,8 +86,8 @@ This runbook does not authorize:
 - multiple activation motions or delivery surfaces
 - a generic onboarding suite, CRM workflow, or channel marketplace
 - partner marketplaces or multi-segment activation programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broad rollout or universal performance claims
 
 Those remain separate decisions, not hidden responsibilities inside `v2.57`.

@@ -3,9 +3,9 @@
 Monetary budgets let operators cap how much an agent can spend when invoking
 cost-bearing tools. The strongest honest budget claim today is:
 
-- **single node:** ARC enforces budgets with an atomic read-check-increment
+- **single node:** Chio enforces budgets with an atomic read-check-increment
   transaction on one SQLite store
-- **clustered mode:** ARC bounds provisional authorized exposure, but does not
+- **clustered mode:** Chio bounds provisional authorized exposure, but does not
   claim distributed-linearizable spend truth and admits the documented overrun
   bound under split-brain conditions
 
@@ -92,7 +92,7 @@ When designing budgets for sensitive tools, size `max_total_cost` conservatively
 
 ## FinancialReceiptMetadata on Receipts
 
-Every allowed invocation under a monetary grant produces a `ArcReceipt` with a `"financial"` key in its `metadata` field. The value is a `FinancialReceiptMetadata` object:
+Every allowed invocation under a monetary grant produces a `ChioReceipt` with a `"financial"` key in its `metadata` field. The value is a `FinancialReceiptMetadata` object:
 
 ```rust
 pub struct FinancialReceiptMetadata {

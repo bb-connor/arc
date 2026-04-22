@@ -71,7 +71,7 @@ and evidence-bundle integrity.
 ### Is there more than one verifier surface?
 
 The initial supported surface is a Rust library plus the dedicated
-`arc-mercury` CLI app. Additional distribution surfaces such as browser or
+`chio-mercury` CLI app. Additional distribution surfaces such as browser or
 WASM packaging follow later.
 
 ### Can verification happen offline?
@@ -199,7 +199,7 @@ model without changing the proof model.
 - supervised-live productionization for the same workflow
 - governance, downstream-consumer, and assurance distribution surfaces
 - embedded OEM and trust-network services
-- companion products such as ARC-Wall
+- companion products such as Chio-Wall
 
 ### Do you have SOC 2 or third-party pen test reports?
 

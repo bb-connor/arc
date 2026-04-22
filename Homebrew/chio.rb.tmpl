@@ -1,0 +1,45 @@
+# typed: strict
+# frozen_string_literal: true
+
+# Homebrew formula template for the Chio sidecar binary.
+#
+# The release workflow renders this file into the `chio.rb` GitHub release
+# asset with concrete version and checksum values.
+class Chio < Formula
+  desc "Chio sidecar runtime"
+  homepage "https://github.com/__CHIO_GITHUB_REPO__"
+  version "__CHIO_VERSION__"
+  license "Apache-2.0"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/__CHIO_GITHUB_REPO__/releases/download/v#{version}/chio-#{version}-aarch64-apple-darwin.tar.gz"
+      sha256 "__CHIO_SHA256_DARWIN_ARM64__"
+    end
+    on_intel do
+      url "https://github.com/__CHIO_GITHUB_REPO__/releases/download/v#{version}/chio-#{version}-x86_64-apple-darwin.tar.gz"
+      sha256 "__CHIO_SHA256_DARWIN_AMD64__"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/__CHIO_GITHUB_REPO__/releases/download/v#{version}/chio-#{version}-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "__CHIO_SHA256_LINUX_ARM64__"
+    end
+    on_intel do
+      url "https://github.com/__CHIO_GITHUB_REPO__/releases/download/v#{version}/chio-#{version}-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "__CHIO_SHA256_LINUX_AMD64__"
+    end
+  end
+
+  def install
+    candidate = Dir["chio", "chio-#{version}-*/chio"].find { |path| File.file?(path) }
+    odie "Chio archive did not contain an installable binary" unless candidate
+    bin.install candidate
+  end
+
+  test do
+    assert_match(/chio/i, shell_output("#{bin}/chio --version"))
+  end
+end

@@ -1,16 +1,16 @@
 /**
- * Fastify plugin for ARC protocol.
+ * Fastify plugin for Chio protocol.
  *
  * Usage:
  *   import Fastify from "fastify";
- *   import { arc } from "@arc-protocol/fastify";
+ *   import { chio } from "@chio-protocol/fastify";
  *
  *   const fastify = Fastify();
- *   fastify.register(arc, { config: "arc.yaml" });
+ *   fastify.register(chio, { config: "chio.yaml" });
  *
  * The plugin intercepts every request via an onRequest hook, evaluates it
- * against the ARC sidecar kernel, and either allows it to proceed or
- * returns a structured error response with ARC error codes.
+ * against the Chio sidecar kernel, and either allows it to proceed or
+ * returns a structured error response with Chio error codes.
  */
 
 import type {
@@ -21,35 +21,35 @@ import type {
 } from "fastify";
 import fp from "fastify-plugin";
 import {
-  type ArcConfig,
+  type ChioConfig,
   type EvaluateResponse,
   type HttpMethod,
-  ARC_ERROR_CODES,
+  CHIO_ERROR_CODES,
   isDenied,
   resolveConfig,
-  buildArcHttpRequest,
-} from "@arc-protocol/node-http";
+  buildChioHttpRequest,
+} from "@chio-protocol/node-http";
 import { createHash } from "node:crypto";
 import { PassThrough } from "node:stream";
 
-/** Fastify-specific ARC config. */
-export interface ArcFastifyConfig extends ArcConfig {
+/** Fastify-specific Chio config. */
+export interface ChioFastifyConfig extends ChioConfig {
   /**
-   * Skip ARC evaluation for specific paths.
+   * Skip Chio evaluation for specific paths.
    * Accepts exact paths or RegExp patterns.
    */
   skip?: Array<string | RegExp> | undefined;
 }
 
-/** Augment FastifyRequest to carry ARC evaluation result. */
+/** Augment FastifyRequest to carry Chio evaluation result. */
 declare module "fastify" {
   interface FastifyRequest {
-    arcResult?: EvaluateResponse | undefined;
-    arcRawBody?: Buffer | undefined;
+    chioResult?: EvaluateResponse | undefined;
+    chioRawBody?: Buffer | undefined;
   }
 }
 
-/** Valid HTTP methods for ARC evaluation. */
+/** Valid HTTP methods for Chio evaluation. */
 const VALID_METHODS = new Set<string>([
   "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS",
 ]);
@@ -57,16 +57,16 @@ const VALID_METHODS = new Set<string>([
 /**
  * Internal plugin implementation (before wrapping with fastify-plugin).
  */
-const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
+const chioPlugin: FastifyPluginAsync<ChioFastifyConfig> = async (
   fastify: FastifyInstance,
-  opts: ArcFastifyConfig,
+  opts: ChioFastifyConfig,
 ): Promise<void> => {
   const resolved = resolveConfig(opts);
   const skipPatterns = opts.skip ?? [];
 
-  // Decorate request with arcResult
-  fastify.decorateRequest("arcResult", undefined);
-  fastify.decorateRequest("arcRawBody", undefined);
+  // Decorate request with chioResult
+  fastify.decorateRequest("chioResult", undefined);
+  fastify.decorateRequest("chioRawBody", undefined);
 
   fastify.addHook("preParsing", async (request, _reply, payload) => {
     const chunks: Buffer[] = [];
@@ -75,7 +75,7 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
     }
 
     const bodyBytes = Buffer.concat(chunks);
-    request.arcRawBody = bodyBytes;
+    request.chioRawBody = bodyBytes;
 
     const replay = new PassThrough();
     replay.end(bodyBytes);
@@ -95,7 +95,7 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
     const method = request.method.toUpperCase();
     if (!VALID_METHODS.has(method)) {
       reply.code(405).send({
-        error: ARC_ERROR_CODES.EVALUATION_FAILED,
+        error: CHIO_ERROR_CODES.EVALUATION_FAILED,
         message: `unsupported HTTP method: ${method}`,
       });
       return reply;
@@ -138,13 +138,13 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
     // Compute body hash from the raw request bytes captured in preParsing.
     let bodyHash: string | undefined;
     let bodyLength = 0;
-    const rawBody = request.arcRawBody;
+    const rawBody = request.chioRawBody;
     if (rawBody != null && rawBody.length > 0) {
       bodyLength = rawBody.length;
       bodyHash = createHash("sha256").update(rawBody).digest("hex");
     }
 
-    const capabilityToken = rawHeaders["x-arc-capability"] ?? query["arc_capability"] ?? undefined;
+    const capabilityToken = rawHeaders["x-chio-capability"] ?? query["chio_capability"] ?? undefined;
     let capabilityId: string | undefined;
     if (capabilityToken != null) {
       try {
@@ -155,7 +155,7 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
       }
     }
 
-    const arcReq = buildArcHttpRequest({
+    const chioReq = buildChioHttpRequest({
       method: httpMethod,
       path,
       query,
@@ -168,23 +168,23 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
     });
 
     try {
-      const result = await resolved.client.evaluate(arcReq, rawHeaders["x-arc-capability"] ?? undefined);
+      const result = await resolved.client.evaluate(chioReq, rawHeaders["x-chio-capability"] ?? undefined);
 
       // Attach receipt ID header
-      reply.header("X-Arc-Receipt-Id", result.receipt.id);
+      reply.header("X-Chio-Receipt-Id", result.receipt.id);
 
       if (isDenied(result.verdict)) {
         reply.code(result.verdict.http_status).send({
-          error: ARC_ERROR_CODES.ACCESS_DENIED,
+          error: CHIO_ERROR_CODES.ACCESS_DENIED,
           message: result.verdict.reason,
           receipt_id: result.receipt.id,
-          suggestion: "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
+          suggestion: "provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter",
         });
         return reply;
       }
 
       // Attach result for downstream handlers
-      request.arcResult = result;
+      request.chioResult = result;
     } catch (error) {
       if (resolved.onSidecarError === "allow") {
         return;
@@ -192,7 +192,7 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
 
       const message = error instanceof Error ? error.message : String(error);
       reply.code(502).send({
-        error: ARC_ERROR_CODES.SIDECAR_UNREACHABLE,
+        error: CHIO_ERROR_CODES.SIDECAR_UNREACHABLE,
         message,
       });
       return reply;
@@ -201,12 +201,12 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
 };
 
 /**
- * Fastify plugin that evaluates every request against ARC.
+ * Fastify plugin that evaluates every request against Chio.
  * Wrapped with fastify-plugin to skip encapsulation, so hooks apply
  * to all routes in the Fastify instance.
  */
-export const arc = fp(arcPlugin, {
-  name: "@arc-protocol/fastify",
+export const chio = fp(chioPlugin, {
+  name: "@chio-protocol/fastify",
   fastify: ">=4.0.0",
 });
 

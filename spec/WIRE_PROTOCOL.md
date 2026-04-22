@@ -1,37 +1,37 @@
-# ARC Wire Protocol
+# Chio Wire Protocol
 
 **Version:** 1.0  
 **Date:** 2026-04-13  
 **Status:** Normative shipped surface
 
-This document defines the shipped ARC wire protocol tightly enough for an
+This document defines the shipped Chio wire protocol tightly enough for an
 independent implementation. It is narrower than [PROTOCOL.md](PROTOCOL.md),
 which remains the repository-wide profile. The paired threat model and
 transport-security requirements live in [SECURITY.md](SECURITY.md).
 
 ## 1. Surface Model
 
-ARC ships four cooperating protocol surfaces:
+Chio ships four cooperating protocol surfaces:
 
 | Surface | Transport | Purpose |
 | --- | --- | --- |
-| Native ARC transport | Length-prefixed canonical JSON | Direct agent-to-kernel messaging |
+| Native Chio transport | Length-prefixed canonical JSON | Direct agent-to-kernel messaging |
 | Hosted MCP edge | JSON-RPC over HTTP POST plus SSE | Remote session admission and MCP-compatible runtime traffic |
 | Trust-control lifecycle APIs | JSON over HTTP | Capability issuance, delegated issuance, receipt lookup, and revocation |
 | HTTP substrate | JSON over HTTP (localhost sidecar) | Evaluation and receipt signing for arbitrary HTTP API requests (see [Section 7](#7-http-substrate-surface)) |
 
-The native ARC transport does **not** define a session-initialization message.
+The native Chio transport does **not** define a session-initialization message.
 Initialization in the shipped stack happens on the hosted MCP surface. Native
 direct peers are expected to obtain capability material out of band and then
 begin sending `AgentMessage` frames immediately.
 
 The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document.
 
-## 2. Native ARC Transport
+## 2. Native Chio Transport
 
 ### 2.1 Framing
 
-Each native ARC frame is encoded as:
+Each native Chio frame is encoded as:
 
 ```text
 +----------------------+---------------------------+
@@ -66,7 +66,7 @@ Example: a payload length of `256` bytes is encoded as
 ### 2.3 Receiver Behavior And Error Recovery
 
 Native receiver behavior is defined by the shipped transport implementation in
-`crates/arc-kernel/src/transport.rs`.
+`crates/chio-kernel/src/transport.rs`.
 
 - If EOF occurs before the 4-byte prefix is fully read, the receiver
   **MUST** treat the connection as closed and deliver no partial message.
@@ -80,7 +80,7 @@ Native receiver behavior is defined by the shipped transport implementation in
 
 Recovery rules:
 
-- ARC defines no in-band resynchronization marker for the native framed lane.
+- Chio defines no in-band resynchronization marker for the native framed lane.
 - After `connection_closed`, `message_too_large`, or deserialization failure,
   an implementation **SHOULD** close the current transport and establish a new
   connection before continuing.
@@ -91,8 +91,8 @@ Recovery rules:
 
 The native message catalog is defined by:
 
-- `crates/arc-core-types/src/message.rs`
-- `crates/arc-kernel/src/transport.rs`
+- `crates/chio-core-types/src/message.rs`
+- `crates/chio-kernel/src/transport.rs`
 
 #### 2.4.1 AgentMessage
 
@@ -140,7 +140,7 @@ All kernel-to-agent frames are JSON objects with a `type` discriminator.
 | --- | --- | --- |
 | `id` | string | Parent request identifier |
 | `result` | `ToolCallResult` object | Terminal execution status |
-| `receipt` | `ArcReceipt` object | Signed receipt for the evaluated action |
+| `receipt` | `ChioReceipt` object | Signed receipt for the evaluated action |
 
 `capability_list` fields:
 
@@ -183,10 +183,10 @@ discriminator.
 
 ### 2.5 Signed Artifact Requirements
 
-Two nested signed ARC artifacts appear directly on the native wire:
+Two nested signed Chio artifacts appear directly on the native wire:
 
 - `CapabilityToken`
-- `ArcReceipt`
+- `ChioReceipt`
 
 Normative requirements:
 
@@ -199,8 +199,8 @@ Normative requirements:
 
 ## 3. Hosted MCP HTTP Session Transport
 
-The hosted edge is implemented by `arc mcp serve-http` in
-`crates/arc-cli/src/remote_mcp/http_service.rs`.
+The hosted edge is implemented by `chio mcp serve-http` in
+`crates/chio-cli/src/remote_mcp/http_service.rs`.
 
 ### 3.1 Endpoint Shape
 
@@ -266,7 +266,7 @@ Rules:
 
 The machine-readable negotiation artifact for the shipped stack is:
 
-- `spec/versions/arc-protocol-negotiation.v1.json`
+- `spec/versions/chio-protocol-negotiation.v1.json`
 
 Hosted MCP negotiation rules:
 
@@ -280,24 +280,24 @@ Hosted MCP negotiation rules:
   versions are rejected rather than silently downgraded.
 - On success, the selected version is echoed in `result.protocolVersion` and
   exposed again under
-  `result.capabilities.experimental.arcProtocol.selectedProtocolVersion`.
+  `result.capabilities.experimental.chioProtocol.selectedProtocolVersion`.
 - On failure, initialize is rejected with JSON-RPC `-32600` plus a structured
-  ARC protocol error descriptor in `error.data.arcError`.
+  Chio protocol error descriptor in `error.data.chioError`.
 
 ### 3.5 Model Metadata Admission
 
 - Hosted `tools/call` requests **MAY** carry model metadata under either
-  `_meta.modelMetadata` or `_meta.arcModelMetadata`.
-- The hosted edge normalizes that payload into ARC request `model_metadata`.
+  `_meta.modelMetadata` or `_meta.chioModelMetadata`.
+- The hosted edge normalizes that payload into Chio request `model_metadata`.
 - Caller-supplied metadata **MUST** be treated as `asserted` provenance at
   admission time even if the caller marks it `verified`.
 - Receipts and downstream exports **MUST** preserve the effective provenance
   class instead of silently upgrading caller assertions into verified runtime
   truth.
 
-Native ARC direct transport versioning rules:
+Native Chio direct transport versioning rules:
 
-- Native ARC framed transport is currently `arc-wire-v1`.
+- Native Chio framed transport is currently `chio-wire-v1`.
 - Native direct peers do not negotiate in-band today; compatibility is an
   exact-match, out-of-band requirement.
 - Because no in-band downgrade exists, incompatible native peers **MUST**
@@ -305,7 +305,7 @@ Native ARC direct transport versioning rules:
 
 ## 4. Trust-Control Capability Lifecycle
 
-The trust-control service is implemented by `arc trust serve`.
+The trust-control service is implemented by `chio trust serve`.
 
 ### 4.1 Capability Issuance
 
@@ -318,7 +318,7 @@ Request body:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `subjectPublicKey` | string | Ed25519 subject key in hex |
-| `scope` | `ArcScope` | Capability scope to issue |
+| `scope` | `ChioScope` | Capability scope to issue |
 | `ttlSeconds` | integer | Requested lifetime |
 | `runtimeAttestation` | object, optional | Attestation evidence used by issuance policy |
 
@@ -413,11 +413,11 @@ Success response:
 
 The machine-readable error registry for the shipped stack is:
 
-- `spec/errors/arc-error-registry.v1.json`
+- `spec/errors/chio-error-registry.v1.json`
 
 Registry guarantees:
 
-- every ARC error entry has a unique numeric code
+- every Chio error entry has a unique numeric code
 - every entry names one category
 - every entry is marked `transient: true|false`
 - every entry carries explicit retry guidance
@@ -434,12 +434,12 @@ The current registry categories are:
 
 Surface mapping rules:
 
-- Native ARC `ToolCallError` discriminators map deterministically to registry
+- Native Chio `ToolCallError` discriminators map deterministically to registry
   entries such as `capability_denied`, `capability_expired`,
   `capability_revoked`, `guard_denied`, `tool_server_error`, and
   `internal_error`.
-- Hosted MCP initialize-time protocol rejection communicates the numeric ARC
-  protocol code under JSON-RPC `error.data.arcError.code`.
+- Hosted MCP initialize-time protocol rejection communicates the numeric Chio
+  protocol code under JSON-RPC `error.data.chioError.code`.
 - Trust-control remains HTTP-status-driven, but registry codes define the
   stable cross-surface classification and retry semantics for future
   conformance and SDK work.
@@ -451,7 +451,7 @@ Surface mapping rules:
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Edge as arc mcp serve-http
+    participant Edge as chio mcp serve-http
     participant Session as Hosted Session
 
     Client->>Edge: POST /mcp initialize (JSON-RPC request, no MCP-Session-Id)
@@ -470,7 +470,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant Trust as arc trust serve
+    participant Trust as chio trust serve
     participant Authority as Capability Authority
 
     Caller->>Trust: POST /v1/capabilities/issue
@@ -484,7 +484,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant Trust as arc trust serve
+    participant Trust as chio trust serve
     participant Store as Receipt/Lineage Store
     participant Authority as Capability Authority
 
@@ -518,7 +518,7 @@ sequenceDiagram
         Kernel-->>Agent: tool_call_chunk
     end
     Tool-->>Kernel: terminal output or failure
-    Kernel->>Kernel: sign ArcReceipt
+    Kernel->>Kernel: sign ChioReceipt
     Kernel-->>Agent: tool_call_response { result, receipt }
 ```
 
@@ -527,7 +527,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Operator
-    participant Trust as arc trust serve
+    participant Trust as chio trust serve
     participant Store as Revocation Store
     participant Kernel
     participant Agent
@@ -568,31 +568,31 @@ sequenceDiagram
 ## 7. HTTP Substrate Surface
 
 The HTTP substrate is a fourth cooperating protocol surface alongside the
-native ARC transport (Section 2), the hosted MCP edge (Section 3), and the
-trust-control lifecycle APIs (Section 4). It enables ARC to evaluate and
+native Chio transport (Section 2), the hosted MCP edge (Section 3), and the
+trust-control lifecycle APIs (Section 4). It enables Chio to evaluate and
 sign receipts for arbitrary HTTP API requests, not only agent-protocol
 traffic.
 
 The normative specification for the HTTP substrate lives in
 [`spec/HTTP-SUBSTRATE.md`](HTTP-SUBSTRATE.md). That document defines the
 sidecar evaluation protocol, the typed request and receipt models, and the
-deterministic mapping from `HttpReceipt` to the core `ArcReceipt` type.
+deterministic mapping from `HttpReceipt` to the core `ChioReceipt` type.
 
 ### 7.1 Sidecar Evaluation Protocol
 
-The HTTP substrate uses a sidecar model. An ARC kernel runs as a local
+The HTTP substrate uses a sidecar model. An Chio kernel runs as a local
 process and exposes three HTTP endpoints on localhost:
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/arc/evaluate` | POST | Evaluate an HTTP request against loaded policy |
-| `/arc/verify` | POST | Verify a receipt signature |
-| `/arc/health` | GET | Sidecar health check |
+| `/chio/evaluate` | POST | Evaluate an HTTP request against loaded policy |
+| `/chio/verify` | POST | Verify a receipt signature |
+| `/chio/health` | GET | Sidecar health check |
 
-Language-specific middleware (arc-tower for Rust, arc-spring-boot for JVM,
-ArcMiddleware for .NET, and the Python/TypeScript/Go substrate SDKs)
-intercepts incoming HTTP requests, constructs an `ArcHttpRequest`, sends it
-to `POST /arc/evaluate`, and enforces the returned verdict.
+Language-specific middleware (chio-tower for Rust, chio-spring-boot for JVM,
+ChioMiddleware for .NET, and the Python/TypeScript/Go substrate SDKs)
+intercepts incoming HTTP requests, constructs an `ChioHttpRequest`, sends it
+to `POST /chio/evaluate`, and enforces the returned verdict.
 
 ### 7.2 Relationship to Language SDKs
 
@@ -607,19 +607,19 @@ Platform-level SDK documentation lives in `docs/sdk/PLATFORM.md`.
 
 Versioned native message schemas live under:
 
-- `spec/schemas/arc-wire/v1/agent/`
-- `spec/schemas/arc-wire/v1/kernel/`
-- `spec/schemas/arc-wire/v1/result/`
-- `spec/schemas/arc-wire/v1/error/`
+- `spec/schemas/chio-wire/v1/agent/`
+- `spec/schemas/chio-wire/v1/kernel/`
+- `spec/schemas/chio-wire/v1/result/`
+- `spec/schemas/chio-wire/v1/error/`
 
 Normative requirements:
 
 - Schema files in that directory are the machine-readable contract for the
-  native ARC message families.
+  native Chio message families.
 - Implementations **MUST** continue to serialize the native message variants in
   a form accepted by those schemas.
 - Schema validation **MUST** be exercised against live Rust serialization,
   not handwritten examples alone.
 
 The shipped validation harness for this document is
-`crates/arc-core-types/tests/wire_protocol_schema.rs`.
+`crates/chio-core-types/tests/wire_protocol_schema.rs`.

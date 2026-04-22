@@ -1,14 +1,14 @@
 # Future Moats and Research Agenda
 
 > **Status**: Strategic research -- April 2026
-> **Source**: Brainstorming review identified 12 future-looking ideas for ARC.
+> **Source**: Brainstorming review identified 12 future-looking ideas for Chio.
 > Near-term items leverage existing primitives. Medium-term items (agent
 > insurance, cross-kernel federation) represent the strongest competitive moats.
 > Long-term items require cryptographic or hardware research.
 >
 > **Dependency map**: Near-term builds on shipped crates. Medium-term depends
-> on `arc-kernel-core` (WASM kernel) and the economic layer (`arc-underwriting`,
-> `arc-market`, `arc-settle`, `arc-credit`). Long-term depends on external
+> on `chio-kernel-core` (WASM kernel) and the economic layer (`chio-underwriting`,
+> `chio-market`, `chio-settle`, `chio-credit`). Long-term depends on external
 > research (ZK circuits, TEE vendor SDKs).
 
 ---
@@ -17,13 +17,13 @@
 
 | # | Idea | Horizon | Effort | Defensibility | Key Dependency |
 |---|------|---------|--------|---------------|----------------|
-| 1 | Receipt as proof-of-safe-behavior | Near-term | Small | Strong | `arc-core-types` receipts, Merkle chain |
+| 1 | Receipt as proof-of-safe-behavior | Near-term | Small | Strong | `chio-core-types` receipts, Merkle chain |
 | 2 | Agent behavioral profiling | Near-term | Medium | Strong | Receipt store, velocity guards |
 | 3 | Regulatory API | Near-term | Small | Medium | `SignedExportEnvelope`, receipt store |
-| 4 | Agent passport | Medium-term | Large | Strong | `arc-kernel-core` WASM, `WorkloadIdentity` |
-| 5 | Agent insurance protocol | Medium-term | Large | Very strong | `arc-underwriting`, `arc-market`, `arc-settle` |
+| 4 | Agent passport | Medium-term | Large | Strong | `chio-kernel-core` WASM, `WorkloadIdentity` |
+| 5 | Agent insurance protocol | Medium-term | Large | Very strong | `chio-underwriting`, `chio-market`, `chio-settle` |
 | 6 | Cross-kernel federation | Medium-term | Large | Strong | Choreography receipts, DPoP, mTLS |
-| 7 | Capability marketplace | Medium-term | Medium | Medium | `arc-market`, `arc-listing`, `arc-metering` |
+| 7 | Capability marketplace | Medium-term | Medium | Medium | `chio-market`, `chio-listing`, `chio-metering` |
 | 8 | Natural language policies | Medium-term | Medium | Medium | HushSpec YAML, guard pipeline |
 | 9 | Federated receipt verification (ZK) | Long-term | Very large | Very strong | Merkle receipts, ZK circuit design |
 | 10 | Compute attestation (TEE) | Long-term | Large | Strong | Receipt signing, hardware vendor SDKs |
@@ -52,7 +52,7 @@ Receipt chain (Merkle-committed, Ed25519-signed)
 | compliance_score()  |
 |                     |
 | Inputs:             |
-|   receipts: &[ArcReceipt]
+|   receipts: &[ChioReceipt]
 |   window: Duration  |
 |   policy_hash: &str |
 |                     |
@@ -137,18 +137,18 @@ a broken Merkle chain drops it below `Marginal`.
 ### Crate Location
 
 > **Updated**: The raw reporting infrastructure already exists. 
-> `ComplianceReport` lives in `arc-kernel/src/operator_report.rs`,
+> `ComplianceReport` lives in `chio-kernel/src/operator_report.rs`,
 > backed by SQLite report queries in
-> `arc-store-sqlite/src/receipt_store/reports.rs`. This work is
+> `chio-store-sqlite/src/receipt_store/reports.rs`. This work is
 > productization (scoring model + API surface) on top of existing
-> primitives, NOT a new crate. Add scoring logic to `arc-kernel` and
+> primitives, NOT a new crate. Add scoring logic to `chio-kernel` and
 > expose via HTTP endpoint.
 
 ### Existing Primitive Dependencies
 
-- `ComplianceReport` in `arc-kernel/src/operator_report.rs` -- shipped
-- `ArcReceipt` with `Decision::Allow` / `Decision::Deny` -- shipped
-- `MerkleTree` / `MerkleProof` in `arc-core-types::merkle` -- shipped
+- `ComplianceReport` in `chio-kernel/src/operator_report.rs` -- shipped
+- `ChioReceipt` with `Decision::Allow` / `Decision::Deny` -- shipped
+- `MerkleTree` / `MerkleProof` in `chio-core-types::merkle` -- shipped
 - `SignedExportEnvelope<T>` for signed score export -- shipped
 - Receipt store report queries (SQLite) -- shipped
 
@@ -161,7 +161,7 @@ storage. The scoring function is a fold over receipts.
 
 **Strong.** No competitor has per-invocation signed receipts, let alone
 Merkle-committed receipt chains. The compliance score is only as credible
-as the receipt data, and ARC is the only protocol producing it.
+as the receipt data, and Chio is the only protocol producing it.
 
 ---
 
@@ -238,7 +238,7 @@ pub struct BehavioralMetrics {
     pub scope_diversity: f64,
     /// Fraction of evaluations that resulted in denial.
     pub denial_rate: f64,
-    /// USD cost per minute (from arc-metering).
+    /// USD cost per minute (from chio-metering).
     pub cost_velocity: f64,
     /// Gini coefficient over tool usage. 1.0 = all calls to one tool.
     pub tool_concentration: f64,
@@ -273,16 +273,16 @@ as `GuardEvidence`.
 
 > **Updated**: The raw behavioral reporting already exists.
 > `BehavioralFeedReport` and `SignedBehavioralFeed` live in
-> `arc-kernel/src/operator_report.rs`, backed by SQLite report queries
-> in `arc-store-sqlite/src/receipt_store/reports.rs`. This work adds
+> `chio-kernel/src/operator_report.rs`, backed by SQLite report queries
+> in `chio-store-sqlite/src/receipt_store/reports.rs`. This work adds
 > EMA baselines, z-score anomaly detection, and guard integration on
-> top of existing primitives. Add to `arc-guards`, NOT a new crate.
+> top of existing primitives. Add to `chio-guards`, NOT a new crate.
 
 ### Existing Primitive Dependencies
 
-- `BehavioralFeedReport` in `arc-kernel/src/operator_report.rs` -- shipped
+- `BehavioralFeedReport` in `chio-kernel/src/operator_report.rs` -- shipped
 - Receipt store with reporting queries -- shipped
-- `arc-metering` per-receipt cost attribution -- shipped
+- `chio-metering` per-receipt cost attribution -- shipped
 - Velocity guard pipeline -- shipped
 - `GuardEvidence` in receipt for recording anomaly factors -- shipped
 
@@ -296,8 +296,8 @@ series table in the receipt SQLite database (persistent).
 
 ### Competitive Defensibility
 
-**Strong.** The behavioral data is derived from ARC receipts, which no
-competitor produces. Any behavioral profiling built on top of ARC inherits
+**Strong.** The behavioral data is derived from Chio receipts, which no
+competitor produces. Any behavioral profiling built on top of Chio inherits
 the receipt chain's cryptographic integrity -- the profiler cannot be fed
 fabricated data. Competitors building behavioral profiling over unattested
 logs have a weaker foundation.
@@ -309,7 +309,7 @@ logs have a weaker foundation.
 ### Problem
 
 Compliance today means periodic audits: collect evidence, package reports,
-submit to regulator, wait. ARC receipts enable continuous compliance --
+submit to regulator, wait. Chio receipts enable continuous compliance --
 regulators could query the receipt store in real time. But there is no
 defined API surface for this.
 
@@ -350,17 +350,17 @@ Endpoints:
 
 GET /receipts
   Query: agent_id, tool_name, decision, from_ts, to_ts, limit, cursor
-  Response: SignedExportEnvelope<Vec<ArcReceipt>>
+  Response: SignedExportEnvelope<Vec<ChioReceipt>>
 
 GET /receipts/{receipt_id}
-  Response: SignedExportEnvelope<ArcReceipt>
+  Response: SignedExportEnvelope<ChioReceipt>
 
 GET /receipts/{receipt_id}/merkle-proof
   Response: SignedExportEnvelope<MerkleProof>
 
 GET /chains/{chain_head_id}
   Query: direction (forward|backward), limit
-  Response: SignedExportEnvelope<Vec<ArcReceipt>>
+  Response: SignedExportEnvelope<Vec<ChioReceipt>>
   Note: follows choreography receipt chains (section 9 of
         EVENT-STREAMING-INTEGRATION.md)
 
@@ -414,12 +414,12 @@ tampering.
 
 ### Crate Location
 
-> **Updated**: Not a new crate. Add endpoints to `arc-http-core/src/routes.rs`
+> **Updated**: Not a new crate. Add endpoints to `chio-http-core/src/routes.rs`
 > using existing `SignedExportEnvelope` and receipt store queries.
 
-Previously proposed as `arc-regulatory-api`. Depends on `arc-core-types` (receipts,
-export envelopes), `arc-store-sqlite` (receipt queries), `arc-compliance`
-(scoring), optionally `arc-behavioral` (profiling).
+Previously proposed as `chio-regulatory-api`. Depends on `chio-core-types` (receipts,
+export envelopes), `chio-store-sqlite` (receipt queries), `chio-compliance`
+(scoring), optionally `chio-behavioral` (profiling).
 
 ### Existing Primitive Dependencies
 
@@ -437,7 +437,7 @@ hardest part is the push-based export scheduler, which is optional for v1.
 
 **Medium.** The API surface itself is a packaging exercise. But the
 underlying data -- signed, Merkle-committed, per-invocation receipts -- is
-unique to ARC. A competitor could build the same API shape but would lack
+unique to Chio. A competitor could build the same API shape but would lack
 the cryptographic integrity guarantees that make it credible to regulators.
 
 ---
@@ -464,7 +464,7 @@ capability decisions.
 | (signed bundle)   |
 |                   |
 | identity:         |  WorkloadIdentity (SPIFFE URI, credential kind)
-| trust_tier:       |  RuntimeAssuranceTier (from arc-core-types)
+| trust_tier:       |  RuntimeAssuranceTier (from chio-core-types)
 | capability_summary:|  aggregate of granted scopes (not individual tokens)
 | receipt_summary:  |  ComplianceScore (from idea #1)
 | behavioral_summary:| BehavioralProfile snapshot (from idea #2)
@@ -482,7 +482,7 @@ capability decisions.
 /// Portable agent identity bundle. Signed by the issuing kernel.
 pub struct AgentPassport {
     /// Version of the passport format.
-    pub version: String,  // "arc.passport.v1"
+    pub version: String,  // "chio.passport.v1"
 
     /// Core identity.
     pub identity: WorkloadIdentity,
@@ -557,15 +557,15 @@ pub struct Certification {
 
 2. Home kernel collects:
    - WorkloadIdentity (from runtime attestation)
-   - RuntimeAssuranceTier (from arc-appraisal)
-   - ComplianceScore (from arc-compliance)
-   - BehavioralProfile (from arc-behavioral)
+   - RuntimeAssuranceTier (from chio-appraisal)
+   - ComplianceScore (from chio-compliance)
+   - BehavioralProfile (from chio-behavioral)
    - Active grants (from capability authority)
 
 3. Home kernel signs passport, returns to agent
 
 4. Agent presents passport to remote kernel
-   Header: X-Arc-Passport: <base64url(canonical_json(passport))>
+   Header: X-Chio-Passport: <base64url(canonical_json(passport))>
 
 5. Remote kernel verifies:
    a. Signature valid against issuer_kernel public key
@@ -580,7 +580,7 @@ pub struct Certification {
 ### Cross-Platform Portability
 
 The passport format is JSON (canonical) and small (typically < 2KB). It
-works across all deployment surfaces enabled by `arc-kernel-core`:
+works across all deployment surfaces enabled by `chio-kernel-core`:
 
 - **Cloud-to-cloud**: agent migrates between Kubernetes clusters
 - **Cloud-to-edge**: agent runs on Cloudflare Worker, presents passport
@@ -590,34 +590,34 @@ works across all deployment surfaces enabled by `arc-kernel-core`:
 - **Mobile-to-cloud**: agent on iOS/Android presents passport
 
 **Critical dependency**: remote kernels must be able to verify passports.
-This requires `arc-kernel-core` (WASM build) for non-server environments,
+This requires `chio-kernel-core` (WASM build) for non-server environments,
 plus a shared trust store for kernel public keys.
 
 ### Crate Location
 
 > **Updated**: Passport support already ships. `AgentPassport` is in
-> `arc-credentials/src/passport.rs`. Challenge flows, OID4VCI/VP, and
-> cross-issuer portfolio evaluation are in `arc-credentials/src/cross_issuer.rs`.
-> CLI passport flows exist in `arc-cli/src/passport.rs`. This work adds
+> `chio-credentials/src/passport.rs`. Challenge flows, OID4VCI/VP, and
+> cross-issuer portfolio evaluation are in `chio-credentials/src/cross_issuer.rs`.
+> CLI passport flows exist in `chio-cli/src/passport.rs`. This work adds
 > trust-tier synthesis (from compliance scoring + behavioral profiling)
 > and WASM-portable verification to the existing passport system.
 > NOT a new crate.
 
-Previously proposed as `arc-passport`. Depends on `arc-core-types` (identity,
+Previously proposed as `chio-passport`. Depends on `chio-core-types` (identity,
 crypto), compliance scoring (see section 1), behavioral profiling (see section 2),
-`arc-appraisal` (trust tiers).
+`chio-appraisal` (trust tiers).
 
 ### Effort
 
 Large. The passport format itself is straightforward. The hard parts are:
-(a) trust store for cross-kernel key verification, (b) `arc-kernel-core`
+(a) trust store for cross-kernel key verification, (b) `chio-kernel-core`
 must be functional for cross-platform verification, (c) policy integration
 so remote kernels use passports as evidence.
 
 ### Competitive Defensibility
 
-**Strong if ARC becomes a multi-organization standard.** The passport's
-value scales with the number of kernels that accept it. If ARC achieves
+**Strong if Chio becomes a multi-organization standard.** The passport's
+value scales with the number of kernels that accept it. If Chio achieves
 cross-organization deployment, the passport becomes a network-effect moat.
 A competitor would need to replicate the entire receipt infrastructure to
 produce credible passports.
@@ -634,7 +634,7 @@ protection. Today, there is no structured way to underwrite agent risk,
 price coverage, or settle claims -- because there is no standard way to
 measure agent behavior.
 
-ARC changes this. The receipt chain provides the actuarial data that
+Chio changes this. The receipt chain provides the actuarial data that
 insurance requires.
 
 ### Architecture
@@ -643,7 +643,7 @@ The full insurance protocol connects three existing crates into a
 lifecycle:
 
 ```
-arc-underwriting          arc-market               arc-settle
+chio-underwriting          chio-market               chio-settle
 (risk assessment)  --->   (liability placement) -> (claims payout)
                     |
                     |     Pricing based on:
@@ -659,7 +659,7 @@ arc-underwriting          arc-market               arc-settle
 ### Protocol Flow
 
 ```
-Phase 1: ASSESSMENT (arc-underwriting)
+Phase 1: ASSESSMENT (chio-underwriting)
   Input:
     - Agent WorkloadIdentity
     - Receipt chain (last N receipts, max 200 per MAX_UNDERWRITING_RECEIPT_LIMIT)
@@ -684,7 +684,7 @@ Phase 1: ASSESSMENT (arc-underwriting)
     - recommended_coverage_classes: Vec<LiabilityCoverageClass>
     - premium_factor: f64 (multiplier based on risk)
 
-Phase 2: PLACEMENT (arc-market)
+Phase 2: PLACEMENT (chio-market)
   Input: SignedUnderwritingDecision
 
   Process:
@@ -717,7 +717,7 @@ Phase 3: MONITORING (continuous)
        - Anomaly score exceeds threshold -> claims monitoring alert
     4. Receipt-backed evidence for claims
 
-Phase 4: CLAIMS (arc-market + arc-settle)
+Phase 4: CLAIMS (chio-market + chio-settle)
   Input: Incident report + receipt chain as evidence
 
   Process:
@@ -731,7 +731,7 @@ Phase 4: CLAIMS (arc-market + arc-settle)
        - Confirm agent was operating within coverage scope
        - Assess whether guards were properly configured
        - Determine payout
-    3. Settlement (arc-settle):
+    3. Settlement (chio-settle):
        - EVM or Solana on-chain settlement
        - Escrow release via PreparedMerkleRelease
        - Receipt-backed proof of payout
@@ -791,18 +791,18 @@ final_premium = base_premium
 
 These are initial calibration points. Real actuarial data from receipt
 chains will refine them over time. The receipt chain IS the actuarial data
-source -- this is why agent insurance only becomes viable with ARC.
+source -- this is why agent insurance only becomes viable with Chio.
 
 ### Crate Dependencies
 
 All three crates exist with typed schemas:
-- `arc-underwriting`: 4-tier risk classification, 13 reason codes,
+- `chio-underwriting`: 4-tier risk classification, 13 reason codes,
   evidence-based decisions -- shipped
-- `arc-market`: 5 coverage classes, 4 provider types, quote/bind/claims
+- `chio-market`: 5 coverage classes, 4 provider types, quote/bind/claims
   workflow with full artifact schemas -- shipped
-- `arc-settle`: EVM + Solana on-chain settlement, escrow,
+- `chio-settle`: EVM + Solana on-chain settlement, escrow,
   `PreparedMerkleRelease` -- shipped
-- `arc-credit`: credit facilities, bonds, exposure ledger -- shipped
+- `chio-credit`: credit facilities, bonds, exposure ledger -- shipped
 
 ### What Needs Building
 
@@ -822,9 +822,9 @@ engine, monitoring bridge, claims packager -- is the gap.
 
 ### Competitive Defensibility
 
-**Very strong.** This is the single strongest moat in the ARC roadmap.
+**Very strong.** This is the single strongest moat in the Chio roadmap.
 Agent insurance requires: (a) per-invocation behavioral data, (b) typed
-risk taxonomies, (c) cryptographic evidence for claims. ARC is the only
+risk taxonomies, (c) cryptographic evidence for claims. Chio is the only
 protocol that provides all three. A competitor would need to rebuild the
 entire receipt + underwriting + market + settlement stack. The typed schemas
 alone (`UnderwritingRiskClass`, `LiabilityCoverageClass`,
@@ -838,12 +838,12 @@ alone (`UnderwritingRiskClass`, `LiabilityCoverageClass`,
 
 Organization A's agent needs to call a tool hosted by Organization B.
 Today, this requires B to trust A's kernel entirely -- or operate outside
-ARC. There is no protocol for two independent kernels to cooperatively
+Chio. There is no protocol for two independent kernels to cooperatively
 govern a cross-boundary tool invocation.
 
 ### Architecture
 
-Federation means two ARC kernels, each maintaining their own policy,
+Federation means two Chio kernels, each maintaining their own policy,
 cooperatively evaluating and receipting a cross-boundary tool call.
 Neither kernel trusts the other fully. Both sign receipts. The result
 is a bilateral receipt chain.
@@ -884,7 +884,7 @@ Phase 0: KEY EXCHANGE (one-time setup)
 Phase 1: FEDERATION AGREEMENT
   Both kernels sign a FederationAgreement:
   {
-    version: "arc.federation.v1",
+    version: "chio.federation.v1",
     parties: [kernel_a_pubkey, kernel_b_pubkey],
     scopes: {
       "a_to_b": ["tools:search", "tools:summarize"],
@@ -998,8 +998,8 @@ signature verification at each boundary crossing.
 
 ### Crate Location
 
-`arc-federation` -- new crate. Depends on `arc-core-types` (receipts,
-crypto), `arc-passport` (agent passport verification), `arc-kernel`
+`chio-federation` -- new crate. Depends on `chio-core-types` (receipts,
+crypto), `chio-passport` (agent passport verification), `chio-kernel`
 (guard pipeline for evaluating federated intents).
 
 ### Effort
@@ -1013,10 +1013,10 @@ agent coordination.
 ### Competitive Defensibility
 
 **Strong.** Bilateral receipt chains across independent kernels are unique
-to ARC. No competitor has the receipt infrastructure to support cross-
+to Chio. No competitor has the receipt infrastructure to support cross-
 organization cryptographic audit trails. Federation also creates network
 effects -- each new organization that federates increases the value of
-the ARC network.
+the Chio network.
 
 ---
 
@@ -1031,12 +1031,12 @@ pricing, or competitive bidding for tool access.
 ### Architecture
 
 A marketplace where tool servers advertise capabilities, agents discover
-and bid, and receipts prove usage for billing. Built on `arc-listing`
-(registry) and `arc-market` (pricing).
+and bid, and receipts prove usage for billing. Built on `chio-listing`
+(registry) and `chio-market` (pricing).
 
 ```
 Tool Server A                 Marketplace                   Agent
-(search provider)             (arc-listing + arc-market)    (consumer)
+(search provider)             (chio-listing + chio-market)    (consumer)
      |                              |                          |
      | register(manifest, pricing)  |                          |
      |---------------------------->|                          |
@@ -1059,7 +1059,7 @@ Tool Server A                 Marketplace                   Agent
 ```rust
 /// Tool server listing in the capability marketplace.
 pub struct ToolListing {
-    /// Tool server manifest (from arc-manifest).
+    /// Tool server manifest (from chio-manifest).
     pub manifest: ToolManifest,
     /// Pricing model.
     pub pricing: PricingModel,
@@ -1139,21 +1139,21 @@ Bidding (for auction pricing):
 ### Receipt-Based Billing
 
 Every tool invocation produces a receipt. Receipts are the billing records.
-`arc-metering` already attributes cost per receipt. The marketplace adds
+`chio-metering` already attributes cost per receipt. The marketplace adds
 settlement:
 
 1. Agent accumulates receipts during a billing period
 2. Marketplace aggregates metering data from receipts
-3. `arc-settle` handles payout (EVM/Solana escrow release)
+3. `chio-settle` handles payout (EVM/Solana escrow release)
 4. Disputes reference specific receipts with Merkle proofs
 
 ### Crate Dependencies
 
-- `arc-listing` -- tool server registry (shipped)
-- `arc-market` -- pricing and placement workflows (shipped)
-- `arc-metering` -- per-receipt cost attribution (shipped)
-- `arc-settle` -- on-chain settlement (shipped)
-- `arc-manifest` -- tool server manifests (shipped)
+- `chio-listing` -- tool server registry (shipped)
+- `chio-market` -- pricing and placement workflows (shipped)
+- `chio-metering` -- per-receipt cost attribution (shipped)
+- `chio-settle` -- on-chain settlement (shipped)
+- `chio-manifest` -- tool server manifests (shipped)
 
 ### Effort
 
@@ -1164,7 +1164,7 @@ reputation system require design iteration.
 ### Competitive Defensibility
 
 **Medium.** Marketplace defensibility comes from network effects, not
-technology. ARC's advantage is that receipts provide the trust and billing
+technology. Chio's advantage is that receipts provide the trust and billing
 infrastructure -- but a marketplace only works if both tool servers and
 agents participate. This is a chicken-and-egg problem.
 
@@ -1174,7 +1174,7 @@ agents participate. This is a chicken-and-egg problem.
 
 ### Problem
 
-Writing HushSpec YAML policy files requires understanding ARC's scope
+Writing HushSpec YAML policy files requires understanding Chio's scope
 model, guard types, constraint syntax, and evaluation semantics. This is
 a barrier for non-technical stakeholders (compliance officers, legal,
 management) who need to express policy intent.
@@ -1201,7 +1201,7 @@ English input                       HushSpec YAML output
   | Steps:           |                    deny_message: >
   |  1. Parse intent |                      PII access requires explicit
   |  2. Map to       |                      consent from the data owner
-  |     ARC scopes   |
+  |     Chio scopes   |
   |  3. Select       |
   |     guards       |
   |  4. Generate     |
@@ -1235,7 +1235,7 @@ Step 1: INTENT EXTRACTION
     }
 
 Step 2: SCOPE MAPPING
-  Map extracted actions to ARC scope patterns.
+  Map extracted actions to Chio scope patterns.
   Use the tool manifest registry to resolve ambiguous tool references.
   "customer PII" -> scope pattern "data:pii:*"
   "file access" -> scope pattern "files:*"
@@ -1282,20 +1282,20 @@ Step 6: DRY-RUN (optional)
 
 ### Crate Location
 
-`arc-nl-policy` -- new crate. Depends on `arc-policy` (HushSpec validator),
+`chio-nl-policy` -- new crate. Depends on `chio-policy` (HushSpec validator),
 optionally on an LLM SDK (OpenAI, Anthropic, or local model).
 
 ### Effort
 
 Medium. The LLM integration is straightforward. The hard part is robust
 scope mapping -- translating informal English descriptions of tools and
-data into ARC's formal scope hierarchy. This requires access to the
+data into Chio's formal scope hierarchy. This requires access to the
 tool manifest registry and iterative prompt engineering.
 
 ### Competitive Defensibility
 
 **Medium.** Any protocol with a policy language could build NL compilation.
-ARC's advantage is that HushSpec is purpose-built for agent governance
+Chio's advantage is that HushSpec is purpose-built for agent governance
 (scopes, guards, capabilities), so the compilation target is richer than
 generic access control policies. But the NL compiler itself is not a moat.
 
@@ -1381,10 +1381,10 @@ accelerated provers (Rapidsnark, Halo2 with GPU backend).
 | SP1 (RISC-V ZK) | N/A (runs Rust directly) | ~200KB | ~50ms | No trusted setup |
 
 **Recommendation**: SP1 (Succinct) is the most practical path. Instead of
-hand-writing a ZK circuit, ARC's existing Rust receipt verification code
+hand-writing a ZK circuit, Chio's existing Rust receipt verification code
 compiles to the SP1 RISC-V target. The prover runs the unmodified Rust
 code inside a ZK virtual machine. This avoids the need for circuit design
-expertise and reuses existing ARC verification logic.
+expertise and reuses existing Chio verification logic.
 
 ### Privacy Levels
 
@@ -1414,7 +1414,7 @@ Level 4: CHAIN INTEGRITY
 
 ### Crate Location
 
-`arc-zkp` -- new crate. Depends on `arc-core-types` (receipts, Merkle
+`chio-zkp` -- new crate. Depends on `chio-core-types` (receipts, Merkle
 proofs), a ZK proving library (sp1-sdk or halo2_proofs).
 
 ### Effort
@@ -1439,7 +1439,7 @@ this is a decisive differentiator.
 
 ### Problem
 
-ARC receipts prove WHAT an agent did (which tool, which scope, allow/deny).
+Chio receipts prove WHAT an agent did (which tool, which scope, allow/deny).
 They do not prove WHERE the agent ran. A receipt signed by a kernel running
 on a compromised machine is worthless. Trusted Execution Environments
 (TEEs) provide hardware-backed proof that code ran in a specific, measured
@@ -1456,7 +1456,7 @@ environment that made the decision.
 | TEE Enclave (SGX, SEV-SNP, TDX, Nitro, CCA)             |
 |                                                          |
 |  +--------------------------------------------------+   |
-|  | ARC Kernel (arc-kernel-core)                      |   |
+|  | Chio Kernel (chio-kernel-core)                      |   |
 |  |                                                   |   |
 |  | evaluate() -> receipt                             |   |
 |  |   receipt.attestation = tee_quote()               |   |
@@ -1474,7 +1474,7 @@ environment that made the decision.
 ### Attestation Integration Points
 
 ```rust
-/// TEE attestation evidence attached to an ARC receipt.
+/// TEE attestation evidence attached to an Chio receipt.
 pub struct ComputeAttestation {
     /// TEE platform.
     pub platform: TeePlatform,
@@ -1507,8 +1507,8 @@ pub enum TeePlatform {
 /// The attestation is optional -- receipts without it are still valid
 /// but carry lower assurance.
 pub struct AttestedReceipt {
-    /// Standard ARC receipt.
-    pub receipt: ArcReceipt,
+    /// Standard Chio receipt.
+    pub receipt: ChioReceipt,
     /// TEE attestation binding this receipt to a measured environment.
     pub attestation: Option<ComputeAttestation>,
 }
@@ -1517,7 +1517,7 @@ pub struct AttestedReceipt {
 ### Binding Receipts to Attestation
 
 The critical property: the TEE quote's `report_data` field MUST contain
-the SHA-256 hash of the `ArcReceiptBody` (the receipt content before
+the SHA-256 hash of the `ChioReceiptBody` (the receipt content before
 signing). This binds the attestation to the specific receipt -- an
 attacker cannot detach an attestation from one receipt and attach it to
 another.
@@ -1525,7 +1525,7 @@ another.
 ```
 Receipt signing with attestation:
 
-1. Kernel constructs ArcReceiptBody (all fields except signature)
+1. Kernel constructs ChioReceiptBody (all fields except signature)
 2. receipt_hash = SHA-256(canonical_json(receipt_body))
 3. tee_quote = platform.get_quote(report_data = receipt_hash)
 4. receipt.attestation = ComputeAttestation { ..., report_data: receipt_hash, quote: tee_quote }
@@ -1535,12 +1535,12 @@ Receipt signing with attestation:
 ### Verification
 
 A verifier checks three things:
-1. **Receipt signature** -- Ed25519 verification (existing ARC logic)
+1. **Receipt signature** -- Ed25519 verification (existing Chio logic)
 2. **Attestation binding** -- `attestation.report_data == SHA-256(receipt_body)`
 3. **Attestation validity** -- verify the TEE quote against the platform's
    attestation service (Intel PCS, AMD KDS, AWS NSM, etc.)
 
-Step 3 requires platform-specific verification libraries. ARC should
+Step 3 requires platform-specific verification libraries. Chio should
 provide adapters for each platform behind a trait:
 
 ```rust
@@ -1564,7 +1564,7 @@ pub struct VerifiedAttestation {
 
 ### Relationship to RuntimeAssuranceTier
 
-The existing `RuntimeAssuranceTier` in `arc-core-types` classifies the
+The existing `RuntimeAssuranceTier` in `chio-core-types` classifies the
 kernel's runtime environment. TEE attestation provides the hardware-backed
 evidence for the highest assurance tiers:
 
@@ -1579,11 +1579,11 @@ RuntimeAssuranceTier::Hardware  -> TEE quote proves measured execution
 
 ### Relationship to AttestationVerifierFamily
 
-The existing `AttestationVerifierFamily` enum in `arc-appraisal` already
+The existing `AttestationVerifierFamily` enum in `chio-appraisal` already
 lists verifier categories. TEE platforms extend this:
 
 ```rust
-// Existing (arc-appraisal)
+// Existing (chio-appraisal)
 pub enum AttestationVerifierFamily {
     // ... existing variants ...
 }
@@ -1611,7 +1611,7 @@ pub enum AttestationVerifierFamily {
 
 ### Crate Location
 
-`arc-tee` -- new crate. Depends on `arc-core-types` (receipts, crypto),
+`chio-tee` -- new crate. Depends on `chio-core-types` (receipts, crypto),
 platform-specific SDKs (aws-nitro-enclaves-sdk, sgx-sdk, etc.) behind
 feature flags.
 
@@ -1627,7 +1627,7 @@ which kernel binary hashes are valid).
 
 **Strong for regulated verticals.** Healthcare, finance, and defense
 deployments increasingly require hardware-backed attestation. TEE
-integration with ARC receipts creates a uniquely strong audit trail:
+integration with Chio receipts creates a uniquely strong audit trail:
 not just WHAT the agent did, but proof that the governance kernel ran in
 a verified, tamper-resistant environment. Competitors would need both the
 receipt infrastructure and the TEE integration.
@@ -1649,18 +1649,18 @@ Near-term (no new crate dependencies):
 
 Medium-term (builds on near-term):
 
-  4. agent passport  <-- 1 + 2 + arc-kernel-core (WASM)
+  4. agent passport  <-- 1 + 2 + chio-kernel-core (WASM)
           |
           v
-  5. agent insurance  <-- 1 + 2 + arc-underwriting + arc-market + arc-settle
+  5. agent insurance  <-- 1 + 2 + chio-underwriting + chio-market + chio-settle
           |
           v
   6. cross-kernel federation  <-- 4 + choreography receipts
           |
           v
-  7. capability marketplace  <-- arc-listing + arc-market + arc-metering
+  7. capability marketplace  <-- chio-listing + chio-market + chio-metering
 
-  8. NL policies  <-- arc-policy (HushSpec) (independent)
+  8. NL policies  <-- chio-policy (HushSpec) (independent)
 
 Long-term (research):
 

@@ -1,14 +1,14 @@
-# Progressive ARC Tutorial
+# Progressive Chio Tutorial
 
-This tutorial takes the shortest honest path from "what is ARC?" to "I made a
+This tutorial takes the shortest honest path from "what is Chio?" to "I made a
 governed call and I understand how delegation continues from here."
 
 It reuses the phase `309` demo stack so the same local deployment can back the
 tutorial, the SDK examples, and the receipt viewer.
 
-## 1. ARC Concepts
+## 1. Chio Concepts
 
-ARC sits between an agent client and the tools it wants to call.
+Chio sits between an agent client and the tools it wants to call.
 
 - Policies define what can be issued.
 - Capabilities bind those permissions to a subject and a TTL.
@@ -19,8 +19,8 @@ ARC sits between an agent client and the tools it wants to call.
 
 For the local demo, the trust service and hosted edge are separate processes:
 
-- `arc trust serve` owns receipt, revocation, and authority state
-- `arc mcp serve-http` exposes an MCP endpoint and asks the trust service to
+- `chio trust serve` owns receipt, revocation, and authority state
+- `chio mcp serve-http` exposes an MCP endpoint and asks the trust service to
   issue and record governed capabilities
 
 ## 2. Start The Demo Stack
@@ -38,12 +38,12 @@ That publishes three defaults used throughout the rest of this tutorial:
 - auth token: `demo-token`
 
 If you prefer to run the processes directly instead of Docker, phase `309`
-already qualified the equivalent `arc trust serve` plus
-`arc mcp serve-http --control-url ...` topology.
+already qualified the equivalent `chio trust serve` plus
+`chio mcp serve-http --control-url ...` topology.
 
 ## 3. Write A Policy
 
-ARC policies describe what the hosted edge may issue when a session starts.
+Chio policies describe what the hosted edge may issue when a session starts.
 The demo policy is intentionally small:
 
 ```yaml
@@ -68,17 +68,17 @@ This means:
   implicitly at the client
 
 You can save this as `tutorial-policy.yaml` or reuse
-[examples/docker/policy.yaml](/Users/connor/Medica/backbay/standalone/arc/examples/docker/policy.yaml).
+[examples/docker/policy.yaml](/Users/connor/Medica/backbay/standalone/chio/examples/docker/policy.yaml).
 
 ## 4. Wrap A Tool
 
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
-[examples/docker/mock_mcp_server.py](/Users/connor/Medica/backbay/standalone/arc/examples/docker/mock_mcp_server.py).
+[examples/docker/mock_mcp_server.py](/Users/connor/Medica/backbay/standalone/chio/examples/docker/mock_mcp_server.py).
 
-To put ARC in front of it without Docker:
+To put Chio in front of it without Docker:
 
 ```bash
-arc \
+chio \
   --control-url http://127.0.0.1:8940 \
   --control-token demo-token \
   mcp serve-http \
@@ -92,7 +92,7 @@ arc \
 ```
 
 At this point the upstream tool is no longer called directly. Clients connect
-to the ARC hosted edge, ARC issues the session capability, and every governed
+to the Chio hosted edge, Chio issues the session capability, and every governed
 call produces a receipt.
 
 ## 5. Execute A Governed Call
@@ -161,7 +161,7 @@ upstream capability ID.
 The relevant commands are:
 
 ```bash
-arc trust federated-delegation-policy-create \
+chio trust federated-delegation-policy-create \
   --output delegation-policy.json \
   --signing-seed-file authority-seed.txt \
   --issuer local-org \
@@ -171,7 +171,7 @@ arc trust federated-delegation-policy-create \
   --parent-capability-id cap-upstream \
   --expires-at 1900000000
 
-arc \
+chio \
   --control-url https://trust.example.com \
   --control-token <service-token> \
   trust federated-issue \
@@ -190,23 +190,23 @@ What this does:
   explain where the child authority came from
 
 For a fuller walkthrough of the federated inputs, see
-[docs/AGENT_PASSPORT_GUIDE.md](/Users/connor/Medica/backbay/standalone/arc/docs/AGENT_PASSPORT_GUIDE.md).
+[docs/AGENT_PASSPORT_GUIDE.md](/Users/connor/Medica/backbay/standalone/chio/docs/AGENT_PASSPORT_GUIDE.md).
 
 ## 8. Run The Framework Examples
 
 With the demo stack still running, the framework examples all target the same
 defaults:
 
-- [examples/anthropic-sdk/README.md](/Users/connor/Medica/backbay/standalone/arc/examples/anthropic-sdk/README.md)
-- [examples/langchain/README.md](/Users/connor/Medica/backbay/standalone/arc/examples/langchain/README.md)
-- [examples/openai-compatible/README.md](/Users/connor/Medica/backbay/standalone/arc/examples/openai-compatible/README.md)
+- [examples/anthropic-sdk/README.md](/Users/connor/Medica/backbay/standalone/chio/examples/anthropic-sdk/README.md)
+- [examples/langchain/README.md](/Users/connor/Medica/backbay/standalone/chio/examples/langchain/README.md)
+- [examples/openai-compatible/README.md](/Users/connor/Medica/backbay/standalone/chio/examples/openai-compatible/README.md)
 
 They all:
 
-- initialize a hosted ARC session
-- list tools through the official ARC SDK
+- initialize a hosted Chio session
+- list tools through the official Chio SDK
 - perform a governed `echo_text` call
 - resolve the resulting receipt through the trust service
 
-That is the stable baseline for integrating ARC into higher-level agent
+That is the stable baseline for integrating Chio into higher-level agent
 frameworks.

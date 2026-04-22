@@ -27,4 +27,4 @@ Proceed with one bounded Mercury program-family lane only.
 - generalized multi-program portfolio claims
 - generic portfolio-management tooling
 - revenue-platform or channel-program automation
-- ARC-side commercial control surfaces
+- Chio-side commercial control surfaces

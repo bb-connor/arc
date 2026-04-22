@@ -8,14 +8,14 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-env CARGO_TARGET_DIR=target/arc-core-web3-parity CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
-  cargo test -p arc-core web3 -- --test-threads=1
-env CARGO_TARGET_DIR=target/arc-web3-bindings-parity CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
-  cargo test -p arc-web3-bindings -- --test-threads=1
+env CARGO_TARGET_DIR=target/chio-core-web3-parity CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
+  cargo test -p chio-core web3 -- --test-threads=1
+env CARGO_TARGET_DIR=target/chio-web3-bindings-parity CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
+  cargo test -p chio-web3-bindings -- --test-threads=1
 jq empty \
-  docs/standards/ARC_WEB3_CONTRACT_PACKAGE.json \
-  docs/standards/ARC_WEB3_CHAIN_CONFIGURATION.json \
-  docs/standards/ARC_WEB3_QUALIFICATION_MATRIX.json \
-  docs/standards/ARC_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json
+  docs/standards/CHIO_WEB3_CONTRACT_PACKAGE.json \
+  docs/standards/CHIO_WEB3_CHAIN_CONFIGURATION.json \
+  docs/standards/CHIO_WEB3_QUALIFICATION_MATRIX.json \
+  docs/standards/CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json
 
 echo "web3 contract parity verified"

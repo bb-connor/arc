@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chio-fastapi"
+version = "0.1.0"
+description = "FastAPI decorators and integration for the Chio protocol"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Backbay Industries" },
+]
+keywords = ["chio", "fastapi", "security", "capability", "decorator"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+    "Framework :: FastAPI",
+]
+
+dependencies = [
+    "chio-sdk-python>=0.1.0",
+    "chio-asgi>=0.1.0",
+    "fastapi>=0.100",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.23,<1",
+    "httpx>=0.27,<1",
+    "respx>=0.21,<1",
+]
+
+[tool.uv.sources]
+chio-sdk-python = { path = "../chio-sdk-python" }
+chio-asgi = { path = "../chio-asgi" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chio_fastapi"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

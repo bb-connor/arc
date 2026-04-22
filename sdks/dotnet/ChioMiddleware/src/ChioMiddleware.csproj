@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Backbay.Chio</RootNamespace>
+    <PackageId>Backbay.Chio.Middleware</PackageId>
+    <Version>0.1.0</Version>
+    <Description>ASP.NET Core middleware for Chio capability validation and receipt signing</Description>
+    <Authors>Backbay Labs</Authors>
+    <License>MIT</License>
+    <RepositoryUrl>https://github.com/backbay/chio</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

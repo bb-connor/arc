@@ -1,6 +1,6 @@
-# ARC Guard System -- Technical Reference
+# Chio Guard System -- Technical Reference
 
-This document describes the guard system as implemented in the ARC protocol
+This document describes the guard system as implemented in the Chio protocol
 codebase. All type signatures, field names, and behaviors are drawn from the
 source code.
 
@@ -8,8 +8,8 @@ source code.
 
 ## 1. The `Guard` Trait
 
-Defined in `crates/arc-kernel/src/kernel/mod.rs` and re-exported from
-`arc_kernel`:
+Defined in `crates/chio-kernel/src/kernel/mod.rs` and re-exported from
+`chio_kernel`:
 
 ```rust
 pub trait Guard: Send + Sync {
@@ -25,13 +25,13 @@ pub trait Guard: Send + Sync {
 ```
 
 The trait requires `Send + Sync` because guards are stored in
-`Vec<Box<dyn Guard>>` on the `ArcKernel` struct and may be invoked from
+`Vec<Box<dyn Guard>>` on the `ChioKernel` struct and may be invoked from
 different contexts.
 
 ### 1.1 `Verdict` (Kernel)
 
 The kernel's own `Verdict` is a simple two-variant enum defined in
-`crates/arc-kernel/src/runtime.rs`:
+`crates/chio-kernel/src/runtime.rs`:
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,7 +49,7 @@ fail-closed design: guards cannot "pass" on a decision.
 
 ### 1.2 `Verdict` (HTTP Layer)
 
-A separate, richer `Verdict` exists in `crates/arc-http-core/src/verdict.rs`
+A separate, richer `Verdict` exists in `crates/chio-http-core/src/verdict.rs`
 for the HTTP substrate:
 
 ```rust
@@ -64,7 +64,7 @@ pub enum Verdict {
 ```
 
 The HTTP verdict includes denial reasons, the guard name, and HTTP status
-codes (defaulting to 403). It converts to/from `arc_core_types::Decision`
+codes (defaulting to 403). It converts to/from `chio_core_types::Decision`
 for receipt signing.
 
 The kernel-level `Verdict` (Allow/Deny) is what guards return. The richer
@@ -75,14 +75,14 @@ HTTP `Verdict` is used at the transport layer.
 ## 2. `GuardContext`
 
 The context struct passed to every guard during evaluation, defined in
-`crates/arc-kernel/src/kernel/mod.rs`:
+`crates/chio-kernel/src/kernel/mod.rs`:
 
 ```rust
 pub struct GuardContext<'a> {
     /// The tool call request being evaluated.
     pub request: &'a ToolCallRequest,
     /// The verified capability scope.
-    pub scope: &'a ArcScope,
+    pub scope: &'a ChioScope,
     /// The agent making the request.
     pub agent_id: &'a AgentId,
     /// The target server.
@@ -118,10 +118,10 @@ Guards have access to the tool name, server ID, agent ID, arguments (as
 `serde_json::Value`), and the full capability token (including its scope,
 delegation chain, issuer, and time bounds).
 
-**`scope: &'a ArcScope`** -- The verified capability scope:
+**`scope: &'a ChioScope`** -- The verified capability scope:
 
 ```rust
-pub struct ArcScope {
+pub struct ChioScope {
     pub grants: Vec<ToolGrant>,
     pub resource_grants: Vec<ResourceGrant>,
     pub prompt_grants: Vec<PromptGrant>,
@@ -150,10 +150,10 @@ within the capability's scope. This is populated by
 
 ### 3.1 Storage
 
-Guards are stored as a `Vec<Box<dyn Guard>>` on `ArcKernel`:
+Guards are stored as a `Vec<Box<dyn Guard>>` on `ChioKernel`:
 
 ```rust
-pub struct ArcKernel {
+pub struct ChioKernel {
     // ...
     guards: Vec<Box<dyn Guard>>,
     // ...
@@ -178,7 +178,7 @@ pub fn add_guard(&mut self, guard: Box<dyn Guard>) {
 
 Guards are appended to the end of the vector. **Registration order
 determines evaluation order.** There is no priority field, sorting, or
-reordering mechanism on `ArcKernel` itself.
+reordering mechanism on `ChioKernel` itself.
 
 > **Note:** `WasmGuardRuntime` has a `priority` field on `WasmGuardConfig`
 > and its struct doc-comment claims guards are "sorted by priority," but the
@@ -189,7 +189,7 @@ reordering mechanism on `ArcKernel` itself.
 
 ### 3.3 Composition via `GuardPipeline`
 
-The `arc-guards` crate provides `GuardPipeline`, which itself implements
+The `chio-guards` crate provides `GuardPipeline`, which itself implements
 `Guard`:
 
 ```rust
@@ -269,7 +269,7 @@ The full evaluation sequence in `evaluate_tool_call_sync_with_session_roots`:
 fn run_guards(
     &self,
     request: &ToolCallRequest,
-    scope: &ArcScope,
+    scope: &ChioScope,
     session_filesystem_roots: Option<&[String]>,
     matched_grant_index: Option<usize>,
 ) -> Result<(), KernelError> {
@@ -374,7 +374,7 @@ GuardDenied(String),
 ```
 
 This variant carries the formatted reason string. It is mapped to:
-- Error code `ARC-KERNEL-GUARD-DENIED` in structured error reports
+- Error code `Chio-KERNEL-GUARD-DENIED` in structured error reports
 - A denial response with `Verdict::Deny` in the tool call response
 - A signed denial receipt in the receipt log
 
@@ -389,11 +389,11 @@ denial via the fail-closed rule.
 
 ## 6. Existing Guard Implementations
 
-### 6.1 Core Guards (`arc-guards` crate)
+### 6.1 Core Guards (`chio-guards` crate)
 
 #### `ForbiddenPathGuard` ("forbidden-path")
 
-**File:** `crates/arc-guards/src/forbidden_path.rs`
+**File:** `crates/chio-guards/src/forbidden_path.rs`
 
 Blocks access to sensitive filesystem paths using glob patterns. Default
 forbidden patterns include `.ssh/`, `.aws/`, `.env`, `.gnupg/`,
@@ -408,7 +408,7 @@ forbidden patterns include `.ssh/`, `.aws/`, `.env`, `.gnupg/`,
 
 #### `ShellCommandGuard` ("shell-command")
 
-**File:** `crates/arc-guards/src/shell_command.rs`
+**File:** `crates/chio-guards/src/shell_command.rs`
 
 Blocks dangerous shell commands using regex patterns. Default patterns
 catch `rm -rf /`, `curl | bash`, reverse shells, base64 exfiltration.
@@ -422,7 +422,7 @@ catch `rm -rf /`, `curl | bash`, reverse shells, base64 exfiltration.
 
 #### `EgressAllowlistGuard` ("egress-allowlist")
 
-**File:** `crates/arc-guards/src/egress_allowlist.rs`
+**File:** `crates/chio-guards/src/egress_allowlist.rs`
 
 Controls network egress by domain allowlist. Default allows common AI APIs
 and package registries. All other egress is denied (fail-closed).
@@ -433,7 +433,7 @@ and package registries. All other egress is denied (fail-closed).
 
 #### `PathAllowlistGuard` ("path-allowlist")
 
-**File:** `crates/arc-guards/src/path_allowlist.rs`
+**File:** `crates/chio-guards/src/path_allowlist.rs`
 
 Allowlist-based path access control. **Disabled by default** (must be
 explicitly configured). Supports separate allowlists for file access, file
@@ -448,7 +448,7 @@ write, and patch operations.
 
 #### `McpToolGuard` ("mcp-tool")
 
-**File:** `crates/arc-guards/src/mcp_tool.rs`
+**File:** `crates/chio-guards/src/mcp_tool.rs`
 
 Restricts which MCP tools an agent may invoke. Supports allow/block lists,
 default action, and argument size limits.
@@ -461,7 +461,7 @@ default action, and argument size limits.
 
 #### `SecretLeakGuard` ("secret-leak")
 
-**File:** `crates/arc-guards/src/secret_leak.rs`
+**File:** `crates/chio-guards/src/secret_leak.rs`
 
 Detects secrets in file write content using regex patterns. Catches AWS
 keys, GitHub tokens, OpenAI keys, Anthropic keys, private keys, NPM
@@ -474,7 +474,7 @@ and generic API key/secret patterns.
 
 #### `PatchIntegrityGuard` ("patch-integrity")
 
-**File:** `crates/arc-guards/src/patch_integrity.rs`
+**File:** `crates/chio-guards/src/patch_integrity.rs`
 
 Validates patch/diff safety. Checks:
 - Maximum additions (default 1000) and deletions (default 500).
@@ -484,7 +484,7 @@ Validates patch/diff safety. Checks:
 
 #### `InternalNetworkGuard` ("internal-network")
 
-**File:** `crates/arc-guards/src/internal_network.rs`
+**File:** `crates/chio-guards/src/internal_network.rs`
 
 SSRF prevention guard. Blocks network egress to:
 - RFC 1918 private ranges, loopback, link-local, broadcast, 0.0.0.0/8.
@@ -497,7 +497,7 @@ SSRF prevention guard. Blocks network egress to:
 
 #### `VelocityGuard` ("velocity")
 
-**File:** `crates/arc-guards/src/velocity.rs`
+**File:** `crates/chio-guards/src/velocity.rs`
 
 Per-grant rate limiting using token buckets keyed by
 `(capability_id, grant_index)`. Supports invocation rate limits and
@@ -509,7 +509,7 @@ floating-point drift.
 
 #### `AgentVelocityGuard` ("agent-velocity")
 
-**File:** `crates/arc-guards/src/agent_velocity.rs`
+**File:** `crates/chio-guards/src/agent_velocity.rs`
 
 Cross-capability rate limiting keyed by agent identity and session.
 
@@ -519,17 +519,17 @@ Cross-capability rate limiting keyed by agent identity and session.
 
 #### `DataFlowGuard` ("data-flow")
 
-**File:** `crates/arc-guards/src/data_flow.rs`
+**File:** `crates/chio-guards/src/data_flow.rs`
 
 Enforces cumulative bytes-read/written limits via session journal.
-Requires an `Arc<SessionJournal>`.
+Requires an `Chio<SessionJournal>`.
 
 - Configurable max bytes read, written, and total.
 - Fails closed if journal is unavailable.
 
 #### `BehavioralSequenceGuard` ("behavioral-sequence")
 
-**File:** `crates/arc-guards/src/behavioral_sequence.rs`
+**File:** `crates/chio-guards/src/behavioral_sequence.rs`
 
 Enforces tool ordering policies via session journal:
 - Required predecessors (tool X requires tool Y to have run first).
@@ -541,7 +541,7 @@ Fails closed if journal is unavailable.
 
 #### `ResponseSanitizationGuard` ("response-sanitization")
 
-**File:** `crates/arc-guards/src/response_sanitization.rs`
+**File:** `crates/chio-guards/src/response_sanitization.rs`
 
 PII/PHI pattern detection with configurable sensitivity levels. Scans for
 SSNs, emails, phone numbers, credit cards, dates of birth, medical record
@@ -552,9 +552,9 @@ numbers, ICD-10 codes.
 - When used as a pre-invocation guard (via `Guard` trait), scans the
   request arguments.
 
-### 6.2 Advisory Guards (`arc-guards::advisory`)
+### 6.2 Advisory Guards (`chio-guards::advisory`)
 
-**File:** `crates/arc-guards/src/advisory.rs`
+**File:** `crates/chio-guards/src/advisory.rs`
 
 Non-blocking guards that emit observations without denying requests.
 
@@ -596,9 +596,9 @@ Flags unusual invocation patterns. Emits advisory signals when:
 Flags high cumulative data transfer volumes. Escalates severity based on
 multiples of the threshold (1x = Medium, 2x = High, 3x = Critical).
 
-### 6.3 WASM Guards (`arc-wasm-guards` crate)
+### 6.3 WASM Guards (`chio-wasm-guards` crate)
 
-**File:** `crates/arc-wasm-guards/src/runtime.rs`
+**File:** `crates/chio-wasm-guards/src/runtime.rs`
 
 #### `WasmGuard`
 
@@ -620,14 +620,14 @@ code does not sort -- see Section 3.2 note above.)
 
 ### 6.4 `GuardPipeline` ("guard-pipeline")
 
-**File:** `crates/arc-guards/src/pipeline.rs`
+**File:** `crates/chio-guards/src/pipeline.rs`
 
 Composition wrapper that itself implements `Guard`. Runs child guards in
 sequence with fail-closed semantics. See Section 3.3 above.
 
 ### 6.5 Post-Invocation Hooks
 
-**File:** `crates/arc-guards/src/post_invocation.rs`
+**File:** `crates/chio-guards/src/post_invocation.rs`
 
 A separate pipeline for inspecting tool **responses** after invocation:
 
@@ -650,7 +650,7 @@ pre-dispatch.
 
 ### 6.6 Test Guards (in kernel tests)
 
-**File:** `crates/arc-kernel/src/kernel/tests/all.rs`
+**File:** `crates/chio-kernel/src/kernel/tests/all.rs`
 
 Several test-only guard implementations:
 
@@ -667,7 +667,7 @@ Several test-only guard implementations:
 
 ## 7. `ToolAction` Extraction
 
-**File:** `crates/arc-guards/src/action.rs`
+**File:** `crates/chio-guards/src/action.rs`
 
 Guards do not directly inspect raw tool names and arguments. Instead, they
 use `extract_action()` to derive a `ToolAction` enum:

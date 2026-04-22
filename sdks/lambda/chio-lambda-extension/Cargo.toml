@@ -1,0 +1,55 @@
+[package]
+name = "chio-lambda-extension"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.93"
+license = "Apache-2.0"
+description = "Chio kernel packaged as an AWS Lambda Extension. Runs in-process alongside the function handler, exposes a localhost:9090 HTTP evaluator, and flushes receipts to DynamoDB on SHUTDOWN."
+repository = "https://github.com/backbay/chio"
+publish = false
+
+# This crate is intentionally EXCLUDED from the main Chio workspace. Declaring
+# our own `[workspace]` table makes cargo treat this directory as an
+# independent workspace root so tooling such as `cargo build` resolves
+# dependencies against our local `Cargo.lock` instead of the Chio root.
+[workspace]
+
+[[bin]]
+name = "chio-lambda-extension"
+path = "src/main.rs"
+
+[dependencies]
+chio-kernel = { path = "../../../crates/chio-kernel" }
+chio-kernel-core = { path = "../../../crates/chio-kernel-core" }
+chio-core-types = { path = "../../../crates/chio-core-types" }
+chio-store-sqlite = { path = "../../../crates/chio-store-sqlite" }
+
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "time", "net", "io-util"] }
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "server-auto", "http1"] }
+http-body-util = "0.1"
+bytes = "1"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+aws-config = { version = "1.5", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = { version = "1" }
+
+uuid = { version = "1", features = ["v7"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = "symbols"
+codegen-units = 1

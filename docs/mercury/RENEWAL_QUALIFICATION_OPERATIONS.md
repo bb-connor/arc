@@ -92,8 +92,8 @@ This runbook does not authorize:
 - a generic customer-success suite, CRM workflow, or account-management
   platform
 - channel marketplaces or multi-account renewal programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broad customer-health or universal renewal-performance claims
 
 Those remain separate decisions, not hidden responsibilities inside `v2.59`.

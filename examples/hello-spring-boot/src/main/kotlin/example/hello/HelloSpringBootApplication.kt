@@ -1,7 +1,7 @@
 package example.hello
 
-import io.backbay.arc.ArcFilter
-import io.backbay.arc.ArcFilterConfig
+import io.backbay.chio.ChioFilter
+import io.backbay.chio.ChioFilterConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.boot.web.servlet.FilterRegistrationBean
@@ -16,14 +16,14 @@ import org.springframework.web.bind.annotation.RestController
 @SpringBootApplication
 class HelloSpringBootApplication {
     @Bean
-    fun arcFilterRegistration(): FilterRegistrationBean<ArcFilter> {
-        val filter = ArcFilter(
-            ArcFilterConfig(
-                sidecarUrl = System.getenv("ARC_SIDECAR_URL") ?: "http://127.0.0.1:9090",
+    fun chioFilterRegistration(): FilterRegistrationBean<ChioFilter> {
+        val filter = ChioFilter(
+            ChioFilterConfig(
+                sidecarUrl = System.getenv("CHIO_SIDECAR_URL") ?: "http://127.0.0.1:9090",
             ),
         )
 
-        return FilterRegistrationBean<ArcFilter>().apply {
+        return FilterRegistrationBean<ChioFilter>().apply {
             setFilter(filter)
             addUrlPatterns("/*")
             order = Ordered.HIGHEST_PRECEDENCE
@@ -54,4 +54,3 @@ data class EchoRequest(
 fun main(args: Array<String>) {
     runApplication<HelloSpringBootApplication>(*args)
 }
-

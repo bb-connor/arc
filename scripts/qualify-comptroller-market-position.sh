@@ -18,10 +18,10 @@ log_root="${output_root}/logs"
 manifest_path="${output_root}/artifact-manifest.json"
 checksum_path="${output_root}/SHA256SUMS"
 report_path="${output_root}/qualification-report.md"
-matrix_src="docs/standards/ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json"
-matrix_snapshot="${output_root}/ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json"
-proof_src="docs/release/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md"
-proof_snapshot="${output_root}/ARC_COMPTROLLER_MARKET_POSITION_PROOF.md"
+matrix_src="docs/standards/CHIO_COMPTROLLER_MARKET_POSITION_MATRIX.json"
+matrix_snapshot="${output_root}/CHIO_COMPTROLLER_MARKET_POSITION_MATRIX.json"
+proof_src="docs/release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md"
+proof_snapshot="${output_root}/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md"
 
 rm -rf "${output_root}"
 mkdir -p "${log_root}"
@@ -51,9 +51,9 @@ This bundle records the strongest honest post-v3.17 decision.
 
 Decision:
 
-- ARC is now qualified as comptroller-capable software on the documented
+- Chio is now qualified as comptroller-capable software on the documented
   technical, operator, partner, and bounded federated proof surfaces.
-- ARC is **not** yet qualified for the stronger claim of a proved
+- Chio is **not** yet qualified for the stronger claim of a proved
   comptroller-of-the-agent-economy market position.
 
 Why not:
@@ -73,8 +73,8 @@ Executed command set:
 
 Supporting documents:
 
-- `ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json`
-- `ARC_COMPTROLLER_MARKET_POSITION_PROOF.md`
+- `CHIO_COMPTROLLER_MARKET_POSITION_MATRIX.json`
+- `CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md`
 EOF
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

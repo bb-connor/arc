@@ -7,7 +7,7 @@ Minimal Express example using [`sdks/typescript/packages/express`](../../sdks/ty
 - `GET /hello` is allowed and returns a receipt id in the response body
 - `POST /echo` is denied without a capability token
 - `POST /echo` succeeds with a trust-issued capability token
-- parsed JSON bodies remain available downstream after ARC buffering
+- parsed JSON bodies remain available downstream after Chio buffering
 - the smoke flow persists sidecar receipts and captures request/response artifacts
 
 ## Files

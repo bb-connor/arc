@@ -129,7 +129,7 @@ trust service or companion-product program:
 - one trust-network lane over the same embedded-OEM, assurance-suite,
   governance, supervised-live, proof, and inquiry artifacts
 - one sponsor boundary: `counterparty_review_exchange`
-- one trust anchor: `arc_checkpoint_witness_chain`
+- one trust anchor: `chio_checkpoint_witness_chain`
 - one interoperability surface: `proof_inquiry_bundle_exchange`
 - one reviewer population: `counterparty_review`
 
@@ -141,7 +141,7 @@ The current post-purity launch lane is narrower still:
 - one delivery surface only: `signed_partner_review_bundle`
 - one Mercury-owned release, escalation, and support-handoff path
 
-That lane is a Mercury packaging motion, not a generic ARC console and not a
+That lane is a Mercury packaging motion, not a generic Chio console and not a
 new product line.
 
 The current post-launch adoption lane is narrower again:
@@ -152,7 +152,7 @@ The current post-launch adoption lane is narrower again:
 - one renewal-evidence bundle rooted in the existing release-readiness,
   trust-network, assurance, proof, and inquiry artifacts
 
-That lane is a Mercury adoption proof point, not a generic ARC renewal
+That lane is a Mercury adoption proof point, not a generic Chio renewal
 console and not a new Mercury surface family.
 
 The current post-adoption expansion lane is narrower still:
@@ -166,7 +166,7 @@ The current post-adoption expansion lane is narrower still:
   artifacts
 
 That lane is a Mercury landed-account expansion proof point, not a generic
-sales platform, CRM workflow, or ARC commercial console.
+sales platform, CRM workflow, or Chio commercial console.
 
 The current post-reference-distribution lane is narrower still:
 
@@ -179,7 +179,7 @@ The current post-reference-distribution lane is narrower still:
   assurance, proof, and inquiry artifacts
 
 That lane is a Mercury broader-distribution readiness proof point, not a
-generic sales platform, CRM workflow, channel console, or ARC commercial
+generic sales platform, CRM workflow, channel console, or Chio commercial
 console.
 
 The current post-broader-distribution lane is narrower still:
@@ -193,7 +193,7 @@ The current post-broader-distribution lane is narrower still:
   readiness, trust-network, assurance, proof, and inquiry artifacts
 
 That lane is a Mercury selective-account activation proof point, not a
-generic onboarding suite, CRM workflow, channel marketplace, or ARC
+generic onboarding suite, CRM workflow, channel marketplace, or Chio
 commercial console.
 
 The current post-selective-account-activation lane is narrower still:
@@ -208,7 +208,7 @@ The current post-selective-account-activation lane is narrower still:
   artifacts
 
 That lane is a Mercury delivery-continuity proof point, not a generic
-onboarding suite, CRM workflow, support desk, channel marketplace, or ARC
+onboarding suite, CRM workflow, support desk, channel marketplace, or Chio
 commercial console.
 
 The current post-delivery-continuity lane is narrower still:
@@ -223,7 +223,7 @@ The current post-delivery-continuity lane is narrower still:
   network, assurance, proof, and inquiry artifacts
 
 That lane is a Mercury renewal proof point, not a generic customer-success
-platform, CRM workflow, account-management suite, or ARC commercial console.
+platform, CRM workflow, account-management suite, or Chio commercial console.
 
 The current post-renewal-qualification lane is narrower still:
 
@@ -238,7 +238,7 @@ The current post-renewal-qualification lane is narrower still:
 
 That lane is a Mercury second-account expansion proof point, not a generic
 customer-success platform, CRM workflow, account-management suite, revenue
-operations system, or ARC commercial console.
+operations system, or Chio commercial console.
 
 The current post-second-account-expansion lane is narrower still:
 
@@ -254,7 +254,7 @@ The current post-second-account-expansion lane is narrower still:
 
 That lane is a Mercury portfolio-program proof point, not a generic account-
 management suite, CRM workflow, customer-success platform, revenue operations
-system, forecasting stack, billing platform, or ARC commercial console.
+system, forecasting stack, billing platform, or Chio commercial console.
 
 The current post-portfolio-program lane is narrower still:
 
@@ -271,7 +271,7 @@ The current post-portfolio-program lane is narrower still:
 That lane is a Mercury second-portfolio-program proof point, not a generic
 portfolio-management suite, account-management platform, customer-success
 workflow, revenue operations system, forecasting stack, billing platform, or
-ARC commercial console.
+Chio commercial console.
 
 The current post-second-portfolio-program lane is narrower still:
 
@@ -284,7 +284,7 @@ The current post-second-portfolio-program lane is narrower still:
 
 That lane is a Mercury third-program repeatability proof point, not a generic
 multi-program portfolio-management suite, revenue platform, channel program,
-or ARC commercial console.
+or Chio commercial console.
 
 The current post-third-program lane is narrower still:
 
@@ -295,7 +295,7 @@ The current post-third-program lane is narrower still:
 - one program-family bundle rooted in the existing third-program chain
 
 That lane is a Mercury program-family proof point, not a generic portfolio-
-management suite, revenue platform, channel program, or ARC commercial
+management suite, revenue platform, channel program, or Chio commercial
 console.
 
 The current post-program-family lane is narrower still:
@@ -308,7 +308,7 @@ The current post-program-family lane is narrower still:
   chain
 
 That lane is a Mercury commercial-boundary proof point, not a generic
-revenue platform, billing system, channel program, or ARC commercial console.
+revenue platform, billing system, channel program, or Chio commercial console.
 
 ### Sales process
 
@@ -398,12 +398,12 @@ deep runtime coupling.
 
 The first downstream case-management lane, the first governance-workbench
 lane, the first assurance-suite reviewer family, the first embedded OEM lane,
-the first trust-network lane, and the first ARC-Wall lane are now validated.
-The current post-ARC-Wall path is one executed multi-product hardening lane over the
-existing MERCURY plus ARC-Wall product set:
+the first trust-network lane, and the first Chio-Wall lane are now validated.
+The current post-Chio-Wall path is one executed multi-product hardening lane over the
+existing MERCURY plus Chio-Wall product set:
 
-- one shared ARC service catalog
-- one shared ARC dependency map
+- one shared Chio service catalog
+- one shared Chio dependency map
 - one cross-product governance and release matrix for shared versus product-
   local change
 - one trust-material recovery drill plus operator alert-routing model

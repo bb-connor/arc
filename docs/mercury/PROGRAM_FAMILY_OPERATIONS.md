@@ -19,7 +19,7 @@ Operators must preserve three constraints:
 ## Export Command
 
 ```bash
-cargo run -p arc-mercury -- program-family export --output target/mercury-program-family-export
+cargo run -p chio-mercury -- program-family export --output target/mercury-program-family-export
 ```
 
 Expected top-level artifacts:
@@ -42,4 +42,4 @@ Stop the lane if:
 - third-program approval refresh is absent or stale
 - the scope expands beyond one named small program family
 - portfolio-claim discipline is missing
-- the request implies generic portfolio management, revenue-platform breadth, channel programs, or ARC commercial behavior
+- the request implies generic portfolio management, revenue-platform breadth, channel programs, or Chio commercial behavior

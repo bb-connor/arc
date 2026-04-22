@@ -26,7 +26,7 @@ The previous trust story was strong inside one process, but weak across a fleet:
 
 That was enough for single-node hosting. It was not enough for a real distributed deployment.
 
-The rewrite target was to move ARC from:
+The rewrite target was to move Chio from:
 
 - embedded trust persistence attached to one runtime
 
@@ -38,11 +38,11 @@ to:
 
 The codebase already had the right extension points:
 
-- `CapabilityAuthority` in `crates/arc-kernel/src/authority.rs`
-- `RevocationStore` in `crates/arc-kernel/src/lib.rs`
-- `ReceiptStore` in `crates/arc-kernel/src/lib.rs`
-- hosted admin surfaces in `crates/arc-cli/src/remote_mcp.rs`
-- centralized CLI/runtime wiring in `crates/arc-cli/src/main.rs`
+- `CapabilityAuthority` in `crates/chio-kernel/src/authority.rs`
+- `RevocationStore` in `crates/chio-kernel/src/lib.rs`
+- `ReceiptStore` in `crates/chio-kernel/src/lib.rs`
+- hosted admin surfaces in `crates/chio-cli/src/remote_mcp.rs`
+- centralized CLI/runtime wiring in `crates/chio-cli/src/main.rs`
 
 That meant the rewrite did not need a new kernel model. It needed a new control-plane implementation behind the existing interfaces.
 
@@ -50,7 +50,7 @@ That meant the rewrite did not need a new kernel model. It needed a new control-
 
 ### 1. Shared trust-control service
 
-The service lives in `crates/arc-cli/src/trust_control.rs` and exposes:
+The service lives in `crates/chio-cli/src/trust_control.rs` and exposes:
 
 - `GET /health`
 - `GET /v1/authority`
@@ -73,7 +73,7 @@ Hosted runtimes now attach remote-backed implementations for:
 - `RevocationStore`
 - `ReceiptStore`
 
-Those clients are also in `crates/arc-cli/src/trust_control.rs`.
+Those clients are also in `crates/chio-cli/src/trust_control.rs`.
 
 The runtime selection rule is:
 
@@ -83,7 +83,7 @@ The runtime selection rule is:
 
 ### 3. Hosted-node admin proxy
 
-`arc mcp serve-http` keeps its existing admin surface, but when a control service is configured it proxies trust-admin operations to the shared control plane.
+`chio mcp serve-http` keeps its existing admin surface, but when a control service is configured it proxies trust-admin operations to the shared control plane.
 
 That preserves a simple operator model:
 
@@ -124,7 +124,7 @@ Deliverables:
 
 Acceptance:
 
-- service can be started with `arc trust serve`
+- service can be started with `chio trust serve`
 - direct HTTP tests prove issuance, revocation, and receipt query behavior
 
 ### Phase 2. Kernel client adapters
@@ -138,7 +138,7 @@ Deliverables:
 
 Acceptance:
 
-- `arc check` can issue capabilities and persist receipts through the control service
+- `chio check` can issue capabilities and persist receipts through the control service
 - hosted nodes can bootstrap sessions with the shared authority
 
 ### Phase 3. Hosted admin integration
@@ -188,16 +188,16 @@ The implementation is validated in three layers.
 
 ### Direct control plane
 
-- `arc trust serve` health and admin behavior
-- `arc trust revoke/status` against `--control-url`
+- `chio trust serve` health and admin behavior
+- `chio trust revoke/status` against `--control-url`
 
 ### CLI runtime path
 
-- `arc check` issuing capabilities and persisting receipts through the control service
+- `chio check` issuing capabilities and persisting receipts through the control service
 
 ### Hosted distributed path
 
-- two `arc mcp serve-http` nodes sharing one control service
+- two `chio mcp serve-http` nodes sharing one control service
 - centralized receipt query
 - cross-node revocation enforcement
 - future-session authority rotation across nodes

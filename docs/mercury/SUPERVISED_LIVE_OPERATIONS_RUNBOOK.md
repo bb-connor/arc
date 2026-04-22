@@ -131,4 +131,4 @@ The supervised-live bridge should retain or reference:
 
 This runbook works with [SUPERVISED_LIVE_BRIDGE.md](SUPERVISED_LIVE_BRIDGE.md),
 [SUPERVISED_LIVE_OPERATING_MODEL.md](SUPERVISED_LIVE_OPERATING_MODEL.md), and
-the typed supervised-live capture contract in `arc-mercury-core`.
+the typed supervised-live capture contract in `chio-mercury-core`.

@@ -52,7 +52,7 @@ run_with_log() {
   return 1
 }
 
-if ! run_with_log host_ffi cargo test -p arc-kernel-mobile --test ffi_roundtrip -- --nocapture; then
+if ! run_with_log host_ffi cargo test -p chio-kernel-mobile --test ffi_roundtrip -- --nocapture; then
   host_ffi_status="fail"
   host_ffi_detail="ffi_roundtrip failed"
   FAILED=1
@@ -60,7 +60,7 @@ fi
 
 if [[ "$HOST_OS" == "Darwin" ]] && printf '%s\n' "$INSTALLED_TARGETS" | grep -qx 'aarch64-apple-ios'; then
   MOBILE_LANES_RAN=$((MOBILE_LANES_RAN + 1))
-  if run_with_log ios_device cargo build -p arc-kernel-mobile --release --target aarch64-apple-ios; then
+  if run_with_log ios_device cargo build -p chio-kernel-mobile --release --target aarch64-apple-ios; then
     ios_device_status="pass"
     ios_device_detail="aarch64-apple-ios release build passed"
     MOBILE_LANES_PASSED=$((MOBILE_LANES_PASSED + 1))
@@ -77,7 +77,7 @@ fi
 
 if [[ "$HOST_OS" == "Darwin" ]] && printf '%s\n' "$INSTALLED_TARGETS" | grep -qx 'aarch64-apple-ios-sim'; then
   MOBILE_LANES_RAN=$((MOBILE_LANES_RAN + 1))
-  if run_with_log ios_sim cargo build -p arc-kernel-mobile --release --target aarch64-apple-ios-sim; then
+  if run_with_log ios_sim cargo build -p chio-kernel-mobile --release --target aarch64-apple-ios-sim; then
     ios_sim_status="pass"
     ios_sim_detail="aarch64-apple-ios-sim release build passed"
     MOBILE_LANES_PASSED=$((MOBILE_LANES_PASSED + 1))
@@ -97,7 +97,7 @@ if printf '%s\n' "$INSTALLED_TARGETS" | grep -qx 'aarch64-linux-android'; then
     MOBILE_LANES_RAN=$((MOBILE_LANES_RAN + 1))
     if run_with_log android_arm64 \
       cargo ndk --target aarch64-linux-android -o "$ARTIFACT_DIR/android-jniLibs" \
-      build --release -p arc-kernel-mobile; then
+      build --release -p chio-kernel-mobile; then
       android_arm64_status="pass"
       android_arm64_detail="aarch64-linux-android release build passed via cargo-ndk"
       MOBILE_LANES_PASSED=$((MOBILE_LANES_PASSED + 1))
@@ -170,7 +170,7 @@ import sys
 
 summary_path = sys.argv[1]
 data = {
-    "schema": "arc.mobile-kernel-qualification.v1",
+    "schema": "chio.mobile-kernel-qualification.v1",
     "host": os.environ["HOST_OS"],
     "cargo_target_dir": os.environ["CARGO_TARGET_DIR"],
     "artifact_dir": os.path.dirname(summary_path),

@@ -37,7 +37,7 @@ The exact first workflow sentence is frozen as:
 
 ## 2. Build Principles
 
-1. Reuse ARC's receipt, signing, and verification substrate wherever possible.
+1. Reuse Chio's receipt, signing, and verification substrate wherever possible.
 2. Make evidence fidelity and proof distribution more important than UI breadth.
 3. Capture raw source artifacts and reconciliation metadata, not just derived
    adapter output.
@@ -61,8 +61,8 @@ docs:
 
 **Deliverables**
 
-- ARC reuse and gap inventory
-- ARC-to-MERCURY portfolio map and commercial boundary
+- Chio reuse and gap inventory
+- Chio-to-MERCURY portfolio map and commercial boundary
 - MERCURY kernel profile assumptions
 - canonical evidence object definition
 - `Proof Package v1` and `Publication Profile v1` definitions
@@ -82,20 +82,20 @@ verification surface.
 
 **Deliverables**
 
-- `arc-mercury-core`
+- `chio-mercury-core`
 - receipt metadata, chronology and causality fields, and evidence-bundle schema
 - provider and dependency provenance fields
 - sensitivity, disclosure, and export-policy fields
 - query extensions for business identifiers
-- MERCURY verification through the dedicated `arc-mercury` app, backed by
-  `arc-mercury-core` and ARC's generic evidence-export substrate
+- MERCURY verification through the dedicated `chio-mercury` app, backed by
+  `chio-mercury-core` and Chio's generic evidence-export substrate
 
 **Exit criteria**
 
 - receipts verify end-to-end
 - evidence bundles hash and verify correctly
 - queries support pilot-scale investigation flows
-- the first supported verifier command in `arc-mercury` validates the package
+- the first supported verifier command in `chio-mercury` validates the package
   contract end to end
 
 ### Phase 2: Pilot Evidence Stack (Weeks 9-16)
@@ -203,7 +203,7 @@ produce a successful pilot outcome and a clear funded next step.
   justified
 - ownership for review, export, and support obligations is defined
 
-### Phase 5: Embedded OEM, Trust Network, and ARC-Wall
+### Phase 5: Embedded OEM, Trust Network, and Chio-Wall
 
 **Tracks**
 
@@ -213,41 +213,41 @@ produce a successful pilot outcome and a clear funded next step.
 - Trust Network
   Shared publication, witness, trust-anchor, and interoperability services that
   make proof distribution easier across firms and reviewers.
-- ARC-Wall
+- Chio-Wall
   Information-domain control evidence and companion product packaging using the
   same trust and publication foundations.
 
 **Current activated path**
 
-- one ARC-Wall companion-product lane over ARC guard, receipt, checkpoint,
+- one Chio-Wall companion-product lane over Chio guard, receipt, checkpoint,
   publication, and verification truth
 - one buyer motion: `control_room_barrier_review`
 - one control surface: `tool_access_domain_boundary`
 - one source/protected domain pair: `research -> execution`
-- one explicit owner boundary: `barrier-control-room` plus `arc-wall-ops`
+- one explicit owner boundary: `barrier-control-room` plus `chio-wall-ops`
 
 **Gate to start**
 
 - the core evidence platform is stable
 - at least one phase 4 expansion track is operating credibly
-- trust-network or ARC-Wall work has a clear buyer or ecosystem sponsor
+- trust-network or Chio-Wall work has a clear buyer or ecosystem sponsor
 
 ---
 
 ## 6. Post-Phase 5: Multi-Product Platform Hardening
 
-Once one ARC-Wall lane is validated, the next bounded step is not another
+Once one Chio-Wall lane is validated, the next bounded step is not another
 buyer motion. It is one hardening lane over the current product set.
 
 ### Current activated path
 
-- one shared ARC service catalog across MERCURY and ARC-Wall
+- one shared Chio service catalog across MERCURY and Chio-Wall
 - one cross-product governance model for release, incident, and trust material
 - one bounded platform-hardening backlog for sustained multi-product operation
 
 ### Gate to start
 
-- MERCURY and ARC-Wall each have one validated lane on the same ARC substrate
+- MERCURY and Chio-Wall each have one validated lane on the same Chio substrate
 - product owners agree that shared-service boundaries must stay explicit
 - the next funded work is hardening, not a new buyer or connector lane
 
@@ -262,7 +262,7 @@ buyer motion. It is one hardening lane over the current product set.
 | M2: Pilot stack working | 16 | Full replay/shadow workflow runs successfully |
 | M3: Pilot ready | 24 | External design-partner deployment is supportable |
 | M3.5: First supervised-live decision | Post-pilot | The same workflow either moves into supervised-live production or is intentionally deferred |
-| M4: First expansion-track decision | Post-pilot | One specific governance, downstream, assurance, OEM, trust, or ARC-Wall path is funded |
+| M4: First expansion-track decision | Post-pilot | One specific governance, downstream, assurance, OEM, trust, or Chio-Wall path is funded |
 | M5: Platform expansion | Post-M4 | Expansion tracks begin in a sequenced way |
 
 ---

@@ -4,30 +4,30 @@
 **Date:** 2026-04-14
 **Status:** Normative companion to PROTOCOL.md
 
-This document specifies how the ARC kernel's trust contract extends to
+This document specifies how the Chio kernel's trust contract extends to
 external protocol surfaces through bridges and edges. Each section covers
 one bridge or edge crate, its invocation flow, fidelity assessment, and
 receipt integration.
 
 All bridges and edges share the same security invariant: every mediated
-action flows through the ARC kernel guard pipeline, producing a signed
+action flows through the Chio kernel guard pipeline, producing a signed
 receipt regardless of the upstream or downstream protocol.
 
 ---
 
-## 1. OpenAPI-to-MCP Bridge (`arc-openapi-mcp-bridge`)
+## 1. OpenAPI-to-MCP Bridge (`chio-openapi-mcp-bridge`)
 
 ### 1.1 Overview
 
-The OpenAPI-to-MCP bridge presents ARC-governed HTTP APIs as MCP tool
+The OpenAPI-to-MCP bridge presents Chio-governed HTTP APIs as MCP tool
 surfaces. Given an OpenAPI 3.x specification, the bridge:
 
-1. Parses the spec via `arc-openapi` to produce `ToolDefinition` values.
-2. Wraps each HTTP operation as an MCP-visible tool via `arc-mcp-edge`.
-3. Routes invocations through the ARC kernel for capability validation
+1. Parses the spec via `chio-openapi` to produce `ToolDefinition` values.
+2. Wraps each HTTP operation as an MCP-visible tool via `chio-mcp-edge`.
+3. Routes invocations through the Chio kernel for capability validation
    and receipt signing before dispatching to the upstream HTTP API.
 
-The bridge MUST generate a valid `arc.manifest.v1` manifest from the
+The bridge MUST generate a valid `chio.manifest.v1` manifest from the
 OpenAPI spec. If the spec contains zero publishable operations, the
 bridge MUST reject construction with a manifest error.
 
@@ -47,7 +47,7 @@ entry in the MCP `tools/list` response. The mapping rules are:
 The bridge MUST set `has_side_effects` to `false` for GET, HEAD, and
 OPTIONS operations and `true` for all other HTTP methods.
 
-When `x-arc-*` extensions are present in the OpenAPI spec, they are
+When `x-chio-*` extensions are present in the OpenAPI spec, they are
 propagated to the corresponding `ToolDefinition` fields as specified in
 [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md).
 
@@ -57,7 +57,7 @@ propagated to the corresponding `ToolDefinition` fields as specified in
 sequenceDiagram
     participant C as MCP Client
     participant B as OpenAPI-MCP Bridge
-    participant K as ARC Kernel
+    participant K as Chio Kernel
     participant U as Upstream HTTP API
 
     C->>B: tools/call(tool_name, arguments)
@@ -72,7 +72,7 @@ sequenceDiagram
         B->>U: HTTP request (method, url, body)
         U-->>B: HTTP response (status, body)
         B->>K: Sign receipt
-        K-->>B: Signed ARC receipt
+        K-->>B: Signed Chio receipt
         B-->>C: tools/call result with structuredContent
     end
 ```
@@ -92,7 +92,7 @@ The `structuredContent` field in the MCP response MUST include:
 ### 1.4 Receipt Generation
 
 Every bridged invocation that reaches the upstream HTTP API MUST produce
-a signed ARC receipt. The receipt MUST include:
+a signed Chio receipt. The receipt MUST include:
 
 - `tool_name`: the MCP tool name (derived from `operationId`)
 - `server_id`: the bridge's configured server ID
@@ -107,7 +107,7 @@ occurs.
 ### 1.5 Kernel Integration
 
 The bridge implements `ToolServerConnection`, allowing direct
-registration with an ARC kernel instance. Both borrowed (`BridgeToolServer`)
+registration with an Chio kernel instance. Both borrowed (`BridgeToolServer`)
 and owned (`OwnedBridgeToolServer`) variants are provided:
 
 - `BridgeToolServer<'a>`: borrows the bridge; suitable for scoped kernel
@@ -120,17 +120,17 @@ logic, mapping `BridgeError` to `KernelError::ToolServerError`.
 
 ---
 
-## 2. A2A Edge (`arc-a2a-edge`)
+## 2. A2A Edge (`chio-a2a-edge`)
 
 ### 2.1 Overview
 
-The A2A edge exposes ARC kernel-governed tools as A2A (Agent-to-Agent)
-skills. This is the reverse direction from `arc-a2a-adapter`: instead of
-consuming a remote A2A server, this crate serves ARC tools to external
+The A2A edge exposes Chio kernel-governed tools as A2A (Agent-to-Agent)
+skills. This is the reverse direction from `chio-a2a-adapter`: instead of
+consuming a remote A2A server, this crate serves Chio tools to external
 A2A clients.
 
 Every invocation flows through the kernel guard pipeline, producing a
-signed ARC receipt.
+signed Chio receipt.
 
 ### 2.2 Agent Card Generation
 
@@ -146,10 +146,10 @@ The Agent Card structure:
 | `description` | `A2aEdgeConfig.agent_description` | Human-readable summary |
 | `version` | `A2aEdgeConfig.agent_version` | Semantic version |
 | `supportedInterfaces` | Derived from config | One entry per endpoint URL |
-| `capabilities.streaming` | Fixed `false` on the authoritative A2A profile | ARC does not currently advertise a receipt-bearing streaming/task lifecycle |
+| `capabilities.streaming` | Fixed `false` on the authoritative A2A profile | Chio does not currently advertise a receipt-bearing streaming/task lifecycle |
 | `defaultInputModes` | `["text"]` | Fixed for current implementation |
 | `defaultOutputModes` | `["text"]` | Fixed for current implementation |
-| `skills` | Derived from tool manifests | One skill per ARC tool |
+| `skills` | Derived from tool manifests | One skill per Chio tool |
 
 Each interface entry MUST include:
 
@@ -159,12 +159,12 @@ Each interface entry MUST include:
 
 ### 2.3 Tool-to-Skill Mapping
 
-Each ARC `ToolDefinition` from registered manifests becomes one A2A
+Each Chio `ToolDefinition` from registered manifests becomes one A2A
 skill entry. The mapping rules are:
 
-| ARC Field | A2A Skill Field | Notes |
+| Chio Field | A2A Skill Field | Notes |
 |---|---|---|
-| `tool.name` | `id`, `name` | Skill ID matches the ARC tool name |
+| `tool.name` | `id`, `name` | Skill ID matches the Chio tool name |
 | `tool.description` | `description` | Passed through unchanged |
 | (inferred) | `tags` | Empty by default; MAY be populated by operators |
 | (fixed) | `inputModes` | `["text"]` |
@@ -182,7 +182,7 @@ published.
 
 The edge handles `message/send` JSON-RPC requests by:
 
-1. Resolving the target skill ID from `params.metadata.arc.targetSkillId`.
+1. Resolving the target skill ID from `params.metadata.chio.targetSkillId`.
    If only one skill is registered, the edge MAY infer the target
    automatically.
 2. If multiple skills are registered and no `targetSkillId` is provided,
@@ -225,9 +225,9 @@ The authoritative A2A surface also exposes:
 | `task/get` | Resolve a deferred `message/stream` task | `TaskResponse` |
 | `task/cancel` | Cancel a deferred `message/stream` task before execution | `TaskResponse` |
 
-`task/get` MUST execute the deferred request through the authoritative ARC
+`task/get` MUST execute the deferred request through the authoritative Chio
 path the first time it is called for a working task and then persist the
-terminal result. Terminal task results MUST carry the same signed ARC receipt
+terminal result. Terminal task results MUST carry the same signed Chio receipt
 metadata as `message/send`.
 
 #### 2.4.4 Result Conversion
@@ -244,13 +244,13 @@ Tool results are converted to A2A message parts using these rules:
 ### 2.5 BridgeFidelity Evaluation
 
 The edge evaluates fidelity per tool at registration time. The assessment
-indicates how faithfully an ARC tool maps to A2A semantics.
+indicates how faithfully an Chio tool maps to A2A semantics.
 
 | Fidelity Level | Criteria | Implications |
 |---|---|---|
 | `lossless` | Tool is publishable and does not depend on approval, deferred-stream, cancellation, or partial-output caveats | The current A2A edge can project the tool without semantic loss |
 | `adapted` | Tool is publishable but side-effect, deferred-stream, cancellation, or partial-output semantics require explicit caveats | The edge preserves the tool through A2A but must surface caveats in discovery metadata |
-| `unsupported` | Tool requires interactive approval or explicit publication suppression (`x-arc-publish: false`) | The tool MUST NOT be auto-published on the A2A surface |
+| `unsupported` | Tool requires interactive approval or explicit publication suppression (`x-chio-publish: false`) | The tool MUST NOT be auto-published on the A2A surface |
 
 The `bridgeFidelity` field is included in each skill entry in the Agent
 Card. Clients SHOULD use this field to assess whether the A2A interface
@@ -260,18 +260,18 @@ Agent Card entirely.
 The current implementation uses these semantic hints when present on the tool
 schema:
 
-- `x-arc-publish`
-- `x-arc-approval-required`
-- `x-arc-streaming`
-- `x-arc-cancellation`
-- `x-arc-partial-output`
+- `x-chio-publish`
+- `x-chio-approval-required`
+- `x-chio-streaming`
+- `x-chio-cancellation`
+- `x-chio-partial-output`
 
 ### 2.6 Kernel-Mediated Receipts
 
 Every `SendMessage` invocation that reaches the tool server MUST flow
 through the kernel guard pipeline. The resulting signed receipt includes:
 
-- `tool_name`: the ARC tool name (matching the A2A skill ID)
+- `tool_name`: the Chio tool name (matching the A2A skill ID)
 - `server_id`: the server ID from the manifest that owns the tool
 - `decision`: `allow` for completed tasks; `deny` for guard rejections
 
@@ -281,26 +281,26 @@ appropriate.
 
 ---
 
-## 3. ACP Edge (`arc-acp-edge`)
+## 3. ACP Edge (`chio-acp-edge`)
 
 ### 3.1 Overview
 
-The ACP edge exposes ARC kernel-governed tools as ACP (Agent Client
+The ACP edge exposes Chio kernel-governed tools as ACP (Agent Client
 Protocol) capabilities. This allows ACP-compatible editors and IDEs to
-access ARC-governed tools through the ACP permission model.
+access Chio-governed tools through the ACP permission model.
 
 ACP has a narrow tool model organized around four categories: filesystem,
-terminal, browser, and generic tool. The edge maps ARC tools into this
+terminal, browser, and generic tool. The edge maps Chio tools into this
 model with category inference and fidelity assessment.
 
-### 3.2 ARC Tools as ACP Capabilities
+### 3.2 Chio Tools as ACP Capabilities
 
-Each ARC `ToolDefinition` becomes one ACP capability advertisement. The
+Each Chio `ToolDefinition` becomes one ACP capability advertisement. The
 mapping rules are:
 
-| ARC Field | ACP Capability Field | Notes |
+| Chio Field | ACP Capability Field | Notes |
 |---|---|---|
-| `tool.name` | `id`, `name` | Capability ID matches the ARC tool name |
+| `tool.name` | `id`, `name` | Capability ID matches the Chio tool name |
 | `tool.description` | `description` | Passed through unchanged |
 | (inferred) | `category` | See Section 3.3 |
 | `tool.has_side_effects` + config | `requiresPermission` | `true` if config requires permission OR tool has side effects |
@@ -328,7 +328,7 @@ When no pattern matches, the edge MUST fall back to
 
 ### 3.4 Permission Evaluation
 
-The edge implements fail-closed permission evaluation backed by ARC
+The edge implements fail-closed permission evaluation backed by Chio
 capabilities.
 
 The edge handles `session/request_permission` JSON-RPC requests by:
@@ -344,7 +344,7 @@ The edge handles `session/request_permission` JSON-RPC requests by:
 sequenceDiagram
     participant I as IDE / ACP Client
     participant E as ACP Edge
-    participant K as ARC Kernel
+    participant K as Chio Kernel
 
     I->>E: session/request_permission(capabilityId, arguments)
     E->>E: Lookup capability
@@ -372,7 +372,7 @@ tool properties.
 |---|---|---|
 | `lossless` | Category is `filesystem` or `terminal` and no caveated semantic hints are present | ACP natively supports the projection without caveats |
 | `adapted` | Capability is publishable but depends on permission-preview, collected streaming, partial-output, cancellation, or generic-tool-category caveats | The capability remains discoverable but caveats MUST be surfaced in `bridgeFidelity` |
-| `unsupported` | Category is `browser`, category is generic mutating `tool`, or publication is disabled with `x-arc-publish: false` | The capability MUST NOT be auto-published on the ACP surface |
+| `unsupported` | Category is `browser`, category is generic mutating `tool`, or publication is disabled with `x-chio-publish: false` | The capability MUST NOT be auto-published on the ACP surface |
 
 The `bridgeFidelity` field is included in each capability advertisement.
 Clients SHOULD use this field to determine whether the ACP interface
@@ -400,7 +400,7 @@ Unknown methods MUST return a JSON-RPC error with code `-32601`.
 sequenceDiagram
     participant I as IDE / ACP Client
     participant E as ACP Edge
-    participant K as ARC Kernel
+    participant K as Chio Kernel
     participant T as Tool Server
 
     I->>E: tool/invoke(capabilityId, arguments)
@@ -414,7 +414,7 @@ sequenceDiagram
         E->>T: Invoke tool
         T-->>E: Tool result
         E->>K: Sign receipt
-        K-->>E: Signed ARC receipt
+        K-->>E: Signed Chio receipt
         E-->>I: { success: true, data: result }
     end
 ```
@@ -427,12 +427,12 @@ resolves them or `tool/cancel` marks them cancelled before execution.
 
 ---
 
-## 4. OpenAI Adapter (`arc-openai`)
+## 4. OpenAI Adapter (`chio-openai`)
 
 ### 4.1 Overview
 
 The OpenAI adapter intercepts OpenAI-style `tool_use` / function-calling
-requests and routes them through the ARC kernel for capability validation
+requests and routes them through the Chio kernel for capability validation
 and receipt signing. It supports both the Chat Completions API format and
 the Responses API format.
 
@@ -441,10 +441,10 @@ default.
 
 ### 4.2 Function Definition Generation
 
-The adapter generates OpenAI-compatible tool definitions from ARC
+The adapter generates OpenAI-compatible tool definitions from Chio
 `ToolManifest` entries. Each `ToolDefinition` becomes one OpenAI function:
 
-| ARC Field | OpenAI Field | Notes |
+| Chio Field | OpenAI Field | Notes |
 |---|---|---|
 | `tool.name` | `function.name` | Used directly; MUST match the receipt `tool_name` |
 | `tool.description` | `function.description` | Passed through unchanged |
@@ -478,7 +478,7 @@ Chat Completions API:
 sequenceDiagram
     participant LLM as LLM (OpenAI API)
     participant A as OpenAI Adapter
-    participant K as ARC Kernel
+    participant K as Chio Kernel
     participant T as Tool Server
 
     LLM->>A: tool_calls[{id, function: {name, arguments}}]
@@ -493,7 +493,7 @@ sequenceDiagram
         K->>K: Validate capability + run guard pipeline
         K->>T: Invoke tool when allowed
         T-->>K: Tool result or error
-        K-->>A: ToolCallResponse with signed ArcReceipt
+        K-->>A: ToolCallResponse with signed ChioReceipt
         A-->>LLM: ToolCallResult(content, denied, receipt_ref, receipt)
     end
 ```
@@ -549,11 +549,11 @@ The output format:
 Every function call MUST produce a signed receipt. The receipt MUST
 include:
 
-- `tool_name`: the OpenAI function name, which matches the ARC tool name
+- `tool_name`: the OpenAI function name, which matches the Chio tool name
 - `server_id`: the adapter's configured server ID
 - `receipt_ref`: the signed receipt's real `id`, included in the
   `ToolCallResult`
-- `receipt`: the signed `ArcReceipt` object itself when the call reached
+- `receipt`: the signed `ChioReceipt` object itself when the call reached
   the kernel
 
 Receipt generation occurs for both successful and failed invocations:
@@ -597,13 +597,13 @@ All edges use a three-level fidelity assessment:
 
 | Level | Meaning | Guidance |
 |---|---|---|
-| `lossless` | The ARC tool maps cleanly to the target protocol's native primitives | No caveats are required and the bridge may publish by default |
-| `adapted` | The ARC tool is publishable only with explicit caveats | Discovery metadata MUST surface the caveats honestly |
+| `lossless` | The Chio tool maps cleanly to the target protocol's native primitives | No caveats are required and the bridge may publish by default |
+| `adapted` | The Chio tool is publishable only with explicit caveats | Discovery metadata MUST surface the caveats honestly |
 | `unsupported` | The target protocol cannot represent the required semantics honestly | The tool MUST remain unpublished on that surface |
 
 ### 5.2 Fail-Closed Invariant
 
-All bridges and edges MUST maintain the ARC fail-closed invariant:
+All bridges and edges MUST maintain the Chio fail-closed invariant:
 
 - If the kernel is unreachable, requests MUST be denied.
 - If a capability token is invalid or expired, requests MUST be denied.
@@ -615,12 +615,12 @@ All bridges and edges MUST maintain the ARC fail-closed invariant:
 ### 5.3 Receipt Chain Continuity
 
 Signed receipts from bridged invocations MUST be compatible with the
-core ARC receipt contract (PROTOCOL.md Section 6). Specifically:
+core Chio receipt contract (PROTOCOL.md Section 6). Specifically:
 
-- Receipts use the same `arc.receipt.v1` schema.
+- Receipts use the same `chio.receipt.v1` schema.
 - Receipts are included in the same Merkle-committed receipt log.
 - Receipts from bridged invocations are indistinguishable from native
-  ARC receipts to downstream consumers (trust-control, evidence export,
+  Chio receipts to downstream consumers (trust-control, evidence export,
   federation).
 
 This ensures that auditors and operators see a unified evidence trail

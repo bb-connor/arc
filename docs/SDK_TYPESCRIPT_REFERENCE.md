@@ -1,13 +1,13 @@
 # TypeScript SDK Reference
 
-The `@arc-protocol/sdk` package provides TypeScript bindings for agent-side ARC operations: signing DPoP proofs, querying receipts, and working with ARC types.
+The `@chio-protocol/sdk` package provides TypeScript bindings for agent-side Chio operations: signing DPoP proofs, querying receipts, and working with Chio types.
 
 ## Installation
 
 ```bash
-npm install @arc-protocol/sdk
+npm install @chio-protocol/sdk
 # or
-yarn add @arc-protocol/sdk
+yarn add @chio-protocol/sdk
 ```
 
 **Requirements:** Node.js >= 22. The package uses ES module format (`"type": "module"` in `package.json`). All entry points export TypeScript source directly; compile with `tsc` before shipping to a consumer that requires `.js` output.
@@ -16,9 +16,9 @@ yarn add @arc-protocol/sdk
 
 | Export | Entry Point |
 |--------|-------------|
-| `@arc-protocol/sdk` | Main surface: errors, DPoP, receipt query client, types, transport, auth |
-| `@arc-protocol/sdk/invariants` | Low-level canonical JSON, hashing, signing invariants |
-| `@arc-protocol/sdk/transport` | Session and message transport types |
+| `@chio-protocol/sdk` | Main surface: errors, DPoP, receipt query client, types, transport, auth |
+| `@chio-protocol/sdk/invariants` | Low-level canonical JSON, hashing, signing invariants |
+| `@chio-protocol/sdk/transport` | Session and message transport types |
 
 ## API Stability
 
@@ -26,10 +26,10 @@ The package follows semantic versioning. The current version is `1.0.0`. All exp
 
 ## Error Hierarchy
 
-All SDK errors extend `ArcError`:
+All SDK errors extend `ChioError`:
 
 ```typescript
-class ArcError extends Error {
+class ChioError extends Error {
   readonly code: string;
   constructor(code: string, message: string, options?: ErrorOptions)
 }
@@ -38,32 +38,32 @@ class ArcError extends Error {
 Concrete error classes:
 
 ```typescript
-class DpopSignError extends ArcError {
+class DpopSignError extends ChioError {
   // code: "dpop_sign_error"
   // Thrown when agentSeedHex is invalid or Ed25519 signing fails.
 }
 
-class QueryError extends ArcError {
+class QueryError extends ChioError {
   // code: "query_error"
   readonly status: number | undefined;
   constructor(message: string, status?: number, options?: ErrorOptions)
   // Thrown when the server returns a non-2xx HTTP status.
 }
 
-class TransportError extends ArcError {
+class TransportError extends ChioError {
   // code: "transport_error"
   // Thrown when the fetch itself fails (network error, DNS failure, etc.).
 }
 ```
 
-`ArcInvariantError` (exported from `./invariants`) is a separate lower-level error type and does NOT extend `ArcError`. Catch it separately if you use the invariants layer directly.
+`ChioInvariantError` (exported from `./invariants`) is a separate lower-level error type and does NOT extend `ChioError`. Catch it separately if you use the invariants layer directly.
 
 ## signDpopProof
 
-Signs a DPoP proof for a single tool invocation. The proof body is serialized as RFC 8785 canonical JSON before signing, ensuring compatibility with `arc-kernel`'s `verify_dpop_proof`.
+Signs a DPoP proof for a single tool invocation. The proof body is serialized as RFC 8785 canonical JSON before signing, ensuring compatibility with `chio-kernel`'s `verify_dpop_proof`.
 
 ```typescript
-import { signDpopProof } from "@arc-protocol/sdk";
+import { signDpopProof } from "@chio-protocol/sdk";
 
 interface SignDpopProofParams {
   capabilityId: string;   // token ID of the capability being used
@@ -110,7 +110,7 @@ Throws `DpopSignError` if `agentSeedHex` is invalid or signing fails.
 Wraps `GET /v1/receipts/query` with TypeScript types and automatic `Bearer` token injection.
 
 ```typescript
-import { ReceiptQueryClient } from "@arc-protocol/sdk";
+import { ReceiptQueryClient } from "@chio-protocol/sdk";
 
 const client = new ReceiptQueryClient(
   "http://localhost:7391",  // trust-control base URL
@@ -139,7 +139,7 @@ interface ReceiptQueryParams {
 interface ReceiptQueryResponse {
   totalCount: number;
   nextCursor?: number;
-  receipts: ArcReceipt[];
+  receipts: ChioReceipt[];
 }
 
 async query(params?: ReceiptQueryParams): Promise<ReceiptQueryResponse>
@@ -154,7 +154,7 @@ Throws `QueryError` (with `status` set to the HTTP status code) on non-2xx respo
 An async generator that iterates through all pages automatically:
 
 ```typescript
-async *paginate(params?: ReceiptQueryParams): AsyncGenerator<ArcReceipt[]>
+async *paginate(params?: ReceiptQueryParams): AsyncGenerator<ChioReceipt[]>
 ```
 
 Each yielded value is one page of receipts. The generator stops when `nextCursor` is absent in the response.
@@ -172,7 +172,7 @@ for await (const page of client.paginate({ toolServer: "filesystem" })) {
 ```typescript
 const client = new ReceiptQueryClient("http://localhost:7391", token);
 
-const all: ArcReceipt[] = [];
+const all: ChioReceipt[] = [];
 for await (const page of client.paginate({
   outcome: "deny",
   since: 1700000000,
@@ -186,7 +186,7 @@ console.log(`Found ${all.length} denied receipts`);
 ### Error Handling
 
 ```typescript
-import { QueryError, TransportError } from "@arc-protocol/sdk";
+import { QueryError, TransportError } from "@chio-protocol/sdk";
 
 try {
   const result = await client.query({ capabilityId: "cap-xyz" });

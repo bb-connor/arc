@@ -6,7 +6,7 @@
 
 ## Context
 
-ARC receipt checkpoints commit batches of receipts to a Merkle tree and
+Chio receipt checkpoints commit batches of receipts to a Merkle tree and
 produce a signed `KernelCheckpoint` that enables inclusion proof verification.
 A design decision was needed for when to trigger checkpoint creation.
 
@@ -20,17 +20,17 @@ A hybrid was also considered: trigger on whichever comes first.
 
 ## Decision
 
-ARC uses a **count-based trigger only**. A checkpoint is issued when the
+Chio uses a **count-based trigger only**. A checkpoint is issued when the
 number of receipts appended since the last checkpoint reaches
 `checkpoint_batch_size`. There is no time-based trigger.
 
 The default `checkpoint_batch_size` is 100, defined as
-`DEFAULT_CHECKPOINT_BATCH_SIZE = 100` in `arc_kernel::lib`. The value is
+`DEFAULT_CHECKPOINT_BATCH_SIZE = 100` in `chio_kernel::lib`. The value is
 configurable in `KernelConfig::checkpoint_batch_size`.
 
 Setting `checkpoint_batch_size = 0` disables automatic checkpointing entirely.
 
-The trigger logic in `ArcKernel::record_arc_receipt`:
+The trigger logic in `ChioKernel::record_chio_receipt`:
 
 ```rust
 if seq > 0

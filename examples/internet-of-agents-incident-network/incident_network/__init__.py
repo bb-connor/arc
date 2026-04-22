@@ -1,4 +1,4 @@
-from incident_network.arc import ArcMcpClient, StdioMcpClient
+from incident_network.chio import ChioMcpClient, StdioMcpClient
 from incident_network.capabilities import (
     Identity,
     PublicKey,
@@ -10,7 +10,7 @@ from incident_network.capabilities import (
 from incident_network.agents import run_agent
 
 __all__ = [
-    "ArcMcpClient",
+    "ChioMcpClient",
     "StdioMcpClient",
     "Identity",
     "PublicKey",

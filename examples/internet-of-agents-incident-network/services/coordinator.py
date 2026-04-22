@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Provider coordinator: entry point for cross-org provider engagement.
 
-Uses arc_asgi middleware for ARC-governed request evaluation. Every
-incoming request is evaluated by the ARC sidecar, and the receipt is
-available to the handler via request.state.arc_receipt.
+Uses chio_asgi middleware for Chio-governed request evaluation. Every
+incoming request is evaluated by the Chio sidecar, and the receipt is
+available to the handler via request.state.chio_receipt.
 """
 from __future__ import annotations
 
@@ -16,14 +16,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel
 
-from arc_asgi import ArcASGIMiddleware, ArcASGIConfig
-from arc_fastapi import get_arc_receipt
+from chio_asgi import ChioASGIMiddleware, ChioASGIConfig
+from chio_fastapi import get_chio_receipt
 
 from incident_network.capabilities import PublicKey, delegate, from_seed
-from incident_network.arc import TrustControl
+from incident_network.chio import TrustControl
 
 
 class ProcessTaskRequest(BaseModel):
@@ -39,18 +39,18 @@ class ProcessTaskRequest(BaseModel):
     executed_at: int | None = None
     executor_ttl_seconds: int = 600
     provider_ops_mcp_url: str | None = None
-    arc_auth_token: str | None = None
+    chio_auth_token: str | None = None
 
 
 def create_app() -> FastAPI:
-    sidecar_url = os.environ.get("ARC_SIDECAR_URL", "http://127.0.0.1:9090")
+    sidecar_url = os.environ.get("CHIO_SIDECAR_URL", "http://127.0.0.1:9090")
 
     app = FastAPI(title="incident-network-provider-coordinator")
     # fail_open=True: receipt attachment without blocking. The coordinator
     # validates capabilities at the application level via trust-control.
     app.add_middleware(
-        ArcASGIMiddleware,
-        config=ArcASGIConfig(
+        ChioASGIMiddleware,
+        config=ChioASGIConfig(
             sidecar_url=sidecar_url,
             exclude_paths=frozenset({"/health"}),
             fail_open=True,
@@ -59,11 +59,14 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health() -> dict:
-        return {"ok": True, "arc_sidecar": sidecar_url}
+        return {"ok": True, "chio_sidecar": sidecar_url}
 
     @app.post("/process-task")
-    def process_task(payload: ProcessTaskRequest, request: Request) -> dict:
-        receipt = getattr(request.state, "arc_receipt", None)
+    def process_task(
+        payload: ProcessTaskRequest,
+        request: Request,
+        receipt=Depends(get_chio_receipt),
+    ) -> dict:
         task = payload.task
         coordinator_capability = task["provider_coordinator_capability"]
 
@@ -111,7 +114,7 @@ def create_app() -> FastAPI:
         result: dict = {
             "provider_coordinator_capability_id": coordinator_capability["id"],
             "provider_executor_capability": executor_capability,
-            "arc_receipt_id": receipt.id if receipt else None,
+            "chio_receipt_id": receipt.id if receipt else None,
         }
 
         if not payload.execute_now:
@@ -129,7 +132,7 @@ def create_app() -> FastAPI:
         }
         if payload.provider_ops_mcp_url:
             execute_payload["provider_ops_mcp_url"] = payload.provider_ops_mcp_url
-            execute_payload["arc_auth_token"] = payload.arc_auth_token
+            execute_payload["chio_auth_token"] = payload.chio_auth_token
 
         execution = httpx.post(
             f"{payload.provider_executor_url.rstrip('/')}/execute",
@@ -152,5 +155,5 @@ if __name__ == "__main__":
     parser.add_argument("--sidecar-url", default=None)
     args = parser.parse_args()
     if args.sidecar_url:
-        os.environ["ARC_SIDECAR_URL"] = args.sidecar_url
+        os.environ["CHIO_SIDECAR_URL"] = args.sidecar_url
     uvicorn.run("coordinator:app", host=args.host, port=args.port, log_level="warning", factory=False)

@@ -1,8 +1,0 @@
-README.md
-app.py
-pyproject.toml
-hello_fastapi.egg-info/PKG-INFO
-hello_fastapi.egg-info/SOURCES.txt
-hello_fastapi.egg-info/dependency_links.txt
-hello_fastapi.egg-info/requires.txt
-hello_fastapi.egg-info/top_level.txt

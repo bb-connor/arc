@@ -36,12 +36,12 @@ verdict, or substitute a different tool call.
 - Short-lived execution nonce bound to the verdict (must be presented
   within N seconds to the tool server, which validates with kernel)
 - Kernel-dispatched execution (kernel calls tool server directly, agent
-  never touches the verdict) -- this is the native ARC transport but
+  never touches the verdict) -- this is the native Chio transport but
   no framework integration uses it
 
 ### 1.2 Agent Memory Is Ungoverned (HIGH)
 
-ARC governs tool calls but not what agents write to their own memory
+Chio governs tool calls but not what agents write to their own memory
 stores (vector DBs for RAG, conversation history, scratchpad files).
 Poisoned context = indirect prompt injection across sessions.
 
@@ -87,28 +87,28 @@ No PyPI packages, no npm packages. A developer cannot `pip install`
 anything. Zero organic discovery. Every SDK is path-referenced. This is
 the single largest adoption blocker.
 
-**Fix:** Publish `arc-sdk-python`, `arc-fastapi`, `arc-langchain` to
-PyPI. Publish `@arc-protocol/node-http` to npm. Automated CI publishing.
+**Fix:** Publish `chio-sdk-python`, `chio-fastapi`, `chio-langchain` to
+PyPI. Publish `@chio-protocol/node-http` to npm. Automated CI publishing.
 
 ### 2.2 No Testing Without the Kernel (HIGH)
 
-No `MockArcClient`, no `allow_all()` test fixture, no dry-run mode.
+No `MockChioClient`, no `allow_all()` test fixture, no dry-run mode.
 Every SDK call requires a running Rust binary.
 
-**Fix:** Ship `arc_sdk.testing` module with `MockArcClient` that returns
+**Fix:** Ship `chio_sdk.testing` module with `MockChioClient` that returns
 configurable verdicts without network calls.
 
 ### 2.3 No 5-Minute Quickstart for Python/TS Devs (HIGH)
 
 Requires compiling Rust or authenticating to private GHCR. A Python
-developer cannot try ARC without a Rust toolchain.
+developer cannot try Chio without a Rust toolchain.
 
 **Fix:** Pre-built binaries (homebrew, cargo-binstall, GitHub Releases).
-Public Docker image. `npx arc-sidecar` or `uvx arc-sidecar` one-liner.
+Public Docker image. `npx chio-sidecar` or `uvx chio-sidecar` one-liner.
 
 ### 2.4 Zero Framework Integrations Ship as Code (HIGH)
 
-9+ framework design docs but only `arc-langchain` exists as a package.
+9+ framework design docs but only `chio-langchain` exists as a package.
 Nothing for CrewAI, AutoGen, LlamaIndex, or Vercel AI SDK.
 
 **Fix:** Ship at least one framework integration as a working package
@@ -118,28 +118,28 @@ trust model).
 ### 2.5 Other DX Findings
 
 - Error messages lack "what to do next" guidance
-- Receipt dashboard exists but is buried (`arc trust serve`)
+- Receipt dashboard exists but is buried (`chio trust serve`)
 - Migration from MCP is possible but not documented as a guide
 - The "zero code change" sidecar story is genuinely strong but not the
   first thing developers see
 - Competitive DX gap: "just use API keys" is zero new infrastructure;
-  ARC is 100x more setup for the first tool call
+  Chio is 100x more setup for the first tool call
 
 ---
 
 ## 3. Economic Layer (Undocumented Asset)
 
-ARC has 7 economic crates that the documentation effort completely missed:
+Chio has 7 economic crates that the documentation effort completely missed:
 
 | Crate | What it does |
 |-------|-------------|
-| `arc-metering` | Per-receipt cost attribution, budget enforcement, billing export |
-| `arc-credit` | Credit risk management, exposure ledger, credit facilities, bonds |
-| `arc-underwriting` | 4-tier agent risk classification, 13 reason codes, evidence-based |
-| `arc-market` | Liability marketplace, 5 coverage classes, quote/bind/claims workflow |
-| `arc-settle` | On-chain settlement (EVM + Solana), escrow, cross-chain (CCIP) |
-| `arc-listing` | Tool server / credential issuer / provider registry |
-| `arc-open-market` | Decentralized marketplace economics, bonds, penalties, governance |
+| `chio-metering` | Per-receipt cost attribution, budget enforcement, billing export |
+| `chio-credit` | Credit risk management, exposure ledger, credit facilities, bonds |
+| `chio-underwriting` | 4-tier agent risk classification, 13 reason codes, evidence-based |
+| `chio-market` | Liability marketplace, 5 coverage classes, quote/bind/claims workflow |
+| `chio-settle` | On-chain settlement (EVM + Solana), escrow, cross-chain (CCIP) |
+| `chio-listing` | Tool server / credential issuer / provider registry |
+| `chio-open-market` | Decentralized marketplace economics, bonds, penalties, governance |
 
 ### Economic Gaps
 
@@ -160,7 +160,7 @@ ARC has 7 economic crates that the documentation effort completely missed:
 
 | Pattern | Coverage | Key Gap |
 |---------|----------|---------|
-| **Coding agents** (Cursor, Claude Code) | Best covered | Ship `arc-code-agent` as P0 onboarding |
+| **Coding agents** (Cursor, Claude Code) | Best covered | Ship `chio-code-agent` as P0 onboarding |
 | **Customer support agents** | Partial | Content-plane governance, HITL escalation |
 | **Data analysis agents** | Not covered | Data layer constraints (blocking gap) |
 | **Multi-agent swarms** | Well covered architecturally | Swarm-level aggregate budgets |
@@ -172,7 +172,7 @@ ARC has 7 economic crates that the documentation effort completely missed:
 | **Autonomous trading agents** | Partial | Position limits, market-hours constraints |
 
 **Most common patterns today:** Coding agents and customer support.
-ARC should optimize the onboarding path for coding agents first.
+Chio should optimize the onboarding path for coding agents first.
 
 **Human-in-the-loop is needed by 6/10 patterns** (customer support,
 CRM, infrastructure, SecOps, trading, data analysis) but is currently
@@ -210,7 +210,7 @@ rated P2. Should be P0.
 | Idea | Feasibility | Defensibility |
 |------|-------------|---------------|
 | **Receipt as proof-of-safe-behavior** | High -- receipts already signed and Merkle-committed | Strong -- no competitor has per-invocation attestations |
-| **Agent behavioral profiling** | High -- receipt store has reporting queries | Strong -- receipt data is proprietary to ARC |
+| **Agent behavioral profiling** | High -- receipt store has reporting queries | Strong -- receipt data is proprietary to Chio |
 | **Regulatory API** | High -- `SignedExportEnvelope` exists | Medium -- packaging exercise |
 | **Agent versioning / rollback** | Trivial -- field addition to WorkloadIdentity | Low standalone, table stakes |
 
@@ -218,10 +218,10 @@ rated P2. Should be P0.
 
 | Idea | Feasibility | Defensibility |
 |------|-------------|---------------|
-| **Agent insurance protocol** | High -- `arc-underwriting` is remarkably mature | Very strong -- typed risk taxonomies for agent behavior |
+| **Agent insurance protocol** | High -- `chio-underwriting` is remarkably mature | Very strong -- typed risk taxonomies for agent behavior |
 | **Cross-kernel federation** | Medium -- choreography receipts show the pattern | Strong -- bilateral receipt chains are unique |
-| **Capability marketplace** | Medium -- `arc-market` + `arc-listing` exist | Medium -- requires network effects |
-| **Agent passport** | Medium -- needs `arc-kernel-core` WASM first | Strong if ARC becomes the standard |
+| **Capability marketplace** | Medium -- `chio-market` + `chio-listing` exist | Medium -- requires network effects |
+| **Agent passport** | Medium -- needs `chio-kernel-core` WASM first | Strong if Chio becomes the standard |
 | **Natural language policies** | Medium -- LLM compiles English to HushSpec | Medium -- anyone can build this |
 | **Agent constitution** | Medium -- HushSpec is the compiled form | Medium |
 
@@ -242,8 +242,8 @@ Based on all six reviews, the coverage map priorities should shift:
 |------|-----------------|-------------|-----|
 | Human-in-the-loop protocol | P2 | **P0** | Needed by 6/10 production patterns |
 | PyPI/npm publishing | Not listed | **P0** | Single largest adoption blocker |
-| `arc-code-agent` adapter | P1 (desktop scoping) | **P0** | Best-covered pattern, fastest onboarding |
-| MockArcClient / test fixtures | Not listed | **P0** | Blocks all framework integration work |
+| `chio-code-agent` adapter | P1 (desktop scoping) | **P0** | Best-covered pattern, fastest onboarding |
+| MockChioClient / test fixtures | Not listed | **P0** | Blocks all framework integration work |
 | Pre-built binary distribution | Not listed | **P1** | Blocks quickstart without Rust toolchain |
 | TOCTOU fix (execution nonces) | Not listed | **P1** | Structural security gap |
 | WASM guard module signing | Not listed | **P1** | Running unsigned code in policy path |

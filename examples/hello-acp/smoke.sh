@@ -95,18 +95,17 @@ with (logs / "edge.log").open("w", encoding="utf-8") as edge_log:
 
 assert listed["result"]["capabilities"][0]["id"] == "hello_tool", listed
 assert invoked["result"]["success"] is True, invoked
-assert invoked["result"]["metadata"]["arc"]["authorityPath"] == "cross_protocol_orchestrator", invoked
-assert invoked["result"]["metadata"]["arc"]["receiptId"], invoked
+assert invoked["result"]["metadata"]["chio"]["authorityPath"] == "cross_protocol_orchestrator", invoked
+assert invoked["result"]["metadata"]["chio"]["receiptId"], invoked
 
 assert streamed["result"]["task"]["status"] == "working", streamed
-assert streamed["result"]["task"]["metadata"]["arc"]["receiptPending"] is True, streamed
+assert streamed["result"]["task"]["metadata"]["chio"]["receiptPending"] is True, streamed
 
 assert resumed["result"]["task"]["status"] == "completed", resumed
-assert resumed["result"]["result"]["metadata"]["arc"]["receiptId"], resumed
+assert resumed["result"]["result"]["metadata"]["chio"]["receiptId"], resumed
 
 print("hello-acp smoke passed")
 print(f"artifacts: {artifacts}")
-print(f"invoke receipt: {invoked['result']['metadata']['arc']['receiptId']}")
-print(f"stream receipt: {resumed['result']['result']['metadata']['arc']['receiptId']}")
+print(f"invoke receipt: {invoked['result']['metadata']['chio']['receiptId']}")
+print(f"stream receipt: {resumed['result']['result']['metadata']['chio']['receiptId']}")
 PY
-

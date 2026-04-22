@@ -1,6 +1,6 @@
 [package]
 name = "hello-tool"
-description = "Example ARC tool server exposing a simple greet tool"
+description = "Example Chio tool server exposing a simple greet tool"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,9 +9,9 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }
-arc-kernel = { package = "arc-kernel", path = "../../crates/arc-kernel" }
-arc-manifest = { package = "arc-manifest", path = "../../crates/arc-manifest" }
-arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../../crates/arc-mcp-adapter" }
+chio-core = { package = "chio-core-types", path = "../../crates/chio-core-types" }
+chio-kernel = { package = "chio-kernel", path = "../../crates/chio-kernel" }
+chio-manifest = { package = "chio-manifest", path = "../../crates/chio-manifest" }
+chio-mcp-adapter = { package = "chio-mcp-adapter", path = "../../crates/chio-mcp-adapter" }
 serde = { workspace = true }
 serde_json = { workspace = true }

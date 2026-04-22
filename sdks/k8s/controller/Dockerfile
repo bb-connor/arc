@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Multi-stage Dockerfile for arc-k8s-controller.
+# Multi-stage Dockerfile for chio-k8s-controller.
 #
 # Stage 1: build the manager binary with the module-compatible Go toolchain.
 # Stage 2: ship a distroless static image running as non-root user 65532.
@@ -26,7 +26,7 @@ ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    go build -trimpath -ldflags "-s -w" -o /out/manager ./cmd/arc-controller
+    go build -trimpath -ldflags "-s -w" -o /out/manager ./cmd/chio-controller
 
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /

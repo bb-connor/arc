@@ -1,9 +1,9 @@
-//! Executable reference specification for ARC scope subsumption.
+//! Executable reference specification for Chio scope subsumption.
 //!
 //! This model intentionally reimplements the shipped subset logic without
-//! calling into `arc_core`, so differential tests can detect spec/runtime drift.
+//! calling into `chio_core`, so differential tests can detect spec/runtime drift.
 
-/// Mirrors `arc_core::capability::Operation`.
+/// Mirrors `chio_core::capability::Operation`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SpecOperation {
     Invoke,
@@ -14,7 +14,7 @@ pub enum SpecOperation {
     Delegate,
 }
 
-/// Mirrors `arc_core::capability::RuntimeAssuranceTier`.
+/// Mirrors `chio_core::capability::RuntimeAssuranceTier`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SpecRuntimeAssuranceTier {
     None,
@@ -23,14 +23,14 @@ pub enum SpecRuntimeAssuranceTier {
     Verified,
 }
 
-/// Mirrors `arc_core::capability::MonetaryAmount`.
+/// Mirrors `chio_core::capability::MonetaryAmount`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpecMonetaryAmount {
     pub units: u64,
     pub currency: String,
 }
 
-/// Mirrors `arc_core::capability::Constraint`.
+/// Mirrors `chio_core::capability::Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SpecConstraint {
     PathPrefix(String),
@@ -46,7 +46,7 @@ pub enum SpecConstraint {
     Custom(String, String),
 }
 
-/// Mirrors `arc_core::capability::ToolGrant`.
+/// Mirrors `chio_core::capability::ToolGrant`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpecToolGrant {
     pub server_id: String,
@@ -112,7 +112,7 @@ impl SpecToolGrant {
     }
 }
 
-/// Mirrors `arc_core::capability::ResourceGrant`.
+/// Mirrors `chio_core::capability::ResourceGrant`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpecResourceGrant {
     pub uri_pattern: String,
@@ -130,7 +130,7 @@ impl SpecResourceGrant {
     }
 }
 
-/// Mirrors `arc_core::capability::PromptGrant`.
+/// Mirrors `chio_core::capability::PromptGrant`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpecPromptGrant {
     pub prompt_name: String,
@@ -148,20 +148,20 @@ impl SpecPromptGrant {
     }
 }
 
-/// Mirrors `arc_core::capability::ArcScope`.
+/// Mirrors `chio_core::capability::ChioScope`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SpecArcScope {
+pub struct SpecChioScope {
     pub grants: Vec<SpecToolGrant>,
     pub resource_grants: Vec<SpecResourceGrant>,
     pub prompt_grants: Vec<SpecPromptGrant>,
 }
 
-impl SpecArcScope {
-    /// Reference implementation of `ArcScope::is_subset_of`.
+impl SpecChioScope {
+    /// Reference implementation of `ChioScope::is_subset_of`.
     ///
     /// Every grant in `self` must be covered by some grant in `parent`.
     #[must_use]
-    pub fn is_subset_of(&self, parent: &SpecArcScope) -> bool {
+    pub fn is_subset_of(&self, parent: &SpecChioScope) -> bool {
         self.grants
             .iter()
             .all(|cg| parent.grants.iter().any(|pg| cg.is_subset_of(pg)))
@@ -220,8 +220,8 @@ mod tests {
         }
     }
 
-    fn scope(grants: Vec<SpecToolGrant>) -> SpecArcScope {
-        SpecArcScope {
+    fn scope(grants: Vec<SpecToolGrant>) -> SpecChioScope {
+        SpecChioScope {
             grants,
             resource_grants: vec![],
             prompt_grants: vec![],
@@ -437,7 +437,7 @@ mod tests {
                     threshold_units: 500,
                 },
                 SpecConstraint::MinimumRuntimeAssurance(SpecRuntimeAssuranceTier::Attested),
-                SpecConstraint::SellerExact("seller.arc".to_string()),
+                SpecConstraint::SellerExact("seller.chio".to_string()),
             ],
             ..parent.clone()
         };
@@ -459,11 +459,11 @@ mod tests {
     #[test]
     fn resource_pattern_prefix_subsumes() {
         let parent = SpecResourceGrant {
-            uri_pattern: "arc://receipts/*".to_string(),
+            uri_pattern: "chio://receipts/*".to_string(),
             operations: vec![SpecOperation::Read],
         };
         let child = SpecResourceGrant {
-            uri_pattern: "arc://receipts/abc".to_string(),
+            uri_pattern: "chio://receipts/abc".to_string(),
             operations: vec![SpecOperation::Read],
         };
 

@@ -15,10 +15,10 @@
     {
       "description": "SHA-256 operates on UTF-8 bytes for non-ASCII strings too.",
       "id": "unicode_utf8",
-      "input_utf8": "arc 🔐",
-      "sha256_hex": "c5e5dab63b091da05bd6319406961cad0056eaf11be37de98b3295e1ec0b5d55"
+      "input_utf8": "chio 🔐",
+      "sha256_hex": "5c57c7deea3998c13730797e592abe72cae55130e8da2923de6374b75b83101b"
     }
   ],
-  "generated_by": "arc-bindings-core",
+  "generated_by": "chio-bindings-core",
   "version": 1
 }

@@ -1,5 +1,5 @@
 {
-  "schema": "arc.evidence_export_manifest.v1",
+  "schema": "chio.evidence_export_manifest.v1",
   "exportedAt": 1776272775,
   "query": {},
   "counts": {

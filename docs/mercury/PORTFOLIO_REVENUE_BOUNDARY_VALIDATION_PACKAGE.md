@@ -20,7 +20,7 @@ The supported claim is narrow:
 ## Generation Command
 
 ```bash
-cargo run -p arc-mercury -- portfolio-revenue-boundary validate --output target/mercury-portfolio-revenue-boundary-validation
+cargo run -p chio-mercury -- portfolio-revenue-boundary validate --output target/mercury-portfolio-revenue-boundary-validation
 ```
 
 ## Expected Layout

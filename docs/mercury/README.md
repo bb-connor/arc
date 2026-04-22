@@ -1,6 +1,6 @@
 # MERCURY Documentation Suite
 
-MERCURY is the first finance-specific product layer built on ARC. ARC remains
+MERCURY is the first finance-specific product layer built on Chio. Chio remains
 the broader rights, receipts, and trust substrate for consequential agent
 actions; MERCURY packages that substrate for regulated trading workflows where
 buyers need review-grade evidence, controlled change records, and portable
@@ -16,7 +16,7 @@ engineering docs should reuse it instead of widening into generic AI-governance
 or connector-sprawl claims.
 
 This suite is therefore both a product plan for MERCURY and a concrete example
-of how ARC becomes a sellable vertical system without redefining ARC itself.
+of how Chio becomes a sellable vertical system without redefining Chio itself.
 
 This suite is the canonical planning set for product, engineering, commercial,
 security, and partner workstreams.
@@ -52,7 +52,7 @@ Pick the reading path that matches your role.
   [SECOND_ACCOUNT_EXPANSION](SECOND_ACCOUNT_EXPANSION.md) >
   [PORTFOLIO_PROGRAM](PORTFOLIO_PROGRAM.md) >
   [SECOND_PORTFOLIO_PROGRAM](SECOND_PORTFOLIO_PROGRAM.md) >
-  [../arc-wall/README](../arc-wall/README.md) >
+  [../chio-wall/README](../chio-wall/README.md) >
   [PRODUCT_SURFACE_BOUNDARIES](PRODUCT_SURFACE_BOUNDARIES.md) >
   [SHARED_SERVICE_VERSION_PINNING](SHARED_SERVICE_VERSION_PINNING.md) >
   [CROSS_PRODUCT_GOVERNANCE](CROSS_PRODUCT_GOVERNANCE.md) >
@@ -89,8 +89,8 @@ Pick the reading path that matches your role.
   [VERIFIER_SDK_RESEARCH](VERIFIER_SDK_RESEARCH.md) >
   [TECHNICAL_ARCHITECTURE](TECHNICAL_ARCHITECTURE.md) >
   [SUPERVISED_LIVE_OPERATIONS_RUNBOOK](SUPERVISED_LIVE_OPERATIONS_RUNBOOK.md) >
-  [ARC_WALL_BRIEF](ARC_WALL_BRIEF.md) >
-  [../arc-wall/README](../arc-wall/README.md) >
+  [CHIO_WALL_BRIEF](CHIO_WALL_BRIEF.md) >
+  [../chio-wall/README](../chio-wall/README.md) >
   [RELEASE_READINESS_VALIDATION_PACKAGE](RELEASE_READINESS_VALIDATION_PACKAGE.md) >
   [CONTROLLED_ADOPTION_VALIDATION_PACKAGE](CONTROLLED_ADOPTION_VALIDATION_PACKAGE.md) >
   [REFERENCE_DISTRIBUTION_VALIDATION_PACKAGE](REFERENCE_DISTRIBUTION_VALIDATION_PACKAGE.md) >
@@ -115,7 +115,7 @@ Pick the reading path that matches your role.
 | Project board | [epics/MASTER_PROJECT.md](epics/MASTER_PROJECT.md) | Epic registry, dependency graph, and execution markers |
 | External package | [EXTERNAL_PACKAGE.md](EXTERNAL_PACKAGE.md) | Short-form narrative, design-partner brief outline, deck outline, and demo storyboard |
 | Build checklist | [PHASE_0_1_BUILD_CHECKLIST.md](PHASE_0_1_BUILD_CHECKLIST.md) | Concrete Phase 0-1 execution checklist and build order |
-| ARC mapping | [ARC_MODULE_MAPPING.md](ARC_MODULE_MAPPING.md) | Mapping of MERCURY Phase 0-1 work onto existing ARC modules |
+| Chio mapping | [CHIO_MODULE_MAPPING.md](CHIO_MODULE_MAPPING.md) | Mapping of MERCURY Phase 0-1 work onto existing Chio modules |
 | Pilot | [POC_DESIGN.md](POC_DESIGN.md) | 45-day design-partner pilot definition and conversion path |
 | Pilot runbook | [PILOT_RUNBOOK.md](PILOT_RUNBOOK.md) | Executable corpus-generation flow for the primary and rollback pilot paths |
 | Demo storyboard | [DEMO_STORYBOARD.md](DEMO_STORYBOARD.md) | Proof-aligned walkthrough for the gold MERCURY workflow |
@@ -185,15 +185,15 @@ Pick the reading path that matches your role.
 | Second portfolio program operations | [SECOND_PORTFOLIO_PROGRAM_OPERATIONS.md](SECOND_PORTFOLIO_PROGRAM_OPERATIONS.md) | Portfolio-reuse review, revenue-boundary guardrails, fail-closed recovery, and second-program handoff for the bounded second-portfolio-program lane |
 | Second portfolio program validation | [SECOND_PORTFOLIO_PROGRAM_VALIDATION_PACKAGE.md](SECOND_PORTFOLIO_PROGRAM_VALIDATION_PACKAGE.md) | Validation-package command, layout, and supported claim for the second-portfolio-program lane |
 | Second portfolio program decision | [SECOND_PORTFOLIO_PROGRAM_DECISION_RECORD.md](SECOND_PORTFOLIO_PROGRAM_DECISION_RECORD.md) | Explicit proceed or defer boundary for the bounded Mercury second-portfolio-program lane |
-| Product surface boundaries | [PRODUCT_SURFACE_BOUNDARIES.md](PRODUCT_SURFACE_BOUNDARIES.md) | Shared ARC substrate seams plus separate MERCURY and ARC-Wall product-owned surfaces |
-| Shared service version pinning | [SHARED_SERVICE_VERSION_PINNING.md](SHARED_SERVICE_VERSION_PINNING.md) | Shared ARC dependency map and fail-closed version-pinning rules for the current product set |
+| Product surface boundaries | [PRODUCT_SURFACE_BOUNDARIES.md](PRODUCT_SURFACE_BOUNDARIES.md) | Shared Chio substrate seams plus separate MERCURY and Chio-Wall product-owned surfaces |
+| Shared service version pinning | [SHARED_SERVICE_VERSION_PINNING.md](SHARED_SERVICE_VERSION_PINNING.md) | Shared Chio dependency map and fail-closed version-pinning rules for the current product set |
 | Cross-product governance | [CROSS_PRODUCT_GOVERNANCE.md](CROSS_PRODUCT_GOVERNANCE.md) | Release, incident, and trust-material ownership across the current product set |
 | Cross-product release matrix | [CROSS_PRODUCT_RELEASE_MATRIX.md](CROSS_PRODUCT_RELEASE_MATRIX.md) | Shared-substrate versus product-local release classes, approvers, and pause rules |
-| Trust-material recovery drill | [TRUST_MATERIAL_RECOVERY_DRILL.md](TRUST_MATERIAL_RECOVERY_DRILL.md) | Shared recovery sequence for ARC-owned receipt, checkpoint, and release-approval material |
-| Operator alert routing | [OPERATOR_ALERT_ROUTING.md](OPERATOR_ALERT_ROUTING.md) | Incident classification and ownership routing across ARC, MERCURY, and ARC-Wall |
+| Trust-material recovery drill | [TRUST_MATERIAL_RECOVERY_DRILL.md](TRUST_MATERIAL_RECOVERY_DRILL.md) | Shared recovery sequence for Chio-owned receipt, checkpoint, and release-approval material |
+| Operator alert routing | [OPERATOR_ALERT_ROUTING.md](OPERATOR_ALERT_ROUTING.md) | Incident classification and ownership routing across Chio, MERCURY, and Chio-Wall |
 | Platform hardening backlog | [PLATFORM_HARDENING_BACKLOG.md](PLATFORM_HARDENING_BACKLOG.md) | Prioritized hardening backlog for sustained multi-product operation |
 | Platform hardening validation | [PLATFORM_HARDENING_VALIDATION_PACKAGE.md](PLATFORM_HARDENING_VALIDATION_PACKAGE.md) | Validation-package command, layout, and supported claim for the hardening lane |
-| Platform hardening decision | [PLATFORM_HARDENING_DECISION_RECORD.md](PLATFORM_HARDENING_DECISION_RECORD.md) | Explicit next-step boundary for the bounded post-ARC-Wall hardening lane |
+| Platform hardening decision | [PLATFORM_HARDENING_DECISION_RECORD.md](PLATFORM_HARDENING_DECISION_RECORD.md) | Explicit next-step boundary for the bounded post-Chio-Wall hardening lane |
 | Investor | [INVESTOR_NARRATIVE.md](INVESTOR_NARRATIVE.md) | Fundraising story, wedge, expansion path, and risks |
 | Market | [MARKET_SIZING.md](MARKET_SIZING.md) | SAM, SOM, pricing bands, and scenario model |
 | FAQ | [TECHNICAL_FAQ.md](TECHNICAL_FAQ.md) | Evaluator-facing technical answers and deployment assumptions |
@@ -203,8 +203,8 @@ Pick the reading path that matches your role.
 | Security | [THREAT_MODEL.md](THREAT_MODEL.md) | Assets, adversaries, trust boundaries, and mitigations |
 | Verification | [VERIFIER_SDK_RESEARCH.md](VERIFIER_SDK_RESEARCH.md) | Verifier surfaces, trust anchors, and distribution plan |
 | FIX expansion | [FIX_INTEGRATION_RESEARCH.md](FIX_INTEGRATION_RESEARCH.md) | Live execution integration strategy and FIX-specific constraints |
-| Companion product | [ARC_WALL_BRIEF.md](ARC_WALL_BRIEF.md) | Information-domain control product built on the same ARC substrate |
-| ARC-Wall docs | [../arc-wall/README.md](../arc-wall/README.md) | Canonical ARC-Wall control-path, operations, validation, and decision docs |
+| Companion product | [CHIO_WALL_BRIEF.md](CHIO_WALL_BRIEF.md) | Information-domain control product built on the same Chio substrate |
+| Chio-Wall docs | [../chio-wall/README.md](../chio-wall/README.md) | Canonical Chio-Wall control-path, operations, validation, and decision docs |
 | Adjacency research | [DEFI_CROSSOVER_RESEARCH.md](DEFI_CROSSOVER_RESEARCH.md) | TradFi / DeFi crossover opportunities after core product maturity |
 
 ---
@@ -216,7 +216,7 @@ The roadmap is organized into six phases:
 - Phases 0-3 define the product program through pilot readiness.
 - A post-pilot bridge defines the first supervised-live productionization path.
 - Phase 4 defines governance, downstream-consumer, and assurance expansion work.
-- Phase 5 defines embedded OEM, trust-network, and ARC-Wall expansion work.
+- Phase 5 defines embedded OEM, trust-network, and Chio-Wall expansion work.
 - Post-launch adoption defines bounded renewal, reference, and follow-on expansion lanes.
 
 The later post-launch lane docs are an execution history of bounded package
@@ -234,7 +234,7 @@ Supporting execution docs:
 - [epics/POC_SPRINT_PLAN.md](epics/POC_SPRINT_PLAN.md)
 - [EXTERNAL_PACKAGE.md](EXTERNAL_PACKAGE.md)
 - [PHASE_0_1_BUILD_CHECKLIST.md](PHASE_0_1_BUILD_CHECKLIST.md)
-- [ARC_MODULE_MAPPING.md](ARC_MODULE_MAPPING.md)
+- [CHIO_MODULE_MAPPING.md](CHIO_MODULE_MAPPING.md)
 - [PILOT_RUNBOOK.md](PILOT_RUNBOOK.md)
 - [DEMO_STORYBOARD.md](DEMO_STORYBOARD.md)
 - [EVALUATOR_VERIFICATION_FLOW.md](EVALUATOR_VERIFICATION_FLOW.md)
@@ -298,7 +298,7 @@ Supporting execution docs:
 - [What MERCURY is](PRODUCT_BRIEF.md#1-what-mercury-is)
 - [Proof boundary](PRODUCT_BRIEF.md#5-proof-boundary)
 - [Deployment model](PRODUCT_BRIEF.md#6-deployment-model)
-- [Why ARC matters](PRODUCT_BRIEF.md#9-why-arc-matters)
+- [Why Chio matters](PRODUCT_BRIEF.md#9-why-chio-matters)
 
 ### Regulatory and buyer messaging
 
@@ -323,12 +323,12 @@ Supporting execution docs:
 
 ---
 
-## Relationship to ARC
+## Relationship to Chio
 
-ARC is the platform thesis. MERCURY is the first vertical commercialization of
+Chio is the platform thesis. MERCURY is the first vertical commercialization of
 that thesis in regulated financial workflows.
 
-ARC provides the generic substrate:
+Chio provides the generic substrate:
 
 - fail-closed kernel mediation
 - delegated authority and policy enforcement
@@ -342,11 +342,11 @@ MERCURY adds the trading-specific layer:
 - retained artifact and record-policy semantics
 - reconciliation, chronology, and buyer-facing retrieval surfaces
 
-MERCURY's operator surface ships as the dedicated `arc-mercury` app and
-`mercury` binary, built on ARC's generic evidence-export and control-plane
-substrate. ARC stays generic; MERCURY stays opinionated.
+MERCURY's operator surface ships as the dedicated `chio-mercury` app and
+`mercury` binary, built on Chio's generic evidence-export and control-plane
+substrate. Chio stays generic; MERCURY stays opinionated.
 
-For ARC protocol details, see the main ARC specification and crate
+For Chio protocol details, see the main Chio specification and crate
 documentation in the repository root.
 
 ---
@@ -364,9 +364,9 @@ auditor, and counterparty review, one bounded embedded OEM distribution lane
 for a single reviewer-workbench partner surface with a manifest-based bundle
 contract, and one bounded trust-network lane for a single counterparty-review
 exchange sponsor with a checkpoint-backed witness chain and proof-profile
-interoperability manifest, plus one bounded ARC-Wall companion-product lane
+interoperability manifest, plus one bounded Chio-Wall companion-product lane
 for a single `research -> execution` barrier-control workflow. The current
-post-ARC-Wall step is one shared-service, governance, and platform-hardening
-lane across the existing MERCURY plus ARC-Wall product set. Product, roadmap,
+post-Chio-Wall step is one shared-service, governance, and platform-hardening
+lane across the existing MERCURY plus Chio-Wall product set. Product, roadmap,
 ticketing, and research documents remain aligned to the same canonical scope
 and terminology.

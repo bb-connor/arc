@@ -10,15 +10,15 @@ const rootDir = path.resolve(__dirname, "..");
 const artifactsDir = path.join(rootDir, "artifacts");
 const deploymentsDir = path.join(rootDir, "deployments");
 
-const PORT = Number(process.env.ARC_DEVNET_PORT ?? "8547");
+const PORT = Number(process.env.CHIO_DEVNET_PORT ?? "8547");
 const RPC_URL = `http://127.0.0.1:${PORT}`;
 const CHAIN_ID = 31337;
 const USDC_UNITS = 10n ** 6n;
-const DEPLOYMENT_NAME = process.env.ARC_RUNTIME_DEPLOYMENT_NAME ?? "runtime-devnet.json";
-const OPERATOR_ED_KEY_HASH = process.env.ARC_OPERATOR_ED_KEY_HASH;
+const DEPLOYMENT_NAME = process.env.CHIO_RUNTIME_DEPLOYMENT_NAME ?? "runtime-devnet.json";
+const OPERATOR_ED_KEY_HASH = process.env.CHIO_OPERATOR_ED_KEY_HASH;
 
 if (!OPERATOR_ED_KEY_HASH) {
-  throw new Error("ARC_OPERATOR_ED_KEY_HASH is required");
+  throw new Error("CHIO_OPERATOR_ED_KEY_HASH is required");
 }
 
 const ACCOUNT_CONFIG = [
@@ -120,26 +120,26 @@ async function main() {
     3000n * 10n ** 8n,
   );
   const mockUsdc = await deploy("mocks/MockERC20", wallets.admin, "Mock USD Coin", "mUSDC", 6);
-  const identityRegistry = await deploy("ArcIdentityRegistry", wallets.admin, wallets.admin.address);
+  const identityRegistry = await deploy("ChioIdentityRegistry", wallets.admin, wallets.admin.address);
   const rootRegistry = await deploy(
-    "ArcRootRegistry",
+    "ChioRootRegistry",
     wallets.admin,
     await identityRegistry.getAddress(),
   );
   const escrow = await deploy(
-    "ArcEscrow",
+    "ChioEscrow",
     wallets.admin,
     await rootRegistry.getAddress(),
     await identityRegistry.getAddress(),
   );
   const bondVault = await deploy(
-    "ArcBondVault",
+    "ChioBondVault",
     wallets.admin,
     await rootRegistry.getAddress(),
     await identityRegistry.getAddress(),
   );
   const priceResolver = await deploy(
-    "ArcPriceResolver",
+    "ChioPriceResolver",
     wallets.admin,
     wallets.admin.address,
     await sequencerFeed.getAddress(),
@@ -172,7 +172,7 @@ async function main() {
 
   const deploymentPath = path.join(deploymentsDir, DEPLOYMENT_NAME);
   const deployment = {
-    manifest_id: "arc.web3-deployment.runtime-devnet.v1",
+    manifest_id: "chio.web3-deployment.runtime-devnet.v1",
     network_name: "Ganache Runtime Devnet",
     chain_id: `eip155:${CHAIN_ID}`,
     rpc_url: RPC_URL,
@@ -198,7 +198,7 @@ async function main() {
   };
 
   fs.writeFileSync(deploymentPath, `${JSON.stringify(normalizeBigints(deployment), null, 2)}\n`);
-  console.log(`ARC_DEVNET_READY ${deploymentPath}`);
+  console.log(`CHIO_DEVNET_READY ${deploymentPath}`);
 }
 
 function shutdown(code = 0) {

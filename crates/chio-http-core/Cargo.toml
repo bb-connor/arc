@@ -1,0 +1,33 @@
+[package]
+name = "chio-http-core"
+description = "Protocol-agnostic HTTP security types for the Chio kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_http_core"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand_core = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+chio-core-types = { path = "../chio-core-types" }
+chio-cross-protocol = { path = "../chio-cross-protocol" }
+chio-kernel = { path = "../chio-kernel" }
+
+[dev-dependencies]
+chio-core = { path = "../chio-core" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

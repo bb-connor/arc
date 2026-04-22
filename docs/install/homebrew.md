@@ -1,36 +1,36 @@
-# Homebrew Tap for ARC
+# Homebrew Tap for Chio
 
 ## One-line install
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
-brew install --formula /tmp/arc.rb
+curl -fsSL -o /tmp/chio.rb https://github.com/bb-connor/chio/releases/latest/download/chio.rb
+brew install --formula /tmp/chio.rb
 ```
 
 ## About the tap
 
 The release-binaries workflow renders the installable formula from
-[`Homebrew/arc.rb.tmpl`](../../Homebrew/arc.rb.tmpl) and publishes the
-result as the `arc.rb` release asset alongside the platform archives.
+[`Homebrew/chio.rb.tmpl`](../../Homebrew/chio.rb.tmpl) and publishes the
+result as the `chio.rb` release asset alongside the platform archives.
 
 ## Upgrading
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
-brew upgrade --formula /tmp/arc.rb
+curl -fsSL -o /tmp/chio.rb https://github.com/bb-connor/chio/releases/latest/download/chio.rb
+brew upgrade --formula /tmp/chio.rb
 ```
 
 ## Uninstalling
 
 ```bash
-brew uninstall arc
+brew uninstall chio
 ```
 
 ## Verifying the install
 
 ```bash
-arc --version
-which arc
+chio --version
+which chio
 ```
 
 For other install paths (Docker, curl), see

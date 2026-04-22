@@ -1,6 +1,6 @@
 # Velocity Guards
 
-The `VelocityGuard` in `crates/arc-guards/src/velocity.rs` limits how fast an agent can invoke tools using a token bucket algorithm. It operates as a synchronous `Guard` in the kernel pipeline, sitting before the tool server receives the request.
+The `VelocityGuard` in `crates/chio-guards/src/velocity.rs` limits how fast an agent can invoke tools using a token bucket algorithm. It operates as a synchronous `Guard` in the kernel pipeline, sitting before the tool server receives the request.
 
 ## Token Bucket Rate Limiting
 
@@ -34,7 +34,7 @@ Default configuration has both limits as `None` (unlimited), `window_secs = 60`,
 Allow at most 30 invocations per minute with no burst:
 
 ```rust
-use arc_guards::velocity::{VelocityConfig, VelocityGuard};
+use chio_guards::velocity::{VelocityConfig, VelocityGuard};
 
 let guard = VelocityGuard::new(VelocityConfig {
     max_invocations_per_window: Some(30),

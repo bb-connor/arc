@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-formal_root="formal/lean4/Pact"
+formal_root="formal/lean4/Chio"
 
 if ! command -v lake >/dev/null 2>&1; then
   echo "formal proof check requires lake on PATH (install Lean 4 / elan first)" >&2
@@ -19,17 +19,13 @@ echo "==> Lean 4 proof build"
 echo "==> Lean 4 placeholder scan"
 if command -v rg >/dev/null 2>&1; then
   placeholder_scan=(rg -n '\bsorry\b' \
-    "${formal_root}/Arc" \
-    "${formal_root}/Pact" \
-    "${formal_root}/Arc.lean" \
-    "${formal_root}/Pact.lean" \
+    "${formal_root}/Chio" \
+    "${formal_root}/Chio.lean" \
     -g '*.lean')
 else
   placeholder_scan=(grep -RInw --include '*.lean' 'sorry' \
-    "${formal_root}/Arc" \
-    "${formal_root}/Pact" \
-    "${formal_root}/Arc.lean" \
-    "${formal_root}/Pact.lean")
+    "${formal_root}/Chio" \
+    "${formal_root}/Chio.lean")
 fi
 
 if "${placeholder_scan[@]}"; then
@@ -114,7 +110,7 @@ except ModuleNotFoundError:
 
 manifest_text = manifest_path.read_text(encoding="utf-8")
 manifest = tomllib.loads(manifest_text) if tomllib else parse_manifest_subset(manifest_text)
-if manifest.get("schema") != "arc.proof-manifest.v1":
+if manifest.get("schema") != "chio.proof-manifest.v1":
     raise SystemExit("proof manifest schema mismatch")
 
 for rel in manifest.get("root_modules", []):
@@ -126,7 +122,7 @@ for rel in manifest.get("covered_rust_modules", []):
         raise SystemExit(f"proof manifest covered module missing: {rel}")
 
 inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-if inventory.get("schema") != "arc.theorem-inventory.v1":
+if inventory.get("schema") != "chio.theorem-inventory.v1":
     raise SystemExit("theorem inventory schema mismatch")
 
 assumptions = inventory.get("assumptions", [])
@@ -222,7 +218,7 @@ found_axioms = []
 found_open_modules = []
 found_exports = []
 found_abbrevs = []
-for lean_file in (repo / "formal" / "lean4" / "Pact").rglob("*.lean"):
+for lean_file in (repo / "formal" / "lean4" / "Chio").rglob("*.lean"):
     found_axioms.extend(lean_axioms_in_file(lean_file))
     opens, exports, abbrevs = lean_surface_controls_in_file(lean_file)
     found_open_modules.extend(opens)

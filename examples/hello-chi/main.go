@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	arc "github.com/backbay-labs/arc/sdks/go/arc-go-http"
+	chio "github.com/backbay/chio/sdks/go/chio-go-http"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -43,9 +43,9 @@ func main() {
 		})
 	})
 
-	handler := arc.Protect(
+	handler := chio.Protect(
 		router,
-		arc.WithSidecarURL(envOrDefault("ARC_SIDECAR_URL", "http://127.0.0.1:9090")),
+		chio.WithSidecarURL(envOrDefault("CHIO_SIDECAR_URL", "http://127.0.0.1:9090")),
 	)
 
 	addr := "127.0.0.1:" + envOrDefault("HELLO_CHI_PORT", "8013")

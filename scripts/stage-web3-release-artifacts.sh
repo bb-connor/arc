@@ -11,8 +11,8 @@ fi
 dest_root="target/release-qualification/web3-runtime"
 mkdir -p "${dest_root}"
 
-present_list="$(mktemp "${TMPDIR:-/tmp}/arc-web3-present.XXXXXX")"
-missing_list="$(mktemp "${TMPDIR:-/tmp}/arc-web3-missing.XXXXXX")"
+present_list="$(mktemp "${TMPDIR:-/tmp}/chio-web3-present.XXXXXX")"
+missing_list="$(mktemp "${TMPDIR:-/tmp}/chio-web3-missing.XXXXXX")"
 
 cleanup() {
   rm -f "${present_list}" "${missing_list}"
@@ -59,44 +59,44 @@ copy_if_exists \
   "contracts/reports/local-devnet-qualification.json" \
   "${dest_root}/contracts/reports/local-devnet-qualification.json"
 copy_if_exists \
-  "contracts/reports/ARC_WEB3_CONTRACT_SECURITY_REVIEW.md" \
-  "${dest_root}/contracts/reports/ARC_WEB3_CONTRACT_SECURITY_REVIEW.md"
+  "contracts/reports/CHIO_WEB3_CONTRACT_SECURITY_REVIEW.md" \
+  "${dest_root}/contracts/reports/CHIO_WEB3_CONTRACT_SECURITY_REVIEW.md"
 copy_if_exists \
-  "contracts/reports/ARC_WEB3_CONTRACT_GAS_AND_STORAGE.md" \
-  "${dest_root}/contracts/reports/ARC_WEB3_CONTRACT_GAS_AND_STORAGE.md"
+  "contracts/reports/CHIO_WEB3_CONTRACT_GAS_AND_STORAGE.md" \
+  "${dest_root}/contracts/reports/CHIO_WEB3_CONTRACT_GAS_AND_STORAGE.md"
 copy_if_exists \
-  "docs/release/ARC_WEB3_READINESS_AUDIT.md" \
-  "${dest_root}/docs/release/ARC_WEB3_READINESS_AUDIT.md"
+  "docs/release/CHIO_WEB3_READINESS_AUDIT.md" \
+  "${dest_root}/docs/release/CHIO_WEB3_READINESS_AUDIT.md"
 copy_if_exists \
-  "docs/release/ARC_WEB3_DEPLOYMENT_PROMOTION.md" \
-  "${dest_root}/docs/release/ARC_WEB3_DEPLOYMENT_PROMOTION.md"
+  "docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md" \
+  "${dest_root}/docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md"
 copy_if_exists \
-  "docs/release/ARC_WEB3_OPERATIONS_RUNBOOK.md" \
-  "${dest_root}/docs/release/ARC_WEB3_OPERATIONS_RUNBOOK.md"
+  "docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md" \
+  "${dest_root}/docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md"
 copy_if_exists \
-  "docs/release/ARC_WEB3_PARTNER_PROOF.md" \
-  "${dest_root}/docs/release/ARC_WEB3_PARTNER_PROOF.md"
+  "docs/release/CHIO_WEB3_PARTNER_PROOF.md" \
+  "${dest_root}/docs/release/CHIO_WEB3_PARTNER_PROOF.md"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_OPERATIONS_PROFILE.md" \
-  "${dest_root}/docs/standards/ARC_WEB3_OPERATIONS_PROFILE.md"
+  "docs/standards/CHIO_WEB3_OPERATIONS_PROFILE.md" \
+  "${dest_root}/docs/standards/CHIO_WEB3_OPERATIONS_PROFILE.md"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_OPERATIONS_QUALIFICATION_MATRIX.json" \
-  "${dest_root}/docs/standards/ARC_WEB3_OPERATIONS_QUALIFICATION_MATRIX.json"
+  "docs/standards/CHIO_WEB3_OPERATIONS_QUALIFICATION_MATRIX.json" \
+  "${dest_root}/docs/standards/CHIO_WEB3_OPERATIONS_QUALIFICATION_MATRIX.json"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_DEPLOYMENT_POLICY.json" \
-  "${dest_root}/docs/standards/ARC_WEB3_DEPLOYMENT_POLICY.json"
+  "docs/standards/CHIO_WEB3_DEPLOYMENT_POLICY.json" \
+  "${dest_root}/docs/standards/CHIO_WEB3_DEPLOYMENT_POLICY.json"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json" \
-  "${dest_root}/docs/standards/ARC_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json"
+  "docs/standards/CHIO_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json" \
+  "${dest_root}/docs/standards/CHIO_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json" \
-  "${dest_root}/docs/standards/ARC_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json"
+  "docs/standards/CHIO_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json" \
+  "${dest_root}/docs/standards/CHIO_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json" \
-  "${dest_root}/docs/standards/ARC_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json"
+  "docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json" \
+  "${dest_root}/docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json"
 copy_if_exists \
-  "docs/standards/ARC_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json" \
-  "${dest_root}/docs/standards/ARC_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json"
+  "docs/standards/CHIO_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json" \
+  "${dest_root}/docs/standards/CHIO_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json"
 copy_if_exists \
   "target/web3-promotion-qualification/promotion-qualification.json" \
   "${dest_root}/promotion/promotion-qualification.json"
@@ -119,32 +119,32 @@ copy_if_exists \
   "target/web3-e2e-qualification/scenarios/bond-expiry-recovery.json" \
   "${dest_root}/e2e/scenarios/bond-expiry-recovery.json"
 copy_if_exists \
-  "target/web3-ops-qualification/runtime-reports/arc-link-runtime-report.json" \
-  "${dest_root}/ops/runtime-reports/arc-link-runtime-report.json"
+  "target/web3-ops-qualification/runtime-reports/chio-link-runtime-report.json" \
+  "${dest_root}/ops/runtime-reports/chio-link-runtime-report.json"
 copy_if_exists \
-  "target/web3-ops-qualification/runtime-reports/arc-anchor-runtime-report.json" \
-  "${dest_root}/ops/runtime-reports/arc-anchor-runtime-report.json"
+  "target/web3-ops-qualification/runtime-reports/chio-anchor-runtime-report.json" \
+  "${dest_root}/ops/runtime-reports/chio-anchor-runtime-report.json"
 copy_if_exists \
-  "target/web3-ops-qualification/runtime-reports/arc-settle-runtime-report.json" \
-  "${dest_root}/ops/runtime-reports/arc-settle-runtime-report.json"
+  "target/web3-ops-qualification/runtime-reports/chio-settle-runtime-report.json" \
+  "${dest_root}/ops/runtime-reports/chio-settle-runtime-report.json"
 copy_if_exists \
-  "target/web3-ops-qualification/control-state/arc-link-control-state.json" \
-  "${dest_root}/ops/control-state/arc-link-control-state.json"
+  "target/web3-ops-qualification/control-state/chio-link-control-state.json" \
+  "${dest_root}/ops/control-state/chio-link-control-state.json"
 copy_if_exists \
-  "target/web3-ops-qualification/control-state/arc-anchor-control-state.json" \
-  "${dest_root}/ops/control-state/arc-anchor-control-state.json"
+  "target/web3-ops-qualification/control-state/chio-anchor-control-state.json" \
+  "${dest_root}/ops/control-state/chio-anchor-control-state.json"
 copy_if_exists \
-  "target/web3-ops-qualification/control-state/arc-settle-control-state.json" \
-  "${dest_root}/ops/control-state/arc-settle-control-state.json"
+  "target/web3-ops-qualification/control-state/chio-settle-control-state.json" \
+  "${dest_root}/ops/control-state/chio-settle-control-state.json"
 copy_if_exists \
-  "target/web3-ops-qualification/control-traces/arc-link-control-trace.json" \
-  "${dest_root}/ops/control-traces/arc-link-control-trace.json"
+  "target/web3-ops-qualification/control-traces/chio-link-control-trace.json" \
+  "${dest_root}/ops/control-traces/chio-link-control-trace.json"
 copy_if_exists \
-  "target/web3-ops-qualification/control-traces/arc-anchor-control-trace.json" \
-  "${dest_root}/ops/control-traces/arc-anchor-control-trace.json"
+  "target/web3-ops-qualification/control-traces/chio-anchor-control-trace.json" \
+  "${dest_root}/ops/control-traces/chio-anchor-control-trace.json"
 copy_if_exists \
-  "target/web3-ops-qualification/control-traces/arc-settle-control-trace.json" \
-  "${dest_root}/ops/control-traces/arc-settle-control-trace.json"
+  "target/web3-ops-qualification/control-traces/chio-settle-control-trace.json" \
+  "${dest_root}/ops/control-traces/chio-settle-control-trace.json"
 copy_if_exists \
   "target/web3-ops-qualification/incident-audit.json" \
   "${dest_root}/ops/incident-audit.json"

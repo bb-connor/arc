@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-arc_bin="${repo_root}/target/debug/arc"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-framework-examples.XXXXXX")"
+chio_bin="${repo_root}/target/debug/chio"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-framework-examples.XXXXXX")"
 venv_dir="${work_dir}/python-venv"
 auth_token="demo-token"
 
@@ -55,11 +55,11 @@ PY
 control_url="http://127.0.0.1:${control_port}"
 mcp_url="http://127.0.0.1:${mcp_port}"
 
-cargo build -p arc-cli --bin arc >/dev/null
-npm --prefix "${repo_root}/packages/sdk/arc-ts" ci --no-fund --no-audit >/dev/null
-npm --prefix "${repo_root}/packages/sdk/arc-ts" run build >/dev/null
+cargo build -p chio-cli --bin chio >/dev/null
+npm --prefix "${repo_root}/packages/sdk/chio-ts" ci --no-fund --no-audit >/dev/null
+npm --prefix "${repo_root}/packages/sdk/chio-ts" run build >/dev/null
 
-"${arc_bin}" \
+"${chio_bin}" \
   --receipt-db "${work_dir}/receipts.sqlite" \
   --revocation-db "${work_dir}/revocations.sqlite" \
   --authority-db "${work_dir}/authority.sqlite" \
@@ -85,7 +85,7 @@ if ! curl --silent --fail "${control_url}/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-"${arc_bin}" \
+"${chio_bin}" \
   --control-url "${control_url}" \
   --control-token "${auth_token}" \
   mcp serve-http \
@@ -119,28 +119,28 @@ fi
 npm --prefix "${repo_root}/examples/anthropic-sdk" ci --no-fund --no-audit >/dev/null
 npm --prefix "${repo_root}/examples/openai-compatible" ci --no-fund --no-audit >/dev/null
 
-ARC_BASE_URL="${mcp_url}" \
-ARC_CONTROL_URL="${control_url}" \
-ARC_AUTH_TOKEN="${auth_token}" \
+CHIO_BASE_URL="${mcp_url}" \
+CHIO_CONTROL_URL="${control_url}" \
+CHIO_AUTH_TOKEN="${auth_token}" \
 node "${repo_root}/examples/anthropic-sdk/run.mjs" --dry-run \
   >"${work_dir}/anthropic.json"
 
 python3 -m venv "${venv_dir}"
 . "${venv_dir}/bin/activate"
 python -m pip install --quiet --upgrade pip
-python -m pip install --quiet -e "${repo_root}/packages/sdk/arc-py" -e "${repo_root}/examples/langchain"
+python -m pip install --quiet -e "${repo_root}/packages/sdk/chio-py" -e "${repo_root}/examples/langchain"
 
-ARC_BASE_URL="${mcp_url}" \
-ARC_CONTROL_URL="${control_url}" \
-ARC_AUTH_TOKEN="${auth_token}" \
+CHIO_BASE_URL="${mcp_url}" \
+CHIO_CONTROL_URL="${control_url}" \
+CHIO_AUTH_TOKEN="${auth_token}" \
 python "${repo_root}/examples/langchain/run.py" \
   >"${work_dir}/langchain.json"
 
 deactivate
 
-ARC_BASE_URL="${mcp_url}" \
-ARC_CONTROL_URL="${control_url}" \
-ARC_AUTH_TOKEN="${auth_token}" \
+CHIO_BASE_URL="${mcp_url}" \
+CHIO_CONTROL_URL="${control_url}" \
+CHIO_AUTH_TOKEN="${auth_token}" \
 node "${repo_root}/examples/openai-compatible/run.mjs" --dry-run \
   >"${work_dir}/openai.json"
 
@@ -164,7 +164,7 @@ for path in sys.argv[1:4]:
 
 tutorial = Path(sys.argv[4]).read_text()
 for phrase in (
-    "ARC Concepts",
+    "Chio Concepts",
     "Write A Policy",
     "Wrap A Tool",
     "Execute A Governed Call",

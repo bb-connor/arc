@@ -3,7 +3,7 @@
  *
  * These tests verify that the TypeScript canonical JSON implementation
  * produces byte-identical output to the Rust kernel's canonical_json_bytes.
- * The expected values are derived from the Rust arc-core-types crate.
+ * The expected values are derived from the Rust chio-core-types crate.
  */
 
 import { describe, it, expect } from "vitest";
@@ -88,7 +88,7 @@ describe("canonical JSON (RFC 8785 conformance)", () => {
     expect(sha256Hex(bytes1)).toBe(sha256Hex(bytes2));
   });
 
-  // -- ARC-specific type conformance --
+  // -- Chio-specific type conformance --
 
   it("produces correct canonical JSON for CallerIdentity", () => {
     const identity = {

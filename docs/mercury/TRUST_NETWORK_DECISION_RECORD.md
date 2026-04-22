@@ -16,7 +16,7 @@ Proceed with one bounded trust-network path only.
 ## Approved Scope
 
 - one `counterparty_review_exchange` sponsor boundary
-- one `arc_checkpoint_witness_chain` trust anchor
+- one `chio_checkpoint_witness_chain` trust anchor
 - one `proof_inquiry_bundle_exchange` interoperability surface
 - one `counterparty_review` package family derived from the validated
   embedded-OEM lane
@@ -29,7 +29,7 @@ Proceed with one bounded trust-network path only.
 - additional sponsor boundaries
 - multi-network witness or trust-broker services
 - generic ecosystem interoperability infrastructure
-- ARC-Wall and companion-product work
+- Chio-Wall and companion-product work
 - multi-product platform hardening
 
 ---

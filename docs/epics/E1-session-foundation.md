@@ -6,7 +6,7 @@
 
 ## Problem
 
-ARC currently has transport primitives and tool-call logic, but no first-class session abstraction. That blocks:
+Chio currently has transport primitives and tool-call logic, but no first-class session abstraction. That blocks:
 
 - lifecycle negotiation
 - cancellation
@@ -42,9 +42,9 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-core/src/`
-- `crates/arc-kernel/src/`
-- possible new `crates/arc-kernel/src/session/`
+- `crates/chio-core/src/`
+- `crates/chio-kernel/src/`
+- possible new `crates/chio-kernel/src/session/`
 
 ## Proposed implementation slices
 
@@ -52,8 +52,8 @@ Out of scope:
 
 Candidate files:
 
-- `crates/arc-core/src/session.rs`
-- `crates/arc-core/src/lib.rs`
+- `crates/chio-core/src/session.rs`
+- `crates/chio-core/src/lib.rs`
 
 Proposed types:
 
@@ -67,18 +67,18 @@ Proposed types:
 
 Candidate files:
 
-- `crates/arc-kernel/src/session/mod.rs`
-- `crates/arc-kernel/src/session/lifecycle.rs`
-- `crates/arc-kernel/src/session/inflight.rs`
-- `crates/arc-kernel/src/session/cancellation.rs`
-- `crates/arc-kernel/src/session/progress.rs`
+- `crates/chio-kernel/src/session/mod.rs`
+- `crates/chio-kernel/src/session/lifecycle.rs`
+- `crates/chio-kernel/src/session/inflight.rs`
+- `crates/chio-kernel/src/session/cancellation.rs`
+- `crates/chio-kernel/src/session/progress.rs`
 
 ### Slice C: transport boundary cleanup
 
 Candidate files:
 
-- `crates/arc-kernel/src/transport.rs`
-- `crates/arc-cli/src/main.rs`
+- `crates/chio-kernel/src/transport.rs`
+- `crates/chio-cli/src/main.rs`
 
 Goal:
 

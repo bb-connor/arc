@@ -5,7 +5,7 @@
   "cpu": "512",
   "memory": "1024",
   "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/arc-sidecar-task-role",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/chio-sidecar-task-role",
   "runtimePlatform": {
     "cpuArchitecture": "X86_64",
     "operatingSystemFamily": "LINUX"
@@ -21,11 +21,11 @@
         { "containerPort": 8080, "hostPort": 8080, "protocol": "tcp" }
       ],
       "environment": [
-        { "name": "ARC_SIDECAR_URL", "value": "http://localhost:9090" },
-        { "name": "ARC_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/arc/health" }
+        { "name": "CHIO_SIDECAR_URL", "value": "http://localhost:9090" },
+        { "name": "CHIO_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/chio/health" }
       ],
       "dependsOn": [
-        { "containerName": "arc-sidecar", "condition": "HEALTHY" }
+        { "containerName": "chio-sidecar", "condition": "HEALTHY" }
       ],
       "restartPolicy": {
         "enabled": true,
@@ -43,8 +43,8 @@
       }
     },
     {
-      "name": "arc-sidecar",
-      "image": "ghcr.io/backbay/arc-sidecar:latest",
+      "name": "chio-sidecar",
+      "image": "ghcr.io/backbay/chio-sidecar:latest",
       "essential": true,
       "cpu": 128,
       "memory": 128,
@@ -57,37 +57,37 @@
         "--upstream",
         "http://127.0.0.1:8080",
         "--spec",
-        "/etc/arc/spec/openapi.yaml",
+        "/etc/chio/spec/openapi.yaml",
         "--listen",
         "0.0.0.0:9090"
       ],
       "environment": [
-        { "name": "ARC_LISTEN_ADDR", "value": "0.0.0.0:9090" },
-        { "name": "ARC_HEALTH_PATH", "value": "/arc/health" },
-        { "name": "ARC_KERNEL_CONFIG_PATH", "value": "/etc/arc/kernel.yaml" },
-        { "name": "ARC_POLICY_SOURCE", "value": "s3://ACCOUNT_ID-arc-config/policy.yaml" },
-        { "name": "ARC_RECEIPT_SINK", "value": "dynamodb://arc-receipts" },
-        { "name": "ARC_LOG_LEVEL", "value": "info" }
+        { "name": "CHIO_LISTEN_ADDR", "value": "0.0.0.0:9090" },
+        { "name": "CHIO_HEALTH_PATH", "value": "/chio/health" },
+        { "name": "CHIO_KERNEL_CONFIG_PATH", "value": "/etc/chio/kernel.yaml" },
+        { "name": "CHIO_POLICY_SOURCE", "value": "s3://ACCOUNT_ID-chio-config/policy.yaml" },
+        { "name": "CHIO_RECEIPT_SINK", "value": "dynamodb://chio-receipts" },
+        { "name": "CHIO_LOG_LEVEL", "value": "info" }
       ],
       "secrets": [
         {
-          "name": "ARC_SIGNING_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/signing-key"
+          "name": "CHIO_SIGNING_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:chio/signing-key"
         },
         {
-          "name": "ARC_CAPABILITY_AUTHORITY_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/capability-authority-url"
+          "name": "CHIO_CAPABILITY_AUTHORITY_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:chio/capability-authority-url"
         }
       ],
       "mountPoints": [
         {
-          "sourceVolume": "arc-config",
-          "containerPath": "/etc/arc",
+          "sourceVolume": "chio-config",
+          "containerPath": "/etc/chio",
           "readOnly": true
         }
       ],
       "healthCheck": {
-        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"],
+        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/chio/health"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,
@@ -103,7 +103,7 @@
         "options": {
           "awslogs-group": "/ecs/agent-tool-server",
           "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "arc-sidecar",
+          "awslogs-stream-prefix": "chio-sidecar",
           "awslogs-create-group": "true"
         }
       },
@@ -113,10 +113,10 @@
   ],
   "volumes": [
     {
-      "name": "arc-config",
+      "name": "chio-config",
       "efsVolumeConfiguration": {
         "fileSystemId": "EFS_FILESYSTEM_ID",
-        "rootDirectory": "/arc-config",
+        "rootDirectory": "/chio-config",
         "transitEncryption": "ENABLED",
         "authorizationConfig": {
           "iam": "ENABLED"

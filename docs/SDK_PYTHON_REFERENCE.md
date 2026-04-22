@@ -1,45 +1,45 @@
 # Python SDK Reference
 
-The `arc-sdk` distribution provides Python bindings for ARC hosted MCP
+The `chio-sdk` distribution provides Python bindings for Chio hosted MCP
 sessions, receipt queries, auth discovery helpers, and invariant verification.
 
 ## Installation
 
 ```bash
-pip install arc-sdk
+pip install chio-sdk
 ```
 
-Import the package as `arc`:
+Import the package as `chio`:
 
 ```python
-from arc import ArcClient, ReceiptQueryClient
+from chio import ChioClient, ReceiptQueryClient
 ```
 
 ## Public API
 
 ### Error Types
 
-- `ArcError`: base SDK exception
-- `ArcTransportError`: network or transport-level failure
-- `ArcQueryError`: non-success HTTP response from the receipt query endpoint
-- `ArcRpcError`: JSON-RPC error returned by the hosted MCP edge
-- `ArcInvariantError`: invariant parsing or verification failure
+- `ChioError`: base SDK exception
+- `ChioTransportError`: network or transport-level failure
+- `ChioQueryError`: non-success HTTP response from the receipt query endpoint
+- `ChioRpcError`: JSON-RPC error returned by the hosted MCP edge
+- `ChioInvariantError`: invariant parsing or verification failure
 
-### ArcClient
+### ChioClient
 
 ```python
-from arc import ArcClient
+from chio import ChioClient
 
-client = ArcClient.with_static_bearer("http://localhost:8931", "token")
+client = ChioClient.with_static_bearer("http://localhost:8931", "token")
 session = client.initialize()
 ```
 
-`ArcClient.initialize()` creates an authenticated ARC MCP HTTP session and
-returns an `ArcSession`.
+`ChioClient.initialize()` creates an authenticated Chio MCP HTTP session and
+returns an `ChioSession`.
 
-### ArcSession
+### ChioSession
 
-`ArcSession` exposes convenience helpers over the Streamable HTTP MCP surface:
+`ChioSession` exposes convenience helpers over the Streamable HTTP MCP surface:
 
 - `list_tools()`
 - `call_tool(name, arguments=None)`
@@ -62,7 +62,7 @@ It also exposes `request()`, `request_result()`, `notification()`, and
 token automatically.
 
 ```python
-from arc import ReceiptQueryClient
+from chio import ReceiptQueryClient
 
 client = ReceiptQueryClient("http://localhost:8940", "token")
 response = client.query({"toolServer": "wrapped-http-mock", "limit": 5})
@@ -102,10 +102,10 @@ for page in client.paginate({"toolServer": "wrapped-http-mock"}):
 
 ## Invariants
 
-The `arc.invariants` module exposes canonical JSON, SHA-256 hashing,
+The `chio.invariants` module exposes canonical JSON, SHA-256 hashing,
 Ed25519 signing and verification, receipt verification, capability
 verification, and signed-manifest verification helpers.
 
 ## Official Example
 
-See [packages/sdk/arc-py/examples/governed_hello.py](../packages/sdk/arc-py/examples/governed_hello.py).
+See [packages/sdk/chio-py/examples/governed_hello.py](../packages/sdk/chio-py/examples/governed_hello.py).

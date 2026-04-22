@@ -70,13 +70,13 @@ def run_procurement_agent(
     http = httpx.Client(timeout=30.0)
     call_log: list[dict] = []
 
-    # Serialize capability token for the ARC sidecar header
+    # Serialize capability token for the Chio sidecar header
     cap_header = json.dumps(capability_token, separators=(",", ":")) if capability_token else None
 
     def _call_buyer(method: str, path: str, body: dict | None = None) -> dict:
         headers: dict[str, str] = {"Authorization": f"Bearer {auth_token}"}
         if cap_header:
-            headers["X-Arc-Capability"] = cap_header
+            headers["X-Chio-Capability"] = cap_header
         if method == "GET":
             r = http.get(f"{buyer_url}{path}", headers=headers)
         else:

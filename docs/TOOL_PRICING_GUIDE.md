@@ -1,6 +1,6 @@
 # Tool Pricing Guide
 
-ARC tool manifests can advertise pricing metadata so operators and authorities
+Chio tool manifests can advertise pricing metadata so operators and authorities
 can plan budgets before any tool call is attempted.
 
 Pricing metadata is advisory discovery data. The hard stop still comes from the
@@ -43,7 +43,7 @@ Supported pricing models:
 The maintained native example in [`examples/hello-tool`](../examples/hello-tool) now publishes pricing directly from `NativeTool`:
 
 ```rust
-use arc_mcp_adapter::NativeTool;
+use chio_mcp_adapter::NativeTool;
 
 let greet_tool = NativeTool::new(
     "greet",
@@ -93,7 +93,7 @@ per_call_cap   = 25
 The corresponding `ToolGrant` is:
 
 ```rust
-use arc_core::capability::{MonetaryAmount, Operation, ToolGrant};
+use chio_core::capability::{MonetaryAmount, Operation, ToolGrant};
 
 let grant = ToolGrant {
     server_id: "srv-hello".to_string(),
@@ -123,7 +123,7 @@ Do not collapse those concepts. A quoted price is not the enforcement boundary.
 ## Governed Metered Billing Quotes
 
 Manifest pricing remains advisory discovery data. When an operator wants to
-bind a concrete pre-execution quote into a governed request, ARC now supports a
+bind a concrete pre-execution quote into a governed request, Chio now supports a
 typed `governed_intent.metered_billing` contract for payment-rail-neutral
 metered tools.
 
@@ -139,7 +139,7 @@ That block carries:
 - optional `max_billed_units`: explicit upper bound on billable units for the
   governed request
 
-This gives ARC a truthful two-source contract:
+This gives Chio a truthful two-source contract:
 
 1. pre-execution quote and settlement posture live in
    `governed_intent.metered_billing`
@@ -153,7 +153,7 @@ budget. The enforced budget is still the issued capability plus any explicit
 governed `max_amount` bound.
 
 The operational rule is strict: adapter evidence is auditable and queryable,
-but signed receipt truth is immutable. ARC reports quote, kernel-observed
+but signed receipt truth is immutable. Chio reports quote, kernel-observed
 financial truth, and external metered evidence side by side instead of
 flattening them into one mutable field.
 

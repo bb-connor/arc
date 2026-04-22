@@ -1,17 +1,17 @@
 //! Differential tests: scope subsumption logic.
 //!
 //! Compares the reference specification's `is_subset_of` against both the
-//! production `arc_core::capability::ArcScope::is_subset_of` logic and the
-//! normalized proof-facing AST in `arc-kernel-core`.
+//! production `chio_core::capability::ChioScope::is_subset_of` logic and the
+//! normalized proof-facing AST in `chio-kernel-core`.
 
-use arc_formal_diff_tests::generators::{
+use chio_formal_diff_tests::generators::{
     arb_paired_grant, arb_paired_normalized_grant, arb_paired_normalized_prompt_grant,
     arb_paired_normalized_resource_grant, arb_paired_normalized_scope,
     arb_paired_normalized_scope_pair, arb_paired_prompt_grant, arb_paired_resource_grant,
     arb_paired_scope_pair, arb_spec_scope, arb_spec_tool_grant, spec_grant_to_normalized,
     spec_prompt_grant_to_normalized, spec_resource_grant_to_normalized, spec_scope_to_normalized,
 };
-use arc_formal_diff_tests::spec::{SpecArcScope, SpecOperation, SpecToolGrant};
+use chio_formal_diff_tests::spec::{SpecChioScope, SpecOperation, SpecToolGrant};
 
 use proptest::prelude::*;
 use proptest::test_runner::Config as ProptestConfig;
@@ -196,7 +196,7 @@ proptest! {
     /// P1: Empty scope is a subset of any scope.
     #[test]
     fn empty_scope_is_subset(scope in arb_spec_scope()) {
-        let empty = SpecArcScope {
+        let empty = SpecChioScope {
             grants: vec![],
             resource_grants: vec![],
             prompt_grants: vec![],
@@ -228,7 +228,7 @@ proptest! {
         let remove_idx = idx % scope.grants.len();
         let mut child_grants = scope.grants.clone();
         child_grants.remove(remove_idx);
-        let child = SpecArcScope {
+        let child = SpecChioScope {
             grants: child_grants,
             resource_grants: scope.resource_grants.clone(),
             prompt_grants: scope.prompt_grants.clone(),
@@ -351,7 +351,7 @@ proptest! {
 
         // Parent: keep first half of grants
         let half = scope.grants.len() / 2;
-        let parent = SpecArcScope {
+        let parent = SpecChioScope {
             grants: scope.grants[..half].to_vec(),
             resource_grants: scope.resource_grants.clone(),
             prompt_grants: scope.prompt_grants.clone(),
@@ -359,7 +359,7 @@ proptest! {
 
         // Child: keep first quarter of grants
         let quarter = half / 2;
-        let child = SpecArcScope {
+        let child = SpecChioScope {
             grants: scope.grants[..quarter].to_vec(),
             resource_grants: scope.resource_grants.clone(),
             prompt_grants: scope.prompt_grants.clone(),

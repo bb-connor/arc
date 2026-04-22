@@ -6,7 +6,7 @@ from django.http import HttpRequest, JsonResponse
 
 
 def _receipt_id(request: HttpRequest) -> str | None:
-    receipt = getattr(request, "arc_receipt", None)
+    receipt = getattr(request, "chio_receipt", None)
     if isinstance(receipt, dict):
         return receipt.get("id")
     return None

@@ -1,4 +1,4 @@
-# ARC Economic Layer: Technical Overview
+# Chio Economic Layer: Technical Overview
 
 **Date:** 2026-04-15
 **Status:** Active technical documentation
@@ -6,18 +6,18 @@
 
 ---
 
-## 0. Why ARC Has an Economic Layer
+## 0. Why Chio Has an Economic Layer
 
-ARC is 80% of a payment authorization system. This is not metaphor. The core
+Chio is 80% of a payment authorization system. This is not metaphor. The core
 protocol primitives map directly onto financial infrastructure:
 
-| ARC Primitive | Financial Equivalent |
+| Chio Primitive | Financial Equivalent |
 |---------------|---------------------|
 | `CapabilityToken` | Spending authorization / corporate card |
 | `ToolGrant.max_total_cost` | Pre-authorized spending limit |
 | `DelegationLink` chain | Cost-responsibility chain / cost center hierarchy |
 | `Attenuation::ReduceTotalCost` | Sub-budget allocation |
-| `ArcReceipt` with `FinancialReceiptMetadata` | Billing ledger entry |
+| `ChioReceipt` with `FinancialReceiptMetadata` | Billing ledger entry |
 | `BudgetStore.try_charge_cost` | Real-time balance check |
 | `GovernedTransactionIntent` + `GovernedApprovalToken` | Purchase order + approval workflow |
 
@@ -37,22 +37,22 @@ The economic layer is built as a stack. Each crate depends on the ones below
 it. From bottom to top:
 
 ```
-                         arc-open-market
+                         chio-open-market
                               |
-                         arc-market
+                         chio-market
                         /          \
-                arc-listing     arc-settle
+                chio-listing     chio-settle
                         \          /
-                         arc-credit
+                         chio-credit
                               |
-                       arc-underwriting
+                       chio-underwriting
                               |
-                        arc-metering
+                        chio-metering
                               |
-                    arc-core (capability, receipt, crypto)
+                    chio-core (capability, receipt, crypto)
 ```
 
-### 1.1 arc-metering: Cost Attribution and Budget Enforcement
+### 1.1 chio-metering: Cost Attribution and Budget Enforcement
 
 **Purpose:** Per-receipt cost tracking, cumulative cost queries, monetary budget
 enforcement, and billing-export-compatible cost records.
@@ -68,13 +68,13 @@ enforcement, and billing-export-compatible cost records.
 - `BillingExport` / `BillingRecord` -- billing-export-compatible cost records
   suitable for downstream invoicing or analytics systems
 
-**Role in the stack:** arc-metering is the ground truth for "how much did this
+**Role in the stack:** chio-metering is the ground truth for "how much did this
 cost." Every receipt that passes through the kernel can carry structured cost
 metadata. The budget enforcement module checks spending limits before tool
 execution proceeds. The export module produces records that external billing
 systems can ingest.
 
-### 1.2 arc-underwriting: Agent Risk Assessment
+### 1.2 chio-underwriting: Agent Risk Assessment
 
 **Purpose:** Typed risk classification of agent behavior with evidence-based
 decision logic, appeal workflows, and premium pricing.
@@ -131,12 +131,12 @@ approval is 100 bps; critical approval is 300 bps. Ceiling-reduced decisions
 carry higher premiums (150-600 bps). Step-up and deny outcomes withhold or
 decline pricing.
 
-**Role in the stack:** arc-underwriting sits between raw cost data
-(arc-metering) and credit/insurance decisions (arc-credit, arc-market). It
+**Role in the stack:** chio-underwriting sits between raw cost data
+(chio-metering) and credit/insurance decisions (chio-credit, chio-market). It
 answers the question: "Given this agent's history, what risk does it
 represent, and what should we charge for coverage?"
 
-### 1.3 arc-credit: Exposure, Credit Scoring, Facilities, Bonds, and Capital
+### 1.3 chio-credit: Exposure, Credit Scoring, Facilities, Bonds, and Capital
 
 **Purpose:** Credit risk management for agent economic activity. Tracks
 exposure positions, produces credit scorecards, issues credit facilities,
@@ -230,12 +230,12 @@ Allocation decisions produce typed outcomes (`Allocate`, `Queue`,
 Operator-simulatable sandbox for testing bonded execution decisions against
 different control policies before runtime use.
 
-**Role in the stack:** arc-credit is the central nervous system of the economic
+**Role in the stack:** chio-credit is the central nervous system of the economic
 layer. It transforms raw receipt data and underwriting decisions into credit
 posture, manages collateral, and produces the evidence packages that insurance
 and marketplace systems consume.
 
-### 1.4 arc-market: Liability Insurance Marketplace
+### 1.4 chio-market: Liability Insurance Marketplace
 
 **Purpose:** A typed liability marketplace where insurance providers can be
 registered, quote requests can be issued against signed risk packages, coverage
@@ -261,7 +261,7 @@ requirements, maximum coverage amounts, and quote TTLs.
 **The quote/bind workflow:**
 
 1. `LiabilityQuoteRequestArtifact` -- operator submits a signed risk package
-   (from arc-credit) to a provider with requested coverage amount and period
+   (from chio-credit) to a provider with requested coverage amount and period
 2. `LiabilityQuoteResponseArtifact` -- provider returns quoted terms
    (coverage, premium, deductible, expiry) or declines with reason
 3. `LiabilityPricingAuthorityArtifact` -- delegated pricing authority linked
@@ -285,15 +285,15 @@ requirements, maximum coverage amounts, and quote TTLs.
 provider-or-regulated-role-bounded envelopes, enabling automatic binding within
 policy-defined envelopes.
 
-**Role in the stack:** arc-market is where risk meets capital. It consumes
-signed risk packages from arc-credit and underwriting decisions from
-arc-underwriting, then produces binding coverage contracts that allocate
+**Role in the stack:** chio-market is where risk meets capital. It consumes
+signed risk packages from chio-credit and underwriting decisions from
+chio-underwriting, then produces binding coverage contracts that allocate
 liability to insurance providers.
 
-### 1.5 arc-settle: On-Chain Settlement
+### 1.5 chio-settle: On-Chain Settlement
 
 **Purpose:** Turns approved capital instructions into real contract calls on
-EVM and Solana, projects on-chain state back into the ARC receipt family.
+EVM and Solana, projects on-chain state back into the Chio receipt family.
 
 **Key modules:**
 
@@ -317,13 +317,13 @@ EVM and Solana, projects on-chain state back into the ARC receipt family.
 **Settlement flow:**
 
 1. A `CapitalExecutionInstruction` with `rail.kind = Web3` is produced by
-   arc-credit
-2. arc-settle prepares the contract call (`prepare_web3_escrow_dispatch`,
+   chio-credit
+2. chio-settle prepares the contract call (`prepare_web3_escrow_dispatch`,
    `prepare_bond_lock`, etc.)
 3. Static validation ensures the call is well-formed before submission
 4. The call is submitted and confirmed on-chain
 5. Finality is inspected and the execution receipt is projected back into the
-   ARC receipt family
+   Chio receipt family
 6. Watchdog automation monitors for expiry, state changes, and recovery
    opportunities
 
@@ -336,11 +336,11 @@ breakers with typed emergency modes, alert severity levels, recovery records,
 and change tracking. The `ensure_settlement_operation_allowed` function
 enforces controls before any settlement operation proceeds.
 
-**Role in the stack:** arc-settle is the bridge between ARC's internal
+**Role in the stack:** chio-settle is the bridge between Chio's internal
 accounting and external financial reality. It is the only crate that touches
 real money on real chains.
 
-### 1.6 arc-listing: Registry and Discovery
+### 1.6 chio-listing: Registry and Discovery
 
 **Purpose:** Generic registry for tool servers, credential issuers, credential
 verifiers, and liability providers. Provides namespace ownership, listing
@@ -363,13 +363,13 @@ lifecycle, trust activation, and federated discovery.
 have typed roles (`Origin`, `Mirror`, `Indexer`) for federated registry
 replication.
 
-**Role in the stack:** arc-listing is the discovery layer. Agents find tool
+**Role in the stack:** chio-listing is the discovery layer. Agents find tool
 servers through listings. Insurance providers are registered as listings.
 The trust activation mechanism ensures that visibility does not imply
 admission -- every listing requires explicit activation before it can
 participate in economic workflows.
 
-### 1.7 arc-open-market: Decentralized Marketplace Economics
+### 1.7 chio-open-market: Decentralized Marketplace Economics
 
 **Purpose:** Fee schedules, bond requirements, abuse detection, and penalty
 enforcement for a decentralized tool marketplace.
@@ -403,11 +403,11 @@ enforcement for a decentralized tool marketplace.
 8. Prior penalty validity for reverse-slash operations
 9. Currency and amount coherence
 
-**Governance integration:** The crate integrates with arc-governance for
+**Governance integration:** The crate integrates with chio-governance for
 charter-based authority scoping and case management. Sanctions and appeals
 flow through the governance layer before economic penalties are enforced.
 
-**Role in the stack:** arc-open-market is the top of the economic stack. It
+**Role in the stack:** chio-open-market is the top of the economic stack. It
 defines the rules for a decentralized marketplace where tool providers list
 capabilities, agents purchase access, and misbehavior is economically
 penalized through bond slashing.
@@ -416,7 +416,7 @@ penalized through bond slashing.
 
 ## 2. The Money Flow
 
-Here is the complete lifecycle of money through the ARC economic layer, from
+Here is the complete lifecycle of money through the Chio economic layer, from
 capability acquisition through settlement and dispute resolution.
 
 ### 2.1 Authorization Phase
@@ -446,7 +446,7 @@ Sub-Agent / Task Agent
 Agent presents CapabilityToken + request
     |
     v
-ARC Kernel
+Chio Kernel
     |-- 1. Validate capability (signature, time, revocation, scope)
     |-- 2. BudgetStore.try_charge_cost (provisional debit)
     |-- 3. Governed transaction validation (intent binding, approval token)
@@ -459,7 +459,7 @@ ARC Kernel
     |-- 10. Receipt signing with FinancialReceiptMetadata
     |
     v
-Signed ArcReceipt
+Signed ChioReceipt
     |-- cost_charged, currency, budget_remaining
     |-- settlement_status (not_applicable / pending / settled / failed)
     |-- payment_reference
@@ -472,12 +472,12 @@ Signed ArcReceipt
 ```
 Receipt Store (indexed by cost_currency, cost_charged)
     |
-    |-- arc-metering: CostQuery by session/agent/tool/time-range
-    |-- arc-metering: BillingExport for downstream invoicing
-    |-- arc-metering: BudgetEnforcer for policy-level enforcement
+    |-- chio-metering: CostQuery by session/agent/tool/time-range
+    |-- chio-metering: BillingExport for downstream invoicing
+    |-- chio-metering: BudgetEnforcer for policy-level enforcement
     |
     v
-Exposure Ledger (arc-credit)
+Exposure Ledger (chio-credit)
     |-- Per-currency position tracking
     |-- Settlement state breakdown (reserved/settled/pending/failed)
     |-- Loss tracking (provisional loss / recovered)
@@ -490,20 +490,20 @@ Exposure Ledger (arc-credit)
 Exposure Ledger + Reputation Inspection
     |
     v
-Credit Scorecard (arc-credit)
+Credit Scorecard (chio-credit)
     |-- 5 bands: Prime -> Restricted
     |-- 4 dimensions: Reputation, Settlement, Loss, Exposure
     |-- Probation tracking
     |-- Anomaly detection
     |
     v
-Credit Facility (arc-credit)
+Credit Facility (chio-credit)
     |-- Grant / ManualReview / Deny disposition
     |-- Credit limit, utilization ceiling, reserve ratio, concentration cap
     |-- Runtime assurance and certification prerequisites
     |
     v
-Credit Bond (arc-credit)
+Credit Bond (chio-credit)
     |-- Lock / Hold / Release / Impair
     |-- Collateral and reserve requirements
     |-- Gates bounded autonomy tiers
@@ -512,25 +512,25 @@ Credit Bond (arc-credit)
 ### 2.5 Insurance Placement
 
 ```
-Provider Risk Package (arc-credit)
+Provider Risk Package (chio-credit)
     |-- Signed exposure + scorecard
     |-- Facility posture + latest facility snapshot
     |-- Runtime assurance + certification state
     |-- Recent loss history
     |
     v
-Liability Quote Request (arc-market)
+Liability Quote Request (chio-market)
     |-- Provider policy reference
     |-- Requested coverage amount and period
     |-- Signed risk package attached
     |
     v
-Liability Quote Response (arc-market)
+Liability Quote Response (chio-market)
     |-- Quoted: coverage, premium, deductible, expiry
     |-- or Declined: reason
     |
     v
-Placement + Bound Coverage (arc-market)
+Placement + Bound Coverage (chio-market)
     |-- Coverage terms finalized
     |-- Premium obligation created
 ```
@@ -538,18 +538,18 @@ Placement + Bound Coverage (arc-market)
 ### 2.6 Settlement
 
 ```
-Capital Allocation Decision (arc-credit)
+Capital Allocation Decision (chio-credit)
     |-- Allocate / Queue / ManualReview / Deny
     |-- Instruction drafts for execution
     |
     v
-Capital Execution Instruction (arc-credit)
+Capital Execution Instruction (chio-credit)
     |-- Authority chain (treasury + custodian approvals)
     |-- Execution window (not_before / not_after)
     |-- Rail (manual / API / ACH / wire / ledger / web3)
     |
     v
-On-Chain Settlement (arc-settle) -- when rail.kind = Web3
+On-Chain Settlement (chio-settle) -- when rail.kind = Web3
     |-- EVM: escrow dispatch, bond lock/release
     |-- Solana: Ed25519-native settlement
     |-- CCIP: cross-chain messaging
@@ -567,11 +567,11 @@ Settlement Reconciliation
 ### 2.7 Claims and Disputes
 
 ```
-Loss Event (arc-credit loss lifecycle)
+Loss Event (chio-credit loss lifecycle)
     |-- Delinquency / Recovery / ReserveRelease / ReserveSlash / WriteOff
     |
     v
-Claim Package (arc-market)
+Claim Package (chio-market)
     |-- Bound coverage reference
     |-- Exposure, bond, loss-lifecycle, capital-execution evidence
     |
@@ -586,7 +586,7 @@ Payout Instruction -> Payout Receipt -> Settlement Instruction -> Settlement Rec
 
 ## 3. Insurance and Underwriting
 
-This section describes what is genuinely novel about ARC's approach. No
+This section describes what is genuinely novel about Chio's approach. No
 competing agent protocol has typed risk taxonomies, evidence-based underwriting,
 or insurance marketplace primitives.
 
@@ -627,7 +627,7 @@ decision with:
 
 ### 3.2 How Insurance Placement Works
 
-ARC's insurance marketplace operates over signed evidence rather than
+Chio's insurance marketplace operates over signed evidence rather than
 self-reported data.
 
 **Provider admission:** Operators register liability providers via
@@ -659,7 +659,7 @@ each as a separate signed artifact.
 ### 3.3 Why This Matters
 
 Traditional insurance underwriting for software systems relies on
-questionnaires and manual audits. ARC's approach is different:
+questionnaires and manual audits. Chio's approach is different:
 
 1. **Evidence is cryptographically signed.** The risk package that the
    underwriter evaluates is the same receipt data that the kernel produced.
@@ -681,7 +681,7 @@ questionnaires and manual audits. ARC's approach is different:
 
 ## 4. On-Chain Settlement
 
-arc-settle bridges the gap between ARC's internal accounting and external
+chio-settle bridges the gap between Chio's internal accounting and external
 financial reality. It supports three settlement substrates:
 
 ### 4.1 EVM Settlement
@@ -689,7 +689,7 @@ financial reality. It supports three settlement substrates:
 The EVM module provides typed functions for:
 
 - **Escrow dispatch:** `prepare_web3_escrow_dispatch` + `finalize_escrow_dispatch`
-  for creating and finalizing escrow contracts linked to ARC capabilities and
+  for creating and finalizing escrow contracts linked to Chio capabilities and
   receipts
 - **Bond management:** `prepare_bond_lock` / `prepare_bond_release` /
   `prepare_bond_impair` / `prepare_bond_expiry` for on-chain collateral
@@ -699,7 +699,7 @@ The EVM module provides typed functions for:
 - **Merkle release:** `prepare_merkle_release` for batch settlement using
   Merkle proof verification
 - **ERC-20 integration:** `prepare_erc20_approval` for token approvals,
-  `scale_arc_amount_to_token_minor_units` for denomination conversion
+  `scale_chio_amount_to_token_minor_units` for denomination conversion
 
 Each function produces a `PreparedEvmCall` with gas estimation and static
 validation before any on-chain submission occurs.
@@ -711,9 +711,9 @@ The Solana module provides Ed25519-first parity:
 - `prepare_solana_settlement` -- prepares a settlement transaction using the
   Ed25519 program for signature verification
 - `verify_solana_binding_and_receipt` -- verifies that a Solana settlement
-  matches the ARC receipt
+  matches the Chio receipt
 - `compare_commitments` -- produces a `CommitmentConsistencyReport` comparing
-  ARC-side and Solana-side commitment state
+  Chio-side and Solana-side commitment state
 
 ### 4.3 Cross-Chain Settlement (CCIP)
 
@@ -727,7 +727,7 @@ For cross-chain scenarios, the CCIP module provides:
 
 ### 4.4 Payment Protocol Adapters
 
-arc-settle also provides adapters for HTTP-native payment protocols:
+chio-settle also provides adapters for HTTP-native payment protocols:
 
 - **x402:** `build_x402_payment_requirements` -- projects governed settlement
   into x402 HTTP payment requirements
@@ -740,7 +740,7 @@ arc-settle also provides adapters for HTTP-native payment protocols:
 
 ### 4.5 When On-Chain Matters
 
-Not every ARC settlement goes on-chain. On-chain settlement is appropriate
+Not every Chio settlement goes on-chain. On-chain settlement is appropriate
 when:
 
 1. **Cross-organizational trust is limited.** On-chain escrow removes the need
@@ -748,7 +748,7 @@ when:
 2. **Collateral is at stake.** Bond lock/release/impair operations require
    verifiable state that both parties can audit.
 3. **Settlement amounts justify gas costs.** The `SettlementAmountTier`
-   configuration in arc-settle defines thresholds for when on-chain settlement
+   configuration in chio-settle defines thresholds for when on-chain settlement
    is economically rational.
 4. **Regulatory requirements demand verifiable settlement.** On-chain receipts
    provide tamper-evident proof of payment.
@@ -766,7 +766,7 @@ capabilities:
 
 ### 5.1 Listing and Discovery
 
-Tool servers register as listings in arc-listing namespaces. Each listing
+Tool servers register as listings in chio-listing namespaces. Each listing
 carries:
 
 - Namespace ownership (who controls the registry)
@@ -845,7 +845,7 @@ relationship is bidirectional:
 | Security Primitive | Economic Use |
 |-------------------|--------------|
 | `CapabilityToken` signatures | Spending authorizations are unforgeable |
-| `ArcReceipt` signatures | Billing records are tamper-evident |
+| `ChioReceipt` signatures | Billing records are tamper-evident |
 | `SignedExportEnvelope` | All economic artifacts (exposure, scorecard, facility, bond, underwriting decision, risk package) are signed |
 | `DelegationLink` chains | Cost-responsibility attribution follows cryptographic delegation |
 | `GovernedTransactionIntent` + `GovernedApprovalToken` | Purchase orders and approvals are cryptographically bound |
@@ -892,7 +892,7 @@ grant level.
 
 ### 7.2 Agent-to-Agent Payment Routing
 
-arc-metering and the kernel's `PaymentAdapter` cover agent-to-tool-server
+chio-metering and the kernel's `PaymentAdapter` cover agent-to-tool-server
 payments. Peer-to-peer agent payments (agent A pays agent B for a delegated
 sub-task result) have no routing protocol. This matters for multi-agent swarm
 economics.
@@ -920,7 +920,7 @@ The primitives exist for "digital fiscal nation states" -- namespace-scoped fee
 schedules, trust activation, bond requirements, governance charters, penalty
 enforcement, federated reputation sharing. But the composition guide describing
 how an operator would assemble these primitives into a self-governing economic
-zone is missing. This is the bridge between ARC's technical capabilities and
+zone is missing. This is the bridge between Chio's technical capabilities and
 the chiodome vision of autonomous agent collectives operating as fiscal
 entities.
 
@@ -932,13 +932,13 @@ Quick reference for navigating the codebase:
 
 | Crate | Entry Point | Key Exports |
 |-------|------------|-------------|
-| `arc-metering` | `crates/arc-metering/src/lib.rs` | `CostMetadata`, `BudgetEnforcer`, `CostQuery`, `BillingExport` |
-| `arc-underwriting` | `crates/arc-underwriting/src/lib.rs` | `evaluate_underwriting_policy_input`, `UnderwritingDecisionArtifact`, `UnderwritingRiskClass`, `UnderwritingPremiumQuote` |
-| `arc-credit` | `crates/arc-credit/src/lib.rs` | `ExposureLedgerReport`, `CreditScorecardReport`, `CreditFacilityArtifact`, `CreditBondArtifact`, `CreditLossLifecycleArtifact`, `CapitalBookReport`, `CapitalExecutionInstructionArtifact` |
-| `arc-market` | `crates/arc-market/src/lib.rs` | `LiabilityProviderReport`, `LiabilityQuoteRequestArtifact`, `LiabilityQuoteResponseArtifact`, `LiabilityBoundCoverageArtifact`, `LiabilityClaimPackageArtifact` |
-| `arc-settle` | `crates/arc-settle/src/lib.rs` | `prepare_web3_escrow_dispatch`, `prepare_bond_lock`, `prepare_solana_settlement`, `prepare_ccip_settlement_message`, `build_x402_payment_requirements` |
-| `arc-listing` | `crates/arc-listing/src/lib.rs` | `GenericListingArtifact`, `GenericNamespaceArtifact`, `GenericTrustActivationArtifact` |
-| `arc-open-market` | `crates/arc-open-market/src/lib.rs` | `OpenMarketFeeScheduleArtifact`, `OpenMarketPenaltyArtifact`, `evaluate_open_market_penalty` |
+| `chio-metering` | `crates/chio-metering/src/lib.rs` | `CostMetadata`, `BudgetEnforcer`, `CostQuery`, `BillingExport` |
+| `chio-underwriting` | `crates/chio-underwriting/src/lib.rs` | `evaluate_underwriting_policy_input`, `UnderwritingDecisionArtifact`, `UnderwritingRiskClass`, `UnderwritingPremiumQuote` |
+| `chio-credit` | `crates/chio-credit/src/lib.rs` | `ExposureLedgerReport`, `CreditScorecardReport`, `CreditFacilityArtifact`, `CreditBondArtifact`, `CreditLossLifecycleArtifact`, `CapitalBookReport`, `CapitalExecutionInstructionArtifact` |
+| `chio-market` | `crates/chio-market/src/lib.rs` | `LiabilityProviderReport`, `LiabilityQuoteRequestArtifact`, `LiabilityQuoteResponseArtifact`, `LiabilityBoundCoverageArtifact`, `LiabilityClaimPackageArtifact` |
+| `chio-settle` | `crates/chio-settle/src/lib.rs` | `prepare_web3_escrow_dispatch`, `prepare_bond_lock`, `prepare_solana_settlement`, `prepare_ccip_settlement_message`, `build_x402_payment_requirements` |
+| `chio-listing` | `crates/chio-listing/src/lib.rs` | `GenericListingArtifact`, `GenericNamespaceArtifact`, `GenericTrustActivationArtifact` |
+| `chio-open-market` | `crates/chio-open-market/src/lib.rs` | `OpenMarketFeeScheduleArtifact`, `OpenMarketPenaltyArtifact`, `evaluate_open_market_penalty` |
 
 See also: `docs/AGENT_ECONOMY.md` for the foundational design document
 covering the kernel-level economic extensions (capability token spending

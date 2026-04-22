@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio ToolCallResult stream_complete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "total_chunks"],
+  "properties": {
+    "status": {
+      "const": "stream_complete"
+    },
+    "total_chunks": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

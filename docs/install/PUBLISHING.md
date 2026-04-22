@@ -1,6 +1,6 @@
-# ARC SDK Publishing Runbook
+# Chio SDK Publishing Runbook
 
-Operator guide for publishing ARC's Python SDKs to PyPI and TypeScript
+Operator guide for publishing Chio's Python SDKs to PyPI and TypeScript
 SDKs to npm. Both release lanes use OIDC Trusted Publishing, meaning
 **no long-lived API tokens are stored in GitHub secrets**; all
 authentication flows come from GitHub's OIDC identity combined with
@@ -22,12 +22,12 @@ what to publish.
 | Tag pattern | Publishes |
 |---|---|
 | `py/v<MAJOR.MINOR.PATCH>` | Every Python package listed below. All packages must be at the same version. |
-| `py/<slug>-v<MAJOR.MINOR.PATCH>` | Just that package (e.g. `py/arc-crewai-v1.2.0`). |
+| `py/<slug>-v<MAJOR.MINOR.PATCH>` | Just that package (e.g. `py/chio-crewai-v1.2.0`). |
 | `ts/v<MAJOR.MINOR.PATCH>` | Every TypeScript package. All packages must be at the same version. |
-| `ts/<slug>-v<MAJOR.MINOR.PATCH>` | Just that package (e.g. `ts/express-v1.2.0` -> `@arc-protocol/express`). |
+| `ts/<slug>-v<MAJOR.MINOR.PATCH>` | Just that package (e.g. `ts/express-v1.2.0` -> `@chio-protocol/express`). |
 
 The per-package slug is the **directory name**, not the distribution
-name. For example, `@arc-protocol/express` lives in
+name. For example, `@chio-protocol/express` lives in
 `sdks/typescript/packages/express`, so its slug is `express`.
 
 **Meta-tag policy**: a `py/v*.*.*` or `ts/v*.*.*` tag publishes every
@@ -43,8 +43,8 @@ all SDK changes for that version have merged.
 
 ```bash
 # Single package, single version bump
-git tag -a py/arc-crewai-v1.2.0 -m "release arc-crewai 1.2.0"
-git push origin py/arc-crewai-v1.2.0
+git tag -a py/chio-crewai-v1.2.0 -m "release chio-crewai 1.2.0"
+git push origin py/chio-crewai-v1.2.0
 
 # Full Python SDK fleet (after bumping every pyproject.toml)
 git tag -a py/v0.2.0 -m "release Python SDKs 0.2.0"
@@ -61,37 +61,37 @@ Published under the listed distribution name:
 
 | Slug | Distribution | Directory |
 |---|---|---|
-| `arc-sdk-python` | `arc-sdk-python` | `sdks/python/arc-sdk-python` |
-| `arc-asgi` | `arc-asgi` | `sdks/python/arc-asgi` |
-| `arc-django` | `arc-django` | `sdks/python/arc-django` |
-| `arc-fastapi` | `arc-fastapi` | `sdks/python/arc-fastapi` |
-| `arc-langchain` | `arc-langchain` | `sdks/python/arc-langchain` |
-| `arc-crewai` | `arc-crewai` | `sdks/python/arc-crewai` |
-| `arc-autogen` | `arc-autogen` | `sdks/python/arc-autogen` |
-| `arc-llamaindex` | `arc-llamaindex` | `sdks/python/arc-llamaindex` |
-| `arc-temporal` | `arc-temporal` | `sdks/python/arc-temporal` |
-| `arc-prefect` | `arc-prefect` | `sdks/python/arc-prefect` |
-| `arc-dagster` | `arc-dagster` | `sdks/python/arc-dagster` |
-| `arc-airflow` | `arc-airflow` | `sdks/python/arc-airflow` |
-| `arc-ray` | `arc-ray` | `sdks/python/arc-ray` |
-| `arc-streaming` | `arc-streaming` | `sdks/python/arc-streaming` |
-| `arc-iac` | `arc-iac` | `sdks/python/arc-iac` |
-| `arc-observability` | `arc-observability` | `sdks/python/arc-observability` |
-| `arc-langgraph` | `arc-langgraph` | `sdks/python/arc-langgraph` |
-| `arc-code-agent` | `arc-code-agent` | `sdks/python/arc-code-agent` |
-| `arc-lambda-python` | `arc-lambda-python` | `sdks/lambda/arc-lambda-python` |
+| `chio-sdk-python` | `chio-sdk-python` | `sdks/python/chio-sdk-python` |
+| `chio-asgi` | `chio-asgi` | `sdks/python/chio-asgi` |
+| `chio-django` | `chio-django` | `sdks/python/chio-django` |
+| `chio-fastapi` | `chio-fastapi` | `sdks/python/chio-fastapi` |
+| `chio-langchain` | `chio-langchain` | `sdks/python/chio-langchain` |
+| `chio-crewai` | `chio-crewai` | `sdks/python/chio-crewai` |
+| `chio-autogen` | `chio-autogen` | `sdks/python/chio-autogen` |
+| `chio-llamaindex` | `chio-llamaindex` | `sdks/python/chio-llamaindex` |
+| `chio-temporal` | `chio-temporal` | `sdks/python/chio-temporal` |
+| `chio-prefect` | `chio-prefect` | `sdks/python/chio-prefect` |
+| `chio-dagster` | `chio-dagster` | `sdks/python/chio-dagster` |
+| `chio-airflow` | `chio-airflow` | `sdks/python/chio-airflow` |
+| `chio-ray` | `chio-ray` | `sdks/python/chio-ray` |
+| `chio-streaming` | `chio-streaming` | `sdks/python/chio-streaming` |
+| `chio-iac` | `chio-iac` | `sdks/python/chio-iac` |
+| `chio-observability` | `chio-observability` | `sdks/python/chio-observability` |
+| `chio-langgraph` | `chio-langgraph` | `sdks/python/chio-langgraph` |
+| `chio-code-agent` | `chio-code-agent` | `sdks/python/chio-code-agent` |
+| `chio-lambda-python` | `chio-lambda-python` | `sdks/lambda/chio-lambda-python` |
 
 ### TypeScript (npm)
 
 | Slug | Distribution | Directory |
 |---|---|---|
-| `node-http` | `@arc-protocol/node-http` | `sdks/typescript/packages/node-http` |
-| `express` | `@arc-protocol/express` | `sdks/typescript/packages/express` |
-| `fastify` | `@arc-protocol/fastify` | `sdks/typescript/packages/fastify` |
-| `elysia` | `@arc-protocol/elysia` | `sdks/typescript/packages/elysia` |
-| `ai-sdk` | `@arc-protocol/ai-sdk` | `sdks/typescript/packages/ai-sdk` |
+| `node-http` | `@chio-protocol/node-http` | `sdks/typescript/packages/node-http` |
+| `express` | `@chio-protocol/express` | `sdks/typescript/packages/express` |
+| `fastify` | `@chio-protocol/fastify` | `sdks/typescript/packages/fastify` |
+| `elysia` | `@chio-protocol/elysia` | `sdks/typescript/packages/elysia` |
+| `ai-sdk` | `@chio-protocol/ai-sdk` | `sdks/typescript/packages/ai-sdk` |
 
-`@arc-protocol/conformance` is marked `"private": true` and is
+`@chio-protocol/conformance` is marked `"private": true` and is
 deliberately excluded from publishing.
 
 ---
@@ -107,9 +107,9 @@ a Trusted Publisher:
    https://pypi.org/manage/account/publishing/ to pre-register a
    pending publisher for a brand-new distribution).
 2. Under **Publishing** -> **Add a new pending publisher**, set:
-   - PyPI Project Name: e.g. `arc-crewai`
+   - PyPI Project Name: e.g. `chio-crewai`
    - Owner: `backbay-industries`
-   - Repository name: `arc`
+   - Repository name: `chio`
    - Workflow name: `release-pypi.yml`
    - Environment name: `pypi`
 3. Save.
@@ -126,12 +126,12 @@ npm provenance requires the workflow to run with
 `permissions.id-token: write` (already set in `release-npm.yml`) and
 for the npm package to opt in to Trusted Publishing:
 
-1. Log in to https://www.npmjs.com as an org admin of `@arc-protocol`.
+1. Log in to https://www.npmjs.com as an org admin of `@chio-protocol`.
 2. For each package (`node-http`, `express`, `fastify`, `elysia`,
    `ai-sdk`), go to **Settings** -> **Trusted Publishers** -> **Add**
    and register:
    - GitHub org: `backbay-industries`
-   - Repository: `arc`
+   - Repository: `chio`
    - Workflow path: `.github/workflows/release-npm.yml`
    - Environment name: `npm`
 3. Confirm the org-level 2FA policy is set to "Publishing and
@@ -193,7 +193,7 @@ For local iteration, use the `package-check.sh` scripts instead:
    succeed for every matrix leg before `publish` starts.
 7. Confirm the package is live:
    - `pip install <dist-name>==<version>`
-   - `npm view @arc-protocol/<slug>@<version>`
+   - `npm view @chio-protocol/<slug>@<version>`
 
 ---
 
@@ -209,7 +209,7 @@ publish a new patch:
    **Options** -> **Yank** on the bad version. Enter a reason
    (shown to users in resolver errors).
 2. Fix the bug on `main`, bump the patch version, land the PR.
-3. Cut a new tag (e.g. `py/arc-crewai-v1.2.1`) and let the workflow
+3. Cut a new tag (e.g. `py/chio-crewai-v1.2.1`) and let the workflow
    publish normally.
 
 Yanked versions remain installable if explicitly pinned, but resolvers
@@ -222,7 +222,7 @@ only if no other package depends on it. The recommended rollback is
 to **deprecate**:
 
 ```bash
-npm deprecate @arc-protocol/<slug>@<version> "Do not use: superseded by <next-version>. See CHANGELOG for details."
+npm deprecate @chio-protocol/<slug>@<version> "Do not use: superseded by <next-version>. See CHANGELOG for details."
 ```
 
 Then bump the patch version, tag, and let the workflow republish.
@@ -231,10 +231,10 @@ For severe security issues within the 72-hour window, unpublishing
 is permitted:
 
 ```bash
-npm unpublish @arc-protocol/<slug>@<version>
+npm unpublish @chio-protocol/<slug>@<version>
 ```
 
-Coordinate with @arc-protocol org admins before unpublishing; the
+Coordinate with @chio-protocol org admins before unpublishing; the
 name+version combo is burnt for 24 hours.
 
 ### Revoking a provenance attestation
@@ -255,7 +255,7 @@ release is the correct response.
 **`403 Forbidden` from npm with provenance enabled**
   -> Org-level Trusted Publisher not configured, or the package's
   access level is `restricted`. Run `npm access ls-packages
-  @arc-protocol` to verify.
+  @chio-protocol` to verify.
 
 **`build` job passes but `publish` does not start**
   -> The plan job set `dry_run=true`. For `workflow_dispatch`,

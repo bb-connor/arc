@@ -26,7 +26,7 @@ Proceed with one bounded Mercury third-program lane only.
 
 - generalized multi-program portfolio-management tooling
 - revenue operations systems, forecasting stacks, billing platforms, or channel programs
-- ARC-side commercial control surfaces
+- Chio-side commercial control surfaces
 
 ## Rationale
 

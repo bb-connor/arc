@@ -43,7 +43,7 @@ The repo is not empty here. There is meaningful groundwork:
 
 The formal side is also suggestive but incomplete:
 
-- the Lean model includes a simplified delegation-chain and revocation model: `formal/lean4/Pact/Pact/Core/Capability.lean:35-89`, `formal/lean4/Pact/Pact/Core/Revocation.lean:40-125`
+- the Lean model includes a simplified delegation-chain and revocation model: `formal/lean4/Chio/Chio/Core/Capability.lean:35-89`, `formal/lean4/Chio/Chio/Core/Revocation.lean:40-125`
 - the release audit already narrows the honest proof boundary to executable alignment and empirical runtime behavior rather than whole-system theorem-prover closure: `docs/release/RELEASE_AUDIT.md:222-245`
 
 ## Why Claims Overreach
@@ -260,7 +260,7 @@ Also split the current broad safety properties into narrower properties that can
 
 ### Proof changes
 
-The current Lean model is too small for the public claim boundary: `formal/lean4/Pact/Pact/Core/Capability.lean:35-89`, `formal/lean4/Pact/Pact/Core/Revocation.lean:40-125`.
+The current Lean model is too small for the public claim boundary: `formal/lean4/Chio/Chio/Core/Capability.lean:35-89`, `formal/lean4/Chio/Chio/Core/Revocation.lean:40-125`.
 
 To support the stronger delegation claims:
 

@@ -24,23 +24,50 @@ Thumbs.db
 # Generated conformance artifacts
 /tests/conformance/results/generated/
 /tests/conformance/reports/generated/
+examples/**/artifacts/live/
+examples/**/.artifacts/
+examples/internet-of-agents-incident-network/workspaces/provider-lab/operations/
+output/playwright/
 
 # Generated Python packaging and cache artifacts
 __pycache__/
 *.py[cod]
-packages/sdk/arc-py/build/
-packages/sdk/arc-py/src/*.egg-info/
-packages/sdk/arc-ts/node_modules/
-packages/sdk/arc-ts/dist/
 examples/anthropic-sdk/node_modules/
 examples/openai-compatible/node_modules/
 examples/langchain/*.egg-info/
 examples/langchain/.venv/
+sdks/python/**/.venv/
+packages/sdk/**/.venv/
 
-# Dashboard node_modules and build output
-crates/arc-cli/dashboard/node_modules/
-crates/arc-cli/dashboard/dist/
+# Generated JVM and .NET build artifacts
+examples/**/.gradle/
+sdks/**/.gradle/
+examples/**/bin/
+examples/**/obj/
+sdks/dotnet/**/bin/
+sdks/dotnet/**/obj/
 
 # Generated coverage artifacts
 /coverage/*
 !/coverage/README.md
+
+# Claude Code session
+.claude/
+
+# Lean build artifacts
+formal/lean4/**/.lake/
+**/.lake/build/
+*.egg-info/
+
+# Build outputs (flagged by scripts/check-release-inputs.sh)
+packages/sdk/chio-ts/dist/
+packages/sdk/chio-ts/node_modules/
+packages/sdk/chio-py/build/
+packages/sdk/chio-py/src/*.egg-info/
+crates/chio-cli/dashboard/dist/
+crates/chio-cli/dashboard/node_modules/
+tests/conformance/results/generated/
+tests/conformance/reports/generated/
+*.pyc
+*.pyo
+*.pyd

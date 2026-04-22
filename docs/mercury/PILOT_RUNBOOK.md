@@ -21,7 +21,7 @@ The runbook uses the shipped repo command, not a hand-built artifact path.
 Run from the repository root:
 
 ```bash
-cargo run -p arc-mercury -- pilot export --output target/mercury-pilot
+cargo run -p chio-mercury -- pilot export --output target/mercury-pilot
 ```
 
 If you already built the repo and have the binary on your path, the equivalent
@@ -73,8 +73,8 @@ Interpretation:
 
 The primary path demonstrates:
 
-1. replay/shadow events can be turned into signed ARC receipts
-2. those receipts can be checkpointed and exported through the canonical ARC
+1. replay/shadow events can be turned into signed Chio receipts
+2. those receipts can be checkpointed and exported through the canonical Chio
    evidence package
 3. the exported package can be wrapped into `Proof Package v1`
 4. a reviewed export can be derived as `Inquiry Package v1`

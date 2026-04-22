@@ -32,7 +32,7 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "message": "hello from openapi-sidecar upstream",
                     "runtime": "python-http-server",
-                    "arc_sdk": False,
+                    "chio_sdk": False,
                 },
             )
             return
@@ -80,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
                 "message": message,
                 "count": count,
                 "handled_by": "plain-upstream-app",
-                "arc_sdk": False,
+                "chio_sdk": False,
             },
         )
 

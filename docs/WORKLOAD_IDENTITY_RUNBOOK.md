@@ -1,22 +1,22 @@
 # Workload Identity and Attestation Runbook
 
-This runbook defines the supported operator boundary for ARC workload identity
+This runbook defines the supported operator boundary for Chio workload identity
 and attestation trust.
 
 ## Supported Surface
 
 - SPIFFE-derived workload identity mapping through
   `runtimeAttestation.workloadIdentity` or a SPIFFE `runtimeIdentity`
-- Azure Attestation JWT normalization into ARC `runtimeAttestation`
-- AWS Nitro attestation document verification into ARC `runtimeAttestation`
-- Google Confidential VM JWT normalization into ARC `runtimeAttestation`
+- Azure Attestation JWT normalization into Chio `runtimeAttestation`
+- AWS Nitro attestation document verification into Chio `runtimeAttestation`
+- Google Confidential VM JWT normalization into Chio `runtimeAttestation`
 - canonical runtime-attestation appraisal artifacts that separate evidence
   identity, normalized assertions, and vendor-scoped claims
 - signed runtime-attestation appraisal reports through
-  `arc trust appraisal export` and `POST /v1/reports/runtime-attestation-appraisal`
+  `chio trust appraisal export` and `POST /v1/reports/runtime-attestation-appraisal`
 - signed runtime-attestation appraisal results plus explicit local import
-  evaluation through `arc trust appraisal export-result`,
-  `arc trust appraisal import`,
+  evaluation through `chio trust appraisal export-result`,
+  `chio trust appraisal import`,
   `POST /v1/reports/runtime-attestation-appraisal-result`, and
   `POST /v1/reports/runtime-attestation-appraisal/import`
 - signed verifier descriptors, signed reference-value sets, and signed trust
@@ -28,42 +28,42 @@ and attestation trust.
 
 ## Appraisal Boundary
 
-ARC now treats verifier output as two related but distinct surfaces:
+Chio now treats verifier output as two related but distinct surfaces:
 
-- `runtimeAttestation`: the bounded evidence ARC carries with governed and
+- `runtimeAttestation`: the bounded evidence Chio carries with governed and
   issuance requests
-- `runtime-attestation appraisal`: the canonical adapter-facing contract ARC
+- `runtime-attestation appraisal`: the canonical adapter-facing contract Chio
   uses to describe verifier family, evidence descriptor, normalized
   assertions, vendor claims, and reason codes
 
 The appraisal contract is intentionally conservative. Vendor-specific claims
-remain vendor-scoped, and ARC only normalizes the small set of assertions it
+remain vendor-scoped, and Chio only normalizes the small set of assertions it
 can defend across verifier families.
 
 Operators can export one signed appraisal report over that contract either
 locally with:
 
-- `arc trust appraisal export --input <runtime-attestation.json> --policy-file <policy.yaml>`
+- `chio trust appraisal export --input <runtime-attestation.json> --policy-file <policy.yaml>`
 
 or remotely through:
 
 - `POST /v1/reports/runtime-attestation-appraisal`
 
-ARC can also exchange one signed appraisal result over that same contract and
+Chio can also exchange one signed appraisal result over that same contract and
 evaluate imported results only through one explicit local import policy. The
 current shipped import boundary is:
 
 - signature-verified and issuer-provenanced
-- constrained to ARC's bounded Azure/AWS Nitro/Google/enterprise-verifier
+- constrained to Chio's bounded Azure/AWS Nitro/Google/enterprise-verifier
   bridge inventory
 - freshness-bound for both result age and underlying evidence age
 - verifier-family and portable-claim mapped through explicit local policy
 
-ARC does not currently implement one-time consume or replay-registry semantics
+Chio does not currently implement one-time consume or replay-registry semantics
 for imported appraisal results. The current replay defense at this boundary is
 explicit signature plus freshness validation.
 
-ARC now also defines one bounded verifier-federation metadata layer over the
+Chio now also defines one bounded verifier-federation metadata layer over the
 same appraisal contract:
 
 - one signed verifier descriptor that names the verifier, family, adapter,
@@ -79,10 +79,10 @@ admission. Operators may publish or import them, but local `trusted_verifiers`
 policy still decides whether runtime assurance is widened.
 
 The signed report captures the canonical appraisal plus the policy-visible
-accept or reject outcome ARC derived at export time. It is an operator-facing
+accept or reject outcome Chio derived at export time. It is an operator-facing
 evidence artifact, not a claim of generic attestation-result interoperability.
 
-Today ARC ships three concrete verifier families against that boundary:
+Today Chio ships three concrete verifier families against that boundary:
 
 - Azure MAA JWT evidence with optional SPIFFE workload-identity projection
 - AWS Nitro `COSE_Sign1` attestation documents with anchored certificate
@@ -111,14 +111,14 @@ extensions:
           ttl_seconds: 300
     trusted_verifiers:
       azure_contoso:
-        schema: arc.runtime-attestation.azure-maa.jwt.v1
+        schema: chio.runtime-attestation.azure-maa.jwt.v1
         verifier: https://maa.contoso.test
         verifier_family: azure_maa
         effective_tier: verified
         max_evidence_age_seconds: 120
         allowed_attestation_types: [sgx]
       google_cvm_prod:
-        schema: arc.runtime-attestation.google-confidential-vm.jwt.v1
+        schema: chio.runtime-attestation.google-confidential-vm.jwt.v1
         verifier: https://confidentialcomputing.googleapis.com
         verifier_family: google_attestation
         effective_tier: verified
@@ -157,7 +157,7 @@ extensions:
 
 - Verifier mismatch:
   normalize the configured verifier URL exactly to the upstream issuer or
-  relying-party string ARC records in `runtimeAttestation.verifier`.
+  relying-party string Chio records in `runtimeAttestation.verifier`.
 - Stale evidence:
   refresh the upstream attestation and resend the governed or issuance request;
   do not extend `max_evidence_age_seconds` just to bypass freshness checks.
@@ -189,17 +189,17 @@ extensions:
 
 ## Qualification Commands
 
-- `cargo test -p arc-core appraisal -- --nocapture`
-- `cargo test -p arc-core trust_bundle -- --nocapture`
-- `cargo test -p arc-core runtime_attestation_trust_policy -- --nocapture`
-- `cargo test -p arc-policy runtime_assurance_validation -- --nocapture`
-- `cargo test -p arc-control-plane azure_maa -- --nocapture`
-- `cargo test -p arc-control-plane aws_nitro -- --nocapture`
-- `cargo test -p arc-control-plane google_confidential_vm -- --nocapture`
-- `cargo test -p arc-control-plane runtime_assurance_policy -- --nocapture`
-- `cargo test -p arc-kernel governed_request_denies_untrusted_attestation_when_trust_policy_is_configured -- --nocapture`
-- `cargo test -p arc-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
-- `cargo test -p arc-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_import_export_surfaces -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`
+- `cargo test -p chio-core appraisal -- --nocapture`
+- `cargo test -p chio-core trust_bundle -- --nocapture`
+- `cargo test -p chio-core runtime_attestation_trust_policy -- --nocapture`
+- `cargo test -p chio-policy runtime_assurance_validation -- --nocapture`
+- `cargo test -p chio-control-plane azure_maa -- --nocapture`
+- `cargo test -p chio-control-plane aws_nitro -- --nocapture`
+- `cargo test -p chio-control-plane google_confidential_vm -- --nocapture`
+- `cargo test -p chio-control-plane runtime_assurance_policy -- --nocapture`
+- `cargo test -p chio-kernel governed_request_denies_untrusted_attestation_when_trust_policy_is_configured -- --nocapture`
+- `cargo test -p chio-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
+- `cargo test -p chio-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_result_import_export_surfaces -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`

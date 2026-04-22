@@ -1,9 +1,9 @@
-# Istio MeshConfig patch: register ARC as an ext_authz provider.
+# Istio MeshConfig patch: register Chio as an ext_authz provider.
 #
 # Istio 1.22+ reads `extensionProviders` from the mesh-wide `MeshConfig`
 # (stored in the `istio` ConfigMap of the Istio install namespace, normally
 # `istio-system`). Once registered, any `AuthorizationPolicy` in the mesh can
-# reference it by name via `spec.provider.name: arc-ext-authz`.
+# reference it by name via `spec.provider.name: chio-ext-authz`.
 #
 # Two install paths are supported:
 #
@@ -28,41 +28,41 @@
 # Verify:
 #
 #   istioctl proxy-config bootstrap -n <namespace> <pod> \
-#     | grep -A3 arc-ext-authz
+#     | grep -A3 chio-ext-authz
 #   kubectl -n istio-system logs deploy/istiod | grep extensionProvider
 #
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 metadata:
-  name: arc-ext-authz-meshconfig
+  name: chio-ext-authz-meshconfig
   namespace: istio-system
 spec:
   # Minimum Istio version. Earlier 1.20/1.21 builds also work for gRPC
   # ext_authz but 1.22 stabilised the typed header forwarding knobs below.
   meshConfig:
     extensionProviders:
-      - name: arc-ext-authz
+      - name: chio-ext-authz
         envoyExtAuthzGrpc:
           # Fully-qualified cluster DNS name of the Service created in
-          # 00-arc-sidecar-deployment.yaml.
-          service: arc-sidecar.arc-system.svc.cluster.local
+          # 00-chio-sidecar-deployment.yaml.
+          service: chio-sidecar.chio-system.svc.cluster.local
           port: 9091
-          # ARC evaluation budget. Increase if your guard pipeline is slow.
+          # Chio evaluation budget. Increase if your guard pipeline is slow.
           timeout: 0.25s
           # Forward identity + capability headers into the CheckRequest.
-          # `arc-envoy-ext-authz::translate` pulls identity from these names.
+          # `chio-envoy-ext-authz::translate` pulls identity from these names.
           includeRequestHeadersInCheck:
             - authorization
-            - x-arc-capability-token
-            - x-arc-session-id
+            - x-chio-capability-token
+            - x-chio-session-id
             - x-request-id
-          # ARC never stores or forwards raw request bodies, but small
+          # Chio never stores or forwards raw request bodies, but small
           # bodies must be available for guards that inspect content.
           includeAdditionalHeadersInCheck:
-            x-arc-source: istio-mesh
-          # Status propagated back to the client on ARC failure. See
+            x-chio-source: istio-mesh
+          # Status propagated back to the client on Chio failure. See
           # docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md section 11.3.
           statusOnError: "403"
-          # Inject the Envoy downstream peer certificate so ARC can derive a
+          # Inject the Envoy downstream peer certificate so Chio can derive a
           # SPIFFE-style CallerIdentity from the mTLS handshake.
           includePeerCertificate: true

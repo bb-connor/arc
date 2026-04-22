@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Provider executor: bounded operation runner.
 
-Uses arc_asgi middleware for ARC-governed request evaluation. The receipt
+Uses chio_asgi middleware for Chio-governed request evaluation. The receipt
 from each incoming request is included in the execution response so the
 full evidence chain is traceable.
 
 Application-level checks (revocation, expiry, attenuation, budget) run
-before the tool call. Tool calls go through arc mcp serve-http where
-the ARC kernel evaluates guards and signs receipts.
+before the tool call. Tool calls go through chio mcp serve-http where
+the Chio kernel evaluates guards and signs receipts.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 
-from incident_network.arc import ArcMcpClient, StdioMcpClient, TrustControl
+from incident_network.chio import ChioMcpClient, StdioMcpClient, TrustControl
 from incident_network.capabilities import intent_hash, verify_approval
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +41,7 @@ class ExecuteRequest(BaseModel):
     approval_required: bool = False
     approval_token: dict | None = None
     provider_ops_mcp_url: str | None = None
-    arc_auth_token: str | None = None
+    chio_auth_token: str | None = None
 
 
 def _find_grant(cap: dict, server_id: str, tool: str) -> dict | None:
@@ -71,9 +71,9 @@ def _constraint_val(cap: dict, server_id: str, tool: str, key: str) -> str | Non
 
 
 def create_app() -> FastAPI:
-    # The executor does its own ARC validation (capability checks, revocation,
-    # budget, attenuation) and calls tools through arc mcp serve-http.
-    # No arc_asgi middleware needed -- ARC governance is explicit in the handler.
+    # The executor does its own Chio validation (capability checks, revocation,
+    # budget, attenuation) and calls tools through chio mcp serve-http.
+    # No chio_asgi middleware needed -- Chio governance is explicit in the handler.
     app = FastAPI(title="incident-network-provider-executor")
 
     @app.get("/health")
@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
 
     @app.post("/execute")
     def execute(payload: ExecuteRequest, request: Request) -> dict:
-        receipt = getattr(request.state, "arc_receipt", None)
+        receipt = getattr(request.state, "chio_receipt", None)
         cap = payload.capability
         svc = payload.requested_service or payload.task["target_service"]
         rule = payload.requested_rule or payload.task["target_rule"]
@@ -149,9 +149,9 @@ def create_app() -> FastAPI:
                         "executor_capability_id": cap["id"], "budget": budget,
                         "requested_service": svc, "requested_rule": rule}
 
-        # Execute tool through ARC MCP
+        # Execute tool through Chio MCP
         if payload.provider_ops_mcp_url:
-            with ArcMcpClient(payload.provider_ops_mcp_url, auth_token=payload.arc_auth_token) as c:
+            with ChioMcpClient(payload.provider_ops_mcp_url, auth_token=payload.chio_auth_token) as c:
                 operation = c.call_tool("disable_edge_rule", {"service": svc, "rule_name": rule})
         else:
             with StdioMcpClient(str(PROVIDER_OPS_SERVER)) as c:
@@ -163,8 +163,8 @@ def create_app() -> FastAPI:
             "executor_capability_id": cap["id"], "request_id": req_id,
             "requested_service": svc, "requested_rule": rule,
             "approval_token_id": payload.approval_token.get("id") if payload.approval_token else None,
-            "arc_mediated": payload.provider_ops_mcp_url is not None,
-            "arc_receipt_id": receipt.id if receipt else None,
+            "chio_mediated": payload.provider_ops_mcp_url is not None,
+            "chio_receipt_id": receipt.id if receipt else None,
             "provider_operation": operation,
         }
 

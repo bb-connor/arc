@@ -1,7 +1,7 @@
 # Identity Federation Guide
 
-ARC now ships the next identity-federation alpha for bearer-authenticated
-`arc mcp serve-http` deployments, including both JWT verification and opaque
+Chio now ships the next identity-federation alpha for bearer-authenticated
+`chio mcp serve-http` deployments, including both JWT verification and opaque
 bearer admission via token introspection.
 
 ## What It Does
@@ -13,7 +13,7 @@ bearer admission via token introspection.
   - `oidc:<issuer>#oid:<oid>` for user principals when `--auth-jwt-provider-profile azure-ad`
     is configured
   - falls back to `azp` / `appid` / `client_id` for client principals on that profile
-- Derives a stable ARC subject key from that federated principal when
+- Derives a stable Chio subject key from that federated principal when
   `--identity-federation-seed-file` is configured.
 - Issues default session capabilities against that stable subject instead of a
   random per-session subject.
@@ -34,21 +34,21 @@ bearer admission via token introspection.
   confidential-client authentication to the introspection endpoint.
 
 This means repeated sessions for the same enterprise principal converge on the
-same ARC subject and therefore the same receipt attribution path.
+same Chio subject and therefore the same receipt attribution path.
 
 ## CLI
 
-Use `arc mcp serve-http` with explicit JWT admission:
+Use `chio mcp serve-http` with explicit JWT admission:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-jwt-public-key <ed25519-public-key-hex> \
   --auth-jwt-issuer https://issuer.example \
-  --auth-jwt-audience arc-mcp \
+  --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -57,14 +57,14 @@ arc mcp serve-http \
 Or use OIDC discovery plus provider-aware mapping:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-jwt-discovery-url https://id.example.com/tenant/v2.0/.well-known/openid-configuration \
   --auth-jwt-provider-profile azure-ad \
-  --auth-jwt-audience arc-mcp \
+  --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -73,16 +73,16 @@ arc mcp serve-http \
 Or use OAuth2 token introspection for opaque bearer tokens:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-introspection-url https://id.example.com/oauth2/introspect \
-  --auth-introspection-client-id arc-edge \
-  --auth-introspection-client-secret "$ARC_EDGE_SECRET" \
+  --auth-introspection-client-id chio-edge \
+  --auth-introspection-client-secret "$CHIO_EDGE_SECRET" \
   --auth-jwt-issuer https://id.example.com/oauth2/default \
-  --auth-jwt-audience arc-mcp \
+  --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -91,7 +91,7 @@ arc mcp serve-http \
 To share an explicit provider-admin registry with the edge and trust-control:
 
 ```bash
-arc mcp serve-http \
+chio mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --listen 127.0.0.1:8931 \
@@ -101,7 +101,7 @@ arc mcp serve-http \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
 
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json
@@ -111,7 +111,7 @@ The same trust-control process can also host portable-trust discovery surfaces
 that depend on explicit operator identity:
 
 ```bash
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json \
@@ -126,30 +126,30 @@ registries become global trust roots.
 
 ## Conservative Cross-Org Reputation Distribution
 
-ARC now also exposes imported reputation as a conservative operator-visible
+Chio now also exposes imported reputation as a conservative operator-visible
 signal instead of folding remote evidence into local receipt truth.
 
 The supported flow is:
 
 1. one operator exports a bilateral evidence package with an attached
    federation policy
-2. the receiving operator imports that package with `arc evidence import`
+2. the receiving operator imports that package with `chio evidence import`
 3. local inspection and comparison surfaces report imported trust separately
    from native local reputation
 
 That separation is deliberate. Imported evidence does not rewrite the local
-receipt log, local budget history, or the native `scorecard` that ARC uses for
+receipt log, local budget history, or the native `scorecard` that Chio uses for
 local truth.
 
 Use the local CLI surfaces to inspect imported trust:
 
 ```bash
-arc --receipt-db receipts.sqlite3 evidence import --input ./upstream-package
+chio --receipt-db receipts.sqlite3 evidence import --input ./upstream-package
 
-arc --json --receipt-db receipts.sqlite3 reputation local \
+chio --json --receipt-db receipts.sqlite3 reputation local \
   --subject-public-key <agent-ed25519-hex>
 
-arc --json --receipt-db receipts.sqlite3 reputation compare \
+chio --json --receipt-db receipts.sqlite3 reputation compare \
   --subject-public-key <agent-ed25519-hex> \
   --passport passport.json
 ```
@@ -176,12 +176,12 @@ The default guardrails are intentionally conservative:
 - stale imported signals expire out of consideration
 - imported scores are attenuated instead of treated as native confidence
 
-This means ARC can surface cross-org reputation without implying a universal
+This means Chio can surface cross-org reputation without implying a universal
 portable score or a hidden trust merge.
 
 ## Provider-Admin Registry
 
-ARC now ships a file-backed provider-admin registry for enterprise federation.
+Chio now ships a file-backed provider-admin registry for enterprise federation.
 Each provider record is an explicit `oidc_jwks`, `oauth_introspection`,
 `scim`, or `saml` source with:
 
@@ -194,10 +194,10 @@ Each provider record is an explicit `oidc_jwks`, `oauth_introspection`,
 CLI surface:
 
 ```text
-arc trust provider list
-arc trust provider get --provider-id <id>
-arc trust provider upsert --input provider.json
-arc trust provider delete --provider-id <id>
+chio trust provider list
+chio trust provider get --provider-id <id>
+chio trust provider upsert --input provider.json
+chio trust provider delete --provider-id <id>
 ```
 
 HTTP surface on trust-control:
@@ -215,12 +215,12 @@ configs without guessing from logs.
 
 ## SCIM Lifecycle Automation
 
-When `arc trust serve` is started with both `--enterprise-providers-file` and
+When `chio trust serve` is started with both `--enterprise-providers-file` and
 `--scim-lifecycle-file`, trust-control exposes a bounded SCIM lifecycle
 surface for validated `scim` provider-admin records:
 
 ```bash
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json \
@@ -237,18 +237,18 @@ POST   /scim/v2/Users
 DELETE /scim/v2/Users/{id}
 ```
 
-The `POST /scim/v2/Users` body must include the core SCIM user schema plus ARC's
+The `POST /scim/v2/Users` body must include the core SCIM user schema plus Chio's
 SCIM extension identifying the validated `providerId`. Trust-control validates
-that provider against the shared provider-admin registry, derives the ARC
+that provider against the shared provider-admin registry, derives the Chio
 enterprise identity context, persists the provisioned user in the operator-owned
-SCIM lifecycle registry, and returns a SCIM user resource annotated with ARC
+SCIM lifecycle registry, and returns a SCIM user resource annotated with Chio
 identity metadata.
 
 `DELETE /scim/v2/Users/{id}` marks the stored SCIM identity inactive, revokes
 every tracked capability issued through the SCIM-governed federated-issue lane,
 and appends a signed deprovisioning receipt into the canonical receipt store.
 
-When the SCIM lifecycle registry is configured, `arc trust federated-issue`
+When the SCIM lifecycle registry is configured, `chio trust federated-issue`
 also changes behavior for validated `scim` providers: issuance requires a
 matching active SCIM identity, successful issuance binds the new capability ID
 back to that identity, and later issuance fails closed after deprovisioning.
@@ -258,8 +258,8 @@ Health output now reports SCIM lifecycle storage availability and counts under
 
 ## Operational Behavior
 
-- Same federated principal + same seed file => same derived ARC subject key.
-- Different federated principal + same seed file => different derived ARC
+- Same federated principal + same seed file => same derived Chio subject key.
+- Different federated principal + same seed file => different derived Chio
   subject key.
 - OIDC discovery and discovered `jwks_uri` must use `https`, or localhost-only
   `http` during local testing.
@@ -291,7 +291,7 @@ Portable-trust admission now distinguishes two paths:
 
 - Legacy bearer-only path: bearer admission can still surface
   `enterpriseIdentity` for observability, but if no validated
-  provider-admin record is selected, `arc trust federated-issue` preserves
+  provider-admin record is selected, `chio trust federated-issue` preserves
   the legacy bearer admission behavior.
 - Enterprise-provider lane: this is active only when
   `enterpriseIdentity.providerRecordId` resolves to a validated provider-admin
@@ -311,10 +311,10 @@ When the enterprise-provider lane is active, allow responses expose
 - matched origin profile and decision reason
 
 Portable-trust issuance can now also project verified enterprise identity into
-passport artifacts. `arc passport create --enterprise-identity <file>` embeds
+passport artifacts. `chio passport create --enterprise-identity <file>` embeds
 typed `enterpriseIdentityProvenance` into the signed credential plus the
-passport bundle, `arc passport verify` / `evaluate` / `challenge verify`
-surface the same provenance back out, and `arc trust federated-issue`
+passport bundle, `chio passport verify` / `evaluate` / `challenge verify`
+surface the same provenance back out, and `chio trust federated-issue`
 includes a typed `enterpriseIdentityProvenance` object alongside the
 enterprise audit when enterprise context participates in admission.
 
@@ -351,7 +351,7 @@ operator can see which provider, organization, group, or role inputs failed.
   trust-control reputation views, but those signals remain evidence-backed,
   issuer-scoped, attenuated, and separate from native local score history.
 - Multi-issuer passport composition and evaluation support now ships
-  (see `arc-credentials/src/cross_issuer.rs` for `CrossIssuerPortfolio`
+  (see `chio-credentials/src/cross_issuer.rs` for `CrossIssuerPortfolio`
   and `CrossIssuerEvaluator`). Automatic local bundle authoring (where
   the system assembles multi-issuer bundles without operator input)
   remains future work.

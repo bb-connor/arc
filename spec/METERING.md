@@ -1,11 +1,11 @@
-# ARC Metering
+# Chio Metering
 
 **Version:** 1.0
 **Date:** 2026-04-14
 **Status:** Normative
 
 This specification defines the receipt metering and cost attribution system
-for ARC runtimes. Implementations MUST support the cost dimensions, budget
+for Chio runtimes. Implementations MUST support the cost dimensions, budget
 enforcement semantics, billing export formats, and query interface described
 herein.
 
@@ -13,7 +13,7 @@ herein.
 
 ## 1. Purpose
 
-ARC metering provides per-receipt cost attribution, cumulative budget
+Chio metering provides per-receipt cost attribution, cumulative budget
 enforcement, billing-compatible export, and operator query tools. Every tool
 invocation can carry cost metadata describing the resources consumed:
 compute time, data volume, monetary API cost, and custom dimensions.
@@ -51,7 +51,7 @@ metadata field under the `"cost"` key.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `schema` | string | Yes | MUST be `"arc.cost-metadata.v1"` |
+| `schema` | string | Yes | MUST be `"chio.cost-metadata.v1"` |
 | `receipt_id` | string | Yes | Receipt ID this cost belongs to |
 | `timestamp` | u64 | Yes | Unix timestamp (seconds) of the receipt |
 | `session_id` | string | No | Session that produced this receipt |
@@ -134,14 +134,14 @@ before invocation.
 
 ## 4. Billing Export
 
-Billing export transforms ARC cost metadata into flat, denormalized records
+Billing export transforms Chio cost metadata into flat, denormalized records
 suitable for ingestion by external billing systems.
 
 ### 4.1 BillingRecord
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema` | string | MUST be `"arc.billing-export.v1"` |
+| `schema` | string | MUST be `"chio.billing-export.v1"` |
 | `receipt_id` | string | Receipt ID |
 | `timestamp` | u64 | Unix timestamp (seconds) |
 | `timestamp_iso` | string | ISO 8601 timestamp in UTC (e.g., `"2023-11-14T22:13:20Z"`) |
@@ -165,7 +165,7 @@ A batch of billing records.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema` | string | MUST be `"arc.billing-export.v1"` |
+| `schema` | string | MUST be `"chio.billing-export.v1"` |
 | `exported_at` | u64 | Unix timestamp when the export was created |
 | `record_count` | u64 | Total number of records in this export |
 | `total_cost` | MonetaryAmount | Aggregate cost (null if mixed currencies) |

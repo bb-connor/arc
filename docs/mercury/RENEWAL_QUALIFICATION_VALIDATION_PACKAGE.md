@@ -11,7 +11,7 @@
 bounded Mercury renewal-qualification lane. It generates the outcome-review
 bundle, writes the validation report, and emits one explicit proceed decision
 instead of implying a generic customer-success suite, CRM workflow,
-account-management platform, channel marketplace, merged shell, or ARC
+account-management platform, channel marketplace, merged shell, or Chio
 commercial surface.
 
 ---
@@ -19,7 +19,7 @@ commercial surface.
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- renewal-qualification validate --output target/mercury-renewal-qualification-validation
+cargo run -p chio-mercury -- renewal-qualification validate --output target/mercury-renewal-qualification-validation
 ```
 
 ---
@@ -74,7 +74,7 @@ This package supports one bounded claim only:
 > expansion-boundary handoff rooted in the validated delivery-continuity,
 > selective-account-activation, broader-distribution, reference-distribution,
 > controlled-adoption, release-readiness, trust-network, assurance, proof,
-> and inquiry stack without widening ARC or creating a generic customer
+> and inquiry stack without widening Chio or creating a generic customer
 > platform.
 
 ---
@@ -87,5 +87,5 @@ This package does not claim:
 - a generic customer-success suite, CRM workflow, or account-management
   platform
 - channel marketplaces or multi-account renewal programs
-- a merged Mercury and ARC-Wall shell
+- a merged Mercury and Chio-Wall shell
 - universal renewal readiness or broad business-performance guarantees

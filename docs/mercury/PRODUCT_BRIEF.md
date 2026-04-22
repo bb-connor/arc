@@ -7,8 +7,8 @@
 
 ## 1. What MERCURY Is
 
-MERCURY is the first finance-specific product layer built on ARC. It packages
-ARC's rights-and-receipts substrate into a review-grade evidence platform for
+MERCURY is the first finance-specific product layer built on Chio. It packages
+Chio's rights-and-receipts substrate into a review-grade evidence platform for
 governed AI trading workflows.
 
 MERCURY produces signed, tamper-evident evidence records that bind a workflow
@@ -212,7 +212,7 @@ MERCURY supports three deployment patterns.
 |------|-------------|----------------|
 | Shadow / replay | Generate evidence from replayed, synthetic, or paper-trading workflow events | Core release path |
 | Supervised live workflow | Capture evidence for a production workflow while keeping existing execution systems in place | Supported after pilot validation |
-| Mediated in-line control | Put ARC directly in the live authorization path for selected actions | Expansion path |
+| Mediated in-line control | Put Chio directly in the live authorization path for selected actions | Expansion path |
 
 The first product release centers on change-review, release, rollback, and
 inquiry evidence in the first mode, with a path to supervised-live production
@@ -252,7 +252,7 @@ After initial deployment, MERCURY can expand into:
 - downstream review, archive, surveillance, and case-management connectors
 - assurance workflows for clients, allocators, auditors, and regulators
 - embedded OEM distribution, trust-network services, and companion products
-  such as ARC-Wall
+  such as Chio-Wall
 
 ---
 
@@ -273,9 +273,9 @@ evidence substrate they currently lack."
 
 ---
 
-## 9. Why ARC Matters
+## 9. Why Chio Matters
 
-MERCURY is viable because ARC already provides:
+MERCURY is viable because Chio already provides:
 
 - receipt structures
 - capability and delegation primitives
@@ -307,7 +307,7 @@ The product program is staged intentionally.
 4. **Embedded distribution and companion products**
    - OEM or embedded evidence distribution
    - trust-network services
-   - ARC-Wall
+   - Chio-Wall
 
 This progression keeps the first release commercially useful and technically
 credible while preserving expansion options.
@@ -317,9 +317,9 @@ credible while preserving expansion options.
 ## Summary
 
 MERCURY is not a generic AI governance product and it is not a trading system.
-It is the first finance-specific commercialization of ARC's rights-and-receipts
+It is the first finance-specific commercialization of Chio's rights-and-receipts
 substrate: signed, reconstructable, portable, and verifiable evidence for
 governed AI trading workflows. The sharpest first use case is change control,
 release attestation, and inquiry packaging, which then opens the path to
 supervised-live deployment, governance, downstream distribution, and broader
-ARC product expansion.
+Chio product expansion.

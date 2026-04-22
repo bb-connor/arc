@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import http from "node:http";
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
-import { arc } from "../src/index.js";
-import type { EvaluateResponse } from "@arc-protocol/node-http";
+import { chio } from "../src/index.js";
+import type { EvaluateResponse } from "@chio-protocol/node-http";
 
 function allowResponse(): EvaluateResponse {
   return {
@@ -31,7 +31,7 @@ async function startMockSidecar(
   onEvaluate?: (requestBody: string) => void,
 ): Promise<{ server: http.Server; url: string }> {
   const server = http.createServer((req, res) => {
-    if (req.method === "POST" && req.url === "/arc/evaluate") {
+    if (req.method === "POST" && req.url === "/chio/evaluate") {
       const chunks: Buffer[] = [];
       req.on("data", (chunk: Buffer) => chunks.push(chunk));
       req.on("end", () => {
@@ -58,14 +58,14 @@ async function startMockSidecar(
   };
 }
 
-describe("arc fastify plugin", () => {
-  it("exports arc as a function", () => {
-    expect(typeof arc).toBe("function");
+describe("chio fastify plugin", () => {
+  it("exports chio as a function", () => {
+    expect(typeof chio).toBe("function");
   });
 
   it("registers without error", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1",
       skip: ["/health"],
     });
@@ -79,9 +79,9 @@ describe("arc fastify plugin", () => {
     await fastify.close();
   });
 
-  it("skipped routes bypass ARC evaluation", async () => {
+  it("skipped routes bypass Chio evaluation", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       skip: ["/health"],
     });
@@ -103,8 +103,8 @@ describe("arc fastify plugin", () => {
   it("denies requests when sidecar is unreachable (fail-closed)", async () => {
     const fastify = Fastify();
 
-    // Register ARC plugin
-    await fastify.register(arc, {
+    // Register Chio plugin
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       timeoutMs: 1000,
     });
@@ -124,13 +124,13 @@ describe("arc fastify plugin", () => {
     // the plugin should return 502.
     expect(response.statusCode).toBe(502);
     const body = JSON.parse(response.body);
-    expect(body.error).toBe("arc_sidecar_unreachable");
+    expect(body.error).toBe("chio_sidecar_unreachable");
     await fastify.close();
   });
 
   it("allows requests when onSidecarError is allow", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       onSidecarError: "allow",
       timeoutMs: 500,
@@ -152,7 +152,7 @@ describe("arc fastify plugin", () => {
 
   it("skip patterns with regex work", async () => {
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: "http://127.0.0.1:1", // Unreachable
       skip: [/^\/internal\//],
     });
@@ -180,7 +180,7 @@ describe("arc fastify plugin", () => {
     });
 
     const fastify = Fastify();
-    await fastify.register(arc, {
+    await fastify.register(chio, {
       sidecarUrl: sidecar.url,
     });
 

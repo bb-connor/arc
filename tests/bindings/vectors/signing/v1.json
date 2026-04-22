@@ -1,5 +1,5 @@
 {
-  "generated_by": "arc-bindings-core",
+  "generated_by": "chio-bindings-core",
   "json_cases": [
     {
       "canonical_json": "{\"a\":2,\"z\":1}",
@@ -26,17 +26,17 @@
       "description": "A UTF-8 message signs and verifies with a deterministic Ed25519 seed.",
       "expected_verify": true,
       "id": "valid_utf8_message",
-      "input_utf8": "hello arc",
+      "input_utf8": "hello chio",
       "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
-      "signature_hex": "8c98b751376b54c34d5f3d330c3b86354af7b79ef4cc8e9ebc94b994d8bcf75dc588bab764a2d488d61a6b7882825a9001af4a18f875769986270899cf1efb03"
+      "signature_hex": "4b134ccad3c684ef462bf085ea2e87c416557980e01da869703d18016f3811a0f0310f38075e2019480f8c1abc06c7d823ef1776eb95687785e5eacdbe57250c"
     },
     {
       "description": "The same signature fails if the UTF-8 message bytes change.",
       "expected_verify": false,
       "id": "tampered_utf8_message",
-      "input_utf8": "hello arc!",
+      "input_utf8": "hello chio!",
       "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
-      "signature_hex": "8c98b751376b54c34d5f3d330c3b86354af7b79ef4cc8e9ebc94b994d8bcf75dc588bab764a2d488d61a6b7882825a9001af4a18f875769986270899cf1efb03"
+      "signature_hex": "4b134ccad3c684ef462bf085ea2e87c416557980e01da869703d18016f3811a0f0310f38075e2019480f8c1abc06c7d823ef1776eb95687785e5eacdbe57250c"
     }
   ],
   "version": 1

@@ -2,7 +2,7 @@
   {
     "scenarioId": "initialize",
     "peer": "js",
-    "peerRole": "client_to_arc_server",
+    "peerRole": "client_to_chio_server",
     "deploymentMode": "wrapped_stdio",
     "transport": "stdio",
     "specVersion": "2025-11-25",
@@ -19,7 +19,7 @@
   {
     "scenarioId": "tools-list",
     "peer": "js",
-    "peerRole": "client_to_arc_server",
+    "peerRole": "client_to_chio_server",
     "deploymentMode": "wrapped_stdio",
     "transport": "stdio",
     "specVersion": "2025-11-25",
@@ -33,7 +33,7 @@
   {
     "scenarioId": "tools-call-simple-text",
     "peer": "python",
-    "peerRole": "client_to_arc_server",
+    "peerRole": "client_to_chio_server",
     "deploymentMode": "remote_http",
     "transport": "streamable-http",
     "specVersion": "2025-11-25",
@@ -47,7 +47,7 @@
   {
     "scenarioId": "resources-list",
     "peer": "python",
-    "peerRole": "client_to_arc_server",
+    "peerRole": "client_to_chio_server",
     "deploymentMode": "remote_http",
     "transport": "streamable-http",
     "specVersion": "2025-11-25",
@@ -59,7 +59,7 @@
   {
     "scenarioId": "prompts-list",
     "peer": "js",
-    "peerRole": "arc_client_to_server",
+    "peerRole": "client_to_chio_server",
     "deploymentMode": "wrapped_stdio",
     "transport": "stdio",
     "specVersion": "2025-11-25",
@@ -78,12 +78,12 @@
   },
   {
     "scenarioId": "deny-receipt-emitted",
-    "peer": "arc-self",
-    "peerRole": "client_to_arc_server",
+    "peer": "chio-self",
+    "peerRole": "client_to_chio_server",
     "deploymentMode": "wrapped_stdio",
     "transport": "stdio",
     "specVersion": "2026-03-19",
-    "category": "arc-extension",
+    "category": "chio-extension",
     "status": "pass",
     "durationMs": 18,
     "assertions": [

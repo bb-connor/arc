@@ -1,11 +1,11 @@
-# ARC Go SDK Reference
+# Chio Go SDK Reference
 
-This document covers the `arc-go-http` package, which provides HTTP middleware for the ARC protocol in Go. It wraps any `http.Handler` with capability validation and receipt signing via the ARC sidecar.
+This document covers the `chio-go-http` package, which provides HTTP middleware for the Chio protocol in Go. It wraps any `http.Handler` with capability validation and receipt signing via the Chio sidecar.
 
 ## Quick Start
 
 ```bash
-go get github.com/backbay-labs/arc/sdks/go/arc-go-http
+go get github.com/backbay/chio/sdks/go/chio-go-http
 ```
 
 ```go
@@ -14,14 +14,14 @@ package main
 import (
 	"net/http"
 
-	arc "github.com/backbay-labs/arc/sdks/go/arc-go-http"
+	chio "github.com/backbay/chio/sdks/go/chio-go-http"
 )
 
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pets", handlePets)
 
-	protected := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+	protected := chio.Protect(mux, chio.ConfigFile("chio.yaml"))
 	http.ListenAndServe(":8080", protected)
 }
 
@@ -33,34 +33,34 @@ func handlePets(w http.ResponseWriter, r *http.Request) {
 
 ## Sidecar Communication Model
 
-The Go SDK communicates with the ARC Rust kernel through localhost HTTP. The kernel runs as a sidecar process alongside your application.
+The Go SDK communicates with the Chio Rust kernel through localhost HTTP. The kernel runs as a sidecar process alongside your application.
 
 - **Default URL**: `http://127.0.0.1:9090`
-- **Configurable via**: `ARC_SIDECAR_URL` environment variable or `WithSidecarURL()` option
+- **Configurable via**: `CHIO_SIDECAR_URL` environment variable or `WithSidecarURL()` option
 - **No native compilation or FFI**: pure Go over HTTP using `net/http`
 - **Fail-closed by default**: when the sidecar is unreachable, requests are denied with a 502 response. Use `WithOnSidecarError("allow")` to change this.
 
 ---
 
-## arc.Protect
+## chio.Protect
 
-`Protect` wraps any `http.Handler` with ARC capability validation. All requests are evaluated against the sidecar before being forwarded to the inner handler.
+`Protect` wraps any `http.Handler` with Chio capability validation. All requests are evaluated against the sidecar before being forwarded to the inner handler.
 
 ```go
 func Protect(handler http.Handler, opts ...Option) http.Handler
 ```
 
-Allowed requests proceed with an `X-Arc-Receipt-Id` response header. Denied requests receive a structured JSON error response.
+Allowed requests proceed with an `X-Chio-Receipt-Id` response header. Denied requests receive a structured JSON error response.
 Fail-open passthroughs proceed without that header and expose an explicit
-`ArcPassthrough` marker on the request context.
+`ChioPassthrough` marker on the request context.
 
 ### Request Flow
 
 1. Normalize and validate the HTTP method
 2. Extract caller identity from request headers
 3. Resolve the route pattern
-4. Build an `ArcHTTPRequest` (with body hash, query params, headers)
-5. POST to `{sidecarURL}/arc/evaluate`
+4. Build an `ChioHTTPRequest` (with body hash, query params, headers)
+5. POST to `{sidecarURL}/chio/evaluate`
 6. On allow: forward to inner handler with receipt header
 7. On deny: return JSON error with receipt ID and suggestion
 
@@ -71,13 +71,13 @@ Fail-open passthroughs proceed without that header and expose an explicit
 Pass options as variadic arguments to `Protect`:
 
 ```go
-protected := arc.Protect(handler,
-	arc.ConfigFile("arc.yaml"),
-	arc.WithSidecarURL("http://127.0.0.1:9090"),
-	arc.WithTimeout(10),
-	arc.WithOnSidecarError("deny"),
-	arc.WithIdentityExtractor(myExtractor),
-	arc.WithRouteResolver(myResolver),
+protected := chio.Protect(handler,
+	chio.ConfigFile("chio.yaml"),
+	chio.WithSidecarURL("http://127.0.0.1:9090"),
+	chio.WithTimeout(10),
+	chio.WithOnSidecarError("deny"),
+	chio.WithIdentityExtractor(myExtractor),
+	chio.WithRouteResolver(myResolver),
 )
 ```
 
@@ -85,18 +85,18 @@ protected := arc.Protect(handler,
 
 **`ConfigFile(path string)`**
 
-Set the path to the `arc.yaml` configuration file. The sidecar reads route patterns and policies from this file.
+Set the path to the `chio.yaml` configuration file. The sidecar reads route patterns and policies from this file.
 
 ```go
-arc.ConfigFile("arc.yaml")
+chio.ConfigFile("chio.yaml")
 ```
 
 **`WithSidecarURL(url string)`**
 
-Override the sidecar base URL. By default, reads from the `ARC_SIDECAR_URL` environment variable, falling back to `http://127.0.0.1:9090`.
+Override the sidecar base URL. By default, reads from the `CHIO_SIDECAR_URL` environment variable, falling back to `http://127.0.0.1:9090`.
 
 ```go
-arc.WithSidecarURL("http://localhost:9090")
+chio.WithSidecarURL("http://localhost:9090")
 ```
 
 **`WithTimeout(seconds int)`**
@@ -104,7 +104,7 @@ arc.WithSidecarURL("http://localhost:9090")
 Set the HTTP timeout for sidecar calls in seconds. Default: 5.
 
 ```go
-arc.WithTimeout(10)
+chio.WithTimeout(10)
 ```
 
 **`WithOnSidecarError(behavior string)`**
@@ -114,18 +114,18 @@ Control behavior when the sidecar is unreachable.
 | Value | Behavior |
 |-------|----------|
 | `"deny"` | Fail-closed (default). Return 502 error. |
-| `"allow"` | Fail-open. Forward request to inner handler without attaching an ARC receipt header. |
+| `"allow"` | Fail-open. Forward request to inner handler without attaching an Chio receipt header. |
 
 ```go
-arc.WithOnSidecarError("allow")  // fail-open
+chio.WithOnSidecarError("allow")  // fail-open
 ```
 
 Retrieve the explicit degraded-state marker inside a handler:
 
 ```go
 func handler(w http.ResponseWriter, r *http.Request) {
-	if passthrough, ok := arc.GetArcPassthrough(r); ok {
-		log.Printf("ARC passthrough: %s (%s)", passthrough.Mode, passthrough.Error)
+	if passthrough, ok := chio.GetChioPassthrough(r); ok {
+		log.Printf("Chio passthrough: %s (%s)", passthrough.Mode, passthrough.Error)
 	}
 }
 ```
@@ -140,11 +140,11 @@ Provide a custom identity extraction function. The default extractor (`DefaultId
 4. Falls back to anonymous
 
 ```go
-arc.WithIdentityExtractor(func(r *http.Request) arc.CallerIdentity {
+chio.WithIdentityExtractor(func(r *http.Request) chio.CallerIdentity {
 	// Custom extraction logic
-	return arc.CallerIdentity{
+	return chio.CallerIdentity{
 		Subject: "custom-subject",
-		AuthMethod: arc.AuthMethod{
+		AuthMethod: chio.AuthMethod{
 			Method:    "bearer",
 			TokenHash: "sha256hex...",
 		},
@@ -160,7 +160,7 @@ Map a raw request path to a route pattern. This is important for frameworks that
 The default resolver returns the raw path.
 
 ```go
-arc.WithRouteResolver(func(method, path string) string {
+chio.WithRouteResolver(func(method, path string) string {
 	// Use your router's pattern matching
 	return path
 })
@@ -185,7 +185,7 @@ type CallerIdentity struct {
 **Helper:**
 
 ```go
-anon := arc.AnonymousIdentity()
+anon := chio.AnonymousIdentity()
 ```
 
 ### AuthMethod
@@ -221,7 +221,7 @@ v.IsDenied() bool
 
 ### HTTPReceipt
 
-Signed proof that an HTTP request was evaluated by ARC.
+Signed proof that an HTTP request was evaluated by Chio.
 
 ```go
 type HTTPReceipt struct {
@@ -233,7 +233,7 @@ type HTTPReceipt struct {
 	SessionID          string          `json:"session_id,omitempty"`
 	Verdict            Verdict         `json:"verdict"`
 	Evidence           []GuardEvidence `json:"evidence,omitempty"`
-	ResponseStatus     int             `json:"response_status"` // ARC evaluation-time HTTP status; allow receipts may be signed before downstream response completion.
+	ResponseStatus     int             `json:"response_status"` // Chio evaluation-time HTTP status; allow receipts may be signed before downstream response completion.
 	Timestamp          int64           `json:"timestamp"`
 	ContentHash        string          `json:"content_hash"`
 	PolicyHash         string          `json:"policy_hash"`
@@ -281,11 +281,11 @@ type ErrorResponse struct {
 
 ```go
 const (
-	ErrAccessDenied       = "arc_access_denied"
-	ErrSidecarUnreachable = "arc_sidecar_unreachable"
-	ErrEvaluationFailed   = "arc_evaluation_failed"
-	ErrInvalidReceipt     = "arc_invalid_receipt"
-	ErrTimeout            = "arc_timeout"
+	ErrAccessDenied       = "chio_access_denied"
+	ErrSidecarUnreachable = "chio_sidecar_unreachable"
+	ErrEvaluationFailed   = "chio_evaluation_failed"
+	ErrInvalidReceipt     = "chio_invalid_receipt"
+	ErrTimeout            = "chio_timeout"
 )
 ```
 
@@ -296,10 +296,10 @@ const (
 For advanced use cases, you can use the sidecar client directly:
 
 ```go
-client := arc.NewSidecarClient("http://127.0.0.1:9090", 5)
+client := chio.NewSidecarClient("http://127.0.0.1:9090", 5)
 
 // Evaluate a request
-result, err := client.Evaluate(ctx, arcHTTPRequest)
+result, err := client.Evaluate(ctx, chioHTTPRequest)
 if err != nil {
 	// Handle *SidecarError
 }
@@ -315,7 +315,7 @@ ok, err := client.HealthCheck(ctx)
 
 ```go
 type SidecarError struct {
-	Code       string  // e.g., "arc_sidecar_unreachable", "arc_evaluation_failed"
+	Code       string  // e.g., "chio_sidecar_unreachable", "chio_evaluation_failed"
 	Message    string
 	StatusCode int     // HTTP status from sidecar (0 if connection failed)
 }
@@ -330,16 +330,16 @@ type SidecarError struct {
 ```go
 import (
 	"github.com/go-chi/chi/v5"
-	arc "github.com/backbay-labs/arc/sdks/go/arc-go-http"
+	chio "github.com/backbay/chio/sdks/go/chio-go-http"
 )
 
 r := chi.NewRouter()
 r.Get("/pets", handlePets)
 r.Post("/pets", handleCreatePet)
 
-protected := arc.Protect(r,
-	arc.ConfigFile("arc.yaml"),
-	arc.WithRouteResolver(func(method, path string) string {
+protected := chio.Protect(r,
+	chio.ConfigFile("chio.yaml"),
+	chio.WithRouteResolver(func(method, path string) string {
 		// Chi provides route context; extract pattern if needed
 		return path
 	}),
@@ -352,15 +352,15 @@ http.ListenAndServe(":8080", protected)
 ```go
 import (
 	"github.com/gorilla/mux"
-	arc "github.com/backbay-labs/arc/sdks/go/arc-go-http"
+	chio "github.com/backbay/chio/sdks/go/chio-go-http"
 )
 
 r := mux.NewRouter()
 r.HandleFunc("/pets/{petId}", handleGetPet).Methods("GET")
 
-protected := arc.Protect(r,
-	arc.ConfigFile("arc.yaml"),
-	arc.WithRouteResolver(func(method, path string) string {
+protected := chio.Protect(r,
+	chio.ConfigFile("chio.yaml"),
+	chio.WithRouteResolver(func(method, path string) string {
 		return path
 	}),
 )
@@ -374,6 +374,6 @@ mux := http.NewServeMux()
 mux.HandleFunc("GET /pets/{petId}", handleGetPet)
 mux.HandleFunc("POST /pets", handleCreatePet)
 
-protected := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+protected := chio.Protect(mux, chio.ConfigFile("chio.yaml"))
 http.ListenAndServe(":8080", protected)
 ```

@@ -17,7 +17,7 @@ partner-platform strategy.
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- embedded-oem validate --output target/mercury-embedded-oem-validation
+cargo run -p chio-mercury -- embedded-oem validate --output target/mercury-embedded-oem-validation
 ```
 
 ---
@@ -65,4 +65,4 @@ This package does not claim:
 - multi-partner OEM breadth
 - generic SDK parity
 - trust-network interoperability services
-- ARC-Wall readiness
+- Chio-Wall readiness

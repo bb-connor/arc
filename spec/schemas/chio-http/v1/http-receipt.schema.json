@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio HTTP Receipt",
+  "description": "Signed receipt proving that an HTTP request was evaluated by the Chio kernel. The signature covers canonical JSON of all fields except 'signature' itself.",
+  "type": "object",
+  "required": [
+    "id",
+    "request_id",
+    "route_pattern",
+    "method",
+    "caller_identity_hash",
+    "verdict",
+    "response_status",
+    "timestamp",
+    "content_hash",
+    "policy_hash",
+    "kernel_key",
+    "signature"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique receipt ID. UUIDv7 recommended."
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique request ID this receipt covers."
+    },
+    "route_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Matched route pattern (e.g., '/pets/{petId}')."
+    },
+    "method": {
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+      "description": "HTTP method of the evaluated request."
+    },
+    "caller_identity_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex hash of the caller identity."
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "description": "Session ID the request belonged to."
+    },
+    "verdict": {
+      "$ref": "verdict.schema.json",
+      "description": "The kernel's verdict."
+    },
+    "evidence": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["guard_name", "verdict"],
+        "properties": {
+          "guard_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the guard."
+          },
+          "verdict": {
+            "type": "boolean",
+            "description": "Whether the guard passed (true) or denied (false)."
+          },
+          "details": {
+            "type": "string",
+            "description": "Human-readable details about the guard's decision."
+          }
+        }
+      },
+      "description": "Per-guard evidence collected during evaluation."
+    },
+    "response_status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "HTTP status Chio associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete Chio error status; allow receipts may carry evaluation-time status metadata rather than downstream response evidence."
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the receipt was created."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex hash binding the request content to this receipt."
+    },
+    "policy_hash": {
+      "type": "string",
+      "description": "SHA-256 hex hash of the policy that was applied."
+    },
+    "capability_id": {
+      "type": ["string", "null"],
+      "description": "Capability ID that was exercised, if any."
+    },
+    "metadata": {
+      "description": "Optional extensibility metadata."
+    },
+    "kernel_key": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Kernel's Ed25519 public key (32 bytes, hex-encoded)."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$",
+      "description": "Ed25519 signature over canonical JSON of the body fields (64 bytes, hex-encoded)."
+    }
+  }
+}

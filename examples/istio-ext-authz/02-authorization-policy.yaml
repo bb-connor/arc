@@ -1,21 +1,21 @@
-# Route mesh traffic through ARC via Istio's AuthorizationPolicy CUSTOM action.
+# Route mesh traffic through Chio via Istio's AuthorizationPolicy CUSTOM action.
 #
 # The CUSTOM action delegates the allow/deny decision to the named provider
 # registered in MeshConfig (see 01-meshconfig-patch.yaml). This file contains
 # three policies:
 #
-#   1. arc-tool-authorization     -- opts workloads labelled
-#                                    `arc.protocol/secured=true` in the
-#                                    `agent-tools` namespace into ARC
+#   1. chio-tool-authorization     -- opts workloads labelled
+#                                    `chio.protocol/secured=true` in the
+#                                    `agent-tools` namespace into Chio
 #                                    evaluation, with a header-driven filter
 #                                    so only capability-bearing requests pay
 #                                    the ext_authz latency.
-#   2. arc-deny-unauthenticated   -- fail-closed backstop: anonymous requests
+#   2. chio-deny-unauthenticated   -- fail-closed backstop: anonymous requests
 #                                    that slip past the CUSTOM match above
 #                                    are denied outright. Ensures there is
 #                                    no bypass path when the capability
 #                                    header is missing.
-#   3. arc-allow-health-probes    -- excludes kubelet probe traffic so the
+#   3. chio-allow-health-probes    -- excludes kubelet probe traffic so the
 #                                    demo workload's `/healthz` path stays
 #                                    reachable without a capability token.
 #
@@ -26,30 +26,30 @@
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: arc-tool-authorization
+  name: chio-tool-authorization
   namespace: agent-tools
   labels:
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   # Apply only to workloads that opted in by labelling themselves.
   selector:
     matchLabels:
-      arc.protocol/secured: "true"
+      chio.protocol/secured: "true"
   action: CUSTOM
   provider:
-    name: arc-ext-authz
+    name: chio-ext-authz
   rules:
-    # Allow-rule #1: route POSTs to /tools/* through ARC when either an
-    # ARC capability token header or a Bearer Authorization header is
+    # Allow-rule #1: route POSTs to /tools/* through Chio when either an
+    # Chio capability token header or a Bearer Authorization header is
     # present. This is the hot path for agent tool invocation.
     - to:
         - operation:
             methods: ["POST"]
             paths: ["/tools/*", "/invoke/*"]
       when:
-        - key: request.headers[x-arc-capability-token]
+        - key: request.headers[x-chio-capability-token]
           notValues: [""]
-    # Allow-rule #2: route POSTs through ARC when the request authenticates
+    # Allow-rule #2: route POSTs through Chio when the request authenticates
     # with a Bearer token instead of a capability header.
     - to:
         - operation:
@@ -59,7 +59,7 @@ spec:
         - key: request.headers[authorization]
           values: ["Bearer *"]
     # Allow-rule #3: route GETs on /tools/* (listings, schema fetches)
-    # through ARC only when an Authorization header is present. This
+    # through Chio only when an Authorization header is present. This
     # illustrates header-based routing -- unauthenticated GETs fall
     # through to the deny policy below.
     - to:
@@ -73,24 +73,24 @@ spec:
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: arc-deny-unauthenticated
+  name: chio-deny-unauthenticated
   namespace: agent-tools
   labels:
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   selector:
     matchLabels:
-      arc.protocol/secured: "true"
+      chio.protocol/secured: "true"
   action: DENY
   rules:
     # Anything hitting /tools/* without either header is denied before it
-    # ever reaches ARC. Saves the ext_authz RTT and keeps receipts focused
+    # ever reaches Chio. Saves the ext_authz RTT and keeps receipts focused
     # on real authenticated traffic.
     - to:
         - operation:
             paths: ["/tools/*", "/invoke/*"]
       when:
-        - key: request.headers[x-arc-capability-token]
+        - key: request.headers[x-chio-capability-token]
           values: [""]
         - key: request.headers[authorization]
           notValues: ["Bearer *"]
@@ -98,14 +98,14 @@ spec:
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: arc-allow-health-probes
+  name: chio-allow-health-probes
   namespace: agent-tools
   labels:
-    app.kubernetes.io/part-of: arc-protocol
+    app.kubernetes.io/part-of: chio-protocol
 spec:
   selector:
     matchLabels:
-      arc.protocol/secured: "true"
+      chio.protocol/secured: "true"
   action: ALLOW
   rules:
     - to:

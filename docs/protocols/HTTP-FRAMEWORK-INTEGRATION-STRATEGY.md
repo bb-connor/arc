@@ -1,29 +1,29 @@
 # HTTP Framework Integration Strategy
 
 > **Status**: Strategic direction -- approved April 2026.
-> This document defines how ARC extends beyond protocol adapters (MCP, A2A, ACP)
+> This document defines how Chio extends beyond protocol adapters (MCP, A2A, ACP)
 > to become the universal security kernel for any API surface.
 >
 > **Current-state note:** the repo now ships the core HTTP/kernel substrate:
-> `arc api protect`, `arc-openapi`, `arc-sdk-python`, `arc-asgi`,
-> `@arc-protocol/node-http`, `arc-go-http`, `arc-tower`,
-> `arc-spring-boot`, and `ArcMiddleware`, plus the thin FastAPI/Django and
+> `chio api protect`, `chio-openapi`, `chio-sdk-python`, `chio-asgi`,
+> `@chio-protocol/node-http`, `chio-go-http`, `chio-tower`,
+> `chio-spring-boot`, and `ChioMiddleware`, plus the thin FastAPI/Django and
 > Express/Fastify/Elysia wrappers. This document still mixes shipped packaging
 > with forward-looking DX direction. Generic cross-protocol orchestration
 > remains future architecture, not a shipped runtime.
 
-## 1. The Problem: ARC Is Not "Just Another MCP Gateway"
+## 1. The Problem: Chio Is Not "Just Another MCP Gateway"
 
-ARC's current adapter surface covers three agent protocols: MCP (tool access),
-A2A (agent-to-agent), and ACP (editor-to-agent). This positions ARC as a
+Chio's current adapter surface covers three agent protocols: MCP (tool access),
+A2A (agent-to-agent), and ACP (editor-to-agent). This positions Chio as a
 protocol-specific security layer.
 
 But the real surface area is much larger. Agents call APIs. They call FastAPI
 endpoints, Django views, Go handlers, Elysia routes, Spring controllers. Every
-HTTP API is a tool surface that agents consume. If ARC only secures the three
+HTTP API is a tool surface that agents consume. If Chio only secures the three
 agent protocols, it misses a large share of the practical attack surface.
 
-The strategic move: **one kernel, many substrates**. ARC's capability tokens,
+The strategic move: **one kernel, many substrates**. Chio's capability tokens,
 guard pipeline, and receipt signing should work on any API -- not just MCP/A2A/ACP.
 
 ## 2. Architecture: Substrates, Not Frameworks
@@ -34,19 +34,19 @@ of **substrate adapters** that cover families of frameworks.
 ```
 +---------------------------------------------------------------+
 |                    Framework Wrappers (thin)                   |
-|  arc-fastapi  arc-django  arc-elysia  arc-fastify  arc-gin    |
+|  chio-fastapi  chio-django  chio-elysia  chio-fastify  chio-gin    |
 +---------------------------------------------------------------+
 |                    Substrate Adapters                          |
-|  arc-asgi     arc-node-http     arc-go-http     arc-tower     |
+|  chio-asgi     chio-node-http     chio-go-http     chio-tower     |
 +---------------------------------------------------------------+
 |                    Shared Core                                 |
-|  arc-http-core (request model, session, receipts, policy)     |
+|  chio-http-core (request model, session, receipts, policy)     |
 +---------------------------------------------------------------+
-|                    ARC Kernel                                  |
+|                    Chio Kernel                                  |
 |  Capabilities  |  Guards  |  Receipts  |  Budgets  |  DPoP    |
 +---------------------------------------------------------------+
 |                    Protocol Adapters (existing)                |
-|  arc-mcp-adapter  |  arc-a2a-adapter  |  arc-acp-proxy        |
+|  chio-mcp-adapter  |  chio-a2a-adapter  |  chio-acp-proxy        |
 +---------------------------------------------------------------+
 ```
 
@@ -54,13 +54,13 @@ of **substrate adapters** that cover families of frameworks.
 
 | Substrate | Covers | Package |
 |-----------|--------|---------|
-| ASGI (Python) | FastAPI, Starlette, Litestar, async Python | `arc-asgi` |
-| WSGI/Django (Python) | Django, DRF, Flask (WSGI + ORM patterns) | `arc-django` |
-| Node/Bun HTTP (JS/TS) | Fastify, Express, Nest, Hono, Elysia | `@arc-protocol/node-http` |
-| net/http (Go) | stdlib, Gin, Echo, Fiber, chi | `arc-go-http` |
-| Servlet/WebFlux (Java) | Spring Boot, Quarkus, Micronaut | `arc-jvm` |
-| ASP.NET Core (.NET) | Minimal APIs, MVC, Blazor | `arc-dotnet` |
-| tower::Layer (Rust) | Axum, Tonic, any tower-based service | `arc-tower` |
+| ASGI (Python) | FastAPI, Starlette, Litestar, async Python | `chio-asgi` |
+| WSGI/Django (Python) | Django, DRF, Flask (WSGI + ORM patterns) | `chio-django` |
+| Node/Bun HTTP (JS/TS) | Fastify, Express, Nest, Hono, Elysia | `@chio-protocol/node-http` |
+| net/http (Go) | stdlib, Gin, Echo, Fiber, chi | `chio-go-http` |
+| Servlet/WebFlux (Java) | Spring Boot, Quarkus, Micronaut | `chio-jvm` |
+| ASP.NET Core (.NET) | Minimal APIs, MVC, Blazor | `chio-dotnet` |
+| tower::Layer (Rust) | Axum, Tonic, any tower-based service | `chio-tower` |
 
 ### Why Substrates Work
 
@@ -79,7 +79,7 @@ of **substrate adapters** that cover families of frameworks.
 
 ## 3. The Best Current Control Surface: OpenAPI/JSON Schema
 
-Any HTTP API with an OpenAPI spec can be brought under baseline ARC governance.
+Any HTTP API with an OpenAPI spec can be brought under baseline Chio governance.
 
 ### Auto-Discovery Pipeline
 
@@ -87,10 +87,10 @@ Any HTTP API with an OpenAPI spec can be brought under baseline ARC governance.
 OpenAPI spec (YAML/JSON)
     |
     v
-arc-openapi: parse routes, methods, params, response schemas, tags
+chio-openapi: parse routes, methods, params, response schemas, tags
     |
     v
-Generate ARC ToolManifest:
+Generate Chio ToolManifest:
     - Each route becomes a candidate ToolDefinition
     - Path params become input_schema fields
     - HTTP method provides a default side-effect hint, not the final truth
@@ -105,37 +105,37 @@ Generate default policy:
     |
     v
 Developer overrides (optional):
-    - annotations, decorators, or arc.yaml sections
+    - annotations, decorators, or chio.yaml sections
     - only needed for exceptional cases
 ```
 
-### ARC Metadata Extensions for OpenAPI
+### Chio Metadata Extensions for OpenAPI
 
-Developers add extra ARC metadata only where needed. These extend the OpenAPI
-spec via `x-arc-*` fields or standalone `arc.yaml` policy:
+Developers add extra Chio metadata only where needed. These extend the OpenAPI
+spec via `x-chio-*` fields or standalone `chio.yaml` policy:
 
 ```yaml
-# In OpenAPI spec (x-arc extensions)
+# In OpenAPI spec (x-chio extensions)
 paths:
   /api/patients/{id}:
     get:
-      x-arc-sensitivity: high
-      x-arc-data-classification: phi
+      x-chio-sensitivity: high
+      x-chio-data-classification: phi
     delete:
-      x-arc-side-effects: true
-      x-arc-approval-required: true
-      x-arc-cost-class: destructive
-      x-arc-publish: false
+      x-chio-side-effects: true
+      x-chio-approval-required: true
+      x-chio-cost-class: destructive
+      x-chio-publish: false
 
   /api/deploy:
     post:
-      x-arc-approval-required: true
-      x-arc-budget-limit: { calls: 10, cost_usd: 500 }
-      x-arc-egress-policy: internal-only
-      x-arc-data-volume-limit: 50mb
+      x-chio-approval-required: true
+      x-chio-budget-limit: { calls: 10, cost_usd: 500 }
+      x-chio-egress-policy: internal-only
+      x-chio-data-volume-limit: 50mb
 ```
 
-Or equivalently in `arc.yaml`:
+Or equivalently in `chio.yaml`:
 
 ```yaml
 routes:
@@ -162,12 +162,12 @@ ground truth for all runtime behavior.
 - non-HTTP surfaces still require protocol adapters or native integrations
 
 API-security platforms already show that spec-first governance can work in
-production. ARC's differentiator would be capability-bound session control and
+production. Chio's differentiator would be capability-bound session control and
 signed receipts, not the mere fact of reading an OpenAPI file.
 
 ## 4. Progressive Adoption Ladder
 
-ARC adoption should not require rewriting an application. Four levels,
+Chio adoption should not require rewriting an application. Four levels,
 each adding depth without breaking the previous level.
 
 ### Level 0: Reverse Proxy / Sidecar (Zero Code)
@@ -175,12 +175,12 @@ each adding depth without breaking the previous level.
 Current shipped CLI surface:
 
 ```bash
-arc api protect --upstream http://localhost:8000 --spec openapi.yaml
+chio api protect --upstream http://localhost:8000 --spec openapi.yaml
 ```
 
 What this does:
 - Reads the OpenAPI spec
-- Generates a default ARC manifest and policy
+- Generates a default Chio manifest and policy
 - Starts a reverse proxy on the configured listen address
 - Every request gets: session binding, capability check, receipt signing
 - Safe routes (GET/HEAD/OPTIONS) are allowed with session-scoped audit receipts
@@ -201,26 +201,26 @@ Current shipped package examples:
 
 Python (FastAPI):
 ```python
-from arc_fastapi import ArcMiddleware
+from chio_fastapi import ChioMiddleware
 
 app = FastAPI()
-app.add_middleware(ArcMiddleware, config="arc.yaml")
+app.add_middleware(ChioMiddleware, config="chio.yaml")
 ```
 
 TypeScript (Elysia):
 ```typescript
-import { arc } from '@arc-protocol/elysia'
+import { chio } from '@chio-protocol/elysia'
 
 const app = new Elysia()
-  .use(arc({ config: 'arc.yaml' }))
+  .use(chio({ config: 'chio.yaml' }))
 ```
 
 Go (net/http):
 ```go
-import "github.com/backbay-labs/arc-go-http"
+import chio "github.com/backbay/chio/sdks/go/chio-go-http"
 
 mux := http.NewServeMux()
-handler := arc.Protect(mux, arc.ConfigFile("arc.yaml"))
+handler := chio.Protect(mux, chio.ConfigFile("chio.yaml"))
 ```
 
 What this adds over Level 0:
@@ -236,16 +236,16 @@ Proposed decorator / plugin APIs:
 
 Python:
 ```python
-from arc_fastapi import arc_requires, arc_approval, arc_budget
+from chio_fastapi import chio_requires, chio_approval, chio_budget
 
 @app.delete("/api/patients/{id}")
-@arc_requires(scope="patients:delete", sensitivity="high")
-@arc_approval(reason="destructive operation on PHI")
+@chio_requires(scope="patients:delete", sensitivity="high")
+@chio_approval(reason="destructive operation on PHI")
 async def delete_patient(id: str):
     ...
 
 @app.post("/api/deploy")
-@arc_budget(calls=10, cost_usd=500, ttl_secs=3600)
+@chio_budget(calls=10, cost_usd=500, ttl_secs=3600)
 async def deploy(target: str):
     ...
 ```
@@ -253,7 +253,7 @@ async def deploy(target: str):
 TypeScript:
 ```typescript
 app.delete('/api/patients/:id', {
-  arc: { scope: 'patients:delete', approval: true, sensitivity: 'high' }
+  chio: { scope: 'patients:delete', approval: true, sensitivity: 'high' }
 }, handler)
 ```
 
@@ -268,17 +268,17 @@ What this adds over Level 1:
 
 For agent-specific protocol surfaces:
 
-- **MCP**: `arc-mcp-adapter` (existing) -- wraps MCP servers
-- **A2A**: `arc-a2a-adapter` (existing) -- wraps A2A agents
-- **ACP**: `arc-acp-proxy` (existing) -- proxies ACP sessions
-- **OpenAI tool_use**: `arc-openai` (proposed) -- intercepts function calling
-- **LangChain**: `arc-langchain` (proposed) -- wraps LangChain Tool interface
-- **AG-UI**: `arc-ag-ui-proxy` (proposed) -- secures agent-to-user event streams
+- **MCP**: `chio-mcp-adapter` (existing) -- wraps MCP servers
+- **A2A**: `chio-a2a-adapter` (existing) -- wraps A2A agents
+- **ACP**: `chio-acp-proxy` (existing) -- proxies ACP sessions
+- **OpenAI tool_use**: `chio-openai` (proposed) -- intercepts function calling
+- **LangChain**: `chio-langchain` (proposed) -- wraps LangChain Tool interface
+- **AG-UI**: `chio-ag-ui-proxy` (proposed) -- secures agent-to-user event streams
 
 These are the deepest integrations, providing full protocol-level mediation
 with streaming, nested flows, and protocol-specific guard evaluation.
 
-## 5. Shared Core: `arc-http-core`
+## 5. Shared Core: `chio-http-core`
 
 All substrate adapters share a common request/session/receipt model.
 
@@ -286,8 +286,8 @@ All substrate adapters share a common request/session/receipt model.
 
 ```rust
 /// Protocol-agnostic representation of an HTTP request
-/// that ARC needs to evaluate.
-pub struct ArcHttpRequest {
+/// that Chio needs to evaluate.
+pub struct ChioHttpRequest {
     /// Unique request identifier.
     pub request_id: String,
     /// HTTP method.
@@ -410,16 +410,16 @@ Proposed CLI / package names:
 
 ```bash
 # Protect any API with an OpenAPI spec
-arc api protect --upstream http://localhost:8000
+chio api protect --upstream http://localhost:8000
 
 # Or add one line of middleware
-pip install arc-fastapi
-# Then: app.add_middleware(ArcMiddleware)
+pip install chio-fastapi
+# Then: app.add_middleware(ChioMiddleware)
 ```
 
 ### Auto-Discovery
 
-- `arc api protect` reads the OpenAPI spec from `/openapi.json`, `/docs`,
+- `chio api protect` reads the OpenAPI spec from `/openapi.json`, `/docs`,
   or a file path
 - Generates a default manifest and policy automatically
 - Developer only annotates the exceptional cases
@@ -429,7 +429,7 @@ pip install arc-fastapi
 - SQLite receipt store (no external dependencies)
 - Dev signing keys (auto-generated, clearly marked non-production)
 - Human-readable receipt log to stdout
-- `arc receipts tail` for live receipt streaming
+- `chio receipt list --limit 20` for receipt inspection
 
 ### Production Swap
 
@@ -448,52 +448,52 @@ the kernel reachable for most developers.
 
 | Package | Purpose | Crate / CLI |
 |---------|---------|-------------|
-| `arc-http-core` | Normalized request/session/receipt model | `crates/arc-http-core` |
-| `arc-openapi` | Import/generate manifests from OpenAPI specs | `crates/arc-openapi` |
-| `arc api protect` | Reverse-proxy / sidecar entrypoint for any HTTP API | `crates/arc-cli` (`arc-api-protect` subcommand) |
+| `chio-http-core` | Normalized request/session/receipt model | `crates/chio-http-core` |
+| `chio-openapi` | Import/generate manifests from OpenAPI specs | `crates/chio-openapi` |
+| `chio api protect` | Reverse-proxy / sidecar entrypoint for any HTTP API | `crates/chio-cli` (`chio-api-protect` subcommand) |
 
 ### Phase 2: First Substrates (Python, TypeScript, Go) [Shipped]
 
 | Package | Language | Covers | Package Name |
 |---------|----------|--------|--------------|
-| `arc-sdk-python` / `arc-asgi` | Python | FastAPI, Starlette, Litestar | `sdks/python/arc-sdk-python`, `sdks/python/arc-asgi` |
-| `@arc-protocol/node-http` | JS/TS/Bun | Fastify, Express, Hono, Elysia | `sdks/typescript/packages/node-http` |
-| `arc-go-http` | Go | net/http, Gin, Echo, Fiber, chi | `sdks/go/arc-go-http` |
+| `chio-sdk-python` / `chio-asgi` | Python | FastAPI, Starlette, Litestar | `sdks/python/chio-sdk-python`, `sdks/python/chio-asgi` |
+| `@chio-protocol/node-http` | JS/TS/Bun | Fastify, Express, Hono, Elysia | `sdks/typescript/packages/node-http` |
+| `chio-go-http` | Go | net/http, Gin, Echo, Fiber, chi | `sdks/go/chio-go-http` |
 
 ### Phase 3: Framework Wrappers (Thin) [Shipped]
 
 | Package | Wraps | Substrate | Package Name |
 |---------|-------|-----------|--------------|
-| `arc-fastapi` | FastAPI decorator/middleware | `arc-asgi` | `sdks/python/arc-fastapi` |
-| `arc-django` | Django/DRF middleware | WSGI-specific | `sdks/python/arc-django` |
-| `@arc-protocol/express` | Express middleware | `@arc-protocol/node-http` | `sdks/typescript/packages/express` |
-| `@arc-protocol/fastify` | Fastify plugin | `@arc-protocol/node-http` | `sdks/typescript/packages/fastify` |
-| `@arc-protocol/elysia` | Elysia lifecycle plugin | `@arc-protocol/node-http` | `sdks/typescript/packages/elysia` |
+| `chio-fastapi` | FastAPI decorator/middleware | `chio-asgi` | `sdks/python/chio-fastapi` |
+| `chio-django` | Django/DRF middleware | WSGI-specific | `sdks/python/chio-django` |
+| `@chio-protocol/express` | Express middleware | `@chio-protocol/node-http` | `sdks/typescript/packages/express` |
+| `@chio-protocol/fastify` | Fastify plugin | `@chio-protocol/node-http` | `sdks/typescript/packages/fastify` |
+| `@chio-protocol/elysia` | Elysia lifecycle plugin | `@chio-protocol/node-http` | `sdks/typescript/packages/elysia` |
 
 ### Phase 4: Session Journal + Stateful Guards [Shipped]
 
 | Package / Surface | Purpose | Package Name |
 |-------------------|---------|--------------|
-| `arc-http-session` | Multi-step journal for session-aware deterministic guards | `crates/arc-http-session` |
-| v3.4 guard suite | All session-aware deterministic guards (delegation depth, data-flow limits, rotation velocity) | `crates/arc-guards` |
+| `chio-http-session` | Multi-step journal for session-aware deterministic guards | `crates/chio-http-session` |
+| v3.4 guard suite | All session-aware deterministic guards (delegation depth, data-flow limits, rotation velocity) | `crates/chio-guards` |
 | signed advisory observations | Emit non-blocking behavioral/risk evidence before default hard-blocking | integrated into guard pipeline |
 
 ### Phase 5: Remaining Substrates [Shipped]
 
 | Package | Language | Covers | Package Name |
 |---------|----------|--------|--------------|
-| `arc-tower` | Rust | Axum and replayable Tower body types; current gRPC coverage is the generic Tower/HTTP2 path rather than a dedicated `tonic::body::Body` qualification | `crates/arc-tower` |
-| `arc-spring-boot` | Java/Kotlin | Spring Boot auto-configuration, ArcFilter servlet filter | `sdks/jvm/arc-spring-boot` |
-| `ArcMiddleware` | C# | ASP.NET Core middleware | `sdks/dotnet/ArcMiddleware` |
+| `chio-tower` | Rust | Axum and replayable Tower body types; current gRPC coverage is the generic Tower/HTTP2 path rather than a dedicated `tonic::body::Body` qualification | `crates/chio-tower` |
+| `chio-spring-boot` | Java/Kotlin | Spring Boot auto-configuration, ChioFilter servlet filter | `sdks/jvm/chio-spring-boot` |
+| `ChioMiddleware` | C# | ASP.NET Core middleware | `sdks/dotnet/ChioMiddleware` |
 
 ### Phase 6: Protocol Adapters and Deep Integrations (Level 3) [Shipped]
 
 | Package | Protocol | Package Name |
 |---------|----------|--------------|
-| `arc-openai` | OpenAI function calling interception | `crates/arc-openai` |
-| `arc-openapi-mcp-bridge` | OpenAPI-to-MCP bridging with ARC governance | `crates/arc-openapi-mcp-bridge` |
-| `arc-a2a-edge` | A2A bidirectional bridging | `crates/arc-a2a-edge` |
-| `arc-acp-edge` | ACP bidirectional bridging | `crates/arc-acp-edge` |
+| `chio-openai` | OpenAI function calling interception | `crates/chio-openai` |
+| `chio-openapi-mcp-bridge` | OpenAPI-to-MCP bridging with Chio governance | `crates/chio-openapi-mcp-bridge` |
+| `chio-a2a-edge` | A2A bidirectional bridging | `crates/chio-a2a-edge` |
+| `chio-acp-edge` | ACP bidirectional bridging | `crates/chio-acp-edge` |
 
 ## 9. Important Constraint
 
@@ -526,5 +526,5 @@ Both levels feed into the same kernel. A single deployment can run:
 All three produce signed receipts into the same receipt store, evaluated by
 the same guard pipeline, governed by the same capability authority.
 
-This is the path that makes ARC a universal security kernel, not just an MCP
+This is the path that makes Chio a universal security kernel, not just an MCP
 gateway.

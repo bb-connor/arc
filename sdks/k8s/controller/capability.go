@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	envTrustedIssuerKey  = "ARC_TRUSTED_ISSUER_KEY"
-	envTrustedIssuerKeys = "ARC_TRUSTED_ISSUER_KEYS"
+	envTrustedIssuerKey  = "CHIO_TRUSTED_ISSUER_KEY"
+	envTrustedIssuerKeys = "CHIO_TRUSTED_ISSUER_KEYS"
 )
 
 type capabilityValidationConfig struct {

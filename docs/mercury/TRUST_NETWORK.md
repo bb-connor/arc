@@ -15,13 +15,13 @@ The lane is intentionally narrow:
   assurance-suite, governance-workbench, supervised-live, proof, and inquiry
   truth artifacts
 - one sponsor boundary only: `counterparty_review_exchange`
-- one trust anchor only: `arc_checkpoint_witness_chain`
+- one trust anchor only: `chio_checkpoint_witness_chain`
 - one interoperability surface only: `proof_inquiry_bundle_exchange`
 - one reviewer population only: `counterparty_review`
 - one fail-closed sponsor-owner and Mercury support-owner boundary
 
 It does not approve a generic ecosystem trust broker, multiple sponsor
-boundaries, multi-network witness services, ARC-Wall work, or multi-product
+boundaries, multi-network witness services, Chio-Wall work, or multi-product
 platform hardening.
 
 ---
@@ -31,13 +31,13 @@ platform hardening.
 The selected trust-network path is:
 
 - sponsor boundary: `counterparty_review_exchange`
-- trust anchor: `arc_checkpoint_witness_chain`
+- trust anchor: `chio_checkpoint_witness_chain`
 - interoperability surface: `proof_inquiry_bundle_exchange`
 - reviewer population: `counterparty_review`
 
 Those names are deliberate. Mercury is not shipping a broad trust service here.
 It is shipping one bounded reviewer-sharing path that keeps the same workflow
-sentence, the same evidence model, and the same ARC publication chain intact.
+sentence, the same evidence model, and the same Chio publication chain intact.
 
 The workflow sentence remains unchanged:
 
@@ -80,7 +80,7 @@ Not supported in `v2.49`:
 - additional sponsor boundaries
 - multi-network witness or trust-broker services
 - generic ecosystem interoperability infrastructure
-- ARC-Wall and companion-product work
+- Chio-Wall and companion-product work
 - multi-product platform hardening
 
 ---
@@ -90,15 +90,15 @@ Not supported in `v2.49`:
 Export the bounded trust-network package and shared reviewer exchange bundle:
 
 ```bash
-cargo run -p arc-mercury -- trust-network export --output target/mercury-trust-network-export
+cargo run -p chio-mercury -- trust-network export --output target/mercury-trust-network-export
 ```
 
 Generate the validation package and explicit next-step decision:
 
 ```bash
-cargo run -p arc-mercury -- trust-network validate --output target/mercury-trust-network-validation
+cargo run -p chio-mercury -- trust-network validate --output target/mercury-trust-network-validation
 ```
 
 These commands must remain wrappers over the existing embedded-OEM,
 assurance-suite, governance-workbench, supervised-live, proof, and inquiry
-artifacts. ARC stays generic; Mercury stays opinionated.
+artifacts. Chio stays generic; Mercury stays opinionated.

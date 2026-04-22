@@ -1,0 +1,29 @@
+[package]
+name = "chio-web3-bindings"
+description = "Alloy bindings and packaged artifacts for the official Chio web3 contract family"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_web3_bindings"
+
+[features]
+default = ["web3"]
+web3 = ["dep:alloy", "dep:serde_json"]
+
+[dependencies]
+alloy = { version = "1.8.3", default-features = false, features = ["json", "json-abi", "sol-types", "std"], optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+chio-core = { path = "../chio-core" }
+chio-link = { path = "../chio-link" }
+chio-web3 = { path = "../chio-web3" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

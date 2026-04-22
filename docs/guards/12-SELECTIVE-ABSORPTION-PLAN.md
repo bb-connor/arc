@@ -1,16 +1,16 @@
 # Selective Absorption: Async Runtime, Threat Intel, Custom Registry, DPoP
 
 This document closes the three documentation gaps identified in the
-ClawdStrike-to-ARC porting audit. Docs 06-11 cover the "absorb now" items
+ClawdStrike-to-Chio porting audit. Docs 06-11 cover the "absorb now" items
 (6 guards, 3 subsystems, data layer). This doc covers the "absorb
 selectively" items -- components where we take the pattern but refactor
-for ARC's architecture rather than copying code.
+for Chio's architecture rather than copying code.
 
 Also closes the partial gap on WASM guard registry unification.
 
 ---
 
-## 1. Custom Guard Registry: Merging ClawdStrike's `custom.rs` with `arc-wasm-guards`
+## 1. Custom Guard Registry: Merging ClawdStrike's `custom.rs` with `chio-wasm-guards`
 
 ### 1.1 What ClawdStrike Has
 
@@ -23,7 +23,7 @@ trait CustomGuardFactory: Send + Sync {
 }
 
 struct CustomGuardRegistry {
-    factories: HashMap<String, Arc<dyn CustomGuardFactory>>,
+    factories: HashMap<String, Chio<dyn CustomGuardFactory>>,
 }
 ```
 
@@ -38,23 +38,23 @@ binaries from plugin manifests:
 The async guard registry (`async_guards/registry.rs`) adds policy-driven
 instantiation: `build_async_guards()` reads the policy config, matches
 package names to guard constructors, resolves placeholder variables in
-config (`resolve_placeholders_in_json`), and returns `Vec<Arc<dyn AsyncGuard>>`.
+config (`resolve_placeholders_in_json`), and returns `Vec<Chio<dyn AsyncGuard>>`.
 
-### 1.2 What ARC Has
+### 1.2 What Chio Has
 
-`arc-wasm-guards` is a full WASM guard runtime:
+`chio-wasm-guards` is a full WASM guard runtime:
 
 - `WasmGuardRuntime` -- loads `.wasm` binaries, manages Wasmtime instances
 - `GuardRequest` / `GuardResponse` ABI over JSON in linear memory
 - Fuel-bounded execution (deterministic termination)
 - Per-call fresh `Store` (stateless, no cross-request leakage)
-- Host function interface (`arc_log`, `arc_get_config`)
+- Host function interface (`chio_log`, `chio_get_config`)
 - Manifest-based guard declaration with config
 
 ### 1.3 Unification Plan
 
-ARC's WASM runtime is more mature than ClawdStrike's plugin loader. The
-merge direction is: keep `arc-wasm-guards` as the runtime, absorb
+Chio's WASM runtime is more mature than ClawdStrike's plugin loader. The
+merge direction is: keep `chio-wasm-guards` as the runtime, absorb
 ClawdStrike's registry and policy-driven instantiation patterns.
 
 **What to take from ClawdStrike:**
@@ -67,29 +67,29 @@ ClawdStrike's registry and policy-driven instantiation patterns.
 2. **Placeholder resolution.** `resolve_placeholders_in_json()` substitutes
    `${ENV_VAR}` references in guard config with environment variable
    values. Useful for API keys in threat intel guard configs. Port this
-   as a utility in `arc-wasm-guards`.
+   as a utility in `chio-wasm-guards`.
 
 3. **Package name registry.** ClawdStrike maps package name strings to
-   guard constructors. ARC should use WASM module paths (from manifest)
+   guard constructors. Chio should use WASM module paths (from manifest)
    as the registry key, not package names. The manifest already declares
    the module path.
 
 4. **Capability intersection.** ClawdStrike intersects requested
-   capabilities with granted capabilities before loading a plugin. ARC's
+   capabilities with granted capabilities before loading a plugin. Chio's
    WASM runtime should do the same: the manifest declares what host
    functions the guard needs; the runtime grants only those.
 
 **What to drop:**
 
-- ClawdStrike's `CustomGuardFactory` trait -- ARC uses the WASM ABI
+- ClawdStrike's `CustomGuardFactory` trait -- Chio uses the WASM ABI
   (`evaluate(ptr, len) -> i32`) instead of dynamic Rust trait objects.
-- Async guard trait -- WASM guards in ARC are synchronous (v1 decision,
+- Async guard trait -- WASM guards in Chio are synchronous (v1 decision,
   doc 05). Async WASM is a v2 concern.
 
-**Concrete changes to `arc-wasm-guards`:**
+**Concrete changes to `chio-wasm-guards`:**
 
 ```rust
-// Add to arc-wasm-guards/src/runtime.rs
+// Add to chio-wasm-guards/src/runtime.rs
 
 /// Load guards from policy config.
 pub fn load_guards_from_policy(
@@ -132,7 +132,7 @@ pub fn load_guards_from_policy(
 
 ---
 
-## 2. Async Guard Runtime: Resilience Patterns for ARC
+## 2. Async Guard Runtime: Resilience Patterns for Chio
 
 ### 2.1 What ClawdStrike Has
 
@@ -173,9 +173,9 @@ limiting, circuit breaker, retry config.
 - **TtlCache** -- per-guard LRU cache for results. Cache keys generated
   from action/context. Avoids redundant external API calls.
 
-### 2.2 Why ARC Needs This
+### 2.2 Why Chio Needs This
 
-ARC's guards are synchronous (`Guard` trait returns `Result<Verdict>`
+Chio's guards are synchronous (`Guard` trait returns `Result<Verdict>`
 without `async`). This is correct for the kernel's core evaluation path --
 filesystem, shell, egress, and policy guards should never block on external
 I/O.
@@ -187,7 +187,7 @@ pipeline.
 
 ### 2.3 Design: Optional Async Wrapper, Not Default
 
-ARC should NOT make the core guard trait async. Instead, provide an
+Chio should NOT make the core guard trait async. Instead, provide an
 optional `AsyncGuardAdapter` that wraps external-calling guards with
 ClawdStrike's resilience patterns:
 
@@ -338,10 +338,10 @@ pub struct RetryConfig {
 
 ### 2.5 Where This Lives
 
-New module in `arc-guards`:
+New module in `chio-guards`:
 
 ```
-crates/arc-guards/src/
+crates/chio-guards/src/
   external/
     mod.rs              // ExternalGuard trait, AsyncGuardAdapter
     circuit_breaker.rs  // CircuitBreaker state machine
@@ -357,15 +357,15 @@ precision; the external adapter needs a simpler per-guard bucket).
 
 ### 2.6 Execution Modes
 
-ClawdStrike's three execution modes map to ARC's pipeline as follows:
+ClawdStrike's three execution modes map to Chio's pipeline as follows:
 
-| ClawdStrike Mode | ARC Equivalent |
+| ClawdStrike Mode | Chio Equivalent |
 |------------------|----------------|
 | Sequential | Default: guards run in `Vec<Box<dyn Guard>>` order |
 | Parallel | Future: parallel guard evaluation (requires kernel change) |
 | Background | Map to `AdvisoryPipeline` -- non-blocking, results recorded but don't gate the verdict |
 
-For v1, all guards run sequentially (current ARC behavior). Background
+For v1, all guards run sequentially (current Chio behavior). Background
 mode maps to advisory signals. Parallel mode is a future kernel
 optimization.
 
@@ -389,7 +389,7 @@ All implement the `AsyncGuard` trait and use:
 - Environment variable placeholder resolution for API keys
 - HTTP client from the async runtime
 
-### 3.2 How to Bring This to ARC
+### 3.2 How to Bring This to Chio
 
 Each threat intel guard becomes an `ExternalGuard` implementation wrapped
 by `AsyncGuardAdapter`:
@@ -474,16 +474,16 @@ keys.
 
 | Component | Action |
 |-----------|--------|
-| Guard logic (API calls, response parsing, threshold checks) | Rewrite as `ExternalGuard` implementations using ARC's HTTP client patterns |
+| Guard logic (API calls, response parsing, threshold checks) | Rewrite as `ExternalGuard` implementations using Chio's HTTP client patterns |
 | `HttpRequestPolicy` (request filtering) | Port -- useful for restricting what URLs/hashes are sent to external APIs |
-| Placeholder resolution (`resolve_placeholders_in_json`) | Port to `arc-wasm-guards` (already planned in section 1.3) |
-| API client code (reqwest-based) | Rewrite using ARC's HTTP client (ureq for sync, or minimal async) |
+| Placeholder resolution (`resolve_placeholders_in_json`) | Port to `chio-wasm-guards` (already planned in section 1.3) |
+| API client code (reqwest-based) | Rewrite using Chio's HTTP client (ureq for sync, or minimal async) |
 | Detection thresholds and severity mapping | Port directly -- pure logic, no framework dependency |
 
 ### 3.5 Package Structure
 
 ```
-crates/arc-guards/src/
+crates/chio-guards/src/
   external/
     mod.rs
     circuit_breaker.rs
@@ -504,9 +504,9 @@ unless using remote embedding APIs).
 
 ## 4. Broker DPoP: Merge Assessment
 
-### 4.1 What ARC Already Has
+### 4.1 What Chio Already Has
 
-`arc-kernel/src/dpop.rs` implements complete DPoP verification:
+`chio-kernel/src/dpop.rs` implements complete DPoP verification:
 
 - `DpopProofBody` -- canonical JSON signable with schema, capability_id,
   tool_server, tool_name, action_hash, nonce, issued_at, agent_key
@@ -545,30 +545,30 @@ optional fields.
 
 ### 4.3 Assessment: Nothing to Port
 
-ARC's DPoP implementation is **more complete** than ClawdStrike's. The
+Chio's DPoP implementation is **more complete** than ClawdStrike's. The
 gap is inverted -- ClawdStrike has container types but no verification
-logic. ARC has full verification with replay detection.
+logic. Chio has full verification with replay detection.
 
 **Action items (small):**
 
-1. **ProofBindingMode enum.** ARC should add `Mtls` and `Spiffe` variants
-   to its proof mode if it does not already have them. ARC's `AuthMethod`
-   in `arc-http-core/src/identity.rs` already supports mTLS certificates
+1. **ProofBindingMode enum.** Chio should add `Mtls` and `Spiffe` variants
+   to its proof mode if it does not already have them. Chio's `AuthMethod`
+   in `chio-http-core/src/identity.rs` already supports mTLS certificates
    and SPIFFE SVIDs, but the DPoP module only knows about DPoP proofs.
    Adding a `ProofBindingMode` enum that unifies DPoP, mTLS, and SPIFFE
    proof types would make the proof model extensible.
 
 2. **Binding hash.** ClawdStrike's `binding_sha256` field on
-   `ProofBinding` links a capability to its proof binding via hash. ARC's
+   `ProofBinding` links a capability to its proof binding via hash. Chio's
    `DpopProofBody` already has `capability_id` and `action_hash` which
    serve the same purpose. No change needed.
 
 3. **Key thumbprint.** ClawdStrike's `key_thumbprint` field provides a
-   compact key identifier. ARC uses the full `agent_key` (hex-encoded
+   compact key identifier. Chio uses the full `agent_key` (hex-encoded
    public key) in the proof body. Adding a thumbprint utility (SHA-256 of
    the public key) would be useful for log correlation but is not blocking.
 
-**Verdict: no port needed.** ARC's DPoP is ahead of ClawdStrike's. The
+**Verdict: no port needed.** Chio's DPoP is ahead of ClawdStrike's. The
 broker service itself (where these types are used) stays in ClawdStrike
 as deployment infrastructure.
 

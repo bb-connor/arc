@@ -9,8 +9,8 @@
 
 Use one clean stack in every short-form external artifact:
 
-- **ARC:** the rights-and-receipts substrate for consequential agent actions
-- **MERCURY:** the finance-specific evidence platform built on ARC
+- **Chio:** the rights-and-receipts substrate for consequential agent actions
+- **MERCURY:** the finance-specific evidence platform built on Chio
 - **First workflow:** controlled release, rollback, and inquiry evidence for
   AI-assisted execution workflow changes
 
@@ -47,8 +47,8 @@ The immediate external package should contain four short artifacts.
 2. Product
    MERCURY produces signed workflow records, retained artifact references, and
    portable proof and inquiry packages.
-3. Why ARC matters
-   ARC already supplies the hard substrate: signed receipts, checkpoints,
+3. Why Chio matters
+   Chio already supplies the hard substrate: signed receipts, checkpoints,
    exportable evidence, verification, and trust controls.
 4. First wedge
    Controlled release, rollback, and inquiry evidence for AI-assisted
@@ -87,8 +87,8 @@ The immediate external package should contain four short artifacts.
 
 Use a 10-slide deck.
 
-1. ARC + MERCURY
-   ARC is the substrate; MERCURY is the finance wedge.
+1. Chio + MERCURY
+   Chio is the substrate; MERCURY is the finance wedge.
 2. The problem
    AI influence is real; decision evidence is weak.
 3. The first workflow
@@ -96,7 +96,7 @@ Use a 10-slide deck.
 4. How MERCURY works
    Workflow event -> receipt -> checkpoint -> proof package -> inquiry package.
 5. Why this is hard to copy
-   ARC substrate, portable proof, chronology, reconciliation, and review-safe
+   Chio substrate, portable proof, chronology, reconciliation, and review-safe
    exports.
 6. Product surface
    Signed records, retained artifacts, verifier, and reviewed exports.
@@ -139,7 +139,7 @@ Use repeatedly:
 - review-grade evidence
 - signed, portable workflow records
 - release, rollback, and inquiry handling
-- built on ARC
+- built on Chio
 
 Avoid repeatedly:
 

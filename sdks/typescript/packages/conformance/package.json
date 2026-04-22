@@ -1,8 +1,8 @@
 {
-  "name": "@arc-protocol/conformance",
+  "name": "@chio-protocol/conformance",
   "version": "1.0.0",
   "type": "module",
-  "description": "Conformance tests for ARC TypeScript SDK against Rust kernel",
+  "description": "Conformance tests for Chio TypeScript SDK against Rust kernel",
   "private": true,
   "scripts": {
     "build": "tsc",
@@ -12,9 +12,9 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@arc-protocol/node-http": "file:../node-http",
-    "@arc-protocol/express": "file:../express",
-    "@arc-protocol/fastify": "file:../fastify"
+    "@chio-protocol/node-http": "file:../node-http",
+    "@chio-protocol/express": "file:../express",
+    "@chio-protocol/fastify": "file:../fastify"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

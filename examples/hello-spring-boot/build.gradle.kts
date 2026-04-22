@@ -1,11 +1,10 @@
 plugins {
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.spring") version "1.9.22"
+    kotlin("jvm") version "2.3.0"
+    kotlin("plugin.spring") version "2.3.0"
     id("org.springframework.boot") version "3.2.2"
-    id("io.spring.dependency-management") version "1.1.4"
 }
 
-group = "examples.arc"
+group = "examples.chio"
 version = "0.1.0"
 
 java {
@@ -17,23 +16,24 @@ repositories {
 }
 
 dependencies {
-    implementation("io.backbay.arc:arc-spring-boot:0.1.0")
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.2.2"))
+    implementation("io.backbay.chio:chio-spring-boot:0.1.0")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
+    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.2.2"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        freeCompilerArgs += "-Xjsr305=strict"
-        jvmTarget = "17"
+    compilerOptions {
+        freeCompilerArgs.add("-Xjsr305=strict")
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
 }
-

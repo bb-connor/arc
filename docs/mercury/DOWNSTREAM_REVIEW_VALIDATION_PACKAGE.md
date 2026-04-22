@@ -14,7 +14,7 @@ bounded downstream review-consumer lane.
 The canonical command is:
 
 ```bash
-cargo run -p arc-mercury -- downstream-review validate --output target/mercury-downstream-review-validation
+cargo run -p chio-mercury -- downstream-review validate --output target/mercury-downstream-review-validation
 ```
 
 ---
@@ -37,7 +37,7 @@ The generated validation directory contains:
 The validation package supports one narrow claim:
 
 > MERCURY can package the same governed workflow evidence for one downstream
-> case-management review intake without redefining ARC truth or widening into
+> case-management review intake without redefining Chio truth or widening into
 > broader integration programs.
 
 It does not approve additional downstream consumers, governance workbench

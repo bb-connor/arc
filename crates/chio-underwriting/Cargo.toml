@@ -1,0 +1,23 @@
+[package]
+name = "chio-underwriting"
+description = "Chio underwriting decision, simulation, and appeal artifacts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_underwriting"
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-core-types = { path = "../chio-core-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

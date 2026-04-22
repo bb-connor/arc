@@ -1,11 +1,9 @@
-# ARC: Vision and Strategic Narrative
-
-**Attested Rights Channel**
+# Chio: Vision and Strategic Narrative
 
 This document is strategic narrative, not the authoritative claim gate. The
 current authoritative technical claim is now the universal control-plane thesis
 on the qualified authoritative surfaces, and the repo now also qualifies a
-stronger local economic boundary: ARC is comptroller-capable software on the
+stronger local economic boundary: Chio is comptroller-capable software on the
 documented operator, partner, and bounded federated proof surfaces. The
 broader market-position story remains strategic rather than proved. See
 [docs/protocols/STRATEGIC-VISION.md](protocols/STRATEGIC-VISION.md) and
@@ -33,29 +31,29 @@ Payment without authorization is just a pipe to a wallet. Authorization without 
 
 No existing protocol combines identity, capability delegation, economic
 primitives, and non-repudiable receipts into a single coherent system on the
-qualified authoritative surfaces ARC now governs.
+qualified authoritative surfaces Chio now governs.
 
-ARC now does.
+Chio now does.
 
 ---
 
-## 2. ARC's Position
+## 2. Chio's Position
 
-> **MCP tells agents how to call tools. ARC proves what they were allowed to do, what it cost, and what happened.**
+> **MCP tells agents how to call tools. Chio proves what they were allowed to do, what it cost, and what happened.**
 
-ARC is not a security layer bolted onto MCP. It is not a wrapper, a proxy, or
-an audit sidecar. ARC is what you need when agents do real things, when the
+Chio is not a security layer bolted onto MCP. It is not a wrapper, a proxy, or
+an audit sidecar. Chio is what you need when agents do real things, when the
 action has consequences, when someone needs to know it was authorized, what it
 cost, and when a machine-verifiable proof must exist after the fact.
 
-**The core primitive is non-repudiation.** Every action that flows through ARC
+**The core primitive is non-repudiation.** Every action that flows through Chio
 produces a signed, timestamped, capability-bound receipt. That receipt is not a
 log line. It is a cryptographic attestation: a specific capability token was
 exercised to invoke this tool, with these parameters, and the kernel rendered
 this decision. The receipt references the capability by ID, and the full
 authorization chain is reconstructable by looking up the capability token.
 
-This is what separates ARC from everything else in the landscape:
+This is what separates Chio from everything else in the landscape:
 
 | Dimension | What it means | Why it matters |
 |-----------|---------------|----------------|
@@ -64,16 +62,16 @@ This is what separates ARC from everything else in the landscape:
 | **Economic primitives** | Per-grant budgets, constraint-based parameter narrowing, spending limits that travel with the capability token | The authorization layer IS the spending authorization. The delegation chain IS the cost-responsibility chain. |
 | **Receipts** | Signed, append-only attestations for every allow, deny, cancel, and incomplete outcome | The receipt log has the structure of an audit trail, a billing ledger, and a compliance record. One data structure, three functions. |
 
-ARC occupies the authorization and attestation layer. It sits above any payment
+Chio occupies the authorization and attestation layer. It sits above any payment
 rail, below any agent framework, and beside any identity provider. It is the
 layer that answers: was this agent allowed to do this, what did it cost, and
 can you prove it?
 
 ---
 
-## 3. What ARC Already Has
+## 3. What Chio Already Has
 
-This is not a pitch deck for vaporware. ARC is a shipped and tested protocol
+This is not a pitch deck for vaporware. Chio is a shipped and tested protocol
 implementation with real runtime governance surfaces, signed receipts, and a
 substantial formal-methods track, but it is not yet honest to describe the
 entire system as fully formally verified or qualification-complete. Here is
@@ -81,8 +79,8 @@ what exists today:
 
 ### Kernel as Trusted Computing Base
 
-The agent never reaches the tool server on ARC's governed authoritative paths.
-Every governed tool invocation flows through the ARC kernel, a trusted
+The agent never reaches the tool server on Chio's governed authoritative paths.
+Every governed tool invocation flows through the Chio kernel, a trusted
 mediator that validates capability tokens, runs the guard pipeline, and signs
 receipts. The agent does not know the kernel's address, PID, or keys. This is
 not defense in depth. It is architectural privilege separation.
@@ -138,7 +136,7 @@ not just whitepaper prose:
 - **P5: Delegation Graph Acyclicity** -- delegation chains cannot form cycles
 
 The current Lean track models these properties with standard axiomatization of
-cryptographic primitives, but ARC does not currently claim that the full Rust
+cryptographic primitives, but Chio does not currently claim that the full Rust
 runtime is end-to-end formally verified. The Monotonicity proof still has one
 outstanding `sorry` for BEq transitivity, and the repo treats the Lean lane as
 meaningful but narrower than the full shipped implementation surface.
@@ -149,17 +147,17 @@ The trust control plane -- capability authority, revocation store, budget store,
 
 ### Full MCP Compatibility Surface
 
-ARC wraps existing MCP servers without modification. The MCP adapter supports
+Chio wraps existing MCP servers without modification. The MCP adapter supports
 tools, resources, prompts, completions, nested flows, auth discovery,
 notifications, roots, sampling, elicitation, and the task lifecycle. Existing
-deployments migrate incrementally: wrap your MCP server in ARC and gain
+deployments migrate incrementally: wrap your MCP server in Chio and gain
 authorization, attestation, and audit without rewriting a line of tool code.
 
 ---
 
 ## 4. The Agent Economy Thesis
 
-The strategic insight is this: ARC does not need a second identity to serve
+The strategic insight is this: Chio does not need a second identity to serve
 the agent economy. What it already is maps directly to economic
 infrastructure.
 
@@ -179,8 +177,8 @@ Every receipt records: the capability that authorized the action, the tool that 
 
 Rate limits, spending caps, parameter constraints, egress restrictions, path allowlists, secret detection -- these are not just security controls. They are compliance controls. SOC 2, HIPAA, PCI-DSS, and SOX all require demonstrable access controls with audit evidence. The guard pipeline produces exactly this: a signed record of every control that was evaluated, every decision that was made, and every piece of evidence that informed the decision.
 
-**ARC's position:** the authorization and attestation layer that sits above any
-payment rail. Agents will pay for things through many payment protocols. ARC
+**Chio's position:** the authorization and attestation layer that sits above any
+payment rail. Agents will pay for things through many payment protocols. Chio
 does not compete with those protocols. It answers the questions they cannot:
 was the agent authorized to pay, can you prove it, who delegated the
 authority, what constraints applied, and what signed evidence exists?
@@ -189,7 +187,7 @@ authority, what constraints applied, and what signed evidence exists?
 
 ## 5. The Agent Reputation Vision
 
-ARC already emits the core behavioral data needed for agent reputation. Once
+Chio already emits the core behavioral data needed for agent reputation. Once
 the runtime persists a local capability-lineage index and a per-grant
 attribution path, the system can compute useful trust scores without
 introducing external telemetry. The receipts are the primary data source.
@@ -206,7 +204,7 @@ introducing external telemetry. The receipts are the primary data source.
 
 Agent reputation materializes as a W3C Verifiable Credential: an Agent
 Passport. The passport is a portable, cryptographically signed attestation of
-an agent's behavioral track record, issued by an ARC-participating authority
+an agent's behavioral track record, issued by an Chio-participating authority
 and verifiable by any relying party.
 
 The current shipped surface already supports offline verification,
@@ -224,7 +222,7 @@ The passport carries:
 
 ### A Credit-Bureau-Like Trust Layer
 
-If enough operators adopt the model, every receipt that flows through ARC
+If enough operators adopt the model, every receipt that flows through Chio
 contributes to a behavioral dataset that no other protocol produces. Over
 time, that dataset could support a credit-bureau-like trust layer for AI
 agents: a portable way to answer "should I trust this agent with this
@@ -232,8 +230,8 @@ capability?"
 
 Graduated authority follows naturally. An agent with 10,000 clean receipts, zero guard violations, and a track record of operating within budget constraints earns higher trust. It gets longer TTLs, deeper delegation authority, and higher budget ceilings. An agent with a history of out-of-scope attempts, budget overruns, and guard denials gets shorter leashes.
 
-This is not a reputation system bolted onto ARC after the fact. It is a
-computation over the data ARC already produces as a side effect of doing its
+This is not a reputation system bolted onto Chio after the fact. It is a
+computation over the data Chio already produces as a side effect of doing its
 primary job, provided the local join substrate is made explicit in the
 implementation plan.
 
@@ -241,7 +239,7 @@ implementation plan.
 
 ## 6. Competitive Landscape
 
-| Capability | **ARC** | **A2A** | **MCP** | **ANP** | **x402** | **AP2** | **IETF Drafts** |
+| Capability | **Chio** | **A2A** | **MCP** | **ANP** | **x402** | **AP2** | **IETF Drafts** |
 |------------|----------|---------|---------|---------|----------|---------|-----------------|
 | **Cryptographic identity** | Ed25519 per-principal | Signed Agent Cards | None | DID-based crypto identity | None | None | Proposed |
 | **Capability delegation** | Attenuated, time-bounded, chain-tracked | None | None | None | None | None | None |
@@ -256,7 +254,7 @@ implementation plan.
 
 The competitive picture is clear. Payment protocols solve payment. Discovery
 protocols solve discovery. Communication protocols solve communication. None of
-them solve authorization, attestation, and non-repudiation. ARC is the layer
+them solve authorization, attestation, and non-repudiation. Chio is the layer
 that treats every agent action as a provable event with cryptographic
 identity, scoped authority, and signed evidence.
 
@@ -264,10 +262,10 @@ identity, scoped authority, and signed evidence.
 
 ## 7. Strategic Roadmap
 
-The roadmap is now organized around the ARC milestone ladder rather than the
+The roadmap is now organized around the Chio milestone ladder rather than the
 older pre-rename quarterly sketch:
 
-- **v2.5 ARC Rename and Identity Realignment:** finish the rename as a
+- **v2.5 Chio Rename and Identity Realignment:** finish the rename as a
   compatibility program, not a cosmetic rebrand
 - **v2.6 Governed Transactions and Payment Rails:** turn the economic-security
   thesis into governed transaction intent, truthful settlement linkage, x402
@@ -279,7 +277,7 @@ older pre-rename quarterly sketch:
   feeds, attested runtime assurance tiers, proof/spec closure, and a real GA
   decision
 
-The sequence matters. ARC first becomes one coherent product, then makes
+The sequence matters. Chio first becomes one coherent product, then makes
 economic governance real, then makes trust portable, then makes that evidence
 strong enough for underwriting, standards, and launch claims.
 
@@ -287,7 +285,7 @@ strong enough for underwriting, standards, and launch claims.
 
 ## 8. The Flywheel
 
-ARC's strategic position creates a self-reinforcing adoption cycle. Each stage
+Chio's strategic position creates a self-reinforcing adoption cycle. Each stage
 feeds the next.
 
 ```
@@ -309,13 +307,13 @@ feeds the next.
                     Reputation Network
 ```
 
-**Stage 1: Protocol adoption.** Teams adopt ARC because they need
+**Stage 1: Protocol adoption.** Teams adopt Chio because they need
 authorization and audit for agent operations. Every wrapped MCP server, every
 native tool, and every delegated capability generates receipts.
 
 **Stage 2: Receipt data accumulates.** The receipt log grows. Behavioral patterns emerge. Reliability scores, compliance rates, scope discipline metrics -- all computable from data that already exists.
 
-**Stage 3: Certification becomes possible.** With enough receipt data, ARC
+**Stage 3: Certification becomes possible.** With enough receipt data, Chio
 Certify can issue meaningful attestations: this tool server is well-behaved,
 this agent has a clean track record, and this delegation pattern is safe.
 Certification is not a checkbox. It is a statistical claim backed by
@@ -328,14 +326,14 @@ cryptographic evidence.
 **Stage 6: More adoption at higher stakes.** Organizations that previously
 kept agents away from consequential actions such as financial transactions,
 healthcare decisions, legal operations, and infrastructure changes begin
-deploying agents with ARC because the authorization, attestation, and
+deploying agents with Chio because the authorization, attestation, and
 insurance infrastructure makes it safe to do so.
 
 The flywheel is self-reinforcing because each stage produces the input the next stage requires. Receipt data enables certification. Certification enables underwriting. Underwriting enables insurance. Insurance enables higher-stakes adoption. Higher-stakes adoption produces more receipt data.
 
 The data moat deepens with every receipt. No competitor can replicate this
 dataset without first building the authorization and attestation layer that
-produces it. By the time they do, ARC's behavioral dataset will be the
+produces it. By the time they do, Chio's behavioral dataset will be the
 largest, most granular, and most cryptographically rigorous record of agent
 operations in existence.
 
@@ -343,12 +341,12 @@ operations in existence.
 
 ## The Bet
 
-ARC is a bet on a specific future: one where AI agents are economic actors with
+Chio is a bet on a specific future: one where AI agents are economic actors with
 real authority, real budgets, and real consequences. In that future, the
 protocols that win are not the ones that help agents call functions. They are
 the ones that prove what happened when agents did things that mattered.
 
-ARC is that layer: the authorization layer, the attestation layer, the proof
+Chio is that layer: the authorization layer, the attestation layer, the proof
 layer, and the evidence layer that makes agent operations auditable,
 insurable, and trustworthy.
 

@@ -1,6 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ARC Evaluate Request",
-  "description": "Request body for POST /arc/evaluate. This is an ArcHttpRequest.",
-  "$ref": "arc-http-request.schema.json"
-}

@@ -19,7 +19,7 @@ The lane is intentionally narrow:
 - one fail-closed partner-owner and Mercury support-owner boundary
 
 It does not approve a generic SDK platform, multiple partner surfaces, a
-multi-partner OEM program, trust-network services, or ARC-Wall work.
+multi-partner OEM program, trust-network services, or Chio-Wall work.
 
 ---
 
@@ -75,7 +75,7 @@ Not supported in `v2.48`:
 - multi-partner OEM breadth
 - generic SDK platform or multi-language client breadth
 - trust-network services
-- ARC-Wall and companion-product work
+- Chio-Wall and companion-product work
 
 ---
 
@@ -84,16 +84,16 @@ Not supported in `v2.48`:
 Export the bounded embedded OEM package and partner bundle:
 
 ```bash
-cargo run -p arc-mercury -- embedded-oem export --output target/mercury-embedded-oem-export
+cargo run -p chio-mercury -- embedded-oem export --output target/mercury-embedded-oem-export
 ```
 
 Generate the validation package and explicit next-step decision:
 
 ```bash
-cargo run -p arc-mercury -- embedded-oem validate --output target/mercury-embedded-oem-validation
+cargo run -p chio-mercury -- embedded-oem validate --output target/mercury-embedded-oem-validation
 ```
 
-These commands must remain wrappers over the existing ARC evidence export,
+These commands must remain wrappers over the existing Chio evidence export,
 Mercury proof/inquiry packaging, supervised-live qualification artifacts,
-governance-workbench decision package, and assurance-suite bundle. ARC stays
+governance-workbench decision package, and assurance-suite bundle. Chio stays
 generic; Mercury stays opinionated.

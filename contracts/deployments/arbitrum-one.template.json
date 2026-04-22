@@ -1,11 +1,11 @@
 {
-  "manifest_id": "arc.web3-deployment.arbitrum-one.template.v1",
+  "manifest_id": "chio.web3-deployment.arbitrum-one.template.v1",
   "network_name": "Arbitrum One",
   "chain_id": "eip155:42161",
   "role": "secondary",
   "deployment_mode": "deterministic-template",
   "deployer_strategy": "create2",
-  "salt_namespace": "arc.web3.v0.1.0",
+  "salt_namespace": "chio.web3.v0.1.0",
   "settlement_token": {
     "symbol": "USDC",
     "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
@@ -29,52 +29,52 @@
   },
   "contracts": [
     {
-      "contract_id": "arc.identity-registry",
-      "artifact": "contracts/artifacts/ArcIdentityRegistry.json",
-      "source": "contracts/src/ArcIdentityRegistry.sol",
+      "contract_id": "chio.identity-registry",
+      "artifact": "contracts/artifacts/ChioIdentityRegistry.json",
+      "source": "contracts/src/ChioIdentityRegistry.sol",
       "constructor_args": [
         "<registry_admin_address>"
       ],
-      "create2_salt": "arc.identity-registry.base.v0.1.0"
+      "create2_salt": "chio.identity-registry.base.v0.1.0"
     },
     {
-      "contract_id": "arc.root-registry",
-      "artifact": "contracts/artifacts/ArcRootRegistry.json",
-      "source": "contracts/src/ArcRootRegistry.sol",
+      "contract_id": "chio.root-registry",
+      "artifact": "contracts/artifacts/ChioRootRegistry.json",
+      "source": "contracts/src/ChioRootRegistry.sol",
       "constructor_args": [
         "<identity_registry_address>"
       ],
-      "create2_salt": "arc.root-registry.base.v0.1.0"
+      "create2_salt": "chio.root-registry.base.v0.1.0"
     },
     {
-      "contract_id": "arc.escrow",
-      "artifact": "contracts/artifacts/ArcEscrow.json",
-      "source": "contracts/src/ArcEscrow.sol",
-      "constructor_args": [
-        "<root_registry_address>",
-        "<identity_registry_address>"
-      ],
-      "create2_salt": "arc.escrow.base.v0.1.0"
-    },
-    {
-      "contract_id": "arc.bond-vault",
-      "artifact": "contracts/artifacts/ArcBondVault.json",
-      "source": "contracts/src/ArcBondVault.sol",
+      "contract_id": "chio.escrow",
+      "artifact": "contracts/artifacts/ChioEscrow.json",
+      "source": "contracts/src/ChioEscrow.sol",
       "constructor_args": [
         "<root_registry_address>",
         "<identity_registry_address>"
       ],
-      "create2_salt": "arc.bond-vault.base.v0.1.0"
+      "create2_salt": "chio.escrow.base.v0.1.0"
     },
     {
-      "contract_id": "arc.price-resolver",
-      "artifact": "contracts/artifacts/ArcPriceResolver.json",
-      "source": "contracts/src/ArcPriceResolver.sol",
+      "contract_id": "chio.bond-vault",
+      "artifact": "contracts/artifacts/ChioBondVault.json",
+      "source": "contracts/src/ChioBondVault.sol",
+      "constructor_args": [
+        "<root_registry_address>",
+        "<identity_registry_address>"
+      ],
+      "create2_salt": "chio.bond-vault.base.v0.1.0"
+    },
+    {
+      "contract_id": "chio.price-resolver",
+      "artifact": "contracts/artifacts/ChioPriceResolver.json",
+      "source": "contracts/src/ChioPriceResolver.sol",
       "constructor_args": [
         "<price_admin_address>",
         "<arbitrum_sequencer_uptime_feed>"
       ],
-      "create2_salt": "arc.price-resolver.base.v0.1.0"
+      "create2_salt": "chio.price-resolver.base.v0.1.0"
     }
   ]
 }

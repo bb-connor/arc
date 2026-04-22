@@ -1,0 +1,64 @@
+{
+  "schema": "chio.public-identity-profile.v1",
+  "profileId": "pip-1",
+  "issuedAt": 1710000000,
+  "supportedSubjectMethods": [
+    "did:chio",
+    "did:web",
+    "did:key"
+  ],
+  "supportedIssuerMethods": [
+    "did:chio",
+    "did:web",
+    "did:jwk"
+  ],
+  "supportedCredentialFamilies": [
+    "chio-agent-passport+json",
+    "application/dc+sd-jwt",
+    "jwt_vc_json"
+  ],
+  "supportedProofFamilies": [
+    "ed25519-signature-2020",
+    "dc+sd-jwt",
+    "jwt_vc_json"
+  ],
+  "supportedTransports": [
+    "openid4vp-same-device",
+    "openid4vp-cross-device",
+    "openid4vp-relay"
+  ],
+  "basisRefs": [
+    {
+      "kind": "portable_trust_profile",
+      "schema": "chio.portable-trust-profile.v1",
+      "artifactId": "ptp-1",
+      "operatorId": "chio",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "https://chio.dev/standards/portable-trust-profile"
+    },
+    {
+      "kind": "oid4vci_issuer_metadata",
+      "schema": "openid-credential-issuer-metadata",
+      "artifactId": "oid4vci-1",
+      "operatorId": "issuer-operator-1",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://issuer.example.com/.well-known/openid-credential-issuer"
+    },
+    {
+      "kind": "oid4vp_verifier_metadata",
+      "schema": "chio.oid4vp-verifier-metadata.v1",
+      "artifactId": "oid4vp-1",
+      "operatorId": "verifier-operator-1",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "uri": "https://verifier.example.com/.well-known/chio-oid4vp-verifier"
+    }
+  ],
+  "bindingPolicy": {
+    "requiresChioSubjectProvenance": true,
+    "requiresChioIssuerProvenance": true,
+    "requiresSameSubjectAcrossCredentials": true,
+    "manualSubjectRebindingRequired": true,
+    "unsupportedMappingsFailClosed": true
+  },
+  "note": "Bounded broader identity support over Chio provenance."
+}

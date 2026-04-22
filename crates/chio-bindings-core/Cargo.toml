@@ -1,0 +1,26 @@
+[package]
+name = "chio-bindings-core"
+description = "Bindings-friendly invariant helpers for Chio SDKs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_bindings_core"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chio-core = { path = "../chio-core" }
+chio-manifest = { path = "../chio-manifest" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

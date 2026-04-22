@@ -38,7 +38,7 @@ MERCURY supports three modes.
 |------|---------|-------------|
 | Replay / shadow | Generate evidence from recorded or mirrored workflow events | pilot, review, paper trading |
 | Supervised live workflow | Generate evidence for a real workflow while existing execution systems remain primary | post-pilot production over the same workflow contract |
-| Mediated in-line control | Put ARC in the authorization path for selected live actions | advanced expansion |
+| Mediated in-line control | Put Chio in the authorization path for selected live actions | advanced expansion |
 
 The initial product is built to make the first mode excellent and the second
 practical for the same controlled workflow. The third is an expansion path, not
@@ -55,7 +55,7 @@ Workflow events / approvals / source artifacts
       MERCURY ingestion or adapter layer
                 |
                 v
-      ARC-backed receipt and checkpoint engine
+      Chio-backed receipt and checkpoint engine
                 |
         +-------+-------+
         |               |
@@ -212,7 +212,7 @@ later review.
 
 ### Step 3: sign receipt
 
-The ARC-backed signing path produces the canonical receipt and assigns stable
+The Chio-backed signing path produces the canonical receipt and assigns stable
 identifiers.
 
 ### Step 4: checkpoint commitment
@@ -281,7 +281,7 @@ for the operator posture that guards that claim.
 ## 7. Verification and Publication
 
 The initial product ships one supported verifier surface: a Rust library and
-the dedicated `arc-mercury` CLI app.
+the dedicated `chio-mercury` CLI app.
 
 ### Proof Package v1
 
@@ -354,7 +354,7 @@ The export policy must state:
 
 ### Active store
 
-The initial product can use the existing ARC SQLite-backed receipt store for
+The initial product can use the existing Chio SQLite-backed receipt store for
 pilot-scale and early production deployments.
 
 ### Artifact storage
@@ -418,9 +418,9 @@ change management.
 
 ---
 
-## 10. ARC Mapping
+## 10. Chio Mapping
 
-MERCURY reuses ARC for:
+MERCURY reuses Chio for:
 
 - signing primitives
 - receipt structures
@@ -439,7 +439,7 @@ MERCURY adds:
 - inquiry package semantics
 - publication and trust-distribution discipline
 
-This separation keeps the product modular and avoids re-implementing ARC core
+This separation keeps the product modular and avoids re-implementing Chio core
 behavior unnecessarily.
 
 ---
@@ -471,32 +471,32 @@ the core proof and inquiry contracts are stable.
 
 The assurance-suite lane is now validated, and the trust-network lane is now
 also validated. That path exposed one `counterparty_review_exchange`
-interoperability manifest and one `arc_checkpoint_witness_chain` trust anchor
+interoperability manifest and one `chio_checkpoint_witness_chain` trust anchor
 derived from the same embedded OEM, assurance, governance, reviewer, and
 qualification artifacts rather than a separate trust-service truth path.
 
 ### Companion products
 
-ARC-Wall and other extensions can reuse the same signing, publication, and
+Chio-Wall and other extensions can reuse the same signing, publication, and
 verification foundations while introducing different evidence types and guard
 logic.
 
-The current companion-product lane is one ARC-Wall `control_room_barrier_review`
+The current companion-product lane is one Chio-Wall `control_room_barrier_review`
 path over one `tool_access_domain_boundary` surface. It records one bounded
-denied cross-domain tool-access event for `research -> execution` using ARC
-tool-guard mechanics, ARC receipts, ARC checkpoints, and ARC evidence export
-instead of inventing a second substrate or folding ARC-Wall into MERCURY.
+denied cross-domain tool-access event for `research -> execution` using Chio
+tool-guard mechanics, Chio receipts, Chio checkpoints, and Chio evidence export
+instead of inventing a second substrate or folding Chio-Wall into MERCURY.
 
 ### Multi-product hardening
 
-Now that MERCURY and ARC-Wall both have one validated lane, the current active
-step is one executed cross-product hardening lane exposed through `arc
-product-surface export` and `arc product-surface validate`.
+Now that MERCURY and Chio-Wall both have one validated lane, the current active
+step is one executed cross-product hardening lane exposed through `chio
+product-surface export` and `chio product-surface validate`.
 
 That lane now freezes and executes:
 
-- which services stay ARC-owned and generic
-- which shared ARC crate versions stay pinned together across both product lanes
+- which services stay Chio-owned and generic
+- which shared Chio crate versions stay pinned together across both product lanes
 - which surfaces stay product-owned and separate
 - which release, trust-material recovery, and operator-routing controls are
   shared across the portfolio

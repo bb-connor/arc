@@ -1,0 +1,26 @@
+[package]
+name = "chio-metering"
+description = "Receipt metering and economics for the Chio protocol -- cost attribution, budget enforcement, and billing export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_metering"
+
+[dependencies]
+chio-core = { path = "../chio-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

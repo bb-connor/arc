@@ -1,35 +1,35 @@
-# Portable Kernel Architecture: `arc-kernel-core` Extraction
+# Portable Kernel Architecture: `chio-kernel-core` Extraction
 
 **Status:** Draft
 **Date:** 2026-04-15
 
-> The WASM kernel build is the single largest surface multiplier in the ARC
+> The WASM kernel build is the single largest surface multiplier in the Chio
 > roadmap. It unlocks browser agents, edge workers (Cloudflare Workers, Deno
 > Deploy), mobile (iOS/Android via FFI), browser extensions, and IoT. This
 > document covers the extraction of a portable, `no_std`-compatible kernel core
-> from the existing `arc-kernel` crate, the dependency analysis required to
+> from the existing `chio-kernel` crate, the dependency analysis required to
 > reach `wasm32-unknown-unknown`, the target matrix, platform adapter
 > contracts, and the migration path from the current monolithic kernel.
 
 ---
 
-## 1. The Split: `arc-kernel-core` vs `arc-kernel`
+## 1. The Split: `chio-kernel-core` vs `chio-kernel`
 
 ### 1.1 Design Principle
 
-The ARC kernel's security-critical logic -- capability validation, scope
+The Chio kernel's security-critical logic -- capability validation, scope
 checking, guard evaluation, DPoP verification, receipt signing -- is pure
 computation over signed data structures. None of it requires an async runtime,
-a filesystem, or a network socket. The current `arc-kernel` crate couples this
+a filesystem, or a network socket. The current `chio-kernel` crate couples this
 pure logic with IO-dependent infrastructure (tokio, rusqlite, ureq) that
 prevents compilation to WASM or bare-metal targets.
 
 The fix is a clean two-crate split:
 
 ```
-arc-kernel-core (no_std + alloc)        arc-kernel (full, std)
+chio-kernel-core (no_std + alloc)        chio-kernel (full, std)
 ---------------------------------       ---------------------------------
-capability validation                   depends on arc-kernel-core
+capability validation                   depends on chio-kernel-core
 scope checking                          tokio async runtime
 guard pipeline (sync)                   rusqlite receipt persistence
 DPoP proof verification                 ureq HTTP client (price oracles)
@@ -40,12 +40,12 @@ budget accounting (in-memory)           tool server dispatch
 revocation checking (in-memory set)     persistent budget/revocation stores
 ```
 
-`arc-kernel-core` is the portable TCB. `arc-kernel` is a thin orchestration
-shell that wires `arc-kernel-core` to platform IO.
+`chio-kernel-core` is the portable TCB. `chio-kernel` is a thin orchestration
+shell that wires `chio-kernel-core` to platform IO.
 
 ### 1.2 Crate Boundaries
 
-**`arc-kernel-core`** contains:
+**`chio-kernel-core`** contains:
 
 - `KernelCore` struct: holds keypair, CA trust set, guards, in-memory receipt
   buffer, in-memory budget map, in-memory revocation set, DPoP nonce cache.
@@ -62,12 +62,12 @@ shell that wires `arc-kernel-core` to platform IO.
 - Budget accounting against in-memory `HashMap<CapabilityId, u64>`.
 - Revocation checking against in-memory `HashSet<CapabilityId>`.
 
-**`arc-kernel`** contains:
+**`chio-kernel`** contains:
 
-- `ArcKernel` struct: wraps `KernelCore`, adds `dyn ReceiptStore`,
+- `ChioKernel` struct: wraps `KernelCore`, adds `dyn ReceiptStore`,
   `dyn ToolServerConnection`, `dyn PaymentAdapter`, `dyn PriceOracle`,
   `dyn ResourceProvider`, `dyn PromptProvider`, session map, async dispatch.
-- `ReceiptStore` trait and SQLite implementation (via `arc-store-sqlite`).
+- `ReceiptStore` trait and SQLite implementation (via `chio-store-sqlite`).
 - `ToolServerConnection` trait and HTTP/stdio implementations.
 - Async guard adapters that wrap sync `Guard` trait calls.
 - Session management with `RwLock<HashMap<SessionId, Session>>`.
@@ -77,12 +77,12 @@ shell that wires `arc-kernel-core` to platform IO.
 
 ### 1.3 Feature Flag Strategy
 
-During migration, `arc-kernel` gains a `full` feature (enabled by default) that
+During migration, `chio-kernel` gains a `full` feature (enabled by default) that
 gates IO-dependent code. This allows incremental extraction without breaking
 downstream crates.
 
 ```toml
-# arc-kernel/Cargo.toml
+# chio-kernel/Cargo.toml
 [features]
 default = ["full"]
 full = ["dep:tokio", "dep:rusqlite", "dep:ureq"]
@@ -98,15 +98,15 @@ pub mod transport;
 pub mod receipt_store_sqlite;
 ```
 
-Once `arc-kernel-core` is extracted as a standalone crate, the feature flags
-are removed and `arc-kernel` unconditionally depends on `arc-kernel-core` plus
+Once `chio-kernel-core` is extracted as a standalone crate, the feature flags
+are removed and `chio-kernel` unconditionally depends on `chio-kernel-core` plus
 its IO dependencies.
 
 ---
 
 ## 2. Dependency Analysis
 
-### 2.1 WASM-Compatible (stays in `arc-kernel-core`)
+### 2.1 WASM-Compatible (stays in `chio-kernel-core`)
 
 | Dependency | WASM status | Notes |
 |---|---|---|
@@ -136,15 +136,15 @@ its IO dependencies.
 | Dependency | Reason | Replacement in core |
 |---|---|---|
 | `tokio` | Async runtime, not available in WASM single-threaded context | Core API is fully synchronous. |
-| `rusqlite` | SQLite FFI, links native C library | In-memory `Vec<ArcReceipt>` ring buffer in core. Platform adapters persist externally. |
+| `rusqlite` | SQLite FFI, links native C library | In-memory `Vec<ChioReceipt>` ring buffer in core. Platform adapters persist externally. |
 | `ureq` | HTTP client for price oracle | Core accepts pre-resolved price data. Platform adapters fetch prices. |
-| `arc-appraisal` | Runtime attestation, may have system deps | Inject attestation records. Core verifies signatures only. |
-| `arc-governance` | May pull transitive IO deps | Extract pure evaluation logic if needed, or inject results. |
+| `chio-appraisal` | Runtime attestation, may have system deps | Inject attestation records. Core verifies signatures only. |
+| `chio-governance` | May pull transitive IO deps | Extract pure evaluation logic if needed, or inject results. |
 
 ### 2.4 `getrandom` Configuration Per Target
 
 ```toml
-# arc-kernel-core/Cargo.toml
+# chio-kernel-core/Cargo.toml
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
@@ -200,8 +200,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup target add wasm32-unknown-unknown
-      - run: cargo build -p arc-kernel-core --target wasm32-unknown-unknown --release
-      - run: wasm-opt -Oz -o kernel-core.wasm target/wasm32-unknown-unknown/release/arc_kernel_core.wasm
+      - run: cargo build -p chio-kernel-core --target wasm32-unknown-unknown --release
+      - run: wasm-opt -Oz -o kernel-core.wasm target/wasm32-unknown-unknown/release/chio_kernel_core.wasm
       - run: test $(stat -c%s kernel-core.wasm) -lt 307200  # 300 KB gate
 
   wasm-wasi:
@@ -209,14 +209,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup target add wasm32-wasip1
-      - run: cargo build -p arc-kernel-core --target wasm32-wasip1 --release
+      - run: cargo build -p chio-kernel-core --target wasm32-wasip1 --release
 
   ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - run: rustup target add aarch64-apple-ios
-      - run: cargo build -p arc-kernel-core --target aarch64-apple-ios --release
+      - run: cargo build -p chio-kernel-core --target aarch64-apple-ios --release
 ```
 
 ---
@@ -224,8 +224,8 @@ jobs:
 ## 4. Platform Adapters
 
 Each deployment environment provides a platform adapter that implements the
-IO contracts that `arc-kernel-core` does not handle: entropy, persistence,
-time, and transport. `arc-kernel-core` defines trait boundaries; adapters
+IO contracts that `chio-kernel-core` does not handle: entropy, persistence,
+time, and transport. `chio-kernel-core` defines trait boundaries; adapters
 implement them.
 
 ### 4.1 Trait Boundaries
@@ -245,7 +245,7 @@ pub trait Clock {
 /// Optional persistent receipt storage.
 /// Core uses an in-memory ring buffer by default.
 pub trait ReceiptSink {
-    fn persist(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptSinkError>;
+    fn persist(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptSinkError>;
 }
 
 /// Optional price data provider for cross-currency budget enforcement.
@@ -254,7 +254,7 @@ pub trait PriceProvider {
 }
 ```
 
-### 4.2 Browser Adapter (`arc-kernel-wasm`)
+### 4.2 Browser Adapter (`chio-kernel-wasm`)
 
 Bindings via `wasm-bindgen`. Published as an npm package.
 
@@ -286,7 +286,7 @@ impl BrowserKernel {
 }
 ```
 
-### 4.3 Edge Worker Adapter (`arc-kernel-edge`)
+### 4.3 Edge Worker Adapter (`chio-kernel-edge`)
 
 For Cloudflare Workers, Deno Deploy, and similar V8-isolate runtimes.
 
@@ -299,7 +299,7 @@ For Cloudflare Workers, Deno Deploy, and similar V8-isolate runtimes.
 | Guard loading | Compiled into the WASM module at build time |
 
 Edge workers are the highest-value target after desktop. A Cloudflare Worker
-running `arc-kernel-core` can enforce capability-based security on tool
+running `chio-kernel-core` can enforce capability-based security on tool
 invocations at the edge with sub-millisecond overhead, without a sidecar
 process or a round-trip to a central kernel.
 
@@ -329,7 +329,7 @@ let verdict = try kernel.evaluate(requestJson: toolCallJson)
 Repo-local qualification commands for the mobile adapter:
 
 ```bash
-cargo test -p arc-kernel-mobile --test ffi_roundtrip
+cargo test -p chio-kernel-mobile --test ffi_roundtrip
 ./scripts/qualify-mobile-kernel.sh
 ```
 
@@ -340,15 +340,15 @@ unless at least one target-backed iOS or Android lane runs and passes.
 
 ### 4.5 Desktop (Current Model)
 
-No changes required. The existing `arc-kernel` crate continues to work as a
-standalone sidecar process. After extraction, `arc-kernel` depends on
-`arc-kernel-core` and provides the tokio runtime, SQLite persistence, HTTP
+No changes required. The existing `chio-kernel` crate continues to work as a
+standalone sidecar process. After extraction, `chio-kernel` depends on
+`chio-kernel-core` and provides the tokio runtime, SQLite persistence, HTTP
 transport, and all current functionality unchanged.
 
 ```
-Desktop: arc-kernel (binary)
+Desktop: chio-kernel (binary)
     |
-    +-- arc-kernel-core (library, pure computation)
+    +-- chio-kernel-core (library, pure computation)
     +-- tokio (async runtime)
     +-- rusqlite (receipt persistence)
     +-- ureq (price oracle HTTP)
@@ -356,7 +356,7 @@ Desktop: arc-kernel (binary)
 
 ---
 
-## 5. API Surface of `arc-kernel-core`
+## 5. API Surface of `chio-kernel-core`
 
 All public methods are synchronous, pure, and deterministic given an entropy
 source and clock.
@@ -386,7 +386,7 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
 
     /// Sign a receipt attesting to a kernel decision.
     ///
-    /// Produces an Ed25519-signed ArcReceipt over the canonical JSON of the
+    /// Produces an Ed25519-signed ChioReceipt over the canonical JSON of the
     /// receipt body. Appends to the in-memory receipt buffer and advances the
     /// Merkle checkpoint if the batch threshold is reached.
     pub fn sign_receipt(
@@ -394,7 +394,7 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
         verdict: Verdict,
         request: &ToolCallRequest,
         metadata: Option<serde_json::Value>,
-    ) -> Result<ArcReceipt, KernelError>;
+    ) -> Result<ChioReceipt, KernelError>;
 
     /// Verify a capability token's signature and structure.
     ///
@@ -403,7 +403,7 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
     pub fn verify_capability(
         &self,
         token: &CapabilityToken,
-    ) -> Result<ArcScope, KernelError>;
+    ) -> Result<ChioScope, KernelError>;
 
     /// Add a capability ID to the in-memory revocation set.
     pub fn revoke(&mut self, capability_id: &str);
@@ -412,7 +412,7 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
     ///
     /// Platform adapters call this periodically to persist receipts to
     /// IndexedDB, KV, SQLite, or other durable storage.
-    pub fn drain_receipts(&mut self) -> Vec<ArcReceipt>;
+    pub fn drain_receipts(&mut self) -> Vec<ChioReceipt>;
 
     /// Register a guard in the evaluation pipeline.
     pub fn add_guard(&mut self, guard: Box<dyn Guard>);
@@ -425,7 +425,7 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
 ### 5.2 Design Constraints
 
 - **No `async`.** Every method is synchronous. The caller (platform adapter or
-  `arc-kernel` orchestrator) owns the async runtime if one exists.
+  `chio-kernel` orchestrator) owns the async runtime if one exists.
 - **No `SystemTime::now()`.** Time comes from the injected `Clock` trait.
   This makes the core deterministic and testable with a mock clock.
 - **No `OsRng` directly.** Entropy comes from the injected `EntropySource`
@@ -434,7 +434,7 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
   The caller drains and persists them.
 - **Fail-closed.** Any error during guard evaluation, capability verification,
   or budget enforcement results in `Verdict::Deny`. This invariant is
-  enforced in `arc-kernel-core` and cannot be overridden by platform adapters.
+  enforced in `chio-kernel-core` and cannot be overridden by platform adapters.
 - **`Send + Sync` guards.** The `Guard` trait requires `Send + Sync`. On
   single-threaded WASM, this is satisfied trivially. On multi-threaded
   targets, guards must be thread-safe.
@@ -445,41 +445,41 @@ impl<E: EntropySource, C: Clock> KernelCore<E, C> {
 
 ### Phase 1: Feature-Flag Existing Code
 
-Modify `arc-kernel/Cargo.toml` to make IO dependencies optional behind a
+Modify `chio-kernel/Cargo.toml` to make IO dependencies optional behind a
 `full` feature (default on). Gate all IO-touching modules. Verify the
 workspace still compiles with `cargo build --workspace` and all tests pass.
 
 Estimated scope: 1-2 days. No behavioral changes.
 
 ```
-arc-kernel/
+chio-kernel/
   Cargo.toml          # Add [features] full = [tokio, rusqlite, ureq]
   src/
     lib.rs            # #[cfg(feature = "full")] on transport, receipt_store, etc.
-    kernel/mod.rs     # Split ArcKernel into core fields + #[cfg(feature = "full")] IO fields
+    kernel/mod.rs     # Split ChioKernel into core fields + #[cfg(feature = "full")] IO fields
 ```
 
-### Phase 2: Extract `arc-kernel-core`
+### Phase 2: Extract `chio-kernel-core`
 
-Create `crates/arc-kernel-core/` with the pure-computation subset. Move types,
-traits, and validation logic. `arc-kernel` depends on `arc-kernel-core` and
+Create `crates/chio-kernel-core/` with the pure-computation subset. Move types,
+traits, and validation logic. `chio-kernel` depends on `chio-kernel-core` and
 re-exports its public API.
 
 ```
 crates/
-  arc-kernel-core/
+  chio-kernel-core/
     Cargo.toml        # no_std + alloc, no IO deps
     src/
       lib.rs          # KernelCore, Guard, Verdict, KernelError, etc.
       capability.rs   # Validation logic extracted from kernel/mod.rs
-      dpop.rs         # DPoP verification (moved from arc-kernel)
+      dpop.rs         # DPoP verification (moved from chio-kernel)
       receipt.rs      # Receipt signing + Merkle checkpoint
       budget.rs       # In-memory budget accounting
       revocation.rs   # In-memory revocation set
-  arc-kernel/
-    Cargo.toml        # depends on arc-kernel-core + tokio + rusqlite + ureq
+  chio-kernel/
+    Cargo.toml        # depends on chio-kernel-core + tokio + rusqlite + ureq
     src/
-      lib.rs          # ArcKernel wraps KernelCore, adds IO
+      lib.rs          # ChioKernel wraps KernelCore, adds IO
 ```
 
 Current in-repo proof command:
@@ -490,13 +490,13 @@ Current in-repo proof command:
 
 It proves both:
 
-1. `cargo build -p arc-kernel-core --no-default-features`
-2. `cargo build -p arc-kernel-core --target wasm32-unknown-unknown --no-default-features`
+1. `cargo build -p chio-kernel-core --no-default-features`
+2. `cargo build -p chio-kernel-core --target wasm32-unknown-unknown --no-default-features`
 
 Broader qualification still layers on top of that:
 
-3. `cargo test -p arc-kernel-core`
-4. `cargo test -p arc-kernel`
+3. `cargo test -p chio-kernel-core`
+4. `cargo test -p chio-kernel`
 5. `cargo build --workspace`
 
 Estimated scope: 3-5 days.
@@ -507,12 +507,12 @@ Create adapter crates for each target environment:
 
 ```
 crates/
-  arc-kernel-wasm/        # wasm-bindgen bindings for browser
-  arc-kernel-edge/        # Cloudflare Workers / Deno Deploy adapter
-  arc-kernel-mobile/      # UniFFI bindings for iOS/Android
+  chio-kernel-wasm/        # wasm-bindgen bindings for browser
+  chio-kernel-edge/        # Cloudflare Workers / Deno Deploy adapter
+  chio-kernel-mobile/      # UniFFI bindings for iOS/Android
 ```
 
-Each adapter crate depends on `arc-kernel-core` and implements the trait
+Each adapter crate depends on `chio-kernel-core` and implements the trait
 boundaries (`EntropySource`, `Clock`, `ReceiptSink`).
 
 Estimated scope: 1-2 weeks per adapter.
@@ -520,7 +520,7 @@ Estimated scope: 1-2 weeks per adapter.
 ### Phase 4: CI and Size Gates
 
 Add cross-compilation targets to CI. Enforce binary size limits per target.
-Publish `arc-kernel-wasm` to npm. Publish `arc-kernel-mobile` UniFFI bindings
+Publish `chio-kernel-wasm` to npm. Publish `chio-kernel-mobile` UniFFI bindings
 to CocoaPods/Maven. The repo-local qualification entry points are now
 `./scripts/check-portable-kernel.sh`, `./scripts/qualify-portable-browser.sh`,
 and `./scripts/qualify-mobile-kernel.sh`.
@@ -528,21 +528,21 @@ and `./scripts/qualify-mobile-kernel.sh`.
 ### Dependency Graph After Extraction
 
 ```
-arc-core-types (pure data + crypto, already WASM-ready)
+chio-core-types (pure data + crypto, already WASM-ready)
     |
-arc-core (canonical JSON, signing, receipts)
+chio-core (canonical JSON, signing, receipts)
     |
-arc-kernel-core (validation, guards, DPoP, receipts -- portable)
+chio-kernel-core (validation, guards, DPoP, receipts -- portable)
     |
-    +-- arc-kernel (full: tokio + rusqlite + ureq + transport)
+    +-- chio-kernel (full: tokio + rusqlite + ureq + transport)
     |       |
-    |       +-- arc-mcp-edge, arc-a2a-edge, arc-acp-edge, arc-cli ...
+    |       +-- chio-mcp-edge, chio-a2a-edge, chio-acp-edge, chio-cli ...
     |
-    +-- arc-kernel-wasm (browser: wasm-bindgen + IndexedDB)
+    +-- chio-kernel-wasm (browser: wasm-bindgen + IndexedDB)
     |
-    +-- arc-kernel-edge (workers: WASI + KV)
+    +-- chio-kernel-edge (workers: WASI + KV)
     |
-    +-- arc-kernel-mobile (iOS/Android: UniFFI + native SQLite)
+    +-- chio-kernel-mobile (iOS/Android: UniFFI + native SQLite)
 ```
 
 ---
@@ -551,7 +551,7 @@ arc-kernel-core (validation, guards, DPoP, receipts -- portable)
 
 ### 7.1 TCB Surface
 
-`arc-kernel-core` is the portable TCB. Its correctness properties must hold on
+`chio-kernel-core` is the portable TCB. Its correctness properties must hold on
 every target:
 
 - **Fail-closed invariant.** Any error path produces `Verdict::Deny`.
@@ -591,20 +591,20 @@ additional side-channel concerns from the WASM compilation target.
    (e.g., a browser guard that checks IndexedDB). The core `Guard` trait is
    sync. Async guards can be implemented in the platform adapter layer by
    blocking on the future before calling into core, or by providing a separate
-   `AsyncGuard` trait in `arc-kernel` (not core).
+   `AsyncGuard` trait in `chio-kernel` (not core).
 
-3. **Receipt buffer size limit.** The in-memory `Vec<ArcReceipt>` in core
+3. **Receipt buffer size limit.** The in-memory `Vec<ChioReceipt>` in core
    needs a configurable upper bound to prevent OOM on constrained targets.
    When the buffer is full, options are: reject new operations (fail-closed),
    evict oldest receipts (lossy), or signal the platform adapter to drain.
 
-4. **`arc-core` portability.** `arc-core` sits between `arc-core-types` and
-   `arc-kernel-core`. It must also compile to WASM. Current audit shows no
+4. **`chio-core` portability.** `chio-core` sits between `chio-core-types` and
+   `chio-kernel-core`. It must also compile to WASM. Current audit shows no
    blocking dependencies, but this needs verification with a CI build gate.
 
-5. **Transitive dependency audit.** `arc-kernel` depends on `arc-governance`,
-   `arc-credit`, `arc-market`, `arc-open-market`, `arc-listing`,
-   `arc-underwriting`, and `arc-appraisal`. These must NOT be dependencies
-   of `arc-kernel-core`. The core kernel evaluates capabilities and guards;
+5. **Transitive dependency audit.** `chio-kernel` depends on `chio-governance`,
+   `chio-credit`, `chio-market`, `chio-open-market`, `chio-listing`,
+   `chio-underwriting`, and `chio-appraisal`. These must NOT be dependencies
+   of `chio-kernel-core`. The core kernel evaluates capabilities and guards;
    governance and market logic stays in the full kernel or in dedicated crates
    that the platform adapter can optionally include.

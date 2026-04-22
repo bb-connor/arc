@@ -7,9 +7,9 @@ import urllib.parse
 import urllib.request
 
 
-BASE_URL = os.environ.get("ARC_BASE_URL", "http://127.0.0.1:8931")
-CONTROL_URL = os.environ.get("ARC_CONTROL_URL", "http://127.0.0.1:8940")
-TOKEN = os.environ.get("ARC_AUTH_TOKEN", "demo-token")
+BASE_URL = os.environ.get("CHIO_BASE_URL", "http://127.0.0.1:8931")
+CONTROL_URL = os.environ.get("CHIO_CONTROL_URL", "http://127.0.0.1:8940")
+TOKEN = os.environ.get("CHIO_AUTH_TOKEN", "demo-token")
 PROTOCOL_VERSION = "2025-11-25"
 
 

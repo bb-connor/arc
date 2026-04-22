@@ -10,7 +10,7 @@ Proposed.
 
 ## Problem
 
-ARC now has a real trust-control service with shared authority, revocation, receipt, and budget state.
+Chio now has a real trust-control service with shared authority, revocation, receipt, and budget state.
 
 What it does not yet have is enough determinism to treat that path as fully reliable under load.
 
@@ -56,13 +56,13 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-cli/src/trust_control.rs`
-- `crates/arc-kernel/src/budget_store.rs`
-- `crates/arc-kernel/src/authority.rs`
-- `crates/arc-kernel/src/receipt_store.rs`
-- `crates/arc-kernel/src/revocation_store.rs`
-- `crates/arc-cli/tests/trust_cluster.rs`
-- `crates/arc-cli/tests/trust_revocation.rs`
+- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-kernel/src/budget_store.rs`
+- `crates/chio-kernel/src/authority.rs`
+- `crates/chio-kernel/src/receipt_store.rs`
+- `crates/chio-kernel/src/revocation_store.rs`
+- `crates/chio-cli/tests/trust_cluster.rs`
+- `crates/chio-cli/tests/trust_revocation.rs`
 - `docs/HA_CONTROL_AUTH_PLAN.md`
 
 ## Proposed implementation slices

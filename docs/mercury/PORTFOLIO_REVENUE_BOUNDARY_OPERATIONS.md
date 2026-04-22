@@ -19,7 +19,7 @@ Operators must preserve three constraints:
 ## Export Command
 
 ```bash
-cargo run -p arc-mercury -- portfolio-revenue-boundary export --output target/mercury-portfolio-revenue-boundary-export
+cargo run -p chio-mercury -- portfolio-revenue-boundary export --output target/mercury-portfolio-revenue-boundary-export
 ```
 
 Expected top-level artifacts:
@@ -42,4 +42,4 @@ Stop the lane if:
 - program-family shared-review approval is absent or stale
 - the scope expands beyond one named commercial handoff
 - channel-boundary rules are missing
-- the request implies generic revenue-platform, billing, channel, or ARC commercial behavior
+- the request implies generic revenue-platform, billing, channel, or Chio commercial behavior

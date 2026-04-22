@@ -4,7 +4,7 @@
   "category": "delegation_attenuation",
   "driver": "artifact",
   "fixture": "delegation_pair",
-  "specVersion": "arc-wire-v1",
+  "specVersion": "chio-wire-v1",
   "assertions": [
     {
       "name": "delegation_chain_valid",

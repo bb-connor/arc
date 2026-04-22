@@ -22,7 +22,7 @@ The supported claim is narrow:
 ## Generation Command
 
 ```bash
-cargo run -p arc-mercury -- second-account-expansion validate --output target/mercury-second-account-expansion-validation
+cargo run -p chio-mercury -- second-account-expansion validate --output target/mercury-second-account-expansion-validation
 ```
 
 ---
@@ -52,6 +52,6 @@ Proceed only if all of the following are true:
 - one review surface only: `portfolio_review_bundle`
 - one Mercury-owned approval and reuse-governance path only
 - no implication of generic customer-success, CRM, account management,
-  revenue operations, or ARC commercial tooling
+  revenue operations, or Chio commercial tooling
 
 Anything broader requires a new milestone.

@@ -3,10 +3,10 @@
  *
  * Verifies that the Express middleware correctly:
  * 1. Extracts caller identity from request headers
- * 2. Builds a valid ArcHttpRequest
+ * 2. Builds a valid ChioHttpRequest
  * 3. Handles sidecar responses (allow/deny)
- * 4. Produces receipts that conform to the ARC receipt schema
- * 5. Returns structured error responses with ARC error codes
+ * 4. Produces receipts that conform to the Chio receipt schema
+ * 5. Returns structured error responses with Chio error codes
  *
  * These tests run against a mock sidecar server that returns
  * predetermined verdicts and receipts, allowing verification
@@ -17,8 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import express from "express";
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
-import { arc } from "@arc-protocol/express";
-import type { HttpReceipt, EvaluateResponse, Verdict } from "@arc-protocol/node-http";
+import { chio } from "@chio-protocol/express";
+import type { HttpReceipt, EvaluateResponse, Verdict } from "@chio-protocol/node-http";
 import { validateReceiptStructure, assertVerdictMatch } from "../../src/verify.js";
 import { canonicalJsonString } from "../../src/canonical.js";
 
@@ -41,7 +41,7 @@ function createMockSidecar(): {
       const parsed = JSON.parse(body);
       lastReq = parsed;
 
-      if (req.url === "/arc/evaluate") {
+      if (req.url === "/chio/evaluate") {
         const receipt = createMockReceipt(parsed, verdictMode);
         const response: EvaluateResponse = {
           verdict: receipt.verdict,
@@ -50,7 +50,7 @@ function createMockSidecar(): {
         };
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(response));
-      } else if (req.url === "/arc/health") {
+      } else if (req.url === "/chio/health") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));
       } else {
@@ -74,7 +74,7 @@ function createMockSidecar(): {
 }
 
 function createMockReceipt(
-  arcReq: { request_id: string; method: string; route_pattern: string; path: string; query: Record<string, string>; caller: { subject: string } },
+  chioReq: { request_id: string; method: string; route_pattern: string; path: string; query: Record<string, string>; caller: { subject: string } },
   mode: "allow" | "deny",
 ): HttpReceipt {
   const verdict: Verdict =
@@ -90,24 +90,24 @@ function createMockReceipt(
   // Compute content hash like the Rust kernel
   const binding = {
     body_hash: null,
-    method: arcReq.method,
-    path: arcReq.path,
-    query: arcReq.query,
-    route_pattern: arcReq.route_pattern,
+    method: chioReq.method,
+    path: chioReq.path,
+    query: chioReq.query,
+    route_pattern: chioReq.route_pattern,
   };
   const contentHash = createHash("sha256")
     .update(canonicalJsonString(binding))
     .digest("hex");
 
   const callerHash = createHash("sha256")
-    .update(canonicalJsonString({ auth_method: { method: "anonymous" }, subject: arcReq.caller.subject, verified: false }))
+    .update(canonicalJsonString({ auth_method: { method: "anonymous" }, subject: chioReq.caller.subject, verified: false }))
     .digest("hex");
 
   return {
     id: `receipt-${randomUUID()}`,
-    request_id: arcReq.request_id,
-    route_pattern: arcReq.route_pattern,
-    method: arcReq.method as "GET",
+    request_id: chioReq.request_id,
+    route_pattern: chioReq.route_pattern,
+    method: chioReq.method as "GET",
     caller_identity_hash: callerHash,
     verdict,
     evidence: [
@@ -169,10 +169,10 @@ describe("Express E2E conformance", () => {
     // Start mock sidecar
     await new Promise<void>((resolve) => mock.server.listen(0, resolve));
 
-    // Create Express app with ARC middleware
+    // Create Express app with Chio middleware
     const app = express();
     app.use(
-      arc({
+      chio({
         sidecarUrl: `http://127.0.0.1:${mock.port()}`,
         skip: ["/health"],
       }),
@@ -193,12 +193,12 @@ describe("Express E2E conformance", () => {
     mock.server.close();
   });
 
-  it("GET /health bypasses ARC evaluation", async () => {
+  it("GET /health bypasses Chio evaluation", async () => {
     const resp = await request(appServer, "GET", "/health");
     expect(resp.status).toBe(200);
     expect(JSON.parse(resp.body)).toEqual({ ok: true });
-    // No X-Arc-Receipt-Id header for skipped routes
-    expect(resp.headers["x-arc-receipt-id"]).toBeUndefined();
+    // No X-Chio-Receipt-Id header for skipped routes
+    expect(resp.headers["x-chio-receipt-id"]).toBeUndefined();
   });
 
   it("GET /pets produces a valid allow receipt", async () => {
@@ -207,12 +207,12 @@ describe("Express E2E conformance", () => {
     expect(resp.status).toBe(200);
 
     // Receipt ID should be in the response headers
-    const receiptId = resp.headers["x-arc-receipt-id"];
+    const receiptId = resp.headers["x-chio-receipt-id"];
     expect(receiptId).toBeDefined();
     expect(typeof receiptId).toBe("string");
   });
 
-  it("sidecar receives correct ArcHttpRequest for GET /pets", async () => {
+  it("sidecar receives correct ChioHttpRequest for GET /pets", async () => {
     mock.setVerdictMode("allow");
     await request(appServer, "GET", "/pets");
 
@@ -245,7 +245,7 @@ describe("Express E2E conformance", () => {
     expect(resp.status).toBe(403);
 
     const body = JSON.parse(resp.body);
-    expect(body.error).toBe("arc_access_denied");
+    expect(body.error).toBe("chio_access_denied");
     expect(body.receipt_id).toBeDefined();
     expect(body.suggestion).toBeDefined();
   });

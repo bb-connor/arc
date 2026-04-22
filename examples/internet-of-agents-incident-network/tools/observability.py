@@ -2,7 +2,7 @@
 """MCP server: customer observability platform.
 
 Provides read-only access to incident data, distributed traces, deployment
-timeline, and SLO status.  Served behind arc mcp serve-http so every tool
+timeline, and SLO status.  Served behind chio mcp serve-http so every tool
 call is kernel-mediated with guard evaluation and receipt signing.
 """
 from __future__ import annotations

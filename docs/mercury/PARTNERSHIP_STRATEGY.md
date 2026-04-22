@@ -45,7 +45,7 @@ The first validated choice inside this category was one case-management review
 consumer path. The governance-workbench path is now also validated, and the
 assurance-suite reviewer family is now complete. The embedded OEM path is also
 validated, and the trust-network lane is now complete. The active `v2.50`
-choice moves into one ARC-Wall buyer path for a barrier-control-room sponsor.
+choice moves into one Chio-Wall buyer path for a barrier-control-room sponsor.
 That keeps the next expansion commercially concrete and avoids opening several
 speculative connector, orchestration, portal, trust-broker, or barrier-
 platform programs at once.
@@ -74,12 +74,12 @@ Why they matter:
 
 Current selected path:
 
-- one bounded ARC-Wall lane over ARC guard, receipt, checkpoint, publication,
+- one bounded Chio-Wall lane over Chio guard, receipt, checkpoint, publication,
   and verification artifacts
 - one buyer motion: `control_room_barrier_review`
 - one control surface: `tool_access_domain_boundary`
 - one domain pair: `research -> execution`
-- one owner boundary: `barrier-control-room` plus `arc-wall-ops`
+- one owner boundary: `barrier-control-room` plus `chio-wall-ops`
 
 What to seek:
 

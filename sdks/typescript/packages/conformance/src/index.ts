@@ -1,7 +1,7 @@
 /**
- * @arc-protocol/conformance
+ * @chio-protocol/conformance
  *
- * Conformance test utilities for the ARC TypeScript SDK.
+ * Conformance test utilities for the Chio TypeScript SDK.
  * Verifies that TS SDK behavior matches the Rust kernel.
  */
 

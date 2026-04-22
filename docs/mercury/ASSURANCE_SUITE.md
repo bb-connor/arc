@@ -82,16 +82,16 @@ Not supported in `v2.47`:
 Export the bounded assurance-suite package family:
 
 ```bash
-cargo run -p arc-mercury -- assurance-suite export --output target/mercury-assurance-suite-export
+cargo run -p chio-mercury -- assurance-suite export --output target/mercury-assurance-suite-export
 ```
 
 Generate the validation package and explicit next-step decision:
 
 ```bash
-cargo run -p arc-mercury -- assurance-suite validate --output target/mercury-assurance-suite-validation
+cargo run -p chio-mercury -- assurance-suite validate --output target/mercury-assurance-suite-validation
 ```
 
-These commands must remain wrappers over the existing ARC evidence export,
+These commands must remain wrappers over the existing Chio evidence export,
 Mercury proof/inquiry packaging, supervised-live qualification artifacts, and
-governance-workbench decision package. ARC stays generic; Mercury stays
+governance-workbench decision package. Chio stays generic; Mercury stays
 opinionated.

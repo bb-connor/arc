@@ -1,0 +1,76 @@
+{
+  "schema": "chio.link.runtime-report.v1",
+  "generatedAt": 1743499990,
+  "globalPause": false,
+  "chains": [
+    {
+      "chainId": 8453,
+      "label": "base-mainnet",
+      "caip2": "eip155:8453",
+      "enabled": true,
+      "status": "healthy",
+      "sequencerUptimeFeed": "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433",
+      "checkedAt": 1743499990,
+      "statusStartedAt": 1743499200
+    },
+    {
+      "chainId": 42161,
+      "label": "arbitrum-one",
+      "caip2": "eip155:42161",
+      "enabled": false,
+      "status": "disabled",
+      "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+      "checkedAt": 1743499990,
+      "note": "operator disabled this chain"
+    }
+  ],
+  "pairs": [
+    {
+      "pair": "ETH/USD",
+      "chainId": 8453,
+      "status": "healthy",
+      "activeBackend": "chainlink",
+      "activeSource": "chainlink:twap",
+      "feedReference": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+      "updatedAt": 1743499950,
+      "cacheAgeSeconds": 40,
+      "conversionMarginBps": 200
+    },
+    {
+      "pair": "BTC/USD",
+      "chainId": 8453,
+      "status": "tripped",
+      "lastError": "oracle sources diverge by 10.00% for BTC/USD (threshold: 5.00%)"
+    },
+    {
+      "pair": "USDC/USD",
+      "chainId": 8453,
+      "status": "degraded_grace",
+      "activeBackend": "chainlink",
+      "activeSource": "chainlink:degraded",
+      "feedReference": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+      "updatedAt": 1743499500,
+      "cacheAgeSeconds": 490,
+      "conversionMarginBps": 1000,
+      "note": "using degraded stale-cache grace policy"
+    }
+  ],
+  "alerts": [
+    {
+      "code": "pair_tripped",
+      "severity": "critical",
+      "message": "oracle sources diverge by 10.00% for BTC/USD (threshold: 5.00%)",
+      "pair": "BTC/USD",
+      "chainId": 8453,
+      "observedAt": 1743499990
+    },
+    {
+      "code": "degraded_grace_active",
+      "severity": "warning",
+      "message": "using degraded stale-cache grace policy",
+      "pair": "USDC/USD",
+      "chainId": 8453,
+      "observedAt": 1743499990
+    }
+  ]
+}

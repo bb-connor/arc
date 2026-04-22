@@ -6,7 +6,7 @@
 
 ## Context
 
-ARC currently uses a custom framed canonical-JSON transport between agent and kernel.
+Chio currently uses a custom framed canonical-JSON transport between agent and kernel.
 
 That is acceptable internally, but it is not sufficient for real MCP replacement. The external ecosystem already expects:
 
@@ -22,7 +22,7 @@ There are two plausible directions:
 
 ## Decision
 
-ARC will use:
+Chio will use:
 
 - JSON-RPC at the public edge
 - a normalized internal session model beneath the edge
@@ -54,7 +54,7 @@ It also avoids the opposite failure modes:
 
 - there is a translation layer to maintain
 - debugging may need better observability because the edge and core are separate
-- errors must be mapped carefully between JSON-RPC and ARC internal errors
+- errors must be mapped carefully between JSON-RPC and Chio internal errors
 
 ## Required follow-up
 
@@ -65,4 +65,4 @@ It also avoids the opposite failure modes:
 ## Non-goals
 
 - replacing the internal framed transport immediately
-- committing to a native public ARC wire protocol before `v1`
+- committing to a native public Chio wire protocol before `v1`

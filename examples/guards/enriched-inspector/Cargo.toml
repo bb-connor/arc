@@ -1,5 +1,5 @@
 [package]
-name = "arc-example-enriched-inspector"
+name = "chio-example-enriched-inspector"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -8,8 +8,8 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-arc-guard-sdk = { path = "../../../crates/arc-guard-sdk" }
-arc-guard-sdk-macros = { path = "../../../crates/arc-guard-sdk-macros" }
+chio-guard-sdk = { path = "../../../crates/chio-guard-sdk" }
+chio-guard-sdk-macros = { path = "../../../crates/chio-guard-sdk-macros" }
 
 [lints.clippy]
 unwrap_used = "deny"

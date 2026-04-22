@@ -1,0 +1,151 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: chiopolicies.chio.backbay.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: chio.backbay.io
+  names:
+    kind: ChioPolicy
+    listKind: ChioPolicyList
+    plural: chiopolicies
+    singular: chiopolicy
+    shortNames:
+      - chiop
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >-
+            ChioPolicy defines required Chio scopes and capability constraints
+            for pods in a namespace or matching a label selector.
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - requiredScopes
+              properties:
+                requiredScopes:
+                  type: array
+                  description: >-
+                    List of Chio scopes required for pods in this namespace.
+                    Pods must present a capability token granting all listed scopes.
+                  items:
+                    type: string
+                  minItems: 1
+                selector:
+                  type: object
+                  description: >-
+                    Optional label selector. When set, the policy applies only to
+                    pods matching this selector. When omitted, it applies to all
+                    pods in the namespace.
+                  properties:
+                    matchLabels:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    matchExpressions:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          operator:
+                            type: string
+                            enum:
+                              - In
+                              - NotIn
+                              - Exists
+                              - DoesNotExist
+                          values:
+                            type: array
+                            items:
+                              type: string
+                enforcement:
+                  type: string
+                  description: >-
+                    Enforcement mode for this policy. "enforce" rejects
+                    non-compliant pods (default). "audit" allows pods but
+                    logs violations. "disabled" skips enforcement entirely.
+                  enum:
+                    - enforce
+                    - audit
+                    - disabled
+                  default: enforce
+                sidecarConfig:
+                  type: object
+                  description: >-
+                    Default sidecar configuration for pods governed by this policy.
+                    Individual pod annotations can override these defaults.
+                  properties:
+                    image:
+                      type: string
+                      description: Container image for the Chio sidecar.
+                    upstream:
+                      type: string
+                      description: Default upstream URL for the sidecar proxy.
+                    specPath:
+                      type: string
+                      description: Path to the OpenAPI spec file.
+                    receiptStore:
+                      type: string
+                      description: Receipt storage backend URI.
+                    autoInject:
+                      type: boolean
+                      description: >-
+                        Automatically inject sidecar into matching pods.
+                        When true, pods do not need the chio.backbay.io/inject
+                        annotation.
+                      default: false
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Scopes
+          type: string
+          jsonPath: .spec.requiredScopes
+          description: Required Chio scopes
+        - name: Enforcement
+          type: string
+          jsonPath: .spec.enforcement
+          description: Enforcement mode
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

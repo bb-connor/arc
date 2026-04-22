@@ -1,21 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { Elysia } from "elysia";
-import { arc } from "../src/index.js";
+import { chio } from "../src/index.js";
 
-describe("arc elysia plugin", () => {
-  it("exports arc as a function", () => {
-    expect(typeof arc).toBe("function");
+describe("chio elysia plugin", () => {
+  it("exports chio as a function", () => {
+    expect(typeof chio).toBe("function");
   });
 
   it("returns an Elysia instance", () => {
-    const plugin = arc({});
+    const plugin = chio({});
     expect(plugin).toBeInstanceOf(Elysia);
   });
 
   it("skip patterns bypass evaluation", async () => {
     const app = new Elysia()
       .use(
-        arc({
+        chio({
           sidecarUrl: "http://127.0.0.1:1", // Unreachable
           skip: ["/health"],
         }),
@@ -34,7 +34,7 @@ describe("arc elysia plugin", () => {
   it("denies requests when sidecar is unreachable (fail-closed)", async () => {
     const app = new Elysia()
       .use(
-        arc({
+        chio({
           sidecarUrl: "http://127.0.0.1:1", // Unreachable
           timeoutMs: 500,
         }),
@@ -47,13 +47,13 @@ describe("arc elysia plugin", () => {
 
     expect(response.status).toBe(502);
     const body = await response.json();
-    expect(body.error).toBe("arc_sidecar_unreachable");
+    expect(body.error).toBe("chio_sidecar_unreachable");
   });
 
   it("allows requests when onSidecarError is allow", async () => {
     const app = new Elysia()
       .use(
-        arc({
+        chio({
           sidecarUrl: "http://127.0.0.1:1", // Unreachable
           onSidecarError: "allow",
           timeoutMs: 500,
@@ -73,7 +73,7 @@ describe("arc elysia plugin", () => {
   it("skip patterns with regex work", async () => {
     const app = new Elysia()
       .use(
-        arc({
+        chio({
           sidecarUrl: "http://127.0.0.1:1", // Unreachable
           skip: [/^\/internal\//],
         }),

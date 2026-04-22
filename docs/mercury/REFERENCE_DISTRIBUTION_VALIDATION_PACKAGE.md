@@ -11,14 +11,14 @@
 bounded Mercury reference-distribution lane. It generates the landed-account
 bundle, writes the validation report, and emits one explicit proceed decision
 instead of implying a generic sales platform, CRM workflow, merged shell, or
-ARC commercial surface.
+Chio commercial surface.
 
 ---
 
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- reference-distribution validate --output target/mercury-reference-distribution-validation
+cargo run -p chio-mercury -- reference-distribution validate --output target/mercury-reference-distribution-validation
 ```
 
 ---
@@ -63,7 +63,7 @@ This package supports one bounded claim only:
 > Mercury can proceed with one landed-account expansion motion using one
 > approved reference bundle rooted in the validated controlled-adoption,
 > release-readiness, trust-network, assurance, proof, and inquiry stack
-> without widening ARC or creating a generic sales platform.
+> without widening Chio or creating a generic sales platform.
 
 ---
 
@@ -72,6 +72,6 @@ This package supports one bounded claim only:
 This package does not claim:
 
 - multiple landed-account motions or broader distribution surfaces
-- a generic sales platform, CRM workflow, or ARC commercial console
-- a merged Mercury and ARC-Wall shell
+- a generic sales platform, CRM workflow, or Chio commercial console
+- a merged Mercury and Chio-Wall shell
 - universal rollout readiness or broad business performance guarantees

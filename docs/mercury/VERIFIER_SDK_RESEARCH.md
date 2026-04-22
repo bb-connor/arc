@@ -31,7 +31,7 @@ of that proof package, not a separate unverifiable artifact family.
 
 Why first:
 
-- closest to ARC primitives
+- closest to Chio primitives
 - easiest to keep deterministic and auditable
 - straightforward to package into a CLI and future FFI or WASM surfaces
 

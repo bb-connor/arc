@@ -1,8 +1,8 @@
 {
-  "name": "@arc-protocol/node-http",
+  "name": "@chio-protocol/node-http",
   "version": "1.0.0",
   "type": "module",
-  "description": "Common HTTP interception substrate for ARC protocol -- Node and Bun compatible",
+  "description": "Common HTTP interception substrate for Chio protocol -- Node and Bun compatible",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

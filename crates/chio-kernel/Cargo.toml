@@ -1,0 +1,45 @@
+[package]
+name = "chio-kernel"
+description = "Chio runtime kernel: capability validation, guard evaluation, receipt signing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[lib]
+name = "chio_kernel"
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-core = { path = "../chio-core" }
+chio-core-types = { path = "../chio-core-types" }
+chio-kernel-core = { path = "../chio-kernel-core" }
+chio-credit = { path = "../chio-credit" }
+chio-federation = { path = "../chio-federation" }
+chio-governance = { path = "../chio-governance" }
+chio-link = { path = "../chio-link", default-features = false }
+lru = "0.16.3"
+chio-listing = { path = "../chio-listing" }
+chio-market = { path = "../chio-market" }
+chio-open-market = { path = "../chio-open-market" }
+regex = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+rusqlite = { workspace = true }
+chio-underwriting = { path = "../chio-underwriting" }
+uuid = { workspace = true, features = ["v7"] }
+ureq = { version = "2.10", features = ["json"] }
+
+[dev-dependencies]
+chio-store-sqlite = { path = "../chio-store-sqlite" }
+proptest = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

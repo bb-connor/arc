@@ -6,8 +6,8 @@ edition = "2021"
 [workspace]
 
 [dependencies]
-arc-core = { path = "../../crates/arc-core" }
-arc-kernel = { path = "../../crates/arc-kernel" }
-arc-manifest = { path = "../../crates/arc-manifest" }
-arc-mcp-edge = { path = "../../crates/arc-mcp-edge" }
+chio-core = { path = "../../crates/chio-core" }
+chio-kernel = { path = "../../crates/chio-kernel" }
+chio-manifest = { path = "../../crates/chio-manifest" }
+chio-mcp-edge = { path = "../../crates/chio-mcp-edge" }
 serde_json = "1"

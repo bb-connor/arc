@@ -1,11 +1,11 @@
-# ARC HTTP Substrate Protocol
+# Chio HTTP Substrate Protocol
 
 **Version:** 1.0
 **Date:** 2026-04-14
 **Status:** Normative
 
-This document defines the HTTP substrate protocol for ARC. The HTTP substrate
-enables ARC to protect arbitrary HTTP APIs by evaluating requests against policy,
+This document defines the HTTP substrate protocol for Chio. The HTTP substrate
+enables Chio to protect arbitrary HTTP APIs by evaluating requests against policy,
 signing receipts, and returning structured verdicts. It is the foundation that
 all HTTP-layer SDKs, middleware crates, and sidecar deployments consume.
 
@@ -16,18 +16,18 @@ The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document
 
 ## 1. Overview
 
-The HTTP substrate introduces a sidecar evaluation model: an ARC kernel runs as
+The HTTP substrate introduces a sidecar evaluation model: an Chio kernel runs as
 a local process and exposes an HTTP API on localhost. Language-specific middleware
 (Express, Actix, Axum, etc.) intercepts incoming HTTP requests, constructs an
-`ArcHttpRequest`, sends it to the sidecar, and enforces the returned verdict.
+`ChioHttpRequest`, sends it to the sidecar, and enforces the returned verdict.
 
 The substrate defines:
 
 - A sidecar evaluation protocol (three HTTP endpoints)
-- A typed request model (`ArcHttpRequest`) for policy evaluation
+- A typed request model (`ChioHttpRequest`) for policy evaluation
 - A typed receipt model (`HttpReceipt`) for signed proof of evaluation
 - Supporting types for caller identity, authentication, sessions, and verdicts
-- A deterministic mapping from `HttpReceipt` to the core `ArcReceipt` type
+- A deterministic mapping from `HttpReceipt` to the core `ChioReceipt` type
 
 ## 2. Sidecar Evaluation Protocol
 
@@ -37,7 +37,7 @@ The sidecar **MUST** listen on `127.0.0.1:9090` by default. Implementations
 **MAY** override the sidecar URL via:
 
 1. An explicit configuration value (`sidecarUrl` in SDK config, or equivalent)
-2. The `ARC_SIDECAR_URL` environment variable
+2. The `CHIO_SIDECAR_URL` environment variable
 
 If both are set, the explicit configuration value takes precedence. If neither
 is set, the default `http://127.0.0.1:9090` **MUST** be used.
@@ -50,15 +50,15 @@ The sidecar exposes three endpoints:
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/arc/evaluate` | POST | Evaluate an HTTP request against policy |
-| `/arc/verify` | POST | Verify a receipt signature |
-| `/arc/health` | GET | Sidecar health check |
+| `/chio/evaluate` | POST | Evaluate an HTTP request against policy |
+| `/chio/verify` | POST | Verify a receipt signature |
+| `/chio/health` | GET | Sidecar health check |
 
-### 2.3 POST /arc/evaluate
+### 2.3 POST /chio/evaluate
 
 Evaluates an HTTP request against the loaded policy and returns a signed receipt.
 
-**Request body:** `ArcHttpRequest` (see [Section 3.1](#31-archttprequest))
+**Request body:** `ChioHttpRequest` (see [Section 3.1](#31-archttprequest))
 
 **Response body:** `EvaluateResponse`
 
@@ -81,7 +81,7 @@ HTTP status code of the sidecar response reflects the health of the evaluation
 pipeline, not the policy outcome. The policy outcome is encoded in the `verdict`
 field.
 
-### 2.4 POST /arc/verify
+### 2.4 POST /chio/verify
 
 Verifies the Ed25519 signature on a previously issued `HttpReceipt`.
 
@@ -102,7 +102,7 @@ A receipt with a valid signature but an expired timestamp is still `valid: true`
 from the verification endpoint's perspective. Temporal validity is the caller's
 responsibility.
 
-### 2.5 GET /arc/health
+### 2.5 GET /chio/health
 
 Returns the sidecar's health status.
 
@@ -134,18 +134,18 @@ be the default.
 sequenceDiagram
     participant Client as HTTP Client
     participant MW as Middleware / SDK
-    participant Sidecar as ARC Sidecar (127.0.0.1:9090)
+    participant Sidecar as Chio Sidecar (127.0.0.1:9090)
     participant Upstream as Upstream API
 
     Client->>MW: HTTP request
     MW->>MW: Extract caller identity, resolve route pattern
-    MW->>Sidecar: POST /arc/evaluate (ArcHttpRequest)
+    MW->>Sidecar: POST /chio/evaluate (ChioHttpRequest)
     Sidecar->>Sidecar: Match route, evaluate guards, sign receipt
     Sidecar-->>MW: 200 { verdict, receipt, evidence }
     alt verdict = allow
         MW->>Upstream: Forward request
         Upstream-->>MW: Response
-        MW-->>Client: Response + X-Arc-Receipt-Id header
+        MW-->>Client: Response + X-Chio-Receipt-Id header
     else verdict = deny
         MW-->>Client: 403 { error, message, receipt_id }
     end
@@ -154,18 +154,18 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Verifier
-    participant Sidecar as ARC Sidecar (127.0.0.1:9090)
+    participant Sidecar as Chio Sidecar (127.0.0.1:9090)
 
-    Verifier->>Sidecar: POST /arc/verify (HttpReceipt)
+    Verifier->>Sidecar: POST /chio/verify (HttpReceipt)
     Sidecar->>Sidecar: Extract body, verify Ed25519 signature
     Sidecar-->>Verifier: 200 { valid: true/false }
 ```
 
 ## 3. Supporting Types
 
-### 3.1 ArcHttpRequest
+### 3.1 ChioHttpRequest
 
-The protocol-agnostic HTTP request that ARC evaluates. This is the shared input
+The protocol-agnostic HTTP request that Chio evaluates. This is the shared input
 type for all HTTP substrate adapters (reverse proxy, framework middleware, and
 sidecar alike).
 
@@ -250,7 +250,7 @@ Example (Anonymous):
 
 ### 3.4 SessionContext
 
-Per-session context carried through the ARC HTTP pipeline. A session groups
+Per-session context carried through the Chio HTTP pipeline. A session groups
 related requests from the same caller over a bounded time window.
 
 | Field | Type | Required | Default | Description |
@@ -303,7 +303,7 @@ Example (Deny):
 
 ### 3.6 HttpMethod
 
-An enumeration of HTTP methods supported by the ARC HTTP substrate.
+An enumeration of HTTP methods supported by the Chio HTTP substrate.
 Serialized as uppercase strings.
 
 | Value | Safe | Requires Capability |
@@ -332,7 +332,7 @@ Evidence from a single guard's evaluation during the request pipeline.
 
 ## 4. HttpReceipt
 
-A signed receipt proving that an HTTP request was evaluated by the ARC kernel.
+A signed receipt proving that an HTTP request was evaluated by the Chio kernel.
 The receipt binds the request identity, route, method, verdict, and guard
 evidence under an Ed25519 signature from the kernel.
 
@@ -348,7 +348,7 @@ evidence under an Ed25519 signature from the kernel.
 | `session_id` | `string` or `null` | MAY | `null` | Yes | Session ID the request belonged to |
 | `verdict` | `Verdict` | MUST | | Yes | The kernel's verdict |
 | `evidence` | `GuardEvidence[]` | MAY | `[]` | Yes | Per-guard evidence collected during evaluation |
-| `response_status` | `integer` | MUST | | Yes | HTTP status ARC associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete ARC error status; for allow receipts produced before proxy or app execution completes, it is evaluation-time status metadata rather than guaranteed downstream response evidence. |
+| `response_status` | `integer` | MUST | | Yes | HTTP status Chio associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete Chio error status; for allow receipts produced before proxy or app execution completes, it is evaluation-time status metadata rather than guaranteed downstream response evidence. |
 | `timestamp` | `integer` | MUST | | Yes | Unix timestamp (seconds) when the receipt was created |
 | `content_hash` | `string` | MUST | | Yes | SHA-256 hex hash binding the request content to this receipt |
 | `policy_hash` | `string` | MUST | | Yes | SHA-256 hex hash of the policy that was applied |
@@ -386,14 +386,14 @@ receipt content as authoritative.
 - `signature`: Ed25519 signature serialized as a 128-character lowercase hex
   string (64 bytes). Pattern: `^[0-9a-f]{128}$`.
 
-## 5. HttpReceipt to ArcReceipt Mapping
+## 5. HttpReceipt to ChioReceipt Mapping
 
-The `to_arc_receipt()` conversion maps an HTTP-layer receipt into the core
-`ArcReceipt` type for unified storage and cross-surface querying.
+The `to_chio_receipt()` conversion maps an HTTP-layer receipt into the core
+`ChioReceipt` type for unified storage and cross-surface querying.
 
 ### 5.1 Field Mapping
 
-| HttpReceipt field | ArcReceipt field | Transformation |
+| HttpReceipt field | ChioReceipt field | Transformation |
 | --- | --- | --- |
 | `id` | `id` | Copied directly |
 | `timestamp` | `timestamp` | Copied directly |
@@ -403,7 +403,7 @@ The `to_arc_receipt()` conversion maps an HTTP-layer receipt into the core
 | `method`, `route_pattern`, `request_id` | `action.parameters` | JSON object: `{ "method": "<method>", "route": "<route_pattern>", "request_id": "<request_id>" }` |
 | `content_hash` | `action.parameter_hash` | Copied directly |
 | `verdict` | `decision` | Converted via `Verdict.to_decision()` (see below) |
-| `content_hash` | `content_hash` | Recomputed as SHA-256 of canonical JSON of `ArcReceiptBody` |
+| `content_hash` | `content_hash` | Recomputed as SHA-256 of canonical JSON of `ChioReceiptBody` |
 | `policy_hash` | `policy_hash` | Copied directly |
 | `evidence` | `evidence` | Copied directly (same `GuardEvidence` type) |
 | `metadata` | `metadata` | Copied directly |
@@ -422,17 +422,17 @@ The `to_arc_receipt()` conversion maps an HTTP-layer receipt into the core
 ### 5.3 Signature Limitation
 
 **Important:** The `signature` field is copied directly from the `HttpReceipt`
-to the `ArcReceipt`. It is **not** re-signed over the `ArcReceiptBody`. This
-means the `ArcReceipt.signature` was computed over the `HttpReceiptBody`
-canonical JSON, not the `ArcReceiptBody` canonical JSON.
+to the `ChioReceipt`. It is **not** re-signed over the `ChioReceiptBody`. This
+means the `ChioReceipt.signature` was computed over the `HttpReceiptBody`
+canonical JSON, not the `ChioReceiptBody` canonical JSON.
 
-Consumers that verify `ArcReceipt` signatures from HTTP-origin receipts
-**MUST** be aware that standard `ArcReceipt` signature verification will fail
+Consumers that verify `ChioReceipt` signatures from HTTP-origin receipts
+**MUST** be aware that standard `ChioReceipt` signature verification will fail
 for these converted receipts. The intended use is unified storage and querying,
 not independent cryptographic verification of the converted form.
 
 In production deployments, the kernel **SHOULD** sign both `HttpReceipt` and
-`ArcReceipt` independently from the same evaluation, rather than relying on
+`ChioReceipt` independently from the same evaluation, rather than relying on
 the conversion method.
 
 ## 6. Default Policy Semantics
@@ -443,8 +443,8 @@ The HTTP substrate defines default policy behavior based on HTTP method safety:
   are considered side-effect-free and are permitted without an explicit
   capability token.
 - **Unsafe methods** (POST, PUT, PATCH, DELETE): Deny by default. These methods
-  require an explicit capability token presented in the `X-Arc-Capability`
-  request header or via `capability_id` in the `ArcHttpRequest`.
+  require an explicit capability token presented in the `X-Chio-Capability`
+  request header or via `capability_id` in the `ChioHttpRequest`.
 
 When a route is not matched in the loaded policy, the evaluator **MUST** fall
 back to method-based default policy.
@@ -458,11 +458,11 @@ to callers:
 
 | Code | Meaning |
 | --- | --- |
-| `arc_access_denied` | The request was denied by policy |
-| `arc_sidecar_unreachable` | The sidecar process is not reachable |
-| `arc_evaluation_failed` | The sidecar returned a non-200 status |
-| `arc_invalid_receipt` | Receipt verification failed |
-| `arc_timeout` | The sidecar did not respond within the timeout |
+| `chio_access_denied` | The request was denied by policy |
+| `chio_sidecar_unreachable` | The sidecar process is not reachable |
+| `chio_evaluation_failed` | The sidecar returned a non-200 status |
+| `chio_invalid_receipt` | Receipt verification failed |
+| `chio_timeout` | The sidecar did not respond within the timeout |
 
 ### 7.2 Structured Error Response
 
@@ -480,7 +480,7 @@ JSON object:
 
 Versioned HTTP substrate schemas live under:
 
-- `spec/schemas/arc-http/v1/`
+- `spec/schemas/chio-http/v1/`
 
 Normative requirements:
 
@@ -496,8 +496,8 @@ The schema files are:
 | File | Described type |
 | --- | --- |
 | `http-receipt.schema.json` | `HttpReceipt` |
-| `arc-http-request.schema.json` | `ArcHttpRequest` |
+| `chio-http-request.schema.json` | `ChioHttpRequest` |
 | `caller-identity.schema.json` | `CallerIdentity` with `AuthMethod` |
 | `verdict.schema.json` | `Verdict` |
-| `evaluate-request.schema.json` | POST `/arc/evaluate` request body (alias for `ArcHttpRequest`) |
-| `evaluate-response.schema.json` | POST `/arc/evaluate` response body (`EvaluateResponse`) |
+| `evaluate-request.schema.json` | POST `/chio/evaluate` request body (alias for `ChioHttpRequest`) |
+| `evaluate-response.schema.json` | POST `/chio/evaluate` response body (`EvaluateResponse`) |

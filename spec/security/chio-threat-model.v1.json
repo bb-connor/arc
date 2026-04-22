@@ -1,0 +1,198 @@
+{
+  "schema": "chio.threat-model.v1",
+  "updatedAt": "2026-04-13",
+  "boundary": {
+    "focus": "agent-kernel-tool trust boundary",
+    "surfaces": [
+      "native_chio",
+      "hosted_mcp",
+      "trust_control",
+      "kernel_to_tool"
+    ],
+    "assets": [
+      "capability_tokens",
+      "delegation_state",
+      "session_sender_binding",
+      "kernel_authenticity",
+      "tool_execution_confinement",
+      "receipts",
+      "runtime_availability"
+    ]
+  },
+  "threats": [
+    {
+      "id": "capability_token_theft",
+      "name": "Capability token theft",
+      "surfaces": [
+        "trust_control",
+        "hosted_mcp",
+        "native_chio"
+      ],
+      "mitigations": [
+        {
+          "status": "existing",
+          "control": "Capabilities are signed, time-bounded, and revocable."
+        },
+        {
+          "status": "existing",
+          "control": "Chio-native DPoP can be required per grant, and hosted sender-constrained sessions can bind to DPoP or mTLS continuity."
+        },
+        {
+          "status": "planned",
+          "control": "High-value clustered deployments should use durable replay state rather than process-local proof nonces alone."
+        }
+      ],
+      "residualRisk": "Compatibility profiles still allow bearer-style capability use when sender constraint is not required, and replay protection weakens across restart or failover when nonce state is only process-local."
+    },
+    {
+      "id": "kernel_impersonation",
+      "name": "Kernel impersonation",
+      "surfaces": [
+        "hosted_mcp",
+        "native_chio"
+      ],
+      "mitigations": [
+        {
+          "status": "existing",
+          "control": "Capabilities and receipts are signed artifacts and hosted/native version contracts are explicit."
+        },
+        {
+          "status": "existing",
+          "control": "Cross-host deployments are required to use authenticated transport before authority is trusted."
+        },
+        {
+          "status": "planned",
+          "control": "Operators should distribute and pin Chio verifier keys, service certificates, or equivalent trust anchors with stricter rotation discipline."
+        }
+      ],
+      "residualRisk": "Plaintext local-development modes intentionally do not provide peer authenticity, and receipt trust still depends on deployment-specific trust-anchor distribution."
+    },
+    {
+      "id": "tool_server_escape",
+      "name": "Tool server escape",
+      "surfaces": [
+        "kernel_to_tool"
+      ],
+      "mitigations": [
+        {
+          "status": "existing",
+          "control": "The kernel mediates capability scope, server id, and tool name before invocation."
+        },
+        {
+          "status": "existing",
+          "control": "Production tool-server transport is modeled as an authenticated channel instead of anonymous raw TCP."
+        },
+        {
+          "status": "planned",
+          "control": "Operators should pair Chio mediation with OS or container sandboxing, least-privilege filesystem access, and outbound-network restrictions."
+        }
+      ],
+      "residualRisk": "Chio mediation does not by itself sandbox arbitrary tool-server code; a compromised tool process can still abuse whatever host privileges the operator granted it."
+    },
+    {
+      "id": "native_channel_replay",
+      "name": "Replay attacks on the native channel",
+      "surfaces": [
+        "native_chio"
+      ],
+      "mitigations": [
+        {
+          "status": "existing",
+          "control": "Chio-native DPoP can bind a request to capability id, tool target, action hash, freshness, sender key, and nonce uniqueness."
+        },
+        {
+          "status": "existing",
+          "control": "Capabilities are time-bounded and can be revoked."
+        },
+        {
+          "status": "planned",
+          "control": "Replay-sensitive deployments should require DPoP and avoid process-local-only nonce registries for high-value flows."
+        }
+      ],
+      "residualRisk": "The native framed lane has no separate in-band anti-replay mechanism outside the sender-proof and capability systems, so non-DPoP grants remain replayable within their validity window if the transport is exposed."
+    },
+    {
+      "id": "resource_exhaustion_dos",
+      "name": "Resource exhaustion denial of service",
+      "surfaces": [
+        "native_chio",
+        "hosted_mcp",
+        "trust_control",
+        "kernel_to_tool"
+      ],
+      "mitigations": [
+        {
+          "status": "existing",
+          "control": "Native frames larger than 16 MiB are rejected, and hosted sessions keep explicit lifecycle and stream-attachment limits."
+        },
+        {
+          "status": "planned",
+          "control": "Deployments should enforce request-rate, concurrency, and time-budget controls at hosted and trust-control edges."
+        },
+        {
+          "status": "planned",
+          "control": "Operators should bound retained replay buffers, queues, and per-session state and pair Chio with upstream load shedding."
+        }
+      ],
+      "residualRisk": "Size checks and lifecycle rules reduce but do not eliminate asymmetric workload attacks, and authenticated callers can still consume their own allowed quota share."
+    },
+    {
+      "id": "delegation_chain_abuse",
+      "name": "Delegation chain abuse",
+      "surfaces": [
+        "trust_control",
+        "native_chio",
+        "hosted_mcp"
+      ],
+      "mitigations": [
+        {
+          "status": "existing",
+          "control": "Trust-control delegated issuance already enforces a signed delegation-policy ceiling when one is supplied."
+        },
+        {
+          "status": "existing",
+          "control": "Chio core exposes delegation-chain and attenuation validators and the runtime already carries revocation state."
+        },
+        {
+          "status": "planned",
+          "control": "High-trust delegated flows should resolve and validate complete parent lineage recursively at admission time rather than trust presented metadata alone."
+        }
+      ],
+      "residualRisk": "The shipped runtime is stronger than unchecked delegation metadata, but it is not yet a universally recursive, fail-closed delegated-authority proof system at every entry point."
+    }
+  ],
+  "transportRequirements": {
+    "profiles": [
+      {
+        "surface": "native_chio_direct",
+        "tls": "required_on_cross_host_or_untrusted_networks",
+        "mtls": "required_when_peer_identity_is_part_of_the_authorization_trust_decision",
+        "dpop": "required_when_matched_grant_sets_dpop_required",
+        "withoutTransportSecurity": "allowed_only_for_same_host_uds_or_loopback_dev_otherwise_nonconformant"
+      },
+      {
+        "surface": "hosted_mcp_http",
+        "tls": "required_for_any_remote_or_non_loopback_deployment",
+        "mtls": "required_when_the_active_sender_constrained_profile_binds_to_an_mtls_thumbprint",
+        "dpop": "required_when_sender_constrained_profile_or_downstream_grant_requires_it",
+        "withoutTransportSecurity": "plain_http_is_local_dev_only_remote_plaintext_is_nonconformant_and_replayable"
+      },
+      {
+        "surface": "trust_control_http",
+        "tls": "required_for_any_remote_or_non_loopback_deployment",
+        "mtls": "required_for_operator_internal_service_to_service_deployments_that_rely_on_transport_identity",
+        "dpop": "not_primary_transport_requirement_today",
+        "withoutTransportSecurity": "plain_http_is_local_dev_only_remote_plaintext_is_nonconformant"
+      },
+      {
+        "surface": "kernel_to_tool_transport",
+        "tls": "use_uds_same_host_or_authenticated_transport_when_networked",
+        "mtls": "required_for_cross_host_or_cross_process_tcp_transport",
+        "dpop": "not_a_substitute_for_tool_transport_authentication",
+        "withoutTransportSecurity": "unauthenticated_network_transport_is_nonconformant_for_production"
+      }
+    ],
+    "attestationRule": "attestation_binding_never_authorizes_alone_it_must_pair_with_dpop_or_mtls_continuity",
+    "failureBehavior": "missing_required_transport_security_must_deny_or_downgrade_to_explicit_local_dev_only_posture"
+  }
+}

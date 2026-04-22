@@ -1,35 +1,35 @@
-# ARC Credential Interop Guide
+# Chio Credential Interop Guide
 
-This guide explains the narrow portable-credential interop path ARC currently
+This guide explains the narrow portable-credential interop path Chio currently
 ships, plus the bounded public identity-network contract layered on top of it.
 
-## What ARC Proves Today
+## What Chio Proves Today
 
-ARC now proves two external portability paths over the shipped portable
+Chio now proves two external portability paths over the shipped portable
 credential surfaces:
 
-1. fetch ARC issuer metadata from
+1. fetch Chio issuer metadata from
    `GET /.well-known/openid-credential-issuer`
 2. optionally fetch portable issuer key material and type metadata from
    `GET /.well-known/jwks.json` and
-   `GET /.well-known/arc-passport-sd-jwt-vc` or
-   `GET /.well-known/arc-passport-jwt-vc-json`
+   `GET /.well-known/chio-passport-sd-jwt-vc` or
+   `GET /.well-known/chio-passport-jwt-vc-json`
 3. redeem a pre-authorized code at
    `POST /v1/passport/issuance/token`
-4. redeem either a native ARC `AgentPassport` or a projected portable
+4. redeem either a native Chio `AgentPassport` or a projected portable
    `application/dc+sd-jwt` or `jwt_vc_json` credential at
    `POST /v1/passport/issuance/credential`
-5. fetch ARC verifier metadata from
-   `GET /.well-known/arc-oid4vp-verifier`
+5. fetch Chio verifier metadata from
+   `GET /.well-known/chio-oid4vp-verifier`
 6. fetch a signed OID4VP request object from
    `GET /v1/public/passport/oid4vp/requests/{request_id}` or resolve the same
    verifier transaction through the HTTPS cross-device launch URL returned by
    the verifier
 7. submit the signed `direct_post.jwt` holder response to
    `POST /v1/public/passport/oid4vp/direct-post`
-8. fetch a stored ARC-native verifier challenge from
+8. fetch a stored Chio-native verifier challenge from
    `GET /v1/public/passport/challenges/{challenge_id}`
-9. submit the signed ARC-native holder response to
+9. submit the signed Chio-native holder response to
    `POST /v1/public/passport/challenges/verify`
 
 The release qualification lane proves that flow with a non-CLI raw HTTP client
@@ -37,17 +37,17 @@ against the live trust-control service.
 
 ## What The Artifacts Still Are
 
-- issuer and subject identities remain `did:arc`
-- the native delivery lane remains the ARC `AgentPassport` artifact
+- issuer and subject identities remain `did:chio`
+- the native delivery lane remains the Chio `AgentPassport` artifact
 - the standards-native delivery lane is a signed projection over that same
   passport truth, not a second source of trust
 - verifier portability now uses a narrow signed OID4VP request-object profile
   over the projected passport lane
-- ARC-native challenge presentation remains a separate signed ARC challenge and
-  signed ARC holder response lane
+- Chio-native challenge presentation remains a separate signed Chio challenge and
+  signed Chio holder response lane
 - lifecycle and replay truth remain operator-scoped mutable side state, not
   new trust roots
-- ARC now also ships one bounded public identity profile over `did:arc` plus
+- Chio now also ships one bounded public identity profile over `did:chio` plus
   explicit `did:web`, `did:key`, and `did:jwk` compatibility inputs, one
   verifier-bound wallet-directory entry, one replay-safe wallet-routing
   manifest, and one qualification matrix that proves supported and fail-closed
@@ -65,10 +65,10 @@ Admin/operator surfaces:
 Holder/public surfaces:
 
 - `GET /.well-known/openid-credential-issuer`
-- `GET /.well-known/arc-oid4vp-verifier`
+- `GET /.well-known/chio-oid4vp-verifier`
 - `GET /.well-known/jwks.json`
-- `GET /.well-known/arc-passport-sd-jwt-vc`
-- `GET /.well-known/arc-passport-jwt-vc-json`
+- `GET /.well-known/chio-passport-sd-jwt-vc`
+- `GET /.well-known/chio-passport-jwt-vc-json`
 - `POST /v1/passport/issuance/token`
 - `POST /v1/passport/issuance/credential`
 - `GET /v1/public/passport/statuses/resolve/{passport_id}`
@@ -79,22 +79,22 @@ Holder/public surfaces:
 - `GET /v1/public/passport/challenges/{challenge_id}`
 - `POST /v1/public/passport/challenges/verify`
 
-ARC keeps those surfaces separate on purpose so public transport does not
+Chio keeps those surfaces separate on purpose so public transport does not
 silently widen verifier admin authority.
 
-If no portable signing key is configured, ARC omits the projected portable
+If no portable signing key is configured, Chio omits the projected portable
 profiles from issuer metadata, does not publish `jwksUri`, and returns `404`
 from the portable `JWKS` and portable type-metadata endpoints.
 
 ## Portable Lifecycle Semantics
 
-When a delivered credential carries `arcCredentialContext.passportStatus`,
+When a delivered credential carries `chioCredentialContext.passportStatus`,
 that sidecar points at mutable operator lifecycle truth instead of copying
 lifecycle state into the credential itself.
 
 - each `resolveUrl` is a base endpoint; consumers resolve one passport at
   `GET {resolveUrl}/{passport_id}`
-- `cacheTtlSecs` is mandatory whenever ARC advertises a public lifecycle
+- `cacheTtlSecs` is mandatory whenever Chio advertises a public lifecycle
   `resolveUrl`, and tells consumers how long a fetched lifecycle response may
   be treated as fresh
 - only `active` is a healthy portable lifecycle state
@@ -114,8 +114,8 @@ Shipped:
 
 - one OID4VCI-compatible native issuance profile for `AgentPassport`
 - two standards-native projected issuance profiles:
-  `arc_agent_passport_sd_jwt_vc` with format `application/dc+sd-jwt`, and
-  `arc_agent_passport_jwt_vc_json` with format `jwt_vc_json`
+  `chio_agent_passport_sd_jwt_vc` with format `application/dc+sd-jwt`, and
+  `chio_agent_passport_jwt_vc_json` with format `jwt_vc_json`
 - one issuer `JWKS` and one portable type-metadata contract per advertised
   projected profile
 - one portable lifecycle distribution and public resolution contract
@@ -132,23 +132,23 @@ Shipped:
   mTLS thumbprint binding, and one attestation-confirmation profile,
   `client_id_scheme=redirect_uri`, `response_type=vp_token`,
   `response_mode=direct_post.jwt`, one signed request-object `request_uri`,
-  one HTTPS cross-device launch URL, one ARC verifier metadata document, and
+  one HTTPS cross-device launch URL, one Chio verifier metadata document, and
   one verifier `JWKS` trust bootstrap
-- one ARC-native holder presentation transport over public challenge fetch and
+- one Chio-native holder presentation transport over public challenge fetch and
   public response submit routes
 - one raw-HTTP external client proof in release qualification
 
 Not shipped:
 
-- generic OID4VP or SIOP compatibility beyond ARC's documented verifier
+- generic OID4VP or SIOP compatibility beyond Chio's documented verifier
   request-object profile
 - DIDComm or mobile-wallet messaging stacks
-- generic SD-JWT VC or JWT VC interoperability beyond ARC's documented
+- generic SD-JWT VC or JWT VC interoperability beyond Chio's documented
   passport profile family
 - permissionless public issuer, verifier, identity, or wallet networks, or any
   claim that public discovery visibility widens local trust automatically
-- any claim that ARC passports are generic VC wallet artifacts outside the
-  documented ARC transport profile
+- any claim that Chio passports are generic VC wallet artifacts outside the
+  documented Chio transport profile
 
 The wallet exchange descriptor is intentionally narrower than a generic wallet
 session protocol:
@@ -168,18 +168,18 @@ When the verifier opts in, `identityAssertion` carries:
 - optional `provider` and `sessionHint`
 - `issuedAt`, `expiresAt`, and `boundRequestId`
 
-ARC treats that object as continuity context only. It does not widen wallet or
+Chio treats that object as continuity context only. It does not widen wallet or
 credential authority, and stale or mismatched assertions fail closed.
 
-When the verifier continues from the wallet exchange into ARC's hosted
+When the verifier continues from the wallet exchange into Chio's hosted
 authorization edge, it may also opt into one bounded sender-constrained
 contract:
 
-- `arc_sender_dpop_public_key`
-- `arc_sender_mtls_thumbprint_sha256`
-- `arc_sender_attestation_sha256`
+- `chio_sender_dpop_public_key`
+- `chio_sender_mtls_thumbprint_sha256`
+- `chio_sender_attestation_sha256`
 
-ARC treats these as continuity constraints, not as independent authority
+Chio treats these as continuity constraints, not as independent authority
 artifacts. DPoP and mTLS bind the runtime sender to the issued token, while
 the attestation digest is only accepted when it matches the carried
 `runtimeAssuranceEvidenceSha256` and is paired with DPoP or mTLS. Missing,
@@ -187,12 +187,12 @@ replayed, or contradictory sender proof fails closed.
 
 ## Cross-Issuer Portfolios
 
-ARC now also supports one bounded cross-issuer composition contract over the
+Chio now also supports one bounded cross-issuer composition contract over the
 same passport truth:
 
-- `arc.cross-issuer-portfolio.v1` for a visible holder or operator portfolio
-- `arc.cross-issuer-trust-pack.v1` for explicit local activation policy
-- `arc.cross-issuer-migration.v1` for explicit subject or issuer continuity
+- `chio.cross-issuer-portfolio.v1` for a visible holder or operator portfolio
+- `chio.cross-issuer-trust-pack.v1` for explicit local activation policy
+- `chio.cross-issuer-migration.v1` for explicit subject or issuer continuity
 
 The important boundary is conservative:
 
@@ -205,23 +205,23 @@ The important boundary is conservative:
   that entry to the portfolio subject
 - duplicate or contradictory migration provenance fails closed
 
-ARC still does not claim automatic federation admission, ambient trust from
+Chio still does not claim automatic federation admission, ambient trust from
 public identity or wallet discovery visibility, or a synthetic cross-issuer
 trust score.
 
 ## Public Identity Network Contract
 
-ARC's broadened public identity claim is still bounded and machine-readable.
+Chio's broadened public identity claim is still bounded and machine-readable.
 The shipped artifact family is:
 
-- `arc.public-identity-profile.v1`
-- `arc.public-wallet-directory-entry.v1`
-- `arc.public-wallet-routing-manifest.v1`
-- `arc.identity-interop-qualification-matrix.v1`
+- `chio.public-identity-profile.v1`
+- `chio.public-wallet-directory-entry.v1`
+- `chio.public-wallet-routing-manifest.v1`
+- `chio.identity-interop-qualification-matrix.v1`
 
 The important boundary stays conservative:
 
-- `did:arc` remains the provenance anchor even when a public profile names
+- `did:chio` remains the provenance anchor even when a public profile names
   `did:web`, `did:key`, or `did:jwk` as compatibility inputs
 - public wallet-directory entries remain verifier-bound references to existing
   issuer, verifier, and portable-profile state
@@ -229,12 +229,12 @@ The important boundary stays conservative:
   explicit fail-closed handling for subject mismatch, stale routing, and
   cross-operator issuer mismatch
 - qualification must cover supported and fail-closed multi-wallet,
-  multi-issuer, and cross-operator cases before ARC claims broader public
+  multi-issuer, and cross-operator cases before Chio claims broader public
   identity interoperability
 
 ## Current Portable Profile Contracts
 
-ARC now publishes one explicit portable claim catalog and one explicit
+Chio now publishes one explicit portable claim catalog and one explicit
 portable identity-binding contract per projected profile.
 
 ### SD-JWT VC
@@ -247,46 +247,46 @@ Always disclosed claims:
 - `sub`
 - `vct`
 - `cnf`
-- `arc_passport_id`
-- `arc_subject_did`
-- `arc_credential_count`
+- `chio_passport_id`
+- `chio_subject_did`
+- `chio_credential_count`
 
 Selectively disclosable claims:
 
-- `arc_issuer_dids`
-- `arc_merkle_roots`
-- `arc_enterprise_identity_provenance`
+- `chio_issuer_dids`
+- `chio_merkle_roots`
+- `chio_enterprise_identity_provenance`
 
 Optional portable claims:
 
-- `arc_passport_status`
+- `chio_passport_status`
 
 Portable identity binding is defined separately from the claim catalog:
 
 - portable subject claim: `sub`
 - subject confirmation material: `cnf.jwk`
-- ARC subject provenance claim: `arc_subject_did`
+- Chio subject provenance claim: `chio_subject_did`
 - portable issuer claim: `iss`
-- ARC issuer provenance claim: `arc_issuer_dids`
-- ARC enterprise provenance claim: `arc_enterprise_identity_provenance`
-- provenance anchor: `did:arc`
+- Chio issuer provenance claim: `chio_issuer_dids`
+- Chio enterprise provenance claim: `chio_enterprise_identity_provenance`
+- provenance anchor: `did:chio`
 
 Unsupported disclosure keys or unsupported subject/issuer rebinding patterns
-fail closed. ARC does not yet claim generic verifier-request negotiation
+fail closed. Chio does not yet claim generic verifier-request negotiation
 beyond this fixed profile.
 
 ### JWT VC JSON
 
 For the projected `jwt_vc_json` lane:
 
-- ARC keeps the same portable subject and issuer binding model:
+- Chio keeps the same portable subject and issuer binding model:
   `sub` plus `cnf.jwk` for subject binding, `iss` for issuer binding, and
-  `did:arc` provenance anchored through `vc.credentialSubject.id` and
-  `vc.credentialSubject.arcIssuerDids`
-- the ARC passport projection is carried in `vc.type` and
+  `did:chio` provenance anchored through `vc.credentialSubject.id` and
+  `vc.credentialSubject.chioIssuerDids`
+- the Chio passport projection is carried in `vc.type` and
   `vc.credentialSubject.*` fields instead of `vct` and SD disclosures
-- ARC publishes the same ARC portable claim catalog, but the profile declares
-  `supportsSelectiveDisclosure=false`, so the ARC claims that are selectively
+- Chio publishes the same Chio portable claim catalog, but the profile declares
+  `supportsSelectiveDisclosure=false`, so the Chio claims that are selectively
   disclosable in the SD-JWT VC profile are always disclosed in this JWT VC
   profile
 - malformed JWT VC payloads, mismatched compact-profile formats, or missing
@@ -297,10 +297,10 @@ For the projected `jwt_vc_json` lane:
 This interop profile is enough for:
 
 - partner pilots that want a standards-legible issuance surface
-- relying parties that can consume ARC JSON over HTTPS without embedding ARC
+- relying parties that can consume Chio JSON over HTTPS without embedding Chio
   CLI workflows
 - wallet or verifier experiments that need one honest transport contract
   before broader ecosystem adapters exist
 
-It is intentionally not a claim that ARC has already solved every wallet
+It is intentionally not a claim that Chio has already solved every wallet
 ecosystem problem.

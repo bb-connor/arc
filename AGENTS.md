@@ -1,10 +1,10 @@
 # AGENTS.md
 
-## What is ARC?
+## What is Chio?
 
-ARC (Provable Agent Capability Transport) is a protocol for secure, attested tool access in AI agent systems. It replaces MCP with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation.
+Chio (Chio) is a protocol for secure, attested tool access in AI agent systems. It replaces MCP with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation.
 
-ARC is the protocol layer. ClawdStrike is the policy engine that plugs into the ARC kernel as the guard evaluation backend.
+Chio is the protocol layer. ClawdStrike is the policy engine that plugs into the Chio kernel as the guard evaluation backend.
 
 ## Five Components
 
@@ -18,10 +18,10 @@ ARC is the protocol layer. ClawdStrike is the policy engine that plugs into the 
 
 | Crate | Purpose |
 |-------|---------|
-| `arc-core` | Shared types: capabilities, scopes, grants, receipts, canonical JSON, signing |
-| `arc-kernel` | Runtime kernel: capability validation, guard pipeline, receipt signing |
-| `arc-manifest` | Tool server manifest format: tool definitions, signing, verification |
-| `arc-mcp-adapter` | Wraps existing MCP servers as ARC tool servers |
+| `chio-core` | Shared types: capabilities, scopes, grants, receipts, canonical JSON, signing |
+| `chio-kernel` | Runtime kernel: capability validation, guard pipeline, receipt signing |
+| `chio-manifest` | Tool server manifest format: tool definitions, signing, verification |
+| `chio-mcp-adapter` | Wraps existing MCP servers as Chio tool servers |
 | `hello-tool` | Example tool server (in `examples/`) |
 
 ## Build and Test
@@ -44,7 +44,7 @@ cargo fmt --all -- --check
 ## Key Files
 
 - Protocol spec: `spec/PROTOCOL.md`
-- Core types: `crates/arc-core/src/lib.rs`
-- Kernel: `crates/arc-kernel/src/lib.rs`
-- Manifest: `crates/arc-manifest/src/lib.rs`
-- MCP adapter: `crates/arc-mcp-adapter/src/lib.rs`
+- Core types: `crates/chio-core/src/lib.rs`
+- Kernel: `crates/chio-kernel/src/lib.rs`
+- Manifest: `crates/chio-manifest/src/lib.rs`
+- MCP adapter: `crates/chio-mcp-adapter/src/lib.rs`

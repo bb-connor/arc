@@ -1,0 +1,18 @@
+{
+  "id": "deny-receipt-emitted",
+  "title": "Denied actions emit signed deny receipts",
+  "area": "trust_extensions",
+  "category": "chio-extension",
+  "specVersions": ["2026-03-19"],
+  "transport": ["stdio"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["wrapped_stdio"],
+  "requiredCapabilities": {
+    "server": [],
+    "client": []
+  },
+  "tags": ["wave4", "trust"],
+  "expected": "pass",
+  "timeoutMs": 5000,
+  "notes": "Chio-specific trust assertion. This should never be counted as MCP-core compatibility."
+}

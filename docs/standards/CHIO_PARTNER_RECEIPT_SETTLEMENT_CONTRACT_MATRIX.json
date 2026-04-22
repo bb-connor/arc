@@ -1,0 +1,54 @@
+{
+  "version": "2026-04-15",
+  "scope": "partner_receipt_and_settlement_contracts",
+  "status": "partner_contract_surfaces_qualified_locally",
+  "decision": "partner_contract_package_defined_and_exercised_locally",
+  "qualifiedContractFamilies": [
+    {
+      "id": "receipt_checkpoint",
+      "summary": "Governed receipts, kernel checkpoints, and inclusion proofs form the root evidentiary contract.",
+      "witnesses": [
+        "crates/chio-http-core/src/receipt.rs",
+        "crates/chio-kernel/src/checkpoint.rs",
+        "crates/chio-kernel/tests/retention.rs"
+      ]
+    },
+    {
+      "id": "settlement_reconciliation",
+      "summary": "Settlement reconciliation, payout, and settlement instruction/receipt artifacts remain linked to governed receipt truth.",
+      "witnesses": [
+        "crates/chio-settle/src",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    },
+    {
+      "id": "risk_credit_capital",
+      "summary": "Underwriting, exposure, facility, bond, loss-lifecycle, and capital artifacts are partner-reviewable economic contracts rather than internal-only state.",
+      "witnesses": [
+        "crates/chio-underwriting/src/lib.rs",
+        "crates/chio-credit/src/lib.rs",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    },
+    {
+      "id": "liability_market",
+      "summary": "Liability provider, quote, bind, claim, dispute, adjudication, payout, and settlement artifacts are surfaced as governed partner contracts.",
+      "witnesses": [
+        "crates/chio-market/src/lib.rs",
+        "crates/chio-open-market/src/lib.rs",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    }
+  ],
+  "packageManifest": "docs/standards/CHIO_COMPTROLLER_PARTNER_CONTRACT_PACKAGE.json",
+  "degradedPathRule": {
+    "mode": "allow_without_receipt",
+    "treatment": "non_authoritative",
+    "summary": "Compatibility or degraded passthrough remains explicitly non-authoritative for partner economic workflows."
+  },
+  "constraints": [
+    "This matrix proves contract packaging and local exercise, not broad partner adoption.",
+    "The partner contract package remains bounded to currently qualified governed surfaces.",
+    "Degraded or compatibility-only flows are never treated as authoritative partner evidence."
+  ]
+}

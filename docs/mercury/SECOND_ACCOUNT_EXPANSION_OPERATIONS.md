@@ -38,7 +38,7 @@ Missing or stale renewal evidence blocks expansion packaging.
 ## Export Command
 
 ```bash
-cargo run -p arc-mercury -- second-account-expansion export --output target/mercury-second-account-expansion-export
+cargo run -p chio-mercury -- second-account-expansion export --output target/mercury-second-account-expansion-export
 ```
 
 Expected top-level artifacts:
@@ -80,6 +80,6 @@ Stop the lane if any of the following occurs:
 - the requested scope expands beyond one follow-on account
 - reuse governance is missing
 - the request implies generic customer-success, CRM, account-management,
-  revenue operations, or ARC commercial behavior
+  revenue operations, or Chio commercial behavior
 
 The correct response is defer or stop, not scope drift.

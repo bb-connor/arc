@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio ToolCallResult incomplete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "reason", "chunks_received"],
+  "properties": {
+    "status": {
+      "const": "incomplete"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "chunks_received": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

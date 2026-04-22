@@ -1,24 +1,24 @@
-# ARC OpenAPI Integration
+# Chio OpenAPI Integration
 
 **Version:** 1.0  
 **Date:** 2026-04-14  
 **Status:** Normative
 
-This document specifies how ARC ingests OpenAPI specifications and enforces
+This document specifies how Chio ingests OpenAPI specifications and enforces
 capability-based access control over HTTP APIs. It covers the OpenAPI-to-manifest
-pipeline (`arc-openapi`), the `x-arc-*` extension vocabulary, the default
-deny-by-method policy, and the `arc api protect` reverse proxy contract.
+pipeline (`chio-openapi`), the `x-chio-*` extension vocabulary, the default
+deny-by-method policy, and the `chio api protect` reverse proxy contract.
 
 The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document.
 
 ---
 
-## 1. OpenAPI to ARC Manifest Pipeline (SPEC-06)
+## 1. OpenAPI to Chio Manifest Pipeline (SPEC-06)
 
 ### 1.1 Scope
 
-The `arc-openapi` crate parses OpenAPI specifications and produces ARC
-`ToolDefinition` values conforming to `arc.manifest.v1` (see
+The `chio-openapi` crate parses OpenAPI specifications and produces Chio
+`ToolDefinition` values conforming to `chio.manifest.v1` (see
 [PROTOCOL.md Section 7](PROTOCOL.md#7-manifest-contract)). Each HTTP operation
 (method + path pair) in the OpenAPI spec becomes one `ToolDefinition`.
 
@@ -135,7 +135,7 @@ Each operation produces one `ToolDefinition` with the following field mapping:
 | `annotations.read_only` | `true` if the operation has no side effects (see Section 3) |
 | `annotations.destructive` | `true` if method is `DELETE` |
 | `annotations.idempotent` | `true` if method is `GET`, `PUT`, or `DELETE` |
-| `annotations.requires_approval` | Value of `x-arc-approval-required` extension, defaulting to `false` |
+| `annotations.requires_approval` | Value of `x-chio-approval-required` extension, defaulting to `false` |
 | `pricing` | `None` (reserved for future use) |
 
 The `input_schema` **MUST** be a JSON Schema object with `type: "object"`. Path
@@ -150,11 +150,11 @@ as a required property named `"body"`.
 graph LR
     A[OpenAPI Spec<br/>JSON or YAML] --> B[Parser<br/>OpenApiSpec::parse]
     B --> C[Intermediate Representation<br/>paths, operations, parameters]
-    C --> D[Extension Extraction<br/>x-arc-* fields]
+    C --> D[Extension Extraction<br/>x-chio-* fields]
     C --> E[$ref Resolution<br/>#/components/...]
     D --> F[ManifestGenerator<br/>generate_tools]
     E --> F
-    F --> G[Vec of ToolDefinition<br/>arc.manifest.v1]
+    F --> G[Vec of ToolDefinition<br/>chio.manifest.v1]
     G --> H[Policy Assignment<br/>DefaultPolicy]
 ```
 
@@ -166,24 +166,24 @@ The `ManifestGenerator` accepts a `GeneratorConfig` with the following options:
 | --- | --- | --- | --- |
 | `server_id` | `String` | `"openapi-server"` | Identifier for the generated manifest body |
 | `include_output_schemas` | `bool` | `true` | Whether to derive output schemas from response definitions |
-| `respect_publish_flag` | `bool` | `true` | Whether to honor `x-arc-publish: false` (see Section 2.5) |
+| `respect_publish_flag` | `bool` | `true` | Whether to honor `x-chio-publish: false` (see Section 2.5) |
 
 ---
 
-## 2. `x-arc-*` Extension Vocabulary (SPEC-07)
+## 2. `x-chio-*` Extension Vocabulary (SPEC-07)
 
-ARC defines five vendor extension fields for OpenAPI operation objects. These
+Chio defines five vendor extension fields for OpenAPI operation objects. These
 fields provide per-route policy hints that the manifest generator and the
-`arc api protect` proxy consume.
+`chio api protect` proxy consume.
 
-All `x-arc-*` fields are optional. If absent, the system uses default behavior
+All `x-chio-*` fields are optional. If absent, the system uses default behavior
 as specified below.
 
-### 2.1 `x-arc-sensitivity`
+### 2.1 `x-chio-sensitivity`
 
 | Property | Value |
 | --- | --- |
-| Key | `x-arc-sensitivity` |
+| Key | `x-chio-sensitivity` |
 | Type | `string` |
 | Allowed values | `public`, `internal`, `sensitive`, `restricted` |
 | Default | `internal` (when not specified) |
@@ -201,11 +201,11 @@ Sensitivity levels:
 If the value does not match one of the four allowed strings, the parser **MUST**
 ignore it (treat as absent).
 
-### 2.2 `x-arc-side-effects`
+### 2.2 `x-chio-side-effects`
 
 | Property | Value |
 | --- | --- |
-| Key | `x-arc-side-effects` |
+| Key | `x-chio-side-effects` |
 | Type | `boolean` |
 | Default | Determined by HTTP method (see Section 3) |
 | Effect | Overrides the method-based side-effect default. `true` forces the operation to deny-by-default. `false` forces session-scoped allow. |
@@ -213,40 +213,40 @@ ignore it (treat as absent).
 This extension enables two critical overrides:
 
 - A `GET` endpoint that mutates state (e.g., `GET /admin/reset-cache`) can be
-  annotated with `x-arc-side-effects: true` to require a capability token.
+  annotated with `x-chio-side-effects: true` to require a capability token.
 - A `POST` endpoint that is purely a query (e.g., `POST /search`) can be
-  annotated with `x-arc-side-effects: false` to permit session-scoped access.
+  annotated with `x-chio-side-effects: false` to permit session-scoped access.
 
-### 2.3 `x-arc-approval-required`
+### 2.3 `x-chio-approval-required`
 
 | Property | Value |
 | --- | --- |
-| Key | `x-arc-approval-required` |
+| Key | `x-chio-approval-required` |
 | Type | `boolean` |
 | Default | `false` |
-| Effect | When `true`, forces deny-by-default regardless of HTTP method or `x-arc-side-effects` value. Sets `annotations.requires_approval` in the generated `ToolDefinition`. |
+| Effect | When `true`, forces deny-by-default regardless of HTTP method or `x-chio-side-effects` value. Sets `annotations.requires_approval` in the generated `ToolDefinition`. |
 
-`x-arc-approval-required: true` **MUST** take precedence over all other policy
-inputs. Even if `x-arc-side-effects` is `false` and the method is `GET`, the
+`x-chio-approval-required: true` **MUST** take precedence over all other policy
+inputs. Even if `x-chio-side-effects` is `false` and the method is `GET`, the
 operation is deny-by-default when approval is required.
 
-### 2.4 `x-arc-budget-limit`
+### 2.4 `x-chio-budget-limit`
 
 | Property | Value |
 | --- | --- |
-| Key | `x-arc-budget-limit` |
+| Key | `x-chio-budget-limit` |
 | Type | `integer` (unsigned, 64-bit) |
 | Default | None (no limit) |
 | Effect | Per-invocation cost cap in minor currency units. Consumed by the budget guard when evaluating whether the caller's remaining budget permits the call. |
 
-### 2.5 `x-arc-publish`
+### 2.5 `x-chio-publish`
 
 | Property | Value |
 | --- | --- |
-| Key | `x-arc-publish` |
+| Key | `x-chio-publish` |
 | Type | `boolean` |
 | Default | `true` |
-| Effect | Controls whether the operation appears in the generated ARC manifest. When `false`, the operation is excluded from the `Vec<ToolDefinition>` output. |
+| Effect | Controls whether the operation appears in the generated Chio manifest. When `false`, the operation is excluded from the `Vec<ToolDefinition>` output. |
 
 This extension is useful for internal or health-check endpoints that should
 remain accessible through the proxy but should not be advertised as agent tools.
@@ -259,7 +259,7 @@ ignored and all operations are included.
 The following table summarizes how extensions interact with the default
 deny-by-method policy:
 
-| Method | `x-arc-side-effects` | `x-arc-approval-required` | Resulting Policy |
+| Method | `x-chio-side-effects` | `x-chio-approval-required` | Resulting Policy |
 | --- | --- | --- | --- |
 | GET | absent | absent | SessionAllow |
 | GET | absent | `true` | DenyByDefault |
@@ -295,18 +295,18 @@ Operations classified as DenyByDefault require the caller to present a valid
 capability token. Without a token, the proxy **MUST** return a structured 403
 response (see Section 4.4).
 
-The caller presents a capability token via the `X-Arc-Capability` HTTP header
-or the `arc_capability` query parameter. When a valid token is present, the
+The caller presents a capability token via the `X-Chio-Capability` HTTP header
+or the `chio_capability` query parameter. When a valid token is present, the
 request proceeds to the upstream.
 
 ### 3.4 Extension Overrides
 
-The `x-arc-side-effects` and `x-arc-approval-required` extensions override
+The `x-chio-side-effects` and `x-chio-approval-required` extensions override
 the method-based default as follows:
 
-1. If `x-arc-approval-required` is `true`, the result is **always**
+1. If `x-chio-approval-required` is `true`, the result is **always**
    DenyByDefault. This check takes highest precedence.
-2. If `x-arc-side-effects` is explicitly set, it overrides the method default:
+2. If `x-chio-side-effects` is explicitly set, it overrides the method default:
    `true` forces DenyByDefault, `false` forces SessionAllow.
 3. If neither extension is set, the method classification from Section 3.1
    applies.
@@ -319,18 +319,18 @@ SessionAllow; side-effect methods receive DenyByDefault.
 
 ---
 
-## 4. `arc api protect` Contract (SPEC-09)
+## 4. `chio api protect` Contract (SPEC-09)
 
 ### 4.1 Purpose
 
-`arc api protect` is a zero-code reverse proxy that interposes ARC's
+`chio api protect` is a zero-code reverse proxy that interposes Chio's
 capability-based access control between callers and an existing HTTP API. It
 requires no code changes to the upstream API.
 
 ### 4.2 Command Interface
 
 ```text
-arc api protect --upstream <URL> [--spec <path>] [--listen <addr>]
+chio api protect --upstream <URL> [--spec <path>] [--listen <addr>]
 ```
 
 | Flag | Required | Default | Description |
@@ -367,16 +367,16 @@ this schema:
 
 ```json
 {
-  "error": "arc_access_denied",
+  "error": "chio_access_denied",
   "message": "<human-readable denial reason>",
   "receipt_id": "<receipt ID for the denial>",
-  "suggestion": "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter"
+  "suggestion": "provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter"
 }
 ```
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `error` | `string` | Always `"arc_access_denied"` |
+| `error` | `string` | Always `"chio_access_denied"` |
 | `message` | `string` | Reason for denial from the guard evaluation |
 | `receipt_id` | `string` | ID of the signed receipt that records this denial |
 | `suggestion` | `string` | Actionable guidance for the caller |
@@ -397,7 +397,7 @@ of whether the request is allowed or denied. The receipt records:
 | `caller_identity_hash` | SHA-256 hash of the caller identity |
 | `verdict` | `Allow` or `Deny` with reason and guard name |
 | `evidence` | Guard evaluation evidence chain |
-| `response_status` | ARC evaluation-time HTTP status (`403` for denied; typically `200` for allowed sidecar/proxy evaluations before the upstream response exists) |
+| `response_status` | Chio evaluation-time HTTP status (`403` for denied; typically `200` for allowed sidecar/proxy evaluations before the upstream response exists) |
 | `timestamp` | Unix timestamp of the request |
 | `content_hash` | Hash of the request content |
 | `policy_hash` | SHA-256 hash of the loaded OpenAPI spec |
@@ -410,11 +410,11 @@ generated at startup. The receipt signature **MUST** be verifiable using the
 ### 4.6 Receipt Header
 
 For proxied responses (allowed requests forwarded to upstream), the proxy
-**MUST** include an `X-Arc-Receipt-Id` header in the response. The value is the
+**MUST** include an `X-Chio-Receipt-Id` header in the response. The value is the
 receipt ID of the signed receipt generated for that request.
 
 For denied requests (403 responses), the receipt ID appears in the JSON response
-body as `receipt_id`. The proxy is not required to add the `X-Arc-Receipt-Id`
+body as `receipt_id`. The proxy is not required to add the `X-Chio-Receipt-Id`
 header on 403 responses.
 
 ### 4.7 Caller Identity Extraction
@@ -455,7 +455,7 @@ allow verdict; the upstream failure does not change the access-control decision.
 On startup, the proxy:
 
 1. Loads the OpenAPI spec (from `--spec` or via auto-discovery).
-2. Parses the spec using `arc-openapi`.
+2. Parses the spec using `chio-openapi`.
 3. Builds a route table mapping (method, path pattern) to policy decisions.
 4. Generates an ephemeral signing keypair.
 5. Computes the SHA-256 hash of the spec content for use as `policy_hash` in
@@ -501,7 +501,7 @@ paths:
     post:
       operationId: createPet
       summary: Create a pet
-      x-arc-sensitivity: internal
+      x-chio-sensitivity: internal
       requestBody:
         required: true
         content:
@@ -539,7 +539,7 @@ paths:
     delete:
       operationId: deletePet
       summary: Delete a pet
-      x-arc-approval-required: true
+      x-chio-approval-required: true
       parameters:
         - name: petId
           in: path
@@ -711,13 +711,13 @@ Input schema:
 | `listPets` | GET | SessionAllow | Safe method, no overrides |
 | `createPet` | POST | DenyByDefault | Side-effect method |
 | `showPetById` | GET | SessionAllow | Safe method, no overrides |
-| `deletePet` | DELETE | DenyByDefault | Side-effect method + `x-arc-approval-required: true` |
+| `deletePet` | DELETE | DenyByDefault | Side-effect method + `x-chio-approval-required: true` |
 
 ---
 
 ## 6. Error Catalog
 
-The `arc-openapi` crate defines the following error conditions:
+The `chio-openapi` crate defines the following error conditions:
 
 | Error | Condition |
 | --- | --- |
@@ -727,12 +727,12 @@ The `arc-openapi` crate defines the following error conditions:
 | `UnsupportedVersion` | The `openapi` version does not begin with `3.` |
 | `UnresolvedRef` | A `$ref` pointer could not be resolved (external URI or nonexistent internal path) |
 
-The `arc-api-protect` crate defines the following additional error conditions:
+The `chio-api-protect` crate defines the following additional error conditions:
 
 | Error | Condition |
 | --- | --- |
 | `SpecLoad` | The OpenAPI spec file cannot be read or auto-discovery failed |
-| `SpecParse` | The loaded spec failed OpenAPI parsing (wraps `arc-openapi` errors) |
+| `SpecParse` | The loaded spec failed OpenAPI parsing (wraps `chio-openapi` errors) |
 | `Config` | Configuration error (e.g., cannot bind listen address) |
 | `ReceiptSign` | Receipt signing or content hashing failed |
 | `Io` | IO error during server operation |
@@ -744,11 +744,11 @@ The `arc-api-protect` crate defines the following additional error conditions:
 
 | Component | Crate | Entry Point |
 | --- | --- | --- |
-| OpenAPI parser | `arc-openapi` | `crates/arc-openapi/src/parser.rs` |
-| Manifest generator | `arc-openapi` | `crates/arc-openapi/src/generator.rs` |
-| Extension vocabulary | `arc-openapi` | `crates/arc-openapi/src/extensions.rs` |
-| Default policy | `arc-openapi` | `crates/arc-openapi/src/policy.rs` |
-| Reverse proxy | `arc-api-protect` | `crates/arc-api-protect/src/proxy.rs` |
-| Request evaluator | `arc-api-protect` | `crates/arc-api-protect/src/evaluator.rs` |
-| Spec discovery | `arc-api-protect` | `crates/arc-api-protect/src/spec_discovery.rs` |
-| Convenience function | `arc-openapi` | `arc_openapi::tools_from_spec()` |
+| OpenAPI parser | `chio-openapi` | `crates/chio-openapi/src/parser.rs` |
+| Manifest generator | `chio-openapi` | `crates/chio-openapi/src/generator.rs` |
+| Extension vocabulary | `chio-openapi` | `crates/chio-openapi/src/extensions.rs` |
+| Default policy | `chio-openapi` | `crates/chio-openapi/src/policy.rs` |
+| Reverse proxy | `chio-api-protect` | `crates/chio-api-protect/src/proxy.rs` |
+| Request evaluator | `chio-api-protect` | `crates/chio-api-protect/src/evaluator.rs` |
+| Spec discovery | `chio-api-protect` | `crates/chio-api-protect/src/spec_discovery.rs` |
+| Convenience function | `chio-openapi` | `chio_openapi::tools_from_spec()` |

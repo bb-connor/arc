@@ -1,4 +1,4 @@
-# ARC Universal Security Kernel: Execution Roadmap
+# Chio Universal Security Kernel: Execution Roadmap
 
 > **Date**: April 2026
 > **Synthesized from**: 35 protocol docs, 13 guard docs, 8 research agents,
@@ -66,32 +66,32 @@ roadmap phase.
 
 ## Phase 0: Developer Experience Foundation
 
-> **Goal**: External developers can install, try, and test ARC without
+> **Goal**: External developers can install, try, and test Chio without
 > compiling Rust or cloning the repo.
 > **Depends on**: Nothing. Unblocks everything.
 > **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md`
 
 ### 0.1 Publish Python SDKs to PyPI [SHIPPED 9eeea0f]
 
-**What**: Publish `arc-sdk-python`, `arc-fastapi`, `arc-asgi`, `arc-django`,
-`arc-langchain` to PyPI. Set up CI to publish on git tag.
+**What**: Publish `chio-sdk-python`, `chio-fastapi`, `chio-asgi`, `chio-django`,
+`chio-langchain` to PyPI. Set up CI to publish on git tag.
 
 **Files**:
-- `sdks/python/arc-sdk-python/pyproject.toml` (add PyPI metadata, classifiers)
-- `sdks/python/arc-fastapi/pyproject.toml`
-- `sdks/python/arc-asgi/pyproject.toml`
-- `sdks/python/arc-django/pyproject.toml`
-- `sdks/python/arc-langchain/pyproject.toml`
+- `sdks/python/chio-sdk-python/pyproject.toml` (add PyPI metadata, classifiers)
+- `sdks/python/chio-fastapi/pyproject.toml`
+- `sdks/python/chio-asgi/pyproject.toml`
+- `sdks/python/chio-django/pyproject.toml`
+- `sdks/python/chio-langchain/pyproject.toml`
 - `.github/workflows/publish-python.yml` (new: CI publish on tag)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 1
 
-**Acceptance**: `pip install arc-sdk-python` works from a clean venv.
+**Acceptance**: `pip install chio-sdk-python` works from a clean venv.
 
 ### 0.2 Publish TypeScript SDKs to npm [SHIPPED 9eeea0f]
 
-**What**: Publish `@arc-protocol/node-http`, `@arc-protocol/express`,
-`@arc-protocol/fastify`, `@arc-protocol/elysia` to npm.
+**What**: Publish `@chio-protocol/node-http`, `@chio-protocol/express`,
+`@chio-protocol/fastify`, `@chio-protocol/elysia` to npm.
 
 **Files**:
 - `sdks/typescript/packages/*/package.json` (add npm metadata)
@@ -99,45 +99,45 @@ roadmap phase.
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 1
 
-**Acceptance**: `npm install @arc-protocol/node-http` works.
+**Acceptance**: `npm install @chio-protocol/node-http` works.
 
-### 0.3 MockArcClient for Testing [SHIPPED 788f69c]
+### 0.3 MockChioClient for Testing [SHIPPED 788f69c]
 
 **What**: Ship test fixtures so developers can write unit tests without
 a running sidecar.
 
 **Files**:
-- `sdks/python/arc-sdk-python/src/arc_sdk/testing.py` (new: `MockArcClient`, `allow_all()`, `deny_all()`, `with_policy()`)
-- `sdks/python/arc-sdk-python/tests/test_mock_client.py` (new)
+- `sdks/python/chio-sdk-python/src/chio_sdk/testing.py` (new: `MockChioClient`, `allow_all()`, `deny_all()`, `with_policy()`)
+- `sdks/python/chio-sdk-python/tests/test_mock_client.py` (new)
 - `sdks/typescript/packages/node-http/src/testing.ts` (new)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 2
 
-**Acceptance**: A pytest test using `MockArcClient` passes without any
+**Acceptance**: A pytest test using `MockChioClient` passes without any
 sidecar process running.
 
 ### 0.4 Pre-Built Binary Distribution [SHIPPED c9650f9]
 
-**What**: Distribute the ARC sidecar as pre-built binaries so developers
+**What**: Distribute the Chio sidecar as pre-built binaries so developers
 don't need the Rust toolchain.
 
 **Files**:
 - `.github/workflows/release-binaries.yml` (new: cross-compile for linux-x86_64, linux-aarch64, darwin-x86_64, darwin-aarch64, windows-x86_64)
-- `Homebrew/arc.rb.tmpl` release formula template (new)
+- `Homebrew/chio.rb.tmpl` release formula template (new)
 - `Dockerfile.sidecar` (public image, no GHCR auth required)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 3
 
-**Acceptance**: `brew install arc` or `docker run ghcr.io/backbay/arc-sidecar:latest` works without Rust installed.
+**Acceptance**: `brew install chio` or `docker run ghcr.io/backbay/chio-sidecar:latest` works without Rust installed.
 
 ### 0.5 Error Message Improvements [SHIPPED 224a05c]
 
-**What**: `ArcDeniedError` includes what was denied, what scope was needed
+**What**: `ChioDeniedError` includes what was denied, what scope was needed
 vs granted, which guard denied, and a next-steps suggestion.
 
 **Files**:
-- `sdks/python/arc-sdk-python/src/arc_sdk/errors.py`
-- `crates/arc-http-core/src/verdict.rs` (enrich Deny variant)
+- `sdks/python/chio-sdk-python/src/chio_sdk/errors.py`
+- `crates/chio-http-core/src/verdict.rs` (enrich Deny variant)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 6
 
@@ -159,10 +159,10 @@ verdict. Tool servers validate the nonce before executing. Closes the
 window between evaluate() and execution.
 
 **Files**:
-- `crates/arc-kernel/src/execution_nonce.rs` (new: `ExecutionNonce`, `ExecutionNonceStore`)
-- `crates/arc-kernel/src/kernel/mod.rs` (issue nonce in evaluate response)
-- `crates/arc-http-core/src/verdict.rs` (add nonce to allow verdict)
-- `crates/arc-core-types/src/lib.rs` (ExecutionNonce type)
+- `crates/chio-kernel/src/execution_nonce.rs` (new: `ExecutionNonce`, `ExecutionNonceStore`)
+- `crates/chio-kernel/src/kernel/mod.rs` (issue nonce in evaluate response)
+- `crates/chio-http-core/src/verdict.rs` (add nonce to allow verdict)
+- `crates/chio-core-types/src/lib.rs` (ExecutionNonce type)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 1
 
@@ -176,8 +176,8 @@ Record trust level on every receipt. Document which integration pattern
 provides which trust level.
 
 **Files**:
-- `crates/arc-core-types/src/capability.rs` (add `TrustLevel` enum)
-- `crates/arc-kernel/src/kernel/mod.rs` (record trust level on receipts)
+- `crates/chio-core-types/src/capability.rs` (add `TrustLevel` enum)
+- `crates/chio-kernel/src/kernel/mod.rs` (record trust level on receipts)
 - `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` (already designed)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 2
@@ -191,14 +191,14 @@ from advisory ones. Operators can filter receipts by trust level.
 at load time. Reject unsigned modules unless explicitly opted out.
 
 **Files**:
-- `crates/arc-wasm-guards/src/manifest.rs` (add signature field)
-- `crates/arc-wasm-guards/src/runtime.rs` (verify before compilation)
-- `crates/arc-cli/src/guards/sign.rs` (new: `arc guard sign` command)
+- `crates/chio-wasm-guards/src/manifest.rs` (add signature field)
+- `crates/chio-wasm-guards/src/runtime.rs` (verify before compilation)
+- `crates/chio-cli/src/guards/sign.rs` (new: `chio guard sign` command)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 4
 
 **Acceptance**: Loading an unsigned WASM guard fails with a clear error.
-`arc guard sign` produces a signed module that loads successfully.
+`chio guard sign` produces a signed module that loads successfully.
 
 ### 1.4 Emergency Kill Switch [SHIPPED 225193d]
 
@@ -207,8 +207,8 @@ rejects all new evaluate() calls. `kernel.emergency_resume()` re-enables.
 Exposed via authenticated HTTP API.
 
 **Files**:
-- `crates/arc-kernel/src/kernel/mod.rs` (add `AtomicBool` emergency flag, check in evaluate path)
-- `crates/arc-http-core/src/routes.rs` (add `/emergency-stop` and `/emergency-resume` endpoints)
+- `crates/chio-kernel/src/kernel/mod.rs` (add `AtomicBool` emergency flag, check in evaluate path)
+- `crates/chio-http-core/src/routes.rs` (add `/emergency-stop` and `/emergency-resume` endpoints)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 5
 
@@ -221,15 +221,15 @@ Deny. After `POST /emergency-resume`, normal operation resumes.
 store level. Tenant derived from auth context, not caller choice.
 
 **Current state**: `tenant_id` exists in session/enterprise identity
-context (`arc-core-types/src/session.rs`) but NOT on receipts
-(`arc-core-types/src/receipt.rs`) or in the receipt store. This story
+context (`chio-core-types/src/session.rs`) but NOT on receipts
+(`chio-core-types/src/receipt.rs`) or in the receipt store. This story
 is untouched -- the file paths below point at files that need modification,
 not files that already have this feature.
 
 **Files**:
-- `crates/arc-store-sqlite/src/receipt_store.rs` (modify: add tenant_id column, WHERE clause)
-- `crates/arc-core-types/src/receipt.rs` (modify: add tenant_id field)
-- `crates/arc-kernel/src/kernel/mod.rs` (modify: populate tenant_id from session)
+- `crates/chio-store-sqlite/src/receipt_store.rs` (modify: add tenant_id column, WHERE clause)
+- `crates/chio-core-types/src/receipt.rs` (modify: add tenant_id field)
+- `crates/chio-kernel/src/kernel/mod.rs` (modify: populate tenant_id from session)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 6
 
@@ -242,8 +242,8 @@ not files that already have this feature.
 > **Goal**: Add the new ToolAction variants and Constraint variants needed
 > by all downstream phases. This is the foundation that guards, framework
 > integrations, and data layer work all depend on.
-> **Current state**: ToolAction in `arc-guards/src/action.rs` and Constraint
-> in `arc-core-types/src/capability.rs` are still the pre-ADR shapes. None
+> **Current state**: ToolAction in `chio-guards/src/action.rs` and Constraint
+> in `chio-core-types/src/capability.rs` are still the pre-ADR shapes. None
 > of the new variants (DatabaseQuery, CodeExecution, BrowserAction,
 > ModelConstraint, TableAllowlist, etc.) exist in code yet. Plan-level
 > evaluation types do not exist. This phase is untouched.
@@ -257,8 +257,8 @@ not files that already have this feature.
 `extract_action()` to populate them from tool call arguments.
 
 **Files**:
-- `crates/arc-guards/src/action.rs` (add variants per ADR-TYPE-EVOLUTION.md section 3)
-- `crates/arc-guards/src/action.rs` fn `extract_action()` (add heuristics for new tool names)
+- `crates/chio-guards/src/action.rs` (add variants per ADR-TYPE-EVOLUTION.md section 3)
+- `crates/chio-guards/src/action.rs` fn `extract_action()` (add heuristics for new tool names)
 
 **Refs**: `docs/protocols/ADR-TYPE-EVOLUTION.md` section 3
 
@@ -271,8 +271,8 @@ Existing guards continue to work (Unknown fallback unchanged).
 memory governance constraints to the `Constraint` enum.
 
 **Files**:
-- `crates/arc-core-types/src/capability.rs` (add variants per ADR-TYPE-EVOLUTION.md section 3)
-- `crates/arc-kernel/src/kernel/mod.rs` (constraint checking for new variants)
+- `crates/chio-core-types/src/capability.rs` (add variants per ADR-TYPE-EVOLUTION.md section 3)
+- `crates/chio-kernel/src/kernel/mod.rs` (constraint checking for new variants)
 
 **Refs**: `docs/protocols/ADR-TYPE-EVOLUTION.md` section 3
 
@@ -285,8 +285,8 @@ compiles, serializes, and is enforced by the kernel.
 `ToolCallRequest`. Add `ModelMetadata` and `ModelSafetyTier` types.
 
 **Files**:
-- `crates/arc-core-types/src/capability.rs` (ModelMetadata, ModelSafetyTier, ModelConstraint)
-- `crates/arc-kernel/src/kernel/mod.rs` (constraint evaluation logic)
+- `crates/chio-core-types/src/capability.rs` (ModelMetadata, ModelSafetyTier, ModelConstraint)
+- `crates/chio-kernel/src/kernel/mod.rs` (constraint evaluation logic)
 
 **Refs**: `docs/protocols/ARCHITECTURAL-EXTENSIONS.md` section 1
 
@@ -300,9 +300,9 @@ endpoint. Takes a list of planned tool calls, evaluates all against scope
 and guards, returns per-step verdicts before any execute.
 
 **Files**:
-- `crates/arc-core-types/src/plan.rs` (new: `PlannedToolCall`, `PlanEvaluationRequest`, `PlanEvaluationResponse`, `PlanVerdict`)
-- `crates/arc-kernel/src/kernel/mod.rs` (add `evaluate_plan()`)
-- `crates/arc-http-core/src/routes.rs` (add `/evaluate-plan` endpoint)
+- `crates/chio-core-types/src/plan.rs` (new: `PlannedToolCall`, `PlanEvaluationRequest`, `PlanEvaluationResponse`, `PlanVerdict`)
+- `crates/chio-kernel/src/kernel/mod.rs` (add `evaluate_plan()`)
+- `crates/chio-http-core/src/routes.rs` (add `/evaluate-plan` endpoint)
 
 **Refs**: `docs/protocols/ARCHITECTURAL-EXTENSIONS.md` section 2
 
@@ -320,13 +320,13 @@ and guards, returns per-step verdicts before any execute.
 
 ### 3.1 PromptInjectionGuard (Port from ClawdStrike) [SHIPPED 3d55e18]
 
-**What**: Port ClawdStrike's 6-signal prompt injection detector to ARC's
+**What**: Port ClawdStrike's 6-signal prompt injection detector to Chio's
 sync Guard trait. Includes text canonicalization and fingerprint dedup.
 
 **Files**:
-- `crates/arc-guards/src/prompt_injection.rs` (new)
-- `crates/arc-guards/src/text_utils.rs` (new: canonicalization, shared with jailbreak)
-- `crates/arc-guards/src/lib.rs` (register)
+- `crates/chio-guards/src/prompt_injection.rs` (new)
+- `crates/chio-guards/src/text_utils.rs` (new: canonicalization, shared with jailbreak)
+- `crates/chio-guards/src/lib.rs` (register)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/guards/prompt_injection.rs`
 **Refs**: `docs/guards/06-CONTENT-SAFETY-ABSORPTION.md` section 1.2, 5.2
@@ -340,8 +340,8 @@ returns Deny. Existing guards unaffected.
 scoring, optional LLM judge). LLM judge deferred to host function in v2.
 
 **Files**:
-- `crates/arc-guards/src/jailbreak.rs` (new)
-- `crates/arc-guards/src/jailbreak_detector.rs` (new: ML scoring layer)
+- `crates/chio-guards/src/jailbreak.rs` (new)
+- `crates/chio-guards/src/jailbreak_detector.rs` (new: ML scoring layer)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/guards/jailbreak.rs`,
 `../clawdstrike/crates/libs/clawdstrike/src/jailbreak.rs`
@@ -357,8 +357,8 @@ Add secret detection, entropy scanning, Luhn validation, allowlist/denylist,
 overlap resolution, and full redaction strategy support.
 
 **Files**:
-- `crates/arc-guards/src/response_sanitization.rs` (extend existing)
-- `crates/arc-guards/src/post_invocation.rs` (extend pipeline)
+- `crates/chio-guards/src/response_sanitization.rs` (extend existing)
+- `crates/chio-guards/src/post_invocation.rs` (extend pipeline)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/output_sanitizer.rs`
 **Refs**: `docs/guards/07-OUTPUT-SANITIZER-ABSORPTION.md`
@@ -372,10 +372,10 @@ API keys, and high-entropy strings from tool results.
 Implement the approval guard, approval store, and resume flow.
 
 **Files**:
-- `crates/arc-kernel/src/runtime.rs` (add PendingApproval variant)
-- `crates/arc-kernel/src/approval.rs` (new: `ApprovalGuard`, `ApprovalStore`, `BatchApprovalStore`)
-- `crates/arc-http-core/src/routes.rs` (add `/approvals/pending`, `/approvals/{id}/respond`, `/approvals/batch`)
-- `crates/arc-kernel/src/kernel/mod.rs` (integrate approval guard, resume validation)
+- `crates/chio-kernel/src/runtime.rs` (add PendingApproval variant)
+- `crates/chio-kernel/src/approval.rs` (new: `ApprovalGuard`, `ApprovalStore`, `BatchApprovalStore`)
+- `crates/chio-http-core/src/routes.rs` (add `/approvals/pending`, `/approvals/{id}/respond`, `/approvals/batch`)
+- `crates/chio-kernel/src/kernel/mod.rs` (integrate approval guard, resume validation)
 
 **Refs**: `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md` sections 2-10, 13
 
@@ -391,9 +391,9 @@ Pending requests are written to durable storage; on restart, the kernel
 reloads pending requests and resumes listening for responses.
 
 **Files**:
-- `crates/arc-store-sqlite/src/approval_store.rs` (new: `SqliteApprovalStore`)
-- `crates/arc-store-sqlite/src/batch_approval_store.rs` (new: `SqliteBatchApprovalStore`)
-- `crates/arc-kernel/src/approval.rs` (define `ApprovalStore`, `BatchApprovalStore` traits)
+- `crates/chio-store-sqlite/src/approval_store.rs` (new: `SqliteApprovalStore`)
+- `crates/chio-store-sqlite/src/batch_approval_store.rs` (new: `SqliteBatchApprovalStore`)
+- `crates/chio-kernel/src/approval.rs` (define `ApprovalStore`, `BatchApprovalStore` traits)
 
 **Refs**: `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md` sections 10, 13
 (specifically: "Pending requests survive in approval store" at the
@@ -409,7 +409,7 @@ Restart the kernel. The pending approval is still queryable via
 and dashboard channels follow.
 
 **Files**:
-- `crates/arc-kernel/src/approval_channels.rs` (new: trait + WebhookChannel)
+- `crates/chio-kernel/src/approval_channels.rs` (new: trait + WebhookChannel)
 
 **Refs**: `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md` section 6
 
@@ -418,48 +418,48 @@ and dashboard channels follow.
 
 ---
 
-## Phase 4: Flagship Integration -- arc-code-agent
+## Phase 4: Flagship Integration -- chio-code-agent
 
 > **Goal**: Ship the single fastest onboarding experience. A coding agent
-> developer installs one package and gets ARC protecting file/shell/git.
+> developer installs one package and gets Chio protecting file/shell/git.
 > **Depends on**: Phase 0 (package publishing, test fixtures).
 > **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 4
 
-### 4.1 arc-code-agent Python Package [SHIPPED e38d41b]
+### 4.1 chio-code-agent Python Package [SHIPPED e38d41b]
 
 **What**: Wraps file, shell, and git tool calls for coding agents. Ships
 with a zero-config default policy. Works with Claude Code, Cursor, or
 any MCP-based coding agent.
 
 **Files**:
-- `sdks/python/arc-code-agent/pyproject.toml` (new)
-- `sdks/python/arc-code-agent/src/arc_code_agent/__init__.py` (new)
-- `sdks/python/arc-code-agent/src/arc_code_agent/policy.py` (new: default policy)
-- `sdks/python/arc-code-agent/src/arc_code_agent/agent.py` (new: CodeAgent wrapper)
-- `sdks/python/arc-code-agent/tests/test_code_agent.py` (new)
+- `sdks/python/chio-code-agent/pyproject.toml` (new)
+- `sdks/python/chio-code-agent/src/chio_code_agent/__init__.py` (new)
+- `sdks/python/chio-code-agent/src/chio_code_agent/policy.py` (new: default policy)
+- `sdks/python/chio-code-agent/src/chio_code_agent/agent.py` (new: CodeAgent wrapper)
+- `sdks/python/chio-code-agent/tests/test_code_agent.py` (new)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` sections 4.1-4.5
 
-**Acceptance**: `pip install arc-code-agent` works. A 10-line Python script
+**Acceptance**: `pip install chio-code-agent` works. A 10-line Python script
 demonstrates safe file reads allowed and `.env` writes denied.
 
 ### 4.2 MCP Sidecar Wrapper for Coding Agents [SHIPPED e38d41b]
 
-**What**: `arc mcp serve` with the default code-agent policy. One command
-wraps any MCP filesystem server with ARC.
+**What**: `chio mcp serve` with the default code-agent policy. One command
+wraps any MCP filesystem server with Chio.
 
 **Files**:
-- `crates/arc-cli/src/policies/code_agent.yaml` (new: bundled default policy)
-- `crates/arc-cli/src/mcp/serve.rs` (add `--preset code-agent` flag)
+- `crates/chio-cli/src/policies/code_agent.yaml` (new: bundled default policy)
+- `crates/chio-cli/src/mcp/serve.rs` (add `--preset code-agent` flag)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 4.4
 
-**Acceptance**: `arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .`
-wraps the MCP server with ARC. File reads allowed, `.env` writes denied.
+**Acceptance**: `chio mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .`
+wraps the MCP server with Chio. File reads allowed, `.env` writes denied.
 
-### 4.3 Migration Guide: MCP to ARC [SHIPPED e38d41b]
+### 4.3 Migration Guide: MCP to Chio [SHIPPED e38d41b]
 
-**What**: Step-by-step guide for adding ARC to existing MCP setups.
+**What**: Step-by-step guide for adding Chio to existing MCP setups.
 
 **Files**:
 - `docs/guides/MIGRATING-FROM-MCP.md` (new)
@@ -467,7 +467,7 @@ wraps the MCP server with ARC. File reads allowed, `.env` writes denied.
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 7
 
 **Acceptance**: A developer with an existing MCP server can follow the
-guide in <5 minutes and have ARC protecting their tool calls.
+guide in <5 minutes and have Chio protecting their tool calls.
 
 ---
 
@@ -484,7 +484,7 @@ guide in <5 minutes and have ARC protecting their tool calls.
 **What**: Port action-type allowlisting with Observe/Guardrail/FailClosed modes.
 
 **Files**:
-- `crates/arc-guards/src/computer_use.rs` (new)
+- `crates/chio-guards/src/computer_use.rs` (new)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/guards/computer_use.rs`
 **Refs**: `docs/guards/08-DESKTOP-CUA-GUARD-ABSORPTION.md` section 1.1
@@ -497,7 +497,7 @@ Screenshot actions respect rate limits.
 **What**: Port input-type restrictions and postcondition probe validation.
 
 **Files**:
-- `crates/arc-guards/src/input_injection.rs` (new)
+- `crates/chio-guards/src/input_injection.rs` (new)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/guards/input_injection_capability.rs`
 **Refs**: `docs/guards/08-DESKTOP-CUA-GUARD-ABSORPTION.md` section 1.2
@@ -510,7 +510,7 @@ allowlist. Actions without postcondition probes denied in strict mode.
 **What**: Port per-channel enable/disable with transfer size limits.
 
 **Files**:
-- `crates/arc-guards/src/remote_desktop.rs` (new)
+- `crates/chio-guards/src/remote_desktop.rs` (new)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/guards/remote_desktop_side_channel.rs`
 **Refs**: `docs/guards/08-DESKTOP-CUA-GUARD-ABSORPTION.md` section 1.3
@@ -525,8 +525,8 @@ File transfer exceeding size limit denied. Unknown channels denied
 pre-computed pattern database.
 
 **Files**:
-- `crates/arc-guards/src/spider_sense.rs` (new)
-- `crates/arc-guards/data/spider_sense_patterns.json` (new: pattern DB)
+- `crates/chio-guards/src/spider_sense.rs` (new)
+- `crates/chio-guards/data/spider_sense_patterns.json` (new: pattern DB)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/spider_sense.rs`
 **Refs**: `docs/guards/06-CONTENT-SAFETY-ABSORPTION.md` section 1.3, 4.1
@@ -542,8 +542,8 @@ to guard instances registered on the kernel. Complete the 5 missing guard
 types in the compilation pipeline.
 
 **Files**:
-- `crates/arc-policy/src/compiler.rs` (extend: add missing guard types)
-- `crates/arc-policy/src/rulesets/` (new: port 7 built-in rulesets from ClawdStrike)
+- `crates/chio-policy/src/compiler.rs` (extend: add missing guard types)
+- `crates/chio-policy/src/rulesets/` (new: port 7 built-in rulesets from ClawdStrike)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/hushspec_compiler.rs`,
 `../clawdstrike/rulesets/`
@@ -558,8 +558,8 @@ that includes all 12 guard types.
 env vars in guard config. Capability intersection on load.
 
 **Files**:
-- `crates/arc-wasm-guards/src/runtime.rs` (add `load_guards_from_policy()`)
-- `crates/arc-wasm-guards/src/placeholders.rs` (new: `resolve_placeholders()`)
+- `crates/chio-wasm-guards/src/runtime.rs` (add `load_guards_from_policy()`)
+- `crates/chio-wasm-guards/src/placeholders.rs` (new: `resolve_placeholders()`)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/guards/custom.rs`
 **Refs**: `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md` section 1
@@ -574,62 +574,62 @@ functions the WASM module can call.
 ## Phase 6: Agent Framework SDKs
 
 > **Goal**: Ship working packages for the top 4 agent frameworks.
-> **Depends on**: Phase 0 (publishing, MockArcClient), Phase 2 (type extensions).
+> **Depends on**: Phase 0 (publishing, MockChioClient), Phase 2 (type extensions).
 > **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md`
 
-### 6.1 arc-crewai (Highest Priority) [SHIPPED dfcb780]
+### 6.1 chio-crewai (Highest Priority) [SHIPPED dfcb780]
 
 **What**: `BaseTool` wrapper, per-role capability scoping, delegation
 between crews. Published to PyPI.
 
 **Files**:
-- `sdks/python/arc-crewai/pyproject.toml` (new)
-- `sdks/python/arc-crewai/src/arc_crewai/__init__.py` (new)
-- `sdks/python/arc-crewai/src/arc_crewai/tool.py` (new: ArcBaseTool)
-- `sdks/python/arc-crewai/src/arc_crewai/crew.py` (new: ArcCrew with scoping)
-- `sdks/python/arc-crewai/tests/` (new)
+- `sdks/python/chio-crewai/pyproject.toml` (new)
+- `sdks/python/chio-crewai/src/chio_crewai/__init__.py` (new)
+- `sdks/python/chio-crewai/src/chio_crewai/tool.py` (new: ChioBaseTool)
+- `sdks/python/chio-crewai/src/chio_crewai/crew.py` (new: ChioCrew with scoping)
+- `sdks/python/chio-crewai/tests/` (new)
 
 **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md` section 1
 
 **Acceptance**: A CrewAI crew where the researcher agent can search but not
 write, and the writer agent can write but not search.
 
-### 6.2 arc-autogen [SHIPPED 1b8f77e]
+### 6.2 chio-autogen [SHIPPED 1b8f77e]
 
 **What**: Function registration wrapper, group chat governance, nested
 chat delegation.
 
 **Files**:
-- `sdks/python/arc-autogen/` (new package)
+- `sdks/python/chio-autogen/` (new package)
 
 **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md` section 2
 
 **Acceptance**: An AutoGen GroupChat where registered functions are
-ARC-governed. Nested chat spawns get attenuated capability tokens.
+Chio-governed. Nested chat spawns get attenuated capability tokens.
 
-### 6.3 arc-llamaindex [SHIPPED 1dd8361]
+### 6.3 chio-llamaindex [SHIPPED 1dd8361]
 
 **What**: FunctionTool wrapper, QueryEngineTool scoping for RAG pipelines.
 
 **Files**:
-- `sdks/python/arc-llamaindex/` (new package)
+- `sdks/python/chio-llamaindex/` (new package)
 
 **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md` section 3
 
-**Acceptance**: A LlamaIndex `AgentRunner` with `ArcFunctionTool` that
+**Acceptance**: A LlamaIndex `AgentRunner` with `ChioFunctionTool` that
 evaluates each tool dispatch through the sidecar. QueryEngineTool
 scoped to specific vector collections.
 
-### 6.4 @arc-protocol/ai-sdk (Vercel AI SDK) [SHIPPED 9c973fe]
+### 6.4 @chio-protocol/ai-sdk (Vercel AI SDK) [SHIPPED 9c973fe]
 
-**What**: `arcTool()` wrapper preserving streaming. Published to npm.
+**What**: `chioTool()` wrapper preserving streaming. Published to npm.
 
 **Files**:
 - `sdks/typescript/packages/ai-sdk/` (new package)
 
 **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md` section 4
 
-**Acceptance**: `arcTool()` wrapping a Vercel AI SDK `tool()` evaluates
+**Acceptance**: `chioTool()` wrapping a Vercel AI SDK `tool()` evaluates
 via sidecar without breaking `ReadableStream` / SSE streaming.
 
 ---
@@ -648,10 +648,10 @@ operations, predicates, LIMIT clauses. Fail-closed on parse failure.
 Blocks DELETE/UPDATE without WHERE.
 
 **Files**:
-- `crates/arc-data-guards/Cargo.toml` (new crate, dep on sqlparser)
-- `crates/arc-data-guards/src/lib.rs` (new)
-- `crates/arc-data-guards/src/sql_guard.rs` (new)
-- `crates/arc-data-guards/src/sql_parser.rs` (new: dialect-aware analysis)
+- `crates/chio-data-guards/Cargo.toml` (new crate, dep on sqlparser)
+- `crates/chio-data-guards/src/lib.rs` (new)
+- `crates/chio-data-guards/src/sql_guard.rs` (new)
+- `crates/chio-data-guards/src/sql_parser.rs` (new: dialect-aware analysis)
 
 **Refs**: `docs/guards/10-DATA-LAYER-GUARDS.md` section 3.1
 
@@ -664,7 +664,7 @@ Blocks DELETE/UPDATE without WHERE.
 embedding exfiltration protection.
 
 **Files**:
-- `crates/arc-data-guards/src/vector_guard.rs` (new)
+- `crates/chio-data-guards/src/vector_guard.rs` (new)
 
 **Refs**: `docs/guards/10-DATA-LAYER-GUARDS.md` section 3.2
 
@@ -678,8 +678,8 @@ ReadOnly. `top_k=500` denied when `MaxRowsReturned=50`.
 arguments. MaxBytesScanned and MaxCostPerQuery enforcement.
 
 **Files**:
-- `crates/arc-data-guards/src/warehouse_cost_guard.rs` (new)
-- `crates/arc-metering/src/lib.rs` (add `CostDimension::WarehouseQuery`)
+- `crates/chio-data-guards/src/warehouse_cost_guard.rs` (new)
+- `crates/chio-metering/src/lib.rs` (add `CostDimension::WarehouseQuery`)
 
 **Refs**: `docs/guards/10-DATA-LAYER-GUARDS.md` section 3.3,
 `docs/protocols/DATA-LAYER-INTEGRATION.md` section 5.3
@@ -699,7 +699,7 @@ records `CostDimension::WarehouseQuery` with actual bytes and cost.
 on query results.
 
 **Files**:
-- `crates/arc-data-guards/src/result_guard.rs` (new)
+- `crates/chio-data-guards/src/result_guard.rs` (new)
 
 **Refs**: `docs/guards/10-DATA-LAYER-GUARDS.md` section 4
 
@@ -721,7 +721,7 @@ before returning to the agent.
 limits, dangerous module detection (os, subprocess, socket).
 
 **Files**:
-- `crates/arc-guards/src/code_execution.rs` (new)
+- `crates/chio-guards/src/code_execution.rs` (new)
 
 **Refs**: `docs/guards/13-CODE-EXECUTION-GUARDS.md` section 2
 
@@ -736,7 +736,7 @@ the constraint.
 detection in Type actions.
 
 **Files**:
-- `crates/arc-guards/src/browser_automation.rs` (new)
+- `crates/chio-guards/src/browser_automation.rs` (new)
 
 **Refs**: `docs/guards/13-CODE-EXECUTION-GUARDS.md` section 3
 
@@ -749,25 +749,25 @@ Deny.
 
 ## Phase 9: Networking -- Envoy ext_authz
 
-> **Goal**: One adapter puts ARC into every Envoy-based mesh.
+> **Goal**: One adapter puts Chio into every Envoy-based mesh.
 > **Depends on**: Nothing (uses existing sidecar endpoint).
 > **Refs**: `docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md`
 
 ### 9.1 gRPC ext_authz Adapter [SHIPPED 7f4d0d7]
 
 **What**: Implement `envoy.service.auth.v3.Authorization/Check` as a thin
-shim over ARC's `/evaluate` endpoint.
+shim over Chio's `/evaluate` endpoint.
 
 **Files**:
-- `crates/arc-envoy-ext-authz/Cargo.toml` (new crate)
-- `crates/arc-envoy-ext-authz/src/lib.rs` (new)
-- `crates/arc-envoy-ext-authz/src/grpc_service.rs` (new)
-- `crates/arc-envoy-ext-authz/proto/` (vendored envoy auth proto)
+- `crates/chio-envoy-ext-authz/Cargo.toml` (new crate)
+- `crates/chio-envoy-ext-authz/src/lib.rs` (new)
+- `crates/chio-envoy-ext-authz/src/grpc_service.rs` (new)
+- `crates/chio-envoy-ext-authz/proto/` (vendored envoy auth proto)
 
 **Refs**: `docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md` sections 3-4
 
-**Acceptance**: An Envoy sidecar with ext_authz pointing at ARC correctly
-allows/denies traffic based on ARC capability evaluation.
+**Acceptance**: An Envoy sidecar with ext_authz pointing at Chio correctly
+allows/denies traffic based on Chio capability evaluation.
 
 ### 9.2 Istio Integration Example [SHIPPED 929e4ab]
 
@@ -779,7 +779,7 @@ allows/denies traffic based on ARC capability evaluation.
 **Refs**: `docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md` section 6
 
 **Acceptance**: An Istio mesh with the reference `AuthorizationPolicy`
-routes ext_authz checks to the ARC adapter. `x-arc-receipt-id` header
+routes ext_authz checks to the Chio adapter. `x-chio-receipt-id` header
 appears on responses passing through the mesh.
 
 ---
@@ -787,23 +787,23 @@ appears on responses passing through the mesh.
 ## Phase 10: Orchestration Integrations
 
 > **Goal**: Ship the top 3 orchestration SDKs.
-> **Depends on**: Phase 0 (publishing). **10.3 (arc-langgraph) additionally
+> **Depends on**: Phase 0 (publishing). **10.3 (chio-langgraph) additionally
 > depends on Phase 3 (HITL)** because it maps LangGraph `interrupt()` to
-> ARC approval guards (see `LANGGRAPH-INTEGRATION.md` section 3.3).
+> Chio approval guards (see `LANGGRAPH-INTEGRATION.md` section 3.3).
 > 10.1 and 10.2 also reference approval-aware flows but can ship a basic
 > version without HITL and add approval support after Phase 3 lands.
 > **Refs**: `docs/protocols/TEMPORAL-INTEGRATION.md`,
 > `docs/protocols/AWS-LAMBDA-INTEGRATION.md`,
 > `docs/protocols/LANGGRAPH-INTEGRATION.md`
 
-### 10.1 arc-temporal (Python) [SHIPPED 811fbb8]
+### 10.1 chio-temporal (Python) [SHIPPED 811fbb8]
 
-**What**: `ArcActivityInterceptor`, `WorkflowGrant`, receipt aggregation.
+**What**: `ChioActivityInterceptor`, `WorkflowGrant`, receipt aggregation.
 Basic version ships without HITL; approval-aware activities added after
 Phase 3.
 
 **Files**:
-- `sdks/python/arc-temporal/` (new package)
+- `sdks/python/chio-temporal/` (new package)
 
 **Refs**: `docs/protocols/TEMPORAL-INTEGRATION.md`
 
@@ -811,33 +811,33 @@ Phase 3.
 Denied activities raise non-retryable `ApplicationError`. WorkflowReceipt
 aggregates step receipts on completion.
 
-### 10.2 arc-lambda-extension [SHIPPED 82b69d4]
+### 10.2 chio-lambda-extension [SHIPPED 82b69d4]
 
-**What**: ARC kernel as Lambda Extension. Pre-built Layer for arm64/x86_64.
+**What**: Chio kernel as Lambda Extension. Pre-built Layer for arm64/x86_64.
 
 **Files**:
-- `sdks/lambda/arc-lambda-extension/` (new: Rust binary)
-- `sdks/lambda/arc-lambda-python/` (new: Python client)
+- `sdks/lambda/chio-lambda-extension/` (new: Rust binary)
+- `sdks/lambda/chio-lambda-python/` (new: Python client)
 
 **Refs**: `docs/protocols/AWS-LAMBDA-INTEGRATION.md`
 
-**Acceptance**: A Lambda function with the ARC Extension Layer evaluates
+**Acceptance**: A Lambda function with the Chio Extension Layer evaluates
 tool calls via the extension's localhost:9090. Receipts flushed to
 DynamoDB on SHUTDOWN lifecycle event.
 
-### 10.3 arc-langgraph (depends on Phases 0 and 3) [SHIPPED 7c2df6b]
+### 10.3 chio-langgraph (depends on Phases 0 and 3) [SHIPPED 7c2df6b]
 
-**What**: `arc_node` wrapper, node-level scoping, delegation, approval nodes.
-Requires HITL (Phase 3) because `arc_approval_node` maps LangGraph
-`interrupt()` to ARC's `Verdict::PendingApproval`.
+**What**: `chio_node` wrapper, node-level scoping, delegation, approval nodes.
+Requires HITL (Phase 3) because `chio_approval_node` maps LangGraph
+`interrupt()` to Chio's `Verdict::PendingApproval`.
 
 **Files**:
-- `sdks/python/arc-langgraph/` (new package)
+- `sdks/python/chio-langgraph/` (new package)
 
 **Refs**: `docs/protocols/LANGGRAPH-INTEGRATION.md`
 
-**Acceptance**: A LangGraph state graph with `arc_node` wrappers where
-each node operates under a scoped capability. `arc_approval_node` pauses
+**Acceptance**: A LangGraph state graph with `chio_node` wrappers where
+each node operates under a scoped capability. `chio_approval_node` pauses
 the graph via `interrupt()`, waits for human approval, and resumes.
 Subgraph nodes cannot exceed the parent graph's scope ceiling.
 
@@ -858,7 +858,7 @@ email text, payment amounts). PII detection, tone/profanity, configurable
 per-service.
 
 **Files**:
-- `crates/arc-guards/src/content_review.rs` (new)
+- `crates/chio-guards/src/content_review.rs` (new)
 
 **Refs**: `docs/protocols/SAAS-COMMUNICATION-INTEGRATION.md` section 6
 
@@ -866,27 +866,27 @@ per-service.
 A Stripe charge above `RequireApprovalAbove` threshold triggers HITL.
 Guard evidence includes detected PII categories.
 
-### 11.2 arc-streaming (Kafka Consumer Middleware) [SHIPPED d42eb02]
+### 11.2 chio-streaming (Kafka Consumer Middleware) [SHIPPED d42eb02]
 
-**What**: `ArcConsumerMiddleware` for Kafka. Consumer-side evaluation,
+**What**: `ChioConsumerMiddleware` for Kafka. Consumer-side evaluation,
 transactional receipt commit, DLQ governance.
 
 **Files**:
-- `sdks/python/arc-streaming/` (new package)
+- `sdks/python/chio-streaming/` (new package)
 
 **Refs**: `docs/protocols/EVENT-STREAMING-INTEGRATION.md`
 
-**Acceptance**: A Kafka consumer with `ArcConsumerMiddleware` evaluates
+**Acceptance**: A Kafka consumer with `ChioConsumerMiddleware` evaluates
 capabilities before processing events. Denied events routed to DLQ with
 denial receipt. Offset commit and receipt are transactionally atomic.
 
-### 11.3 IaC Governance (arc-iac) [SHIPPED 4177cad]
+### 11.3 IaC Governance (chio-iac) [SHIPPED 4177cad]
 
 **What**: Terraform CLI wrapper with plan/apply two-phase capability.
 Pulumi decorators.
 
 **Files**:
-- `sdks/python/arc-iac/` (new package)
+- `sdks/python/chio-iac/` (new package)
 
 **Refs**: `docs/protocols/IAC-INTEGRATION.md`
 
@@ -908,10 +908,10 @@ Resource types outside granted scopes are denied.
 ClawdStrike.
 
 **Files**:
-- `crates/arc-siem/src/exporters/datadog.rs` (new)
-- `crates/arc-siem/src/exporters/sumo_logic.rs` (new)
-- `crates/arc-siem/src/exporters/webhook.rs` (new)
-- `crates/arc-siem/src/alerting.rs` (new)
+- `crates/chio-siem/src/exporters/datadog.rs` (new)
+- `crates/chio-siem/src/exporters/sumo_logic.rs` (new)
+- `crates/chio-siem/src/exporters/webhook.rs` (new)
+- `crates/chio-siem/src/alerting.rs` (new)
 
 **Source**: `../clawdstrike/crates/services/hushd/src/siem/exporters/`
 **Refs**: `docs/guards/11-SIEM-OBSERVABILITY-COMPLETION.md` section 2
@@ -923,10 +923,10 @@ on high-severity guard denials.
 
 ### 12.2 OCSF Receipt Format [SHIPPED dec8378]
 
-**What**: Map ARC receipts to OCSF Authorization event class (3002).
+**What**: Map Chio receipts to OCSF Authorization event class (3002).
 
 **Files**:
-- `crates/arc-siem/src/ocsf.rs` (new)
+- `crates/chio-siem/src/ocsf.rs` (new)
 
 **Refs**: `docs/guards/11-SIEM-OBSERVABILITY-COMPLETION.md` section 3
 
@@ -938,7 +938,7 @@ on high-severity guard denials.
 **What**: Push receipts as enriched spans into agent observability platforms.
 
 **Files**:
-- `sdks/python/arc-observability/` (new package)
+- `sdks/python/chio-observability/` (new package)
 
 **Refs**: `docs/guards/11-SIEM-OBSERVABILITY-COMPLETION.md` section 5
 
@@ -961,10 +961,10 @@ tool name, verdict, guard evidence, and cost metadata.
 token bucket, TtlCache, retry with jitter.
 
 **Files**:
-- `crates/arc-guards/src/external/mod.rs` (new)
-- `crates/arc-guards/src/external/circuit_breaker.rs` (new)
-- `crates/arc-guards/src/external/cache.rs` (new)
-- `crates/arc-guards/src/external/retry.rs` (new)
+- `crates/chio-guards/src/external/mod.rs` (new)
+- `crates/chio-guards/src/external/circuit_breaker.rs` (new)
+- `crates/chio-guards/src/external/cache.rs` (new)
+- `crates/chio-guards/src/external/retry.rs` (new)
 
 **Refs**: `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md` section 2
 
@@ -979,9 +979,9 @@ the external service. Cache hit returns cached verdict without API call.
 `VertexSafetyGuard` as `ExternalGuard` implementations.
 
 **Files**:
-- `crates/arc-guards/src/external/bedrock.rs` (new)
-- `crates/arc-guards/src/external/azure_content_safety.rs` (new)
-- `crates/arc-guards/src/external/vertex_safety.rs` (new)
+- `crates/chio-guards/src/external/bedrock.rs` (new)
+- `crates/chio-guards/src/external/azure_content_safety.rs` (new)
+- `crates/chio-guards/src/external/vertex_safety.rs` (new)
 
 **Refs**: `docs/protocols/ARCHITECTURAL-EXTENSIONS.md` section 3
 
@@ -995,9 +995,9 @@ verdict captured as `GuardEvidence` in receipt.
 **What**: VirusTotal, Safe Browsing, Snyk as `ExternalGuard` implementations.
 
 **Files**:
-- `crates/arc-guards/src/external/threat_intel/virustotal.rs` (new)
-- `crates/arc-guards/src/external/threat_intel/safe_browsing.rs` (new)
-- `crates/arc-guards/src/external/threat_intel/snyk.rs` (new)
+- `crates/chio-guards/src/external/threat_intel/virustotal.rs` (new)
+- `crates/chio-guards/src/external/threat_intel/safe_browsing.rs` (new)
+- `crates/chio-guards/src/external/threat_intel/snyk.rs` (new)
 
 **Source**: `../clawdstrike/crates/libs/clawdstrike/src/async_guards/threat_intel/`
 **Refs**: `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md` section 3
@@ -1011,18 +1011,18 @@ guard denies navigation to a flagged URL.
 
 ## Phase 14: Portable Kernel (WASM)
 
-> **Goal**: ARC kernel runs in browsers, edge workers, mobile, and embedded.
+> **Goal**: Chio kernel runs in browsers, edge workers, mobile, and embedded.
 > **Depends on**: Phases 1-3 (security fixes, content safety -- the core
 > kernel must be stable before extracting a portable subset).
 > **Refs**: `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`
 
-### 14.1 arc-kernel-core Extraction [SHIPPED ce43897]
+### 14.1 chio-kernel-core Extraction [SHIPPED ce43897]
 
 > Portable `#![no_std] + alloc` crate extracted with pure evaluate,
 > sign, and verify entry points (`38b230e`). WASM32 cross-compile
-> unblocked by the arc-core-types `std`/`no_std + alloc` feature
+> unblocked by the chio-core-types `std`/`no_std + alloc` feature
 > split landed as part of `ce43897` (bundled via staging race):
-> `cargo build --target wasm32-unknown-unknown -p arc-kernel-core`
+> `cargo build --target wasm32-unknown-unknown -p chio-kernel-core`
 > now succeeds on both default and `--no-default-features` paths.
 
 
@@ -1030,23 +1030,23 @@ guard denies navigation to a flagged URL.
 scope checking, sync guard pipeline, receipt signing. No tokio, rusqlite, ureq.
 
 **Files**:
-- `crates/arc-kernel-core/Cargo.toml` (new)
-- `crates/arc-kernel-core/src/lib.rs` (new: evaluate, sign_receipt, verify_capability)
-- `crates/arc-kernel/Cargo.toml` (depend on arc-kernel-core)
-- `crates/arc-kernel/src/kernel/mod.rs` (delegate to core for evaluation)
+- `crates/chio-kernel-core/Cargo.toml` (new)
+- `crates/chio-kernel-core/src/lib.rs` (new: evaluate, sign_receipt, verify_capability)
+- `crates/chio-kernel/Cargo.toml` (depend on chio-kernel-core)
+- `crates/chio-kernel/src/kernel/mod.rs` (delegate to core for evaluation)
 
 **Refs**: `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md` sections 1-2
 
-**Acceptance**: `cargo build --target wasm32-unknown-unknown -p arc-kernel-core` succeeds.
+**Acceptance**: `cargo build --target wasm32-unknown-unknown -p chio-kernel-core` succeeds.
 Binary size < 1MB stripped.
 
 ### 14.2 Browser Bindings [SHIPPED 9872b71]
 
-**What**: `wasm-bindgen` bindings for browser-based ARC evaluation.
+**What**: `wasm-bindgen` bindings for browser-based Chio evaluation.
 
 **Files**:
-- `crates/arc-kernel-browser/Cargo.toml` (new)
-- `crates/arc-kernel-browser/src/lib.rs` (new)
+- `crates/chio-kernel-browser/Cargo.toml` (new)
+- `crates/chio-kernel-browser/src/lib.rs` (new)
 
 **Refs**: `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md` section 4
 
@@ -1056,15 +1056,15 @@ Web Crypto for entropy.
 
 ### 14.3 Mobile FFI (iOS/Android) [SHIPPED 00b6eb1]
 
-**What**: UniFFI bindings for embedding ARC in mobile apps.
+**What**: UniFFI bindings for embedding Chio in mobile apps.
 
 **Files**:
-- `crates/arc-kernel-mobile/Cargo.toml` (new)
-- `crates/arc-kernel-mobile/src/lib.rs` (new)
+- `crates/chio-kernel-mobile/Cargo.toml` (new)
+- `crates/chio-kernel-mobile/src/lib.rs` (new)
 
 **Refs**: `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md` section 4
 
-**Acceptance**: A Swift iOS app links the ARC static library via UniFFI.
+**Acceptance**: A Swift iOS app links the Chio static library via UniFFI.
 `evaluate()` and `sign_receipt()` work offline. Receipts sync to a backend
 when connectivity returns.
 
@@ -1081,25 +1081,25 @@ when connectivity returns.
 
 **What**: Add FIPS-capable signing for receipts, capability tokens, and
 DPoP proofs. Currently all signing uses Ed25519 via `ed25519-dalek` in
-`arc-core-types/src/crypto.rs`. Verifier-side JWT/JWK P-256 handling
-exists in `arc-cli` (`jsonwebtoken` crate), but there is no shared core
-signing abstraction and no FIPS path for ARC artifact signing.
+`chio-core-types/src/crypto.rs`. Verifier-side JWT/JWK P-256 handling
+exists in `chio-cli` (`jsonwebtoken` crate), but there is no shared core
+signing abstraction and no FIPS path for Chio artifact signing.
 
 This requires a cross-crate migration:
-1. Define `SigningBackend` trait in `arc-core-types/src/crypto.rs`
+1. Define `SigningBackend` trait in `chio-core-types/src/crypto.rs`
 2. Implement Ed25519 backend (default, current behavior)
 3. Implement P-256/P-384 backend behind `fips` feature flag using `aws-lc-rs`
-4. Update `CapabilityToken::sign()`, `ArcReceipt` signing, `DpopProof`
+4. Update `CapabilityToken::sign()`, `ChioReceipt` signing, `DpopProof`
    signing, and `GovernedApprovalToken::sign()` to use the trait
 5. Update all verification paths to accept both algorithm families
 6. Extend receipt/capability serialization to include algorithm identifier
 
 **Files**:
-- `crates/arc-core-types/src/crypto.rs` (add `SigningBackend` trait, algorithm enum)
-- `crates/arc-core-types/src/capability.rs` (update `CapabilityToken::sign/verify`)
-- `crates/arc-core-types/src/receipt.rs` (update receipt signing)
-- `crates/arc-kernel/src/dpop.rs` (update DPoP signing/verification)
-- `crates/arc-kernel/src/kernel/mod.rs` (update approval token verification)
+- `crates/chio-core-types/src/crypto.rs` (add `SigningBackend` trait, algorithm enum)
+- `crates/chio-core-types/src/capability.rs` (update `CapabilityToken::sign/verify`)
+- `crates/chio-core-types/src/receipt.rs` (update receipt signing)
+- `crates/chio-kernel/src/dpop.rs` (update DPoP signing/verification)
+- `crates/chio-kernel/src/kernel/mod.rs` (update approval token verification)
 - `Cargo.toml` (add aws-lc-rs optional dep behind `fips` feature)
 
 **Refs**: `docs/protocols/COMPLIANCE-ROADMAP.md` section 2
@@ -1111,7 +1111,7 @@ accepted by the kernel. Existing Ed25519 signatures continue to work
 
 ### 15.2 NIST AI RMF Mapping [SHIPPED 98252dd]
 
-**What**: Map ARC controls to NIST AI RMF Govern/Map/Measure/Manage functions.
+**What**: Map Chio controls to NIST AI RMF Govern/Map/Measure/Manage functions.
 
 **Files**:
 - `docs/compliance/nist-ai-rmf.md` (new)
@@ -1119,12 +1119,12 @@ accepted by the kernel. Existing Ed25519 signatures continue to work
 **Refs**: `docs/protocols/COMPLIANCE-ROADMAP.md` section 4
 
 **Acceptance**: Document maps each NIST AI RMF subcategory to specific
-ARC controls (capability tokens, guards, receipts, budgets). Reviewed
+Chio controls (capability tokens, guards, receipts, budgets). Reviewed
 by compliance-focused contributor.
 
 ### 15.3 PCI DSS v4.0 Mapping [SHIPPED 98252dd]
 
-**What**: Map ARC controls to PCI DSS requirements.
+**What**: Map Chio controls to PCI DSS requirements.
 
 **Files**:
 - `docs/compliance/pci-dss-v4.md` (new)
@@ -1132,12 +1132,12 @@ by compliance-focused contributor.
 **Refs**: `docs/protocols/COMPLIANCE-ROADMAP.md` section 3
 
 **Acceptance**: All 12 PCI DSS requirement groups mapped. Each requirement
-shows ARC controls that satisfy it, gaps requiring additional work, and
+shows Chio controls that satisfy it, gaps requiring additional work, and
 customer responsibilities.
 
 ### 15.4 ISO 42001 Mapping [SHIPPED 98252dd]
 
-**What**: Map ARC controls to ISO 42001 AI management system clauses.
+**What**: Map Chio controls to ISO 42001 AI management system clauses.
 
 **Files**:
 - `docs/compliance/iso-42001.md` (new)
@@ -1145,12 +1145,12 @@ customer responsibilities.
 **Refs**: `docs/protocols/COMPLIANCE-ROADMAP.md` section 5
 
 **Acceptance**: Clause-level mapping covering organizational controls
-(ARC provides technical controls, customer provides organizational).
+(Chio provides technical controls, customer provides organizational).
 Annex A control mapping included.
 
 ### 15.5 OWASP LLM Top 10 Coverage Matrix [SHIPPED 98252dd]
 
-**What**: Document which of the 10 risks ARC addresses, which are gaps,
+**What**: Document which of the 10 risks Chio addresses, which are gaps,
 which are out of scope.
 
 **Files**:
@@ -1159,7 +1159,7 @@ which are out of scope.
 **Refs**: `docs/protocols/COMPLIANCE-ROADMAP.md` section 8
 
 **Acceptance**: A markdown document mapping each of the 10 OWASP LLM risks
-to ARC controls. Coverage level (strong/partial/out-of-scope) for each.
+to Chio controls. Coverage level (strong/partial/out-of-scope) for each.
 Reviewed by at least one security-focused contributor.
 
 ---
@@ -1192,7 +1192,7 @@ budget limits, track tool call costs, and export billing records.
 (department -> team -> agent). **This is product work, not documentation.**
 
 **Files**:
-- `crates/arc-metering/src/budget_hierarchy.rs` (new)
+- `crates/chio-metering/src/budget_hierarchy.rs` (new)
 
 **Refs**: `docs/protocols/ECONOMIC-LAYER-OVERVIEW.md` section 7
 
@@ -1213,44 +1213,44 @@ team.
 > `docs/protocols/RAY-INTEGRATION.md`,
 > `docs/protocols/K8S-JOBS-INTEGRATION.md`
 
-### 17.1 arc-prefect [SHIPPED b72dc0d]
+### 17.1 chio-prefect [SHIPPED b72dc0d]
 
-**What**: `@arc_task` / `@arc_flow` decorators, Prefect Events integration.
+**What**: `@chio_task` / `@chio_flow` decorators, Prefect Events integration.
 
-**Files**: `sdks/python/arc-prefect/` (new)
+**Files**: `sdks/python/chio-prefect/` (new)
 **Refs**: `docs/protocols/PREFECT-INTEGRATION.md`
 
 **Acceptance**: A Prefect flow where each task is capability-checked.
 Denied tasks raise `PermissionError`. Receipts emitted as Prefect events.
 
-### 17.2 arc-dagster [SHIPPED ac31e21]
+### 17.2 chio-dagster [SHIPPED ac31e21]
 
-**What**: `@arc_asset` decorator, partition-scoped capabilities, IO Manager.
+**What**: `@chio_asset` decorator, partition-scoped capabilities, IO Manager.
 
-**Files**: `sdks/python/arc-dagster/` (new)
+**Files**: `sdks/python/chio-dagster/` (new)
 **Refs**: `docs/protocols/DAGSTER-INTEGRATION.md`
 
-**Acceptance**: A Dagster asset materialization governed by ARC. Partition
+**Acceptance**: A Dagster asset materialization governed by Chio. Partition
 key included in capability evaluation context.
 
-### 17.3 arc-airflow [SHIPPED e25d73f]
+### 17.3 chio-airflow [SHIPPED e25d73f]
 
-**What**: `ArcOperator` wrapper, TaskFlow `@arc_task` decorator, DAG listener.
+**What**: `ChioOperator` wrapper, TaskFlow `@chio_task` decorator, DAG listener.
 
-**Files**: `sdks/python/arc-airflow/` (new)
+**Files**: `sdks/python/chio-airflow/` (new)
 **Refs**: `docs/protocols/AIRFLOW-INTEGRATION.md`
 
-**Acceptance**: An Airflow DAG with `ArcOperator`-wrapped tasks. Denied
+**Acceptance**: An Airflow DAG with `ChioOperator`-wrapped tasks. Denied
 tasks fail with `PermissionError`. Receipt IDs pushed to XCom.
 
-### 17.4 arc-ray [SHIPPED 1e290d2]
+### 17.4 chio-ray [SHIPPED 1e290d2]
 
-**What**: `@arc_remote` decorator, `ArcActor` base class with standing grants.
+**What**: `@chio_remote` decorator, `ChioActor` base class with standing grants.
 
-**Files**: `sdks/python/arc-ray/` (new)
+**Files**: `sdks/python/chio-ray/` (new)
 **Refs**: `docs/protocols/RAY-INTEGRATION.md`
 
-**Acceptance**: A Ray actor with `@ArcActor.requires("tools:search")` on
+**Acceptance**: A Ray actor with `@ChioActor.requires("tools:search")` on
 methods. Calls outside granted scope are denied.
 
 ### 17.5 K8s Job Controller Extension [SHIPPED 6a1cac9]
@@ -1260,29 +1260,29 @@ methods. Calls outside granted scope are denied.
 **Files**: `sdks/k8s/controller/job_reconciler.go` (new)
 **Refs**: `docs/protocols/K8S-JOBS-INTEGRATION.md`
 
-**Acceptance**: A K8s Job with `arc.protocol/governed: "true"` label gets
+**Acceptance**: A K8s Job with `chio.protocol/governed: "true"` label gets
 a capability grant at creation and release on completion.
 
 ### 17.6 Cloud Run / ECS Sidecar Reference Patterns [SHIPPED 8a0b933]
 
-**What**: Reference deployment configs for running ARC sidecar alongside
+**What**: Reference deployment configs for running Chio sidecar alongside
 application containers on Cloud Run, ECS Fargate, and Azure Container Apps.
 
 **Files**:
 - `deploy/cloud-run/service.yaml` (new)
 - `deploy/ecs/task-definition.json` (new)
 - `deploy/azure/container-app.bicep` (new)
-- `deploy/sidecar/Dockerfile` (new: ARC sidecar container image)
+- `deploy/sidecar/Dockerfile` (new: Chio sidecar container image)
 
 **Refs**: `docs/protocols/CLOUD-SIDECAR-INTEGRATION.md`
 
 **Acceptance**:
 - Cloud Run: `gcloud run services replace deploy/cloud-run/service.yaml`
-  deploys a multi-container service with ARC sidecar. Health check on
-  `:9090/health` passes. ARC evaluates tool calls from the app container.
+  deploys a multi-container service with Chio sidecar. Health check on
+  `:9090/health` passes. Chio evaluates tool calls from the app container.
 - ECS: Task definition at `deploy/ecs/task-definition.json` registers
   successfully. App container depends on sidecar health check.
-- Azure: `deploy/azure/container-app.bicep` deploys with ARC sidecar.
+- Azure: `deploy/azure/container-app.bicep` deploys with Chio sidecar.
   Sidecar starts before app container.
 
 ---
@@ -1299,7 +1299,7 @@ application containers on Cloud Run, ECS Fargate, and Azure Container Apps.
 Enforce `MemoryStoreAllowlist`, `MaxRetentionTtl`, `MaxMemoryEntries`.
 
 **Files**:
-- `crates/arc-guards/src/memory_governance.rs` (new)
+- `crates/chio-guards/src/memory_governance.rs` (new)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 3
 
@@ -1313,7 +1313,7 @@ are denied.
 verify the write was authorized.
 
 **Files**:
-- `crates/arc-kernel/src/memory_provenance.rs` (new)
+- `crates/chio-kernel/src/memory_provenance.rs` (new)
 
 **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 3
 
@@ -1328,8 +1328,8 @@ provenance are flagged as unverified.
 > **Goal**: Productize and expose the near-term competitive moats. This is
 > analytics/productization work, NOT raw-reporting greenfield. The kernel
 > already ships `BehavioralFeedReport`, `SignedBehavioralFeed`, and
-> `ComplianceReport` in `arc-kernel/src/operator_report.rs`, backed by
-> SQLite report queries in `arc-store-sqlite/src/receipt_store/reports.rs`.
+> `ComplianceReport` in `chio-kernel/src/operator_report.rs`, backed by
+> SQLite report queries in `chio-store-sqlite/src/receipt_store/reports.rs`.
 > This phase wraps those primitives into user-facing scoring APIs, guard
 > integration, and regulatory endpoints.
 > **Depends on**: Receipts and metering (already shipped).
@@ -1338,39 +1338,39 @@ provenance are flagged as unverified.
 ### 19.1 Receipt Compliance Scoring [SHIPPED c5c5d06]
 
 **What**: Productize the existing `ComplianceReport` in
-`arc-kernel/src/operator_report.rs` into a user-facing `compliance_score()`
+`chio-kernel/src/operator_report.rs` into a user-facing `compliance_score()`
 API. The raw reporting infrastructure exists; this story adds the scoring
 model (0-1000 range, weighted factors) and the CLI/HTTP surface.
 
 **Files**:
-- `crates/arc-kernel/src/compliance_score.rs` (new: scoring model on top of existing ComplianceReport)
-- `crates/arc-kernel/src/operator_report.rs` (extend: add score computation)
-- `crates/arc-http-core/src/routes.rs` (add `/compliance/score` endpoint)
+- `crates/chio-kernel/src/compliance_score.rs` (new: scoring model on top of existing ComplianceReport)
+- `crates/chio-kernel/src/operator_report.rs` (extend: add score computation)
+- `crates/chio-http-core/src/routes.rs` (add `/compliance/score` endpoint)
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 1
 
-**Acceptance**: `arc compliance score --agent <id>` returns a 0-1000 score.
+**Acceptance**: `chio compliance score --agent <id>` returns a 0-1000 score.
 An agent with zero denials in 1000 calls scores above 900. An agent with
 a revoked capability scores below 500.
 
 ### 19.2 Agent Behavioral Profiling [SHIPPED c5c5d06]
 
 **What**: Productize the existing `BehavioralFeedReport` and
-`SignedBehavioralFeed` in `arc-kernel/src/operator_report.rs` into a
+`SignedBehavioralFeed` in `chio-kernel/src/operator_report.rs` into a
 guard-integrated anomaly detection system. The raw behavioral reporting
-and SQLite queries exist in `arc-store-sqlite/src/receipt_store/reports.rs`.
+and SQLite queries exist in `chio-store-sqlite/src/receipt_store/reports.rs`.
 This story adds EMA baselines, z-score anomaly detection, and integration
 with the velocity guard pipeline.
 
 **Files**:
-- `crates/arc-guards/src/behavioral_profile.rs` (new: guard that reads from existing behavioral feed)
-- `crates/arc-kernel/src/operator_report.rs` (extend: add anomaly scoring on top of existing BehavioralFeedReport)
+- `crates/chio-guards/src/behavioral_profile.rs` (new: guard that reads from existing behavioral feed)
+- `crates/chio-kernel/src/operator_report.rs` (extend: add anomaly scoring on top of existing BehavioralFeedReport)
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 2
 
 **Acceptance**: An agent that normally makes 10 calls/minute triggers an
 advisory signal when it suddenly makes 500. The behavioral guard reads
-from `arc-store-sqlite` receipt queries.
+from `chio-store-sqlite` receipt queries.
 
 ### 19.3 Regulatory API [SHIPPED c5c5d06]
 
@@ -1378,7 +1378,7 @@ from `arc-store-sqlite` receipt queries.
 wrapped in `SignedExportEnvelope`.
 
 **Files**:
-- `crates/arc-http-core/src/regulatory_api.rs` (new)
+- `crates/chio-http-core/src/regulatory_api.rs` (new)
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 3
 
@@ -1400,34 +1400,34 @@ kernel's public key.
 ### 20.1 Agent Passport: Trust-Tier Synthesis and WASM Portability (depends on Phases 14, 19.1, 19.2) [SHIPPED 1da2900]
 
 **What**: The core passport system already ships: `AgentPassport` in
-`crates/arc-credentials/src/passport.rs`, challenge flows, OID4VCI/VP,
-and cross-issuer portfolio evaluation in `crates/arc-credentials/src/cross_issuer.rs`.
-CLI passport flows exist in `crates/arc-cli/src/passport.rs`.
+`crates/chio-credentials/src/passport.rs`, challenge flows, OID4VCI/VP,
+and cross-issuer portfolio evaluation in `crates/chio-credentials/src/cross_issuer.rs`.
+CLI passport flows exist in `crates/chio-cli/src/passport.rs`.
 
 This phase adds **trust-tier synthesis** (populating the passport with
 compliance scores from 19.1 and behavioral profiles from 19.2) and
-**WASM portability** (passport verification in `arc-kernel-core` for
+**WASM portability** (passport verification in `chio-kernel-core` for
 browser/mobile agents). It is NOT creating passport support from scratch.
 
 **Files**:
-- `crates/arc-credentials/src/passport.rs` (extend: add trust_tier field from compliance score)
-- `crates/arc-credentials/src/trust_tier.rs` (new: synthesize tier from compliance + behavioral data)
-- `crates/arc-kernel-core/src/passport_verify.rs` (new: WASM-compatible verification)
+- `crates/chio-credentials/src/passport.rs` (extend: add trust_tier field from compliance score)
+- `crates/chio-credentials/src/trust_tier.rs` (new: synthesize tier from compliance + behavioral data)
+- `crates/chio-kernel-core/src/passport_verify.rs` (new: WASM-compatible verification)
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 4
 
-**Acceptance**: `arc passport generate --agent <id>` includes a `trust_tier`
+**Acceptance**: `chio passport generate --agent <id>` includes a `trust_tier`
 field computed from compliance score and behavioral profile. A WASM-compiled
 kernel verifies the passport and reads the tier.
 
 ### 20.2 Agent Insurance Protocol (depends on Phases 16, 19.1, 19.2) [SHIPPED 657ca6d]
 
-**What**: Connect arc-underwriting risk assessment -> arc-market liability
-placement -> arc-settle claims payout. Premium pricing from receipt history.
+**What**: Connect chio-underwriting risk assessment -> chio-market liability
+placement -> chio-settle claims payout. Premium pricing from receipt history.
 
 **Files**:
-- `crates/arc-underwriting/src/premium.rs` (new: premium pricing from receipt score)
-- `crates/arc-market/src/insurance_flow.rs` (new: end-to-end flow)
+- `crates/chio-underwriting/src/premium.rs` (new: premium pricing from receipt score)
+- `crates/chio-market/src/insurance_flow.rs` (new: end-to-end flow)
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 5,
 `docs/protocols/ECONOMIC-LAYER-OVERVIEW.md` section 4
@@ -1440,7 +1440,7 @@ evidence is processed through the settlement flow.
 
 **What**: The federation crate already ships signed activation, quorum
 governance, open-admission, reputation, and qualification artifacts
-(`crates/arc-federation/src/lib.rs`). CLI/control-plane federation-policy
+(`crates/chio-federation/src/lib.rs`). CLI/control-plane federation-policy
 and federated-issue flows are shipped.
 
 This phase adds **bilateral runtime co-signing** (two kernels in different
@@ -1449,9 +1449,9 @@ orgs both sign the same receipt when an agent crosses org boundaries) and
 creating federation from scratch.
 
 **Files**:
-- `crates/arc-federation/src/bilateral.rs` (new: bilateral receipt co-signing protocol)
-- `crates/arc-federation/src/trust_establishment.rs` (new: mTLS key exchange)
-- `crates/arc-kernel/src/kernel/mod.rs` (extend: co-sign receipt with remote kernel)
+- `crates/chio-federation/src/bilateral.rs` (new: bilateral receipt co-signing protocol)
+- `crates/chio-federation/src/trust_establishment.rs` (new: mTLS key exchange)
+- `crates/chio-kernel/src/kernel/mod.rs` (extend: co-sign receipt with remote kernel)
 
 **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md` section 6
 
@@ -1459,16 +1459,16 @@ creating federation from scratch.
 the receipt (dual signatures). Receipt chain is verifiable by either org.
 Trust established via mTLS handshake between kernels.
 
-### 20.4 Capability Marketplace (independent -- builds on shipped arc-listing/arc-market) [SHIPPED e6ee085]
+### 20.4 Capability Marketplace (independent -- builds on shipped chio-listing/chio-market) [SHIPPED e6ee085]
 
 **What**: Tool servers advertise, agents discover and bid. Receipts prove
 usage for billing.
 
 **Files**:
-- `crates/arc-listing/src/discovery.rs` (extend: search and compare)
-- `crates/arc-open-market/src/bidding.rs` (new: bid/ask protocol)
+- `crates/chio-listing/src/discovery.rs` (extend: search and compare)
+- `crates/chio-open-market/src/bidding.rs` (new: bid/ask protocol)
 
-**Acceptance**: A tool server listed via `arc-listing` is discoverable
+**Acceptance**: A tool server listed via `chio-listing` is discoverable
 by agents. Agents can compare prices and bid for access. Receipts serve
 as proof of usage for settlement.
 
@@ -1487,7 +1487,7 @@ Phase 2 (Core Type Evolution) ────────────────�
                ┌──────────────────────────────────────────────┤
                │                                              │
 Phase 3 (Content Safety + HITL) ──── depends on 2             │
-Phase 4 (arc-code-agent) ────────── depends on 0              │
+Phase 4 (chio-code-agent) ────────── depends on 0              │
 Phase 5 (ClawdStrike Guards) ────── depends on 2              │
 Phase 6 (Framework SDKs) ───────── depends on 0, 2            │
 Phase 7 (Data Layer Guards) ─────── depends on 2              │
@@ -1522,7 +1522,7 @@ These phase groups can execute concurrently:
 
 **Wave 2** (after Wave 1 core types land):
 - Phase 3: Content Safety + HITL
-- Phase 4: arc-code-agent
+- Phase 4: chio-code-agent
 - Phase 5: ClawdStrike Guards
 - Phase 6: Framework SDKs
 - Phase 7: Data Layer Guards

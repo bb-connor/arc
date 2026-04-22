@@ -1,23 +1,23 @@
-# ARC Partner Proof Package
+# Chio Partner Proof Package
 
 **Prepared:** 2026-04-02
-**Surface:** current post-`v2.41` ARC production candidate
+**Surface:** current post-`v2.41` Chio production candidate
 **Role:** reviewer-facing evidence package, not the authoritative release-go
 record
 
-This document is the compact partner/security-review package for ARC's current
+This document is the compact partner/security-review package for Chio's current
 production candidate. It is derived from the same local evidence set used by
 [RELEASE_AUDIT.md](RELEASE_AUDIT.md) and
 [QUALIFICATION.md](QUALIFICATION.md).
 
 The web3-runtime ladder now also has a focused reviewer pack in
-[ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md). That document should
+[CHIO_WEB3_PARTNER_PROOF.md](CHIO_WEB3_PARTNER_PROOF.md). That document should
 be used for contract/oracle/anchor/settlement/interop/ops review rather than
 forcing partners to infer the web3 boundary from the broader repository pack.
 
 ## Current Decision
 
-Local technical evidence says **go** for the current ARC candidate. External
+Local technical evidence says **go** for the current Chio candidate. External
 tag/publication remains **on hold** until hosted `CI` and `Release
 Qualification` workflow results are observed on the candidate commit.
 
@@ -37,7 +37,7 @@ target-chain factory, and rollout environment explicitly.
 - machine-readable authorization-profile metadata and reviewer-pack exports
   that tie the enterprise IAM projection back to typed governed transaction
   metadata and full signed receipt truth
-- portable-trust artifacts built on `did:arc`, ARC-primary passport/verifier
+- portable-trust artifacts built on `did:chio`, Chio-primary passport/verifier
   schemas, certification discovery, and conservative imported-trust handling
 - governed public certification marketplace metadata, search, transparency,
   dispute, and consume surfaces that preserve operator provenance and keep
@@ -87,12 +87,12 @@ target-chain factory, and rollout environment explicitly.
   attestation-confirmation profile
 - one bounded public identity profile, one verifier-bound wallet-directory
   entry, one replay-safe wallet-routing manifest, and one identity-interop
-  qualification matrix over `did:arc` plus explicit `did:web`, `did:key`, and
+  qualification matrix over `did:chio` plus explicit `did:web`, `did:key`, and
   `did:jwk` compatibility inputs, projected passport profile families, and
   fail-closed subject or issuer mismatch handling
 - one mostly immutable official web3 contract family, with the
   owner-managed identity registry as the only mutable contract, plus one
-  bounded `arc-link`, `arc-anchor`, `arc-settle`, automation, CCIP, and
+  bounded `chio-link`, `chio-anchor`, `chio-settle`, automation, CCIP, and
   payment-interop stack over that contract family
 - one bounded web3 operations contract over runtime reports, indexer
   drift/replay visibility, emergency modes, promotion policy, readiness audit,
@@ -150,67 +150,67 @@ target-chain factory, and rollout environment explicitly.
 - `./scripts/qualify-release.sh`
 - `./scripts/check-web3-contract-parity.sh`
 - `./scripts/qualify-web3-runtime.sh`
-- `cargo test -p arc-formal-diff-tests`
-- `cargo test -p arc-core underwriting -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query credit_bonded_execution -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_external_http_issuance_and_verifier_roundtrip_is_interop_qualified -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_oid4vp_cli_holder_adapter_supports_same_device_and_cross_device_launches -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_portable_sd_jwt_metadata_and_issuance_roundtrip -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revoked_states -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_issuance_metadata_rejects_public_status_distribution_without_cache_ttl -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_portable_lifecycle_stale_state_fails_closed_on_offer_and_public_resolution -- --nocapture`
-- `cargo test -p arc-cli --test passport passport_portable_metadata_endpoints_require_signing_key_configuration -- --nocapture`
-- `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture`
-- `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion -- --exact --nocapture`
-- `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime -- --exact --nocapture --test-threads=1`
-- `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_constraint -- --exact --nocapture --test-threads=1`
-- `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpop_or_mtls -- --exact --nocapture --test-threads=1`
-- `cargo test -p arc-core appraisal -- --nocapture`
-- `cargo test -p arc-core trust_bundle -- --nocapture`
-- `cargo test -p arc-core runtime_attestation_trust_policy -- --nocapture`
-- `cargo test -p arc-policy runtime_assurance_validation -- --nocapture`
-- `cargo test -p arc-control-plane azure_maa -- --nocapture`
-- `cargo test -p arc-control-plane aws_nitro -- --nocapture`
-- `cargo test -p arc-control-plane google_confidential_vm -- --nocapture`
-- `cargo test -p arc-control-plane runtime_assurance_policy -- --nocapture`
-- `cargo test -p arc-kernel governed_request_denies_untrusted_attestation_when_trust_policy_is_configured -- --nocapture`
-- `cargo test -p arc-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
-- `cargo test -p arc-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_import_export_surfaces -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_authorization_context_report_and_cli -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_authorization_metadata_and_review_pack_surfaces -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_invalid_arc_oauth_profile_projection -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_missing_sender_binding_material -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_incomplete_runtime_assurance_projection -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_invalid_delegated_call_chain_projection -- --exact --nocapture`
-- `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_serves_oauth_authorization_server_metadata_for_local_issuer -- --exact --nocapture`
-- `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture`
-- `cargo test -p arc-cli --test certify certify_check_emits_signed_pass_artifact_and_report -- --exact --nocapture`
-- `cargo test -p arc-cli --test certify certify_registry_discover_fails_closed_on_stale_and_mismatched_public_metadata -- --exact --nocapture`
-- `cargo test -p arc-cli --test certify certify_marketplace_search_transparency_consume_and_dispute_work -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_underwriting_appeal_and_supersession_lifecycle -- --exact`
-- `cargo test -p arc-cli --test receipt_query test_underwriting_simulation_report_surfaces -- --exact`
-- `cargo test -p arc-core credit -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_credit_backtest_report_surfaces_drift_and_failure_modes -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query test_provider_risk_package_export_surfaces -- --exact --nocapture`
-- `cargo test -p arc-cli --test receipt_query credit_loss_lifecycle -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query credit_bonded_execution -- --nocapture`
-- `cargo test -p arc-credentials signed_public_ -- --nocapture`
-- `cargo test -p arc-cli --test passport public_discovery -- --nocapture`
-- `cargo test -p arc-core market -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query liability_provider -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query liability_market -- --nocapture`
-- `cargo test -p arc-cli --test receipt_query liability_claim -- --nocapture`
-- `CARGO_INCREMENTAL=0 cargo test -p arc-credentials portable_reputation -- --nocapture`
-- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test local_reputation trust_service_portable_reputation_issue_and_evaluate_respects_local_weighting -- --exact --nocapture`
-- `CARGO_INCREMENTAL=0 cargo test -p arc-core --lib generic_listing_search_rejects_reports_with_invalid_listing_signatures -- --nocapture`
-- `CARGO_INCREMENTAL=0 cargo test -p arc-core --lib non_local_activation_authority -- --nocapture`
-- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_adversarial_multi_operator_open_market_preserves_visibility_without_trust -- --exact --nocapture`
+- `cargo test -p chio-formal-diff-tests`
+- `cargo test -p chio-core underwriting -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query credit_bonded_execution -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_external_http_issuance_and_verifier_roundtrip_is_interop_qualified -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_oid4vp_cli_holder_adapter_supports_same_device_and_cross_device_launches -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_portable_sd_jwt_metadata_and_issuance_roundtrip -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revoked_states -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_issuance_metadata_rejects_public_status_distribution_without_cache_ttl -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_portable_lifecycle_stale_state_fails_closed_on_offer_and_public_resolution -- --nocapture`
+- `cargo test -p chio-cli --test passport passport_portable_metadata_endpoints_require_signing_key_configuration -- --nocapture`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion -- --exact --nocapture`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime -- --exact --nocapture --test-threads=1`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_constraint -- --exact --nocapture --test-threads=1`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpop_or_mtls -- --exact --nocapture --test-threads=1`
+- `cargo test -p chio-core appraisal -- --nocapture`
+- `cargo test -p chio-core trust_bundle -- --nocapture`
+- `cargo test -p chio-core runtime_attestation_trust_policy -- --nocapture`
+- `cargo test -p chio-policy runtime_assurance_validation -- --nocapture`
+- `cargo test -p chio-control-plane azure_maa -- --nocapture`
+- `cargo test -p chio-control-plane aws_nitro -- --nocapture`
+- `cargo test -p chio-control-plane google_confidential_vm -- --nocapture`
+- `cargo test -p chio-control-plane runtime_assurance_policy -- --nocapture`
+- `cargo test -p chio-kernel governed_request_denies_untrusted_attestation_when_trust_policy_is_configured -- --nocapture`
+- `cargo test -p chio-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
+- `cargo test -p chio-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_result_import_export_surfaces -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_and_cli -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_metadata_and_review_pack_surfaces -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_invalid_chio_oauth_profile_projection -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_missing_sender_binding_material -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_incomplete_runtime_assurance_projection -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_authorization_context_report_rejects_invalid_delegated_call_chain_projection -- --exact --nocapture`
+- `cargo test -p chio-cli --test mcp_serve_http mcp_serve_http_serves_oauth_authorization_server_metadata_for_local_issuer -- --exact --nocapture`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture`
+- `cargo test -p chio-cli --test certify certify_check_emits_signed_pass_artifact_and_report -- --exact --nocapture`
+- `cargo test -p chio-cli --test certify certify_registry_discover_fails_closed_on_stale_and_mismatched_public_metadata -- --exact --nocapture`
+- `cargo test -p chio-cli --test certify certify_marketplace_search_transparency_consume_and_dispute_work -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_underwriting_decision_issue_and_list_surfaces -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_underwriting_appeal_and_supersession_lifecycle -- --exact`
+- `cargo test -p chio-cli --test receipt_query test_underwriting_simulation_report_surfaces -- --exact`
+- `cargo test -p chio-core credit -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_credit_backtest_report_surfaces_drift_and_failure_modes -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query test_provider_risk_package_export_surfaces -- --exact --nocapture`
+- `cargo test -p chio-cli --test receipt_query credit_loss_lifecycle -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query credit_bonded_execution -- --nocapture`
+- `cargo test -p chio-credentials signed_public_ -- --nocapture`
+- `cargo test -p chio-cli --test passport public_discovery -- --nocapture`
+- `cargo test -p chio-core market -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query liability_provider -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query liability_market -- --nocapture`
+- `cargo test -p chio-cli --test receipt_query liability_claim -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p chio-credentials portable_reputation -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p chio-cli --test local_reputation trust_service_portable_reputation_issue_and_evaluate_respects_local_weighting -- --exact --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p chio-core --lib generic_listing_search_rejects_reports_with_invalid_listing_signatures -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p chio-core --lib non_local_activation_authority -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p chio-cli --test certify certify_adversarial_multi_operator_open_market_preserves_visibility_without_trust -- --exact --nocapture`
 - `target/release-qualification/conformance/wave1/report.md`
 - `target/release-qualification/conformance/wave2/report.md`
 - `target/release-qualification/conformance/wave3/report.md`
@@ -218,10 +218,10 @@ target-chain factory, and rollout environment explicitly.
 - `target/release-qualification/conformance/wave5/report.md`
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 - `target/release-qualification/web3-runtime/artifact-manifest.json`
-- [ARC_WEB3_READINESS_AUDIT.md](ARC_WEB3_READINESS_AUDIT.md)
-- [ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md)
-- [ARC_RECEIPTS_PROFILE.md](../standards/ARC_RECEIPTS_PROFILE.md)
-- [ARC_PORTABLE_TRUST_PROFILE.md](../standards/ARC_PORTABLE_TRUST_PROFILE.md)
+- [CHIO_WEB3_READINESS_AUDIT.md](CHIO_WEB3_READINESS_AUDIT.md)
+- [CHIO_WEB3_PARTNER_PROOF.md](CHIO_WEB3_PARTNER_PROOF.md)
+- [CHIO_RECEIPTS_PROFILE.md](../standards/CHIO_RECEIPTS_PROFILE.md)
+- [CHIO_PORTABLE_TRUST_PROFILE.md](../standards/CHIO_PORTABLE_TRUST_PROFILE.md)
 - [PROTOCOL.md](../../spec/PROTOCOL.md)
 - [ECONOMIC_INTEROP_GUIDE.md](../ECONOMIC_INTEROP_GUIDE.md)
 - [CREDENTIAL_INTEROP_GUIDE.md](../CREDENTIAL_INTEROP_GUIDE.md)
@@ -229,7 +229,7 @@ target-chain factory, and rollout environment explicitly.
 
 ## Explicit Non-Claims
 
-ARC does not currently claim:
+Chio does not currently claim:
 
 - full theorem-prover coverage for every shipped protocol property
 - consensus or multi-region trust replication
@@ -242,12 +242,12 @@ ARC does not currently claim:
 - that authorization-context exports are independent source-of-truth documents
   rather than derived projections from signed receipts
 - generic OID4VP, DIDComm, SIOP, or permissionless public wallet-network
-  compatibility beyond ARC's documented passport profile family plus bounded
+  compatibility beyond Chio's documented passport profile family plus bounded
   public identity-profile, wallet-directory, and routing-manifest contracts
 - attestation-bound sender semantics as standalone authorization outside the
   documented paired DPoP/mTLS confirmation profile
 - generic attestation-result interoperability or automatic trust in arbitrary
-  cloud attestation providers beyond ARC's documented appraisal contract,
+  cloud attestation providers beyond Chio's documented appraisal contract,
   concrete verifier bridges, signed appraisal-result import/export contract,
   and trusted-verifier plus import-policy surfaces
 - one-time consume or replay-registry semantics for imported appraisal
@@ -258,22 +258,22 @@ ARC does not currently claim:
 - permissionless mirror/indexer publication as automatic trust, sanction, or
   market-penalty authority
 - permissionless or ambient open-market penalties, slashing, or trust
-  widening outside ARC's documented fee-schedule, trust-activation, and
+  widening outside Chio's documented fee-schedule, trust-activation, and
   governance-case surfaces
-- cross-network recovery clearing or insurer-network messaging beyond ARC's
+- cross-network recovery clearing or insurer-network messaging beyond Chio's
   documented liability-market orchestration boundary, including its bounded
   payout-instruction, payout-receipt, settlement-instruction, and
   settlement-receipt lane
-- automatic coverage binding beyond ARC's documented delegated
+- automatic coverage binding beyond Chio's documented delegated
   pricing-authority envelope
 - implicit regulated-actor status, automatic external capital dispatch,
-  autonomous insurer pricing, or open-market capital execution beyond ARC's
+  autonomous insurer pricing, or open-market capital execution beyond Chio's
   documented live capital-book, custody-neutral instruction,
   simulation-first allocation, and executable reserve-control surface
 
 ## Integration Posture
 
-ARC is the rights-and-receipts control plane under MCP, A2A, payment rails,
+Chio is the rights-and-receipts control plane under MCP, A2A, payment rails,
 portable trust, bounded public identity routing, and higher-assurance runtime
 evidence. It is not positioned as a replacement transport, universal wallet
 network, or standalone payment network.

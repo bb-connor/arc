@@ -12,7 +12,7 @@ def main() -> int:
     workspace = tomllib.loads((root / "Cargo.toml").read_text())
     members = workspace["workspace"]["members"]
     entrypoints = set(
-        workspace["workspace"]["metadata"]["arc"]["rust_public_entrypoints"]
+        workspace["workspace"]["metadata"]["chio"]["rust_public_entrypoints"]
     )
 
     errors: list[str] = []
@@ -50,7 +50,7 @@ def main() -> int:
     missing = sorted(entrypoints - seen_names)
     if missing:
         errors.append(
-            "workspace.metadata.arc.rust_public_entrypoints references unknown "
+            "workspace.metadata.chio.rust_public_entrypoints references unknown "
             f"crates: {', '.join(missing)}"
         )
 

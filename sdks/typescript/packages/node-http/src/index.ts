@@ -1,14 +1,14 @@
 /**
- * @arc-protocol/node-http
+ * @chio-protocol/node-http
  *
- * Common HTTP interception substrate for the ARC protocol.
+ * Common HTTP interception substrate for the Chio protocol.
  * Works with Node.js and Bun runtimes. Provides:
  *
  * - Identity extraction from Authorization headers, cookies, API keys
- * - ARC sidecar client for localhost HTTP evaluation
+ * - Chio sidecar client for localhost HTTP evaluation
  * - Node.js (req, res) interception
  * - Web API (Request -> Response) interception
- * - Signed receipt production via ARC sidecar
+ * - Signed receipt production via Chio sidecar
  */
 
 export * from "./types.js";
@@ -18,7 +18,7 @@ export {
   interceptNodeRequest,
   interceptWebRequest,
   getBufferedNodeRequestBody,
-  buildArcHttpRequest,
+  buildChioHttpRequest,
   resolveConfig,
   type ResolvedConfig,
   type BuildRequestOptions,

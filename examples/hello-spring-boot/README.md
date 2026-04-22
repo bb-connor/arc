@@ -1,12 +1,12 @@
 # hello-spring-boot
 
-Minimal Spring Boot example using [`sdks/jvm/arc-spring-boot`](../../sdks/jvm/arc-spring-boot/).
+Minimal Spring Boot example using [`sdks/jvm/chio-spring-boot`](../../sdks/jvm/chio-spring-boot/).
 
 ## What It Demonstrates
 
-- `GET /hello` and `POST /echo` behind the real ARC servlet filter
+- `GET /hello` and `POST /echo` behind the real Chio servlet filter
 - deny without capability and allow with a trust-issued capability token
-- request body remains readable by the controller after ARC hashing
+- request body remains readable by the controller after Chio hashing
 - receipt ids are emitted on the response header path
 
 ## Files

@@ -1,4 +1,4 @@
-# ARC Agent Economy: Technical Design
+# Chio Agent Economy: Technical Design
 
 Status: Phase 1 shipped in v2.0; governed transaction controls shipped in v2.6; bounded payment interop shipped through v2.38
 Authors: Engineering
@@ -8,7 +8,7 @@ Date: 2026-03-21 (updated 2026-04-02)
 
 ## 1. Overview
 
-ARC's existing architecture -- capability tokens, delegation chains, invocation budgets, and signed receipts -- is a programmable spending authorization system. The protocol already enforces who can do what, how many times, with cryptographic proof of every decision. This document describes how to extend that architecture into a full economic substrate for the agent economy.
+Chio's existing architecture -- capability tokens, delegation chains, invocation budgets, and signed receipts -- is a programmable spending authorization system. The protocol already enforces who can do what, how many times, with cryptographic proof of every decision. This document describes how to extend that architecture into a full economic substrate for the agent economy.
 
 Three observations anchor the design:
 
@@ -16,15 +16,15 @@ Three observations anchor the design:
 
 2. **The delegation chain is a cost-responsibility chain.** Each `DelegationLink` records who delegated what to whom, with `Attenuation` narrowing scope at each hop. Budget attenuation through delegation creates a tree of cost responsibility rooted at the original authorizer.
 
-3. **The receipt log is a billing ledger.** Every `ArcReceipt` is a signed, tamper-evident record of a decision. The existing `metadata: Option<serde_json::Value>` field is the natural insertion point for structured financial data. Receipts are already persisted in `SqliteReceiptStore` with indexed queries by capability, tool, and timestamp.
+3. **The receipt log is a billing ledger.** Every `ChioReceipt` is a signed, tamper-evident record of a decision. The existing `metadata: Option<serde_json::Value>` field is the natural insertion point for structured financial data. Receipts are already persisted in `SqliteReceiptStore` with indexed queries by capability, tool, and timestamp.
 
-The strategy is not to bolt a payment system onto ARC. It is to recognize that ARC is already 80% of a payment authorization system and close the remaining gaps with minimal, backward-compatible extensions.
+The strategy is not to bolt a payment system onto Chio. It is to recognize that Chio is already 80% of a payment authorization system and close the remaining gaps with minimal, backward-compatible extensions.
 
 As of `v2.38`, the shipped payment-facing overlay is explicit and bounded:
-ARC can now project governed settlement into x402 requirements, prepare
+Chio can now project governed settlement into x402 requirements, prepare
 EIP-3009 authorization digests, evaluate Circle-managed-custody nanopayments,
 and assess ERC-4337/paymaster compatibility. Those surfaces remain
-interoperability adapters over canonical ARC approval, receipt, and settlement
+interoperability adapters over canonical Chio approval, receipt, and settlement
 truth; they do not become a second ledger.
 
 ---
@@ -33,7 +33,7 @@ truth; they do not become a second ledger.
 
 ### 2.1 Invocation-Count Budgets
 
-`ToolGrant` in `crates/arc-core/src/capability.rs` carries an optional invocation cap:
+`ToolGrant` in `crates/chio-core/src/capability.rs` carries an optional invocation cap:
 
 ```rust
 pub struct ToolGrant {
@@ -45,7 +45,7 @@ pub struct ToolGrant {
 }
 ```
 
-The kernel enforces this via `BudgetStore::try_increment` in `crates/arc-kernel/src/budget_store.rs`. Each budget record is keyed by `(capability_id, grant_index)`:
+The kernel enforces this via `BudgetStore::try_increment` in `crates/chio-kernel/src/budget_store.rs`. Each budget record is keyed by `(capability_id, grant_index)`:
 
 ```rust
 pub struct BudgetUsageRecord {
@@ -59,7 +59,7 @@ pub struct BudgetUsageRecord {
 
 ### 2.2 BudgetStore Trait
 
-The `BudgetStore` trait (`crates/arc-kernel/src/budget_store.rs`) now covers
+The `BudgetStore` trait (`crates/chio-kernel/src/budget_store.rs`) now covers
 both invocation-count and monetary accounting:
 
 ```rust
@@ -114,11 +114,11 @@ Delta queries via `list_usages_after(limit, after_seq)` enable efficient replica
 
 ### 2.4 Budget Enforcement in the Kernel
 
-`ArcKernel::check_and_increment_budget` in `crates/arc-kernel/src/lib.rs` iterates matching grants that arrive pre-sorted by specificity from `resolve_matching_grants` upstream. If all matching grants with `max_invocations` are exhausted, the method returns `KernelError::BudgetExhausted`. The calling code then passes the error message (e.g. "invocation budget exhausted for capability ...") to `build_deny_response`, which produces a signed `Decision::Deny` receipt with guard `"kernel"` and the budget-exhaustion error as the reason string.
+`ChioKernel::check_and_increment_budget` in `crates/chio-kernel/src/lib.rs` iterates matching grants that arrive pre-sorted by specificity from `resolve_matching_grants` upstream. If all matching grants with `max_invocations` are exhausted, the method returns `KernelError::BudgetExhausted`. The calling code then passes the error message (e.g. "invocation budget exhausted for capability ...") to `build_deny_response`, which produces a signed `Decision::Deny` receipt with guard `"kernel"` and the budget-exhaustion error as the reason string.
 
 ### 2.5 Delegation Attenuation
 
-`Attenuation::ReduceBudget` in `crates/arc-core/src/capability.rs` already supports narrowing invocation counts during delegation:
+`Attenuation::ReduceBudget` in `crates/chio-core/src/capability.rs` already supports narrowing invocation counts during delegation:
 
 ```rust
 pub enum Attenuation {
@@ -135,7 +135,7 @@ pub enum Attenuation {
 
 ### 2.6 Receipt Metadata
 
-`ArcReceipt` and `ArcReceiptBody` in `crates/arc-core/src/receipt.rs` carry:
+`ChioReceipt` and `ChioReceiptBody` in `crates/chio-core/src/receipt.rs` carry:
 
 ```rust
 pub metadata: Option<serde_json::Value>,
@@ -167,9 +167,9 @@ rely on persisted local state rather than ad hoc inference.
 
 **Goal:** Extend `ToolGrant` so that in addition to invocation-count limits, a grant can carry a monetary spending cap.
 
-#### 3.1.1 New Types in `arc-core`
+#### 3.1.1 New Types in `chio-core`
 
-Add to `crates/arc-core/src/capability.rs`:
+Add to `crates/chio-core/src/capability.rs`:
 
 ```rust
 /// A monetary amount with currency denomination.
@@ -211,7 +211,7 @@ All new fields use `#[serde(default, skip_serializing_if = "Option::is_none")]` 
 
 #### 3.1.2 Attenuation for Cost Budgets
 
-Add a new `Attenuation` variant in `crates/arc-core/src/capability.rs`:
+Add a new `Attenuation` variant in `crates/chio-core/src/capability.rs`:
 
 ```rust
 pub enum Attenuation {
@@ -237,7 +237,7 @@ pub enum Attenuation {
 
 #### 3.1.3 Budget Store Extensions
 
-Extend `BudgetUsageRecord` in `crates/arc-kernel/src/budget_store.rs`:
+Extend `BudgetUsageRecord` in `crates/chio-kernel/src/budget_store.rs`:
 
 ```rust
 pub struct BudgetUsageRecord {
@@ -300,7 +300,7 @@ END
 
 #### 3.2.1 Tool Server Cost Response
 
-Tool servers must be able to report the actual cost of an invocation. Extend the `ToolServerConnection` trait in `crates/arc-kernel/src/lib.rs`:
+Tool servers must be able to report the actual cost of an invocation. Extend the `ToolServerConnection` trait in `crates/chio-kernel/src/lib.rs`:
 
 ```rust
 /// Cost reported by a tool server after invocation.
@@ -376,7 +376,7 @@ For reconciliation, the receipt log (section 3.5) records the delegation depth a
 
 #### 3.4.1 New Constraint Variants
 
-Add to `Constraint` in `crates/arc-core/src/capability.rs`:
+Add to `Constraint` in `crates/chio-core/src/capability.rs`:
 
 ```rust
 pub enum Constraint {
@@ -394,14 +394,14 @@ pub enum Constraint {
 }
 ```
 
-These two variants are now shipped in `arc-core`. Rolling-window spend and
+These two variants are now shipped in `chio-core`. Rolling-window spend and
 velocity controls remain planned follow-ons, but the first production governed
 flow is intentionally narrower: bind a canonical intent to the request, then
 require a signed approval artifact when the spend threshold is met.
 
 #### 3.4.2 Kernel Enforcement Path
 
-`ArcKernel` now enforces governed transactions in a dedicated validation step
+`ChioKernel` now enforces governed transactions in a dedicated validation step
 after provisional monetary charging and before guard or tool dispatch. The
 runtime checks:
 
@@ -452,10 +452,10 @@ it only verifies the signed inputs already present on the request.
 
 #### 3.5.1 Structured Financial Metadata
 
-Define a structured schema for the receipt `metadata` field. This does not change the `ArcReceipt` type -- it specifies what goes into the existing `Option<serde_json::Value>`:
+Define a structured schema for the receipt `metadata` field. This does not change the `ChioReceipt` type -- it specifies what goes into the existing `Option<serde_json::Value>`:
 
 ```rust
-/// Financial metadata populated in ArcReceipt.metadata when a grant
+/// Financial metadata populated in ChioReceipt.metadata when a grant
 /// carries monetary budget fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinancialReceiptMetadata {
@@ -548,25 +548,25 @@ evidence in one receipt document.
 
 #### 3.5.3 Receipt Store Indexing
 
-Add columns to `arc_tool_receipts` in `crates/arc-kernel/src/receipt_store.rs`:
+Add columns to `chio_tool_receipts` in `crates/chio-kernel/src/receipt_store.rs`:
 
 ```sql
-ALTER TABLE arc_tool_receipts
+ALTER TABLE chio_tool_receipts
     ADD COLUMN cost_charged INTEGER;
-ALTER TABLE arc_tool_receipts
+ALTER TABLE chio_tool_receipts
     ADD COLUMN cost_currency TEXT;
 
-CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_cost
-    ON arc_tool_receipts(cost_currency, cost_charged);
+CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_cost
+    ON chio_tool_receipts(cost_currency, cost_charged);
 ```
 
-The `SqliteReceiptStore::append_arc_receipt` method extracts `financial.cost_charged` and `financial.currency` from the receipt metadata at insert time. This enables efficient billing queries without full-JSON scanning.
+The `SqliteReceiptStore::append_chio_receipt` method extracts `financial.cost_charged` and `financial.currency` from the receipt metadata at insert time. This enables efficient billing queries without full-JSON scanning.
 
 ### 3.6 Payment Rail Integration
 
 #### 3.6.1 PaymentAdapter Trait
 
-Add a new module `crates/arc-kernel/src/payment.rs`:
+Add a new module `crates/chio-kernel/src/payment.rs`:
 
 ```rust
 /// Result of a payment authorization or settlement action.
@@ -604,7 +604,7 @@ pub enum RailSettlementStatus {
 
 /// Trait for executing payments against an external rail.
 ///
-/// ARC authorizes. The payment rail executes. Separation of concerns:
+/// Chio authorizes. The payment rail executes. Separation of concerns:
 /// the kernel never holds funds or manages wallets.
 pub trait PaymentAdapter: Send + Sync {
     /// Authorize or prepay up to the requested amount before the tool executes.
@@ -679,11 +679,11 @@ pub struct PaymentAuthorizeRequest {
 }
 ```
 
-Implemented on 2026-03-23: `arc-kernel` now ships this payment bridge module
+Implemented on 2026-03-23: `chio-kernel` now ships this payment bridge module
 with the adapter trait, rail-side settlement enum, and canonical
 receipt-side settlement mapping helper.
 
-Also implemented on 2026-03-23: `arc-kernel` now ships a concrete
+Also implemented on 2026-03-23: `chio-kernel` now ships a concrete
 `X402PaymentAdapter` reference bridge. It performs a thin prepaid HTTP
 authorization hop before execution, records receipt-linked payment references
 on successful calls, and denies truthfully when authorization fails.
@@ -693,7 +693,7 @@ transaction context when present, including the intent id/hash, target
 server/tool, purpose, and optional approval-token id. This binds prepaid rail
 authorization to the same governed request the kernel validates locally.
 
-Extended on 2026-03-26: `arc-kernel` now also ships `AcpPaymentAdapter`, a
+Extended on 2026-03-26: `chio-kernel` now also ships `AcpPaymentAdapter`, a
 seller-scoped shared-payment-token reference bridge. Governed intents can now
 carry typed commerce approval context (`seller`, `shared_payment_token_id`),
 grants can require an exact seller scope, and receipts preserve the commerce
@@ -718,7 +718,7 @@ cost when the configured payment rail is not prepaid.
 
 #### 3.6.3 Integration Point
 
-The `PaymentAdapter` is an optional dependency of `ArcKernel`.
+The `PaymentAdapter` is an optional dependency of `ChioKernel`.
 `X402PaymentAdapter` uses the prepaid branch below, while `AcpPaymentAdapter`
 uses the hold/capture branch for seller-scoped commerce approvals.
 
@@ -739,7 +739,7 @@ When configured, the kernel follows this rule set:
    `Decision::Allow` and records the failed settlement state plus a recovery
    reference in `FinancialReceiptMetadata`. Reconciliation happens out-of-band.
 
-For operator visibility, ARC preserves x402 and ACP bridge details inside
+For operator visibility, Chio preserves x402 and ACP bridge details inside
 `FinancialReceiptMetadata.cost_breakdown.payment`, including the prepaid
 authorization or hold id plus adapter metadata. Governed receipts also preserve
 seller-scoped commerce approval context under `governed_transaction.commerce`.
@@ -755,7 +755,7 @@ explicit `dimensions.invocations` plus `dimensions.money` budget profiles on
 each utilization row.
 
 ```rust
-pub struct ArcKernel {
+pub struct ChioKernel {
     // ... existing fields ...
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
 }
@@ -769,7 +769,7 @@ The payment adapter is never called on the hot path for grants without monetary 
 
 The economic extensions enable four product surfaces. All are built on the same kernel and receipt infrastructure.
 
-### 4.1 ARC Authorize
+### 4.1 Chio Authorize
 
 Agent spending authorization -- analogous to Brex or Ramp for autonomous agents.
 
@@ -779,16 +779,16 @@ Agent spending authorization -- analogous to Brex or Ramp for autonomous agents.
 - Receipts provide a complete, signed audit trail of every charge.
 - Velocity controls (`MaxSpendPerWindow`, `RequireApprovalAbove`) provide the same controls a CFO applies to corporate cards.
 
-### 4.2 ARC Meter
+### 4.2 Chio Meter
 
 Tool provider billing infrastructure.
 
 - Tool servers report `ToolInvocationCost` on every invocation.
 - Receipts accumulate per-tool-server cost data.
 - `SqliteReceiptStore` cost indexes enable per-provider billing aggregation.
-- Settlement queries: `SELECT tool_server, SUM(cost_charged) FROM arc_tool_receipts WHERE cost_currency = ? GROUP BY tool_server`.
+- Settlement queries: `SELECT tool_server, SUM(cost_charged) FROM chio_tool_receipts WHERE cost_currency = ? GROUP BY tool_server`.
 
-### 4.3 ARC Settle
+### 4.3 Chio Settle
 
 Cross-organization delegation chain settlement.
 
@@ -798,7 +798,7 @@ Cross-organization delegation chain settlement.
 - Settlement is a batch process that walks delegation chains in receipts, nets out cost attribution per org, and triggers capture, transfer, refund, or reconciliation actions against the connected payment rail.
 - Dispute resolution: any party can verify any receipt's signature and delegation chain independently using only the kernel's public key.
 
-### 4.4 ARC Watch
+### 4.4 Chio Watch
 
 Spending analytics and anomaly detection.
 
@@ -806,55 +806,55 @@ Spending analytics and anomaly detection.
 - `GET /v1/reports/operator` composes receipt analytics, cost attribution,
   budget utilization, settlement reconciliation, and evidence-export readiness
   into one operator-facing workflow surface.
-- `arc trust behavioral-feed export` and `GET /v1/reports/behavioral-feed`
+- `chio trust behavioral-feed export` and `GET /v1/reports/behavioral-feed`
   produce a signed insurer-facing behavioral feed from the same canonical
   receipt, settlement, governed-action, reputation, and shared-evidence data.
-- `arc trust underwriting-input export` and `GET /v1/reports/underwriting-input`
+- `chio trust underwriting-input export` and `GET /v1/reports/underwriting-input`
   produce a signed underwriting policy-input snapshot with explicit receipt,
   reputation, certification, runtime-assurance, and shared-evidence references.
-- `arc trust underwriting-decision evaluate` and
+- `chio trust underwriting-decision evaluate` and
   `GET /v1/reports/underwriting-decision` evaluate that same canonical
   evidence package into one bounded outcome: `approve`, `reduce_ceiling`,
   `step_up`, or `deny`.
-- `arc trust underwriting-decision simulate` and
-  `POST /v1/reports/underwriting-simulation` compare ARC's default decision
+- `chio trust underwriting-decision simulate` and
+  `POST /v1/reports/underwriting-simulation` compare Chio's default decision
   policy with an operator-supplied simulation policy over the same canonical
   evidence without persisting a new decision.
-- `arc trust exposure-ledger export` and `GET /v1/reports/exposure-ledger`
+- `chio trust exposure-ledger export` and `GET /v1/reports/exposure-ledger`
   produce a signed economic-position ledger over governed receipts and
   persisted underwriting decisions, with per-currency totals and concrete
   evidence references for receipt-side reserve, settlement, and loss posture.
-- `arc trust credit-scorecard export` and `GET /v1/reports/credit-scorecard`
+- `chio trust credit-scorecard export` and `GET /v1/reports/credit-scorecard`
   produce a signed, subject-scoped credit posture over that same exposure
   ledger plus local reputation inspection, with explicit dimensions,
   probation, confidence, and anomaly semantics.
-- `arc trust credit-backtest export` and `GET /v1/reports/credit-backtest`
+- `chio trust credit-backtest export` and `GET /v1/reports/credit-backtest`
   replay the current credit and facility logic over bounded historical windows
   so drift, stale evidence, mixed-currency books, and prerequisite failures
   are qualification-visible instead of inferred.
-- `arc trust provider-risk-package export` and
+- `chio trust provider-risk-package export` and
   `GET /v1/reports/provider-risk-package` produce one signed provider-facing
   review package containing signed exposure and scorecard artifacts, current
   facility posture, latest facility snapshot, runtime-assurance and
   certification state, and recent-loss history.
-- `arc trust liability-provider issue|list|resolve` plus the matching
+- `chio trust liability-provider issue|list|resolve` plus the matching
   trust-control routes keep carrier policy, jurisdiction, coverage-class,
   currency, and evidence-requirement truth curated and supersession-aware
   before any quote or bind step can proceed.
-- `arc trust liability-market quote-request-issue|quote-response-issue|
+- `chio trust liability-market quote-request-issue|quote-response-issue|
   placement-issue|bound-coverage-issue|list` plus the matching trust-control
   routes now model one provider-neutral quote and bind workflow over that
   signed provider-risk package, preserving provider provenance and failing
   closed on stale provider records, expired quotes, coverage mismatches, or
   unsupported bound-coverage policy.
-- `arc trust underwriting-decision issue` and
+- `chio trust underwriting-decision issue` and
   `POST /v1/underwriting/decisions/issue` persist a signed underwriting
   decision artifact with explicit review state, budget action, premium quote
   state, and optional supersession linkage.
-- `arc trust underwriting-decision list` and
+- `chio trust underwriting-decision list` and
   `GET /v1/reports/underwriting-decisions` return persisted signed decisions
   together with the current lifecycle projection and latest appeal status.
-- `arc trust underwriting-appeal create|resolve` plus
+- `chio trust underwriting-appeal create|resolve` plus
   `POST /v1/underwriting/appeals` and
   `POST /v1/underwriting/appeals/resolve` keep appeal state explicit without
   editing execution receipts or re-signing prior decisions.
@@ -888,18 +888,18 @@ Spending analytics and anomaly detection.
 - The exposure ledger is the canonical signed economic-position projection over
   those same receipts and persisted decisions. It partitions totals by
   currency rather than netting across currencies, and it fails closed if one
-  receipt row contains contradictory currency truth that ARC cannot represent
+  receipt row contains contradictory currency truth that Chio cannot represent
   honestly in a single position row.
 - The credit scorecard is intentionally subject-scoped and explicitly weighted.
   It reuses the existing local reputation inspection as one input rather than
   inventing a second trust score, then combines that with settlement, reserve,
   and provisional-loss posture from the signed exposure ledger.
 - The facility-policy layer turns that scorecard into one bounded allocation
-  recommendation. ARC can now produce explicit grant, manual-review, or deny
+  recommendation. Chio can now produce explicit grant, manual-review, or deny
   posture with typed runtime-assurance and certification prerequisites, plus a
   signed facility artifact lifecycle that supports supersession and expiry
   without rewriting the previously signed body.
-- Credit qualification is now explicit rather than implied. ARC can replay the
+- Credit qualification is now explicit rather than implied. Chio can replay the
   current scorecard and facility-policy logic over historical windows, then
   surface typed drift reasons such as stale evidence, mixed-currency books,
   utilization overage, missing runtime assurance, or settlement backlog.
@@ -907,29 +907,29 @@ Spending analytics and anomaly detection.
   signed exposure and scorecard truth together with current facility posture,
   runtime-assurance or certification state, and recent-loss rows sourced from
   the newest matching loss evidence rather than from a truncated ledger page.
-- The capital book is now explicit instead of implied. ARC can export one
+- The capital book is now explicit instead of implied. Chio can export one
   signed live capital book that ties the current facility commitment and
   reserve book to one subject-scoped source-of-funds view with explicit
   committed, held, drawn, disbursed, released, repaid, and impaired state over
   canonical receipt, facility, bond, and loss-lifecycle evidence.
-- Capital attribution remains conservative and fail closed. ARC refuses to
+- Capital attribution remains conservative and fail closed. Chio refuses to
   auto-blend multiple live facilities or reserve books, mixed-currency
   positions, missing counterparty attribution, or books with no active granted
   facility that can explain the committed source of funds honestly.
-- Capital instructions are now explicit instead of inferred. ARC can issue one
+- Capital instructions are now explicit instead of inferred. Chio can issue one
   signed custody-neutral instruction artifact for reserve locks, reserve
   holds, reserve releases, fund transfers, or instruction cancellation over
   one subject-scoped live capital source.
 - Capital execution remains evidence-linked and fail closed. Each instruction
   carries one explicit authority chain, execution window, rail descriptor,
-  intended versus reconciled state, and bounded evidence set, and ARC rejects
+  intended versus reconciled state, and bounded evidence set, and Chio rejects
   stale authority, mismatched custody steps, expired windows, mixed-currency
   amounts, or observed execution that does not match the intended movement.
-- Capital allocation decisions are now explicit instead of ambient. ARC can
+- Capital allocation decisions are now explicit instead of ambient. Chio can
   issue one signed simulation-first allocation artifact for one governed
   receipt, one active facility-backed capital source, one optional reserve
   source, and one bounded execution envelope.
-- Allocation remains deterministic and fail closed. ARC requires one approved
+- Allocation remains deterministic and fail closed. Chio requires one approved
   actionable governed receipt, binds allocation against the currently active
   facility/book state when it exists, and emits typed `allocate`, `queue`,
   `manual_review`, or `deny` posture instead of blending sources or implying
@@ -938,25 +938,25 @@ Spending analytics and anomaly detection.
   instructions and allocations require one named source-owner approval, one
   named custody-provider execution step, and one bounded execution window
   rather than relying on implicit operator authority.
-- The regulated-role baseline remains intentionally bounded. ARC now emits
-  auditable live-capital contracts, but it still does not claim ARC itself is
+- The regulated-role baseline remains intentionally bounded. Chio now emits
+  auditable live-capital contracts, but it still does not claim Chio itself is
   the regulated custodian, settlement rail, or insurer of record.
-- Bond policy is now explicit instead of implicit. ARC can evaluate reserve
+- Bond policy is now explicit instead of implicit. Chio can evaluate reserve
   posture into one typed `lock`, `hold`, `release`, or `impair` report over
   canonical exposure plus the latest active granted facility, then persist the
   result as a separate signed bond artifact without mutating the facility or
   receipt bodies.
 - Reserve accounting remains intentionally single-currency and fail closed.
   If the selected book or the latest active facility would require blended
-  cross-currency collateral math, ARC rejects the bond report rather than
+  cross-currency collateral math, Chio rejects the bond report rather than
   inventing a netted reserve state.
-- Bond artifacts now participate in bounded runtime enforcement. ARC can deny
+- Bond artifacts now participate in bounded runtime enforcement. Chio can deny
   delegated and autonomous governed execution unless the caller supplies an
   explicit autonomy context with an active delegation bond whose lifecycle,
   reserve disposition, facility prerequisites, support boundary, runtime
   assurance, call-chain binding, and tool-server scope all still match the
   current invocation.
-- Bond-loss lifecycle is now explicit instead of implicit. ARC can evaluate
+- Bond-loss lifecycle is now explicit instead of implicit. Chio can evaluate
   one delinquency, recovery, reserve-release, reserve-slash, or write-off step
   over a signed bond, then persist that step as a separate signed artifact
   without mutating the bond body or the original execution receipt.
@@ -975,7 +975,7 @@ Spending analytics and anomaly detection.
   chain, one bounded execution window, one custody rail, optional observed
   execution that reconciles to the computed event amount, and an optional
   machine-readable appeal window.
-- Liability-provider admission is now explicit rather than ad hoc. ARC can
+- Liability-provider admission is now explicit rather than ad hoc. Chio can
   publish one curated signed provider artifact with bounded jurisdiction,
   coverage-class, currency, and evidence requirements, then fail closed
   during provider resolution when the requested combination is unsupported or
@@ -983,12 +983,12 @@ Spending analytics and anomaly detection.
 - Bond artifacts are still not a live escrow engine. They now gate bounded
   autonomy tiers, but they still do not slash reserves or execute external
   collateral movement from phases `85` and `86` alone.
-- Bonded execution is now operator-simulatable before runtime use. ARC can
+- Bonded execution is now operator-simulatable before runtime use. Chio can
   replay one requested autonomy tier, runtime-assurance tier, and call-chain
   posture against a persisted bond plus lifecycle history, then compare the
   default decision versus an explicit operator control policy without mutating
   the bond or execution receipt bodies.
-- Operator controls are explicit instead of implied. ARC now supports a
+- Operator controls are explicit instead of implied. Chio now supports a
   kill-switch, autonomy-tier clamp, runtime-assurance floor, reserve-lock
   requirement, and delinquency clamp-down policy over bonded execution, and
   the simulation path fails closed if loss-lifecycle history is truncated.
@@ -997,7 +997,7 @@ Spending analytics and anomaly detection.
   change operator-visible state, but they do not rewrite the previously signed
   artifact. Summary premium totals are partitioned by currency so cross-currency
   reports do not collapse into one raw unit count.
-- Claim workflows are explicit instead of implied. ARC now issues immutable
+- Claim workflows are explicit instead of implied. Chio now issues immutable
   claim packages, provider responses, disputes, adjudications, payout
   instructions, payout receipts, settlement instructions, and settlement
   receipts linked back to bound coverage, exposure, bond, loss-lifecycle,
@@ -1005,26 +1005,26 @@ Spending analytics and anomaly detection.
   reconstruct that state from quote, bond, or payment side effects alone.
 - The liability-market posture is now locally qualified end to end across
   curated provider admission, quote/bind, claim/dispute workflow evidence, and
-  one bounded payout-and-settlement lane. ARC can now prove the marketplace
+  one bounded payout-and-settlement lane. Chio can now prove the marketplace
   orchestration layer it claims without implying autonomous insurer pricing,
   open-ended payment rails, cross-network clearing, or permissionless market
   trust.
-- Delegated pricing authority is now explicit instead of implied. ARC issues a
+- Delegated pricing authority is now explicit instead of implied. Chio issues a
   signed provider- or regulated-role-bounded authority artifact linked to one
   quote request, one facility, one underwriting decision, and one capital-book
   snapshot, and automatic binding fails closed on stale authority, stale
   provider state, or out-of-envelope coverage or premium requests.
-- Bounded autonomous pricing is now explicit instead of implied. ARC issues one
+- Bounded autonomous pricing is now explicit instead of implied. Chio issues one
   signed pricing-input, authority-envelope, pricing-decision, capital-pool,
   execution, rollback, comparison, drift, and qualification family that keeps
   automated reprice, renew, decline, and bind behavior subordinate to explicit
   evidence provenance, reserve strategy, human-interrupt contacts, and
   fail-safe rollback posture.
-- Recovery and claims-network semantics remain intentionally bounded. ARC now
+- Recovery and claims-network semantics remain intentionally bounded. Chio now
   records claim, payout, settlement, and dispute state, but it still does not
   claim insurer-network messaging or open-ended cross-organization recovery
   clearing in the signed export.
-- Open-market economics are now explicit instead of informal. ARC issues one
+- Open-market economics are now explicit instead of informal. Chio issues one
   signed fee-schedule artifact over bounded namespace, actor-kind,
   publisher-operator, and admission-class scope plus one signed penalty
   artifact over matched listing, activation, governance sanction, abuse class,
@@ -1032,16 +1032,16 @@ Spending analytics and anomaly detection.
   authority, scope mismatch, unsupported bond requirements, non-slashable
   bonds, and currency or amount mismatch instead of treating market discipline
   as ambient operator discretion.
-- Federated trust is now explicit instead of implied. ARC issues one signed
+- Federated trust is now explicit instead of implied. Chio issues one signed
   federation-activation exchange, one quorum report, one federated open-
   admission policy, one shared reputation-clearing artifact, and one
   qualification matrix so cross-operator visibility can be shared without
   turning mirrors, indexers, or imported trust into ambient runtime
   admission.
 - Public identity and wallet interoperability are now explicit instead of
-  implied. ARC issues one public identity profile, one verifier-bound wallet-
+  implied. Chio issues one public identity profile, one verifier-bound wallet-
   directory entry, one replay-safe wallet-routing manifest, and one
-  qualification matrix over `did:arc` plus bounded `did:web`, `did:key`, and
+  qualification matrix over `did:chio` plus bounded `did:web`, `did:key`, and
   `did:jwk` compatibility inputs without turning public routing or directory
   visibility into ambient trust or admission.
 - Shared reputation remains locally weighted. Independent issuers, per-issuer
@@ -1049,20 +1049,20 @@ Spending analytics and anomaly detection.
   the federation lane from collapsing into a universal trust score or
   permissionless trust network.
 - Adversarial multi-operator market proof is now explicit instead of assumed.
-  ARC can preserve public visibility of conflicting or invalid registry
+  Chio can preserve public visibility of conflicting or invalid registry
   replicas while refusing to treat them as runtime trust, can keep imported
   reputation locally weighted under hostile operator input, and can reject
   governance or market-penalty artifacts that depend on trust activations not
   issued by the governing local operator.
 - Score confidence and probation are explicit instead of implied. Sparse
-  history can still produce a scorecard, but ARC marks it low-confidence and
+  history can still produce a scorecard, but Chio marks it low-confidence and
   probationary rather than letting later facility policy treat it as a mature
   credit book.
-- Live capital execution remains intentionally bounded. ARC now issues
+- Live capital execution remains intentionally bounded. Chio now issues
   reviewable capital-book, capital-instruction, capital-allocation,
   reserve-control, payout, and settlement artifacts, plus one official web3
   dispatch and settlement lane with anchored reconciliation, plus one bounded
-  `arc-settle` runtime over explicit escrow, refund, and bond-lifecycle flows,
+  `chio-settle` runtime over explicit escrow, refund, and bond-lifecycle flows,
   plus one bounded autonomous pricing and capital-pool lane over that
   substrate, but it still does not claim permissionless external dispatch or
   open-ended insurer automation outside the documented bounded envelope.
@@ -1072,7 +1072,7 @@ Spending analytics and anomaly detection.
 
 ### 4.5 Attested Runtime Tiers
 
-ARC treats runtime attestation as an input to issuance and governed execution,
+Chio treats runtime attestation as an input to issuance and governed execution,
 not as a replacement trust system.
 
 - HushSpec policies can define `extensions.runtime_assurance.tiers`, where each
@@ -1094,17 +1094,17 @@ not as a replacement trust system.
   `MinimumRuntimeAssurance(...)` constraint. The kernel re-checks that
   requirement at invocation time against `governed_intent.runtime_attestation`
   before approval and budget enforcement continue.
-- ARC now recognizes one typed workload-identity projection inside runtime
+- Chio now recognizes one typed workload-identity projection inside runtime
   attestation: SPIFFE with `credentialKind` `uri`, `x509_svid`, or `jwt_svid`
   and normalized `{ uri, trustDomain, path }` fields. A legacy raw
-  `runtimeIdentity` string still remains allowed, but ARC only projects it into
+  `runtimeIdentity` string still remains allowed, but Chio only projects it into
   typed policy/runtime surfaces when it is a valid SPIFFE URI.
-- ARC's first concrete verifier adapter is Azure Attestation JWT
+- Chio's first concrete verifier adapter is Azure Attestation JWT
   normalization. It binds a configured issuer plus RSA signing material,
   enforces allowed `x-ms-attestation-type` values, preserves Azure-specific
   claims under `claims.azureMaa`, and can optionally project one SPIFFE URI
   from `x-ms-runtime.claims.*` into the same typed workload-identity surface.
-- ARC's second and third concrete verifier adapters are AWS Nitro
+- Chio's second and third concrete verifier adapters are AWS Nitro
   `COSE_Sign1` documents and Google Confidential VM JWTs. Nitro binds
   certificate-anchored `ES384` measurements, freshness, optional nonce
   matching, and debug-mode denial; Google binds metadata-resolved `JWKS`
@@ -1118,7 +1118,7 @@ not as a replacement trust system.
   operator-controlled. A carried attestation must match one trusted verifier
   rule and satisfy its freshness and attestation-type constraints or issuance
   and governed execution deny fail closed.
-- Conflicting or malformed workload-identity claims fail closed. ARC will not
+- Conflicting or malformed workload-identity claims fail closed. Chio will not
   silently widen rights or runtime trust from an opaque verifier string it does
   not understand.
 - Receipt metadata records the accepted attestation schema, optional verifier
@@ -1141,7 +1141,7 @@ not as a replacement trust system.
                                 v
   +-----------+         +----------------+         +----------------+
   |           |  req    |                |  invoke  |                |
-  |  Agent    |-------->|  ARC Kernel   |--------->|  Tool Server   |
+  |  Agent    |-------->|  Chio Kernel   |--------->|  Tool Server   |
   | (spender) |         |  (authorizer)  |<---------|  (provider)    |
   |           |<--------|                |  result  |                |
   +-----------+  receipt|                |  + cost  +----------------+
@@ -1180,7 +1180,7 @@ operator-managed sidecar data keyed by `receipt_id`.*
 7. **[current]** Tool server returns result + `ToolInvocationCost`.
 8. **[current]** Kernel verifies reported cost against the per-invocation cap, unwinds aborted invocations, and finalizes the budget charge.
 9. **[current]** If `PaymentAdapter` is configured, the kernel either records prepaid settlement metadata or captures/releases the post-execution amount depending on rail mode.
-10. **[current]** Kernel signs `ArcReceipt` with `FinancialReceiptMetadata`, including settlement status and payment reference.
+10. **[current]** Kernel signs `ChioReceipt` with `FinancialReceiptMetadata`, including settlement status and payment reference.
 11. Receipt is appended to `SqliteReceiptStore` and replicated. *(current)*
 12. **[current]** Failed or pending settlement follow-up is handled through
     trust-control reconciliation sidecar state and backlog reports, not by
@@ -1211,7 +1211,7 @@ Operational guides for v2.0 features:
 
 All Phase 1 deliverables shipped in v2.0:
 
-- `MonetaryAmount` type in `crates/arc-core/src/capability.rs`.
+- `MonetaryAmount` type in `crates/chio-core/src/capability.rs`.
 - `max_cost_per_invocation` and `max_total_cost` fields on `ToolGrant`; `is_subset_of` enforces cost caps through delegation chains.
 - `ReduceCostPerInvocation` and `ReduceTotalCost` attenuation variants.
 - `total_cost_charged` in `BudgetUsageRecord` and `capability_grant_budgets` table.
@@ -1221,19 +1221,19 @@ All Phase 1 deliverables shipped in v2.0:
 - Kernel cost verification in `evaluate_tool_call_with_session_roots`.
 - `FinancialReceiptMetadata` populated into receipt `metadata` field, including `grant_index`, `cost_charged`, `currency`, `budget_remaining`, `budget_total`, `delegation_depth`, `root_budget_holder`, and `settlement_status`.
 - Receipt store cost indexing columns (`cost_charged`, `cost_currency`).
-- `VelocityGuard` token-bucket rate limiting in `crates/arc-guards/src/velocity.rs`.
+- `VelocityGuard` token-bucket rate limiting in `crates/chio-guards/src/velocity.rs`.
 - Unit and integration tests for all of the above.
 
 **Shipped files:**
 
 | File | What shipped |
 |------|-------------|
-| `crates/arc-core/src/capability.rs` | `MonetaryAmount`, `ToolGrant` monetary fields, attenuation variants, `is_subset_of` monetary checks |
-| `crates/arc-kernel/src/budget_store.rs` | `BudgetUsageRecord.total_cost_charged`, `try_charge_cost`, schema migration, replication |
-| `crates/arc-kernel/src/lib.rs` | `ToolInvocationCost`, `invoke_with_cost`, kernel cost verification, receipt population |
-| `crates/arc-core/src/receipt.rs` | `FinancialReceiptMetadata` (serialized into `metadata` field) |
-| `crates/arc-kernel/src/receipt_store.rs` | Cost indexing columns, `RetentionConfig`, archival rotation |
-| `crates/arc-guards/src/velocity.rs` | `VelocityGuard` token-bucket implementation |
+| `crates/chio-core/src/capability.rs` | `MonetaryAmount`, `ToolGrant` monetary fields, attenuation variants, `is_subset_of` monetary checks |
+| `crates/chio-kernel/src/budget_store.rs` | `BudgetUsageRecord.total_cost_charged`, `try_charge_cost`, schema migration, replication |
+| `crates/chio-kernel/src/lib.rs` | `ToolInvocationCost`, `invoke_with_cost`, kernel cost verification, receipt population |
+| `crates/chio-core/src/receipt.rs` | `FinancialReceiptMetadata` (serialized into `metadata` field) |
+| `crates/chio-kernel/src/receipt_store.rs` | Cost indexing columns, `RetentionConfig`, archival rotation |
+| `crates/chio-guards/src/velocity.rs` | `VelocityGuard` token-bucket implementation |
 
 ### Phase 2: Observability (~3 months effort; maps to Q3 2026 in the Strategic Roadmap)
 
@@ -1247,7 +1247,7 @@ All Phase 1 deliverables shipped in v2.0:
 Shipped baseline in `v2.6`:
 
 - `PaymentAdapter` trait and truthful settlement mapping in
-  `crates/arc-kernel/src/payment.rs`
+  `crates/chio-kernel/src/payment.rs`
 - `X402PaymentAdapter` for prepaid API flows and `AcpPaymentAdapter` for
   shared-payment-token commerce approvals
 - operator-visible settlement backlog reporting and sidecar reconciliation
@@ -1255,10 +1255,10 @@ Shipped baseline in `v2.6`:
 
 Remaining incremental work:
 
-- `PaymentAdapter` trait and `PaymentError` in `crates/arc-kernel/src/payment.rs`.
+- `PaymentAdapter` trait and `PaymentError` in `crates/chio-kernel/src/payment.rs`.
 - `StripePaymentAdapter` implementation.
 - Hold-and-capture flow (authorize before invocation, capture or release after cost report).
-- Kernel integration: optional adapter on `ArcKernel`, with truthful receipt semantics and deeper reconciliation automation for post-execution settlement failures.
+- Kernel integration: optional adapter on `ChioKernel`, with truthful receipt semantics and deeper reconciliation automation for post-execution settlement failures.
 
 ### Phase 4: Cross-Org Settlement (~6 months effort; maps to Q1-Q2 2027 in the Strategic Roadmap)
 

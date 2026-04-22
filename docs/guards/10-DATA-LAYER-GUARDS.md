@@ -5,7 +5,7 @@
 > extensions), `docs/guards/01-CURRENT-GUARD-SYSTEM.md` (guard trait and
 > pipeline)
 
-These are the first guards designed natively for ARC. Every previous guard
+These are the first guards designed natively for Chio. Every previous guard
 was ported from ClawdStrike. ClawdStrike has no database guards because it
 was built for filesystem/shell/network governance. Data layer governance
 is new ground.
@@ -27,7 +27,7 @@ Six new guards, four pre-invocation and two post-invocation:
 
 All six implement fail-closed semantics. Errors during evaluation produce
 `Verdict::Deny` (pre-invocation) or `PostInvocationVerdict::Block`
-(post-invocation), consistent with every existing ARC guard.
+(post-invocation), consistent with every existing Chio guard.
 
 ---
 
@@ -35,7 +35,7 @@ All six implement fail-closed semantics. Errors during evaluation produce
 
 ### 2.1 Variant Definition
 
-The `ToolAction` enum in `arc-guards/src/action.rs` gains a
+The `ToolAction` enum in `chio-guards/src/action.rs` gains a
 `DatabaseQuery` variant. This is the discriminant that data layer guards
 match on:
 
@@ -139,7 +139,7 @@ fallback.
 **Purpose**: Parse SQL queries and enforce data layer constraints from the
 matched `ToolGrant`.
 
-**Implements**: `arc_kernel::Guard`
+**Implements**: `chio_kernel::Guard`
 
 #### What It Checks
 
@@ -238,7 +238,7 @@ based on `DatabaseEngine`:
 
 **Fail-closed on parse failure**: If `sqlparser` cannot parse the query,
 the guard returns `Err(KernelError::Internal(...))`, which the kernel
-treats as deny. This matches ARC's convention (see `DataFlowGuard`,
+treats as deny. This matches Chio's convention (see `DataFlowGuard`,
 which returns `Err` when the session journal is unavailable).
 
 Rationale: an unparseable query is either malformed (should not execute),
@@ -302,7 +302,7 @@ ALLOWED: SELECT name, email FROM users WHERE tenant_id = 'acme' LIMIT 100;
 **Purpose**: Enforce collection/namespace scoping and operation class
 constraints on vector database tool calls.
 
-**Implements**: `arc_kernel::Guard`
+**Implements**: `chio_kernel::Guard`
 
 #### What It Checks
 
@@ -378,13 +378,13 @@ ALLOWED: collection="product-embeddings", namespace="production",
 **Purpose**: Enforce cost limits on data warehouse queries using
 pre-execution dry-run estimates.
 
-**Implements**: `arc_kernel::Guard`
+**Implements**: `chio_kernel::Guard`
 
 #### The Dry-Run Pattern
 
 Data warehouses (BigQuery, Snowflake, Databricks) support dry-run
 queries that return estimated scan size and cost without executing. The
-ARC guard does not call warehouse APIs directly. Instead:
+Chio guard does not call warehouse APIs directly. Instead:
 
 1. The tool server receives the query from the agent.
 2. The tool server runs the warehouse dry-run API itself.
@@ -399,10 +399,10 @@ ARC guard does not call warehouse APIs directly. Instead:
      }
    }
    ```
-4. The ARC kernel evaluates the guard using the submitted estimate.
+4. The Chio kernel evaluates the guard using the submitted estimate.
 5. If allowed, the tool server executes the actual query.
 
-This design preserves ARC's architecture: the kernel never has direct
+This design preserves Chio's architecture: the kernel never has direct
 access to external services. The tool server is inside the sandbox; the
 kernel is the trusted mediator. The kernel trusts the dry-run estimate
 to the same degree it trusts any tool server argument -- it is the best
@@ -466,7 +466,7 @@ ALLOWED: dry_run_estimate = { bytes_scanned: 52428800, estimated_cost: { units: 
 **Purpose**: Prevent unbounded graph database traversals that return
 massive subgraphs.
 
-**Implements**: `arc_kernel::Guard`
+**Implements**: `chio_kernel::Guard`
 
 #### What It Checks
 
@@ -524,7 +524,7 @@ ALLOWED: MATCH (p:Person)-[:KNOWS*1..3]->(friend) RETURN friend.name
 **Purpose**: Scope cache/session store access to specific key patterns
 and block dangerous administrative commands.
 
-**Implements**: `arc_kernel::Guard`
+**Implements**: `chio_kernel::Guard`
 
 #### What It Checks
 
@@ -581,7 +581,7 @@ ALLOWED: operation="GET", key="session:agent-42:state"
 delivery to the agent. Provides defense-in-depth for constraints that
 pre-invocation guards can only partially enforce.
 
-**Implements**: `PostInvocationHook` (from `arc-guards/src/post_invocation.rs`)
+**Implements**: `PostInvocationHook` (from `chio-guards/src/post_invocation.rs`)
 
 #### What It Checks
 
@@ -671,7 +671,7 @@ the guard pipeline alongside them.
 
 ### 5.1 Composition with `VelocityGuard`
 
-`VelocityGuard` (in `arc-guards/src/velocity.rs`) rate-limits by
+`VelocityGuard` (in `chio-guards/src/velocity.rs`) rate-limits by
 `(capability_id, grant_index)`. Data layer guards run in the same
 pipeline. Typical ordering:
 
@@ -693,7 +693,7 @@ These are complementary: velocity limits the rate of spend,
 
 ### 5.2 Composition with `DataFlowGuard`
 
-`DataFlowGuard` (in `arc-guards/src/data_flow.rs`) tracks cumulative
+`DataFlowGuard` (in `chio-guards/src/data_flow.rs`) tracks cumulative
 bytes read/written via the session journal. Database queries generate
 data flow: a query returning 10,000 rows of 1 KB each produces ~10 MB
 of bytes_read.
@@ -740,7 +740,7 @@ post_pipeline.add(Box::new(QueryResultGuard::new(/* ... */)));
 
 ### 6.1 Recommendation
 
-**Built-in** (compiled into `arc-guards` or a new `arc-data-guards` crate):
+**Built-in** (compiled into `chio-guards` or a new `chio-data-guards` crate):
 
 - `SqlQueryGuard` -- SQL parsing with `sqlparser-rs` requires a full
   Rust AST library. Compiling `sqlparser` to WASM is possible but adds
@@ -776,7 +776,7 @@ database-accessing agents needs them. Making them built-in ensures:
    SQL parsing is latency-sensitive.
 3. **Type safety**: Guards match directly on `ToolAction::DatabaseQuery`
    fields, `Constraint` variants, and `sqlparser::ast` types.
-4. **Testing**: Built-in guards are tested in the ARC CI pipeline.
+4. **Testing**: Built-in guards are tested in the Chio CI pipeline.
 
 Organization-specific policies layer on top as WASM guards. The built-in
 guards handle the structural safety checks; WASM guards handle
@@ -787,11 +787,11 @@ policy-specific logic. This mirrors the existing split: `ForbiddenPathGuard`
 
 ## 7. Crate Structure
 
-The data layer guards live in a new `arc-data-guards` crate to keep the
-dependency on `sqlparser` isolated from the core `arc-guards` crate:
+The data layer guards live in a new `chio-data-guards` crate to keep the
+dependency on `sqlparser` isolated from the core `chio-guards` crate:
 
 ```
-crates/arc-data-guards/
+crates/chio-data-guards/
   Cargo.toml
   src/
     lib.rs                  # Re-exports, module declarations
@@ -810,9 +810,9 @@ Dependencies:
 
 ```toml
 [dependencies]
-arc-core-types = { path = "../arc-core-types" }
-arc-kernel = { path = "../arc-kernel" }
-arc-guards = { path = "../arc-guards" }
+chio-core-types = { path = "../chio-core-types" }
+chio-kernel = { path = "../chio-kernel" }
+chio-guards = { path = "../chio-guards" }
 sqlparser = "0.53"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

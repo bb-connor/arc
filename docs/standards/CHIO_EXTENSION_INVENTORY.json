@@ -1,0 +1,292 @@
+{
+  "schema": "chio.extension-inventory.v1",
+  "chio_contract_version": "2.0",
+  "canonical_truth": [
+    {
+      "id": "chio.canonical.capability",
+      "name": "Capability and approval artifacts",
+      "crate_path": "crates/chio-core/src/capability.rs",
+      "contract_kind": "capability",
+      "artifact_schemas": [
+        "capability_token",
+        "governed_approval_token"
+      ],
+      "notes": "Extensions may supply evidence or execution behind named seams, but they must not redefine scope attenuation, approval binding, or delegation semantics.",
+      "extensions_may_write": false
+    },
+    {
+      "id": "chio.canonical.receipt",
+      "name": "Signed receipts and checkpoints",
+      "crate_path": "crates/chio-core/src/receipt.rs",
+      "contract_kind": "receipt",
+      "artifact_schemas": [
+        "chio.receipt.v1",
+        "chio.checkpoint.v1"
+      ],
+      "notes": "Receipt, child-receipt, and checkpoint truth stays canonical even when extensions provide storage, projection, or downstream transport.",
+      "extensions_may_write": false
+    },
+    {
+      "id": "chio.canonical.policy",
+      "name": "Local policy activation and trust decisions",
+      "crate_path": "crates/chio-policy/src/evaluate.rs",
+      "contract_kind": "policy",
+      "artifact_schemas": [
+        "chio.policy.runtime.v1",
+        "chio.generic-trust-activation.v1"
+      ],
+      "notes": "Custom adapters may surface external evidence, but local policy activation and trust admission remain Chio-owned decisions.",
+      "extensions_may_write": false
+    },
+    {
+      "id": "chio.canonical.artifacts",
+      "name": "Signed Chio artifact families",
+      "crate_path": "crates/chio-core/src/lib.rs",
+      "contract_kind": "artifact_family",
+      "artifact_schemas": [
+        "chio.manifest.v1",
+        "chio.agent-passport.v1",
+        "chio.runtime-attestation.appraisal-result.v1"
+      ],
+      "notes": "Extensions may project, import, or dispatch around these artifacts only through named envelopes that preserve schema and signing truth.",
+      "extensions_may_write": false
+    }
+  ],
+  "extension_points": [
+    {
+      "id": "chio.kernel.capability_authority",
+      "name": "Capability authority backend",
+      "point_kind": "authority",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/authority.rs::CapabilityAuthority",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "none"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "filesystem_write",
+        "network_egress",
+        "operator_secrets"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": false,
+      "official_component_ids": [
+        "chio.local-capability-authority",
+        "chio.remote-capability-authority"
+      ]
+    },
+    {
+      "id": "chio.kernel.receipt_store",
+      "name": "Receipt store backend",
+      "point_kind": "store",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/receipt_store.rs::ReceiptStore",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "none"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "filesystem_write",
+        "network_egress"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": false,
+      "official_component_ids": [
+        "chio.sqlite-receipt-store",
+        "chio.remote-receipt-store"
+      ]
+    },
+    {
+      "id": "chio.kernel.revocation_store",
+      "name": "Revocation store backend",
+      "point_kind": "store",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/revocation_runtime.rs::RevocationStore",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "none"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "filesystem_write",
+        "network_egress"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": false,
+      "official_component_ids": [
+        "chio.sqlite-revocation-store",
+        "chio.remote-revocation-store"
+      ]
+    },
+    {
+      "id": "chio.kernel.budget_store",
+      "name": "Budget store backend",
+      "point_kind": "store",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/budget_store.rs::BudgetStore",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "none"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "filesystem_write",
+        "network_egress"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": false,
+      "official_component_ids": [
+        "chio.sqlite-budget-store",
+        "chio.remote-budget-store"
+      ]
+    },
+    {
+      "id": "chio.kernel.tool_server_connection",
+      "name": "Tool server connection",
+      "point_kind": "tool_server_connection",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/runtime.rs::ToolServerConnection",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "subprocess",
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "none",
+        "import_only",
+        "dispatch_only",
+        "import_and_dispatch"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "network_egress",
+        "process_execution",
+        "operator_secrets"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": true,
+      "official_component_ids": [
+        "chio.native-chio-service",
+        "chio.mcp-adapter",
+        "chio.a2a-adapter"
+      ]
+    },
+    {
+      "id": "chio.kernel.resource_provider",
+      "name": "Resource provider",
+      "point_kind": "resource_provider",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/lib.rs::ResourceProvider",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "subprocess"
+      ],
+      "allowed_evidence_modes": [
+        "none"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "network_egress"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": false,
+      "official_component_ids": [
+        "chio.native-chio-service",
+        "chio.mcp-adapter"
+      ]
+    },
+    {
+      "id": "chio.kernel.prompt_provider",
+      "name": "Prompt provider",
+      "point_kind": "prompt_provider",
+      "owner": "kernel",
+      "contract_path": "crates/chio-kernel/src/lib.rs::PromptProvider",
+      "stability": "supported",
+      "allowed_isolations": [
+        "in_process",
+        "subprocess"
+      ],
+      "allowed_evidence_modes": [
+        "none"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "network_egress"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": false,
+      "official_component_ids": [
+        "chio.native-chio-service",
+        "chio.mcp-adapter"
+      ]
+    },
+    {
+      "id": "chio.adapter.mcp",
+      "name": "MCP compatibility adapter",
+      "point_kind": "adapter",
+      "owner": "ecosystem_bridges",
+      "contract_path": "crates/chio-mcp-adapter/src/lib.rs::McpAdapter",
+      "stability": "supported",
+      "allowed_isolations": [
+        "subprocess",
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "dispatch_only"
+      ],
+      "allowed_privileges": [
+        "filesystem_read",
+        "network_egress",
+        "process_execution"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": true,
+      "official_component_ids": [
+        "chio.mcp-adapter"
+      ]
+    },
+    {
+      "id": "chio.adapter.a2a",
+      "name": "A2A compatibility adapter",
+      "point_kind": "adapter",
+      "owner": "ecosystem_bridges",
+      "contract_path": "crates/chio-a2a-adapter/src/invoke.rs::A2aAdapter",
+      "stability": "experimental",
+      "allowed_isolations": [
+        "remote_service"
+      ],
+      "allowed_evidence_modes": [
+        "import_and_dispatch"
+      ],
+      "allowed_privileges": [
+        "network_egress",
+        "operator_secrets"
+      ],
+      "custom_implementations_allowed": true,
+      "policy_activation_required": true,
+      "official_component_ids": [
+        "chio.a2a-adapter"
+      ]
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 # Desktop and CUA Guard Absorption
 
 This document specifies how the three ClawdStrike desktop/CUA guards will be
-absorbed into the ARC kernel as first-class action types, native guards, and
-WASM guard extension points. ARC currently has zero coverage for desktop agent,
+absorbed into the Chio kernel as first-class action types, native guards, and
+WASM guard extension points. Chio currently has zero coverage for desktop agent,
 browser extension, and computer use surfaces. ClawdStrike has three guards that
 cover this surface completely.
 
@@ -113,7 +113,7 @@ specific action type gets a second pass with deeper inspection.
 
 ## 2. New `ToolAction` Variants
 
-ARC's `ToolAction` enum (in `arc-guards/src/action.rs`) currently has seven
+Chio's `ToolAction` enum (in `chio-guards/src/action.rs`) currently has seven
 variants: `FileAccess`, `FileWrite`, `NetworkEgress`, `ShellCommand`,
 `McpTool`, `Patch`, `Unknown`. None of these represent desktop, browser, or
 screen interaction.
@@ -269,7 +269,7 @@ impl ToolAction {
 
 ## 3. Platform Target Mapping
 
-The three CUA guards and three new action types map to ARC's platform targets
+The three CUA guards and three new action types map to Chio's platform targets
 as follows:
 
 ### 3.1 Desktop agents (Claude Desktop, Cursor, Windsurf)
@@ -318,11 +318,11 @@ desktop session via RDP/VNC/etc. All three ClawdStrike guards apply directly.
 
 ---
 
-## 4. Refactoring Plan for ARC's Sync Guard Trait
+## 4. Refactoring Plan for Chio's Sync Guard Trait
 
-ClawdStrike's `Guard` trait is async (`async fn check`). ARC's kernel `Guard`
+ClawdStrike's `Guard` trait is async (`async fn check`). Chio's kernel `Guard`
 trait is synchronous (`fn evaluate`). The existing absorption path from
-ClawdStrike to ARC (`arc-guards` crate) wraps async guards in sync
+ClawdStrike to Chio (`chio-guards` crate) wraps async guards in sync
 implementations. The CUA guards need the same treatment.
 
 ### 4.1 Current state
@@ -337,7 +337,7 @@ pub trait Guard: Send + Sync {
 }
 ```
 
-**ARC kernel:**
+**Chio kernel:**
 ```rust
 pub trait Guard: Send + Sync {
     fn name(&self) -> &str;
@@ -346,10 +346,10 @@ pub trait Guard: Send + Sync {
 ```
 
 Key differences:
-1. **No `handles` method in ARC.** ARC guards receive the full `GuardContext`
+1. **No `handles` method in Chio.** Chio guards receive the full `GuardContext`
    and must internally decide whether they apply. They return `Allow` for
    actions they don't govern.
-2. **No `GuardAction` dispatch in ARC.** ARC uses `ToolAction` (extracted by
+2. **No `GuardAction` dispatch in Chio.** Chio uses `ToolAction` (extracted by
    the host from `ToolCallRequest` fields), not a `GuardAction` enum passed
    to the guard.
 3. **Sync vs async.** All three ClawdStrike CUA guards perform no I/O in their
@@ -358,7 +358,7 @@ Key differences:
 
 ### 4.2 Absorption strategy
 
-Each ClawdStrike guard becomes an ARC guard that:
+Each ClawdStrike guard becomes an Chio guard that:
 
 1. Calls `extract_action(ctx.request.tool_name, ctx.request.arguments)` to get
    a `ToolAction`.
@@ -368,7 +368,7 @@ Each ClawdStrike guard becomes an ARC guard that:
 4. Returns `Ok(Verdict::Deny)` for policy violations.
 
 ```rust
-// Example: ComputerUseGuard adapted for ARC
+// Example: ComputerUseGuard adapted for Chio
 impl Guard for ComputerUseGuard {
     fn name(&self) -> &str { "computer-use" }
 
@@ -391,7 +391,7 @@ impl Guard for ComputerUseGuard {
 
 ### 4.3 Mapping table
 
-| ClawdStrike guard | ARC guard name | `ToolAction` variants consumed |
+| ClawdStrike guard | Chio guard name | `ToolAction` variants consumed |
 |------------------|----------------|-------------------------------|
 | `ComputerUseGuard` | `ComputerUseGuard` | `DesktopAction(*, _)` |
 | `InputInjectionCapabilityGuard` | `InputInjectionGuard` | `DesktopAction(KeyboardInput\|MouseInput\|TouchInput, _)` |
@@ -528,7 +528,7 @@ Custom CUA policies as WASM guards:
 
 ### 6.2 `GuardRequest` enrichment
 
-The `GuardRequest` struct (defined in `arc-wasm-guards/src/abi.rs`) already
+The `GuardRequest` struct (defined in `chio-wasm-guards/src/abi.rs`) already
 carries `action_type` and `extracted_path` fields (added in v1, see
 [05-V1-DECISION.md](05-V1-DECISION.md)). For CUA actions, the host must
 populate:
@@ -561,9 +561,9 @@ A WASM guard that blocks navigation to internal admin pages:
 
 ```rust
 // Guest code (compiles to .wasm)
-use arc_guard_sdk::prelude::*;
+use chio_guard_sdk::prelude::*;
 
-#[arc_guard]
+#[chio_guard]
 fn evaluate(req: &GuardRequest) -> GuardVerdict {
     if req.action_type.as_deref() != Some("browser_action") {
         return GuardVerdict::Allow;
@@ -662,31 +662,31 @@ Rationale:
 
 | File | Change |
 |------|--------|
-| `crates/arc-guards/src/action.rs` | Add `BrowserAction`, `DesktopAction`, `ScreenCapture` variants and subtype enums. Extend `extract_action`. |
-| `crates/arc-guards/src/lib.rs` | Add `pub mod computer_use`, `pub mod input_injection`, `pub mod side_channel`, `pub mod browser_navigation`, `pub mod browser_input`, `pub mod screen_capture`. Re-export guard types. |
-| `crates/arc-guards/src/computer_use.rs` | New file. Port of `ComputerUseGuard`. |
-| `crates/arc-guards/src/input_injection.rs` | New file. Port of `InputInjectionCapabilityGuard`. |
-| `crates/arc-guards/src/side_channel.rs` | New file. Port of `RemoteDesktopSideChannelGuard`. |
-| `crates/arc-guards/src/browser_navigation.rs` | New file. `BrowserNavigationGuard`. |
-| `crates/arc-guards/src/browser_input.rs` | New file. `BrowserInputGuard`. |
-| `crates/arc-guards/src/screen_capture.rs` | New file. `ScreenCaptureGuard`. |
-| `crates/arc-guards/src/pipeline.rs` | Register CUA guards in default pipeline at correct priority. |
-| `crates/arc-wasm-guards/src/abi.rs` | Add `action_subtype` to `GuardRequest`. Add new `action_type` values. |
-| `crates/arc-wasm-guards/src/runtime.rs` | Populate CUA fields in `build_request`. |
+| `crates/chio-guards/src/action.rs` | Add `BrowserAction`, `DesktopAction`, `ScreenCapture` variants and subtype enums. Extend `extract_action`. |
+| `crates/chio-guards/src/lib.rs` | Add `pub mod computer_use`, `pub mod input_injection`, `pub mod side_channel`, `pub mod browser_navigation`, `pub mod browser_input`, `pub mod screen_capture`. Re-export guard types. |
+| `crates/chio-guards/src/computer_use.rs` | New file. Port of `ComputerUseGuard`. |
+| `crates/chio-guards/src/input_injection.rs` | New file. Port of `InputInjectionCapabilityGuard`. |
+| `crates/chio-guards/src/side_channel.rs` | New file. Port of `RemoteDesktopSideChannelGuard`. |
+| `crates/chio-guards/src/browser_navigation.rs` | New file. `BrowserNavigationGuard`. |
+| `crates/chio-guards/src/browser_input.rs` | New file. `BrowserInputGuard`. |
+| `crates/chio-guards/src/screen_capture.rs` | New file. `ScreenCaptureGuard`. |
+| `crates/chio-guards/src/pipeline.rs` | Register CUA guards in default pipeline at correct priority. |
+| `crates/chio-wasm-guards/src/abi.rs` | Add `action_subtype` to `GuardRequest`. Add new `action_type` values. |
+| `crates/chio-wasm-guards/src/runtime.rs` | Populate CUA fields in `build_request`. |
 | `spec/GUARDS.md` | Document the six new guards. |
 
 ---
 
 ## 10. Open Questions
 
-1. **Should `BrowserNavigationGuard` live in `arc-guards` or a separate
-   `arc-browser-guards` crate?** The browser surface is distinct enough that a
+1. **Should `BrowserNavigationGuard` live in `chio-guards` or a separate
+   `chio-browser-guards` crate?** The browser surface is distinct enough that a
    separate crate might be cleaner. Counter-argument: all guards should live
    together for a unified pipeline.
 
 2. **Postcondition probe verification.** ClawdStrike checks for the *presence*
    of a `postcondition_probe_hash` but does not verify it against anything. In
-   ARC, should the kernel verify the hash against the receipt log (proving the
+   Chio, should the kernel verify the hash against the receipt log (proving the
    agent actually captured and processed a screenshot)?
 
 3. **Screen capture PII scanning.** If `scan_for_pii` is enabled on

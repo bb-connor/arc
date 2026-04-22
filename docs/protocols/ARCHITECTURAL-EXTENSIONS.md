@@ -1,12 +1,12 @@
 # Architectural Extensions: Model Routing, Plan Evaluation, Cloud Guardrails
 
 > **Status**: Proposed April 2026
-> **Priority**: High -- these three gaps require new ARC primitives in the
+> **Priority**: High -- these three gaps require new Chio primitives in the
 > type system and kernel, not just new guards or integration adapters.
 
 These are the gaps that cannot be solved by adding another guard to the
 pipeline or writing another SDK wrapper. They require changes to the
-core types in `arc-core-types/src/capability.rs` and new evaluation
+core types in `chio-core-types/src/capability.rs` and new evaluation
 methods on the kernel.
 
 ---
@@ -15,9 +15,9 @@ methods on the kernel.
 
 ### 1.1 The Problem
 
-ARC governs which tools an agent calls but not which LLM model processes
+Chio governs which tools an agent calls but not which LLM model processes
 the request. In production multi-model deployments (GPT-4 for reasoning,
-Claude for code, smaller models for classification), there is no ARC
+Claude for code, smaller models for classification), there is no Chio
 primitive for "this capability token authorizes tool calls only when
 driven by model X at provider Y."
 
@@ -33,7 +33,7 @@ Add a new `Constraint` variant and a model metadata field on
 `ToolCallRequest`:
 
 ```rust
-// In arc-core-types/src/capability.rs
+// In chio-core-types/src/capability.rs
 
 pub enum Constraint {
     // ... existing variants ...
@@ -75,7 +75,7 @@ The agent (or the framework wrapping the agent) includes model metadata
 in the tool call request:
 
 ```rust
-// In arc-core-types (or arc-kernel types)
+// In chio-core-types (or chio-kernel types)
 
 /// Metadata about the LLM model driving this tool call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,7 +104,7 @@ The kernel checks `ModelConstraint` during grant matching, alongside
 existing constraint checks:
 
 ```rust
-// In arc-kernel constraint evaluation
+// In chio-kernel constraint evaluation
 
 fn check_model_constraint(
     constraint: &ModelConstraint,
@@ -208,7 +208,7 @@ Agent frameworks create multi-step execution plans before running them:
 - LangGraph compiles state graphs with node sequences
 - Custom agents use ReAct loops with planned tool sequences
 
-ARC evaluates per-tool-call. A plan with 5 steps might be denied at step
+Chio evaluates per-tool-call. A plan with 5 steps might be denied at step
 5 after steps 1-4 already executed. This wastes compute, creates partial
 state, and surprises the agent.
 
@@ -218,7 +218,7 @@ Add a new evaluation method that takes a list of planned tool calls and
 checks all of them against the capability scope before any execute:
 
 ```rust
-// New types in arc-core-types
+// New types in chio-core-types
 
 /// A planned tool call that has not yet been executed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -298,7 +298,7 @@ pub struct BudgetCheckResult {
 ### 2.3 Kernel Method
 
 ```rust
-impl ArcKernel {
+impl ChioKernel {
     /// Evaluate a multi-step plan before execution begins.
     ///
     /// Checks every step against the capability scope, constraints,
@@ -450,13 +450,13 @@ Response:
 The agent sees that step 3 will be denied and can revise the plan before
 executing steps 1 and 2.
 
-### 2.5 Relationship to arc-workflow
+### 2.5 Relationship to chio-workflow
 
-`arc-workflow` provides `SkillManifest` with declared `SkillStep` sequences
+`chio-workflow` provides `SkillManifest` with declared `SkillStep` sequences
 and `WorkflowAuthority` that validates each step during execution. Plan
 evaluation extends this:
 
-| arc-workflow | Plan evaluation |
+| chio-workflow | Plan evaluation |
 |-------------|-----------------|
 | Steps declared in manifest at registration | Steps declared in plan at evaluation time |
 | Validated per-step during execution | Validated all-at-once before execution |
@@ -482,12 +482,12 @@ Enterprises already run cloud-native content safety layers:
 - **Google Vertex AI Safety**: content classification, safety filters,
   responsible AI metrics
 
-These are often mandated by enterprise security teams. If ARC cannot
+These are often mandated by enterprise security teams. If Chio cannot
 integrate with them, it becomes an either/or choice -- and the cloud
 providers win by default.
 
-ARC should not compete with these services. It should consume their
-verdicts as guard evidence and record them in ARC receipts.
+Chio should not compete with these services. It should consume their
+verdicts as guard evidence and record them in Chio receipts.
 
 ### 3.2 Architecture
 
@@ -495,7 +495,7 @@ Cloud guardrail adapters are `ExternalGuard` implementations (from doc 12)
 wrapped in `AsyncGuardAdapter` with circuit breakers:
 
 ```
-Agent -> ARC Kernel -> Guard Pipeline:
+Agent -> Chio Kernel -> Guard Pipeline:
   1. Built-in guards (path, shell, egress, etc.)
   2. Content safety guards (jailbreak, prompt injection -- from doc 06)
   3. Cloud guardrail adapters (Bedrock, Azure, Vertex)
@@ -507,7 +507,7 @@ Agent -> ARC Kernel -> Guard Pipeline:
      |
      +-> Cloud API returns verdict + categories + scores
      |
-     +-> Mapped to ARC Verdict + GuardEvidence
+     +-> Mapped to Chio Verdict + GuardEvidence
   4. Advisory pipeline (non-blocking)
 ```
 
@@ -555,7 +555,7 @@ impl ExternalGuard for BedrockGuardrailGuard {
 
         let result: ApplyGuardrailResponse = parse_response(response)?;
 
-        // Map Bedrock action to ARC verdict
+        // Map Bedrock action to Chio verdict
         match result.action.as_str() {
             "NONE" => Ok(Verdict::Allow),
             "GUARDRAIL_INTERVENED" => {
@@ -663,7 +663,7 @@ impl ExternalGuard for VertexSafetyGuard {
 ### 3.4 Guard Evidence in Receipts
 
 The cloud provider's verdict, categories, and scores are captured as
-`GuardEvidence` in the ARC receipt. This means the signed receipt contains
+`GuardEvidence` in the Chio receipt. This means the signed receipt contains
 proof of what the cloud safety API said:
 
 ```json
@@ -740,7 +740,7 @@ This is configurable per-guard via `AsyncGuardConfig::circuit_open_verdict`.
 
 | Extension | Effort | Depends on | Priority |
 |-----------|--------|------------|----------|
-| ModelConstraint | Small | arc-core-types change | P1 |
+| ModelConstraint | Small | chio-core-types change | P1 |
 | Plan evaluation | Medium | Kernel method, HTTP endpoint | P1 |
 | Bedrock adapter | Medium | AsyncGuardAdapter (doc 12) | P1 |
 | Azure adapter | Medium | AsyncGuardAdapter (doc 12) | P1 |

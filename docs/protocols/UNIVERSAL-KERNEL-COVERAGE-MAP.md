@@ -1,7 +1,7 @@
 # Universal Security Kernel: Integration Coverage Map
 
 > **Status**: Research synthesis -- April 2026, **amended** after review
-> **Purpose**: Complete mapping of integration surfaces required for ARC to
+> **Purpose**: Complete mapping of integration surfaces required for Chio to
 > function as a universal security kernel for AI agent systems. Synthesized
 > from eight parallel research streams covering agent frameworks, data layer,
 > code execution, SaaS/communications, networking, edge/WASM, security
@@ -15,8 +15,8 @@
 > precedence**. Key changes:
 > - Human-in-the-loop: P2 -> **P0** (needed by 6/10 production patterns)
 > - Package publishing (PyPI/npm): unlisted -> **P0** (adoption blocker)
-> - MockArcClient / test fixtures: unlisted -> **P0** (blocks framework work)
-> - arc-code-agent adapter: P1 -> **P0** (best onboarding path)
+> - MockChioClient / test fixtures: unlisted -> **P0** (blocks framework work)
+> - chio-code-agent adapter: P1 -> **P0** (best onboarding path)
 > - TOCTOU execution nonces: unlisted -> **P1** (structural security gap)
 > - Emergency kill switch: unlisted -> **P1** (no global circuit breaker)
 >
@@ -30,7 +30,7 @@
 
 ## 1. Coverage Overview
 
-### What ARC Already Covers
+### What Chio Already Covers
 
 ```
 PROTOCOL LAYER (shipped)
@@ -104,9 +104,9 @@ CONTENT SAFETY (critical gap)
 
 | Integration | Why | Type | Effort |
 |-------------|-----|------|--------|
-| **Envoy ext_authz** | Single adapter puts ARC into every Istio/Envoy mesh. ARC's sidecar HTTP endpoint is 80% there. | Networking | Small |
-| **Content safety guards** | OWASP #1 risk. ARC guards tool access but not LLM content plane. Need ML classifier guard adapters (Lakera, NeMo, Bedrock Guardrails, Azure Content Safety). | Security | Medium |
-| **WASM kernel build** | Biggest surface multiplier. Unlocks browser, edge workers, mobile, extensions. `arc-core-types` is already WASM-ready; kernel needs feature flags to drop tokio/rusqlite. | Platform | Large |
+| **Envoy ext_authz** | Single adapter puts Chio into every Istio/Envoy mesh. Chio's sidecar HTTP endpoint is 80% there. | Networking | Small |
+| **Content safety guards** | OWASP #1 risk. Chio guards tool access but not LLM content plane. Need ML classifier guard adapters (Lakera, NeMo, Bedrock Guardrails, Azure Content Safety). | Security | Medium |
+| **WASM kernel build** | Biggest surface multiplier. Unlocks browser, edge workers, mobile, extensions. `chio-core-types` is already WASM-ready; kernel needs feature flags to drop tokio/rusqlite. | Platform | Large |
 | **Cloud guardrail interop** | Enterprise adoption blocker. Adapters for Bedrock Guardrails, Azure Content Safety, Vertex AI safety that consume their verdicts as `GuardEvidence`. | Security | Medium |
 | **Code execution governance** | Every agent framework supports code execution (E2B, Modal, Code Interpreter). Need `CodeExecution` and `BrowserAction` variants in `ToolAction`. | Data model | Medium |
 | **Temporal integration** | Durable agent workflows are the production standard. Activity interceptor + workflow grants. | Orchestration | Medium |
@@ -115,33 +115,33 @@ CONTENT SAFETY (critical gap)
 
 | Integration | Why | Type | Effort |
 |-------------|-----|------|--------|
-| **CrewAI** | Largest multi-agent framework. Default trust model is "every agent can do anything" -- exactly what ARC fixes. Tool wrapper + role-scoped capabilities. | Agent framework | Small |
+| **CrewAI** | Largest multi-agent framework. Default trust model is "every agent can do anything" -- exactly what Chio fixes. Tool wrapper + role-scoped capabilities. | Agent framework | Small |
 | **AutoGen / AG2** | Microsoft-backed, enterprise adoption. Group chat + tool use is high-risk. Two intercept points: tool execution + agent handoff. | Agent framework | Small |
-| **LlamaIndex** | Dominant RAG framework. `AgentRunner` + `FunctionTool` map directly to ARC. Query engine tools carry data-access risk. | Agent framework | Small |
+| **LlamaIndex** | Dominant RAG framework. `AgentRunner` + `FunctionTool` map directly to Chio. Query engine tools carry data-access risk. | Agent framework | Small |
 | **Vercel AI SDK** | Dominates TypeScript/Next.js. `tool()` with Zod schemas + streaming. Web-facing agent UIs exposed to end users. | Agent framework | Small |
 | **SQL database governance** | Text-to-SQL is everywhere. Need `TableAllowlist`, `OperationClass`, `RowFilter`, `MaxRowsReturned` constraints. | Data layer | Medium |
 | **Vector database governance** | Every RAG pipeline. Need `CollectionAllowlist`, `NamespaceExact`, `MaxTopK` constraints. URI pattern: `vector://provider/ns/collection`. | Data layer | Medium |
 | **Data warehouse cost governance** | BigQuery/Snowflake cost explosion risk. Pre-execution cost estimation via dry-run APIs + `MaxBytesScanned` constraint. | Data layer | Medium |
-| **Kong/Traefik/NGINX** | ForwardAuth / auth_request to ARC sidecar. Covers self-hosted API gateway market. | Networking | Small |
+| **Kong/Traefik/NGINX** | ForwardAuth / auth_request to Chio sidecar. Covers self-hosted API gateway market. | Networking | Small |
 | **gRPC interceptors** | Thin clients (Python/Go/Java) calling sidecar. Per-stream evaluation. | Networking | Small |
 | **AWS Lambda** | Lambda Extension model. Serverless tool servers. | Compute | Medium |
 | **Communication platforms** | Slack, email, SMS. Agent messages are visible to humans and hard to reverse. Content-review guards mandatory. | SaaS | Medium |
 | **Payment APIs** | Stripe, Plaid. Direct monetary risk. Amount limits, transaction type restrictions, mandatory approval above thresholds. | SaaS | Medium |
 | **Desktop agent scoping** | Claude Desktop, Cursor, VS Code. Per-application capability scoping. Near-term deployment reality. | Platform | Small |
 | **Model routing governance** | Capability tokens should constrain which LLM model can drive tool calls. Need `model_constraint` on `ToolGrant`. | Architecture | Medium |
-| **LangGraph** | Extends existing arc-langchain. Graph-level scoping, delegation, approval nodes. | Orchestration | Medium |
+| **LangGraph** | Extends existing chio-langchain. Graph-level scoping, delegation, approval nodes. | Orchestration | Medium |
 | **Vault/KMS integration** | `VaultCapabilityAuthority` implementing existing trait. HSM for receipt signing keys. | Security | Medium |
 | **Terraform/Pulumi** | Highest-blast-radius tool call. Plan/apply as two-phase capability. | IaC | Medium |
 | **Kafka/event streaming** | Choreography governance. Consumer-side evaluation, transactional receipts, DLQ as security signal. | Streaming | Medium |
-| **NIST AI RMF / ISO 42001 mapping** | Enterprise procurement requires it. ARC likely already satisfies most controls; needs explicit mapping docs. | Compliance | Small |
+| **NIST AI RMF / ISO 42001 mapping** | Enterprise procurement requires it. Chio likely already satisfies most controls; needs explicit mapping docs. | Compliance | Small |
 
 ### P2 -- Important, can follow
 
 | Integration | Why | Type | Effort |
 |-------------|-----|------|--------|
 | Semantic Kernel | Enterprise .NET/Java. Plugin/KernelFunction model. Plan-level evaluation is unique. | Agent framework | Small |
-| Pydantic AI | Growing, clean DI model for ARC context. | Agent framework | Small |
-| OpenAI Swarm | Minimal but handoff-as-delegation is natural ARC fit. | Agent framework | Small |
+| Pydantic AI | Growing, clean DI model for Chio context. | Agent framework | Small |
+| OpenAI Swarm | Minimal but handoff-as-delegation is natural Chio fit. | Agent framework | Small |
 | Prefect / Dagster / Airflow | ML pipeline orchestrators. Decorator-based integration. | Orchestration | Medium |
 | Ray | Distributed agent swarms. Actor-level standing grants. | Compute | Medium |
 | GraphQL | Operation-level middleware. Query complexity as budget. | Networking | Medium |
@@ -151,7 +151,7 @@ CONTENT SAFETY (critical gap)
 | NoSQL databases | Collection-level capabilities, operation class. | Data layer | Small |
 | Browser automation | Domain allowlists, action-type restrictions, credential detection. | Code execution | Medium |
 | Mobile (iOS/Android) | Embedded library via UniFFI. Offline evaluation, receipt sync. | Platform | Large |
-| Browser extensions | WASM kernel in service worker. Chrome permissions map to ARC scopes. | Platform | Medium |
+| Browser extensions | WASM kernel in service worker. Chrome permissions map to Chio scopes. | Platform | Medium |
 | OPA/Cedar adapters | Guard that delegates policy evaluation to OPA/Rego or Cedar. | Security | Small |
 | OCSF receipt format | Receipts natively queryable in OCSF-aware SIEMs. | Security | Small |
 | LangSmith/LangFuse adapters | Push receipts as enriched spans into existing observability. | Observability | Small |
@@ -185,19 +185,19 @@ CONTENT SAFETY (critical gap)
 
 ## 3. Architectural Gaps (Not Just Integrations)
 
-The research identified several gaps that require new ARC primitives, not
+The research identified several gaps that require new Chio primitives, not
 just adapter code:
 
 ### 3.1 Content Plane Governance
 
-ARC governs the **control plane** (which tools can be called, by whom,
+Chio governs the **control plane** (which tools can be called, by whom,
 with what scope). It does not govern the **content plane** (what the LLM
 says, what it sends, what data flows through tool results).
 
 ```
-Current ARC coverage:
+Current Chio coverage:
 
-  LLM -> [???] -> tool call -> [ARC kernel] -> tool server -> result -> [???] -> LLM
+  LLM -> [???] -> tool call -> [Chio kernel] -> tool server -> result -> [???] -> LLM
           ^                                                               ^
           |                                                               |
      NOT GOVERNED                                                   NOT GOVERNED
@@ -218,7 +218,7 @@ adapters.
 
 ### 3.2 New `ToolAction` Variants
 
-The `ToolAction` enum in `arc-guards` needs extension:
+The `ToolAction` enum in `chio-guards` needs extension:
 
 ```rust
 pub enum ToolAction {
@@ -293,7 +293,7 @@ pub enum Constraint {
 }
 ```
 
-### 3.4 Portable Kernel (`arc-kernel-core`)
+### 3.4 Portable Kernel (`chio-kernel-core`)
 
 The biggest architectural unlock: a feature-flagged kernel build that
 compiles to WASM, mobile, and embedded targets.
@@ -306,7 +306,7 @@ Current kernel dependencies:
   OsRng         -> entropy (available via getrandom js/wasi features)
 
 Proposed split:
-  arc-kernel-core (no_std + alloc)
+  chio-kernel-core (no_std + alloc)
     - Capability validation
     - Scope checking
     - Guard pipeline (sync)
@@ -314,8 +314,8 @@ Proposed split:
     - In-memory receipt buffer
     - Pure computation, zero I/O
 
-  arc-kernel (full, current)
-    - Depends on arc-kernel-core
+  chio-kernel (full, current)
+    - Depends on chio-kernel-core
     - Adds tokio, rusqlite, ureq
     - Adds HTTP server, persistent storage, async guards
 
@@ -331,16 +331,16 @@ Targets:
 
 Several frameworks (Semantic Kernel planners, CrewAI task planning,
 LangGraph graph compilation) create multi-step execution plans before
-running them. ARC currently evaluates per-tool-call. A new evaluation
+running them. Chio currently evaluates per-tool-call. A new evaluation
 mode would evaluate the plan holistically:
 
 ```
 Agent submits: "I plan to call tools A, B, C in sequence"
-ARC evaluates: "You have capability for A and B but not C"
+Chio evaluates: "You have capability for A and B but not C"
 Result: Plan rejected before execution begins
 ```
 
-This prevents wasted work and provides earlier feedback. The `arc-workflow`
+This prevents wasted work and provides earlier feedback. The `chio-workflow`
 crate's `SkillManifest` with declared steps is the foundation, but it
 needs to integrate with framework-specific plan formats.
 
@@ -348,42 +348,42 @@ needs to integrate with framework-specific plan formats.
 
 ## 4. The Integration Pattern Taxonomy
 
-Across all surfaces researched, ARC integrations follow one of five
+Across all surfaces researched, Chio integrations follow one of five
 patterns. Any new integration should identify which pattern it uses:
 
 ### Pattern 1: Tool Execution Wrapper
 **Used by:** Agent frameworks (CrewAI, AutoGen, LlamaIndex, Vercel AI SDK),
   data layer (SQL, vector DB), code execution (E2B, Modal)
-**How:** Wrap the framework's tool/function execution with an ARC
+**How:** Wrap the framework's tool/function execution with an Chio
   `evaluate()` call before and `record()` call after.
-**ARC artifact:** `arc-{framework}` SDK package.
+**Chio artifact:** `chio-{framework}` SDK package.
 
 ### Pattern 2: Middleware / Interceptor
 **Used by:** HTTP frameworks (FastAPI, Express), gRPC, API gateways,
   service mesh (Envoy ext_authz)
 **How:** HTTP/gRPC middleware that intercepts requests, calls sidecar,
   injects receipt headers on response.
-**ARC artifact:** Middleware library or gateway plugin.
+**Chio artifact:** Middleware library or gateway plugin.
 
 ### Pattern 3: Lifecycle Controller
 **Used by:** Orchestrators (Temporal, Airflow), K8s Jobs, Lambda,
   Cloud Run, event streaming
 **How:** Controller that manages capability grant lifecycle: acquire
   on start, evaluate per-step, release on completion, aggregate receipts.
-**ARC artifact:** Interceptor/controller + lifecycle hooks.
+**Chio artifact:** Interceptor/controller + lifecycle hooks.
 
 ### Pattern 4: Delegation Chain
 **Used by:** Multi-agent frameworks (CrewAI crews, AutoGen group chats,
   LangGraph supervisor/worker, OpenAI Swarm handoffs)
 **How:** When agent A delegates to agent B, capabilities are attenuated.
   Child agent's scope is a subset of parent's scope.
-**ARC artifact:** Delegation primitives on existing capability model.
+**Chio artifact:** Delegation primitives on existing capability model.
 
 ### Pattern 5: Platform Adapter
 **Used by:** WASM, mobile, desktop, browser extensions, IoT
-**How:** Compile ARC kernel to target platform. Provide platform-specific
+**How:** Compile Chio kernel to target platform. Provide platform-specific
   I/O adapters (storage, entropy, networking).
-**ARC artifact:** `arc-kernel-core` + platform binding crate.
+**Chio artifact:** `chio-kernel-core` + platform binding crate.
 
 ---
 
@@ -396,7 +396,7 @@ emerged:
 ### Must-Build (defines "universal kernel")
 1. Envoy ext_authz adapter
 2. Content safety guard adapters (ML classifiers + cloud provider interop)
-3. WASM kernel build (arc-kernel-core)
+3. WASM kernel build (chio-kernel-core)
 4. Temporal integration
 5. Top 4 agent frameworks (CrewAI, AutoGen, LlamaIndex, Vercel AI SDK)
 6. Data layer constraints (SQL, vector DB, warehouse cost governance)

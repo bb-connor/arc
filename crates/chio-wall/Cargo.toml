@@ -1,0 +1,35 @@
+[package]
+name = "chio-wall"
+description = "Chio-Wall companion-product CLI built on Chio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+default-run = "chio-wall"
+autobins = false
+publish = false
+
+[[bin]]
+name = "chio-wall"
+path = "src/main.rs"
+
+[dependencies]
+chio-control-plane = { path = "../chio-control-plane" }
+chio-core = { path = "../chio-core" }
+chio-guards = { path = "../chio-guards" }
+chio-kernel = { path = "../chio-kernel" }
+chio-store-sqlite = { path = "../chio-store-sqlite" }
+chio-wall-core = { path = "../chio-wall-core" }
+chrono = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+chio-siem = { path = "../chio-siem" }
+tokio = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

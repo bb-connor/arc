@@ -14,10 +14,10 @@
 
 ### 1.1 Current State
 
-Every SDK is path-referenced. `arc-fastapi` depends on `arc-sdk-python` via
-`path = "../arc-sdk-python"` in `tool.uv.sources`. The TypeScript packages
-(`@arc-protocol/node-http`, `@arc-protocol/fastify`, `@arc-protocol/express`,
-`@arc-protocol/elysia`) have no `publishConfig` and are not on npm. A developer
+Every SDK is path-referenced. `chio-fastapi` depends on `chio-sdk-python` via
+`path = "../chio-sdk-python"` in `tool.uv.sources`. The TypeScript packages
+(`@chio-protocol/node-http`, `@chio-protocol/fastify`, `@chio-protocol/express`,
+`@chio-protocol/elysia`) have no `publishConfig` and are not on npm. A developer
 cannot `pip install` or `npm install` anything. This means zero organic
 discovery through registry search, zero integration with dependency scanners,
 and zero ability to pin a known-good version.
@@ -26,16 +26,16 @@ and zero ability to pin a known-good version.
 
 | Order | Package | Registry | Why first |
 |-------|---------|----------|-----------|
-| 1 | `arc-sdk-python` | PyPI | Foundation -- every Python integration depends on it |
-| 2 | `arc-fastapi` | PyPI | Most popular Python web framework for AI backends |
-| 3 | `arc-langchain` | PyPI | Largest agent framework ecosystem |
-| 4 | `@arc-protocol/node-http` | npm | Foundation -- every TS integration depends on it |
-| 5 | `@arc-protocol/fastify` | npm | Popular TS server framework |
-| 6 | `@arc-protocol/express` | npm | Widest TS server adoption |
-| 7 | `arc-asgi` | PyPI | Needed by arc-fastapi and arc-django, publish to decouple |
-| 8 | `arc-django` | PyPI | Second most popular Python web framework |
+| 1 | `chio-sdk-python` | PyPI | Foundation -- every Python integration depends on it |
+| 2 | `chio-fastapi` | PyPI | Most popular Python web framework for AI backends |
+| 3 | `chio-langchain` | PyPI | Largest agent framework ecosystem |
+| 4 | `@chio-protocol/node-http` | npm | Foundation -- every TS integration depends on it |
+| 5 | `@chio-protocol/fastify` | npm | Popular TS server framework |
+| 6 | `@chio-protocol/express` | npm | Widest TS server adoption |
+| 7 | `chio-asgi` | PyPI | Needed by chio-fastapi and chio-django, publish to decouple |
+| 8 | `chio-django` | PyPI | Second most popular Python web framework |
 
-Rust crates (`arc-core`, `arc-kernel`, `arc-manifest`, `arc-mcp-adapter`) should
+Rust crates (`chio-core`, `chio-kernel`, `chio-manifest`, `chio-mcp-adapter`) should
 publish to crates.io after the SDK packages ship. The Rust crates serve
 infrastructure authors, not the primary adoption funnel.
 
@@ -45,10 +45,10 @@ All packages start at `0.1.0` (already declared in pyproject.toml / package.json
 Follow semantic versioning with these rules:
 
 - **0.x.y**: pre-1.0 breaking changes allowed in minor bumps.
-- All packages in the same language share a version. `arc-sdk-python` 0.2.0 and
-  `arc-fastapi` 0.2.0 are tested together. This avoids a matrix explosion of
+- All packages in the same language share a version. `chio-sdk-python` 0.2.0 and
+  `chio-fastapi` 0.2.0 are tested together. This avoids a matrix explosion of
   cross-version compatibility.
-- The `arc-sdk-python` dependency spec in downstream packages uses `>=0.x.0,<0.y.0`
+- The `chio-sdk-python` dependency spec in downstream packages uses `>=0.x.0,<0.y.0`
   (compatible minor range) so that patch releases propagate without pinning.
 
 ### 1.4 CI/CD for Automated Publishing
@@ -66,13 +66,13 @@ jobs:
       - checkout
       - uv sync
       - uv run pytest (all Python SDK packages)
-      - uv build --package arc-sdk-python
-      - uv build --package arc-asgi
-      - uv build --package arc-fastapi
-      - uv build --package arc-langchain
+      - uv build --package chio-sdk-python
+      - uv build --package chio-asgi
+      - uv build --package chio-fastapi
+      - uv build --package chio-langchain
       - twine upload dist/*
     secrets:
-      PYPI_API_TOKEN (scoped to arc-* packages)
+      PYPI_API_TOKEN (scoped to chio-* packages)
 
   publish-typescript:
     steps:
@@ -84,7 +84,7 @@ jobs:
       - npm publish --workspace packages/express --access public
       - npm publish --workspace packages/elysia --access public
     secrets:
-      NPM_TOKEN (scoped to @arc-protocol org)
+      NPM_TOKEN (scoped to @chio-protocol org)
 ```
 
 Each publish job runs the full test suite first. Tags are separate per language
@@ -105,22 +105,22 @@ so a Python-only change does not trigger an npm publish.
 
 ### 2.1 Problem
 
-Every `ArcClient` method makes an HTTP call to `http://127.0.0.1:9090`. There
-is no `MockArcClient`, no `allow_all()` fixture, no dry-run mode. A developer
-writing a LangChain tool cannot test their ARC integration without compiling
+Every `ChioClient` method makes an HTTP call to `http://127.0.0.1:9090`. There
+is no `MockChioClient`, no `allow_all()` fixture, no dry-run mode. A developer
+writing a LangChain tool cannot test their Chio integration without compiling
 and running the Rust sidecar binary. This blocks:
 
 - Unit tests in CI (no Rust toolchain available)
 - Local development iteration (compile time)
 - Framework integration authors who need fast feedback loops
 
-### 2.2 Python: `arc_sdk.testing` Module
+### 2.2 Python: `chio_sdk.testing` Module
 
-Ship a `testing` submodule in `arc-sdk-python` with zero additional dependencies
-(uses only `arc_sdk.models` and `arc_sdk.errors`).
+Ship a `testing` submodule in `chio-sdk-python` with zero additional dependencies
+(uses only `chio_sdk.models` and `chio_sdk.errors`).
 
 ```python
-from arc_sdk.testing import MockArcClient, allow_all, deny_all, with_policy
+from chio_sdk.testing import MockChioClient, allow_all, deny_all, with_policy
 
 # -- Quick fixtures for common cases --
 
@@ -155,7 +155,7 @@ async def test_selective_policy():
     """with_policy() accepts a callback that receives the tool call and
     returns a Decision."""
     def my_policy(tool_server: str, tool_name: str, params: dict) -> "Decision":
-        from arc_sdk.models import Decision
+        from chio_sdk.models import Decision
         if tool_name == "read_file":
             return Decision.allow()
         return Decision.deny(
@@ -182,14 +182,14 @@ async def test_selective_policy():
     assert r2.is_denied
 ```
 
-### 2.3 `MockArcClient` Implementation Contract
+### 2.3 `MockChioClient` Implementation Contract
 
-`MockArcClient` is a drop-in replacement for `ArcClient`. It has the same
+`MockChioClient` is a drop-in replacement for `ChioClient`. It has the same
 method signatures but never opens a network connection.
 
 ```python
-class MockArcClient:
-    """In-memory ARC client for testing. No sidecar required."""
+class MockChioClient:
+    """In-memory Chio client for testing. No sidecar required."""
 
     def __init__(
         self,
@@ -198,8 +198,8 @@ class MockArcClient:
         default_verdict: str = "allow",
     ) -> None: ...
 
-    # Same public API as ArcClient:
-    async def evaluate_tool_call(self, ...) -> ArcReceipt: ...
+    # Same public API as ChioClient:
+    async def evaluate_tool_call(self, ...) -> ChioReceipt: ...
     async def evaluate_http_request(self, ...) -> EvaluateResponse: ...
     async def create_capability(self, ...) -> CapabilityToken: ...
     async def validate_capability(self, ...) -> bool: ...
@@ -214,16 +214,16 @@ class MockArcClient:
     def reset(self) -> None: ...
 ```
 
-Receipts generated by `MockArcClient` use a deterministic test keypair so that
+Receipts generated by `MockChioClient` use a deterministic test keypair so that
 `verify_receipt()` works within the mock without a sidecar. The `call_log`
 property records every evaluation for test assertions.
 
-### 2.4 TypeScript: `@arc-protocol/node-http/testing`
+### 2.4 TypeScript: `@chio-protocol/node-http/testing`
 
 Same pattern, exported from a `/testing` subpath:
 
 ```typescript
-import { mockArcClient, allowAll, denyAll, withPolicy } from "@arc-protocol/node-http/testing";
+import { mockChioClient, allowAll, denyAll, withPolicy } from "@chio-protocol/node-http/testing";
 
 // allowAll() -- every tool call returns an allow receipt
 const client = allowAll();
@@ -246,23 +246,23 @@ client.reset();
 ### 2.5 Framework Integration Test Helpers
 
 Each framework integration package should re-export its language's mock client
-with framework-specific wiring. For example, `arc-fastapi` should export a
+with framework-specific wiring. For example, `chio-fastapi` should export a
 pytest fixture:
 
 ```python
-# In arc_fastapi.testing:
+# In chio_fastapi.testing:
 import pytest
-from arc_sdk.testing import MockArcClient, allow_all
+from chio_sdk.testing import MockChioClient, allow_all
 
 @pytest.fixture
-def arc_client() -> MockArcClient:
+def chio_client() -> MockChioClient:
     return allow_all()
 
 @pytest.fixture
-def arc_app(arc_client: MockArcClient):
-    """FastAPI TestClient with ARC middleware using the mock client."""
+def chio_app(chio_client: MockChioClient):
+    """FastAPI TestClient with Chio middleware using the mock client."""
     from fastapi.testclient import TestClient
-    # ... wire up middleware with arc_client ...
+    # ... wire up middleware with chio_client ...
 ```
 
 ---
@@ -271,21 +271,21 @@ def arc_app(arc_client: MockArcClient):
 
 ### 3.1 Goal
 
-A Python developer with no Rust toolchain runs their first ARC-protected tool
+A Python developer with no Rust toolchain runs their first Chio-protected tool
 call in under 5 minutes. The path has three steps: install SDK, start sidecar,
 run code.
 
 ### 3.2 Step 1: Install the SDK
 
 ```bash
-pip install arc-sdk-python
+pip install chio-sdk-python
 ```
 
 This is blocked on section 1 (package publishing). Until then, the quickstart
 uses a git-based install:
 
 ```bash
-pip install "arc-sdk-python @ git+https://github.com/backbay/arc.git#subdirectory=sdks/python/arc-sdk-python"
+pip install "chio-sdk-python @ git+https://github.com/backbay/chio.git#subdirectory=sdks/python/chio-sdk-python"
 ```
 
 ### 3.3 Step 2: Start the Sidecar
@@ -295,17 +295,17 @@ Four distribution channels, ordered by ease of use:
 **Option A: Docker (zero install)**
 
 ```bash
-docker run -p 9090:9090 ghcr.io/backbay/arc-sidecar:latest
+docker run -p 9090:9090 ghcr.io/backbay/chio-sidecar:latest
 ```
 
-The container bundles the `arc` binary with a permissive default policy. It
+The container bundles the `chio` binary with a permissive default policy. It
 listens on port 9090 and logs to stderr.
 
 **Option B: Homebrew (macOS/Linux)**
 
 ```bash
-brew install backbay/tap/arc
-arc mcp serve --policy default.toml
+brew install backbay/tap/chio
+chio mcp serve --policy default.toml
 ```
 
 The tap publishes pre-built binaries for `darwin-arm64`, `darwin-x86_64`,
@@ -314,8 +314,8 @@ The tap publishes pre-built binaries for `darwin-arm64`, `darwin-x86_64`,
 **Option C: cargo-binstall (Rust users)**
 
 ```bash
-cargo binstall arc-cli
-arc mcp serve --policy default.toml
+cargo binstall chio-cli
+chio mcp serve --policy default.toml
 ```
 
 Downloads pre-built binaries from GitHub Releases instead of compiling.
@@ -323,33 +323,33 @@ Downloads pre-built binaries from GitHub Releases instead of compiling.
 **Option D: npx (Node developers)**
 
 ```bash
-npx @arc-protocol/sidecar
+npx @chio-protocol/sidecar
 ```
 
-The `@arc-protocol/sidecar` npm package contains platform-specific binaries
+The `@chio-protocol/sidecar` npm package contains platform-specific binaries
 selected at install time via `optionalDependencies` (same pattern as
 `@esbuild/*`, `@swc/*`). Supported platforms:
 
 | Platform | Package |
 |----------|---------|
-| macOS arm64 | `@arc-protocol/sidecar-darwin-arm64` |
-| macOS x86_64 | `@arc-protocol/sidecar-darwin-x64` |
-| Linux arm64 | `@arc-protocol/sidecar-linux-arm64` |
-| Linux x86_64 | `@arc-protocol/sidecar-linux-x64` |
-| Windows arm64 | `@arc-protocol/sidecar-win32-arm64` |
-| Windows x86_64 | `@arc-protocol/sidecar-win32-x64` |
+| macOS arm64 | `@chio-protocol/sidecar-darwin-arm64` |
+| macOS x86_64 | `@chio-protocol/sidecar-darwin-x64` |
+| Linux arm64 | `@chio-protocol/sidecar-linux-arm64` |
+| Linux x86_64 | `@chio-protocol/sidecar-linux-x64` |
+| Windows arm64 | `@chio-protocol/sidecar-win32-arm64` |
+| Windows x86_64 | `@chio-protocol/sidecar-win32-x64` |
 
 ### 3.4 GitHub Releases Binary Matrix
 
 Every tagged release publishes pre-built binaries:
 
 ```
-arc-v0.1.0-darwin-arm64.tar.gz
-arc-v0.1.0-darwin-x64.tar.gz
-arc-v0.1.0-linux-arm64.tar.gz
-arc-v0.1.0-linux-x64.tar.gz
-arc-v0.1.0-win32-arm64.zip
-arc-v0.1.0-win32-x64.zip
+chio-v0.1.0-darwin-arm64.tar.gz
+chio-v0.1.0-darwin-x64.tar.gz
+chio-v0.1.0-linux-arm64.tar.gz
+chio-v0.1.0-linux-x64.tar.gz
+chio-v0.1.0-win32-arm64.zip
+chio-v0.1.0-win32-x64.zip
 ```
 
 Built in CI using cross-compilation (`cross` for Linux, native for macOS,
@@ -361,20 +361,20 @@ each archive.
 The complete quickstart tutorial -- 10 lines of Python to protect a tool call:
 
 ```python
-# quickstart.py -- protect a tool call with ARC in 10 lines
+# quickstart.py -- protect a tool call with Chio in 10 lines
 import asyncio
-from arc_sdk import ArcClient, ArcScope, ToolGrant, Operation
+from chio_sdk import ChioClient, ChioScope, ToolGrant, Operation
 
 async def main():
-    async with ArcClient() as arc:
+    async with ChioClient() as chio:
         # 1. Create a capability that only allows read_file on the "fs" server
-        scope = ArcScope(grants=[
+        scope = ChioScope(grants=[
             ToolGrant(server_id="fs", tool_name="read_file", operations=[Operation.INVOKE])
         ])
-        cap = await arc.create_capability(subject="agent-001", scope=scope)
+        cap = await chio.create_capability(subject="agent-001", scope=scope)
 
         # 2. Evaluate a tool call -- kernel checks scope, runs guards, signs receipt
-        receipt = await arc.evaluate_tool_call(
+        receipt = await chio.evaluate_tool_call(
             capability_id=cap.id, tool_server="fs",
             tool_name="read_file", parameters={"path": "/tmp/hello.txt"},
         )
@@ -382,7 +382,7 @@ async def main():
         print(f"Receipt:  {receipt.id}")                 # signed proof
 
         # 3. Try an unauthorized tool -- kernel denies it
-        receipt2 = await arc.evaluate_tool_call(
+        receipt2 = await chio.evaluate_tool_call(
             capability_id=cap.id, tool_server="fs",
             tool_name="write_file", parameters={"path": "/etc/passwd", "content": "x"},
         )
@@ -395,7 +395,7 @@ Output:
 
 ```
 Decision: allow
-Receipt:  arc-receipt-a1b2c3d4
+Receipt:  chio-receipt-a1b2c3d4
 Decision: deny
 ```
 
@@ -406,7 +406,7 @@ For developers who want to try the API without any binary at all:
 ```python
 # quickstart_testing.py -- no sidecar needed
 import asyncio
-from arc_sdk.testing import allow_all
+from chio_sdk.testing import allow_all
 
 async def main():
     client = allow_all()
@@ -426,19 +426,19 @@ infrastructure.
 
 ---
 
-## 4. Flagship Integration: `arc-code-agent`
+## 4. Flagship Integration: `chio-code-agent`
 
 ### 4.1 Rationale
 
 Coding agents (Claude Code, Cursor, Windsurf, any MCP-based coding agent) are
-the highest-volume tool-calling pattern today and ARC's best-covered use case.
+the highest-volume tool-calling pattern today and Chio's best-covered use case.
 The review found that coding agents are the clearest onboarding path (section
-4 of REVIEW-FINDINGS-AND-NEXT-STEPS.md). An `arc-code-agent` package serves as
-both the primary demo ("this is what ARC does") and a production-ready tool.
+4 of REVIEW-FINDINGS-AND-NEXT-STEPS.md). An `chio-code-agent` package serves as
+both the primary demo ("this is what Chio does") and a production-ready tool.
 
 ### 4.2 What It Does
 
-`arc-code-agent` wraps file, shell, and git tool calls for coding agents with:
+`chio-code-agent` wraps file, shell, and git tool calls for coding agents with:
 
 - **File system scoping**: read allowed anywhere in project, write restricted
   to project directory, no writes to dotfiles or config outside project root.
@@ -453,7 +453,7 @@ both the primary demo ("this is what ARC does") and a production-ready tool.
 ### 4.3 Zero-Config Default Policy
 
 ```toml
-# arc-code-agent default policy (built-in, override with --policy path/to/policy.yaml)
+# chio-code-agent default policy (built-in, override with --policy path/to/policy.yaml)
 
 [[server]]
 id = "filesystem"
@@ -511,18 +511,18 @@ deny_patterns = [
 
 ```bash
 # NOTE: --policy takes a YAML file path, not a bare policy name.
-# The arc-code-agent default policy ships as a built-in; custom overrides
+# The chio-code-agent default policy ships as a built-in; custom overrides
 # use --policy ./my-policy.yaml
-arc mcp serve --policy ./arc-code-agent-policy.yaml --server-id filesystem -- npx @modelcontextprotocol/server-filesystem .
+chio mcp serve --policy ./chio-code-agent-policy.yaml --server-id filesystem -- npx @modelcontextprotocol/server-filesystem .
 ```
 
-The ARC kernel sits between the MCP client (Claude Code, Cursor) and the MCP
+The Chio kernel sits between the MCP client (Claude Code, Cursor) and the MCP
 tool server. Every tool call is evaluated, every result gets a receipt.
 
 **Mode 2: Python wrapper (for custom agents)**
 
 ```python
-from arc_code_agent import CodeAgent
+from chio_code_agent import CodeAgent
 
 agent = CodeAgent(project_root=".")
 result = await agent.read_file("src/main.py")       # allowed
@@ -531,37 +531,37 @@ result = await agent.shell("ls -la")                  # allowed
 result = await agent.shell("rm -rf /")                # denied
 ```
 
-### 4.5 The "This Is What ARC Does" Demo
+### 4.5 The "This Is What Chio Does" Demo
 
 The demo script that goes on the landing page and in every conference talk:
 
 ```bash
 # Terminal 1: start the sidecar with coding agent policy
 # NOTE: --policy takes a file path. The Docker image bundles a default
-# policy at /etc/arc/code-agent-policy.yaml for the demo.
-docker run -p 9090:9090 ghcr.io/backbay/arc-sidecar:latest --policy /etc/arc/code-agent-policy.yaml
+# policy at /etc/chio/code-agent-policy.yaml for the demo.
+docker run -p 9090:9090 ghcr.io/backbay/chio-sidecar:latest --policy /etc/chio/code-agent-policy.yaml
 
 # Terminal 2: try safe and unsafe operations
 python -c "
 import asyncio
-from arc_sdk import ArcClient
+from chio_sdk import ChioClient
 
 async def demo():
-    async with ArcClient() as arc:
+    async with ChioClient() as chio:
         # Safe: read a file
-        r = await arc.evaluate_tool_call(
+        r = await chio.evaluate_tool_call(
             capability_id='agent-1', tool_server='filesystem',
             tool_name='read_file', parameters={'path': 'src/main.py'})
         print(f'read_file: {r.decision.verdict}')     # allow
 
         # Unsafe: write to .env
-        r = await arc.evaluate_tool_call(
+        r = await chio.evaluate_tool_call(
             capability_id='agent-1', tool_server='filesystem',
             tool_name='write_file', parameters={'path': '.env', 'content': 'KEY=stolen'})
         print(f'write .env: {r.decision.verdict}')    # deny
 
         # Unsafe: destructive shell
-        r = await arc.evaluate_tool_call(
+        r = await chio.evaluate_tool_call(
             capability_id='agent-1', tool_server='shell',
             tool_name='execute', parameters={'command': 'rm -rf /'})
         print(f'rm -rf /: {r.decision.verdict}')      # deny
@@ -589,23 +589,23 @@ Every framework integration must meet this bar before publishing:
 1. **Working package** installable from the registry with `pip install` or
    `npm install`.
 2. **3 tests minimum**: one allow path, one deny path, one receipt verification.
-   Tests must pass without a running sidecar (use `MockArcClient`).
+   Tests must pass without a running sidecar (use `MockChioClient`).
 3. **README** with a complete example (install, configure, use).
 
-### 5.2 CrewAI: `arc-crewai`
+### 5.2 CrewAI: `chio-crewai`
 
 CrewAI is the highest priority because it has the largest mindshare among
 multi-agent frameworks and the worst default trust model (every agent can call
 every tool with no authorization check).
 
 ```python
-# pip install arc-crewai
+# pip install chio-crewai
 
 from crewai import Agent, Task, Crew
-from arc_crewai import ArcBaseTool, arc_crew
+from chio_crewai import ChioBaseTool, chio_crew
 
-# Wrap any CrewAI tool with ARC governance
-class SecureFileReader(ArcBaseTool):
+# Wrap any CrewAI tool with Chio governance
+class SecureFileReader(ChioBaseTool):
     name = "read_file"
     server_id = "filesystem"
     description = "Read a file from the project directory"
@@ -617,7 +617,7 @@ class SecureFileReader(ArcBaseTool):
 researcher = Agent(
     role="researcher",
     tools=[SecureFileReader()],
-    arc_scope=ArcScope(grants=[
+    chio_scope=ChioScope(grants=[
         ToolGrant(server_id="filesystem", tool_name="read_file",
                   operations=[Operation.INVOKE]),
     ]),
@@ -626,39 +626,39 @@ researcher = Agent(
 writer = Agent(
     role="writer",
     tools=[SecureFileReader(), SecureFileWriter()],
-    arc_scope=ArcScope(grants=[
+    chio_scope=ChioScope(grants=[
         ToolGrant(server_id="filesystem", tool_name="*",
                   operations=[Operation.INVOKE]),
     ]),
 )
 
-# arc_crew() wraps Crew to enforce per-agent capability scoping
-crew = arc_crew(Crew(agents=[researcher, writer], tasks=[...]))
+# chio_crew() wraps Crew to enforce per-agent capability scoping
+crew = chio_crew(Crew(agents=[researcher, writer], tasks=[...]))
 crew.kickoff()
 ```
 
-**Key design choice**: `ArcBaseTool` extends CrewAI's `BaseTool` and
-intercepts `_run()` / `_arun()` to call `arc_client.evaluate_tool_call()`
-before delegating to the actual implementation. The `arc_scope` attribute on
+**Key design choice**: `ChioBaseTool` extends CrewAI's `BaseTool` and
+intercepts `_run()` / `_arun()` to call `chio_client.evaluate_tool_call()`
+before delegating to the actual implementation. The `chio_scope` attribute on
 `Agent` is used to create a per-agent capability token at crew startup.
 
-### 5.3 AutoGen: `arc-autogen`
+### 5.3 AutoGen: `chio-autogen`
 
 ```python
-# pip install arc-autogen
+# pip install chio-autogen
 
 from autogen import AssistantAgent, UserProxyAgent
-from arc_autogen import arc_function, ArcUserProxy
+from chio_autogen import chio_function, ChioUserProxy
 
-# Wrap function registration with ARC governance
-@arc_function(server_id="calculator", tool_name="compute")
+# Wrap function registration with Chio governance
+@chio_function(server_id="calculator", tool_name="compute")
 def compute(expression: str) -> str:
-    return str(eval(expression))  # governed by ARC, not raw eval
+    return str(eval(expression))  # governed by Chio, not raw eval
 
-# ArcUserProxy enforces capability checks before function execution
-proxy = ArcUserProxy(
+# ChioUserProxy enforces capability checks before function execution
+proxy = ChioUserProxy(
     name="user_proxy",
-    arc_scope=ArcScope(grants=[
+    chio_scope=ChioScope(grants=[
         ToolGrant(server_id="calculator", tool_name="compute",
                   operations=[Operation.INVOKE],
                   constraints=[Constraint.max_length(100)]),
@@ -667,46 +667,46 @@ proxy = ArcUserProxy(
 proxy.register_function({"compute": compute})
 ```
 
-**Key design choice**: `@arc_function` is a decorator that wraps the registered
-function. `ArcUserProxy` extends `UserProxyAgent` to inject capability tokens
+**Key design choice**: `@chio_function` is a decorator that wraps the registered
+function. `ChioUserProxy` extends `UserProxyAgent` to inject capability tokens
 into the execution context.
 
-### 5.4 LlamaIndex: `arc-llamaindex`
+### 5.4 LlamaIndex: `chio-llamaindex`
 
 ```python
-# pip install arc-llamaindex
+# pip install chio-llamaindex
 
 from llama_index.core.tools import FunctionTool
-from arc_llamaindex import ArcFunctionTool
+from chio_llamaindex import ChioFunctionTool
 
 # Wrap any LlamaIndex FunctionTool
 def search_documents(query: str) -> str:
     return "results..."
 
-tool = ArcFunctionTool.from_defaults(
+tool = ChioFunctionTool.from_defaults(
     fn=search_documents,
     server_id="search",
     tool_name="search_documents",
 )
 
-# Use with any LlamaIndex agent -- ARC evaluates before execution
+# Use with any LlamaIndex agent -- Chio evaluates before execution
 agent = OpenAIAgent.from_tools([tool])
 ```
 
-**Key design choice**: `ArcFunctionTool` extends `FunctionTool` and overrides
+**Key design choice**: `ChioFunctionTool` extends `FunctionTool` and overrides
 `call()` / `acall()` to insert the evaluate/record cycle.
 
-### 5.5 Vercel AI SDK: `@arc-protocol/ai-sdk`
+### 5.5 Vercel AI SDK: `@chio-protocol/ai-sdk`
 
 ```typescript
-// npm install @arc-protocol/ai-sdk
+// npm install @chio-protocol/ai-sdk
 
 import { tool } from "ai";
-import { arcTool } from "@arc-protocol/ai-sdk";
+import { chioTool } from "@chio-protocol/ai-sdk";
 import { z } from "zod";
 
-// Wrap Vercel AI SDK tool() with ARC governance
-const readFile = arcTool({
+// Wrap Vercel AI SDK tool() with Chio governance
+const readFile = chioTool({
   serverId: "filesystem",
   toolName: "read_file",
   description: "Read a file",
@@ -716,7 +716,7 @@ const readFile = arcTool({
   },
 });
 
-// Use with generateText / streamText -- ARC evaluates before execute()
+// Use with generateText / streamText -- Chio evaluates before execute()
 const result = await generateText({
   model: openai("gpt-4o"),
   tools: { readFile },
@@ -724,8 +724,8 @@ const result = await generateText({
 });
 ```
 
-**Key design choice**: `arcTool()` wraps the Vercel AI SDK `tool()` function.
-It calls `arc.evaluate()` before `execute()` and `arc.record()` after. The
+**Key design choice**: `chioTool()` wraps the Vercel AI SDK `tool()` function.
+It calls `chio.evaluate()` before `execute()` and `chio.record()` after. The
 wrapper is transparent -- it returns a standard `Tool` object that works with
 `generateText`, `streamText`, and `useChat`.
 
@@ -733,11 +733,11 @@ wrapper is transparent -- it returns a standard `Tool` object that works with
 
 | Week | Milestone |
 |------|-----------|
-| W1 | `arc-sdk-python` on PyPI, `arc_sdk.testing` module merged |
-| W2 | `arc-crewai` package with 3 tests, published to PyPI |
-| W3 | `@arc-protocol/node-http` on npm, `@arc-protocol/ai-sdk` with 3 tests |
-| W4 | `arc-autogen` and `arc-llamaindex` packages with tests |
-| W5 | `arc-code-agent` package with default policy and demo script |
+| W1 | `chio-sdk-python` on PyPI, `chio_sdk.testing` module merged |
+| W2 | `chio-crewai` package with 3 tests, published to PyPI |
+| W3 | `@chio-protocol/node-http` on npm, `@chio-protocol/ai-sdk` with 3 tests |
+| W4 | `chio-autogen` and `chio-llamaindex` packages with tests |
+| W5 | `chio-code-agent` package with default policy and demo script |
 
 ---
 
@@ -746,7 +746,7 @@ wrapper is transparent -- it returns a standard `Tool` object that works with
 ### 6.1 Current Error (Denied Tool Call)
 
 ```
-ArcDeniedError: denied
+ChioDeniedError: denied
 ```
 
 That is the entire error. No tool name, no scope information, no guidance.
@@ -754,7 +754,7 @@ That is the entire error. No tool name, no scope information, no guidance.
 ### 6.2 Proposed Error (Denied Tool Call)
 
 ```
-ARC DENIED: tool "write_file" on server "filesystem"
+Chio DENIED: tool "write_file" on server "filesystem"
 
   What was denied:
     write_file({ path: ".env", content: "SECRET=x" })
@@ -775,22 +775,22 @@ ARC DENIED: tool "write_file" on server "filesystem"
     path-constraint-guard (built-in)
 
   Receipt ID:
-    arc-receipt-7f3a9b2c
+    chio-receipt-7f3a9b2c
 
   Next steps:
     - If this tool call should be allowed, update your policy to remove
-      the path constraint: https://docs.arc-protocol.dev/policies/constraints
+      the path constraint: https://docs.chio-protocol.dev/policies/constraints
     - If this is expected, the receipt above is your audit proof
-    - Run `arc check --verbose --tool write_file --server filesystem`
+    - Run `chio check --verbose --tool write_file --server filesystem`
       to trace the full guard evaluation pipeline
 ```
 
 ### 6.3 Implementation Changes
 
-The `ArcDeniedError` class in `arc_sdk/errors.py` needs additional fields:
+The `ChioDeniedError` class in `chio_sdk/errors.py` needs additional fields:
 
 ```python
-class ArcDeniedError(ArcError):
+class ChioDeniedError(ChioError):
     def __init__(
         self,
         message: str,
@@ -815,7 +815,7 @@ response serialization.
 
 ```json
 {
-  "code": "ARC-DENIED",
+  "code": "Chio-DENIED",
   "tool_name": "write_file",
   "tool_server": "filesystem",
   "reason": "Constraint violation: path matches deny pattern",
@@ -827,41 +827,41 @@ response serialization.
     "grants": [{"server_id": "filesystem", "tool_name": "write_file", "operations": ["Invoke"],
                 "constraints": [{"type": "regex_match", "value": "^(?!.*(\\. env))"}]}]
   },
-  "receipt_id": "arc-receipt-7f3a9b2c",
-  "docs_url": "https://docs.arc-protocol.dev/errors/ARC-DENIED",
+  "receipt_id": "chio-receipt-7f3a9b2c",
+  "docs_url": "https://docs.chio-protocol.dev/errors/Chio-DENIED",
   "suggested_fix": "Update your policy to remove the path constraint, or use a capability with broader scope."
 }
 ```
 
 The CLI already has `suggested_fix` and error code fields in its structured
-output (see `write_cli_error` in `arc-cli/src/main.rs`). The SDK error path
+output (see `write_cli_error` in `chio-cli/src/main.rs`). The SDK error path
 needs to match that quality.
 
 ---
 
 ## 7. Migration Guides
 
-### 7.1 Migrating from MCP to ARC
+### 7.1 Migrating from MCP to Chio
 
-**Key message**: you do not replace your MCP server. You put ARC in front of it.
+**Key message**: you do not replace your MCP server. You put Chio in front of it.
 
 ```
 Before:
   MCP Client --> MCP Server (stdio/SSE)
 
 After:
-  MCP Client --> ARC Kernel --> MCP Server (stdio/SSE)
+  MCP Client --> Chio Kernel --> MCP Server (stdio/SSE)
                  (evaluates)    (unchanged)
 ```
 
 **Steps (3 commands)**:
 
 ```bash
-# 1. Install ARC
-brew install backbay/tap/arc
+# 1. Install Chio
+brew install backbay/tap/chio
 
 # 2. Write a minimal policy (or use the default)
-cat > arc-policy.yaml << 'EOF'
+cat > chio-policy.yaml << 'EOF'
 version: "1.1.0"
 guards:
   forbidden_path:
@@ -874,12 +874,12 @@ EOF
 # Before:
 npx @modelcontextprotocol/server-filesystem .
 # After (--policy takes a YAML file path):
-arc mcp serve --policy ./arc-policy.yaml --server-id my-mcp-server -- npx @modelcontextprotocol/server-filesystem .
+chio mcp serve --policy ./chio-policy.yaml --server-id my-mcp-server -- npx @modelcontextprotocol/server-filesystem .
 ```
 
 Nothing changes in the MCP server. Nothing changes in the MCP client (it still
-speaks MCP over stdio). ARC sits in the middle, evaluating every `tools/call`
-and signing receipts. The `arc mcp serve` command already exists in the CLI.
+speaks MCP over stdio). Chio sits in the middle, evaluating every `tools/call`
+and signing receipts. The `chio mcp serve` command already exists in the CLI.
 
 **What you gain**:
 
@@ -888,7 +888,7 @@ and signing receipts. The `arc mcp serve` command already exists in the CLI.
 - Guard pipeline (rate limits, content inspection, cost caps)
 - Budget tracking (per-session and per-agent cost limits)
 
-### 7.2 Adding ARC to an Existing FastAPI App
+### 7.2 Adding Chio to an Existing FastAPI App
 
 Three lines of code:
 
@@ -899,26 +899,26 @@ app = FastAPI()
 
 # After (3 lines added):
 from fastapi import FastAPI
-from arc_fastapi import ArcMiddleware          # line 1
+from chio_fastapi import ChioMiddleware          # line 1
 
 app = FastAPI()
-app.add_middleware(ArcMiddleware)               # line 2
-# That's it. ARC_SIDECAR_URL defaults to http://127.0.0.1:9090
+app.add_middleware(ChioMiddleware)               # line 2
+# That's it. CHIO_SIDECAR_URL defaults to http://127.0.0.1:9090
 
 # Optional: configure
 app.add_middleware(                             # line 3 (replaces line 2)
-    ArcMiddleware,
+    ChioMiddleware,
     sidecar_url="http://127.0.0.1:9090",
     fail_open=False,
     exclude_paths=["/health", "/metrics"],
 )
 ```
 
-The middleware intercepts every request, calls `arc.evaluate_http_request()`,
-and either passes the request through (with an `X-Arc-Receipt` header) or
+The middleware intercepts every request, calls `chio.evaluate_http_request()`,
+and either passes the request through (with an `X-Chio-Receipt` header) or
 returns a 403 with the denial details.
 
-### 7.3 Adding ARC to an Existing Express App
+### 7.3 Adding Chio to an Existing Express App
 
 Three lines of code:
 
@@ -929,11 +929,11 @@ const app = express();
 
 // After (3 lines added):
 import express from "express";
-import { arcMiddleware } from "@arc-protocol/express";  // line 1
+import { arcMiddleware } from "@chio-protocol/express";  // line 1
 
 const app = express();
 app.use(arcMiddleware());                                // line 2
-// That's it. ARC_SIDECAR_URL defaults to http://127.0.0.1:9090
+// That's it. CHIO_SIDECAR_URL defaults to http://127.0.0.1:9090
 
 // Optional: configure
 app.use(arcMiddleware({                                  // line 3 (replaces line 2)
@@ -949,37 +949,37 @@ Same pattern as FastAPI: intercept, evaluate, pass-through or deny.
 
 ## 8. Observability for Developers
 
-### 8.1 `arc check --verbose` Trace Mode
+### 8.1 `chio check --verbose` Trace Mode
 
-The `arc check` command already evaluates a single tool call against a policy.
+The `chio check` command already evaluates a single tool call against a policy.
 Add `--verbose` to show the full guard evaluation trace:
 
 ```bash
-$ arc check --verbose --policy ./arc-policy.yaml \
+$ chio check --verbose --policy ./chio-policy.yaml \
     --tool write_file --server filesystem \
     --params '{"path": ".env", "content": "SECRET=x"}'
 
-[arc] Loading policy from ./arc-policy.yaml
-[arc]   Policy hash: sha256:a1b2c3d4...
-[arc]   Tool servers declared: 2 (filesystem, shell)
-[arc]   Guards loaded: 3 (scope-check, path-constraint, rate-limit)
+[chio] Loading policy from ./chio-policy.yaml
+[chio]   Policy hash: sha256:a1b2c3d4...
+[chio]   Tool servers declared: 2 (filesystem, shell)
+[chio]   Guards loaded: 3 (scope-check, path-constraint, rate-limit)
 
-[arc] Evaluating: filesystem::write_file
-[arc]   Capability: cap-default (scope: filesystem/write_file [Invoke])
-[arc]   Parameter hash: sha256:e5f6a7b8...
+[chio] Evaluating: filesystem::write_file
+[chio]   Capability: cap-default (scope: filesystem/write_file [Invoke])
+[chio]   Parameter hash: sha256:e5f6a7b8...
 
-[arc] Guard pipeline:
-[arc]   [1/3] scope-check ............ PASS (tool in scope)
-[arc]   [2/3] path-constraint ........ FAIL
-[arc]         Constraint: regex_match("^(?!.*(\.env))")
-[arc]         Parameter:  path = ".env"
-[arc]         Result:     path matches deny pattern
-[arc]   [3/3] rate-limit ............. SKIP (short-circuited after deny)
+[chio] Guard pipeline:
+[chio]   [1/3] scope-check ............ PASS (tool in scope)
+[chio]   [2/3] path-constraint ........ FAIL
+[chio]         Constraint: regex_match("^(?!.*(\.env))")
+[chio]         Parameter:  path = ".env"
+[chio]         Result:     path matches deny pattern
+[chio]   [3/3] rate-limit ............. SKIP (short-circuited after deny)
 
-[arc] Decision: DENY
-[arc]   Guard:  path-constraint
-[arc]   Reason: Constraint violation: path ".env" matches deny pattern
-[arc] Receipt: arc-receipt-7f3a9b2c (signed, persisted)
+[chio] Decision: DENY
+[chio]   Guard:  path-constraint
+[chio]   Reason: Constraint violation: path ".env" matches deny pattern
+[chio] Receipt: chio-receipt-7f3a9b2c (signed, persisted)
 ```
 
 This output is the single most useful debugging tool for policy authors. It
@@ -989,15 +989,15 @@ answers "why was my tool call denied?" without reading source code.
 
 ```bash
 # List recent receipts
-$ arc receipts list --limit 10
+$ chio receipts list --limit 10
 ID                    TIME                 SERVER      TOOL         VERDICT
-arc-receipt-7f3a9b2c  2026-04-15 14:32:01  filesystem  write_file   deny
-arc-receipt-3e4f5a6b  2026-04-15 14:31:58  filesystem  read_file    allow
-arc-receipt-1c2d3e4f  2026-04-15 14:31:55  shell       execute      allow
+chio-receipt-7f3a9b2c  2026-04-15 14:32:01  filesystem  write_file   deny
+chio-receipt-3e4f5a6b  2026-04-15 14:31:58  filesystem  read_file    allow
+chio-receipt-1c2d3e4f  2026-04-15 14:31:55  shell       execute      allow
 
 # Inspect a single receipt
-$ arc receipts show arc-receipt-7f3a9b2c
-Receipt: arc-receipt-7f3a9b2c
+$ chio receipts show chio-receipt-7f3a9b2c
+Receipt: chio-receipt-7f3a9b2c
   Timestamp:     2026-04-15T14:32:01Z
   Server:        filesystem
   Tool:          write_file
@@ -1012,32 +1012,32 @@ Receipt: arc-receipt-7f3a9b2c
   Content hash:  sha256:b2c3d4e5... (chain link to previous receipt)
 
 # Verify a receipt chain
-$ arc receipts verify --session session-abc123
+$ chio receipts verify --session session-abc123
 Verifying receipt chain for session session-abc123...
-  Receipt 1: arc-receipt-1c2d3e4f -- signature VALID
-  Receipt 2: arc-receipt-3e4f5a6b -- signature VALID, chain link VALID
-  Receipt 3: arc-receipt-7f3a9b2c -- signature VALID, chain link VALID
+  Receipt 1: chio-receipt-1c2d3e4f -- signature VALID
+  Receipt 2: chio-receipt-3e4f5a6b -- signature VALID, chain link VALID
+  Receipt 3: chio-receipt-7f3a9b2c -- signature VALID, chain link VALID
 Chain integrity: VALID (3 receipts, 0 gaps)
 
 # Export receipts for compliance
-$ arc receipts export --session session-abc123 --format json > receipts.json
+$ chio receipts export --session session-abc123 --format json > receipts.json
 ```
 
-Note: `arc trust serve` already provides a receipt dashboard (web UI). These
+Note: `chio trust serve` already provides a receipt dashboard (web UI). These
 CLI commands complement it for terminal-based workflows and CI pipelines.
 
 ### 8.3 Guard Evaluation Trace in Logs
 
-When `RUST_LOG=arc_kernel=debug` is set, the kernel logs the full guard
+When `RUST_LOG=chio_kernel=debug` is set, the kernel logs the full guard
 evaluation trace to stderr. This is already partially implemented. The
 improvement is standardizing the log format so it can be parsed by log
 aggregators:
 
 ```
-2026-04-15T14:32:01.123Z DEBUG arc_kernel::guard: guard_pipeline_start tool="write_file" server="filesystem" guards=3
-2026-04-15T14:32:01.124Z DEBUG arc_kernel::guard: guard_eval guard="scope-check" result="pass" duration_us=42
-2026-04-15T14:32:01.125Z DEBUG arc_kernel::guard: guard_eval guard="path-constraint" result="deny" reason="path matches deny pattern" duration_us=18
-2026-04-15T14:32:01.125Z DEBUG arc_kernel::guard: guard_pipeline_end tool="write_file" verdict="deny" total_duration_us=67 receipt_id="arc-receipt-7f3a9b2c"
+2026-04-15T14:32:01.123Z DEBUG chio_kernel::guard: guard_pipeline_start tool="write_file" server="filesystem" guards=3
+2026-04-15T14:32:01.124Z DEBUG chio_kernel::guard: guard_eval guard="scope-check" result="pass" duration_us=42
+2026-04-15T14:32:01.125Z DEBUG chio_kernel::guard: guard_eval guard="path-constraint" result="deny" reason="path matches deny pattern" duration_us=18
+2026-04-15T14:32:01.125Z DEBUG chio_kernel::guard: guard_pipeline_end tool="write_file" verdict="deny" total_duration_us=67 receipt_id="chio-receipt-7f3a9b2c"
 ```
 
 Key fields for observability dashboards:
@@ -1053,20 +1053,20 @@ The Python and TypeScript SDKs should emit traces when a logger is configured:
 
 ```python
 import logging
-logging.getLogger("arc_sdk").setLevel(logging.DEBUG)
+logging.getLogger("chio_sdk").setLevel(logging.DEBUG)
 
 # Now every evaluate_tool_call logs:
-# DEBUG arc_sdk: evaluate_tool_call server="filesystem" tool="read_file" -> allow (42ms)
-# DEBUG arc_sdk: evaluate_tool_call server="filesystem" tool="write_file" -> deny (18ms) guard="path-constraint"
+# DEBUG chio_sdk: evaluate_tool_call server="filesystem" tool="read_file" -> allow (42ms)
+# DEBUG chio_sdk: evaluate_tool_call server="filesystem" tool="write_file" -> deny (18ms) guard="path-constraint"
 ```
 
 ```typescript
-import { setLogLevel } from "@arc-protocol/node-http";
+import { setLogLevel } from "@chio-protocol/node-http";
 setLogLevel("debug");
 
 // Now every evaluate logs:
-// [arc] evaluate server=filesystem tool=read_file -> allow (42ms)
-// [arc] evaluate server=filesystem tool=write_file -> deny (18ms) guard=path-constraint
+// [chio] evaluate server=filesystem tool=read_file -> allow (42ms)
+// [chio] evaluate server=filesystem tool=write_file -> deny (18ms) guard=path-constraint
 ```
 
 ---
@@ -1075,11 +1075,11 @@ setLogLevel("debug");
 
 | Metric | Current | Target (W6) |
 |--------|---------|-------------|
-| Packages on PyPI | 0 | 4 (arc-sdk-python, arc-asgi, arc-fastapi, arc-langchain) |
-| Packages on npm | 0 | 3 (@arc-protocol/node-http, express, fastify) |
+| Packages on PyPI | 0 | 4 (chio-sdk-python, chio-asgi, chio-fastapi, chio-langchain) |
+| Packages on npm | 0 | 3 (@chio-protocol/node-http, express, fastify) |
 | Time to first tool call (Python dev) | unbounded (requires Rust toolchain) | < 5 minutes |
-| Test without sidecar | impossible | `MockArcClient` in Python + TypeScript |
-| Framework integrations with tests | 0 | 3 (arc-crewai, arc-autogen, @arc-protocol/ai-sdk) |
+| Test without sidecar | impossible | `MockChioClient` in Python + TypeScript |
+| Framework integrations with tests | 0 | 3 (chio-crewai, chio-autogen, @chio-protocol/ai-sdk) |
 | Error message includes "what to do next" | no | yes (all SDK errors) |
 | Pre-built binary platforms | 0 | 6 (darwin/linux/win, arm64/x64) |
 
@@ -1088,33 +1088,33 @@ setLogLevel("debug");
 ## 10. Dependencies and Sequencing
 
 ```
-Week 1: arc_sdk.testing + arc-sdk-python on PyPI
+Week 1: chio_sdk.testing + chio-sdk-python on PyPI
             |
             v
-Week 2: arc-crewai (uses arc_sdk.testing for tests)
-         + arc-fastapi on PyPI
+Week 2: chio-crewai (uses chio_sdk.testing for tests)
+         + chio-fastapi on PyPI
          + Docker sidecar image (ghcr.io)
             |
             v
-Week 3: @arc-protocol/node-http on npm
-         + @arc-protocol/ai-sdk (uses node-http/testing)
+Week 3: @chio-protocol/node-http on npm
+         + @chio-protocol/ai-sdk (uses node-http/testing)
          + Homebrew tap + GitHub Releases binaries
             |
             v
-Week 4: arc-autogen + arc-llamaindex on PyPI
-         + npx @arc-protocol/sidecar
+Week 4: chio-autogen + chio-llamaindex on PyPI
+         + npx @chio-protocol/sidecar
          + Error message improvements merged
             |
             v
-Week 5: arc-code-agent package + demo
+Week 5: chio-code-agent package + demo
          + Migration guides published
-         + arc check --verbose + receipts CLI
+         + chio check --verbose + receipts CLI
             |
             v
 Week 6: Quickstart tutorial on docs site
          + Blog post: "Secure your coding agent in 5 minutes"
 ```
 
-The critical path is: `arc_sdk.testing` (unblocks all integration testing)
-then `arc-sdk-python` on PyPI (unblocks all downstream Python packages) then
+The critical path is: `chio_sdk.testing` (unblocks all integration testing)
+then `chio-sdk-python` on PyPI (unblocks all downstream Python packages) then
 sidecar distribution (unblocks the quickstart).

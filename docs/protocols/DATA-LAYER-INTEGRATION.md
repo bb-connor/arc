@@ -12,21 +12,21 @@
 Every agent framework ships a database tool. LangChain has
 `SQLDatabaseToolkit`. LlamaIndex has `NLSQLTableQueryEngine`. Custom agents
 call Postgres, BigQuery, Pinecone, and Redis through tool wrappers. Today,
-ARC governs the tool call itself ("can this agent invoke the `query` tool?")
+Chio governs the tool call itself ("can this agent invoke the `query` tool?")
 but has no primitives for governing what the query does inside the database.
 
 The gap:
 
 ```
-Agent -> [ARC: can agent invoke "sql_query" tool?] -> tool server -> database
+Agent -> [Chio: can agent invoke "sql_query" tool?] -> tool server -> database
                                                           ^
-                                            ARC says "allowed"
+                                            Chio says "allowed"
                                             but the query is:
                                             SELECT * FROM users;
                                             (exfiltrates entire table)
 ```
 
-ARC needs to govern not just WHICH tools an agent calls, but WHAT those
+Chio needs to govern not just WHICH tools an agent calls, but WHAT those
 tools do when the target is a data store. This means data-aware constraints
 on `ToolGrant`, data-aware `ToolAction` variants for guards, and
 data-aware `CostDimension` tracking for warehouse cost governance.
@@ -43,12 +43,12 @@ data-aware `CostDimension` tracking for warehouse cost governance.
 | Search (Elasticsearch, OpenSearch) | Full-text search | Index cross-access, result volume explosion |
 | Cache (Redis, Memcached) | Key-value access | Session hijacking via key-pattern overreach, cache poisoning |
 
-## 2. Architecture: Where ARC Intercepts
+## 2. Architecture: Where Chio Intercepts
 
-ARC intercepts at the kernel boundary -- between the agent and the tool
+Chio intercepts at the kernel boundary -- between the agent and the tool
 server -- never inside the tool server or at the database driver level.
 The tool server wrapping the database submits query details as tool call
-arguments, and ARC's guard pipeline evaluates them before execution.
+arguments, and Chio's guard pipeline evaluates them before execution.
 
 ```
 Agent
@@ -62,7 +62,7 @@ Agent
   | }
   |
   v
-ARC Kernel
+Chio Kernel
   |
   +-- 1. ToolGrant check: does capability grant "sql_query" on this server?
   +-- 2. Constraint check: is "users" in TableAllowlist? Is operation ReadOnly?
@@ -77,7 +77,7 @@ Tool Server (database wrapper)
   | executes query against database
   |
   v
-ARC Kernel (post-invocation)
+Chio Kernel (post-invocation)
   |
   +-- 5. Result guard: row count within MaxRowsReturned?
   +-- 6. PII guard: sensitive columns redacted?
@@ -89,17 +89,17 @@ Agent (receives governed result)
 
 ### Why Not Intercept at the Driver Level?
 
-ARC treats tool servers as untrusted. The tool server is inside the sandbox;
-the kernel is the trusted mediator. If ARC intercepted at the driver level
+Chio treats tool servers as untrusted. The tool server is inside the sandbox;
+the kernel is the trusted mediator. If Chio intercepted at the driver level
 (inside the tool server process), a compromised tool server could bypass it.
 The kernel boundary is the enforcement point. Tool servers submit queries as
 tool arguments; guards parse and validate them.
 
-## 3. Extending ARC's Type System
+## 3. Extending Chio's Type System
 
 ### 3.1 New Constraint Variants
 
-The existing `Constraint` enum in `arc-core-types/src/capability.rs`
+The existing `Constraint` enum in `chio-core-types/src/capability.rs`
 currently has `PathPrefix`, `DomainExact`, `DomainGlob`, `RegexMatch`,
 `MaxLength`, `GovernedIntentRequired`, `RequireApprovalAbove`,
 `SellerExact`, `MinimumRuntimeAssurance`, `MinimumAutonomyTier`, and
@@ -128,7 +128,7 @@ pub enum Constraint {
 
     /// Maximum number of rows the tool may return per invocation.
     /// The tool server must enforce this at query time (LIMIT clause)
-    /// and ARC validates the result count post-invocation.
+    /// and Chio validates the result count post-invocation.
     MaxRowsReturned(u64),
 
     /// Maximum bytes scanned per query (for warehouse cost governance).
@@ -185,7 +185,7 @@ pub enum DataOperationClass {
 
 ### 3.2 New ToolAction Variant
 
-The `ToolAction` enum in `arc-guards/src/action.rs` needs a
+The `ToolAction` enum in `chio-guards/src/action.rs` needs a
 `DatabaseQuery` variant so guards can pattern-match on database operations:
 
 ```rust
@@ -247,7 +247,7 @@ pub enum DatabaseEngine {
 
 ### 3.3 New CostDimension Variant
 
-The existing `CostDimension` enum in `arc-metering` already has
+The existing `CostDimension` enum in `chio-metering` already has
 `DataVolume { bytes_read, bytes_written }` and `ApiCost`. Add a
 warehouse-specific variant:
 
@@ -649,7 +649,7 @@ impl PostInvocationGuard for QueryResultGuard {
 ### 5.1 SQL Databases (PostgreSQL, MySQL)
 
 **Tool server contract**: The database tool server must submit structured
-arguments that ARC guards can evaluate:
+arguments that Chio guards can evaluate:
 
 ```json
 {
@@ -828,10 +828,10 @@ Tool server runs BigQuery dry-run
   -> "This query will scan 50 GB, estimated cost $0.25"
      |
      v
-Tool server submits to ARC with dry_run_estimate
+Tool server submits to Chio with dry_run_estimate
      |
      v
-ARC WarehouseCostGuard:
+Chio WarehouseCostGuard:
   - 50 GB < MaxBytesScanned (1 GB)? NO -> DENY
   OR
   - 50 GB < MaxBytesScanned (100 GB)? YES
@@ -841,7 +841,7 @@ ARC WarehouseCostGuard:
 Tool server executes actual query
      |
      v
-ARC receipt records CostDimension::WarehouseQuery {
+Chio receipt records CostDimension::WarehouseQuery {
   cost: $0.25,
   bytes_scanned: 50 GB,
   rows_returned: 847,
@@ -968,7 +968,7 @@ The `ColumnDenylist` constraint is the primary mechanism. Organizations
 define which columns contain PII:
 
 ```yaml
-# arc-policy.yaml
+# chio-policy.yaml
 pii_columns:
   - ssn
   - social_security_number
@@ -1030,7 +1030,7 @@ access from querying a US-region database, even if the table name matches.
 
 For data layer governance to work, tool servers wrapping databases must
 submit structured arguments that guards can evaluate. This is a contract
-between the tool server and the ARC kernel.
+between the tool server and the Chio kernel.
 
 ### Required Argument Fields
 
@@ -1052,7 +1052,7 @@ operation and target metadata.
 
 ### Manifest Declaration
 
-Tool servers declare their database access pattern in the ARC manifest:
+Tool servers declare their database access pattern in the Chio manifest:
 
 ```json
 {
@@ -1070,18 +1070,18 @@ Tool servers declare their database access pattern in the ARC manifest:
         "required": ["query"]
       },
       "annotations": {
-        "arc:data_layer": "sql",
-        "arc:engine": "postgres",
-        "arc:default_operation_class": "read_only",
-        "arc:supports_dry_run": false,
-        "arc:tables": ["users", "orders", "products", "sessions"]
+        "chio:data_layer": "sql",
+        "chio:engine": "postgres",
+        "chio:default_operation_class": "read_only",
+        "chio:supports_dry_run": false,
+        "chio:tables": ["users", "orders", "products", "sessions"]
       }
     }
   ]
 }
 ```
 
-The `arc:*` annotations inform the kernel which guards to activate and
+The `chio:*` annotations inform the kernel which guards to activate and
 what constraints are meaningful for this tool.
 
 ## 8. Python SDK Integration
@@ -1089,11 +1089,11 @@ what constraints are meaningful for this tool.
 ### 8.1 Database Tool Decorators
 
 ```python
-from arc_sdk import ArcClient
-from arc_data import arc_query, arc_vector_search, DataScope
+from chio_sdk import ChioClient
+from chio_data import chio_query, chio_vector_search, DataScope
 
-# SQL query with ARC governance
-@arc_query(
+# SQL query with Chio governance
+@chio_query(
     scope=DataScope.sql(
         tables=["users", "orders"],
         operation_class="read_only",
@@ -1107,8 +1107,8 @@ async def query_users(query: str, tenant_id: str) -> list[dict]:
     return await db.fetch_all(query)
 
 
-# Vector search with ARC governance
-@arc_vector_search(
+# Vector search with Chio governance
+@chio_vector_search(
     scope=DataScope.vector(
         collections=["prod/product-embeddings", "prod/faq-*"],
         operation_class="read_only",
@@ -1121,7 +1121,7 @@ async def search_products(query_vector: list[float], top_k: int = 10) -> list[di
 
 
 # Warehouse query with cost governance
-@arc_query(
+@chio_query(
     scope=DataScope.warehouse(
         engine="bigquery",
         tables=["analytics.orders", "analytics.products"],
@@ -1138,19 +1138,19 @@ async def analytics_query(query: str) -> list[dict]:
 
 ### 8.2 LangChain Integration
 
-Wrap LangChain's database toolkits with ARC governance:
+Wrap LangChain's database toolkits with Chio governance:
 
 ```python
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
-from arc_data.langchain import ArcSQLDatabaseToolkit
+from chio_data.langchain import ChioSQLDatabaseToolkit
 
 # Standard LangChain SQL toolkit
 db = SQLDatabase.from_uri("postgresql://localhost/analytics")
 toolkit = SQLDatabaseToolkit(db=db, llm=llm)
 
-# ARC-governed wrapper
-arc_toolkit = ArcSQLDatabaseToolkit(
+# Chio-governed wrapper
+chio_toolkit = ChioSQLDatabaseToolkit(
     toolkit=toolkit,
     sidecar_url="http://127.0.0.1:9090",
     table_allowlist=["users", "orders", "products"],
@@ -1160,28 +1160,28 @@ arc_toolkit = ArcSQLDatabaseToolkit(
     require_tenant_filter="tenant_id",
 )
 
-# Use in agent -- same interface, ARC-governed
-agent = create_sql_agent(llm=llm, toolkit=arc_toolkit)
+# Use in agent -- same interface, Chio-governed
+agent = create_sql_agent(llm=llm, toolkit=chio_toolkit)
 result = agent.invoke("How many orders did we get last month?")
-# ARC evaluates every generated SQL query before execution
+# Chio evaluates every generated SQL query before execution
 ```
 
 ### 8.3 LlamaIndex Integration
 
 ```python
 from llama_index.core import SQLDatabase, VectorStoreIndex
-from arc_data.llamaindex import ArcSQLDatabase, ArcVectorStoreIndex
+from chio_data.llamaindex import ChioSQLDatabase, ChioVectorStoreIndex
 
-# ARC-governed SQL database for text-to-SQL
-arc_db = ArcSQLDatabase(
+# Chio-governed SQL database for text-to-SQL
+chio_db = ChioSQLDatabase(
     sql_database=SQLDatabase.from_uri("postgresql://localhost/analytics"),
     table_allowlist=["users", "orders"],
     operation_class="read_only",
     max_rows=500,
 )
 
-# ARC-governed vector store for RAG
-arc_index = ArcVectorStoreIndex(
+# Chio-governed vector store for RAG
+chio_index = ChioVectorStoreIndex(
     vector_store=pinecone_store,
     collection_allowlist=["prod/product-embeddings"],
     max_results=20,
@@ -1199,16 +1199,16 @@ Every data layer operation produces a receipt with data-specific metadata:
   "server_id": "analytics-db",
   "verdict": "allow",
   "metadata": {
-    "arc:data_layer": "sql",
-    "arc:engine": "postgres",
-    "arc:operation_class": "read_only",
-    "arc:tables_accessed": ["users"],
-    "arc:columns_returned": ["name", "email", "created_at"],
-    "arc:rows_returned": 47,
-    "arc:query_hash": "sha256:a1b2c3d4...",
-    "arc:had_limit": true,
-    "arc:had_tenant_filter": true,
-    "arc:tenant_id": "acme"
+    "chio:data_layer": "sql",
+    "chio:engine": "postgres",
+    "chio:operation_class": "read_only",
+    "chio:tables_accessed": ["users"],
+    "chio:columns_returned": ["name", "email", "created_at"],
+    "chio:rows_returned": 47,
+    "chio:query_hash": "sha256:a1b2c3d4...",
+    "chio:had_limit": true,
+    "chio:had_tenant_filter": true,
+    "chio:tenant_id": "acme"
   },
   "cost": {
     "dimensions": [
@@ -1246,8 +1246,8 @@ For warehouse queries, the receipt also includes:
 
 ```
 crates/
-  arc-data-guards/
-    Cargo.toml                  # deps: arc-core-types, arc-guards, sqlparser
+  chio-data-guards/
+    Cargo.toml                  # deps: chio-core-types, chio-guards, sqlparser
     src/
       lib.rs
       sql_guard.rs              # SqlQueryGuard
@@ -1263,19 +1263,19 @@ crates/
       test_warehouse_cost.rs
       test_pii.rs
 
-sdks/python/arc-data/
-  pyproject.toml                # deps: arc-sdk-python, sqlparse
-  src/arc_data/
+sdks/python/chio-data/
+  pyproject.toml                # deps: chio-sdk-python, sqlparse
+  src/chio_data/
     __init__.py
     scope.py                    # DataScope builder
-    decorators.py               # arc_query, arc_vector_search
+    decorators.py               # chio_query, chio_vector_search
     langchain/
       __init__.py
-      toolkit.py                # ArcSQLDatabaseToolkit
+      toolkit.py                # ChioSQLDatabaseToolkit
     llamaindex/
       __init__.py
-      database.py               # ArcSQLDatabase
-      vector_store.py           # ArcVectorStoreIndex
+      database.py               # ChioSQLDatabase
+      vector_store.py           # ChioVectorStoreIndex
   tests/
     test_sql_scope.py
     test_vector_scope.py
@@ -1290,7 +1290,7 @@ sdks/python/arc-data/
    SQL, Snowflake SQL, Spark SQL). The `sqlparser` crate supports multiple
    dialects but is not perfect. Should unparseable queries be denied
    (fail-closed) or delegated to the tool server with a warning?
-   Recommendation: fail-closed, matching ARC's convention.
+   Recommendation: fail-closed, matching Chio's convention.
 
 2. **Prepared statements.** If the tool server uses parameterized queries,
    the guard sees `SELECT * FROM users WHERE id = $1` without knowing the
@@ -1310,7 +1310,7 @@ sdks/python/arc-data/
    independently?
 
 5. **Connection pooling.** Tool servers typically use connection pools.
-   ARC governs at the tool call level, not the connection level. A single
+   Chio governs at the tool call level, not the connection level. A single
    tool call might execute multiple queries (e.g., a transaction).
    Should the tool server submit all queries in a transaction as a
    single tool call, or each query separately?

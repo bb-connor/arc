@@ -17,7 +17,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "arc_django.ArcDjangoMiddleware",
+    "chio_django.ChioDjangoMiddleware",
 ]
 
 DATABASES = {
@@ -31,9 +31,9 @@ USE_TZ = True
 TIME_ZONE = "UTC"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-ARC_SIDECAR_URL = os.environ.get("ARC_SIDECAR_URL", "http://127.0.0.1:9090")
-ARC_FAIL_OPEN = False
-ARC_EXCLUDE_PATHS = ["/healthz"]
-ARC_EXCLUDE_METHODS = ["OPTIONS"]
-ARC_RECEIPT_HEADER = "X-Arc-Receipt"
+CHIO_SIDECAR_URL = os.environ.get("CHIO_SIDECAR_URL", "http://127.0.0.1:9090")
+CHIO_FAIL_OPEN = False
+CHIO_EXCLUDE_PATHS = ["/healthz"]
+CHIO_EXCLUDE_METHODS = ["OPTIONS"]
+CHIO_RECEIPT_HEADER = "X-Chio-Receipt"
 

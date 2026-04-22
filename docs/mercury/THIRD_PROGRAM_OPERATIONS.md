@@ -33,7 +33,7 @@ The export path depends on a fresh bounded second-portfolio-program chain:
 ## Export Command
 
 ```bash
-cargo run -p arc-mercury -- third-program export --output target/mercury-third-program-export
+cargo run -p chio-mercury -- third-program export --output target/mercury-third-program-export
 ```
 
 Expected top-level artifacts:
@@ -56,4 +56,4 @@ Stop the lane if:
 - second-portfolio-program approval is absent or stale
 - the requested scope expands beyond one bounded repeated adjacent-program reuse decision
 - multi-program guardrails are missing
-- the request implies generic portfolio management, revenue operations, billing, channel, or ARC commercial behavior
+- the request implies generic portfolio management, revenue operations, billing, channel, or Chio commercial behavior

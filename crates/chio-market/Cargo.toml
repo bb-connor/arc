@@ -1,0 +1,25 @@
+[package]
+name = "chio-market"
+description = "Chio liability-market provider, quote, and claims contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_market"
+
+[dependencies]
+chio-appraisal = { path = "../chio-appraisal" }
+chio-core-types = { path = "../chio-core-types" }
+chio-credit = { path = "../chio-credit" }
+chio-underwriting = { path = "../chio-underwriting" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

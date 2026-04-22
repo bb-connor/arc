@@ -1,4 +1,4 @@
-# ARC Agent Passport Guide
+# Chio Agent Passport Guide
 
 **Status:** alpha plus verifier infrastructure, lifecycle status distribution,
 portable OID4VCI-compatible issuance, holder transport over public
@@ -10,51 +10,51 @@ analytics shipped
 
 ## Overview
 
-ARC now ships Agent Passport verification and presentation on top of:
+Chio now ships Agent Passport verification and presentation on top of:
 
 - local reputation scoring
 - reputation-gated issuance
-- `did:arc`
+- `did:chio`
 - signed receipt and checkpoint evidence
 - signed reusable verifier policy artifacts
 - replay-safe verifier challenge state
 - truthful multi-issuer bundle verification and evaluation
 - shared-evidence provenance in operator and comparison reporting
 
-The current CLI surface is ARC-first, with `arc` retained as a compatibility
+The current CLI surface is Chio-first, with `chio` retained as a compatibility
 alias during the rename window:
 
 ```text
-arc passport create
-arc passport policy create
-arc passport policy verify
-arc passport policy list
-arc passport policy get
-arc passport policy upsert
-arc passport policy delete
-arc passport challenge create
-arc passport challenge respond
-arc passport challenge submit
-arc passport challenge verify
-arc passport evaluate
-arc passport verify
-arc passport present
-arc passport issuance metadata
-arc passport issuance offer
-arc passport issuance token
-arc passport issuance credential
-arc passport status publish
-arc passport status list
-arc passport status get
-arc passport status resolve
-arc passport status revoke
+chio passport create
+chio passport policy create
+chio passport policy verify
+chio passport policy list
+chio passport policy get
+chio passport policy upsert
+chio passport policy delete
+chio passport challenge create
+chio passport challenge respond
+chio passport challenge submit
+chio passport challenge verify
+chio passport evaluate
+chio passport verify
+chio passport present
+chio passport issuance metadata
+chio passport issuance offer
+chio passport issuance token
+chio passport issuance credential
+chio passport status publish
+chio passport status list
+chio passport status get
+chio passport status resolve
+chio passport status revoke
 ```
 
 The passport is a bundle of independently verifiable reputation credentials.
 Each embedded credential is signed by the issuing operator key and identifies
-both issuer and subject as `did:arc` DIDs.
+both issuer and subject as `did:chio` DIDs.
 
-`arc passport create` still produces a single-issuer passport from one local
+`chio passport create` still produces a single-issuer passport from one local
 operator signing key and one local receipt corpus. Verification, evaluation,
 and presentation now also support same-subject passport bundles composed from
 multiple independently signed issuer credentials.
@@ -65,67 +65,67 @@ the issuing operator explicitly supplies enterprise identity context during
 passport creation; verification recomputes the passport-level provenance from
 the embedded credentials and fails closed if the aggregate is tampered.
 
-New ARC issuance uses these primary schema identifiers while verification still
-accepts legacy `arc.*` passport artifacts:
+Chio issuance and verification use these schema identifiers and reject legacy
+legacy pre-Chio passport artifacts:
 
-- `arc.agent-passport.v1`
-- `arc.passport-verifier-policy.v1`
-- `arc.agent-passport-presentation-challenge.v1`
-- `arc.agent-passport-presentation-response.v1`
+- `chio.agent-passport.v1`
+- `chio.passport-verifier-policy.v1`
+- `chio.agent-passport-presentation-challenge.v1`
+- `chio.agent-passport-presentation-response.v1`
 
-Issuer and subject identifiers currently remain `did:arc`. `did:arc` is the
+Issuer and subject identifiers currently remain `did:chio`. `did:chio` is the
 shipped canonical DID method.
 
-ARC now also publishes one bounded public identity-profile and wallet-routing
+Chio now also publishes one bounded public identity-profile and wallet-routing
 contract over the passport substrate in
-`docs/standards/ARC_PUBLIC_IDENTITY_PROFILE.md`. That profile may name
+`docs/standards/CHIO_PUBLIC_IDENTITY_PROFILE.md`. That profile may name
 `did:web`, `did:key`, and `did:jwk` as compatibility inputs, but the shipped
-passport artifact and projected portable responses still keep `did:arc` as the
+passport artifact and projected portable responses still keep `did:chio` as the
 signed provenance anchor.
 
 ## OID4VCI-Compatible Issuance
 
-ARC now ships one conservative OID4VCI-style pre-authorized-code issuance lane
+Chio now ships one conservative OID4VCI-style pre-authorized-code issuance lane
 for the existing `AgentPassport` artifact plus two bounded projected portable
-passport profiles. This is still a transport and delivery layer over ARC's
-current passport truth surface, not a rewrite of ARC credentials into generic
+passport profiles. This is still a transport and delivery layer over Chio's
+current passport truth surface, not a rewrite of Chio credentials into generic
 `ldp_vc` or arbitrary VC wallet formats.
 
 The shipped profile is:
 
-- configuration id: `arc_agent_passport`
-- format: `arc-agent-passport+json`
+- configuration id: `chio_agent_passport`
+- format: `chio-agent-passport+json`
 - issuer metadata: `/.well-known/openid-credential-issuer`
 - operator-authenticated offer creation: `/v1/passport/issuance/offers`
 - holder-facing token redemption: `/v1/passport/issuance/token`
 - holder-facing credential redemption: `/v1/passport/issuance/credential`
-- optional issuer-profile `arcProfile.passportStatusDistribution` advertisement
+- optional issuer-profile `chioProfile.passportStatusDistribution` advertisement
   when the operator has published a portable lifecycle resolve plane
 - optional credential-response
-  `arcCredentialContext.passportStatus` sidecar when the delivered passport is
+  `chioCredentialContext.passportStatus` sidecar when the delivered passport is
   already published active with lifecycle distribution
 
 Local CLI flow:
 
 ```text
-arc passport issuance metadata \
+chio passport issuance metadata \
   --issuer-url https://trust.example.com \
   --passport-status-url https://trust.example.com/v1/public/passport/statuses/resolve \
   --passport-status-cache-ttl-secs 300
 
-arc passport issuance offer \
+chio passport issuance offer \
   --input passport.json \
   --output offer.json \
   --issuer-url https://trust.example.com \
   --passport-issuance-offers-file passport-issuance-offers.json \
   --passport-statuses-file passport-statuses.json
 
-arc passport issuance token \
+chio passport issuance token \
   --offer offer.json \
   --output token.json \
   --passport-issuance-offers-file passport-issuance-offers.json
 
-arc passport issuance credential \
+chio passport issuance credential \
   --offer offer.json \
   --token token.json \
   --output delivered-passport.json \
@@ -136,7 +136,7 @@ arc passport issuance credential \
 Remote trust-control flow:
 
 ```text
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8090 \
   --advertise-url https://trust.example.com \
   --service-token issuer-admin-token \
@@ -147,23 +147,23 @@ arc trust serve \
 Remote compatibility is bounded intentionally:
 
 - `credential_issuer` is an operator-controlled HTTPS transport identifier
-- the delivered credential still binds issuer and subject as `did:arc`
-- offer creation stays on ARC's authenticated admin plane
+- the delivered credential still binds issuer and subject as `did:chio`
+- offer creation stays on Chio's authenticated admin plane
 - pre-authorized codes and access tokens are single-use and short-lived
 - portable lifecycle support is only advertised when the issuer has a published
   read-only lifecycle resolve plane
 - if the trust-control service is configured for portable lifecycle support,
   offer creation fails closed until the target passport is already published
   active into that lifecycle registry
-- ARC now also publishes one bounded public identity-profile, wallet-
+- Chio now also publishes one bounded public identity-profile, wallet-
   directory, and routing contract for the documented passport profile family
-- ARC still does not claim generic OID4VP, DIDComm, permissionless public-
-  wallet, or arbitrary non-ARC credential compatibility
+- Chio still does not claim generic OID4VP, DIDComm, permissionless public-
+  wallet, or arbitrary non-Chio credential compatibility
 
 ## Create
 
 ```text
-arc \
+chio \
   --receipt-db receipts.sqlite3 \
   --budget-db budgets.sqlite3 \
   passport create \
@@ -180,7 +180,7 @@ What this does:
 
 - assembles the local reputation corpus for the selected subject
 - computes a deterministic local scorecard
-- builds one signed `ArcReputationAttestation`
+- builds one signed `ChioReputationAttestation`
 - wraps it in an `AgentPassport`
 - optionally projects enterprise federation facts into typed
   `enterpriseIdentityProvenance` on the credential and the passport bundle
@@ -191,13 +191,13 @@ coverage.
 ## Verify
 
 ```text
-arc passport verify --input passport.json
+chio passport verify --input passport.json
 ```
 
 Verification checks:
 
 - every embedded credential signature
-- `did:arc` issuer and subject consistency
+- `did:chio` issuer and subject consistency
 - credential validity windows
 - single-subject passport consistency
 - bundle `validUntil` does not exceed the minimum credential expiry
@@ -211,7 +211,7 @@ Verification checks:
 
 ## Lifecycle Status And Distribution
 
-ARC now treats passport lifecycle as operator-managed truth instead of a
+Chio now treats passport lifecycle as operator-managed truth instead of a
 private convention. A relying party can distinguish:
 
 - `active`: the published passport is current
@@ -225,7 +225,7 @@ private convention. A relying party can distinguish:
 Publish one passport into a local lifecycle registry:
 
 ```text
-arc passport status publish \
+chio passport status publish \
   --input passport.json \
   --passport-statuses-file passport-statuses.json \
   --resolve-url https://trust.example.com/v1/public/passport/statuses/resolve \
@@ -235,11 +235,11 @@ arc passport status publish \
 Resolve or revoke one lifecycle record:
 
 ```text
-arc passport status resolve \
+chio passport status resolve \
   --passport-id <passport-artifact-id> \
   --passport-statuses-file passport-statuses.json
 
-arc passport status revoke \
+chio passport status revoke \
   --passport-id <passport-artifact-id> \
   --passport-statuses-file passport-statuses.json \
   --reason compromised
@@ -253,7 +253,7 @@ If you expose lifecycle over trust-control, start the service with a dedicated
 registry file:
 
 ```text
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8090 \
   --advertise-url https://trust.example.com \
   --service-token verifier-token \
@@ -268,24 +268,24 @@ resolution is only advertised when the distribution also carries an explicit
 `cacheTtlSecs`, and resolutions now expose `updatedAt` so consumers can
 distinguish current `active` state from fail-closed `stale` state.
 
-`arc passport status resolve --control-url ...` now uses that public read path
+`chio passport status resolve --control-url ...` now uses that public read path
 when no `--control-token` is supplied. Admin-only lifecycle operations remain
 operator-authenticated.
 
 You can also advertise the lifecycle endpoint through the subject DID document:
 
 ```text
-arc did resolve \
-  --id did:arc:<subject> \
+chio did resolve \
+  --id did:chio:<subject> \
   --passport-status-url https://trust.example.com/v1/public/passport/statuses/resolve
 ```
 
-This emits an `ArcPassportStatusService` DID service entry so relying parties
+This emits an `ChioPassportStatusService` DID service entry so relying parties
 have one supported place to discover lifecycle state.
 
 ## Multi-Issuer Composition
 
-ARC now accepts passport bundles that contain credentials from multiple
+Chio now accepts passport bundles that contain credentials from multiple
 issuers when all credentials:
 
 - independently verify
@@ -302,12 +302,12 @@ The verifier contract remains conservative:
 - evaluation output reports `matchedIssuers` plus `credentialResults[].issuer`
 
 This means multi-issuer support is a verification/evaluation/presentation
-feature, not a claim that ARC now synthesizes a new trust signal across
+feature, not a claim that Chio now synthesizes a new trust signal across
 issuers.
 
 ## Cross-Issuer Portfolios
 
-ARC now also defines one bounded cross-issuer portfolio layer over those same
+Chio now also defines one bounded cross-issuer portfolio layer over those same
 passport artifacts:
 
 - a portfolio can hold native, imported, or explicitly migrated passport
@@ -327,7 +327,7 @@ That keeps cross-issuer portability honest:
 ## Evaluate
 
 ```text
-arc passport evaluate \
+chio passport evaluate \
   --input passport.json \
   --policy examples/policies/passport-verifier.yaml \
   --passport-statuses-file passport-statuses.json
@@ -336,7 +336,7 @@ arc passport evaluate \
 This is the first relying-party verifier lane on top of the shipped passport
 format. The verifier:
 
-- performs the same structural passport verification as `arc passport verify`
+- performs the same structural passport verification as `chio passport verify`
 - evaluates each embedded credential independently against a relying-party policy
 - accepts the passport if at least one credential satisfies the policy
 - does not invent cross-issuer aggregation semantics beyond those independent
@@ -360,7 +360,7 @@ verification:
 
 ```yaml
 issuerAllowlist:
-  - "did:arc:..."
+  - "did:chio:..."
 requireActiveLifecycle: true
 ```
 
@@ -373,12 +373,12 @@ When this flag is enabled:
 - output includes `passportLifecycle` plus human-readable `passportReasons`
   describing the lifecycle denial
 
-See [examples/policies/passport-verifier.yaml](/Users/connor/Medica/backbay/standalone/arc/examples/policies/passport-verifier.yaml).
+See [examples/policies/passport-verifier.yaml](/Users/connor/Medica/backbay/standalone/chio/examples/policies/passport-verifier.yaml).
 
 ## Reusable Verifier Policy Artifacts
 
 ```text
-arc passport policy create \
+chio passport policy create \
   --output verifier-policy.json \
   --policy-id rp-default \
   --verifier https://rp.example.com \
@@ -387,9 +387,9 @@ arc passport policy create \
   --expires-at 1900000000 \
   --verifier-policies-file verifier-policies.json
 
-arc passport policy verify --input verifier-policy.json
+chio passport policy verify --input verifier-policy.json
 
-arc passport policy list \
+chio passport policy list \
   --verifier-policies-file verifier-policies.json
 ```
 
@@ -407,7 +407,7 @@ remote trust-control admin APIs.
 ## Compare Against Live Local State
 
 ```text
-arc reputation compare \
+chio reputation compare \
   --subject-public-key <agent-ed25519-hex> \
   --passport passport.json
 ```
@@ -436,14 +436,14 @@ to. Each imported signal reports:
 - rejection reasons when local guardrails fail
 - an `attenuatedCompositeScore` only for accepted imported evidence
 
-The same segregation applies to `arc reputation local`: the top-level local
+The same segregation applies to `chio reputation local`: the top-level local
 `scorecard` still reflects native local receipts and budgets, while
 `importedTrust` reports evidence-backed remote signals separately.
 
 Example:
 
 ```text
-arc --json --receipt-db receipts.sqlite3 reputation local \
+chio --json --receipt-db receipts.sqlite3 reputation local \
   --subject-public-key <agent-ed25519-hex>
 ```
 
@@ -453,13 +453,13 @@ without pretending it became first-party local history.
 ## Federated Issuance
 
 ```text
-arc \
+chio \
   --control-url https://trust.example.com \
   --control-token <service-token> \
   evidence import \
   --input upstream-evidence-package
 
-arc trust federated-delegation-policy-create \
+chio trust federated-delegation-policy-create \
   --output delegation-policy.json \
   --signing-seed-file authority-seed.txt \
   --issuer local-org \
@@ -469,7 +469,7 @@ arc trust federated-delegation-policy-create \
   --parent-capability-id cap-upstream \
   --expires-at 1900000000
 
-arc \
+chio \
   --control-url https://trust.example.com \
   --control-token <service-token> \
   trust federated-issue \
@@ -482,9 +482,9 @@ arc \
 ```
 
 This lane now supports verified bilateral evidence consumption plus a real
-multi-hop continuation step. `arc evidence import` verifies the upstream
+multi-hop continuation step. `chio evidence import` verifies the upstream
 package before it is indexed locally, the delegation policy binds to an exact
-upstream capability ID, and `arc trust federated-issue --upstream-capability-id ...`
+upstream capability ID, and `chio trust federated-issue --upstream-capability-id ...`
 persists a local delegation anchor that bridges to the imported parent without
 pretending the foreign capability was natively issued by the local authority.
 
@@ -513,10 +513,10 @@ was not activated.
 ## Present
 
 ```text
-arc passport present \
+chio passport present \
   --input passport.json \
   --output presented.json \
-  --issuer did:arc:... \
+  --issuer did:chio:... \
   --max-credentials 1
 ```
 
@@ -528,7 +528,7 @@ the composed credential set.
 ## Challenge-Bound Presentation
 
 ```text
-arc passport challenge create \
+chio passport challenge create \
   --output challenge.json \
   --verifier https://rp.example.com \
   --ttl-secs 300 \
@@ -536,17 +536,17 @@ arc passport challenge create \
   --verifier-policies-file verifier-policies.json \
   --verifier-challenge-db verifier-challenges.sqlite3
 
-arc passport challenge respond \
+chio passport challenge respond \
   --input passport.json \
   --challenge challenge.json \
   --holder-seed-file subject-seed.txt \
   --output response.json
 
-arc passport challenge submit \
+chio passport challenge submit \
   --input response.json \
   --submit-url https://trust.example.com/v1/public/passport/challenges/verify
 
-arc passport challenge verify \
+chio passport challenge verify \
   --input response.json \
   --challenge challenge.json \
   --verifier-policies-file verifier-policies.json \
@@ -592,13 +592,13 @@ challenge verification applies the same lifecycle fail-closed rules as
 
 ## Holder Transport
 
-Phase 55 adds one conservative holder-facing transport over the existing ARC
+Phase 55 adds one conservative holder-facing transport over the existing Chio
 challenge and response artifacts. The proof material is unchanged:
 
 - the verifier/admin still creates the signed
-  `arc.agent-passport-presentation-challenge.v1`
+  `chio.agent-passport-presentation-challenge.v1`
 - the holder still signs the existing
-  `arc.agent-passport-presentation-response.v1`
+  `chio.agent-passport-presentation-response.v1`
 - replay truth still lives in the verifier challenge store
 
 What changed is transport:
@@ -617,7 +617,7 @@ What changed is transport:
 Remote holder flow:
 
 ```text
-arc \
+chio \
   --json \
   --control-url https://trust.example.com \
   --control-token verifier-token \
@@ -625,13 +625,13 @@ arc \
   --output challenge.json \
   --verifier https://rp.example.com
 
-arc passport challenge respond \
+chio passport challenge respond \
   --input passport.json \
   --challenge-url https://trust.example.com/v1/public/passport/challenges/<challenge-id> \
   --holder-seed-file subject-seed.txt \
   --output response.json
 
-arc passport challenge submit \
+chio passport challenge submit \
   --input response.json \
   --submit-url https://trust.example.com/v1/public/passport/challenges/verify
 ```
@@ -648,7 +648,7 @@ The public holder transport is intentionally narrow:
 ## Remote Verifier Surface
 
 ```text
-arc trust serve \
+chio trust serve \
   --listen 127.0.0.1:8090 \
   --advertise-url https://trust.example.com \
   --service-token verifier-token \
@@ -656,7 +656,7 @@ arc trust serve \
   --verifier-policies-file verifier-policies.json \
   --verifier-challenge-db verifier-challenges.sqlite3
 
-arc \
+chio \
   --control-url https://trust.example.com \
   --control-token verifier-token \
   passport policy create \
@@ -667,7 +667,7 @@ arc \
   --policy examples/policies/passport-verifier.yaml \
   --expires-at 1900000000
 
-arc \
+chio \
   --control-url https://trust.example.com \
   --control-token verifier-token \
   passport challenge create \
@@ -675,7 +675,7 @@ arc \
   --verifier https://trust.example.com \
   --policy-id rp-default
 
-arc \
+chio \
   --control-url https://trust.example.com \
   --control-token verifier-token \
   passport challenge verify \
@@ -703,7 +703,7 @@ challenge store semantics.
 Shipped now:
 
 - single-issuer reputation credentials
-- single-issuer passport bundle creation with ARC-primary schema issuance
+- single-issuer passport bundle creation with Chio-primary schema issuance
 - multi-issuer passport bundle verification, evaluation, and filtered presentation
 - offline verification without custom glue code
 - relying-party policy evaluation over passports without custom glue code
@@ -733,11 +733,11 @@ Shipped now:
 
 Not shipped yet:
 
-- `did:arc` issuance and resolution
-- `did:arc:update` rotation flows
+- `did:chio` issuance and resolution
+- `did:chio:update` rotation flows
 - zero-knowledge selective disclosure
 - generic OID4VP, DIDComm, or universal wallet qualification beyond the
-  documented ARC verifier profile plus bounded public identity-profile and
+  documented Chio verifier profile plus bounded public identity-profile and
   wallet-routing contract
 - permissionless or auto-trusting public issuer, verifier, or wallet
   discovery networks

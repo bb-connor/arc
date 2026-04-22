@@ -1,11 +1,11 @@
 {
-  "schema": "arc.theorem-inventory.v1",
-  "rootModule": "formal/lean4/Pact/Arc.lean",
+  "schema": "chio.theorem-inventory.v1",
+  "rootModule": "formal/lean4/Chio/Chio.lean",
   "assumptions": [
     {
       "id": "assumption.crypto.verify_capability_signature",
-      "leanName": "Arc.Core.verifyCapabilitySignature",
-      "file": "formal/lean4/Pact/Pact/Core/Revocation.lean",
+      "leanName": "Chio.Core.verifyCapabilitySignature",
+      "file": "formal/lean4/Chio/Chio/Core/Revocation.lean",
       "kind": "axiom",
       "rootImported": true,
       "claimClass": "audited_axiom",
@@ -15,18 +15,18 @@
   "theorems": [
     {
       "id": "core.scope.empty_isSubsetOf",
-      "leanName": "Arc.Core.ArcScope.empty_isSubsetOf",
-      "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
+      "leanName": "Chio.Core.ChioScope.empty_isSubsetOf",
+      "file": "formal/lean4/Chio/Chio/Core/Scope.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "mapsTo": ["P1"],
-      "notes": "Structural empty-scope attenuation lemma over the bounded ArcScope model."
+      "notes": "Structural empty-scope attenuation lemma over the bounded ChioScope model."
     },
     {
       "id": "core.tool_grant.isSubsetOf_refl",
-      "leanName": "Arc.Core.ToolGrant.isSubsetOf_refl",
-      "file": "formal/lean4/Pact/Pact/Core/Scope.lean",
+      "leanName": "Chio.Core.ToolGrant.isSubsetOf_refl",
+      "file": "formal/lean4/Chio/Chio/Core/Scope.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -35,18 +35,18 @@
     },
     {
       "id": "spec.capability_monotonicity",
-      "leanName": "Arc.Spec.capability_monotonicity",
-      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "leanName": "Chio.Spec.capability_monotonicity",
+      "file": "formal/lean4/Chio/Chio/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "mapsTo": ["P1"],
-      "notes": "Primary attenuation theorem over ArcScope grants only; no Rust refinement proof yet."
+      "notes": "Primary attenuation theorem over ChioScope grants only; no Rust refinement proof yet."
     },
     {
       "id": "spec.empty_scope_monotonicity",
-      "leanName": "Arc.Spec.empty_scope_monotonicity",
-      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "leanName": "Chio.Spec.empty_scope_monotonicity",
+      "file": "formal/lean4/Chio/Chio/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -55,8 +55,8 @@
     },
     {
       "id": "spec.scope_budgets_nonnegative",
-      "leanName": "Arc.Spec.scope_budgets_nonnegative",
-      "file": "formal/lean4/Pact/Pact/Spec/Properties.lean",
+      "leanName": "Chio.Spec.scope_budgets_nonnegative",
+      "file": "formal/lean4/Chio/Chio/Spec/Properties.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -65,8 +65,8 @@
     },
     {
       "id": "proof.list_isSubsetOf_trans",
-      "leanName": "Arc.Proofs.list_isSubsetOf_trans",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "leanName": "Chio.Proofs.list_isSubsetOf_trans",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -75,18 +75,18 @@
     },
     {
       "id": "proof.scope_subset_of_grants_subset",
-      "leanName": "Arc.Proofs.scope_subset_of_grants_subset",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "leanName": "Chio.Proofs.scope_subset_of_grants_subset",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "mapsTo": ["P1"],
-      "notes": "Bridges grant-wise subset assumptions into ArcScope subset truth."
+      "notes": "Bridges grant-wise subset assumptions into ChioScope subset truth."
     },
     {
       "id": "proof.wildcard_subsumes",
-      "leanName": "Arc.Proofs.wildcard_subsumes",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "leanName": "Chio.Proofs.wildcard_subsumes",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -95,8 +95,8 @@
     },
     {
       "id": "proof.reduced_budget_is_subset",
-      "leanName": "Arc.Proofs.reduced_budget_is_subset",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "leanName": "Chio.Proofs.reduced_budget_is_subset",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -105,8 +105,8 @@
     },
     {
       "id": "proof.added_constraint_is_subset",
-      "leanName": "Arc.Proofs.added_constraint_is_subset",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "leanName": "Chio.Proofs.added_constraint_is_subset",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -115,8 +115,8 @@
     },
     {
       "id": "proof.delegation_chain_integrity",
-      "leanName": "Arc.Proofs.delegation_chain_integrity",
-      "file": "formal/lean4/Pact/Pact/Proofs/Monotonicity.lean",
+      "leanName": "Chio.Proofs.delegation_chain_integrity",
+      "file": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
@@ -125,8 +125,8 @@
     },
     {
       "id": "proof.applyProof_append",
-      "leanName": "Arc.Proofs.applyProof_append",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "leanName": "Chio.Proofs.applyProof_append",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -135,8 +135,8 @@
     },
     {
       "id": "proof.membership_proof_sound",
-      "leanName": "Arc.Proofs.membership_proof_sound",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "leanName": "Chio.Proofs.membership_proof_sound",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -145,8 +145,8 @@
     },
     {
       "id": "proof.membership_proof_verifies",
-      "leanName": "Arc.Proofs.membership_proof_verifies",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "leanName": "Chio.Proofs.membership_proof_verifies",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -155,8 +155,8 @@
     },
     {
       "id": "proof.checkpoint_consistency",
-      "leanName": "Arc.Proofs.checkpoint_consistency",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "leanName": "Chio.Proofs.checkpoint_consistency",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -165,8 +165,8 @@
     },
     {
       "id": "proof.receipt_sign_then_verify",
-      "leanName": "Arc.Proofs.receipt_sign_then_verify",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "leanName": "Chio.Proofs.receipt_sign_then_verify",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",
@@ -175,8 +175,8 @@
     },
     {
       "id": "proof.receipt_immutability",
-      "leanName": "Arc.Proofs.receipt_immutability",
-      "file": "formal/lean4/Pact/Pact/Proofs/Receipt.lean",
+      "leanName": "Chio.Proofs.receipt_immutability",
+      "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "symbolic_crypto",

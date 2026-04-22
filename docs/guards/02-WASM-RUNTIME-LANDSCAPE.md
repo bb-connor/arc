@@ -1,8 +1,8 @@
-# WASM Runtime Landscape for ARC Guard Execution
+# WASM Runtime Landscape for Chio Guard Execution
 
 Research document covering WASM runtime options, ABI patterns, the Component
 Model, guest SDK toolchains, and security considerations for running
-user-supplied guard/policy functions inside the ARC kernel.
+user-supplied guard/policy functions inside the Chio kernel.
 
 Date: 2026-04-14
 
@@ -15,7 +15,7 @@ Date: 2026-04-14
 3. [Component Model and WIT](#3-component-model-and-wit)
 4. [Guest SDK Patterns](#4-guest-sdk-patterns)
 5. [Security Considerations](#5-security-considerations)
-6. [Recommendations for ARC](#6-recommendations-for-arc)
+6. [Recommendations for Chio](#6-recommendations-for-chio)
 
 ---
 
@@ -25,7 +25,7 @@ Date: 2026-04-14
 
 **Maintainer:** Bytecode Alliance (Mozilla, Fastly, Intel, Microsoft)
 **License:** Apache-2.0 with LLVM-exception
-**Current version:** 29.x (as used in `arc-wasm-guards`)
+**Current version:** 29.x (as used in `chio-wasm-guards`)
 
 #### Sandboxing and Isolation
 
@@ -77,7 +77,7 @@ Wasmtime offers two complementary mechanisms for bounding CPU consumption:
   epoch advances, not at a precise instruction count.
 - Better suited to wall-clock timeouts than budgeting.
 
-**Recommendation for ARC:** Use fuel metering for guard evaluation. Guards are
+**Recommendation for Chio:** Use fuel metering for guard evaluation. Guards are
 short-lived policy checks, not long-running computations, so the overhead is
 acceptable and determinism is valuable for audit/debugging. Keep epoch
 interruption available as a hard wall-clock backstop (e.g., 100ms timeout)
@@ -126,7 +126,7 @@ Wasmtime has first-class async support:
 - `tokio::time::timeout` can be applied to the entire guest execution Future
   for wall-clock cancellation.
 
-This integrates cleanly with the ARC kernel, which is async Rust.
+This integrates cleanly with the Chio kernel, which is async Rust.
 
 #### WASI Support and Selective Capabilities
 
@@ -149,7 +149,7 @@ capability:
 | Network | `WasiCtxBuilder::socket_addr_check()` | Allowlist of addresses |
 | HTTP | `wasmtime_wasi_http` | Per-request policy |
 
-**For ARC guards:** Provide ZERO WASI capabilities by default. Guard functions
+**For Chio guards:** Provide ZERO WASI capabilities by default. Guard functions
 are pure computations: they receive a JSON request and return a verdict. They
 should not need filesystem, network, or even clock access. If a guard needs
 external data, the host should provide it through explicit ABI imports, not
@@ -163,7 +163,7 @@ extensive feature flags to reduce this:
 
 - `--no-default-features` strips out component-model, cache, profiling,
   parallel-compilation, and more.
-- Minimal features for ARC: `runtime`, `cranelift` (or `winch` for smaller
+- Minimal features for Chio: `runtime`, `cranelift` (or `winch` for smaller
   builds), `consume_fuel`.
 - Pre-compiling modules offline removes the need for Cranelift in production
   builds entirely (use only the `runtime` feature).
@@ -207,13 +207,13 @@ Wasmer supports instruction metering through a middleware system. The
 fuel checks at compilation time, similar to Wasmtime's fuel metering but
 implemented as a compiler transform.
 
-#### Concerns for ARC
+#### Concerns for Chio
 
 - **Standards lag:** Wasmer has historically prioritized usability over
   standards compliance. WASIX is a fork of WASI that may cause ecosystem
   fragmentation.
 - **Component Model:** Not yet at Wasmtime's level of support, which matters
-  if ARC adopts WIT-based guard interfaces.
+  if Chio adopts WIT-based guard interfaces.
 - **Governance:** Single-company project vs. Wasmtime's multi-stakeholder
   Bytecode Alliance.
 - **Async:** Wasmer has async support but it is less mature than Wasmtime's
@@ -240,9 +240,9 @@ implemented as a compiler transform.
 - No WASI Preview 2 support, no Component Model support.
 - No fuel metering built in (would need custom implementation).
 
-#### Assessment for ARC
+#### Assessment for Chio
 
-wasm3 is not recommended for ARC. While the fast cold start is attractive,
+wasm3 is not recommended for Chio. While the fast cold start is attractive,
 the lack of fuel metering, stalled maintenance, missing WASI P2/Component
 Model support, and the fact that guards need predictable execution budgets
 (not raw speed) make it unsuitable. The 10-100x execution overhead is also a
@@ -273,7 +273,7 @@ concern for latency-sensitive guard evaluation on the hot path.
 
 ## 2. proxy-wasm as Analogue
 
-Envoy's proxy-wasm ABI is the closest existing analogue to what ARC needs
+Envoy's proxy-wasm ABI is the closest existing analogue to what Chio needs
 for WASM guard execution. It defines how a host (proxy) exposes context to
 guest (WASM filter) modules.
 
@@ -305,8 +305,8 @@ proxy-wasm uses a two-tier context system:
 All callbacks include a context identifier as the first parameter to
 distinguish between contexts.
 
-**Lesson for ARC:** The root context / per-invocation context split maps
-cleanly to ARC's model. A guard module could have a root context for
+**Lesson for Chio:** The root context / per-invocation context split maps
+cleanly to Chio's model. A guard module could have a root context for
 initialization (loading config, compiling regexes, etc.) and a per-request
 context for each `evaluate()` call.
 
@@ -373,27 +373,27 @@ Configuration is passed through the `proxy_on_configure` callback:
    to read the configuration data into guest memory.
 3. Configuration is typically JSON or protobuf.
 
-### 2.6 Lessons for ARC Guard ABI
+### 2.6 Lessons for Chio Guard ABI
 
-The current `arc-wasm-guards` ABI is simpler than proxy-wasm but can learn
+The current `chio-wasm-guards` ABI is simpler than proxy-wasm but can learn
 from its design:
 
-| proxy-wasm Pattern | ARC Equivalent | Status |
+| proxy-wasm Pattern | Chio Equivalent | Status |
 |-------------------|----------------|--------|
 | Root context for config | Guard init with config JSON | Not yet implemented |
 | Per-stream context | Per-request evaluate | Implemented |
 | Host property access | Guard context fields | Partially (JSON blob) |
 | Copy-based memory | Copy-based (JSON at offset 0) | Implemented |
 | Return action enum | Return verdict i32 | Implemented |
-| Structured logging | Host `arc.log` import | Not yet implemented |
+| Structured logging | Host `chio.log` import | Not yet implemented |
 
 **Key improvements planned for v1** (see `05-V1-DECISION.md`):
 
 1. **Configuration via manifest:** Guards receive static configuration
-   at load time from `guard-manifest.yaml`, accessed via `arc.get_config`.
-2. **Host function imports:** `arc.log`, `arc.get_config`,
-   `arc.get_time_unix_secs` registered on the linker.
-3. **Structured deny reasons:** `arc_deny_reason` guest export as an
+   at load time from `guard-manifest.yaml`, accessed via `chio.get_config`.
+2. **Host function imports:** `chio.log`, `chio.get_config`,
+   `chio.get_time_unix_secs` registered on the linker.
+3. **Structured deny reasons:** `chio_deny_reason` guest export as an
    alternative to the NUL-terminated string at offset 64 KiB.
 
 ---
@@ -422,9 +422,9 @@ WIT is an Interface Description Language (IDL) for defining contracts between
 WASM components:
 
 ```wit
-// guard.wit -- hypothetical ARC guard interface
+// guard.wit -- hypothetical Chio guard interface
 
-package arc:guard@0.1.0;
+package chio:guard@0.1.0;
 
 /// The verdict a guard returns.
 enum verdict {
@@ -469,7 +469,7 @@ world guard {
     export evaluator;
 
     /// Optional: host-provided logging.
-    import arc:guard/logging@0.1.0;
+    import chio:guard/logging@0.1.0;
 }
 ```
 
@@ -519,13 +519,13 @@ pointer/length passing.
 
 **Rationale for raw ABI first:**
 
-1. The code (`arc-wasm-guards/src/abi.rs`, `runtime.rs`) already implements a
+1. The code (`chio-wasm-guards/src/abi.rs`, `runtime.rs`) already implements a
    working raw ABI with `evaluate(ptr, len) -> i32`.
 2. Adopting WIT now would require rewriting the host backend, the ABI types,
    and introducing new compilation toolchains (`cargo-component`,
    `componentize-py`, `jco`) before the basic contract is validated.
 3. The v1 goal is to validate the execution envelope (latency, fuel, memory)
-   on real ARC workloads -- the serialization format is not the bottleneck.
+   on real Chio workloads -- the serialization format is not the bottleneck.
 4. WIT migration can be done non-destructively later: support both raw modules
    (legacy) and components (new) during transition.
 
@@ -673,7 +673,7 @@ to matter for guard functions that primarily do JSON parsing and field checks.
 >
 > **v2 (deferred):** Once the raw ABI is validated on real workloads:
 > 1. Define and publish a WIT interface as the canonical guard contract.
-> 2. Provide a Rust SDK crate (`arc-guard-sdk`) with helpers.
+> 2. Provide a Rust SDK crate (`chio-guard-sdk`) with helpers.
 > 3. Document componentize-py and jco workflows for Python/TS authors.
 > 4. Accept both raw core modules (legacy) and components (new).
 
@@ -737,7 +737,7 @@ operating on provided context only.
 Users uploading `.wasm` files is analogous to uploading executable code:
 
 - **Module signing:** Require guards to be signed by an authorized key.
-  The ARC manifest system already has a signing infrastructure that can
+  The Chio manifest system already has a signing infrastructure that can
   be extended to guard modules.
 - **Content hashing:** Store and verify SHA-256 hashes of loaded modules
   in the receipt log.
@@ -777,7 +777,7 @@ has any I/O capability.
 
 ---
 
-## 6. Recommendations for ARC
+## 6. Recommendations for Chio
 
 ### 6.1 Runtime Choice: Wasmtime
 
@@ -789,15 +789,15 @@ has any I/O capability.
 - WASI capability control (fine-grained)
 - Ecosystem momentum (Fermyon Spin, Fastly, wasmCloud all use it)
 
-The existing `arc-wasm-guards` crate already uses Wasmtime v29, which is
+The existing `chio-wasm-guards` crate already uses Wasmtime v29, which is
 the right foundation.
 
 ### 6.2 v1 (see `05-V1-DECISION.md` for authoritative scope)
 
 1. **Add `ResourceLimiter`** to cap memory per guard invocation.
-2. **Add host function imports** for structured logging (`arc.log`), config
-   access (`arc.get_config`), and wall-clock time (`arc.get_time_unix_secs`).
-3. **Add `arc_alloc` / `arc_deny_reason`** export support.
+2. **Add host function imports** for structured logging (`chio.log`), config
+   access (`chio.get_config`), and wall-clock time (`chio.get_time_unix_secs`).
+3. **Add `chio_alloc` / `chio_deny_reason`** export support.
 4. **Add module size and import validation** at load time.
 5. **Benchmark spike** -- module load, instantiation, p50/p99 evaluate
    latency, fuel overhead.
@@ -808,25 +808,25 @@ the right foundation.
 
 ### 6.3 v2 (Component Model Migration)
 
-1. **Define the guard WIT interface** (`arc:guard@0.1.0`).
+1. **Define the guard WIT interface** (`chio:guard@0.1.0`).
 2. **Implement Component Model host** using `wasmtime::component::bindgen!`.
 3. **Support dual mode:** Accept both core WASM modules (raw ABI) and
    Component Model components.
-4. **Publish `arc-guard-sdk`** Rust crate for guard authors.
+4. **Publish `chio-guard-sdk`** Rust crate for guard authors.
 5. **Document guest SDK workflows** for Python (componentize-py), TypeScript
    (jco), and Go (TinyGo).
 6. **Provide example guards** in each supported language.
 
 ### 6.4 Long-Term
 
-1. **Module signing and verification** integrated with ARC manifest system.
+1. **Module signing and verification** integrated with Chio manifest system.
 2. **Guard marketplace:** Curated, signed guards for common policy patterns
    (PII detection, rate limiting, scope enforcement).
 3. **Preview 3 async adoption** when Component Model async stabilizes
    (expected 2026-2027) -- enables guards to make async host calls for
    external policy lookups.
 4. **Guard testing framework:** A `cargo-component`-based test harness that
-   lets guard authors test their modules locally against mock ARC contexts.
+   lets guard authors test their modules locally against mock Chio contexts.
 
 ---
 

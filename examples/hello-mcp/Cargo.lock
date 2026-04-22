@@ -39,238 +39,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
-name = "arc-appraisal"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-autonomy"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-market",
- "arc-web3",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-core"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-autonomy",
- "arc-core-types",
- "arc-credit",
- "arc-federation",
- "arc-governance",
- "arc-listing",
- "arc-market",
- "arc-open-market",
- "arc-underwriting",
- "arc-web3",
- "ed25519-dalek",
- "hex",
- "percent-encoding",
- "rand_core 0.6.4",
- "ryu",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "arc-core-types"
-version = "0.1.0"
-dependencies = [
- "ed25519-dalek",
- "hex",
- "percent-encoding",
- "rand_core 0.6.4",
- "ryu",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "arc-credit"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core-types",
- "arc-underwriting",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-cross-protocol"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-kernel",
- "arc-manifest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-federation"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-listing",
- "arc-open-market",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-governance"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-listing",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-kernel"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core",
- "arc-credit",
- "arc-governance",
- "arc-link",
- "arc-listing",
- "arc-market",
- "arc-open-market",
- "arc-underwriting",
- "lru",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "ureq",
- "uuid",
-]
-
-[[package]]
-name = "arc-link"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "arc-listing"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-manifest"
-version = "0.1.0"
-dependencies = [
- "arc-core",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-market"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core-types",
- "arc-credit",
- "arc-underwriting",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-mcp-edge"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-cross-protocol",
- "arc-kernel",
- "arc-manifest",
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "arc-open-market"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-governance",
- "arc-listing",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-underwriting"
-version = "0.1.0"
-dependencies = [
- "arc-appraisal",
- "arc-core-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "arc-web3"
-version = "0.1.0"
-dependencies = [
- "arc-core-types",
- "arc-credit",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -372,6 +140,251 @@ name = "cfg_aliases"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
+name = "chio-appraisal"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-autonomy"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-market",
+ "chio-web3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-core"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-autonomy",
+ "chio-core-types",
+ "chio-credit",
+ "chio-federation",
+ "chio-governance",
+ "chio-listing",
+ "chio-market",
+ "chio-open-market",
+ "chio-underwriting",
+ "chio-web3",
+ "ed25519-dalek",
+ "hex",
+ "percent-encoding",
+ "rand_core 0.6.4",
+ "ryu",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "chio-core-types"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "getrandom 0.2.17",
+ "hex",
+ "percent-encoding",
+ "rand_core 0.6.4",
+ "ryu",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "chio-credit"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core-types",
+ "chio-underwriting",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-cross-protocol"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "chio-manifest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-federation"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-listing",
+ "chio-open-market",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-governance"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-listing",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-kernel"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core",
+ "chio-core-types",
+ "chio-credit",
+ "chio-federation",
+ "chio-governance",
+ "chio-kernel-core",
+ "chio-link",
+ "chio-listing",
+ "chio-market",
+ "chio-open-market",
+ "chio-underwriting",
+ "lru",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "ureq",
+ "uuid",
+]
+
+[[package]]
+name = "chio-kernel-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-link"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "chio-listing"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-manifest"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-market"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core-types",
+ "chio-credit",
+ "chio-underwriting",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-mcp-edge"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-cross-protocol",
+ "chio-kernel",
+ "chio-manifest",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "chio-open-market"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-governance",
+ "chio-listing",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-underwriting"
+version = "0.1.0"
+dependencies = [
+ "chio-appraisal",
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-web3"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-credit",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "chrono"
@@ -749,10 +762,10 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-mcp"
 version = "0.1.0"
 dependencies = [
- "arc-core",
- "arc-kernel",
- "arc-manifest",
- "arc-mcp-edge",
+ "chio-core",
+ "chio-kernel",
+ "chio-manifest",
+ "chio-mcp-edge",
  "serde_json",
 ]
 

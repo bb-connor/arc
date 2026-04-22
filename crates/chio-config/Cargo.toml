@@ -1,0 +1,22 @@
+[package]
+name = "chio-config"
+description = "Unified chio.yaml configuration loader for the Chio runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_config"
+
+[dependencies]
+serde = { workspace = true }
+serde_yml = { workspace = true }
+thiserror = { workspace = true }
+regex = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

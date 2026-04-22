@@ -77,8 +77,8 @@ Recovery posture:
 This runbook does not authorize:
 
 - multiple renewal cohorts
-- a generic ARC renewal console
-- a merged Mercury and ARC-Wall shell
+- a generic Chio renewal console
+- a merged Mercury and Chio-Wall shell
 - broad marketing or reference claims beyond the approved sentence
 - new Mercury product-line scope
 

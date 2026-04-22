@@ -1,4 +1,4 @@
-# ARC Compliance Certificate
+# Chio Compliance Certificate
 
 **Version:** 1.0
 **Date:** 2026-04-14
@@ -16,7 +16,7 @@ The design rationale, regulatory mapping, and integration details are in
 
 ## 1. Purpose
 
-ARC runtimes produce Ed25519-signed receipts for every tool invocation and
+Chio runtimes produce Ed25519-signed receipts for every tool invocation and
 commit them to Merkle-rooted checkpoint batches. A compliance certificate
 composes receipt-level evidence into a single auditor-ready document. A
 third party can verify the certificate without replaying every guard
@@ -42,7 +42,7 @@ The unsigned body of a compliance certificate.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema` | string | Schema identifier. MUST be `"arc.compliance.certificate.v1"`. |
+| `schema` | string | Schema identifier. MUST be `"chio.compliance.certificate.v1"`. |
 | `session_id` | string | Session ID the certificate covers. |
 | `issued_at` | u64 | Unix timestamp (seconds) when the certificate was generated. |
 | `receipt_count` | u64 | Number of receipts examined. |
@@ -223,7 +223,7 @@ Implementations SHOULD provide the following CLI commands:
 ### 6.1 Generate
 
 ```
-arc cert generate --session <session-id> [--output <path>]
+chio cert generate --session <session-id> [--output <path>]
 ```
 
 Walks the receipt log for the given session, runs the generation algorithm
@@ -233,7 +233,7 @@ stdout if omitted).
 ### 6.2 Verify
 
 ```
-arc cert verify --cert <path> [--receipts <path>] [--trusted-keys <path>]
+chio cert verify --cert <path> [--receipts <path>] [--trusted-keys <path>]
 ```
 
 Performs lightweight verification by default. When `--receipts` is provided,
@@ -251,7 +251,7 @@ Exit codes:
 ### 6.3 Inspect
 
 ```
-arc cert inspect --cert <path>
+chio cert inspect --cert <path>
 ```
 
 Prints the certificate body fields in human-readable format without
@@ -266,7 +266,7 @@ summary, anomaly list, and signer key fingerprint.
 ## 7. Serialization
 
 All certificate fields use canonical JSON (RFC 8785 / JCS) for deterministic
-hashing and signature verification. This is consistent with all other ARC
+hashing and signature verification. This is consistent with all other Chio
 signed artifacts.
 
 The signature covers `canonical_json_bytes(&body)`. Verifiers MUST

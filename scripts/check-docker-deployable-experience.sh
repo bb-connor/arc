@@ -47,13 +47,13 @@ if [[ "${status}" != "401" ]]; then
   exit 1
 fi
 
-python3 "${example_dir}/smoke_client.py" > /tmp/arc-docker-smoke.json
+python3 "${example_dir}/smoke_client.py" > /tmp/chio-docker-smoke.json
 
 python3 - <<'PY'
 from pathlib import Path
 import json
 
-payload = json.loads(Path("/tmp/arc-docker-smoke.json").read_text())
+payload = json.loads(Path("/tmp/chio-docker-smoke.json").read_text())
 if not payload.get("receiptId"):
     raise SystemExit("smoke flow did not produce a receipt id")
 if not payload.get("capabilityId"):
@@ -63,4 +63,4 @@ if not payload.get("viewerUrl"):
 print("docker deployable experience smoke verified")
 PY
 
-curl --silent "http://127.0.0.1:8940/?token=demo-token" | grep -qi "ARC Receipt Dashboard"
+curl --silent "http://127.0.0.1:8940/?token=demo-token" | grep -qi "Chio Receipt Dashboard"

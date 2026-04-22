@@ -1,3 +1,3 @@
-from commerce_network.arc import ArcMcpClient, TrustControl
+from commerce_network.chio import ChioMcpClient, TrustControl
 
-__all__ = ["ArcMcpClient", "TrustControl"]
+__all__ = ["ChioMcpClient", "TrustControl"]

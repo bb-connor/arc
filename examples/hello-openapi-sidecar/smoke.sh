@@ -10,8 +10,8 @@ LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
-ARC_BIN="$(ensure_arc_bin)"
-SERVICE_TOKEN="${ARC_SERVICE_TOKEN:-demo-token}"
+CHIO_BIN="$(ensure_chio_bin)"
+SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
 TRUST_PORT="$(pick_free_port)"
 APP_PORT="$(pick_free_port)"
 SIDECAR_PORT="$(pick_free_port)"
@@ -32,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${ARC_BIN}" trust serve \
+"${CHIO_BIN}" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" \
   --service-token "${SERVICE_TOKEN}" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
@@ -53,7 +53,7 @@ APP_PID=$!
 wait_for_http "${APP_URL}/healthz"
 
 (
-  exec "${ARC_BIN}" \
+  exec "${CHIO_BIN}" \
     --control-url "${CONTROL_URL}" \
     --control-token "${SERVICE_TOKEN}" \
     api protect \
@@ -64,7 +64,7 @@ wait_for_http "${APP_URL}/healthz"
 ) >"${LOG_DIR}/sidecar.log" 2>&1 &
 SIDECAR_PID=$!
 
-wait_for_http "${SIDECAR_URL}/arc/health"
+wait_for_http "${SIDECAR_URL}/chio/health"
 
 curl -sS -D "${ARTIFACT_ROOT}/hello.headers" "${SIDECAR_URL}/hello" > "${ARTIFACT_ROOT}/hello.json"
 
@@ -75,7 +75,7 @@ from pathlib import Path
 
 body = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 assert body["message"] == "hello from openapi-sidecar upstream", body
-assert body["arc_sdk"] is False, body
+assert body["chio_sdk"] is False, body
 PY
 
 curl -sS -D "${ARTIFACT_ROOT}/deny.headers" \
@@ -90,7 +90,7 @@ import sys
 from pathlib import Path
 
 body = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-assert body["error"] == "arc_access_denied", body
+assert body["error"] == "chio_access_denied", body
 assert body["receipt_id"], body
 assert body["suggestion"], body
 PY
@@ -100,7 +100,7 @@ materialize_capability_token "${ARTIFACT_ROOT}/capability.json" "${ARTIFACT_ROOT
 
 curl -sS -D "${ARTIFACT_ROOT}/allow.headers" \
   -H "content-type: application/json" \
-  -H "X-Arc-Capability: $(tr -d '\n' < "${ARTIFACT_ROOT}/capability.token")" \
+  -H "X-Chio-Capability: $(tr -d '\n' < "${ARTIFACT_ROOT}/capability.token")" \
   --data '{"message":"hello","count":2}' \
   "${SIDECAR_URL}/echo" \
   > "${ARTIFACT_ROOT}/allow.json"
@@ -114,14 +114,14 @@ body = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 assert body["message"] == "hello", body
 assert body["count"] == 2, body
 assert body["handled_by"] == "plain-upstream-app", body
-assert body["arc_sdk"] is False, body
+assert body["chio_sdk"] is False, body
 PY
 
-"${ARC_BIN}" receipt list --receipt-db "${RECEIPT_STORE}" --limit 20 > "${ARTIFACT_ROOT}/receipts.ndjson"
+"${CHIO_BIN}" receipt list --receipt-db "${RECEIPT_STORE}" --limit 20 > "${ARTIFACT_ROOT}/receipts.ndjson"
 
-HELLO_RECEIPT_ID="$(header_value "${ARTIFACT_ROOT}/hello.headers" "x-arc-receipt-id")"
-DENY_RECEIPT_ID="$(header_value "${ARTIFACT_ROOT}/deny.headers" "x-arc-receipt-id")"
-ALLOW_RECEIPT_ID="$(header_value "${ARTIFACT_ROOT}/allow.headers" "x-arc-receipt-id")"
+HELLO_RECEIPT_ID="$(header_value "${ARTIFACT_ROOT}/hello.headers" "x-chio-receipt-id")"
+DENY_RECEIPT_ID="$(header_value "${ARTIFACT_ROOT}/deny.headers" "x-chio-receipt-id")"
+ALLOW_RECEIPT_ID="$(header_value "${ARTIFACT_ROOT}/allow.headers" "x-chio-receipt-id")"
 
 python3 - "${ARTIFACT_ROOT}" "${HELLO_RECEIPT_ID}" "${DENY_RECEIPT_ID}" "${ALLOW_RECEIPT_ID}" <<'PY'
 import json

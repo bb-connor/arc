@@ -10,14 +10,14 @@
 `trust-network validate` is the canonical close-out command for the bounded
 trust-network lane. It generates the trust-network bundle, writes the
 validation report, and emits one explicit expansion decision instead of
-implying a generic trust broker, multi-network service, or ARC-Wall program.
+implying a generic trust broker, multi-network service, or Chio-Wall program.
 
 ---
 
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- trust-network validate --output target/mercury-trust-network-validation
+cargo run -p chio-mercury -- trust-network validate --output target/mercury-trust-network-validation
 ```
 
 ---
@@ -53,7 +53,7 @@ This package supports one bounded claim only:
 
 > Mercury can share one counterparty-review proof and inquiry bundle through
 > one `counterparty_review_exchange` sponsor boundary using one
-> `arc_checkpoint_witness_chain` trust anchor and one
+> `chio_checkpoint_witness_chain` trust anchor and one
 > `proof_inquiry_bundle_exchange` interoperability manifest without widening
 > into a generic trust broker.
 
@@ -66,5 +66,5 @@ This package does not claim:
 - multiple sponsor boundaries
 - multi-network witness or trust-broker services
 - generic ecosystem interoperability infrastructure
-- ARC-Wall readiness
+- Chio-Wall readiness
 - multi-product platform hardening

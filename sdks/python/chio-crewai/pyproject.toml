@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chio-crewai"
+version = "0.1.0"
+description = "CrewAI integration for the Chio protocol -- capability-scoped tools, per-role scoping, delegation attenuation"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Backbay Industries" },
+]
+keywords = ["chio", "crewai", "agent", "tool", "security", "capability"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "chio-sdk-python>=0.1.0",
+    "crewai>=0.80,<1",
+    "pydantic>=2.5,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.23,<1",
+    "httpx>=0.27,<1",
+    "respx>=0.21,<1",
+    "mypy>=1.10",
+    "ruff>=0.5",
+]
+
+[tool.uv.sources]
+chio-sdk-python = { path = "../chio-sdk-python" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chio_crewai"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_unused_ignores = true
+warn_return_any = false
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]

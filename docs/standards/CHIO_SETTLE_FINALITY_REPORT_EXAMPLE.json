@@ -1,0 +1,15 @@
+{
+  "schema": "chio.settle.finality-report.v1",
+  "profileId": "chio.settle.profile",
+  "chainId": "eip155:31337",
+  "networkName": "Ganache Runtime Devnet",
+  "settlementReference": "settlement-runtime-1",
+  "txHash": "0x6fd3c24695d2f91f1b66358f2b6f4b93f48d4f45ebae5b6cbd322dc9c3d52d31",
+  "requiredConfirmations": 1,
+  "currentConfirmations": 3,
+  "disputeWindowSecs": 3600,
+  "disputeWindowClosesAt": 1743296400,
+  "status": "awaiting_dispute_window",
+  "recoveryAction": "wait_for_dispute_window",
+  "notes": "Representative mid-value EVM settlement after the release transaction is confirmed but before the dispute window closes."
+}

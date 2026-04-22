@@ -1,16 +1,16 @@
 # Agent Reputation System
 
-**Status:** Design proposal with Phase 1 local scoring, issuance gating, `did:arc`, and Agent Passport alpha shipped
+**Status:** Design proposal with Phase 1 local scoring, issuance gating, `did:chio`, and Agent Passport alpha shipped
 **Date:** 2026-03-23
-**Authors:** ARC Protocol Team
+**Authors:** Chio Protocol Team
 
 ---
 
 ## 1. Overview
 
-ARC already emits most of the raw events needed to build a comprehensive local
+Chio already emits most of the raw events needed to build a comprehensive local
 agent reputation system. Every tool invocation -- whether allowed, denied,
-cancelled, or incomplete -- produces a signed `ArcReceipt` appended to an
+cancelled, or incomplete -- produces a signed `ChioReceipt` appended to an
 append-only log with signed Merkle checkpoints and inclusion proofs.
 Every capability token records its scope, delegation chain, time bounds, and
 invocation budget.
@@ -47,7 +47,7 @@ Three properties make this uniquely valuable:
 ## 2. Metrics Derivable from Receipts and Local Lineage Data
 
 Every metric below is computable from fields that already exist on
-`ArcReceipt`, `CapabilityToken`, `DelegationLink`, and the existing budget
+`ChioReceipt`, `CapabilityToken`, `DelegationLink`, and the existing budget
 usage records, provided the runtime persists the local join paths described in
 Section 1.
 
@@ -147,8 +147,8 @@ least_privilege_score(agent, capability_id) =
 
 Where:
 - `tools_actually_used` = distinct `tool_name` values in receipts for this capability
-- `tools_in_scope` = count of `ToolGrant` entries in the capability's `ArcScope`
-  (note: `ArcScope` also contains `resource_grants` and `prompt_grants`;
+- `tools_in_scope` = count of `ToolGrant` entries in the capability's `ChioScope`
+  (note: `ChioScope` also contains `resource_grants` and `prompt_grants`;
   these are excluded from tool-focused metrics but may inform future
   resource-usage scoring)
 - `constraint_density_factor` = bonus for having non-empty `constraints` on grants
@@ -469,13 +469,13 @@ After probation:
 ## 5. Portable Trust Credentials
 
 Agent reputation must be portable across organizations and Kernel operators.
-ARC receipts are already signed and timestamped (Merkle commitment is now shipped in v2) --
+Chio receipts are already signed and timestamped (Merkle commitment is now shipped in v2) --
 they are natural candidates for standardized verifiable credentials.
 
 ### 5.1 Receipt-Derived Reputation Attestations as W3C Verifiable Credentials
 
 The portable credential unit is not a literal 1:1 wrapper around a single
-`ArcReceipt`. It is an attestation computed over a bounded receipt set
+`ChioReceipt`. It is an attestation computed over a bounded receipt set
 (for example, "this agent's behavior during the last 30 days under this
 Kernel"), signed by the issuing authority and linked back to the underlying
 receipt log via receipt IDs, Merkle roots, or inclusion proofs.
@@ -483,16 +483,16 @@ receipt log via receipt IDs, Merkle roots, or inclusion proofs.
 A receipt-derived reputation attestation maps to a W3C Verifiable Credential
 (VC) like this:
 
-| VC Field | ARC Source |
+| VC Field | Chio Source |
 |----------|-----------------|
-| `@context` | `["https://www.w3.org/2018/credentials/v1", "https://arc.dev/credentials/v1"]` |
-| `type` | `["VerifiableCredential", "ArcReputationAttestation"]` |
+| `@context` | `["https://www.w3.org/2018/credentials/v1", "https://chio.dev/credentials/v1"]` |
+| `type` | `["VerifiableCredential", "ChioReputationAttestation"]` |
 | `issuer` | Kernel or authority key that computed the attestation |
 | `issuanceDate` | Attestation issuance time |
 | `credentialSubject.id` | Agent's Ed25519 public key from the capability lineage index |
 | `credentialSubject.metrics` | Aggregated reputation vector for the attested interval |
 | `proof.type` | `Ed25519Signature2020` |
-| `proof.verificationMethod` | `did:arc:{kernel_key_hex}#key-1` |
+| `proof.verificationMethod` | `did:chio:{kernel_key_hex}#key-1` |
 | `proof.proofValue` | Attestation signature |
 
 ### 5.2 Agent Passport
@@ -503,7 +503,7 @@ them into richer cross-organizational bundles and composite attestations.
 
 ```
 AgentPassport {
-    subject:      did:arc:{agent_public_key_hex}
+    subject:      did:chio:{agent_public_key_hex}
     credentials:  Vec<VerifiableCredential>
     merkle_roots: Vec<Hash>  // one per issuing Kernel (MerkleTree::root() returns Hash)
     issued_at:    DateTime
@@ -519,9 +519,9 @@ party can:
 3. Compute a cross-organizational composite score by aggregating metrics
 4. Weight credentials by the trust it places in each issuing Kernel
 
-This alpha now ships in `crates/arc-credentials` and via the CLI commands
-`arc passport create`, `arc passport evaluate`, `arc passport verify`, and
-`arc passport present`. The current implementation is intentionally
+This alpha now ships in `crates/chio-credentials` and via the CLI commands
+`chio passport create`, `chio passport evaluate`, `chio passport verify`, and
+`chio passport present`. The current implementation is intentionally
 single-issuer: each passport is a bundle of one or more independently
 verifiable reputation credentials from the same issuing operator.
 
@@ -533,16 +533,16 @@ applied per embedded credential, and the passport is accepted if at least one
 credential satisfies the policy. Cross-credential aggregation semantics remain
 explicitly out of scope until the multi-issuer model is specified.
 
-### 5.3 did:arc DID Method
+### 5.3 did:chio DID Method
 
-ARC agents already have Ed25519 keypairs. The `did:arc` method provides
+Chio agents already have Ed25519 keypairs. The `did:chio` method provides
 a decentralized identifier scheme:
 
 ```
-did:arc:{hex-encoded-ed25519-public-key}
+did:chio:{hex-encoded-ed25519-public-key}
 
 Example:
-did:arc:a1b2c3d4e5f6...  (64 hex characters)
+did:chio:a1b2c3d4e5f6...  (64 hex characters)
 ```
 
 **DID Document:**
@@ -550,26 +550,26 @@ did:arc:a1b2c3d4e5f6...  (64 hex characters)
 ```json
 {
   "@context": "https://www.w3.org/ns/did/v1",
-  "id": "did:arc:a1b2c3d4e5f6...",
+  "id": "did:chio:a1b2c3d4e5f6...",
   "verificationMethod": [{
-    "id": "did:arc:a1b2c3d4e5f6...#key-1",
+    "id": "did:chio:a1b2c3d4e5f6...#key-1",
     "type": "Ed25519VerificationKey2020",
-    "controller": "did:arc:a1b2c3d4e5f6...",
+    "controller": "did:chio:a1b2c3d4e5f6...",
     "publicKeyMultibase": "z6Mk..."
   }],
-  "authentication": ["did:arc:a1b2c3d4e5f6...#key-1"],
-  "assertionMethod": ["did:arc:a1b2c3d4e5f6...#key-1"]
+  "authentication": ["did:chio:a1b2c3d4e5f6...#key-1"],
+  "assertionMethod": ["did:chio:a1b2c3d4e5f6...#key-1"]
 }
 ```
 
 Resolution: the DID document is self-certifying. The public key is the
 identifier. No registry lookup is needed for basic resolution. Extended
 resolution (service endpoints, delegation metadata) can be published to
-a ARC receipt log as a special `did:arc:update` receipt type.
+a Chio receipt log as a special `did:chio:update` receipt type.
 
-This basic resolver now ships in `crates/arc-did` and is exposed via
-`arc did resolve`. The current shipped service type is
-`ArcReceiptLogService`, which allows an operator-local resolver to attach one
+This basic resolver now ships in `crates/chio-did` and is exposed via
+`chio did resolve`. The current shipped service type is
+`ChioReceiptLogService`, which allows an operator-local resolver to attach one
 or more receipt-log URLs without changing the self-certifying base identity.
 
 ### 5.4 Selective Disclosure
@@ -590,7 +590,7 @@ See Section 8.2.
 
 ## 6. Gaming Resistance
 
-A reputation system is only useful if it resists manipulation. ARC's
+A reputation system is only useful if it resists manipulation. Chio's
 architecture provides several structural advantages, supplemented by
 explicit countermeasures.
 
@@ -667,7 +667,7 @@ using the `delegator` and `delegatee` fields in `DelegationLink`.
 
 Reputation is bound to the agent's Ed25519 key. There is no mechanism to
 transfer reputation to a new key without re-earning it. Key rotation is
-supported via a `did:arc:update` receipt signed by both the old and new
+supported via a `did:chio:update` receipt signed by both the old and new
 keys, which transfers history but requires proof of control over both keys.
 
 This prevents reputation markets (buying/selling established identities)
@@ -843,7 +843,7 @@ and denies issuance when the requested TTL or grant scope exceeds the current
 tier ceiling.
 
 Operators can now inspect the exact same local evaluation path without bespoke
-SQLite queries or Rust glue. `arc reputation local --subject-public-key ...`
+SQLite queries or Rust glue. `chio reputation local --subject-public-key ...`
 computes the scorecard directly from persisted state, and trust-control exposes
 the same report over `GET /v1/reputation/local/:subject_key` when running with
 service auth. Those operator surfaces reuse the issuance-time corpus assembly,
@@ -908,7 +908,7 @@ The agent constructs a ZK-SNARK or Bulletproof over:
 
 The verifier checks the proof against the known Merkle root without learning
 the receipts. This requires the receipt log to publish periodic signed roots.
-ARC does not already have this via Spine; the roadmap requires adding
+Chio does not already have this via Spine; the roadmap requires adding
 kernel-signed checkpoints over the Merkle-committed receipt log first, with
 any witness layer remaining optional follow-on work.
 
@@ -968,7 +968,7 @@ disclosure in the VC layer).
 |  - Embeds Merkle  |  |    bundles         |  |    before issuing   |
 |    proofs          |  |  - Selective       |  |    capabilities     |
 |  - Publishes to   |  |    disclosure      |  |  - Enforce tier     |
-|    VC registry    |  |  - did:arc DIDs   |  |    ceilings         |
+|    VC registry    |  |  - did:chio DIDs   |  |    ceilings         |
 |                   |  |                    |  |                     |
 +-------------------+  +--------------------+  +---------------------+
 ```
@@ -1027,7 +1027,7 @@ behavior data could make the aggregate scores more accurate for all
 participants. An agent's score from a single operator is useful; a score from
 many operators could become materially more trustworthy.
 
-**Standards leverage:** The `did:arc` DID method, the VC schema, and the
+**Standards leverage:** The `did:chio` DID method, the VC schema, and the
 reputation scoring algorithm could become de facto standards if adoption
 grows. Competing systems would then face pressure either to interoperate or to
 build lower-value incompatible alternatives.
@@ -1057,18 +1057,18 @@ capability lineage index and receipt attribution path described in Section 1.
 - Local to each Kernel operator (no cross-org communication)
 - Composite score computation with configurable weights
 - HushSpec policy extension for tier definitions. **Note:** The `Extensions`
-  struct in `arc-policy/src/models.rs` uses `#[serde(deny_unknown_fields)]`,
+  struct in `chio-policy/src/models.rs` uses `#[serde(deny_unknown_fields)]`,
   so adding an `extensions.reputation` field requires modifying that struct
   to include a `reputation: Option<ReputationExtension>` variant.
 - Tier-gated capability issuance in the Capability Authority
 
 **Deliverables:**
-- `arc-reputation` crate with metric computation functions
-- HushSpec `extensions.reputation` schema in `arc-policy`
-- Integration with `arc-kernel` for reputation-gated capability issuance
+- `chio-reputation` crate with metric computation functions
+- HushSpec `extensions.reputation` schema in `chio-policy`
+- Integration with `chio-kernel` for reputation-gated capability issuance
 - Verification checklist showing the required local joins exist
-- CLI commands: `arc reputation score <agent-id>`,
-  `arc reputation history <agent-id>`
+- CLI commands: `chio reputation score <agent-id>`,
+  `chio reputation history <agent-id>`
 - Unit tests for all metric computations and tier transitions
 
 **Non-goals for Phase 1:**
@@ -1079,13 +1079,13 @@ capability lineage index and receipt attribution path described in Section 1.
 
 ### Phase 2: Portable Credentials
 
-**Timeline:** Active. `did:arc`, single-issuer passport creation, verification,
+**Timeline:** Active. `did:chio`, single-issuer passport creation, verification,
 filtered presentation, challenge-bound presentation, and local-versus-portable
 comparison are now shipped. Multi-issuer aggregation and richer VC
 distribution flows remain open.
 
 **Scope:**
-- `did:arc` DID method specification and resolver
+- `did:chio` DID method specification and resolver
 - W3C Verifiable Credential schema for reputation attestations
 - Agent Passport data structure and serialization
 - VC issuance endpoint on the Kernel
@@ -1093,12 +1093,12 @@ distribution flows remain open.
 - Single-issuer passports first; multi-issuer aggregation can remain a Phase 3 concern
 
 **Deliverables:**
-- `did:arc` method specification document
-- `arc-did` crate with self-certifying DID parsing and DID Document resolution
-- `arc-credentials` crate with VC creation, serialization, verification, and single-issuer passport bundling
-- CLI command: `arc did resolve`
-- Agent Passport CLI: `arc passport create`, `arc passport evaluate`, `arc passport verify`, `arc passport present`, `arc passport challenge ...`
-- Operator comparison surfaces: `arc reputation compare`, `POST /v1/reputation/compare/:subject_key`, and dashboard portable-comparison panel
+- `did:chio` method specification document
+- `chio-did` crate with self-certifying DID parsing and DID Document resolution
+- `chio-credentials` crate with VC creation, serialization, verification, and single-issuer passport bundling
+- CLI command: `chio did resolve`
+- Agent Passport CLI: `chio passport create`, `chio passport evaluate`, `chio passport verify`, `chio passport present`, `chio passport challenge ...`
+- Operator comparison surfaces: `chio reputation compare`, `POST /v1/reputation/compare/:subject_key`, and dashboard portable-comparison panel
 - VC verification library for relying parties
 
 **Dependencies:**
@@ -1117,7 +1117,7 @@ distribution flows remain open.
 - Reputation query API for Capability Authorities
 
 **Deliverables:**
-- `arc-aggregator` service with API
+- `chio-aggregator` service with API
 - ZK proof circuit for Merkle tree membership and predicate verification
 - Sybil detection module (delegation graph analysis)
 - Cross-org reputation query protocol specification

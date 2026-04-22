@@ -12,7 +12,7 @@ paths:
   /execute:
     post:
       operationId: execute
-      x-arc-tool-name: execute
+      x-chio-tool-name: execute
       requestBody:
         required: true
         content:

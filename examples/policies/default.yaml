@@ -1,4 +1,4 @@
-# ARC default policy
+# Chio default policy
 #
 # Enables core guards and issues a wildcard capability with a 5-minute TTL.
 # Intended for development and testing.

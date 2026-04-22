@@ -10,7 +10,7 @@ Proposed.
 
 ## Problem
 
-ARC now negotiates and tracks client roots.
+Chio now negotiates and tracks client roots.
 
 That is useful, but it is not yet the same thing as enforcing a boundary.
 
@@ -52,16 +52,16 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-core/src/capability.rs`
-- `crates/arc-core/src/session.rs`
-- `crates/arc-kernel/src/lib.rs`
-- `crates/arc-kernel/src/session.rs`
-- `crates/arc-guards/src/path_normalization.rs`
-- `crates/arc-guards/src/path_allowlist.rs`
-- `crates/arc-guards/src/forbidden_path.rs`
-- `crates/arc-policy/src/compiler.rs`
-- `crates/arc-cli/src/policy.rs`
-- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/chio-core/src/capability.rs`
+- `crates/chio-core/src/session.rs`
+- `crates/chio-kernel/src/lib.rs`
+- `crates/chio-kernel/src/session.rs`
+- `crates/chio-guards/src/path_normalization.rs`
+- `crates/chio-guards/src/path_allowlist.rs`
+- `crates/chio-guards/src/forbidden_path.rs`
+- `crates/chio-policy/src/compiler.rs`
+- `crates/chio-cli/src/policy.rs`
+- `crates/chio-mcp-adapter/src/edge.rs`
 - `docs/epics/E5-nested-flows-roots-sampling-elicitation.md`
 
 ## Proposed implementation slices

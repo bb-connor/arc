@@ -2,7 +2,7 @@
 
 > **Status**: Proposed April 2026
 > **Priority**: High -- when an agent runs `terraform apply`, it is making
-> the highest-blast-radius tool call in the entire agent ecosystem. If ARC
+> the highest-blast-radius tool call in the entire agent ecosystem. If Chio
 > exists to govern tool access, this is the tool access that most needs
 > governing. Covers Terraform, Pulumi, Crossplane, and CDK.
 
@@ -19,7 +19,7 @@ pipelines, agents that handle capacity planning. This is happening now.
 **Not orthogonal.** `terraform apply` IS a tool call. It is literally an
 agent invoking a tool that modifies real-world infrastructure. It creates
 databases, opens network paths, provisions IAM roles, allocates compute.
-This is the exact use case ARC was designed for -- capability-bounded,
+This is the exact use case Chio was designed for -- capability-bounded,
 attested, auditable tool access.
 
 The difference is blast radius. When an agent calls a search API with the
@@ -27,12 +27,12 @@ wrong query, you get bad results. When an agent runs `terraform apply` with
 the wrong config, you get a production outage, a security breach, or a
 five-figure cloud bill.
 
-### What ARC Adds to IaC
+### What Chio Adds to IaC
 
-| IaC alone | IaC + ARC |
+| IaC alone | IaC + Chio |
 |-----------|-----------|
 | IAM/RBAC controls who can apply | Capability tokens control what specific resources an agent can provision |
-| Sentinel/OPA validates policy at plan time | ARC guards validate capability + identity + budget before any action |
+| Sentinel/OPA validates policy at plan time | Chio guards validate capability + identity + budget before any action |
 | State file records what exists | Receipt proves WHO authorized it, WHEN, with WHAT capability |
 | Plan/apply separation is manual workflow | Plan/apply separation is enforced by capability scope levels |
 | Drift is detected after the fact | Drift without a receipt is a security signal |
@@ -42,33 +42,33 @@ five-figure cloud bill.
 
 ### 2.1 Terraform Integration Model
 
-ARC wraps Terraform's execution lifecycle. The key insight: Terraform
-already has a two-phase model (plan / apply) that maps directly to ARC's
+Chio wraps Terraform's execution lifecycle. The key insight: Terraform
+already has a two-phase model (plan / apply) that maps directly to Chio's
 capability tiers.
 
 ```
 Agent (requests infrastructure change)
   |
   v
-ARC Evaluate: scope="infra:plan"  (low privilege, read-only)
+Chio Evaluate: scope="infra:plan"  (low privilege, read-only)
   |
   | allowed
   v
 terraform plan -> plan output
   |
   v
-ARC Guard: plan-review (human or automated review of plan output)
+Chio Guard: plan-review (human or automated review of plan output)
   |
   | approved
   v
-ARC Evaluate: scope="infra:apply" + approval guard  (high privilege)
+Chio Evaluate: scope="infra:apply" + approval guard  (high privilege)
   |
   | allowed
   v
 terraform apply -> state change
   |
   v
-ARC Receipt: signed attestation of what was provisioned, by whom, under what authority
+Chio Receipt: signed attestation of what was provisioned, by whom, under what authority
   |
   v
 State file + Receipt = complete provenance
@@ -77,10 +77,10 @@ State file + Receipt = complete provenance
 ### 2.2 Module-Level Capability Scoping
 
 Terraform modules are the natural capability boundary. Each module maps
-to an ARC scope:
+to an Chio scope:
 
 ```
-Modules                          ARC Scopes
+Modules                          Chio Scopes
 +------------------------+      +----------------------------------+
 | modules/rds/           | ---> | infra:database:rds               |
 | modules/elasticache/   | ---> | infra:cache:redis                |
@@ -105,7 +105,7 @@ Terraform providers are another trust boundary. An agent operating in a
 specific cloud account should only use providers for that account:
 
 ```
-ARC Policy:
+Chio Policy:
   provider_trust:
     - provider: "aws"
       allowed_regions: ["us-east-1", "us-west-2"]
@@ -124,21 +124,21 @@ ARC Policy:
 A thin wrapper around `terraform` that intercepts plan and apply:
 
 ```python
-# arc-terraform: wraps terraform CLI with ARC governance
+# chio-terraform: wraps terraform CLI with Chio governance
 import subprocess
 import json
-from arc_sdk import ArcClient
+from chio_sdk import ChioClient
 
-class ArcTerraform:
-    """Wraps terraform CLI with ARC capability enforcement."""
+class ChioTerraform:
+    """Wraps terraform CLI with Chio capability enforcement."""
 
     def __init__(self, sidecar_url: str = "http://127.0.0.1:9090"):
-        self.arc = ArcClient(base_url=sidecar_url)
+        self.chio = ChioClient(base_url=sidecar_url)
 
     def plan(self, working_dir: str, var_file: str | None = None) -> dict:
-        """Run terraform plan with ARC evaluation."""
+        """Run terraform plan with Chio evaluation."""
         # Evaluate plan capability (low privilege)
-        verdict = self.arc.evaluate_sync(
+        verdict = self.chio.evaluate_sync(
             tool="terraform:plan",
             scope="infra:plan",
             arguments={
@@ -148,7 +148,7 @@ class ArcTerraform:
         )
 
         if verdict.denied:
-            raise PermissionError(f"ARC denied terraform plan: {verdict.reason}")
+            raise PermissionError(f"Chio denied terraform plan: {verdict.reason}")
 
         # Run terraform plan, output as JSON for analysis
         result = subprocess.run(
@@ -169,7 +169,7 @@ class ArcTerraform:
         plan_data = json.loads(plan_show.stdout)
 
         # Record plan receipt
-        self.arc.record_sync(
+        self.chio.record_sync(
             verdict=verdict,
             result_hash=self._hash_plan(plan_data),
         )
@@ -182,12 +182,12 @@ class ArcTerraform:
         plan_data: dict,
         auto_approve: bool = False,
     ) -> dict:
-        """Run terraform apply with ARC evaluation + approval guard."""
+        """Run terraform apply with Chio evaluation + approval guard."""
         # Extract resource types from plan for scope checking
         resource_scopes = self._plan_to_scopes(plan_data)
 
         # Evaluate apply capability (high privilege, per-resource-type)
-        verdict = self.arc.evaluate_sync(
+        verdict = self.chio.evaluate_sync(
             tool="terraform:apply",
             scope="infra:apply",
             arguments={
@@ -200,17 +200,17 @@ class ArcTerraform:
         )
 
         if verdict.denied:
-            raise PermissionError(f"ARC denied terraform apply: {verdict.reason}")
+            raise PermissionError(f"Chio denied terraform apply: {verdict.reason}")
 
         # Check each resource type against granted scopes
         for scope in resource_scopes:
-            resource_verdict = self.arc.evaluate_sync(
+            resource_verdict = self.chio.evaluate_sync(
                 tool=f"terraform:apply:{scope}",
                 scope=f"infra:{scope}",
             )
             if resource_verdict.denied:
                 raise PermissionError(
-                    f"ARC denied resource type {scope}: {resource_verdict.reason}"
+                    f"Chio denied resource type {scope}: {resource_verdict.reason}"
                 )
 
         # Run terraform apply
@@ -224,7 +224,7 @@ class ArcTerraform:
         )
 
         # Record apply receipt with full state change attestation
-        receipt = self.arc.record_sync(
+        receipt = self.chio.record_sync(
             verdict=verdict,
             result_hash=self._hash_state(working_dir),
         )
@@ -236,7 +236,7 @@ class ArcTerraform:
         }
 
     def _plan_to_scopes(self, plan_data: dict) -> list[str]:
-        """Extract ARC scopes from terraform plan resource changes."""
+        """Extract Chio scopes from terraform plan resource changes."""
         scopes = set()
         for change in plan_data.get("resource_changes", []):
             # aws_rds_instance -> database:rds
@@ -248,7 +248,7 @@ class ArcTerraform:
         return sorted(scopes)
 
     def _resource_type_to_scope(self, resource_type: str) -> str:
-        """Map terraform resource type to ARC scope."""
+        """Map terraform resource type to Chio scope."""
         scope_map = {
             "aws_db_instance": "database:rds",
             "aws_rds_cluster": "database:rds",
@@ -274,7 +274,7 @@ The plan review guard inspects the terraform plan output and makes a
 policy decision:
 
 ```python
-# ARC guard: reviews terraform plan before approving apply
+# Chio guard: reviews terraform plan before approving apply
 class TerraformPlanReviewGuard:
     """Guard that reviews terraform plan for policy violations."""
 
@@ -318,26 +318,26 @@ class TerraformPlanReviewGuard:
 
 ### 3.3 Terraform Provider Plugin (Advanced)
 
-For deeper integration, ARC can run as a Terraform provider that validates
+For deeper integration, Chio can run as a Terraform provider that validates
 capabilities before delegating to the real provider:
 
 ```hcl
 # main.tf
 terraform {
   required_providers {
-    arc = {
-      source = "backbay/arc"
+    chio = {
+      source = "backbay/chio"
       version = "~> 0.1"
     }
   }
 }
 
-provider "arc" {
+provider "chio" {
   sidecar_url = "http://127.0.0.1:9090"
 }
 
-# ARC-governed resource: wraps aws_db_instance
-resource "arc_governed_resource" "database" {
+# Chio-governed resource: wraps aws_db_instance
+resource "chio_governed_resource" "database" {
   provider_resource = "aws_db_instance"
   scope             = "infra:database:rds"
 
@@ -357,7 +357,7 @@ resource "arc_governed_resource" "database" {
 ### 3.4 State File + Receipt Correlation
 
 ```
-Terraform State                    ARC Receipt
+Terraform State                    Chio Receipt
 +-----------------------------+    +-----------------------------+
 | resource: aws_db_instance   |    | receipt_id: rcpt_abc123     |
 | id: db-xyz789               |    | tool: terraform:apply       |
@@ -377,8 +377,8 @@ Terraform State                    ARC Receipt
 ### 3.5 Drift Detection as Capability Violation
 
 ```python
-class ArcDriftDetector:
-    """Correlate terraform drift with ARC receipts."""
+class ChioDriftDetector:
+    """Correlate terraform drift with Chio receipts."""
 
     async def check_drift(self, working_dir: str) -> DriftReport:
         # Run terraform plan to detect drift
@@ -393,8 +393,8 @@ class ArcDriftDetector:
             drift_resources = self._extract_drift(plan)
 
             for resource in drift_resources:
-                # Check if this change has an ARC receipt
-                receipts = await self.arc.find_receipts(
+                # Check if this change has an Chio receipt
+                receipts = await self.chio.find_receipts(
                     meta={
                         "tf_resource_id": resource["id"],
                         "tf_resource_type": resource["type"],
@@ -407,12 +407,12 @@ class ArcDriftDetector:
                     yield DriftViolation(
                         resource=resource,
                         severity="critical",
-                        reason="Infrastructure change with no ARC receipt -- "
-                               "either a human bypassed ARC or an agent "
+                        reason="Infrastructure change with no Chio receipt -- "
+                               "either a human bypassed Chio or an agent "
                                "bypassed the sidecar",
                     )
                 else:
-                    # Drift with receipt = authorized change through ARC
+                    # Drift with receipt = authorized change through Chio
                     yield DriftAuthorized(
                         resource=resource,
                         receipt=receipts[-1],
@@ -421,20 +421,20 @@ class ArcDriftDetector:
 
 ## 4. Pulumi Integration
 
-Pulumi uses real programming languages. ARC decorators work naturally:
+Pulumi uses real programming languages. Chio decorators work naturally:
 
 ### 4.1 Python Decorator Model
 
 ```python
 import pulumi
 import pulumi_aws as aws
-from arc_iac import arc_resource, arc_stack
+from chio_iac import chio_resource, chio_stack
 
-@arc_stack(scope="infra:staging-environment")
+@chio_stack(scope="infra:staging-environment")
 def staging():
-    """Entire Pulumi stack governed by a single ARC grant."""
+    """Entire Pulumi stack governed by a single Chio grant."""
 
-    @arc_resource(scope="infra:database:rds")
+    @chio_resource(scope="infra:database:rds")
     def create_database():
         return aws.rds.Instance(
             "agent-db",
@@ -443,7 +443,7 @@ def staging():
             allocated_storage=20,
         )
 
-    @arc_resource(scope="infra:cache:redis")
+    @chio_resource(scope="infra:cache:redis")
     def create_cache():
         return aws.elasticache.Cluster(
             "agent-cache",
@@ -452,7 +452,7 @@ def staging():
             num_cache_nodes=1,
         )
 
-    @arc_resource(scope="infra:network:vpc")
+    @chio_resource(scope="infra:network:vpc")
     def create_vpc():
         # This will be DENIED if the agent only has database+cache scopes
         return aws.ec2.Vpc(
@@ -472,15 +472,15 @@ staging()
 ### 4.2 Implementation
 
 ```python
-def arc_resource(scope: str, guards: list[str] | None = None):
-    """Decorator that evaluates ARC capability before Pulumi resource creation."""
+def chio_resource(scope: str, guards: list[str] | None = None):
+    """Decorator that evaluates Chio capability before Pulumi resource creation."""
 
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            arc = ArcClient()
+            chio = ChioClient()
 
-            verdict = arc.evaluate_sync(
+            verdict = chio.evaluate_sync(
                 tool=f"pulumi:resource:{fn.__name__}",
                 scope=scope,
                 arguments={
@@ -493,17 +493,17 @@ def arc_resource(scope: str, guards: list[str] | None = None):
 
             if verdict.denied:
                 raise PermissionError(
-                    f"ARC denied infrastructure resource {fn.__name__}: {verdict.reason}"
+                    f"Chio denied infrastructure resource {fn.__name__}: {verdict.reason}"
                 )
 
             resource = fn(*args, **kwargs)
 
             # Record receipt after resource is registered with Pulumi
-            receipt = arc.record_sync(verdict=verdict)
+            receipt = chio.record_sync(verdict=verdict)
 
             # Tag the resource with the receipt ID
             # (if the cloud provider supports tags)
-            pulumi.log.info(f"ARC receipt: {receipt.receipt_id} for {fn.__name__}")
+            pulumi.log.info(f"Chio receipt: {receipt.receipt_id} for {fn.__name__}")
 
             return resource
 
@@ -511,22 +511,22 @@ def arc_resource(scope: str, guards: list[str] | None = None):
     return decorator
 
 
-def arc_stack(scope: str):
-    """Stack-level ARC grant -- scopes all resources within."""
+def chio_stack(scope: str):
+    """Stack-level Chio grant -- scopes all resources within."""
 
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            arc = ArcClient()
+            chio = ChioClient()
 
-            grant = arc.acquire_grant_sync(scope=scope)
-            pulumi.log.info(f"ARC grant acquired: {grant.token[:16]}...")
+            grant = chio.acquire_grant_sync(scope=scope)
+            pulumi.log.info(f"Chio grant acquired: {grant.token[:16]}...")
 
             try:
                 result = fn(*args, **kwargs)
             finally:
-                arc.release_grant_sync(grant)
-                pulumi.log.info("ARC grant released")
+                chio.release_grant_sync(grant)
+                pulumi.log.info("Chio grant released")
 
             return result
 
@@ -539,7 +539,7 @@ def arc_stack(scope: str):
 ```typescript
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
-import { arcResource, arcStack } from "@arc-protocol/pulumi";
+import { arcResource, arcStack } from "@chio-protocol/pulumi";
 
 // Stack-level grant
 const stack = arcStack("infra:staging", async () => {
@@ -573,9 +573,9 @@ directly to the existing K8s integration:
 ### 5.1 Crossplane Composition as Capability Boundary
 
 ```yaml
-# ArcJobGrant for a Crossplane Composition
-apiVersion: arc.protocol/v1alpha1
-kind: ArcJobGrant
+# ChioJobGrant for a Crossplane Composition
+apiVersion: chio.protocol/v1alpha1
+kind: ChioJobGrant
 metadata:
   name: crossplane-database-grant
   namespace: infrastructure
@@ -584,7 +584,7 @@ spec:
   jobSelector:
     matchLabels:
       crossplane.io/claim-name: agent-database
-      arc.protocol/governed: "true"
+      chio.protocol/governed: "true"
 
   capability:
     scopes:
@@ -612,20 +612,20 @@ spec:
 
 ### 5.2 Crossplane Admission Webhook Extension
 
-Extend the existing ARC validating webhook to understand Crossplane Claims:
+Extend the existing Chio validating webhook to understand Crossplane Claims:
 
 ```go
-func (v *ArcValidator) handleCrossplaneClaim(
+func (v *ChioValidator) handleCrossplaneClaim(
     ctx context.Context,
     claim *unstructured.Unstructured,
 ) admission.Response {
     // Extract the Composition reference
     compositionRef := claim.GetAnnotations()["crossplane.io/composition-resource-name"]
 
-    // Find matching ArcJobGrant
+    // Find matching ChioJobGrant
     grant, err := v.findCrossplaneGrant(ctx, claim)
     if err != nil || grant == nil {
-        return admission.Denied("No ARC grant covers this Crossplane Claim")
+        return admission.Denied("No Chio grant covers this Crossplane Claim")
     }
 
     // Check if the Composition is allowed
@@ -636,7 +636,7 @@ func (v *ArcValidator) handleCrossplaneClaim(
         ))
     }
 
-    // Evaluate against ARC kernel
+    // Evaluate against Chio kernel
     verdict, err := v.arcKernel.Evaluate(ctx, EvaluateRequest{
         Tool:  fmt.Sprintf("crossplane:%s", compositionRef),
         Scope: grant.Spec.Capability.Scopes[0],
@@ -649,35 +649,35 @@ func (v *ArcValidator) handleCrossplaneClaim(
     })
 
     if err != nil || verdict.Denied {
-        return admission.Denied(fmt.Sprintf("ARC denied: %s", verdict.Reason))
+        return admission.Denied(fmt.Sprintf("Chio denied: %s", verdict.Reason))
     }
 
     // Mutate: inject receipt ID as annotation
     claim.SetAnnotations(mergeMaps(claim.GetAnnotations(), map[string]string{
-        "arc.protocol/receipt-id": verdict.ReceiptID,
-        "arc.protocol/grant":     grant.Name,
+        "chio.protocol/receipt-id": verdict.ReceiptID,
+        "chio.protocol/grant":     grant.Name,
     }))
 
-    return admission.Patched("ARC approved", claim)
+    return admission.Patched("Chio approved", claim)
 }
 ```
 
 ## 6. CDK/CloudFormation Integration
 
-AWS CDK produces CloudFormation templates. ARC can wrap the synthesis
+AWS CDK produces CloudFormation templates. Chio can wrap the synthesis
 and deployment:
 
 ```typescript
-import { ArcCdkApp } from "@arc-protocol/cdk";
+import { ChioCdkApp } from "@chio-protocol/cdk";
 
-// Wrap the entire CDK app with ARC governance
-const app = new ArcCdkApp({
+// Wrap the entire CDK app with Chio governance
+const app = new ChioCdkApp({
   arcSidecarUrl: "http://127.0.0.1:9090",
   scope: "infra:cdk:my-app",
 });
 
 // Each stack is a capability boundary
-const dbStack = new ArcStack(app, "DatabaseStack", {
+const dbStack = new ChioStack(app, "DatabaseStack", {
   arcScope: "infra:database",
   arcGuards: ["cost-limit"],
 });
@@ -731,32 +731,32 @@ class InfraCostGuard:
 
 ## 8. Resource Tagging
 
-All agent-provisioned infrastructure should be tagged with ARC metadata
+All agent-provisioned infrastructure should be tagged with Chio metadata
 for traceability:
 
 ```python
-# Standard ARC tags applied to all provisioned resources
-ARC_TAGS = {
-    "arc:receipt-id": receipt.receipt_id,
-    "arc:agent-id": identity.agent_id,
-    "arc:capability-scope": scope,
-    "arc:provisioned-by": "arc-protocol",
-    "arc:grant-authority": grant.authority,
-    "arc:timestamp": receipt.timestamp,
+# Standard Chio tags applied to all provisioned resources
+CHIO_TAGS = {
+    "chio:receipt-id": receipt.receipt_id,
+    "chio:agent-id": identity.agent_id,
+    "chio:capability-scope": scope,
+    "chio:provisioned-by": "chio-protocol",
+    "chio:grant-authority": grant.authority,
+    "chio:timestamp": receipt.timestamp,
 }
 
 # In Terraform
 resource "aws_db_instance" "agent_db" {
   # ... configuration ...
   tags = merge(var.common_tags, {
-    "arc:receipt-id"       = var.arc_receipt_id
-    "arc:agent-id"         = var.arc_agent_id
-    "arc:capability-scope" = "infra:database:rds"
-    "arc:provisioned-by"   = "arc-protocol"
+    "chio:receipt-id"       = var.chio_receipt_id
+    "chio:agent-id"         = var.chio_agent_id
+    "chio:capability-scope" = "infra:database:rds"
+    "chio:provisioned-by"   = "chio-protocol"
   })
 }
 
-# In Pulumi (automatic via arc_resource decorator)
+# In Pulumi (automatic via chio_resource decorator)
 # Tags are injected by the decorator before resource creation
 ```
 
@@ -765,23 +765,23 @@ resource "aws_db_instance" "agent_db" {
 ```bash
 # Find all infrastructure provisioned by a specific agent
 aws resourcegroupstaggingapi get-resources \
-  --tag-filters Key=arc:agent-id,Values=agent-42
+  --tag-filters Key=chio:agent-id,Values=agent-42
 
 # Find all infrastructure provisioned under a specific capability
 aws resourcegroupstaggingapi get-resources \
-  --tag-filters Key=arc:capability-scope,Values=infra:database:rds
+  --tag-filters Key=chio:capability-scope,Values=infra:database:rds
 
-# Correlate cloud resources with ARC receipts
-arc receipt list --meta tf_resource_type=aws_db_instance
+# Correlate cloud resources with Chio receipts
+chio receipt list --meta tf_resource_type=aws_db_instance
 ```
 
 ## 9. CI/CD Pipeline Integration
 
-Agent-driven infrastructure changes should flow through CI/CD with ARC
+Agent-driven infrastructure changes should flow through CI/CD with Chio
 governance at each stage:
 
 ```yaml
-# GitHub Actions: ARC-governed Terraform pipeline
+# GitHub Actions: Chio-governed Terraform pipeline
 name: Agent Infrastructure Change
 
 on:
@@ -791,7 +791,7 @@ on:
         description: "Agent requesting the change"
         required: true
       capability_token:
-        description: "ARC capability token"
+        description: "Chio capability token"
         required: true
 
 jobs:
@@ -800,19 +800,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: ARC Evaluate Plan
-        uses: backbay/arc-action@v1
+      - name: Chio Evaluate Plan
+        uses: backbay/chio-action@v1
         with:
           tool: terraform:plan
           scope: infra:plan
           token: ${{ inputs.capability_token }}
-          sidecar-url: ${{ secrets.ARC_SIDECAR_URL }}
+          sidecar-url: ${{ secrets.CHIO_SIDECAR_URL }}
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan -json > plan.json
 
-      - name: ARC Plan Review Guard
-        uses: backbay/arc-action@v1
+      - name: Chio Plan Review Guard
+        uses: backbay/chio-action@v1
         with:
           tool: terraform:plan-review
           scope: infra:plan
@@ -824,20 +824,20 @@ jobs:
     runs-on: ubuntu-latest
     environment: production  # Requires GitHub environment approval
     steps:
-      - name: ARC Evaluate Apply
-        uses: backbay/arc-action@v1
+      - name: Chio Evaluate Apply
+        uses: backbay/chio-action@v1
         with:
           tool: terraform:apply
           scope: infra:apply
           token: ${{ inputs.capability_token }}
           guards: plan-review,cost-limit
-          sidecar-url: ${{ secrets.ARC_SIDECAR_URL }}
+          sidecar-url: ${{ secrets.CHIO_SIDECAR_URL }}
 
       - name: Terraform Apply
         run: terraform apply tfplan
 
-      - name: Record ARC Receipt
-        uses: backbay/arc-action@v1
+      - name: Record Chio Receipt
+        uses: backbay/chio-action@v1
         with:
           action: record
           state-file: terraform.tfstate
@@ -847,26 +847,26 @@ jobs:
 
 ```
 crates/
-  arc-iac-core/
-    Cargo.toml                # deps: arc-core
+  chio-iac-core/
+    Cargo.toml                # deps: chio-core
     src/
       lib.rs                  # IaC-specific evaluation types
-      scope_map.rs            # Resource type -> ARC scope mapping
+      scope_map.rs            # Resource type -> Chio scope mapping
       plan_review.rs          # Plan analysis utilities
       drift.rs                # Drift-to-receipt correlation
 
-sdks/python/arc-iac/
-  pyproject.toml              # deps: arc-sdk-python
-  src/arc_iac/
+sdks/python/chio-iac/
+  pyproject.toml              # deps: chio-sdk-python
+  src/chio_iac/
     __init__.py
     terraform/
       __init__.py
-      wrapper.py              # ArcTerraform CLI wrapper
+      wrapper.py              # ChioTerraform CLI wrapper
       scope_map.py            # Resource type -> scope mapping
-      drift.py                # ArcDriftDetector
+      drift.py                # ChioDriftDetector
     pulumi/
       __init__.py
-      decorators.py           # arc_resource, arc_stack
+      decorators.py           # chio_resource, chio_stack
     guards/
       plan_review.py          # TerraformPlanReviewGuard
       cost_limit.py           # InfraCostGuard
@@ -876,12 +876,12 @@ sdks/python/arc-iac/
     test_plan_review.py
     test_drift_detection.py
 
-sdks/typescript/arc-iac/
-  package.json                # deps: @arc-protocol/node-http
+sdks/typescript/chio-iac/
+  package.json                # deps: @chio-protocol/node-http
   src/
     cdk/
-      arc-cdk-app.ts          # ArcCdkApp
-      arc-stack.ts             # ArcStack with scope
+      chio-cdk-app.ts          # ChioCdkApp
+      chio-stack.ts             # ChioStack with scope
     pulumi/
       decorators.ts            # arcResource, arcStack
     index.ts
@@ -894,13 +894,13 @@ sdks/k8s/
 
 deploy/
   github-actions/
-    arc-action/
-      action.yml              # GitHub Action for ARC evaluation
+    chio-action/
+      action.yml              # GitHub Action for Chio evaluation
       index.js
 
   terraform/
     modules/
-      arc-governed/            # Wrapper module for ARC governance
+      chio-governed/            # Wrapper module for Chio governance
         main.tf
         variables.tf
         outputs.tf
@@ -930,7 +930,7 @@ Threat: Agent with broad infrastructure access
   |     Mitigation: infra:network:* scope denied by default
   |     Mitigation: plan-review guard in production
   |
-  +-- Bypass: agent modifies infrastructure outside ARC
+  +-- Bypass: agent modifies infrastructure outside Chio
         Detection: drift without receipt = security signal
         Response: alert, investigate, remediate
 ```
@@ -938,12 +938,12 @@ Threat: Agent with broad infrastructure access
 ## 12. Open Questions
 
 1. **Terraform Cloud / Spacelift / env0.** Managed Terraform platforms run
-   plan/apply in their infrastructure. The ARC sidecar needs to be
-   available there. Should ARC offer a remote evaluation API for managed
+   plan/apply in their infrastructure. The Chio sidecar needs to be
+   available there. Should Chio offer a remote evaluation API for managed
    IaC platforms, or require the sidecar in the execution environment?
 
 2. **State locking.** Terraform uses state locking (DynamoDB, GCS) to
-   prevent concurrent modifications. Should ARC's capability grant also
+   prevent concurrent modifications. Should Chio's capability grant also
    function as a state lock, preventing concurrent agent modifications?
 
 3. **Import.** `terraform import` brings existing resources under
@@ -955,7 +955,7 @@ Threat: Agent with broad infrastructure access
    approval, even if `infra:apply` is auto-approved?
 
 5. **Workspace isolation.** Terraform workspaces separate state. Should
-   each workspace map to a separate ARC capability boundary?
+   each workspace map to a separate Chio capability boundary?
 
 6. **Ansible.** Ansible is configuration management, not IaC in the
    Terraform sense. But agents running Ansible playbooks against

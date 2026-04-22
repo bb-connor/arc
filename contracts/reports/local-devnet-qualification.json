@@ -1,5 +1,5 @@
 {
-  "report_id": "arc.web3-contract-qualification.local-devnet.v1",
+  "report_id": "chio.web3-contract-qualification.local-devnet.v1",
   "generated_at": "2026-04-02T19:32:47.006Z",
   "chain_id": "eip155:31337",
   "gas_estimates": {
@@ -19,7 +19,7 @@
     {
       "id": "identity.operator_registration",
       "outcome": "pass",
-      "note": "Identity registry bound the operator settlement key to the ARC Ed25519 key hash."
+      "note": "Identity registry bound the operator settlement key to the Chio Ed25519 key hash."
     },
     {
       "id": "identity.entity_registration",
@@ -79,7 +79,7 @@
     {
       "id": "bond.reserve_requirement_metadata_parity",
       "outcome": "pass",
-      "note": "Bond vault locks collateral on-chain while preserving reserve requirement metadata from the signed ARC bond terms for parity and review."
+      "note": "Bond vault locks collateral on-chain while preserving reserve requirement metadata from the signed Chio bond terms for parity and review."
     },
     {
       "id": "bond.release_with_proof",

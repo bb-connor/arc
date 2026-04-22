@@ -1,6 +1,6 @@
 # MERCURY Phase 4-5 Tickets
 
-**Scope:** Phase 4 (Governance, Downstream Consumers, and Assurance) and Phase 5 (Embedded OEM, Trust Network, and ARC-Wall)  
+**Scope:** Phase 4 (Governance, Downstream Consumers, and Assurance) and Phase 5 (Embedded OEM, Trust Network, and Chio-Wall)
 **Activation:** Begins only after a successful pilot and a funded next step
 
 ---
@@ -89,7 +89,7 @@
 
 - Produce the staged rollout and operating model for a shared trust network.
 
-### E-025: ARC-Wall Core and Buyer Motion
+### E-025: Chio-Wall Core and Buyer Motion
 
 #### T-219: Information-domain evidence schema
 
@@ -101,13 +101,13 @@
 
 #### T-221: Buyer and packaging validation
 
-- Validate ARC-Wall demand, packaging, and distribution with target buyers.
+- Validate Chio-Wall demand, packaging, and distribution with target buyers.
 
 ### E-026: Multi-Product Platform Hardening
 
 **Current activated lane**
 
-- one shared ARC service catalog across MERCURY and ARC-Wall
+- one shared Chio service catalog across MERCURY and Chio-Wall
 - one cross-product governance model for release, incident, and trust material
 - one bounded platform-hardening backlog for sustained multi-product operation
 
@@ -130,6 +130,6 @@
 Phase 4-5 work is complete when:
 
 - governance, downstream, or assurance expansion matches real buyer needs
-- embedded OEM, trust-network services, and ARC-Wall reuse the same trust and
+- embedded OEM, trust-network services, and Chio-Wall reuse the same trust and
   publication model cleanly
 - expansion work has a clear operating owner and buyer path

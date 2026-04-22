@@ -22,7 +22,7 @@ multi-system integration.
 ### Scene 1: Freeze the workflow
 
 Show `scenario.json` and explain that MERCURY is the finance-specific product
-layer on ARC, not a second runtime or second truth contract.
+layer on Chio, not a second runtime or second truth contract.
 
 ### Scene 2: Proposal enters the shadow lane
 
@@ -31,18 +31,18 @@ shadow workflow.
 
 ### Scene 3: Approval becomes signed truth
 
-Explain that ARC emits the signed receipts and checkpoints while MERCURY adds
+Explain that Chio emits the signed receipts and checkpoints while MERCURY adds
 workflow semantics and retained-artifact meaning.
 
 ### Scene 4: Controlled release lands
 
-Show `primary/evidence/manifest.json` and explain that ARC evidence export is
+Show `primary/evidence/manifest.json` and explain that Chio evidence export is
 still the canonical substrate.
 
 ### Scene 5: Proof package is wrapped, not invented
 
 Open `primary/proof-package.json` and explain that `Proof Package v1` binds
-back to the verified ARC evidence export manifest hash.
+back to the verified Chio evidence export manifest hash.
 
 ### Scene 6: Inquiry package is derived safely
 

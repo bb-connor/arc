@@ -1,0 +1,53 @@
+{
+  "schema": "chio.anchor-discovery.v1",
+  "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "operator_binding": {
+    "certificate": {
+      "schema": "chio.key-binding-certificate.v1",
+      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "settlement_address": "0x1111111111111111111111111111111111111111",
+      "issued_at": 1743292800,
+      "expires_at": 1774828800,
+      "nonce": "0123456789abcdef0123456789abcdef"
+    },
+    "signature": "66c566b5ed17f4b1b23a18ef073d3ed331f43d9e420bafc7edbd676c71e45e26285b5d35ad8fce99488968a368bb231fa8a83a6664f8979c725e4481143acd03"
+  },
+  "service": {
+    "id": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c#anchor",
+    "type": "ChioAnchorService",
+    "service_endpoint": {
+      "chains": [
+        {
+          "chain_id": "eip155:8453",
+          "contract_address": "0x1000000000000000000000000000000000000001",
+          "operator_address": "0x1111111111111111111111111111111111111111",
+          "publisher_address": "0x2000000000000000000000000000000000000002",
+          "requires_delegate_authorization": true
+        }
+      ],
+      "bitcoin_anchor_method": "opentimestamps",
+      "ots_calendars": [
+        "https://alice.btc.calendar.opentimestamps.org"
+      ],
+      "solana_cluster": "solana:mainnet-beta"
+    }
+  },
+  "root_publication_ownership": [
+    {
+      "chain_id": "eip155:8453",
+      "root_owner_address": "0x1111111111111111111111111111111111111111",
+      "publisher_address": "0x2000000000000000000000000000000000000002",
+      "delegate_publication_allowed": true,
+      "ownership_rule": "operator-owned-root delegate-published-via-root-registry-authorization"
+    }
+  ]
+}

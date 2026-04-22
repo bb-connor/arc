@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: hello-fastapi
-Version: 0.1.0
-Requires-Python: >=3.11
-Requires-Dist: arc-asgi>=0.1.0
-Requires-Dist: arc-fastapi>=0.1.0
-Requires-Dist: arc-sdk-python>=0.1.0
-Requires-Dist: fastapi<1,>=0.116
-Requires-Dist: uvicorn<1,>=0.35

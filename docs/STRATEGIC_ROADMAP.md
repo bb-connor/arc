@@ -1,4 +1,4 @@
-# ARC Strategic Roadmap
+# Chio Strategic Roadmap
 
 **Date:** 2026-03-27
 **Status:** milestone ladder through `v2.8` executed; launch hold pending hosted workflow observation
@@ -8,11 +8,11 @@
 
 ## Strategic Thesis
 
-ARC should be understood as a **trust-and-economics control plane** for
+Chio should be understood as a **trust-and-economics control plane** for
 agentic systems.
 
 The moat is not basic connectivity. MCP, A2A, and payment protocols already
-cover connectivity well enough. ARC's job is the harder layer under them:
+cover connectivity well enough. Chio's job is the harder layer under them:
 
 - delegated authority
 - bounded spend
@@ -25,18 +25,18 @@ That is the economic-security thesis from the deep research work:
 > **Economic security = delegated authority + bounded spend + verifiable
 > receipts + enforceable governance across heterogeneous agent protocols.**
 
-ARC should therefore be positioned as the **rights and receipts layer** under
+Chio should therefore be positioned as the **rights and receipts layer** under
 MCP, A2A, payment rails, and future enterprise identity or attestation
 systems, not as a transport competitor trying to replace them.
 
 ## What Is Already Shipped
 
-ARC is not starting from zero. The shipped base now includes:
+Chio is not starting from zero. The shipped base now includes:
 
 - fail-closed kernel mediation, guard evaluation, and signed receipts
 - Merkle checkpoints, DPoP, truthful budget and settlement semantics, and
   receipt query/export/reporting
-- portable-trust primitives including `did:arc`, passports, verifier-policy
+- portable-trust primitives including `did:chio`, passports, verifier-policy
   artifacts, challenge/response flows, and multi-issuer composition
 - certification registry publication, resolution, supersession, and revocation
 - A2A and MCP adapter surfaces plus enterprise identity and federation
@@ -49,7 +49,7 @@ ARC is not starting from zero. The shipped base now includes:
   architecture decomposition wave
 
 The active rename milestone exists because the implementation and the product
-story had drifted apart. ARC needs one coherent identity before the next major
+story had drifted apart. Chio needs one coherent identity before the next major
 feature wave lands.
 
 ## Strategic Principles
@@ -60,10 +60,10 @@ feature wave lands.
 
 2. **Governance and economics stay fused.**
    Authorization without spend control is incomplete. Payment without proof is
-   unsafe. ARC wins by keeping them in one contract.
+   unsafe. Chio wins by keeping them in one contract.
 
 3. **Adapters beat replacement.**
-   ARC should sit under MCP, A2A, and payment ecosystems rather than trying to
+   Chio should sit under MCP, A2A, and payment ecosystems rather than trying to
    replace them outright.
 
 4. **Compatibility work is first-class work.**
@@ -76,26 +76,27 @@ feature wave lands.
 
 ## Milestone Ladder
 
-### v2.5 ARC Rename and Identity Realignment
+### v2.5 Chio Rename and Identity Realignment
 
-**Goal:** make ARC the real product identity across code, packages, CLI, docs,
+**Goal:** make Chio the real product identity across code, packages, CLI, docs,
 spec, and operator materials without breaking verifiability or operator
 continuity.
 
-**Why it matters:** the economic-security story is stronger than the old ARC
+**Why it matters:** the economic-security story is stronger than the old Chio
 framing, but only if the rename is handled as a migration contract instead of a
 search-and-replace exercise.
 
 **Core outcomes:**
 
-- ARC-first package, CLI, SDK, and release identity
-- ARC-primary schema issuance where implemented
-- explicit compatibility rules for legacy `arc.*` artifacts and `did:arc`
+- Chio-first package, CLI, SDK, and release identity
+- Chio-primary schema issuance where implemented
+- explicit rejection of legacy pre-Chio artifacts and canonical `did:chio`
+  identity
 - one coherent migration and qualification story
 
 ### v2.6 Governed Transactions and Payment Rails
 
-**Goal:** make ARC's economic-security thesis concrete in operator workflows.
+**Goal:** make Chio's economic-security thesis concrete in operator workflows.
 
 **Must land:**
 
@@ -106,7 +107,7 @@ search-and-replace exercise.
 - operator-visible reconciliation and accounting flows
 
 **Why it matters:** this is the shortest path from "bounded spend exists in the
-kernel" to "ARC governs real machine-mediated economic actions."
+kernel" to "Chio governs real machine-mediated economic actions."
 
 ### v2.7 Portable Trust, Certification, and Federation Maturity
 
@@ -122,12 +123,12 @@ between organizations conservatively and visibly.
 - certification discovery and multi-operator/public registry semantics
 - conservative cross-org reputation and trust distribution backed by evidence
 
-**Why it matters:** ARC becomes materially more valuable when trust no longer
+**Why it matters:** Chio becomes materially more valuable when trust no longer
 stops at one operator boundary.
 
 ### v2.8 Risk, Attestation, and Launch Closure
 
-**Goal:** turn ARC's evidence substrate into external trust and close the gap
+**Goal:** turn Chio's evidence substrate into external trust and close the gap
 between production candidate and actual launch.
 
 **Must land:**
@@ -137,46 +138,46 @@ between production candidate and actual launch.
 - proof/spec cleanup or explicit scoped deferral of any remaining formal debt
 - real GA decision artifacts, not just conditional release-candidate posture
 
-**Why it matters:** this is where ARC stops being merely auditable and becomes
+**Why it matters:** this is where Chio stops being merely auditable and becomes
 financable, insurable, and standards-ready.
 
 ## Ecosystem Posture
 
-ARC should pursue a partner map that matches the control-plane thesis:
+Chio should pursue a partner map that matches the control-plane thesis:
 
 - **MCP and A2A ecosystems:** integrate beneath them and become the trust
   substrate they intentionally do not provide
-- **payments and commerce:** treat x402 and ACP/SPT systems as rails that ARC
+- **payments and commerce:** treat x402 and ACP/SPT systems as rails that Chio
   governs, not competitors to replace
 - **enterprise IAM:** integrate with OIDC/OAuth-based identity providers so
   rights are legible to security reviewers and operators
 - **attestation stacks:** treat TEEs and runtime evidence as a higher-assurance
   tier once the core economic and portable-trust surface is stable
-- **standards bodies and regulators:** keep ARC's claims aligned to shipping
+- **standards bodies and regulators:** keep Chio's claims aligned to shipping
   evidence so the project remains legible in NIST, OAuth, OpenID, and W3C
   conversations
 
 ## Commercialization Posture
 
-ARC is the platform thesis, not the single product packaging.
+Chio is the platform thesis, not the single product packaging.
 
 That distinction matters:
 
-- ARC remains the broad rights, receipts, governance, and trust substrate for
+- Chio remains the broad rights, receipts, governance, and trust substrate for
   consequential agent actions
-- vertical products can package ARC for specific high-value markets without
+- vertical products can package Chio for specific high-value markets without
   shrinking the underlying platform ambition
 - the first finance-specific product layer is MERCURY
-- ARC-Wall remains a separate companion product line built on the same
-  substrate, not a redefinition of ARC itself
+- Chio-Wall remains a separate companion product line built on the same
+  substrate, not a redefinition of Chio itself
 
 The commercial mistake would be to let a narrow first wedge redefine the full
 project. The strategic goal is the opposite: use narrow wedges to prove the
-broader ARC thesis in markets that can buy earlier.
+broader Chio thesis in markets that can buy earlier.
 
 ## Success Conditions
 
-ARC is on the right path if the following become true in order:
+Chio is on the right path if the following become true in order:
 
 1. the product identity is coherent and migration-safe
 2. governed transactions and payment rails are real and truthful
@@ -194,7 +195,7 @@ The `v2.5` through `v2.8` ladder derived from
 `docs/research/DEEP_RESEARCH_1.md` is now executed locally. The current
 decision is:
 
-- local evidence says ARC is ready for launch packaging on the shipped surface
+- local evidence says Chio is ready for launch packaging on the shipped surface
 - external release publication remains on hold until hosted `CI` and `Release
   Qualification` runs are observed on the candidate commit
 - the next roadmap turn should start from post-launch or next-milestone work,

@@ -1,19 +1,19 @@
 # Unified Configuration
 
 Status: **Partially shipped -- see caveats below**
-Authors: ARC core team
+Authors: Chio core team
 Normative spec: `spec/CONFIGURATION.md`
 
 > **Status note (amended April 2026)**: This document was originally written
-> as the design rationale for a unified `arc.yaml` configuration system.
+> as the design rationale for a unified `chio.yaml` configuration system.
 > **Parts of this document are aspirational and do not match the current
 > implementation.** Specifically:
 >
 > - The nested `adapters.mcp/a2a/acp` schema described here is NOT the
 >   shipped schema. The current loader uses flat Vec sections. See
->   `crates/arc-config/src/schema.rs` for the actual schema.
+>   `crates/chio-config/src/schema.rs` for the actual schema.
 > - `kernel.keypair` is NOT shipped. The current field is `kernel.signing_key`.
-> - `arc start --config arc.yaml` does NOT exist. The CLI uses per-command
+> - `chio start --config chio.yaml` does NOT exist. The CLI uses per-command
 >   `--config` flags on individual subcommands.
 >
 > For the current, normative config contract, read `spec/CONFIGURATION.md`.
@@ -23,7 +23,7 @@ Normative spec: `spec/CONFIGURATION.md`
 
 ## 1. Problem Statement
 
-ARC supports three protocol adapters -- MCP, A2A, and ACP -- each with its own
+Chio supports three protocol adapters -- MCP, A2A, and ACP -- each with its own
 configuration type, builder API, and field naming conventions:
 
 - `McpAdapterConfig` -- `server_id`, `server_name`, `server_version`, `public_key`
@@ -43,7 +43,7 @@ remaining honest about trust-boundary complexity in larger deployments.
 
 ## 2. Design Goals
 
-1. **Single file** -- one `arc.yaml` describes the kernel, all adapters, edges,
+1. **Single file** -- one `chio.yaml` describes the kernel, all adapters, edges,
    receipts, and logging.
 2. **Environment variable interpolation** -- `${VAR}` syntax for secrets and
    per-environment values.
@@ -61,20 +61,20 @@ remaining honest about trust-boundary complexity in larger deployments.
 ## 3. File Format
 
 YAML. Nested structures (auth blocks, partner policies, exporter lists) are more
-readable in YAML than in TOML's table syntax. The file is named `arc.yaml` by
+readable in YAML than in TOML's table syntax. The file is named `chio.yaml` by
 convention and, in the proposed runtime flow, would be loaded via
-`arc start --config arc.yaml`.
+`chio start --config chio.yaml`.
 
 ### Full Annotated Example
 
 ```yaml
-# arc.yaml -- unified ARC configuration
+# chio.yaml -- unified Chio configuration
 
 kernel:
   # Path to an Ed25519 keypair file (PEM or raw 64-byte seed+pubkey).
   # Used by the kernel for signing receipts and issuing capabilities.
   # All adapters derive their public_key from this keypair automatically.
-  keypair: ./keys/arc-kernel.ed25519
+  keypair: ./keys/chio-kernel.ed25519
 
   # SHA-256 hash of the active guard policy file, or the path to the
   # policy file (the loader computes the hash).
@@ -160,20 +160,20 @@ edges:
     - id: mcp-edge-primary
       expose_from: ["mcp-filesystem", "mcp-github", "a2a-research-agent"]
       bind: "127.0.0.1:8080"
-      server_name: "ARC MCP Edge"
+      server_name: "Chio MCP Edge"
       server_version: "1.0.0"
 
   a2a:
     - id: a2a-edge-primary
       expose_from: ["mcp-filesystem", "mcp-github"]
-      agent_name: "ARC A2A Edge"
+      agent_name: "Chio A2A Edge"
       bind: "0.0.0.0:8081"
       security_schemes: ["bearer"]
 
   acp:
     - id: acp-edge-primary
       expose_from: ["mcp-filesystem"]
-      agent_name: "ARC ACP Edge"
+      agent_name: "Chio ACP Edge"
       advertised_capabilities:
         streaming: true
         permissions: true
@@ -210,7 +210,7 @@ use serde::Deserialize;
 /// Root of the unified configuration file.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ArcConfig {
+pub struct ChioConfig {
     pub kernel: KernelSection,
     #[serde(default)]
     pub adapters: AdaptersSection,
@@ -527,7 +527,7 @@ is the kernel's signing identity and is used for:
 - Issuing capability tokens
 - Generating the `public_key` field for all adapter manifests
 
-This single-keypair model is the **default local profile**, not the entire ARC
+This single-keypair model is the **default local profile**, not the entire Chio
 trust model. Production hosted deployments may separate trust roots, kernel
 signers, capability-authority keys, checkpoint publishers, and verifier trust
 bundles. See `TRUST-MODEL-AND-KEY-MANAGEMENT.md` for the broader model.
@@ -616,22 +616,22 @@ versions.
 Proposed CLI integration:
 
 ```
-arc start --config arc.yaml
+chio start --config chio.yaml
 ```
 
-Status note: `arc start` is not a current command in the repo. The shipped CLI
-today exposes `arc mcp serve`, `arc mcp serve-http`, `arc run`, and related
+Status note: `chio start` is not a current command in the repo. The shipped CLI
+today exposes `chio mcp serve`, `chio mcp serve-http`, `chio run`, and related
 trust/receipt commands. This section specifies the intended future entry point.
 
 ### Startup sequence
 
-1. Parse `arc.yaml` and resolve environment variables.
+1. Parse `chio.yaml` and resolve environment variables.
 2. Run validation (Section 7).
 3. Load the keypair from `kernel.keypair`.
 4. Initialize the receipt store from `receipts.store`.
 5. Build the guard pipeline from `kernel.guards`.
 6. For each MCP adapter entry: spawn the subprocess, perform the MCP
-   `initialize` handshake, generate the ARC manifest.
+   `initialize` handshake, generate the Chio manifest.
 7. For each A2A adapter entry: fetch the agent card, validate partner policy,
    build the transport.
 8. For each ACP adapter entry: build the proxy config with the declared
@@ -685,14 +685,14 @@ let adapter = McpAdapter::from_command("npx", &["-y", "server-fs"], mcp_config)?
 
 ### Conversion layer
 
-The `arc-config` crate provides `From` implementations that convert unified
+The `chio-config` crate provides `From` implementations that convert unified
 config entries into the existing per-adapter config types:
 
 ```rust
-impl ArcConfig {
+impl ChioConfig {
     /// Convert the parsed unified config into the runtime objects
     /// the kernel and adapters expect.
-    pub fn into_runtime(self) -> Result<ArcRuntime, ConfigError> {
+    pub fn into_runtime(self) -> Result<ChioRuntime, ConfigError> {
         let keypair = load_keypair(&self.kernel.keypair)?;
         let public_key_hex = keypair.public_key().to_hex();
 
@@ -751,18 +751,18 @@ impl ArcConfig {
             .collect();
 
         // ... build KernelConfig, edges, receipt store, exporters ...
-        Ok(ArcRuntime { keypair, mcp_adapters, a2a_adapters, acp_proxies, /* ... */ })
+        Ok(ChioRuntime { keypair, mcp_adapters, a2a_adapters, acp_proxies, /* ... */ })
     }
 }
 ```
 
 ### Hybrid mode
 
-A deployment can load a base config from `arc.yaml` and then programmatically
+A deployment can load a base config from `chio.yaml` and then programmatically
 add or override adapters before starting the kernel:
 
 ```rust
-let mut runtime = ArcConfig::load("arc.yaml")?.into_runtime()?;
+let mut runtime = ChioConfig::load("chio.yaml")?.into_runtime()?;
 
 // Add an adapter not in the YAML file
 runtime.register_mcp_adapter(my_custom_adapter);

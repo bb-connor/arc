@@ -95,8 +95,8 @@ This runbook does not authorize:
 - multiple continuity motions or surfaces
 - a generic onboarding suite, CRM workflow, or support desk
 - channel marketplaces or multi-account continuity programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broad customer-health or universal renewal-performance claims
 
 Those remain separate decisions, not hidden responsibilities inside `v2.58`.

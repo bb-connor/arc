@@ -1,0 +1,69 @@
+{
+  "version": "2026-04-15",
+  "scope": "operator_control_surfaces",
+  "status": "operator_control_surfaces_qualified_locally",
+  "decision": "externally_operable_control_surfaces_defined_and_exercised_locally",
+  "summary": "Chio exposes one operator-facing economic control plane over trust-control HTTP surfaces, typed operator reports, and signed underwriting, credit, capital, and liability artifacts.",
+  "surfaces": [
+    {
+      "id": "operator-report",
+      "kind": "report",
+      "transport": "http",
+      "authority": "trust_control_service",
+      "witnesses": [
+        "crates/chio-kernel/src/operator_report.rs",
+        "crates/chio-cli/src/trust_control/http_handlers_b.rs",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    },
+    {
+      "id": "settlement-reconciliation",
+      "kind": "report_and_action",
+      "transport": "http",
+      "authority": "trust_control_service",
+      "witnesses": [
+        "crates/chio-cli/src/trust_control/http_handlers_b.rs",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    },
+    {
+      "id": "metered-billing-reconciliation",
+      "kind": "report_and_action",
+      "transport": "http",
+      "authority": "trust_control_service",
+      "witnesses": [
+        "crates/chio-cli/src/trust_control/http_handlers_b.rs",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    },
+    {
+      "id": "authorization-context",
+      "kind": "report",
+      "transport": "http_and_cli",
+      "authority": "trust_control_service",
+      "witnesses": [
+        "crates/chio-kernel/src/operator_report.rs",
+        "crates/chio-cli/tests/receipt_query.rs"
+      ]
+    },
+    {
+      "id": "underwriting-credit-capital-liability",
+      "kind": "signed_economic_artifacts",
+      "transport": "http_and_cli",
+      "authority": "trust_control_service",
+      "witnesses": [
+        "crates/chio-underwriting/src/lib.rs",
+        "crates/chio-credit/src/lib.rs",
+        "crates/chio-market/src/lib.rs",
+        "crates/chio-open-market/src/lib.rs",
+        "crates/chio-cli/src/trust_control/capital_and_liability.rs"
+      ]
+    }
+  ],
+  "constraints": [
+    "This profile proves operator-facing surfaces are defined and exercised locally.",
+    "It does not prove independent third-party operator adoption.",
+    "Promotion outside the operator boundary still requires qualification bundles and explicit service-auth governance."
+  ]
+}
+

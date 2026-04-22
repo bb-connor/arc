@@ -165,7 +165,7 @@ If MERCURY moves into mediated live control, additional risks become material:
 - credential custody for downstream systems
 - tighter change-management expectations
 
-If ARC-Wall is added, model-memory and prompt-injection risks remain relevant
+If Chio-Wall is added, model-memory and prompt-injection risks remain relevant
 even when tool-boundary enforcement is strong.
 
 ---

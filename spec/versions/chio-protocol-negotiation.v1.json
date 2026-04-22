@@ -1,0 +1,36 @@
+{
+  "schema": "chio.protocol-negotiation.v1",
+  "updatedAt": "2026-04-13",
+  "surfaces": {
+    "nativeChio": {
+      "wireVersion": "chio-wire-v1",
+      "exchangeFormat": "out_of_band",
+      "compatibility": "exact_match",
+      "downgradeBehavior": "not_supported",
+      "connectionRejection": {
+        "transportAction": "close_or_reset_transport",
+        "chioErrorCode": 1000
+      }
+    },
+    "hostedMcp": {
+      "initializeRequestField": "params.protocolVersion",
+      "initializeResponseField": "result.protocolVersion",
+      "sessionHeader": "MCP-Protocol-Version",
+      "supportedProtocolVersions": [
+        "2025-11-25"
+      ],
+      "selectionPolicy": "exact_match_from_supported_set",
+      "downgradeBehavior": "current implementation publishes one supported version and rejects mismatches",
+      "connectionRejection": {
+        "jsonrpcCode": -32600,
+        "chioErrorCode": 1000
+      }
+    },
+    "trustControl": {
+      "versioning": "path_prefix",
+      "basePathPrefix": "/v1",
+      "compatibility": "exact_prefix_match",
+      "downgradeBehavior": "not_applicable"
+    }
+  }
+}

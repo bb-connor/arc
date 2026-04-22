@@ -1,52 +1,52 @@
 /**
- * Express middleware for ARC protocol.
+ * Express middleware for Chio protocol.
  *
  * Usage:
- *   import { arc } from "@arc-protocol/express";
- *   app.use(arc({ config: "arc.yaml" }));
+ *   import { chio } from "@chio-protocol/express";
+ *   app.use(chio({ config: "chio.yaml" }));
  *
- * The middleware intercepts every request, evaluates it against the ARC
+ * The middleware intercepts every request, evaluates it against the Chio
  * sidecar kernel, and either allows it to proceed or returns a structured
- * error response with ARC error codes.
+ * error response with Chio error codes.
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { PassThrough } from "node:stream";
 import {
-  type ArcConfig,
-  type ArcPassthrough,
+  type ChioConfig,
+  type ChioPassthrough,
   type EvaluateResponse,
   type HttpMethod,
   type Verdict,
-  ARC_ERROR_CODES,
+  CHIO_ERROR_CODES,
   isDenied,
   resolveConfig,
   type ResolvedConfig,
   interceptNodeRequest,
-} from "@arc-protocol/node-http";
+} from "@chio-protocol/node-http";
 
-/** Express-specific ARC config with route pattern extraction. */
-export interface ArcExpressConfig extends ArcConfig {
+/** Express-specific Chio config with route pattern extraction. */
+export interface ChioExpressConfig extends ChioConfig {
   /**
-   * Skip ARC evaluation for specific paths.
+   * Skip Chio evaluation for specific paths.
    * Accepts exact paths or RegExp patterns.
    */
   skip?: Array<string | RegExp> | undefined;
 }
 
 /**
- * Create an Express middleware that evaluates every request against ARC.
+ * Create an Express middleware that evaluates every request against Chio.
  *
  * @example
  * ```ts
  * import express from "express";
- * import { arc } from "@arc-protocol/express";
+ * import { chio } from "@chio-protocol/express";
  *
  * const app = express();
- * app.use(arc({ config: "arc.yaml" }));
+ * app.use(chio({ config: "chio.yaml" }));
  * ```
  */
-export function arc(config: ArcExpressConfig = {}): RequestHandler {
+export function chio(config: ChioExpressConfig = {}): RequestHandler {
   const resolved = resolveConfig(config);
   const skipPatterns = config.skip ?? [];
 
@@ -73,15 +73,15 @@ export function arc(config: ArcExpressConfig = {}): RequestHandler {
       resolved.routePatternResolver = () => routePattern;
 
       try {
-        const rawBody = await ensureExpressBufferedBody(req as ArcRequest);
+        const rawBody = await ensureExpressBufferedBody(req as ChioRequest);
         const outcome = await interceptNodeRequest(req, res, resolved);
         if (!outcome.responseSent) {
-          hydrateExpressBody(req as ArcRequest, rawBody);
+          hydrateExpressBody(req as ChioRequest, rawBody);
           if (outcome.result != null) {
-            (req as ArcRequest).arcResult = outcome.result;
+            (req as ChioRequest).chioResult = outcome.result;
           }
           if (outcome.passthrough != null) {
-            (req as ArcRequest).arcPassthrough = outcome.passthrough;
+            (req as ChioRequest).chioPassthrough = outcome.passthrough;
           }
           next();
         }
@@ -94,15 +94,15 @@ export function arc(config: ArcExpressConfig = {}): RequestHandler {
     }
 
     try {
-      const rawBody = await ensureExpressBufferedBody(req as ArcRequest);
+      const rawBody = await ensureExpressBufferedBody(req as ChioRequest);
       const outcome = await interceptNodeRequest(req, res, resolved);
       if (!outcome.responseSent) {
-        hydrateExpressBody(req as ArcRequest, rawBody);
+        hydrateExpressBody(req as ChioRequest, rawBody);
         if (outcome.result != null) {
-          (req as ArcRequest).arcResult = outcome.result;
+          (req as ChioRequest).chioResult = outcome.result;
         }
         if (outcome.passthrough != null) {
-          (req as ArcRequest).arcPassthrough = outcome.passthrough;
+          (req as ChioRequest).chioPassthrough = outcome.passthrough;
         }
         next();
       }
@@ -113,19 +113,19 @@ export function arc(config: ArcExpressConfig = {}): RequestHandler {
 }
 
 /**
- * Express request with ARC evaluation result attached.
+ * Express request with Chio evaluation result attached.
  */
-export interface ArcRequest extends Request {
-  arcResult?: EvaluateResponse | undefined;
-  arcPassthrough?: ArcPassthrough | undefined;
+export interface ChioRequest extends Request {
+  chioResult?: EvaluateResponse | undefined;
+  chioPassthrough?: ChioPassthrough | undefined;
   rawBody?: Buffer | undefined;
   _body?: boolean | undefined;
 }
 
 /**
- * Express error handler that formats ARC errors as structured JSON.
+ * Express error handler that formats Chio errors as structured JSON.
  */
-export function arcErrorHandler(
+export function chioErrorHandler(
   err: Error,
   _req: Request,
   res: Response,
@@ -136,10 +136,10 @@ export function arcErrorHandler(
     return;
   }
 
-  // Check if this is an ARC-related error
+  // Check if this is an Chio-related error
   if ("code" in err && typeof (err as { code: unknown }).code === "string") {
     const code = (err as { code: string }).code;
-    if (code.startsWith("arc_")) {
+    if (code.startsWith("chio_")) {
       res.status(502).json({
         error: code,
         message: err.message,
@@ -176,7 +176,7 @@ function extractRoutePattern(req: Request): string | null {
   return null;
 }
 
-async function ensureExpressBufferedBody(req: ArcRequest): Promise<Buffer> {
+async function ensureExpressBufferedBody(req: ChioRequest): Promise<Buffer> {
   if (Buffer.isBuffer(req.rawBody)) {
     return req.rawBody;
   }
@@ -192,7 +192,7 @@ async function ensureExpressBufferedBody(req: ArcRequest): Promise<Buffer> {
   return rawBody;
 }
 
-function replayExpressRequestBody(req: ArcRequest, rawBody: Buffer): void {
+function replayExpressRequestBody(req: ChioRequest, rawBody: Buffer): void {
   const replay = new PassThrough();
   replay.end(rawBody);
 
@@ -247,7 +247,7 @@ function replayExpressRequestBody(req: ArcRequest, rawBody: Buffer): void {
   }
 }
 
-function hydrateExpressBody(req: ArcRequest, rawBody: Buffer): void {
+function hydrateExpressBody(req: ChioRequest, rawBody: Buffer): void {
   if (req.body !== undefined) {
     return;
   }
@@ -284,6 +284,6 @@ function hydrateExpressBody(req: ArcRequest, rawBody: Buffer): void {
       req._body = true;
     }
   } catch {
-    // Leave body parsing to downstream middleware when ARC cannot safely infer it.
+    // Leave body parsing to downstream middleware when Chio cannot safely infer it.
   }
 }

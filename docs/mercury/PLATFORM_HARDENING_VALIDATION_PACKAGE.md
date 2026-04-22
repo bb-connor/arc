@@ -7,7 +7,7 @@
 
 ## Purpose
 
-The validation package proves the current MERCURY plus ARC-Wall portfolio
+The validation package proves the current MERCURY plus Chio-Wall portfolio
 boundary is explicit, machine-readable, paired with one executed hardening
 package, and still bounded to the current product set only.
 
@@ -16,7 +16,7 @@ package, and still bounded to the current product set only.
 ## Canonical Command
 
 ```bash
-cargo run -p arc-cli -- product-surface validate --output target/arc-product-surface-hardening-validation
+cargo run -p chio-cli -- product-surface validate --output target/chio-product-surface-hardening-validation
 ```
 
 ---
@@ -25,7 +25,7 @@ cargo run -p arc-cli -- product-surface validate --output target/arc-product-sur
 
 - `product-surface/shared-service-catalog.json`
 - `product-surface/mercury-product-surface.json`
-- `product-surface/arc-wall-product-surface.json`
+- `product-surface/chio-wall-product-surface.json`
 - `product-surface/shared-dependency-map.json`
 - `product-surface/cross-product-governance.json`
 - `product-surface/cross-product-release-matrix.json`
@@ -42,8 +42,8 @@ cargo run -p arc-cli -- product-surface validate --output target/arc-product-sur
 
 The package supports one bounded claim only:
 
-> ARC now has one executed shared-service, release-control, recovery-routing,
-> and qualification package for the current MERCURY and ARC-Wall product set.
+> Chio now has one executed shared-service, release-control, recovery-routing,
+> and qualification package for the current MERCURY and Chio-Wall product set.
 
 It does not claim:
 

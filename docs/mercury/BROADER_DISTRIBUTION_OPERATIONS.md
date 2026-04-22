@@ -91,8 +91,8 @@ This runbook does not authorize:
 - multiple broader-distribution motions or surfaces
 - a generic sales platform, CRM workflow, or channel console
 - partner marketplaces or multi-segment account programs
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broad rollout or universal performance claims
 
 Those remain separate decisions, not hidden responsibilities inside `v2.56`.

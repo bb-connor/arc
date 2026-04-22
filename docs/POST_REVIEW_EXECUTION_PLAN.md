@@ -4,11 +4,11 @@
 
 This document turns the current project review findings into an execution sequence.
 
-The repo is no longer blocked on "can ARC speak enough MCP to be interesting?"
+The repo is no longer blocked on "can Chio speak enough MCP to be interesting?"
 
 The new blocking question is:
 
-- can ARC become deterministic, security-complete, and simple enough to operate and adopt?
+- can Chio become deterministic, security-complete, and simple enough to operate and adopt?
 
 This plan assumes the current repo state described in:
 
@@ -114,7 +114,7 @@ The regular CI lane stays the workspace suite:
 
 The repeat-run proving path for clustered trust-control stays as an explicit qualification lane rather than a normal CI-on-every-PR step:
 
-- `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture`
+- `cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture`
 
 That qualification command reruns the in-repo authority, receipt, revocation, budget, and leader-failover scenario five times through `trust_cluster.rs`.
 
@@ -123,7 +123,7 @@ That qualification command reruns the in-repo authority, receipt, revocation, bu
 ### Gate G1: workspace stability for E9
 
 - `cargo test --workspace` is green in the normal CI lane, including the default single-run `trust_control_cluster_replicates_state_and_survives_leader_failover` coverage.
-- `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` is green in E9 qualification, repeating the authority, receipt, revocation, budget, and leader-failover path five times in-repo.
+- `cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` is green in E9 qualification, repeating the authority, receipt, revocation, budget, and leader-failover path five times in-repo.
 - "Workspace stability" for this gate means no known flaky trust-control path remains in the clustered control-plane flow above; broader release hardening still belongs to `E14`.
 
 ### Gate G2: roots are enforceable
@@ -148,7 +148,7 @@ That qualification command reruns the in-repo authority, receipt, revocation, bu
 
 - one policy path is clearly documented as canonical
 - all shipped guards are reachable through the supported path
-- migration docs and a higher-level authoring surface exist for native ARC services
+- migration docs and a higher-level authoring surface exist for native Chio services
 
 ## Non-Goals For This Cycle
 
@@ -172,7 +172,7 @@ Those may matter later, but they are not the next bottlenecks.
 
 ## Bottom Line
 
-ARC has already crossed the line from "idea" to "real system."
+Chio has already crossed the line from "idea" to "real system."
 
 The next step is not adding more breadth for its own sake.
 

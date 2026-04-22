@@ -1,4 +1,4 @@
-# ARC Protocol Stack: Strategic Vision
+# Chio Protocol Stack: Strategic Vision
 
 **Date:** 2026-04-13
 **Status:** Active strategy document
@@ -20,9 +20,9 @@ they have the same epistemic weight:
   evidence by themselves.
 
 Where a surface is only proposed, this document now labels it explicitly. In
-particular: `arc mcp serve`, `arc mcp serve-http`, `arc api protect`, the
+particular: `chio mcp serve`, `chio mcp serve-http`, `chio api protect`, the
 HTTP/framework substrate packages, ACP live-path cryptographic receipts, and
-the receipt dashboard ship today. `arc start --config arc.yaml` and the
+the receipt dashboard ship today. `chio start --config chio.yaml` and the
 stronger market-position claims remain strategic or proposed rather than
 current runtime fact. The shared `CrossProtocolOrchestrator` substrate is no
 longer purely proposed; the stronger technical control-plane thesis is now
@@ -33,11 +33,11 @@ partner/ecosystem thesis remains future.
 
 ## 1. The One-Sentence Vision
 
-**Current defensible claim:** ARC is a cryptographically signed, fail-closed,
+**Current defensible claim:** Chio is a cryptographically signed, fail-closed,
 intent-aware governance control plane on the qualified authoritative HTTP, MCP,
 OpenAI, A2A, and ACP surfaces.
 
-**Strategic thesis:** ARC could become the comptroller of the agent economy --
+**Strategic thesis:** Chio could become the comptroller of the agent economy --
 but only if the broader cross-protocol, economic, federated-governance, and
 external market-adoption layers are proven in production rather than assumed
 by narrative.
@@ -66,7 +66,7 @@ no revocation semantics.
 
 A2A is the clearest open attempt to standardize agent-to-agent discovery and
 task exchange. It introduces signed Agent Cards, task lifecycle streaming, and
-DNS/HTTP discovery. ARC treats A2A as strategically important, but this
+DNS/HTTP discovery. Chio treats A2A as strategically important, but this
 document does not use it as the system of record for ecosystem metrics.
 
 A2A added cryptographic identity for card publishers but still has no scoped
@@ -85,7 +85,7 @@ the agent actually did, no signed receipts, and no delegation model.
 
 ### The Convergence
 
-ARC's working strategic assumption is that many enterprise agent deployments
+Chio's working strategic assumption is that many enterprise agent deployments
 will encounter all three interaction patterns: MCP for tool access, A2A for
 multi-agent coordination, and ACP for developer-facing agent integration. The
 three protocols are complementary, not competitive.
@@ -98,19 +98,19 @@ ACP produces three separate, unlinked, unsigned event streams. There is no
 unified proof of what happened. There is no cross-protocol receipt chain.
 There is no single artifact an auditor, insurer, or regulator can verify.
 
-ARC fills that gap.
+Chio fills that gap.
 
 ---
 
-## 3. ARC's Unique Position
+## 3. Chio's Unique Position
 
-ARC is not an alternative to MCP, A2A, or ACP. It is the authorization,
+Chio is not an alternative to MCP, A2A, or ACP. It is the authorization,
 attestation, and audit layer that sits across all three.
 
-### ARC Is Not Just an MCP Gateway
+### Chio Is Not Just an MCP Gateway
 
 MCP gateway-style enforcement is an important adoption wedge, but it is not the
-full ARC architecture and should not be treated as the end-state product
+full Chio architecture and should not be treated as the end-state product
 identity.
 
 A pure gateway gives a clean enforcement chokepoint for wrapped MCP traffic.
@@ -125,7 +125,7 @@ That is useful. It is also structurally incomplete:
   native-function architectures, an MCP-only control point secures a shrinking
   fraction of agent behavior.
 
-ARC should therefore position wrapped MCP enforcement as the fastest current
+Chio should therefore position wrapped MCP enforcement as the fastest current
 on-ramp, not the complete runtime-security strategy.
 
 Detailed research notes and open questions live in
@@ -134,7 +134,7 @@ framework adoption track lives in `HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md`.
 
 ### Three Runtime Security Layers
 
-ARC's runtime-security story is strongest when described as three layers, not
+Chio's runtime-security story is strongest when described as three layers, not
 one:
 
 1. **Deterministic governance.** Capability validation, static policy checks,
@@ -144,7 +144,7 @@ one:
 3. **Dynamic governance.** Optional future controls that use live context,
    drift signals, and intent/risk scoring to change what is allowed mid-session.
 
-Today ARC ships layers 1 and 2 broadly and now qualifies a bounded but real
+Today Chio ships layers 1 and 2 broadly and now qualifies a bounded but real
 form of layer 3 on the claim-eligible authoritative surfaces. Broader
 ecosystem-wide dynamic governance remains strategic expansion rather than a
 market-qualified claim.
@@ -152,11 +152,11 @@ market-qualified claim.
 ### Three Protocol Adapters, One Kernel
 
 ```
-  MCP Server  <-->  arc-mcp-adapter  <--\
+  MCP Server  <-->  chio-mcp-adapter  <--\
                                          \
-  A2A Agent   <-->  arc-a2a-adapter  <---+--->  ARC Kernel  --->  Receipt Log
+  A2A Agent   <-->  chio-a2a-adapter  <---+--->  Chio Kernel  --->  Receipt Log
                                          /         |
-  ACP Agent   <-->  arc-acp-proxy    <--/     Guard Pipeline
+  ACP Agent   <-->  chio-acp-proxy    <--/     Guard Pipeline
 ```
 
 Every tool invocation, agent delegation, and code action flows through the
@@ -167,7 +167,7 @@ request.
 ### Current Signed Receipt Posture Across Shipped Protocol Surfaces
 
 The receipt log is protocol-agnostic. An MCP tool call, an A2A task
-delegation, ACP live-path action, and ARC-governed HTTP/API call all use the
+delegation, ACP live-path action, and Chio-governed HTTP/API call all use the
 same signed evidence model: timestamped, capability-bound, and append-only.
 Today that is shipped on the live paths that actually reach the kernel. What is
 still future is the full protocol-to-protocol fabric and literal
@@ -179,28 +179,28 @@ shared orchestrator substrate.
 
 The receipt log is not just an audit trail. It is a billing ledger, a
 compliance record, a behavioral dataset, and an underwriting input -- all from
-one data structure. Every receipt that flows through ARC deepens a dataset that
+one data structure. Every receipt that flows through Chio deepens a dataset that
 would be hard to match: a competitor would need comparable authorization,
 attestation, portability, and real deployment distribution before they could
 assemble an equivalent evidence corpus.
 
-The key nuance: observability is not equivalent to enforcement. ARC should not
+The key nuance: observability is not equivalent to enforcement. Chio should not
 collapse those concepts. The receipt log is valuable because it is rooted in
 enforced, signed execution, not because it is "just more telemetry."
 
-### ARC vs. Microsoft AGT
+### Chio vs. Microsoft AGT
 
 Microsoft's Agent Governance Toolkit is the clearest emerging runtime-
 governance reference point as of April 2026. Public Microsoft material
 emphasizes multi-language packaging, a stateless policy engine, DID-based
-identity, and dynamic trust scoring. ARC should not dismiss AGT as a toy or as
+identity, and dynamic trust scoring. Chio should not dismiss AGT as a toy or as
 an Azure-only niche. The better contrast is:
 
 - AGT appears strongest on packaging, language reach, and enterprise
   distribution.
-- ARC's differentiation thesis is portable signed receipts, cross-protocol
+- Chio's differentiation thesis is portable signed receipts, cross-protocol
   delegation/evidence chains, and economic primitives in the decision path.
-- AGT is not best framed as "single protocol"; ARC wins if it proves broader
+- AGT is not best framed as "single protocol"; Chio wins if it proves broader
   attested lineage and third-party-verifiable evidence, not if it relies on a
   weak competitor caricature.
 
@@ -210,9 +210,9 @@ not ACP receipt promotion itself; it is the more generic orchestration layer
 described in `CROSS-PROTOCOL-BRIDGING.md`, plus broader deployment proof that
 the multi-surface story holds under real operator workloads.
 
-### ARC's Differentiation Thesis Today
+### Chio's Differentiation Thesis Today
 
-| Area | ARC position | Status / caveat |
+| Area | Chio position | Status / caveat |
 |------|--------------|-----------------|
 | **Capability tokens** | Attenuated, time-bounded, subject-bound, revocable, formally verified (Lean 4 P1) | Shipped in the core model |
 | **Guard evidence** | Composable fail-closed guards with signed evidence capture | Shipped; advanced stateful guards remain planned |
@@ -224,7 +224,7 @@ the multi-surface story holds under real operator workloads.
 
 The adjacent comparison set is broader than one product. Runtime governance
 toolkits, policy engines, API-security platforms, and observability systems all
-cover part of this landscape. ARC's claim is the fusion of deterministic
+cover part of this landscape. Chio's claim is the fusion of deterministic
 enforcement, signed portable evidence, delegation lineage, and economic
 controls -- not that no adjacent system exists.
 
@@ -241,10 +241,10 @@ shipping surface.
 
 | Item | Rationale | Crate | Status |
 |------|-----------|-------|--------|
-| ACP kernel integration | Promote arc-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `arc-acp-proxy` | [Shipped] |
-| MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `arc-cli` | |
-| Unified runtime config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` | [Partial -- flat schema shipped, nested schema proposed. See spec/CONFIGURATION.md] |
-| Symlink fix | Workspace symlink resolution for monorepo consumers | `arc-cli` | |
+| ACP kernel integration | Promote chio-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `chio-acp-proxy` | [Shipped] |
+| MCP proxy DX polish | The repo already ships `chio mcp serve` and `chio mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `chio proxy` alias | `chio-cli` | |
+| Unified runtime config | Single `chio.yaml` that configures MCP, A2A, and ACP edges with shared policy | `chio-cli` | [Partial -- flat schema shipped, nested schema proposed. See spec/CONFIGURATION.md] |
+| Symlink fix | Workspace symlink resolution for monorepo consumers | `chio-cli` | |
 
 **Why Tier 1 first:** ACP live-path cryptographic enforcement is now landed, so
 the remaining Tier 1 work is about adoption clarity: wrapped MCP DX polish and
@@ -261,14 +261,14 @@ These items extend the protocol surface and complete the compliance story.
 
 | Item | Rationale | Crate | Status |
 |------|-----------|-------|--------|
-| A2A edge crate | Bidirectional bridging: expose ARC tools as A2A Agent Cards | `arc-a2a-edge` | [Shipped] |
-| ACP edge crate | Bidirectional bridging: expose ARC tools as ACP capabilities | `arc-acp-edge` | [Shipped] |
-| MCP adapter completion | Close coverage from 14 tests to 80+, covering streaming, error paths, and edge cases | `arc-mcp-adapter` | [Shipped] |
-| Compliance certificates | Session-scoped, single-artifact proof bundles for auditors (SOC 2, HIPAA, EU AI Act) | `arc-core` | [Shipped] |
+| A2A edge crate | Bidirectional bridging: expose Chio tools as A2A Agent Cards | `chio-a2a-edge` | [Shipped] |
+| ACP edge crate | Bidirectional bridging: expose Chio tools as ACP capabilities | `chio-acp-edge` | [Shipped] |
+| MCP adapter completion | Close coverage from 14 tests to 80+, covering streaming, error paths, and edge cases | `chio-mcp-adapter` | [Shipped] |
+| Compliance certificates | Session-scoped, single-artifact proof bundles for auditors (SOC 2, HIPAA, EU AI Act) | `chio-core` | [Shipped] |
 
 **Why Tier 2 second:** Edge symmetry means every protocol gets both inbound
-adaptation (consume external tools) and outbound exposure (publish ARC tools).
-This is what makes ARC a hub, not just a consumer. Compliance certificates
+adaptation (consume external tools) and outbound exposure (publish Chio tools).
+This is what makes Chio a hub, not just a consumer. Compliance certificates
 are the artifact that enterprise security and legal teams actually want to see.
 
 ### Tier 3: Strategic Bets
@@ -277,14 +277,14 @@ These items create new market categories or defensible network effects.
 
 | Item | Rationale | Crate / Surface | Status |
 |------|-----------|-----------------|--------|
-| Capability attenuation SDK | Programmatic sub-agent delegation with provable subset guarantees | `arc-core` | |
-| Receipt dashboard expansion | The dashboard ships today; the strategic work is adding cross-protocol traces, compliance views, and certificate inspection | `arc-cli/dashboard` | |
-| OpenAI function calling adapter | Fourth protocol edge, capturing the OpenAI ecosystem | `arc-openai` | [Shipped] |
-| WASM guard runtime | Custom guards authored in any language compiled to WASM, sandboxed execution | `arc-guards` | [Shipped] |
-| Kubernetes admission controller | Enforce ARC capability policies at pod deployment time | `sdks/k8s` | [Shipped] |
+| Capability attenuation SDK | Programmatic sub-agent delegation with provable subset guarantees | `chio-core` | |
+| Receipt dashboard expansion | The dashboard ships today; the strategic work is adding cross-protocol traces, compliance views, and certificate inspection | `chio-cli/dashboard` | |
+| OpenAI function calling adapter | Fourth protocol edge, capturing the OpenAI ecosystem | `chio-openai` | [Shipped] |
+| WASM guard runtime | Custom guards authored in any language compiled to WASM, sandboxed execution | `chio-guards` | [Shipped] |
+| Kubernetes admission controller | Enforce Chio capability policies at pod deployment time | `sdks/k8s` | [Shipped] |
 
 **Why Tier 3 last:** These are force multipliers that assume Tier 1 and Tier 2
-are complete. The WASM guard runtime and K8s controller extend ARC into
+are complete. The WASM guard runtime and K8s controller extend Chio into
 infrastructure-level enforcement. The OpenAI adapter captures a major remaining
 agent ecosystem. The dashboard work here is expansion of an existing operator
 surface, not net-new UI creation.
@@ -296,11 +296,11 @@ fully landed and battle-tested in production.
 
 | Item | Rationale | Surface |
 |------|-----------|---------|
-| Multi-region consensus | Distributed receipt log replication across geographic regions with consistency guarantees for global deployments | `arc-consensus` |
-| Public certification marketplace | Third-party auditors and tool authors publish ARC compliance certificates that consumers can verify independently | `arc-marketplace` |
-| Synthetic scoring and simulation | Generate synthetic agent workloads to test guard configurations, budget policies, and capability delegation graphs before production deployment | `arc-sim` |
-| Receipt-backed SLA enforcement | Automated SLA compliance checking using receipt chain evidence, with breach detection and escalation | `arc-sla` |
-| Cross-org federated policy negotiation | Organizations exchange and negotiate capability delegation ceilings through a structured protocol, not ad-hoc configuration | `arc-federation` |
+| Multi-region consensus | Distributed receipt log replication across geographic regions with consistency guarantees for global deployments | `chio-consensus` |
+| Public certification marketplace | Third-party auditors and tool authors publish Chio compliance certificates that consumers can verify independently | `chio-marketplace` |
+| Synthetic scoring and simulation | Generate synthetic agent workloads to test guard configurations, budget policies, and capability delegation graphs before production deployment | `chio-sim` |
+| Receipt-backed SLA enforcement | Automated SLA compliance checking using receipt chain evidence, with breach detection and escalation | `chio-sla` |
+| Cross-org federated policy negotiation | Organizations exchange and negotiate capability delegation ceilings through a structured protocol, not ad-hoc configuration | `chio-federation` |
 
 **Why Tier 4 is horizon work:** These items assume mature production adoption
 across multiple organizations and protocol surfaces. Multi-region consensus
@@ -313,7 +313,7 @@ directions, but premature to build before Tier 1-3 are proven at scale.
 
 The kernel can remain Rust-first. The adoption surface cannot.
 
-ARC's current shipping story is strongest where the Rust CLI can wrap a known
+Chio's current shipping story is strongest where the Rust CLI can wrap a known
 protocol edge directly. That is valuable, but it is not enough to win ordinary
 API developers or mixed-language platform teams. The complementary adoption
 track is defined in `HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md`:
@@ -323,14 +323,14 @@ track is defined in `HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md`:
 - Python first, TypeScript second, Go third for native packaging
 - thin framework wrappers over shared substrate adapters
 
-This is not optional DX polish. It is the packaging path that keeps ARC from
+This is not optional DX polish. It is the packaging path that keeps Chio from
 being a strong kernel with weak reach.
 
 ---
 
-## 5. ARC's Differentiation Features
+## 5. Chio's Differentiation Features
 
-These features are where ARC appears differentiated today or where it is making
+These features are where Chio appears differentiated today or where it is making
 explicit strategic bets. Some are shipped. Some are in progress. Some are
 research horizon.
 
@@ -355,7 +355,7 @@ inherit the tighter of the parent's remaining budget or the delegated budget.
 Planned extensions:
 - **Data volume limits:** cap bytes read/written per grant, not just invocation count
 - **Time + usage composition:** "100 invocations OR 24 hours, whichever comes first"
-- **Monetary budget enforcement:** per-grant spending ceilings in denominated currency, enforced through the arc-link oracle runtime
+- **Monetary budget enforcement:** per-grant spending ceilings in denominated currency, enforced through the chio-link oracle runtime
 
 ### 5.3 Capability Attestation Chaining (Shipped)
 
@@ -404,19 +404,19 @@ multi-department sign-off for cross-functional agent deployments.
 ## 6. The Protocol-Agnostic Tool Store
 
 The three-adapter architecture creates a natural opportunity: a tool store
-where publishers register once and ARC automatically exposes the tool through
+where publishers register once and Chio automatically exposes the tool through
 every protocol edge.
 
 ### Publish Once, Expose Everywhere
 
-A tool author writes a tool, signs a manifest, and registers it with ARC.
+A tool author writes a tool, signs a manifest, and registers it with Chio.
 The MCP edge exposes it as an MCP tool. The A2A edge publishes it in an
 Agent Card. The ACP edge makes it available to coding agents. One tool
 definition, three protocol surfaces, zero additional work for the author.
 
 ### Federated Capability Exchange
 
-Organizations running ARC can federate capability tokens across organizational
+Organizations running Chio can federate capability tokens across organizational
 boundaries. Delegation chains span federation boundaries. The receipt chain
 captures the full cross-org lineage. Federation trust is explicit, bounded,
 and auditable -- not implicit or ambient.
@@ -425,7 +425,7 @@ and auditable -- not implicit or ambient.
 
 A unified discovery surface spans all three protocols: query by tool name,
 capability scope, or protocol preference. The marketplace model follows
-naturally: ARC-mediated billing where every invocation produces a receipt
+naturally: Chio-mediated billing where every invocation produces a receipt
 carrying financial metadata. The receipt chain is the settlement evidence.
 The billing ledger is not a separate system. It is the receipt log.
 
@@ -436,14 +436,14 @@ store or liability-linked billing surface is already implemented.
 
 ## 6.5 Claim Gate
 
-ARC can honestly claim a stronger breakthrough today:
+Chio can honestly claim a stronger breakthrough today:
 
-- ARC ships a cryptographically signed, fail-closed, intent-aware governance
+- Chio ships a cryptographically signed, fail-closed, intent-aware governance
   control plane with shared executor registry resolution, signed
   route-selection evidence, receipt-bearing multi-hop route execution, and a
   shared lifecycle contract across the qualified authoritative HTTP, MCP,
   OpenAI tool execution, A2A skills, and ACP capabilities
-- ARC ships a cryptographically signed, fail-closed governance kernel and a
+- Chio ships a cryptographically signed, fail-closed governance kernel and a
   bounded protocol-aware cross-protocol execution fabric across HTTP APIs,
   MCP, OpenAI tool execution, A2A skills, and ACP capabilities
 - the shipped orchestrator now supports explicit metadata-driven qualified
@@ -452,16 +452,16 @@ ARC can honestly claim a stronger breakthrough today:
   `Native`
 - on the supported authoritative paths, execution is kernel-mediated,
   receipt-bearing, and explicit about lifecycle and fidelity limits, including
-  the authoritative deferred-task mediation ARC now exposes on A2A and ACP
+  the authoritative deferred-task mediation Chio now exposes on A2A and ACP
   public surfaces
 - the repo ships multi-language substrate packages that preserve that kernel
   contract across Python, TypeScript, Go, Rust, JVM, and .NET surfaces
-- ARC now also ships explicit operator-facing economic control surfaces,
+- Chio now also ships explicit operator-facing economic control surfaces,
   partner-visible receipt and settlement contract packages, and bounded
   federated multi-operator proof bundles that justify calling the software
   **comptroller-capable** on qualified local evidence
 
-ARC should not yet claim:
+Chio should not yet claim:
 
 - a proved comptroller-of-the-agent-economy market position
 - "comptroller of the agent economy" as a proved market position rather than a
@@ -469,21 +469,21 @@ ARC should not yet claim:
 
 Broader market-position claims require at least these additional proofs:
 
-- independent external operators running ARC as a live economic control plane
-- partners consuming ARC-issued receipts, checkpoints, reconciliation, or
+- independent external operators running Chio as a live economic control plane
+- partners consuming Chio-issued receipts, checkpoints, reconciliation, or
   settlement artifacts as authoritative workflow inputs
 - external evidence that meaningful economic workflows would fail or lose
-  partner acceptance without ARC
+  partner acceptance without Chio
 - stronger ecosystem and economic validation for the market-position story
 
 The authoritative machine-readable gates now split these levels explicitly:
 
 - bounded runtime substrate:
-  `docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`
+  `docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`
 - stronger technical control-plane thesis:
-  `docs/standards/ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
+  `docs/standards/CHIO_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
 - comptroller-capable market-position boundary:
-  `docs/standards/ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json`
+  `docs/standards/CHIO_COMPTROLLER_MARKET_POSITION_MATRIX.json`
 
 The reason this matters to runtime security is simple: if tools and skills can
 be invoked through multiple protocols or through native APIs, security
@@ -497,7 +497,7 @@ treated as a naive 1:1 "every endpoint becomes a tool" rule.
 
 ## 7. Developer Experience Roadmap
 
-Five phases, each building on the last. The goal is to take ARC from "powerful
+Five phases, each building on the last. The goal is to take Chio from "powerful
 but requires expertise" to "secure any agent in one command." The phases below
 explicitly distinguish shipped surfaces from proposed next steps.
 
@@ -506,25 +506,25 @@ explicitly distinguish shipped surfaces from proposed next steps.
 Current shipped surface:
 
 ```
-arc mcp serve --policy <policy.yaml> --server-id <id> <command>...
+chio mcp serve --policy <policy.yaml> --server-id <id> <command>...
 ```
 
 and, for hosted HTTP:
 
 ```bash
-arc mcp serve-http --policy <policy.yaml> --server-id <id> --listen <addr> <command>...
+chio mcp serve-http --policy <policy.yaml> --server-id <id> --listen <addr> <command>...
 ```
 
-These commands already wrap an MCP server subprocess, interpose the ARC
+These commands already wrap an MCP server subprocess, interpose the Chio
 kernel, and produce signed receipts for every tool call. The next DX step is
 to simplify naming, defaults, and documentation further, potentially including
-an `arc proxy` alias.
+an `chio proxy` alias.
 
-This is the **adoption wedge**, not the architectural boundary. ARC should win
+This is the **adoption wedge**, not the architectural boundary. Chio should win
 initial deployment through wrapped MCP edges while building toward broader
 protocol and native-surface coverage.
 
-### Phase 2: `arc.yaml` Unified Runtime Config (Proposed)
+### Phase 2: `chio.yaml` Unified Runtime Config (Proposed)
 
 One configuration file that defines all three protocol edges, shared policy,
 capability authorities, and receipt storage:
@@ -546,11 +546,11 @@ policy:
   guards: [forbidden-path, shell-command, egress-allowlist]
 receipts:
   store: sqlite
-  path: "./arc-receipts.db"
+  path: "./chio-receipts.db"
 ```
 
-Status note: this is a design proposal. The repo currently supports `arc_yaml`
-as a policy format, but does not currently ship an `arc start --config arc.yaml`
+Status note: this is a design proposal. The repo currently supports `chio_yaml`
+as a policy format, but does not currently ship an `chio start --config chio.yaml`
 runtime command.
 
 ### Phase 3: Guard SDK
@@ -562,7 +562,7 @@ sandbox, and the kernel provides the integration.
 
 ### Phase 3.5: Behavioral and Intent Signals (Research / Design)
 
-ARC should explicitly research which live signals are useful for runtime risk
+Chio should explicitly research which live signals are useful for runtime risk
 evaluation without introducing a false sense of precision:
 
 - workflow drift from the initial session objective
@@ -584,7 +584,7 @@ collection.
 
 ### Phase 5: Hosted Managed Service
 
-ARC-as-a-service with per-receipt pricing. Organizations that do not want to
+Chio-as-a-service with per-receipt pricing. Organizations that do not want to
 operate the kernel, receipt store, or control plane can use the hosted service.
 The trust model is preserved: the managed kernel signs receipts with keys the
 customer controls, so the hosted service cannot forge receipts. Key custody,
@@ -602,15 +602,15 @@ presented here as externally validated market research.
 
 ### Ring 1: Open-Source Adoption (Developers)
 
-ARC is open source and free. Developers adopt it because `arc mcp serve` /
-`arc mcp serve-http` are the fastest current way to add authorization and audit
-to an MCP server. A future `arc proxy` alias may compress that further. The
+Chio is open source and free. Developers adopt it because `chio mcp serve` /
+`chio mcp serve-http` are the fastest current way to add authorization and audit
+to an MCP server. A future `chio proxy` alias may compress that further. The
 receipt log is local SQLite. No account, no sign-up, no cloud dependency.
 
 ### Ring 2: Enterprise SIEM Integration (Security Teams)
 
-`arc-siem` exports receipt data to Splunk, Datadog, Elastic, and any SIEM
-that accepts structured events. Security teams adopt ARC because it gives
+`chio-siem` exports receipt data to Splunk, Datadog, Elastic, and any SIEM
+that accepts structured events. Security teams adopt Chio because it gives
 them the agent audit trail they cannot get from any other source. The
 integration is the wedge into enterprise procurement.
 
@@ -621,13 +621,13 @@ pre-execution enforcement is still reactive.
 
 Compliance teams need artifacts, not dashboards. Session compliance
 certificates, receipt chain exports, and EU AI Act Article 19 traceability
-reports are the artifacts ARC produces natively. Managed analytics packages
+reports are the artifacts Chio produces natively. Managed analytics packages
 these artifacts with retention policies, automated report generation, and
 regulator-ready formatting.
 
 ### Ring 4: Liability Market Integration (Insurance Industry)
 
-ARC receipts are actuarial data. The behavioral metrics computed from the
+Chio receipts are actuarial data. The behavioral metrics computed from the
 receipt log -- reliability, compliance rate, scope discipline, delegation
 hygiene -- are the inputs an underwriter needs to price agent liability
 coverage. Per-session pricing, capability-scoped coverage, and receipt-backed
@@ -643,19 +643,19 @@ Current shipped and planned integrations, ordered by expected adoption impact.
 
 | Integration | Description | Status |
 |-------------|-------------|--------|
-| **OpenAI function calling adapter** | Wrap OpenAI-style function calls through the ARC kernel | Shipped |
-| **HTTP/OpenAPI sidecar** | Reverse-proxy adoption path for any documented API, with manifest generation from OpenAPI and `x-arc-*` policy hints | Shipped |
+| **OpenAI function calling adapter** | Wrap OpenAI-style function calls through the Chio kernel | Shipped |
+| **HTTP/OpenAPI sidecar** | Reverse-proxy adoption path for any documented API, with manifest generation from OpenAPI and `x-chio-*` policy hints | Shipped |
 | **Python / TypeScript / Go substrate SDKs** | Multi-language middleware and wrapper packages around the Rust kernel | Shipped |
-| **LangChain / LlamaIndex wrappers** | Python packages that inject ARC authorization into existing agent frameworks | Planned |
-| **Kubernetes admission controller** | Enforce ARC capability policies at pod deployment, reject workloads without valid tokens from trusted ARC issuers | Shipped |
+| **LangChain / LlamaIndex wrappers** | Python packages that inject Chio authorization into existing agent frameworks | Planned |
+| **Kubernetes admission controller** | Enforce Chio capability policies at pod deployment, reject workloads without valid tokens from trusted Chio issuers | Shipped |
 | **WASM guard runtime** | Execute custom guards compiled to WASM in a sandboxed runtime | Planned |
 | **HSM integration** | Hardware Security Module support for kernel signing keys (PKCS#11, AWS CloudHSM, Azure HSM) | Planned |
-| **TEE / confidential computing** | Run the ARC kernel inside a Trusted Execution Environment (Intel SGX, AMD SEV, ARM CCA) | Research |
+| **TEE / confidential computing** | Run the Chio kernel inside a Trusted Execution Environment (Intel SGX, AMD SEV, ARM CCA) | Research |
 | **SCIM provisioning** | Sync agent identities and capability grants from enterprise identity providers | Planned |
 | **OpenTelemetry collector** | Export receipt data as OTel spans for existing observability infrastructure | Planned |
 
 These integrations matter partly because agent execution is already moving
-beyond MCP-specific surfaces. ARC's protocol-agnostic story gets stronger as it
+beyond MCP-specific surfaces. Chio's protocol-agnostic story gets stronger as it
 secures a wider share of actual runtime behavior.
 
 ---
@@ -666,10 +666,10 @@ Current state and targets for the four protocol surfaces.
 
 | Adapter | Tests (Current) | Grade | Target | Target Grade |
 |---------|-----------------|-------|--------|--------------|
-| `arc-mcp-adapter` | 14 | C | 80+ | A |
-| `arc-a2a-adapter` | 56 | A- | 60+ | Maintain |
-| `arc-acp-proxy` | 129 | A | 130+ | Maintain |
-| `arc-mcp-edge` | 42 | B+ | 60+ | A- |
+| `chio-mcp-adapter` | 14 | C | 80+ | A |
+| `chio-a2a-adapter` | 56 | A- | 60+ | Maintain |
+| `chio-acp-proxy` | 129 | A | 130+ | Maintain |
+| `chio-mcp-edge` | 42 | B+ | 60+ | A- |
 
 Counts reflect `#[test]` functions in each crate's source tree. For line-level
 coverage metrics, see CI reports.
@@ -695,14 +695,14 @@ It is not a tool server. It does not implement tools. It intercepts JSON-RPC
 messages, enforces capability-based access control, and generates audit entries.
 
 The kernel is injected as a service, not embedded as a library. This means the
-proxy can run alongside an ARC kernel that is already managing MCP and A2A
+proxy can run alongside an Chio kernel that is already managing MCP and A2A
 edges, producing receipts into the same log. The alternative -- making the ACP
 proxy a standalone tool server -- would have created a second receipt log and a
 second policy evaluation path, violating the single-kernel invariant.
 
-Note: `arc-acp-proxy` and `arc-acp-edge` serve opposite directions.
+Note: `chio-acp-proxy` and `chio-acp-edge` serve opposite directions.
 The proxy is an inbound adapter (intercepts an existing ACP session for
-security enforcement). The edge is an outbound adapter (exposes ARC
+security enforcement). The edge is an outbound adapter (exposes Chio
 tools to ACP editors as if they were native ACP capabilities). The
 "not a tool server" characterization applies to the proxy only.
 
@@ -722,29 +722,29 @@ leaks through an inappropriate abstraction.
 
 Every protocol gets two crate surfaces:
 
-| Protocol | Inbound (consume external) | Outbound (expose ARC tools) |
+| Protocol | Inbound (consume external) | Outbound (expose Chio tools) |
 |----------|---------------------------|----------------------------|
-| MCP | `arc-mcp-adapter` | `arc-mcp-edge` |
-| A2A | `arc-a2a-adapter` | `arc-a2a-edge` (Tier 2) |
-| ACP | `arc-acp-proxy` | `arc-acp-edge` (Tier 2) |
+| MCP | `chio-mcp-adapter` | `chio-mcp-edge` |
+| A2A | `chio-a2a-adapter` | `chio-a2a-edge` (Tier 2) |
+| ACP | `chio-acp-proxy` | `chio-acp-edge` (Tier 2) |
 
-Inbound adapters wrap external protocol servers as ARC tool servers. Outbound
-edges expose ARC-native tools through the external protocol's wire format.
-Bidirectional bridging is what makes ARC a protocol hub rather than a
-protocol consumer. An ARC-native tool registered once is discoverable and
+Inbound adapters wrap external protocol servers as Chio tool servers. Outbound
+edges expose Chio-native tools through the external protocol's wire format.
+Bidirectional bridging is what makes Chio a protocol hub rather than a
+protocol consumer. An Chio-native tool registered once is discoverable and
 invocable from MCP clients, A2A agents, and ACP editors simultaneously.
 
 ---
 
 ## The Strategic Thesis
 
-ARC's near-term protocol bet centers on MCP, A2A, and ACP, but the broader
+Chio's near-term protocol bet centers on MCP, A2A, and ACP, but the broader
 strategic view is that agent execution will remain protocol-mixed: MCP, A2A,
 ACP, native APIs, and framework-level tool surfaces will coexist.
 None of these surfaces natively solve authorization, attestation, or non-
 repudiation, because those are not their jobs.
 
-ARC is the system that aims to sit across those surfaces and answer the
+Chio is the system that aims to sit across those surfaces and answer the
 questions that matter after the agent acts: was it authorized, what did it
 cost, can you prove it, and who is liable if it went wrong?
 
@@ -754,5 +754,5 @@ protocol adapters are the distribution mechanism. The kernel is the trust
 anchor. Liability-market applications are a long-term strategic extension if
 the security and compliance layers prove valuable first.
 
-ARC does not compete with agent protocols. It makes them safe to use for
+Chio does not compete with agent protocols. It makes them safe to use for
 things that matter.

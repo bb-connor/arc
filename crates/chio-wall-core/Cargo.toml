@@ -1,0 +1,21 @@
+[package]
+name = "chio-wall-core"
+description = "Typed Chio-Wall control-path contracts layered on Chio guard and receipt truth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_wall_core"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

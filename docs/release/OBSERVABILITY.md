@@ -1,6 +1,6 @@
 # Observability Guide
 
-ARC `v2.8` treats observability as a supported operator contract, not a
+Chio `v2.8` treats observability as a supported operator contract, not a
 best-effort debugging convenience. The goal is that an operator can identify
 trust, lifecycle, federation, and evidence problems without reading Rust source
 or replaying raw traffic by hand.
@@ -18,7 +18,7 @@ or replaying raw traffic by hand.
 
 ### Trust-Control
 
-`arc trust serve` exposes:
+`chio trust serve` exposes:
 
 - `GET /health`
 - `GET /v1/authority`
@@ -46,7 +46,7 @@ leader visibility rather than general service health.
 
 ### Hosted MCP Edge
 
-`arc mcp serve-http` exposes:
+`chio mcp serve-http` exposes:
 
 - `GET /admin/health`
 - `GET /admin/authority`
@@ -103,7 +103,7 @@ These surfaces intentionally preserve invalid or incomplete state:
 
 ## A2A Diagnostics
 
-`arc-a2a-adapter` does not ship a separate HTTP health server. Its production
+`chio-a2a-adapter` does not ship a separate HTTP health server. Its production
 diagnostic contract is:
 
 - fail-closed discovery and invocation errors with explicit reason strings

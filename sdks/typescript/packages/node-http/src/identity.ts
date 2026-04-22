@@ -1,7 +1,7 @@
 /**
  * Default identity extraction from HTTP request headers.
  *
- * Mirrors the Rust extract_caller logic in arc-api-protect/src/evaluator.rs.
+ * Mirrors the Rust extract_caller logic in chio-api-protect/src/evaluator.rs.
  * Extracts caller identity from Authorization headers, cookies, and API keys.
  */
 

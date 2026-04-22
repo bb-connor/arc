@@ -1,10 +1,10 @@
-# Output Sanitizer Absorption: ClawdStrike to ARC
+# Output Sanitizer Absorption: ClawdStrike to Chio
 
 This document plans the full absorption of ClawdStrike's output sanitizer
-into ARC's post-invocation guard system. ARC already has a partial port at
-`crates/arc-guards/src/response_sanitization.rs`. ClawdStrike's implementation
+into Chio's post-invocation guard system. Chio already has a partial port at
+`crates/chio-guards/src/response_sanitization.rs`. ClawdStrike's implementation
 is substantially richer. This doc inventories the gap, defines the refactoring
-plan, and proposes type signatures for the complete ARC-native version.
+plan, and proposes type signatures for the complete Chio-native version.
 
 ---
 
@@ -201,16 +201,16 @@ relevant because it operates on the same text pipeline:
   suppress alert spam from repeated injection payloads
 
 The hygiene module is a pre-invocation concern (inspecting inputs), while the
-output sanitizer is post-invocation (inspecting outputs). ARC already has
+output sanitizer is post-invocation (inspecting outputs). Chio already has
 separate pre- and post-invocation pipelines, so these map naturally.
 
 ---
 
-## 4. Gap Analysis: ARC vs ClawdStrike
+## 4. Gap Analysis: Chio vs ClawdStrike
 
-### 4.1 What ARC Has
+### 4.1 What Chio Has
 
-`crates/arc-guards/src/response_sanitization.rs` implements:
+`crates/chio-guards/src/response_sanitization.rs` implements:
 
 - `SensitivityLevel` enum (Low/Medium/High) -- three tiers, no custom variant
 - `SensitivePattern` struct with name, regex, level, redaction string
@@ -223,22 +223,22 @@ separate pre- and post-invocation pipelines, so these map naturally.
 - `ScanResult` enum (Clean/Blocked/Redacted)
 - `build_pattern()` helper for custom patterns
 
-`crates/arc-guards/src/post_invocation.rs` implements:
+`crates/chio-guards/src/post_invocation.rs` implements:
 
 - `PostInvocationVerdict` enum (Allow/Block/Redact/Escalate)
 - `PostInvocationHook` trait with `name()` and `inspect()` methods
 - `PostInvocationPipeline` with ordered evaluation, short-circuit on Block,
   response threading through Redact hooks, and escalation collection
 
-### 4.2 What ARC Is Missing
+### 4.2 What Chio Is Missing
 
-| Feature | ClawdStrike | ARC |
+| Feature | ClawdStrike | Chio |
 |---------|------------|-----|
 | Detection categories | 4 variants (`Secret`/`Pii`/`Internal`/`Custom`) with per-category toggles and strategies | 3-tier sensitivity level, no categories |
 | Redaction strategies | 5 variants with strength ranking and overlap resolution | Single replacement string per pattern |
 | Secret detection | 7 patterns + entropy detector | None |
 | Internal infra detection | 4 patterns | None |
-| Healthcare PII | None (generic PII only) | MRN + ICD-10 (ARC has this, ClawdStrike does not) |
+| Healthcare PII | None (generic PII only) | MRN + ICD-10 (Chio has this, ClawdStrike does not) |
 | Luhn validation | Yes, on credit card matches | No (regex-only, high false positive rate) |
 | Allowlist/denylist | Exact strings, regex patterns, test credential detection | None |
 | Entity recognizer hook | Trait-based extensibility for NER | None |
@@ -250,7 +250,7 @@ separate pre- and post-invocation pipelines, so these map naturally.
 | Watermarking | Ed25519-signed content provenance | None |
 | Processing stats | Input/output length, timing, counts | Redaction count only |
 
-### 4.3 ARC-Only Features Worth Keeping
+### 4.3 Chio-Only Features Worth Keeping
 
 - **MRN and ICD-10 patterns** -- healthcare-specific PII not present in
   ClawdStrike. These should be preserved and added to the merged pattern
@@ -268,14 +268,14 @@ separate pre- and post-invocation pipelines, so these map naturally.
 
 ### 5.1 Phase 1: Type Unification
 
-Replace ARC's `SensitivityLevel` with ClawdStrike's richer type model:
+Replace Chio's `SensitivityLevel` with ClawdStrike's richer type model:
 
 - Adopt `SensitiveCategory` (Secret/Pii/Internal/Custom)
 - Adopt `RedactionStrategy` (None/Partial/Hash/TypeLabel/Full) with strength
   ranking
 - Adopt `Span`, `DetectorType`, `SensitiveDataFinding`
 - Add `CategoryConfig` with per-category enable/disable
-- Keep ARC's `SanitizationAction` (Block/Redact) as the guard-level policy;
+- Keep Chio's `SanitizationAction` (Block/Redact) as the guard-level policy;
   this is orthogonal to per-finding redaction strategies
 
 Remove `SensitivityLevel`. The old Low/Medium/High mapping becomes:
@@ -287,7 +287,7 @@ Remove `SensitivityLevel`. The old Low/Medium/High mapping becomes:
 
 Port the full detection pipeline into `response_sanitization.rs`:
 
-1. **Static pattern library** -- merge ClawdStrike's 14 patterns with ARC's
+1. **Static pattern library** -- merge ClawdStrike's 14 patterns with Chio's
    healthcare patterns (MRN, ICD-10, date of birth) into a single
    `OnceLock`-backed `compile_patterns()` function. Total: ~17 patterns.
 
@@ -325,7 +325,7 @@ The stream integrates with `PostInvocationPipeline` by producing
 
 ### 5.4 Phase 4: PostInvocationHook Adapter
 
-Bridge the sanitizer into ARC's post-invocation pipeline:
+Bridge the sanitizer into Chio's post-invocation pipeline:
 
 ```rust
 pub struct SanitizationHook {
@@ -383,7 +383,7 @@ prevent PII from being sent to tools, and post-invocation (via
 
 ### 6.1 Column-Level PII in Query Results
 
-When ARC mediates database tool access (SQL tools, data connectors), the
+When Chio mediates database tool access (SQL tools, data connectors), the
 output sanitizer provides a second layer of defense beyond column-level
 access control:
 
@@ -400,7 +400,7 @@ ACL was satisfied.
 
 ### 6.2 Query Result Governance
 
-The sanitizer's finding metadata integrates with ARC's receipt log:
+The sanitizer's finding metadata integrates with Chio's receipt log:
 
 ```rust
 // In the receipt, after post-invocation sanitization:
@@ -447,18 +447,18 @@ fn sanitize_json_value(
 
 ---
 
-## 7. Watermarking: Should ARC Absorb It?
+## 7. Watermarking: Should Chio Absorb It?
 
 ### 7.1 Recommendation: Yes, as a Separate Module
 
 The watermarking system is orthogonal to sanitization but closely related
-to ARC's receipt system. ARC should absorb it into a new
-`crates/arc-guards/src/watermarking.rs` module (or potentially a standalone
-`arc-watermark` crate if the dependency footprint warrants it).
+to Chio's receipt system. Chio should absorb it into a new
+`crates/chio-guards/src/watermarking.rs` module (or potentially a standalone
+`chio-watermark` crate if the dependency footprint warrants it).
 
 ### 7.2 Use Case: Receipt-Linked Content Watermarks
 
-ARC already signs receipts with Ed25519 over canonical JSON. The watermarking
+Chio already signs receipts with Ed25519 over canonical JSON. The watermarking
 system uses the same primitives. The natural integration:
 
 1. When a tool response passes through the post-invocation pipeline, the
@@ -484,13 +484,13 @@ pub struct ReceiptLinkedWatermarkPayload {
 }
 ```
 
-### 7.3 Adaptations for ARC
+### 7.3 Adaptations for Chio
 
-- Replace `hush_core` crypto with `arc_core::crypto` (same Ed25519
+- Replace `hush_core` crypto with `chio_core::crypto` (same Ed25519
   primitives, different crate path)
-- Replace `hush_core::canonical` with `arc_core::canonical` for JCS
+- Replace `hush_core::canonical` with `chio_core::canonical` for JCS
   serialization
-- Replace `<!--hushclaw.watermark:v1:` prefix with `<!--arc.watermark:v1:`
+- Replace `<!--hushclaw.watermark:v1:` prefix with `<!--chio.watermark:v1:`
 - Add the receipt ID to the watermark payload as a required field
 - Keep the `WatermarkExtractor` and `WatermarkVerifierConfig` for downstream
   consumers that need to verify content provenance
@@ -508,10 +508,10 @@ configurable per tool or per capability scope:
 
 ---
 
-## 8. Type Signatures for the Complete ARC-Native Version
+## 8. Type Signatures for the Complete Chio-Native Version
 
 These are the target types for the fully absorbed implementation in
-`crates/arc-guards/src/response_sanitization.rs`.
+`crates/chio-guards/src/response_sanitization.rs`.
 
 ### 8.1 Core Types
 
@@ -658,7 +658,7 @@ pub struct OutputSanitizer {
     config: OutputSanitizerConfig,
     allowlist_patterns: Vec<Regex>,
     denylist_patterns: Vec<(String, Regex)>,
-    entity_recognizer: Option<Arc<dyn EntityRecognizer>>,
+    entity_recognizer: Option<Chio<dyn EntityRecognizer>>,
 }
 
 impl OutputSanitizer {
@@ -700,7 +700,7 @@ pub struct ProcessingStats {
 ### 8.5 Post-Invocation Hook Adapter
 
 ```rust
-/// Bridges OutputSanitizer into ARC's PostInvocationPipeline.
+/// Bridges OutputSanitizer into Chio's PostInvocationPipeline.
 pub struct SanitizationHook {
     sanitizer: OutputSanitizer,
     on_finding: SanitizationAction,
@@ -810,9 +810,9 @@ impl ResponseSanitizationGuard {
 ### 9.2 Pattern Library Migration
 
 1. Start with ClawdStrike's 14 patterns as the base
-2. Add ARC's MRN, ICD-10, and date-of-birth patterns with appropriate
+2. Add Chio's MRN, ICD-10, and date-of-birth patterns with appropriate
    categories and confidence scores
-3. Mark ARC-original patterns with a `healthcare_` prefix in their IDs
+3. Mark Chio-original patterns with a `healthcare_` prefix in their IDs
    for traceability
 4. Remove duplicate patterns (SSN, email, phone, credit card are in both;
    prefer ClawdStrike's versions which have Luhn validation and better
@@ -821,27 +821,27 @@ impl ResponseSanitizationGuard {
 ### 9.3 Dependency Changes
 
 The port requires:
-- `regex` -- already a dependency of `arc-guards`
-- `arc-core` crypto -- replaces `hush_core` for SHA-256 and Ed25519
+- `regex` -- already a dependency of `chio-guards`
+- `chio-core` crypto -- replaces `hush_core` for SHA-256 and Ed25519
 - No new external dependencies needed
 
-The `hush_core` dependency is **not** added to `arc-guards`. All crypto
-goes through `arc_core::crypto` and `arc_core::canonical`.
+The `hush_core` dependency is **not** added to `chio-guards`. All crypto
+goes through `chio_core::crypto` and `chio_core::canonical`.
 
 ---
 
 ## 10. Open Questions
 
 1. **Entropy threshold tuning** -- ClawdStrike defaults to 4.5 bits. Is this
-   appropriate for ARC's use cases, or should it be more conservative
+   appropriate for Chio's use cases, or should it be more conservative
    (higher threshold, fewer false positives)?
 
 2. **Entity recognizer backend** -- The trait is defined but what ships as
    the default implementation? Options: no default (callers bring their own),
    a WASM-based NER module, or a simple keyword list for common entity types.
 
-3. **Watermark format** -- should `<!--arc.watermark:v1:` be the only
-   encoding, or should ARC also support a non-HTML format for non-text
+3. **Watermark format** -- should `<!--chio.watermark:v1:` be the only
+   encoding, or should Chio also support a non-HTML format for non-text
    payloads (JSON metadata field, binary trailer)?
 
 4. **Receipt integration granularity** -- should every finding be recorded

@@ -3,19 +3,19 @@
 > **Status**: Tier 2 -- proposed April 2026
 > **Priority**: Medium-low -- massive installed base justifies presence, but
 > the integration should be thin. Airflow is not agent-native; the value is
-> "ARC works everywhere" positioning and brownfield adoption.
+> "Chio works everywhere" positioning and brownfield adoption.
 
 ## 1. Why Airflow
 
 Apache Airflow has the largest installed base of any workflow orchestrator.
 Thousands of organizations run production data pipelines on Airflow. As
 agents begin to participate in these pipelines -- triggering DAGs, running
-operators, accessing data -- ARC governance needs to work in this
+operators, accessing data -- Chio governance needs to work in this
 environment.
 
 The integration strategy is deliberately thin: a custom Operator wrapper and
 a DAG-level hook. Airflow's architecture (scheduler, worker, metadata DB)
-is well-established and heavyweight. ARC should not try to deeply integrate
+is well-established and heavyweight. Chio should not try to deeply integrate
 with Airflow internals. Instead, wrap the execution boundary.
 
 ### Integration Scope
@@ -36,13 +36,13 @@ Airflow Worker
 |                                                          |
 |  DAG: agent_pipeline                                     |
 |  +---------------------------------------------------+  |
-|  |  ArcOperator(                                      |  |
+|  |  ChioOperator(                                      |  |
 |  |    operator=PythonOperator(callable=search),       |  |
 |  |    scope="tools:search",                           |  |
 |  |  )                                                 |  |
 |  |       |                                            |  |
 |  |       v                                            |  |
-|  |  ARC Sidecar (:9090)                               |  |
+|  |  Chio Sidecar (:9090)                               |  |
 |  |  evaluate -> guard -> allow/deny                   |  |
 |  |       |                                            |  |
 |  |       v (if allowed)                               |  |
@@ -57,20 +57,20 @@ Airflow Worker
 
 ## 3. Integration Model
 
-### 3.1 ArcOperator Wrapper
+### 3.1 ChioOperator Wrapper
 
 The primary integration point. Wraps any existing Airflow operator with
-ARC capability enforcement:
+Chio capability enforcement:
 
 ```python
 from airflow.models import BaseOperator
-from arc_sdk import ArcClient
+from chio_sdk import ChioClient
 
 
-class ArcOperator(BaseOperator):
-    """Wraps an inner operator with ARC capability evaluation.
+class ChioOperator(BaseOperator):
+    """Wraps an inner operator with Chio capability evaluation.
 
-    The inner operator only executes if the ARC kernel grants the
+    The inner operator only executes if the Chio kernel grants the
     requested capability. A receipt is stored in XCom on success.
     """
 
@@ -96,9 +96,9 @@ class ArcOperator(BaseOperator):
         self.sidecar_url = sidecar_url
 
     def execute(self, context):
-        arc = ArcClient(base_url=self.sidecar_url)
+        chio = ChioClient(base_url=self.sidecar_url)
 
-        verdict = arc.evaluate_sync(
+        verdict = chio.evaluate_sync(
             tool=self.tool_name,
             scope=self.scope,
             arguments={
@@ -112,16 +112,16 @@ class ArcOperator(BaseOperator):
         )
 
         if verdict.denied:
-            self.log.error("ARC denied %s: %s", self.tool_name, verdict.reason)
-            raise PermissionError(f"ARC denied: {verdict.reason}")
+            self.log.error("Chio denied %s: %s", self.tool_name, verdict.reason)
+            raise PermissionError(f"Chio denied: {verdict.reason}")
 
         # Execute the inner operator
         result = self.inner_operator.execute(context)
 
         # Record receipt and push to XCom
-        receipt = arc.record_sync(verdict=verdict)
-        context["ti"].xcom_push(key="arc_receipt_id", value=receipt.receipt_id)
-        context["ti"].xcom_push(key="arc_scope", value=self.scope)
+        receipt = chio.record_sync(verdict=verdict)
+        context["ti"].xcom_push(key="chio_receipt_id", value=receipt.receipt_id)
+        context["ti"].xcom_push(key="chio_scope", value=self.scope)
 
         return result
 ```
@@ -132,12 +132,12 @@ class ArcOperator(BaseOperator):
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.http.operators.http import SimpleHttpOperator
-from arc_airflow import ArcOperator
+from chio_airflow import ChioOperator
 
 with DAG("agent_pipeline", schedule="@hourly") as dag:
 
     # Wrap a PythonOperator
-    search = ArcOperator(
+    search = ChioOperator(
         task_id="search",
         inner_operator=PythonOperator(
             task_id="search_inner",
@@ -148,7 +148,7 @@ with DAG("agent_pipeline", schedule="@hourly") as dag:
     )
 
     # Wrap an HTTP operator
-    api_call = ArcOperator(
+    api_call = ChioOperator(
         task_id="api_call",
         inner_operator=SimpleHttpOperator(
             task_id="api_call_inner",
@@ -169,16 +169,16 @@ For Airflow 2.x+ TaskFlow API:
 
 ```python
 from airflow.decorators import dag, task
-from arc_airflow import arc_task
+from chio_airflow import chio_task
 
 @dag(schedule="@daily")
 def agent_pipeline():
 
-    @arc_task(scope="tools:search", guards=["rate-limit"])
+    @chio_task(scope="tools:search", guards=["rate-limit"])
     def search(query: str) -> list[dict]:
         return search_engine.search(query)
 
-    @arc_task(scope="tools:analyze")
+    @chio_task(scope="tools:analyze")
     def analyze(documents: list[dict]) -> dict:
         return analyzer.run(documents)
 
@@ -193,16 +193,16 @@ Implementation:
 ```python
 from airflow.decorators import task as airflow_task
 
-def arc_task(scope: str, guards: list[str] | None = None, budget: dict | None = None):
-    """TaskFlow decorator with ARC governance."""
+def chio_task(scope: str, guards: list[str] | None = None, budget: dict | None = None):
+    """TaskFlow decorator with Chio governance."""
 
     def decorator(fn):
         @airflow_task(task_id=fn.__name__)
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            arc = ArcClient()
+            chio = ChioClient()
 
-            verdict = arc.evaluate_sync(
+            verdict = chio.evaluate_sync(
                 tool=fn.__name__,
                 scope=scope,
                 guards=guards,
@@ -210,11 +210,11 @@ def arc_task(scope: str, guards: list[str] | None = None, budget: dict | None = 
             )
 
             if verdict.denied:
-                raise PermissionError(f"ARC denied: {verdict.reason}")
+                raise PermissionError(f"Chio denied: {verdict.reason}")
 
             result = fn(*args, **kwargs)
 
-            receipt = arc.record_sync(verdict=verdict)
+            receipt = chio.record_sync(verdict=verdict)
             # Push receipt to XCom via return metadata
             return result
 
@@ -229,16 +229,16 @@ task in the DAG executes:
 
 ```python
 from airflow.listeners import hookimpl
-from arc_sdk import ArcClient
+from chio_sdk import ChioClient
 
 
-class ArcDagListener:
-    """Airflow listener that evaluates DAG-level ARC grants."""
+class ChioDagListener:
+    """Airflow listener that evaluates DAG-level Chio grants."""
 
     @hookimpl
     def on_dag_run_running(self, dag_run, msg):
-        arc = ArcClient()
-        verdict = arc.evaluate_sync(
+        chio = ChioClient()
+        verdict = chio.evaluate_sync(
             tool=f"dag:{dag_run.dag_id}",
             scope="automation:dag-run",
             arguments={
@@ -251,20 +251,20 @@ class ArcDagListener:
 
         if verdict.denied:
             dag_run.set_state("failed")
-            raise PermissionError(f"ARC denied DAG {dag_run.dag_id}: {verdict.reason}")
+            raise PermissionError(f"Chio denied DAG {dag_run.dag_id}: {verdict.reason}")
 ```
 
 ### 3.5 Sensor Governance
 
-Airflow sensors poll for conditions. ARC can govern what sensors are
+Airflow sensors poll for conditions. Chio can govern what sensors are
 allowed to poll and how frequently:
 
 ```python
 from airflow.sensors.base import BaseSensorOperator
-from arc_airflow import ArcOperator
+from chio_airflow import ChioOperator
 
-# Wrap a sensor with ARC -- each poke is evaluated
-check_data = ArcOperator(
+# Wrap a sensor with Chio -- each poke is evaluated
+check_data = ChioOperator(
     task_id="check_data",
     inner_operator=S3KeySensor(
         task_id="check_data_inner",
@@ -277,65 +277,65 @@ check_data = ArcOperator(
 
 ## 4. Receipt Aggregation via XCom
 
-Each ArcOperator pushes its receipt ID to XCom. A final task can aggregate
+Each ChioOperator pushes its receipt ID to XCom. A final task can aggregate
 these into a workflow receipt:
 
 ```python
-@arc_task(scope="receipts:aggregate")
+@chio_task(scope="receipts:aggregate")
 def aggregate_receipts(**context):
-    """Collect all ARC receipts from the DAG run into a workflow receipt."""
-    arc = ArcClient()
+    """Collect all Chio receipts from the DAG run into a workflow receipt."""
+    chio = ChioClient()
     ti = context["ti"]
 
     # Pull receipt IDs from all upstream tasks
     receipt_ids = []
     for task_id in context["dag"].task_ids:
-        rid = ti.xcom_pull(task_ids=task_id, key="arc_receipt_id")
+        rid = ti.xcom_pull(task_ids=task_id, key="chio_receipt_id")
         if rid:
             receipt_ids.append(rid)
 
     if receipt_ids:
-        workflow_receipt = arc.finalize_workflow_sync(
+        workflow_receipt = chio.finalize_workflow_sync(
             step_receipt_ids=receipt_ids,
             workflow_id=context["run_id"],
         )
         return workflow_receipt.receipt_id
 ```
 
-## 5. Airflow Connection for ARC
+## 5. Airflow Connection for Chio
 
 ```python
 # Register as an Airflow connection type
 from airflow.hooks.base import BaseHook
 
-class ArcHook(BaseHook):
-    conn_name_attr = "arc_conn_id"
-    default_conn_name = "arc_default"
-    conn_type = "arc"
-    hook_name = "ARC Protocol"
+class ChioHook(BaseHook):
+    conn_name_attr = "chio_conn_id"
+    default_conn_name = "chio_default"
+    conn_type = "chio"
+    hook_name = "Chio Protocol"
 
-    def __init__(self, arc_conn_id: str = default_conn_name):
+    def __init__(self, chio_conn_id: str = default_conn_name):
         super().__init__()
-        self.arc_conn_id = arc_conn_id
-        self.connection = self.get_connection(arc_conn_id)
+        self.chio_conn_id = chio_conn_id
+        self.connection = self.get_connection(chio_conn_id)
 
-    def get_client(self) -> ArcClient:
-        return ArcClient(base_url=self.connection.host)
+    def get_client(self) -> ChioClient:
+        return ChioClient(base_url=self.connection.host)
 ```
 
 ## 6. Package Structure
 
 ```
-sdks/python/arc-airflow/
-  pyproject.toml            # deps: arc-sdk-python, apache-airflow>=2.8
-  src/arc_airflow/
+sdks/python/chio-airflow/
+  pyproject.toml            # deps: chio-sdk-python, apache-airflow>=2.8
+  src/chio_airflow/
     __init__.py
-    operators.py            # ArcOperator wrapper
-    decorators.py           # arc_task (TaskFlow)
-    hooks.py                # ArcHook (connection type)
-    listeners.py            # ArcDagListener (DAG-level grants)
+    operators.py            # ChioOperator wrapper
+    decorators.py           # chio_task (TaskFlow)
+    hooks.py                # ChioHook (connection type)
+    listeners.py            # ChioDagListener (DAG-level grants)
   tests/
-    test_arc_operator.py
+    test_chio_operator.py
     test_taskflow.py
     test_dag_listener.py
 ```
@@ -344,11 +344,11 @@ sdks/python/arc-airflow/
 
 For teams with existing Airflow DAGs, adoption is incremental:
 
-1. **Deploy ARC sidecar** alongside Airflow workers
-2. **Wrap high-risk operators** with `ArcOperator` (external API calls,
+1. **Deploy Chio sidecar** alongside Airflow workers
+2. **Wrap high-risk operators** with `ChioOperator` (external API calls,
    database writes, ML model invocations)
 3. **Add DAG listener** for DAG-level grant evaluation
-4. **Migrate to `@arc_task`** in new TaskFlow DAGs
+4. **Migrate to `@chio_task`** in new TaskFlow DAGs
 5. **Aggregate receipts** for audit trail
 
 No changes to existing DAG structure required. Wrap-and-go.
@@ -356,7 +356,7 @@ No changes to existing DAG structure required. Wrap-and-go.
 ## 8. Open Questions
 
 1. **Managed Airflow.** MWAA (AWS), Cloud Composer (GCP), Astronomer --
-   these manage the Airflow infrastructure. Can the ARC sidecar run as
+   these manage the Airflow infrastructure. Can the Chio sidecar run as
    a sidecar container in these environments, or does it need to be a
    remote kernel?
 
@@ -366,5 +366,5 @@ No changes to existing DAG structure required. Wrap-and-go.
    get a single grant?
 
 3. **Cross-DAG dependencies.** Airflow's `ExternalTaskSensor` creates
-   cross-DAG dependencies. Should ARC capability grants span DAG
+   cross-DAG dependencies. Should Chio capability grants span DAG
    boundaries?

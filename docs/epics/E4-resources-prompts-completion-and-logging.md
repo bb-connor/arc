@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented for the kernel, in-process MCP edge, and wrapped-subprocess `arc mcp serve` path.
+Implemented for the kernel, in-process MCP edge, and wrapped-subprocess `chio mcp serve` path.
 
 Delivered:
 
@@ -23,7 +23,7 @@ Deferred follow-ons:
 
 ## Problem
 
-ARC now has a usable MCP tool edge, but it still cannot host the broader contextual server surface that real MCP deployments expect.
+Chio now has a usable MCP tool edge, but it still cannot host the broader contextual server surface that real MCP deployments expect.
 
 That blocks:
 
@@ -36,7 +36,7 @@ That blocks:
 
 By the end of E4:
 
-- ARC exposes first-class resources and prompts
+- Chio exposes first-class resources and prompts
 - resources and prompts are mediated by policy and capabilities, not disguised as tools
 - the MCP edge can advertise and serve `resources/*`, `prompts/*`, completion, and logging
 
@@ -60,11 +60,11 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/arc-core/src/session.rs`
-- `crates/arc-kernel/src/lib.rs`
-- `crates/arc-kernel/src/session.rs`
-- `crates/arc-mcp-adapter/src/edge.rs`
-- `crates/arc-cli/src/policy.rs`
+- `crates/chio-core/src/session.rs`
+- `crates/chio-kernel/src/lib.rs`
+- `crates/chio-kernel/src/session.rs`
+- `crates/chio-mcp-adapter/src/edge.rs`
+- `crates/chio-cli/src/policy.rs`
 
 ## Proposed implementation slices
 
@@ -153,11 +153,11 @@ Requirements:
 
 ## Acceptance criteria
 
-- an MCP client can list and read resources through ARC
-- an MCP client can list and fetch prompts through ARC
+- an MCP client can list and read resources through Chio
+- an MCP client can list and fetch prompts through Chio
 - completion requests are routed without abusing tool semantics
 - logging notifications can be emitted without corrupting request/response flow
-- `arc mcp serve` exposes wrapped resources, prompts, and completion when the upstream MCP server supports them
+- `chio mcp serve` exposes wrapped resources, prompts, and completion when the upstream MCP server supports them
 
 ## Definition of done
 

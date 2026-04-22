@@ -1,0 +1,105 @@
+{
+  "schema": "chio.anchor-inclusion-proof.v1",
+  "receipt": {
+    "id": "rcpt-web3-1",
+    "timestamp": 1743292800,
+    "capability_id": "cap-web3-1",
+    "tool_server": "chio-settle",
+    "tool_name": "release_escrow",
+    "action": {
+      "parameters": {
+        "amount": 150,
+        "currency": "USDC",
+        "to": "0x2222222222222222222222222222222222222222"
+      },
+      "parameter_hash": "46f33e98c10f37a46625ba93402c262878b694af71ea1d2f35ab89b53404e127"
+    },
+    "decision": {
+      "verdict": "allow"
+    },
+    "content_hash": "1ff0dfe4513af263d73d4cc9dedae5aeb7ecc223cb42529f23c436601403afe5",
+    "policy_hash": "dc6d6cc7acce9b97eb353f08426fefba0b54cc98f38d794dab4f6770252f50df",
+    "metadata": {
+      "financial": {
+        "budget_remaining": 850,
+        "budget_total": 1000,
+        "cost_charged": 150,
+        "currency": "USD",
+        "delegation_depth": 1,
+        "grant_index": 0,
+        "oracle_evidence": {
+          "authority": "chio_link_runtime_v1",
+          "base": "ETH",
+          "cache_age_seconds": 45,
+          "converted_cost_units": 300,
+          "feed_address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+          "grant_currency": "USD",
+          "max_age_seconds": 3600,
+          "original_cost_units": 100000000000000,
+          "original_currency": "ETH",
+          "quote": "USD",
+          "rate_denominator": 100,
+          "rate_numerator": 300000,
+          "schema": "chio.oracle-conversion-evidence.v1",
+          "source": "chainlink",
+          "updated_at": 1743292740
+        },
+        "payment_reference": "escrow-1",
+        "root_budget_holder": "subject-1",
+        "settlement_status": "pending"
+      }
+    },
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signature": "8eb9e2aa3290e69362a270ce61ea9ab1269705bb62732746560c992b649ee5f3df400e9c4856644c73dbd021b9bbaf49fc57933deda3ef8d0280fa5a2484a600"
+  },
+  "receipt_inclusion": {
+    "checkpoint_seq": 1042,
+    "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+    "proof": {
+      "tree_size": 1,
+      "leaf_index": 0,
+      "audit_path": []
+    }
+  },
+  "checkpoint_statement": {
+    "schema": "chio.checkpoint_statement.v1",
+    "checkpoint_seq": 1042,
+    "batch_start_seq": 104101,
+    "batch_end_seq": 104200,
+    "tree_size": 1,
+    "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+    "issued_at": 1743292800,
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signature": "91ef6c1f7e1789491d77fec62448d70a1b2c850ff5e29f9db7b1d8cf29034328483448ebc747826bfecbe8293c2fc74bbadd66cc61d1339a6c52ae2282b7c40a"
+  },
+  "chain_anchor": {
+    "chain_id": "eip155:8453",
+    "contract_address": "0x1000000000000000000000000000000000000001",
+    "operator_address": "0x1111111111111111111111111111111111111111",
+    "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "block_number": 12345678,
+    "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "anchored_merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+    "anchored_checkpoint_seq": 1042
+  },
+  "key_binding_certificate": {
+    "certificate": {
+      "schema": "chio.key-binding-certificate.v1",
+      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "settlement_address": "0x1111111111111111111111111111111111111111",
+      "issued_at": 1743292800,
+      "expires_at": 1774828800,
+      "nonce": "0123456789abcdef0123456789abcdef"
+    },
+    "signature": "66c566b5ed17f4b1b23a18ef073d3ed331f43d9e420bafc7edbd676c71e45e26285b5d35ad8fce99488968a368bb231fa8a83a6664f8979c725e4481143acd03"
+  }
+}

@@ -1,10 +1,10 @@
-# ARC Guard Taxonomy and Security Model
+# Chio Guard Taxonomy and Security Model
 
 **Version:** 1.0
 **Date:** 2026-04-14
 **Status:** Normative
 
-This document defines the complete guard taxonomy for the ARC runtime kernel,
+This document defines the complete guard taxonomy for the Chio runtime kernel,
 including guard categories, configuration, fail-closed behavior, advisory
 signals, WASM custom guards, and the session journal contract. It complements
 [SECURITY.md](SECURITY.md) (threat model) and [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md)
@@ -17,7 +17,7 @@ The keywords **MUST**, **SHOULD**, and **MAY** are normative in this document
 
 ## 1. Guard Pipeline Overview
 
-The ARC runtime kernel evaluates guards in a sequential pipeline before
+The Chio runtime kernel evaluates guards in a sequential pipeline before
 admitting any tool invocation. The pipeline operates under a universal
 **fail-closed** invariant:
 
@@ -35,7 +35,7 @@ the request and what they observed.
 
 ### 1.1 Guard Categories
 
-ARC guards are classified into five categories based on their state
+Chio guards are classified into five categories based on their state
 requirements and execution phase:
 
 | Category | State | Phase | Blocking |
@@ -170,7 +170,7 @@ exceeded (per-agent or per-session) and the current token count.
 
 Session-aware deterministic guards consult the session journal to make
 decisions based on cumulative session history. They require an
-`Arc<SessionJournal>` reference and produce deterministic verdicts given
+`Chio<SessionJournal>` reference and produce deterministic verdicts given
 the same journal state.
 
 ### 3.1 DataFlowGuard
@@ -392,7 +392,7 @@ Without any promotion rules, the advisory pipeline **MUST** always return
 
 ### 5.4 PromotionPolicy
 
-Operators configure promotion rules in `arc.yaml` to convert advisory signals
+Operators configure promotion rules in `chio.yaml` to convert advisory signals
 into deterministic denials:
 
 ```yaml
@@ -483,9 +483,9 @@ The `type` discriminator field uses `snake_case` naming in JSON serialization.
 
 ## 6. WASM Custom Guards
 
-The `arc-wasm-guards` crate allows operators to author guards in any language
+The `chio-wasm-guards` crate allows operators to author guards in any language
 that compiles to WebAssembly (Rust, AssemblyScript, Go, C) and load them into
-the ARC kernel at runtime.
+the Chio kernel at runtime.
 
 ### 6.1 Host-Guest ABI
 
@@ -554,12 +554,12 @@ overflow, unreachable instruction) **MUST** result in denial.
 
 ### 6.4 Configuration
 
-WASM guards are declared in `arc.yaml`:
+WASM guards are declared in `chio.yaml`:
 
 ```yaml
 wasm_guards:
   - name: custom-pii-guard
-    path: /etc/arc/guards/pii_guard.wasm
+    path: /etc/chio/guards/pii_guard.wasm
     fuel_limit: 5000000
     priority: 100
     advisory: false
@@ -594,7 +594,7 @@ guards in production without blocking traffic.
 
 ## 7. Session Journal Contract
 
-The session journal (`arc-http-session` crate) is the shared state layer
+The session journal (`chio-http-session` crate) is the shared state layer
 that session-aware guards and advisory guards read from. It is an
 append-only, hash-chained log of request records within a single session.
 
@@ -607,7 +607,7 @@ append-only, hash-chained log of request records within a single session.
 - **Thread-safe:** The journal **MUST** be safe for concurrent access from
   multiple guards. The implementation uses a `Mutex` around the inner state.
 - **Per-session scope:** Each session creates one journal. The journal is
-  shared via `Arc<SessionJournal>` with all guards that need it.
+  shared via `Chio<SessionJournal>` with all guards that need it.
 
 ### 7.2 Journal Entry
 
@@ -699,7 +699,7 @@ though this adds latency and is not required for normal operation.
 
 ## 8. Configuration Reference
 
-### 8.1 arc.yaml Guard Section
+### 8.1 chio.yaml Guard Section
 
 ```yaml
 guards:
@@ -751,7 +751,7 @@ guards:
 # WASM custom guards
 wasm_guards:
   - name: custom-compliance
-    path: /etc/arc/guards/compliance.wasm
+    path: /etc/chio/guards/compliance.wasm
     fuel_limit: 5000000
     priority: 200
     advisory: false
@@ -763,15 +763,15 @@ wasm_guards:
 
 | Guard | Crate | Status |
 | --- | --- | --- |
-| InternalNetworkGuard | `arc-guards` | Full |
-| AgentVelocityGuard | `arc-guards` | Full |
-| DataFlowGuard | `arc-guards` | Full |
-| BehavioralSequenceGuard | `arc-guards` | Full |
-| ResponseSanitizationGuard | `arc-guards` | Full |
-| PostInvocationPipeline | `arc-guards` | Full |
-| AdvisoryPipeline | `arc-guards` | Full |
-| AnomalyAdvisoryGuard | `arc-guards` | Full |
-| DataTransferAdvisoryGuard | `arc-guards` | Full |
-| WasmGuard | `arc-wasm-guards` | Full |
-| WasmGuardRuntime | `arc-wasm-guards` | Full |
-| SessionJournal | `arc-http-session` | Full |
+| InternalNetworkGuard | `chio-guards` | Full |
+| AgentVelocityGuard | `chio-guards` | Full |
+| DataFlowGuard | `chio-guards` | Full |
+| BehavioralSequenceGuard | `chio-guards` | Full |
+| ResponseSanitizationGuard | `chio-guards` | Full |
+| PostInvocationPipeline | `chio-guards` | Full |
+| AdvisoryPipeline | `chio-guards` | Full |
+| AnomalyAdvisoryGuard | `chio-guards` | Full |
+| DataTransferAdvisoryGuard | `chio-guards` | Full |
+| WasmGuard | `chio-wasm-guards` | Full |
+| WasmGuardRuntime | `chio-wasm-guards` | Full |
+| SessionJournal | `chio-http-session` | Full |

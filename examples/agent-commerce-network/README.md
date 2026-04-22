@@ -1,14 +1,14 @@
 # Agent Commerce Network
 
-Governed service procurement between a buyer and provider using ARC for
+Governed service procurement between a buyer and provider using Chio for
 capability-based access control, budget enforcement, and receipt signing.
 
 ## Scenario
 
 Lattice Platform Security needs a security review for their payments API.
-Vanguard Security provides reviews via an MCP tool server. ARC governs every
-interaction: the buyer's API sits behind `arc api protect`, the provider's
-MCP server sits behind `arc mcp serve-http`, and trust-control tracks
+Vanguard Security provides reviews via an MCP tool server. Chio governs every
+interaction: the buyer's API sits behind `chio api protect`, the provider's
+MCP server sits behind `chio mcp serve-http`, and trust-control tracks
 budgets, receipts, and capabilities.
 
 A procurement agent (OpenAI Agents SDK) reasons about which review scope
@@ -18,9 +18,9 @@ approval if the price exceeds the threshold.
 ## Architecture
 
 ```
-arc trust serve                     capability authority, budget store
-arc mcp serve-http                  kernel-mediated provider MCP tools
-arc api protect                     buyer API sidecar (receipt signing)
+chio trust serve                     capability authority, budget store
+chio mcp serve-http                  kernel-mediated provider MCP tools
+chio api protect                    buyer API sidecar (receipt signing)
 buyer/app.py                        FastAPI procurement service
 provider/review_server.py           MCP tool server (quote, execute, dispute)
 orchestrate.py                      procurement agent entry point
@@ -29,18 +29,18 @@ orchestrate.py                      procurement agent entry point
 ## Running
 
 ```bash
-cargo build --bin arc
+cargo build --bin chio
 ./smoke.sh
 ```
 
 Set `OPENAI_API_KEY` for live agent reasoning. Without it, runs a
 deterministic fallback flow (CI mode).
 
-## What ARC Governs
+## What Chio Governs
 
 - **Budget limits** on capability grants (`maxTotalCost`, `maxCostPerInvocation`)
-- **Receipt signing** for every buyer API call (via `arc api protect`)
-- **Guard policies** on provider MCP tools (via `arc mcp serve-http`)
+- **Receipt signing** for every buyer API call (via `chio api protect`)
+- **Guard policies** on provider MCP tools (via `chio mcp serve-http`)
 - **Budget tracking** via trust-control's split budget endpoints (`/v1/budgets/authorize-exposure`, `/v1/budgets/release-exposure`, `/v1/budgets/reconcile-spend`)
 - **Financial reports**: exposure ledger, settlement reconciliation
 
@@ -48,18 +48,18 @@ deterministic fallback flow (CI mode).
 
 ```
 commerce_network/           shared package
-  arc.py                    ARC clients (MCP, trust-control)
+  chio.py                    Chio clients (MCP, trust-control)
   agents.py                 procurement agent (Agents SDK / Anthropic)
   verify.py                 bundle verification
 buyer/
   app.py                    FastAPI procurement service
-  policy.yaml               ARC HushSpec policy
-  openapi.yaml              API spec with x-arc-* metadata
-  run-sidecar.sh            arc api protect wrapper
+  policy.yaml               Chio HushSpec policy
+  openapi.yaml              API spec with x-chio-* metadata
+  run-sidecar.sh            chio api protect wrapper
 provider/
   review_server.py          MCP tool server
-  policy.yaml               ARC HushSpec policy
-  run-edge.sh               arc mcp serve-http wrapper
+  policy.yaml               Chio HushSpec policy
+  run-edge.sh               chio mcp serve-http wrapper
 contracts/                  JSON contract templates
 orchestrate.py              entry point
 smoke.sh                    smoke test

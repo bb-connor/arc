@@ -42,13 +42,13 @@ tarpaulin_args=(
   --out Html
   --out Json
   --out Lcov
-  --exclude arc-formal-diff-tests
-  --exclude arc-e2e
+  --exclude chio-formal-diff-tests
+  --exclude chio-e2e
   --exclude hello-tool
-  --exclude arc-conformance
-  --exclude arc-control-plane
-  --exclude arc-web3-bindings
-  --exclude arc-wasm-guards
+  --exclude chio-conformance
+  --exclude chio-control-plane
+  --exclude chio-web3-bindings
+  --exclude chio-wasm-guards
 )
 
 if [[ "${TARPAULIN_SKIP_CLEAN:-false}" == "true" ]]; then

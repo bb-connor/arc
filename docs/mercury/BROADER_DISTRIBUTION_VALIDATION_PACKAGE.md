@@ -11,14 +11,14 @@
 bounded Mercury broader-distribution lane. It generates the governed
 qualification bundle, writes the validation report, and emits one explicit
 proceed decision instead of implying a generic sales platform, CRM workflow,
-channel console, merged shell, or ARC commercial surface.
+channel console, merged shell, or Chio commercial surface.
 
 ---
 
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- broader-distribution validate --output target/mercury-broader-distribution-validation
+cargo run -p chio-mercury -- broader-distribution validate --output target/mercury-broader-distribution-validation
 ```
 
 ---
@@ -70,7 +70,7 @@ This package supports one bounded claim only:
 > governed distribution bundle for selective account qualification rooted in
 > the validated reference-distribution, controlled-adoption, release-
 > readiness, trust-network, assurance, proof, and inquiry stack without
-> widening ARC or creating a generic commercial platform.
+> widening Chio or creating a generic commercial platform.
 
 ---
 
@@ -79,8 +79,8 @@ This package supports one bounded claim only:
 This package does not claim:
 
 - multiple broader-distribution motions or surfaces
-- a generic sales platform, CRM workflow, channel console, or ARC commercial
+- a generic sales platform, CRM workflow, channel console, or Chio commercial
   console
 - partner marketplaces or multi-segment account programs
-- a merged Mercury and ARC-Wall shell
+- a merged Mercury and Chio-Wall shell
 - universal rollout readiness or broad business performance guarantees

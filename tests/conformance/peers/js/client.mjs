@@ -4,13 +4,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  ArcClient,
-  ArcSession,
+  ChioClient,
+  ChioSession,
   terminalMessage
-} from "../../../../packages/sdk/arc-ts/src/index.ts";
+} from "../../../../packages/sdk/chio-ts/src/index.ts";
 
 if (process.argv.includes("--help")) {
-  console.log("ARC JS conformance client");
+  console.log("Chio JS conformance client");
   process.exit(0);
 }
 
@@ -197,11 +197,11 @@ async function resolveAuth(args, transcript) {
 async function initializeSession(baseUrl, authToken, transcript, stepPrefix = "") {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
-      const client = ArcClient.withStaticBearer(baseUrl, authToken);
+      const client = ChioClient.withStaticBearer(baseUrl, authToken);
       const session = await client.initialize({
         capabilities: CONFORMANCE_CLIENT_CAPABILITIES,
         clientInfo: {
-          name: "arc-conformance-js",
+          name: "chio-conformance-js",
           version: "0.1.0"
         },
         onMessage: async (message, session) => {
@@ -252,7 +252,7 @@ async function postRpc(
   body,
   onMessage = async () => {}
 ) {
-  const session = new ArcSession({
+  const session = new ChioSession({
     baseUrl,
     authToken,
     sessionId,
@@ -269,7 +269,7 @@ async function postNotification(
   body,
   onMessage = async () => {}
 ) {
-  const session = new ArcSession({
+  const session = new ChioSession({
     baseUrl,
     authToken,
     sessionId,
@@ -622,7 +622,7 @@ async function runScenario(scenario, args, authContext, session, transcript) {
             params: {
               protocolVersion: "2025-11-25",
               capabilities: {},
-              clientInfo: { name: "arc-conformance-js-unauthorized", version: "0.1.0" }
+              clientInfo: { name: "chio-conformance-js-unauthorized", version: "0.1.0" }
             }
           })
         });
@@ -1117,7 +1117,7 @@ async function handleNestedClientRequest(
               type: "text",
               text: CONFORMANCE_SAMPLE_TEXT
             },
-            model: "arc-conformance-js-model",
+            model: "chio-conformance-js-model",
             stopReason: "end_turn"
           }
         }
@@ -1202,10 +1202,10 @@ async function fetchJson(url) {
 }
 
 async function performAuthorizationCodeFlow(baseUrl, authScope, authorizationServerMetadata, transcript) {
-  const codeVerifier = "arc-conformance-js-verifier";
+  const codeVerifier = "chio-conformance-js-verifier";
   const redirectUri = "http://localhost:7777/callback";
   const resource = `${baseUrl}/mcp`;
-  const state = "arc-js-state";
+  const state = "chio-js-state";
   const authorizationEndpoint =
     authorizationServerMetadata.authorization_endpoint ?? `${baseUrl}/oauth/authorize`;
   const tokenEndpoint = authorizationServerMetadata.token_endpoint ?? `${baseUrl}/oauth/token`;
@@ -1374,7 +1374,7 @@ function scenarioResult(scenario, durationMs, status, assertions) {
   return {
     scenarioId: scenario.id,
     peer: "js",
-    peerRole: "client_to_arc_server",
+    peerRole: "client_to_chio_server",
     deploymentMode: "remote_http",
     transport: "streamable-http",
     specVersion: scenario.specVersions?.[0] ?? "2025-11-25",

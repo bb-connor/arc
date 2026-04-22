@@ -19,7 +19,7 @@ supervised-live decision and nothing broader.
 Use the repo-native command:
 
 ```bash
-cargo run -p arc-mercury -- supervised-live qualify \
+cargo run -p chio-mercury -- supervised-live qualify \
   --output target/mercury-supervised-live-qualification
 ```
 
@@ -55,7 +55,7 @@ Canonical document references inside the reviewer package:
 The package supports these claims:
 
 - MERCURY can generate live-mode evidence for the same governed workflow using
-  the existing ARC and MERCURY proof contracts
+  the existing Chio and MERCURY proof contracts
 - supervised-live export is gated by explicit approval, rollback, health, and
   interruption state
 - the rollback path remains bounded and reviewable in the same workflow family

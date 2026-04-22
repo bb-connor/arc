@@ -1,0 +1,50 @@
+{
+  "schema": "chio.public-wallet-directory-entry.v1",
+  "entryId": "wde-1",
+  "issuedAt": 1710000010,
+  "directoryOperatorId": "wallet-operator-1",
+  "walletId": "wallet.example",
+  "supportedSubjectMethods": [
+    "did:chio",
+    "did:web",
+    "did:key"
+  ],
+  "supportedIssuerMethods": [
+    "did:chio",
+    "did:web",
+    "did:jwk"
+  ],
+  "supportedCredentialFamilies": [
+    "application/dc+sd-jwt",
+    "jwt_vc_json"
+  ],
+  "supportedProofFamilies": [
+    "dc+sd-jwt",
+    "jwt_vc_json"
+  ],
+  "discoveryRef": {
+    "kind": "public_verifier_discovery",
+    "schema": "chio.public-verifier-discovery.v1",
+    "artifactId": "pvd-1",
+    "operatorId": "verifier-operator-1",
+    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "uri": "https://verifier.example.com/discovery/verifier-1"
+  },
+  "profileRef": {
+    "kind": "public_identity_profile",
+    "schema": "chio.public-identity-profile.v1",
+    "artifactId": "pip-1",
+    "operatorId": "chio",
+    "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "uri": "https://chio.dev/standards/public-identity-profile"
+  },
+  "metadataUrl": "https://wallet.example/.well-known/openid-credential-wallet",
+  "requestUriPrefix": "https://wallet.example/wallet-exchanges/",
+  "lookupGuardrails": {
+    "requiresExplicitVerifierBinding": true,
+    "requiresManualSubjectBindingReview": true,
+    "rejectAmbientDirectoryTrust": true,
+    "failClosedOnUnknownWalletFamily": true
+  },
+  "note": "Verifier-scoped wallet directory entry for broader public identity routing."
+}

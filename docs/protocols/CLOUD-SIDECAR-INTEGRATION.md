@@ -3,19 +3,19 @@
 > **Status**: Tier 3 -- proposed April 2026
 > **Priority**: Exploratory -- Cloud Run and ECS natively support sidecar
 > containers, making them the easiest managed container platforms to deploy
-> ARC on. This is a reference deployment pattern more than a new SDK.
+> Chio on. This is a reference deployment pattern more than a new SDK.
 
 ## 1. Why Cloud Run and ECS
 
-ARC's sidecar model -- kernel running alongside the application on the same
+Chio's sidecar model -- kernel running alongside the application on the same
 host, communicating over localhost -- maps directly to how Cloud Run and ECS
 handle multi-container tasks. Unlike Lambda (which needs Extensions) or
 Kubernetes (which needs admission webhooks), these platforms have first-class
 sidecar support with no custom infrastructure.
 
 This document defines reference deployment patterns, not new libraries.
-The existing SDKs (`arc-sdk-python`, `@arc-protocol/node-http`,
-`arc-go-http`, etc.) work as-is when the sidecar is co-deployed.
+The existing SDKs (`chio-sdk-python`, `@chio-protocol/node-http`,
+`chio-go-http`, etc.) work as-is when the sidecar is co-deployed.
 
 ### Platform Comparison
 
@@ -38,13 +38,13 @@ Managed Container Platform
 |  Service / Task / Revision                                |
 |                                                           |
 |  +---------------------+    +---------------------------+ |
-|  | Application         |    | ARC Sidecar               | |
+|  | Application         |    | Chio Sidecar               | |
 |  | Container           |    | Container                 | |
 |  |                     |    |                           | |
 |  | app --HTTP-->       |--->| :9090 (localhost)         | |
-|  |   arc.evaluate()    |    | Capability | Guard | Rcpt | |
+|  |   chio.evaluate()    |    | Capability | Guard | Rcpt | |
 |  |   ... do work ...   |    |                           | |
-|  |   arc.record()      |    | Startup: load policy      | |
+|  |   chio.record()      |    | Startup: load policy      | |
 |  +---------------------+    | Shutdown: flush receipts  | |
 |                              +---------------------------+ |
 |                                                           |
@@ -72,7 +72,7 @@ spec:
         autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "100"
         # Container startup ordering
-        run.googleapis.com/container-dependencies: '{"app":["arc-sidecar"]}'
+        run.googleapis.com/container-dependencies: '{"app":["chio-sidecar"]}'
     spec:
       containers:
         # Application container
@@ -81,23 +81,23 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            - name: ARC_SIDECAR_URL
+            - name: CHIO_SIDECAR_URL
               value: "http://localhost:9090"
           resources:
             limits:
               cpu: "1"
               memory: 512Mi
 
-        # ARC sidecar container
-        - name: arc-sidecar
-          image: gcr.io/my-project/arc-sidecar:latest
+        # Chio sidecar container
+        - name: chio-sidecar
+          image: gcr.io/my-project/chio-sidecar:latest
           ports:
             - containerPort: 9090
           env:
-            - name: ARC_POLICY_SOURCE
-              value: "gs://my-bucket/arc-policy.yaml"
-            - name: ARC_RECEIPT_SINK
-              value: "bigquery://my-project.arc_receipts.receipts"
+            - name: CHIO_POLICY_SOURCE
+              value: "gs://my-bucket/chio-policy.yaml"
+            - name: CHIO_RECEIPT_SINK
+              value: "bigquery://my-project.chio_receipts.receipts"
           startupProbe:
             httpGet:
               path: /health
@@ -121,7 +121,7 @@ gcloud run services replace cloud-run-service.yaml \
 # Or using gcloud CLI directly
 gcloud run deploy agent-tool-server \
   --image gcr.io/my-project/agent-tool-server:latest \
-  --add-sidecar=arc-sidecar,image=gcr.io/my-project/arc-sidecar:latest,port=9090 \
+  --add-sidecar=chio-sidecar,image=gcr.io/my-project/chio-sidecar:latest,port=9090 \
   --region us-central1
 ```
 
@@ -141,10 +141,10 @@ spec:
         - name: worker
           image: gcr.io/my-project/batch-worker:latest
           env:
-            - name: ARC_SIDECAR_URL
+            - name: CHIO_SIDECAR_URL
               value: "http://localhost:9090"
-        - name: arc-sidecar
-          image: gcr.io/my-project/arc-sidecar:latest
+        - name: chio-sidecar
+          image: gcr.io/my-project/chio-sidecar:latest
 ```
 
 ## 4. AWS ECS (Fargate)
@@ -166,24 +166,24 @@ spec:
         { "containerPort": 8080, "protocol": "tcp" }
       ],
       "environment": [
-        { "name": "ARC_SIDECAR_URL", "value": "http://localhost:9090" }
+        { "name": "CHIO_SIDECAR_URL", "value": "http://localhost:9090" }
       ],
       "dependsOn": [
-        { "containerName": "arc-sidecar", "condition": "HEALTHY" }
+        { "containerName": "chio-sidecar", "condition": "HEALTHY" }
       ],
       "essential": true,
       "cpu": 384,
       "memory": 896
     },
     {
-      "name": "arc-sidecar",
-      "image": "123456789.dkr.ecr.us-east-1.amazonaws.com/arc-sidecar:latest",
+      "name": "chio-sidecar",
+      "image": "123456789.dkr.ecr.us-east-1.amazonaws.com/chio-sidecar:latest",
       "portMappings": [
         { "containerPort": 9090, "protocol": "tcp" }
       ],
       "environment": [
-        { "name": "ARC_POLICY_SOURCE", "value": "s3://my-bucket/arc-policy.yaml" },
-        { "name": "ARC_RECEIPT_SINK", "value": "dynamodb://arc-receipts" }
+        { "name": "CHIO_POLICY_SOURCE", "value": "s3://my-bucket/chio-policy.yaml" },
+        { "name": "CHIO_RECEIPT_SINK", "value": "dynamodb://chio-receipts" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"],
@@ -213,15 +213,15 @@ const taskDef = new ecs.FargateTaskDefinition(this, "AgentToolServer", {
 const app = taskDef.addContainer("app", {
   image: ecs.ContainerImage.fromEcrRepository(appRepo),
   portMappings: [{ containerPort: 8080 }],
-  environment: { ARC_SIDECAR_URL: "http://localhost:9090" },
+  environment: { CHIO_SIDECAR_URL: "http://localhost:9090" },
 });
 
-const sidecar = taskDef.addContainer("arc-sidecar", {
+const sidecar = taskDef.addContainer("chio-sidecar", {
   image: ecs.ContainerImage.fromEcrRepository(arcSidecarRepo),
   portMappings: [{ containerPort: 9090 }],
   environment: {
-    ARC_POLICY_SOURCE: `s3://${policyBucket.bucketName}/arc-policy.yaml`,
-    ARC_RECEIPT_SINK: `dynamodb://${receiptTable.tableName}`,
+    CHIO_POLICY_SOURCE: `s3://${policyBucket.bucketName}/chio-policy.yaml`,
+    CHIO_RECEIPT_SINK: `dynamodb://${receiptTable.tableName}`,
   },
   healthCheck: {
     command: ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"],
@@ -262,7 +262,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             memory: '1.5Gi'
           }
           env: [
-            { name: 'ARC_SIDECAR_URL', value: 'http://localhost:9090' }
+            { name: 'CHIO_SIDECAR_URL', value: 'http://localhost:9090' }
           ]
         }
       ]
@@ -271,14 +271,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       // that run alongside main containers
       sidecars: [
         {
-          name: 'arc-sidecar'
-          image: 'myregistry.azurecr.io/arc-sidecar:latest'
+          name: 'chio-sidecar'
+          image: 'myregistry.azurecr.io/chio-sidecar:latest'
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
           env: [
-            { name: 'ARC_POLICY_SOURCE', value: 'https://mystorageaccount.blob.core.windows.net/config/arc-policy.yaml' }
+            { name: 'CHIO_POLICY_SOURCE', value: 'https://mystorageaccount.blob.core.windows.net/config/chio-policy.yaml' }
           ]
         }
       ]
@@ -287,9 +287,9 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 ```
 
-## 6. ARC Sidecar Container
+## 6. Chio Sidecar Container
 
-The sidecar container image is shared across all platforms. It is the ARC
+The sidecar container image is shared across all platforms. It is the Chio
 kernel compiled as a standalone HTTP server:
 
 ### 6.1 Dockerfile
@@ -299,14 +299,14 @@ FROM rust:1.82-slim AS builder
 
 WORKDIR /build
 COPY . .
-RUN cargo build --release --bin arc-sidecar \
+RUN cargo build --release --bin chio-sidecar \
     --features "http-server,s3-policy,dynamodb-receipts,bigquery-receipts"
 
 FROM gcr.io/distroless/cc-debian12:nonroot
-COPY --from=builder /build/target/release/arc-sidecar /arc-sidecar
+COPY --from=builder /build/target/release/chio-sidecar /chio-sidecar
 
 EXPOSE 9090
-ENTRYPOINT ["/arc-sidecar"]
+ENTRYPOINT ["/chio-sidecar"]
 ```
 
 ### 6.2 Configuration
@@ -315,13 +315,13 @@ The sidecar accepts configuration via environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ARC_LISTEN_ADDR` | HTTP listen address | `0.0.0.0:9090` |
-| `ARC_POLICY_SOURCE` | Policy location (file, s3://, gs://) | `/etc/arc/policy.yaml` |
-| `ARC_RECEIPT_SINK` | Receipt destination | `stdout` |
-| `ARC_LOG_LEVEL` | Log level | `info` |
-| `ARC_HEALTH_PATH` | Health check endpoint | `/health` |
-| `ARC_GRANT_TOKEN` | Pre-loaded grant token | (none) |
-| `ARC_POLICY_REFRESH` | Policy refresh interval | `5m` |
+| `CHIO_LISTEN_ADDR` | HTTP listen address | `0.0.0.0:9090` |
+| `CHIO_POLICY_SOURCE` | Policy location (file, s3://, gs://) | `/etc/chio/policy.yaml` |
+| `CHIO_RECEIPT_SINK` | Receipt destination | `stdout` |
+| `CHIO_LOG_LEVEL` | Log level | `info` |
+| `CHIO_HEALTH_PATH` | Health check endpoint | `/health` |
+| `CHIO_GRANT_TOKEN` | Pre-loaded grant token | (none) |
+| `CHIO_POLICY_REFRESH` | Policy refresh interval | `5m` |
 
 ### 6.3 Health Check
 
@@ -347,26 +347,26 @@ Each cloud platform has a natural receipt destination:
 | GCP Cloud Run | BigQuery | Cloud Storage |
 | AWS ECS | DynamoDB | S3 |
 | Azure Container Apps | Cosmos DB | Blob Storage |
-| Any | ARC Control Plane | stdout (CloudWatch/Cloud Logging) |
+| Any | Chio Control Plane | stdout (CloudWatch/Cloud Logging) |
 
-The sidecar supports pluggable sinks. The `ARC_RECEIPT_SINK` env var
+The sidecar supports pluggable sinks. The `CHIO_RECEIPT_SINK` env var
 selects the sink:
 
 ```
 # DynamoDB
-ARC_RECEIPT_SINK=dynamodb://table-name
+CHIO_RECEIPT_SINK=dynamodb://table-name
 
 # BigQuery
-ARC_RECEIPT_SINK=bigquery://project.dataset.table
+CHIO_RECEIPT_SINK=bigquery://project.dataset.table
 
 # S3 (buffered, flushed on shutdown)
-ARC_RECEIPT_SINK=s3://bucket-name/prefix/
+CHIO_RECEIPT_SINK=s3://bucket-name/prefix/
 
-# ARC Control Plane
-ARC_RECEIPT_SINK=https://control.arc-protocol.io/v1/receipts
+# Chio Control Plane
+CHIO_RECEIPT_SINK=https://control.chio-protocol.io/v1/receipts
 
 # stdout (for structured log ingestion)
-ARC_RECEIPT_SINK=stdout
+CHIO_RECEIPT_SINK=stdout
 ```
 
 ## 8. Scale-to-Zero Considerations
@@ -375,7 +375,7 @@ Cloud Run and Azure Container Apps can scale to zero. When the first
 request arrives after a cold start:
 
 1. Platform starts both containers
-2. ARC sidecar starts first (dependency ordering)
+2. Chio sidecar starts first (dependency ordering)
 3. Sidecar loads policy (bundled: ~2ms, cloud storage: ~40-80ms)
 4. Health check passes
 5. Application container starts
@@ -391,10 +391,10 @@ request arrives after a cold start:
 ## 9. Terraform Module
 
 ```hcl
-# Reference Terraform module for deploying ARC-governed services
+# Reference Terraform module for deploying Chio-governed services
 
-module "arc_cloud_run" {
-  source = "github.com/backbay/arc//terraform/modules/cloud-run-sidecar"
+module "chio_cloud_run" {
+  source = "github.com/backbay/chio//terraform/modules/cloud-run-sidecar"
 
   project_id    = var.project_id
   region        = var.region
@@ -405,12 +405,12 @@ module "arc_cloud_run" {
   app_cpu       = "1"
   app_memory    = "512Mi"
 
-  arc_image     = "gcr.io/${var.project_id}/arc-sidecar:latest"
-  arc_cpu       = "0.25"
-  arc_memory    = "64Mi"
+  chio_image     = "gcr.io/${var.project_id}/chio-sidecar:latest"
+  chio_cpu       = "0.25"
+  chio_memory    = "64Mi"
 
-  policy_source = "gs://${var.policy_bucket}/arc-policy.yaml"
-  receipt_sink  = "bigquery://${var.project_id}.arc.receipts"
+  policy_source = "gs://${var.policy_bucket}/chio-policy.yaml"
+  receipt_sink  = "bigquery://${var.project_id}.chio.receipts"
 
   min_instances = 1
   max_instances = 100
@@ -431,7 +431,7 @@ deploy/
   ecs/
     task-definition.json      # ECS Fargate task definition
     cdk/                      # CDK constructs
-      lib/arc-sidecar.ts
+      lib/chio-sidecar.ts
     README.md
 
   azure/
@@ -439,7 +439,7 @@ deploy/
     README.md
 
   sidecar/
-    Dockerfile                # ARC sidecar container
+    Dockerfile                # Chio sidecar container
     Dockerfile.distroless     # Minimal image
 
   terraform/
@@ -451,19 +451,19 @@ deploy/
 
 ## 11. Open Questions
 
-1. **Sidecar vs. init container.** Should ARC offer an init-container mode
+1. **Sidecar vs. init container.** Should Chio offer an init-container mode
    that pre-evaluates policy and writes a grant token to a shared volume,
    then exits? This avoids ongoing sidecar resource consumption for simple
    "evaluate once at startup" use cases.
 
 2. **Service mesh interaction.** If the platform already runs a service
-   mesh sidecar (Envoy/Istio), adding an ARC sidecar is a third container.
-   Should ARC integrate as an Envoy external authorization filter instead?
+   mesh sidecar (Envoy/Istio), adding an Chio sidecar is a third container.
+   Should Chio integrate as an Envoy external authorization filter instead?
 
 3. **Multi-region.** For global deployments (Cloud Run multi-region, ECS
-   multi-region), should each region's ARC sidecar connect to a regional
+   multi-region), should each region's Chio sidecar connect to a regional
    kernel, or a centralized control plane?
 
-4. **GPU workloads.** ML inference containers often use GPUs. The ARC
+4. **GPU workloads.** ML inference containers often use GPUs. The Chio
    sidecar does not need GPU access. Ensure resource allocation does not
    compete with the primary container for GPU memory.

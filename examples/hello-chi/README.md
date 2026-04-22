@@ -1,10 +1,10 @@
 # hello-chi
 
-Minimal Go `chi` example using [`arc-go-http`](../../sdks/go/arc-go-http/).
+Minimal Go `chi` example using [`chio-go-http`](../../sdks/go/chio-go-http/).
 
 ## What It Demonstrates
 
-- `GET /hello` is allowed through ARC middleware
+- `GET /hello` is allowed through Chio middleware
 - `POST /echo` is denied without a capability token
 - `POST /echo` succeeds with a trust-issued capability token
 - receipt ids are visible in response headers

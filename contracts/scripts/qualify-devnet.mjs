@@ -155,8 +155,8 @@ async function main() {
     const nowBlock = await provider.getBlock("latest");
     const now = Number(nowBlock.timestamp);
 
-    const operatorEdKeyHash = toBytes32Label("arc-operator-ed25519-key");
-    const beneficiaryEntityId = toBytes32Label("arc-beneficiary-entity");
+    const operatorEdKeyHash = toBytes32Label("chio-operator-ed25519-key");
+    const beneficiaryEntityId = toBytes32Label("chio-beneficiary-entity");
     const priceBase = toBytes32Label("ETH");
     const priceQuote = toBytes32Label("USD");
 
@@ -177,29 +177,29 @@ async function main() {
     );
     const mockUsdc = await deploy("mocks/MockERC20", wallets.admin, "Mock USD Coin", "mUSDC", 6);
     const identityRegistry = await deploy(
-      "ArcIdentityRegistry",
+      "ChioIdentityRegistry",
       wallets.admin,
       wallets.admin.address,
     );
     const rootRegistry = await deploy(
-      "ArcRootRegistry",
+      "ChioRootRegistry",
       wallets.admin,
       await identityRegistry.getAddress(),
     );
     const escrow = await deploy(
-      "ArcEscrow",
+      "ChioEscrow",
       wallets.admin,
       await rootRegistry.getAddress(),
       await identityRegistry.getAddress(),
     );
     const bondVault = await deploy(
-      "ArcBondVault",
+      "ChioBondVault",
       wallets.admin,
       await rootRegistry.getAddress(),
       await identityRegistry.getAddress(),
     );
     const priceResolver = await deploy(
-      "ArcPriceResolver",
+      "ChioPriceResolver",
       wallets.admin,
       wallets.admin.address,
       await sequencerFeed.getAddress(),
@@ -225,7 +225,7 @@ async function main() {
     checks.push({
       id: "identity.operator_registration",
       outcome: "pass",
-      note: "Identity registry bound the operator settlement key to the ARC Ed25519 key hash.",
+      note: "Identity registry bound the operator settlement key to the Chio Ed25519 key hash.",
     });
 
     await (
@@ -695,7 +695,7 @@ async function main() {
     checks.push({
       id: "bond.reserve_requirement_metadata_parity",
       outcome: "pass",
-      note: "Bond vault locks collateral on-chain while preserving reserve requirement metadata from the signed ARC bond terms for parity and review.",
+      note: "Bond vault locks collateral on-chain while preserving reserve requirement metadata from the signed Chio bond terms for parity and review.",
     });
 
     await expectRevert("bond proof metadata required", async () => {
@@ -805,7 +805,7 @@ async function main() {
 
     logStep("writing deployment and qualification reports");
     const localDeployment = {
-      manifest_id: "arc.web3-deployment.local-devnet.v1",
+      manifest_id: "chio.web3-deployment.local-devnet.v1",
       network_name: "Ganache Local Devnet",
       chain_id: `eip155:${chainId}`,
       rpc_url: RPC_URL,
@@ -828,7 +828,7 @@ async function main() {
     };
 
     const qualificationReport = {
-      report_id: "arc.web3-contract-qualification.local-devnet.v1",
+      report_id: "chio.web3-contract-qualification.local-devnet.v1",
       generated_at: new Date().toISOString(),
       chain_id: `eip155:${chainId}`,
       gas_estimates: gasEstimates,
@@ -845,7 +845,7 @@ async function main() {
     );
 
     console.log(
-      `Qualified ARC web3 contracts on local devnet at ${RPC_URL}. Reports written to contracts/deployments/local-devnet.json and contracts/reports/local-devnet-qualification.json.`,
+      `Qualified Chio web3 contracts on local devnet at ${RPC_URL}. Reports written to contracts/deployments/local-devnet.json and contracts/reports/local-devnet-qualification.json.`,
     );
   } finally {
     provider?.destroy?.();

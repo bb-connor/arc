@@ -1,0 +1,49 @@
+[package]
+name = "chio-wasm-guards"
+description = "WASM guard runtime for Chio -- load and execute .wasm guard modules with fuel metering"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_wasm_guards"
+
+[features]
+default = []
+# Enable the wasmtime-based runtime backend.
+wasmtime-runtime = ["dep:wasmtime", "dep:wasmparser"]
+
+[dependencies]
+chio-kernel = { path = "../chio-kernel" }
+chio-core = { path = "../chio-core" }
+chio-config = { path = "../chio-config" }
+chio-guards = { path = "../chio-guards" }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yml = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+wasmparser = { version = "0.221", optional = true }
+wasmtime = { version = "29", optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+rand_core = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+wat = "1.246"
+
+[[bench]]
+name = "wasm_guard_perf"
+harness = false
+required-features = ["wasmtime-runtime"]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

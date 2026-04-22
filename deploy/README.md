@@ -1,9 +1,9 @@
-# ARC sidecar deployment references
+# Chio sidecar deployment references
 
-Reference deployment manifests for running the ARC (Chio) kernel as a sidecar
+Reference deployment manifests for running the Chio (Chio) kernel as a sidecar
 alongside an application container on managed multi-container platforms.
 
-All manifests assume the sidecar listens on `:9090` and exposes `GET /arc/health`.
+All manifests assume the sidecar listens on `:9090` and exposes `GET /chio/health`.
 The application talks to the kernel over `http://localhost:9090`.
 
 See `docs/protocols/CLOUD-SIDECAR-INTEGRATION.md` for the architectural
@@ -16,7 +16,7 @@ rationale, env var catalogue, and receipt-sink options.
 | `cloud-run/service.yaml` | Google Cloud Run Knative-style multi-container service |
 | `ecs/task-definition.json` | AWS ECS Fargate task definition (two containers, `dependsOn: HEALTHY`) |
 | `azure/container-app.bicep` | Azure Container Apps Bicep template with startup/liveness probes |
-| `sidecar/Dockerfile` | Multi-stage build producing a distroless nonroot ARC sidecar image |
+| `sidecar/Dockerfile` | Multi-stage build producing a distroless nonroot Chio sidecar image |
 
 ## Placeholders
 
@@ -26,26 +26,26 @@ Search and replace the following before applying:
 | Placeholder | Meaning |
 |-------------|---------|
 | `APP_IMAGE_PLACEHOLDER` | Your application container image |
-| `ghcr.io/backbay/arc-sidecar:latest` | ARC sidecar image you have built and pushed |
+| `ghcr.io/backbay/chio-sidecar:latest` | Chio sidecar image you have built and pushed |
 | `PROJECT_ID`, `REGION` | GCP project and region (Cloud Run) |
 | `ACCOUNT_ID` | AWS account ID (ECS) |
-| `EFS_FILESYSTEM_ID` | ECS EFS volume containing `/arc-config/kernel.yaml` and `/arc-config/spec/openapi.yaml` |
+| `EFS_FILESYSTEM_ID` | ECS EFS volume containing `/chio-config/kernel.yaml` and `/chio-config/spec/openapi.yaml` |
 | Key Vault / Secret Manager ARNs | Pre-created secret references |
 
 ## Required secrets
 
 Each manifest wires the following as secret references (never inline):
 
-- `ARC_SIGNING_KEY` -- Ed25519 signing key for receipts
-- `ARC_CAPABILITY_AUTHORITY_URL` -- URL of the capability authority
+- `CHIO_SIGNING_KEY` -- Ed25519 signing key for receipts
+- `CHIO_CAPABILITY_AUTHORITY_URL` -- URL of the capability authority
 
 Additional non-secret configuration:
 
-- `ARC_KERNEL_CONFIG_PATH` (default `/etc/arc/kernel.yaml`) -- kernel config file inside the image
-- `ARC_POLICY_SOURCE` -- policy bundle location (bundled, `gs://`, `s3://`, `https://`)
-- `ARC_RECEIPT_SINK` -- receipt destination (BigQuery, DynamoDB, Cosmos DB, stdout, ...)
-- `ARC_LISTEN_ADDR` (default `0.0.0.0:9090`)
-- `ARC_HEALTH_PATH` (default `/arc/health`)
+- `CHIO_KERNEL_CONFIG_PATH` (default `/etc/chio/kernel.yaml`) -- kernel config file inside the image
+- `CHIO_POLICY_SOURCE` -- policy bundle location (bundled, `gs://`, `s3://`, `https://`)
+- `CHIO_RECEIPT_SINK` -- receipt destination (BigQuery, DynamoDB, Cosmos DB, stdout, ...)
+- `CHIO_LISTEN_ADDR` (default `0.0.0.0:9090`)
+- `CHIO_HEALTH_PATH` (default `/chio/health`)
 
 ## Startup ordering
 
@@ -53,19 +53,19 @@ All three platforms enforce that the app container cannot serve traffic until
 the sidecar is healthy:
 
 - **Cloud Run** -- `run.googleapis.com/container-dependencies` annotation plus
-  sidecar `startupProbe` on `:9090/arc/health`.
+  sidecar `startupProbe` on `:9090/chio/health`.
 - **ECS Fargate** -- the app waits for the sidecar process to start, and the
-  sidecar uses the mounted `/etc/arc/spec/openapi.yaml` plus its own
-  `healthCheck` on `:9090/arc/health`. This avoids a startup deadlock where
+  sidecar uses the mounted `/etc/chio/spec/openapi.yaml` plus its own
+  `healthCheck` on `:9090/chio/health`. This avoids a startup deadlock where
   spec auto-discovery would need the app healthy before the sidecar could
   report healthy.
 - **Azure Container Apps** -- sidecar `startupProbe` plus `readinessProbe` on
-  `:9090/arc/health`; the app's own `startupProbe` ensures it does not report
+  `:9090/chio/health`; the app's own `startupProbe` ensures it does not report
   healthy until it can reach the sidecar.
 
 ## Fail-closed behaviour
 
-If the sidecar cannot load `ARC_KERNEL_CONFIG_PATH` or the policy bundle, it
+If the sidecar cannot load `CHIO_KERNEL_CONFIG_PATH` or the policy bundle, it
 exits non-zero. The platform then marks the container unhealthy (ECS, Azure)
 or fails the revision (Cloud Run), which prevents the app container from
 starting. The restart policies are configured to `always` so transient
@@ -94,14 +94,14 @@ az deployment group create \
   --template-file deploy/azure/container-app.bicep \
   --parameters \
       managedEnvironmentId=/subscriptions/.../managedEnvironments/my-env \
-      userAssignedIdentityId=/subscriptions/.../userAssignedIdentities/arc-mi \
-      arcSigningKeySecretUri=https://my-kv.vault.azure.net/secrets/arc-signing-key \
-      arcCapabilityAuthoritySecretUri=https://my-kv.vault.azure.net/secrets/arc-cap-authority-url
+      userAssignedIdentityId=/subscriptions/.../userAssignedIdentities/chio-mi \
+      chioSigningKeySecretUri=https://my-kv.vault.azure.net/secrets/chio-signing-key \
+      chioCapabilityAuthoritySecretUri=https://my-kv.vault.azure.net/secrets/chio-cap-authority-url
 ```
 
 ### Sidecar image
 
 ```bash
-docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/arc-sidecar:latest .
-docker push ghcr.io/backbay/arc-sidecar:latest
+docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/chio-sidecar:latest .
+docker push ghcr.io/backbay/chio-sidecar:latest
 ```

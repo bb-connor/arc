@@ -47,7 +47,7 @@ The completed record must reference:
 **Account / workflow:** Gold release-control workflow / same-workflow
 supervised-live bridge  
 **Date:** 2026-04-02  
-**Prepared by:** ARC/MERCURY local bridge qualification  
+**Prepared by:** Chio/MERCURY local bridge qualification
 **Decision:** proceed
 
 ### Workflow Boundary

@@ -10,10 +10,10 @@ mkdir -p "${STATE_DIR}"
 
 cd "${ROOT}"
 
-if [[ -n "${ARC_BIN:-}" ]]; then
-  exec "${ARC_BIN}" \
-    --control-url "${ARC_CONTROL_URL:-http://127.0.0.1:8940}" \
-    --control-token "${ARC_CONTROL_TOKEN:-demo-token}" \
+if [[ -n "${CHIO_BIN:-}" ]]; then
+  exec "${CHIO_BIN}" \
+    --control-url "${CHIO_CONTROL_URL:-http://127.0.0.1:8940}" \
+    --control-token "${CHIO_CONTROL_TOKEN:-demo-token}" \
     api protect \
     --upstream "${BUYER_UPSTREAM_URL:-http://127.0.0.1:8101}" \
     --spec "${EXAMPLE_ROOT}/buyer/openapi.yaml" \
@@ -21,9 +21,9 @@ if [[ -n "${ARC_BIN:-}" ]]; then
     --receipt-store "${RECEIPT_STORE}"
 fi
 
-exec cargo run --bin arc -- \
-  --control-url "${ARC_CONTROL_URL:-http://127.0.0.1:8940}" \
-  --control-token "${ARC_CONTROL_TOKEN:-demo-token}" \
+exec cargo run --bin chio -- \
+  --control-url "${CHIO_CONTROL_URL:-http://127.0.0.1:8940}" \
+  --control-token "${CHIO_CONTROL_TOKEN:-demo-token}" \
   api protect \
   --upstream "${BUYER_UPSTREAM_URL:-http://127.0.0.1:8101}" \
   --spec "${EXAMPLE_ROOT}/buyer/openapi.yaml" \

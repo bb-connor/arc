@@ -10,7 +10,7 @@
 `release-readiness validate` is the canonical close-out command for the
 bounded Mercury release-readiness lane. It generates the release package,
 writes the validation report, and emits one explicit launch decision instead
-of implying a generic ARC release console, merged shell, or new Mercury
+of implying a generic Chio release console, merged shell, or new Mercury
 product line.
 
 ---
@@ -18,7 +18,7 @@ product line.
 ## Command
 
 ```bash
-cargo run -p arc-mercury -- release-readiness validate --output target/mercury-release-readiness-validation
+cargo run -p chio-mercury -- release-readiness validate --output target/mercury-release-readiness-validation
 ```
 
 ---
@@ -58,7 +58,7 @@ This package supports one bounded claim only:
 > Mercury can launch one release-readiness lane for `reviewer`, `partner`, and
 > `operator` audiences over one `signed_partner_review_bundle` built from the
 > existing proof, inquiry, assurance, and trust-network stack without widening
-> ARC or creating a new Mercury product line.
+> Chio or creating a new Mercury product line.
 
 ---
 
@@ -67,7 +67,7 @@ This package supports one bounded claim only:
 This package does not claim:
 
 - additional partner-delivery surfaces
-- a generic ARC release console
-- a merged Mercury and ARC-Wall shell
+- a generic Chio release console
+- a merged Mercury and Chio-Wall shell
 - new Mercury feature-family scope
 - cross-product packaging unification

@@ -203,7 +203,7 @@ func TestValidate_AllowWithProtocolCapabilityToken(t *testing.T) {
 	signer := newCapabilitySigner(t)
 	trustCapabilitySigner(t, signer)
 	body := buildAdmissionReview(t, map[string]string{
-		"arc.protocol/capability-token": validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
+		"chio.protocol/capability-token": validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
@@ -461,7 +461,7 @@ func TestMutate_InjectSidecar(t *testing.T) {
 		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 		AnnotationInject:          "true",
 		AnnotationUpstream:        "http://127.0.0.1:3000",
-		AnnotationSpecPath:        "/etc/arc/openapi.yaml",
+		AnnotationSpecPath:        "/etc/chio/openapi.yaml",
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/mutate", bytes.NewReader(body))
@@ -509,8 +509,8 @@ func TestMutate_InjectSidecar(t *testing.T) {
 	if err := json.Unmarshal(containerBytes, &container); err != nil {
 		t.Fatalf("failed to unmarshal container: %v", err)
 	}
-	if container.Name != "arc-sidecar" {
-		t.Fatalf("expected container name arc-sidecar, got %s", container.Name)
+	if container.Name != "chio-sidecar" {
+		t.Fatalf("expected container name chio-sidecar, got %s", container.Name)
 	}
 	if container.Image != DefaultSidecarImage {
 		t.Fatalf("expected image %s, got %s", DefaultSidecarImage, container.Image)
@@ -520,7 +520,7 @@ func TestMutate_InjectSidecar(t *testing.T) {
 func TestMutate_CustomSidecarImage(t *testing.T) {
 	body := buildAdmissionReview(t, map[string]string{
 		AnnotationInject:       "true",
-		AnnotationSidecarImage: "myregistry/arc:v1.0",
+		AnnotationSidecarImage: "myregistry/chio-sidecar:v1.0",
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/mutate", bytes.NewReader(body))
@@ -543,7 +543,7 @@ func TestMutate_CustomSidecarImage(t *testing.T) {
 	var container Container
 	_ = json.Unmarshal(containerBytes, &container)
 
-	if container.Image != "myregistry/arc:v1.0" {
+	if container.Image != "myregistry/chio-sidecar:v1.0" {
 		t.Fatalf("expected custom image, got %s", container.Image)
 	}
 }
@@ -562,8 +562,8 @@ func TestHealthz(t *testing.T) {
 func TestBuildSidecarContainer_Defaults(t *testing.T) {
 	container := buildSidecarContainer(map[string]string{})
 
-	if container.Name != "arc-sidecar" {
-		t.Fatalf("expected arc-sidecar, got %s", container.Name)
+	if container.Name != "chio-sidecar" {
+		t.Fatalf("expected chio-sidecar, got %s", container.Name)
 	}
 	if container.Image != DefaultSidecarImage {
 		t.Fatalf("expected default image, got %s", container.Image)

@@ -1,7 +1,7 @@
-# ARC Binary Distribution
+# Chio Binary Distribution
 
-Pre-built `arc` sidecar binaries are published with every tagged release so
-developers can run ARC without installing a Rust toolchain.
+Pre-built `chio` sidecar binaries are published with every tagged release so
+developers can run Chio without installing a Rust toolchain.
 
 ## Supported Platforms
 
@@ -18,36 +18,36 @@ Container images are published for `linux/amd64` and `linux/arm64`.
 ## Install via Homebrew
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
-brew install --formula /tmp/arc.rb
-arc --version
+curl -fsSL -o /tmp/chio.rb https://github.com/bb-connor/chio/releases/latest/download/chio.rb
+brew install --formula /tmp/chio.rb
+chio --version
 ```
 
 The release workflow renders the installable formula from
-`Homebrew/arc.rb.tmpl` and publishes it as the `arc.rb` release asset.
+`Homebrew/chio.rb.tmpl` and publishes it as the `chio.rb` release asset.
 See [`docs/install/homebrew.md`](./homebrew.md) for details.
 
 ## Install via Docker
 
 ```bash
 # Pull the latest published image
-docker pull ghcr.io/bb-connor/arc-sidecar:latest
+docker pull ghcr.io/bb-connor/chio-sidecar:latest
 
 # Pin to a specific version
-docker pull ghcr.io/bb-connor/arc-sidecar:0.1.0
+docker pull ghcr.io/bb-connor/chio-sidecar:0.1.0
 
 # Run the published image
-docker run --rm ghcr.io/bb-connor/arc-sidecar:latest --help
+docker run --rm ghcr.io/bb-connor/chio-sidecar:latest --help
 ```
 
 The image:
 
-- is built from `Dockerfile.sidecar` (Alpine base, non-root user `arc`, UID
+- is built from `Dockerfile.sidecar` (Alpine base, non-root user `chio`, UID
   `10001`);
-- defaults to `arc --help`; operators override the command with `run`,
+- defaults to `chio --help`; operators override the command with `run`,
   `mcp serve-http`, or another real subcommand at deploy time;
 - uses `tini` as PID 1 for correct signal handling;
-- stores sidecar state under `/var/lib/arc` (mount a volume to persist it).
+- stores sidecar state under `/var/lib/chio` (mount a volume to persist it).
 
 ## Install via `curl | sh` (archive download)
 
@@ -61,15 +61,15 @@ case "$OS" in
   *) echo "unsupported OS: $OS"; exit 1 ;;
 esac
 
-ARCHIVE="arc-${VERSION}-${TRIPLE}.tar.gz"
-BASE="https://github.com/bb-connor/arc/releases/download/v${VERSION}"
+ARCHIVE="chio-${VERSION}-${TRIPLE}.tar.gz"
+BASE="https://github.com/bb-connor/chio/releases/download/v${VERSION}"
 
 curl -fsSL "${BASE}/${ARCHIVE}"        -o "${ARCHIVE}"
 curl -fsSL "${BASE}/${ARCHIVE}.sha256" -o "${ARCHIVE}.sha256"
 shasum -a 256 -c "${ARCHIVE}.sha256"
 tar xf "${ARCHIVE}"
-sudo install -m 0755 "arc-${VERSION}-${TRIPLE}/arc" /usr/local/bin/arc
-arc --version
+sudo install -m 0755 "chio-${VERSION}-${TRIPLE}/chio" /usr/local/bin/chio
+chio --version
 ```
 
 ## Signature and Checksum Verification
@@ -83,10 +83,10 @@ Verify a downloaded archive with:
 
 ```bash
 # Single archive
-shasum -a 256 -c arc-0.1.0-aarch64-apple-darwin.tar.gz.sha256
+shasum -a 256 -c chio-0.1.0-aarch64-apple-darwin.tar.gz.sha256
 
 # All archives at once
-curl -fsSL https://github.com/bb-connor/arc/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
+curl -fsSL https://github.com/bb-connor/chio/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
 shasum -a 256 -c SHA256SUMS
 ```
 
@@ -95,7 +95,7 @@ Container image provenance is attested by the build workflow
 workflow logged:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/bb-connor/arc-sidecar:0.1.0
+docker buildx imagetools inspect ghcr.io/bb-connor/chio-sidecar:0.1.0
 ```
 
 ## Troubleshooting
@@ -105,7 +105,7 @@ docker buildx imagetools inspect ghcr.io/bb-connor/arc-sidecar:0.1.0
   Re-run `brew update` and retry.
 - **`docker run` exits immediately with code 64**: you overrode the image with
   `run`, `mcp serve-http`, or another subcommand that still needs policy and
-  authority configuration. Mount config into `/etc/arc` and retry with the full
+  authority configuration. Mount config into `/etc/chio` and retry with the full
   command line.
 - **Linux binary reports `GLIBC_2.XX not found`**: the published
   `linux-gnu` builds target a recent glibc. Use the Docker image instead,
@@ -116,5 +116,5 @@ docker buildx imagetools inspect ghcr.io/bb-connor/arc-sidecar:0.1.0
 | Asset                                          | Built by                                              |
 | ---------------------------------------------- | ----------------------------------------------------- |
 | GitHub Release archives + `SHA256SUMS`         | `.github/workflows/release-binaries.yml`              |
-| `ghcr.io/bb-connor/arc-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
-| Homebrew formula template                      | `Homebrew/arc.rb.tmpl` rendered into release asset `arc.rb` |
+| `ghcr.io/bb-connor/chio-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
+| Homebrew formula template                      | `Homebrew/chio.rb.tmpl` rendered into release asset `chio.rb` |

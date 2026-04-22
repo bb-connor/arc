@@ -1,20 +1,20 @@
-# Reference Cloud Run service for an ARC-sidecar-governed tool server.
+# Reference Cloud Run service for an Chio-sidecar-governed tool server.
 #
 # Placeholders:
 #   APP_IMAGE_PLACEHOLDER            -- replace with your application image
-#   ghcr.io/backbay/arc-sidecar      -- replace with the sidecar image you pushed
+#   ghcr.io/backbay/chio-sidecar      -- replace with the sidecar image you pushed
 #   PROJECT_ID / REGION              -- substitute for your GCP project and region
 #   projects/PROJECT_ID/secrets/...  -- create the secrets in Secret Manager first
-#   arc-kernel-config / arc-openapi-spec -- Secret Manager secrets mounted below
+#   chio-kernel-config / chio-openapi-spec -- Secret Manager secrets mounted below
 #
 # Deploy:
 #   gcloud run services replace deploy/cloud-run/service.yaml --region REGION
 #
 # Cloud Run container dependency graph (annotation
 # run.googleapis.com/container-dependencies) enforces startup ordering: the
-# `app` container is not started until `arc-sidecar` reports healthy via its
-# startupProbe on :9090/arc/health. The sidecar must fail closed if
-# ARC_KERNEL_CONFIG_PATH cannot be loaded; Cloud Run will restart the revision.
+# `app` container is not started until `chio-sidecar` reports healthy via its
+# startupProbe on :9090/chio/health. The sidecar must fail closed if
+# CHIO_KERNEL_CONFIG_PATH cannot be loaded; Cloud Run will restart the revision.
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
@@ -28,11 +28,11 @@ spec:
         # Keep at least one warm instance to amortise sidecar cold starts.
         autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "100"
-        # App waits until arc-sidecar startupProbe succeeds.
-        run.googleapis.com/container-dependencies: '{"app":["arc-sidecar"]}'
+        # App waits until chio-sidecar startupProbe succeeds.
+        run.googleapis.com/container-dependencies: '{"app":["chio-sidecar"]}'
         run.googleapis.com/execution-environment: gen2
     spec:
-      serviceAccountName: arc-sidecar@PROJECT_ID.iam.gserviceaccount.com
+      serviceAccountName: chio-sidecar@PROJECT_ID.iam.gserviceaccount.com
       containerConcurrency: 80
       timeoutSeconds: 300
       containers:
@@ -42,10 +42,10 @@ spec:
         - name: app
           image: APP_IMAGE_PLACEHOLDER
           env:
-            - name: ARC_SIDECAR_URL
+            - name: CHIO_SIDECAR_URL
               value: "http://localhost:9090"
-            - name: ARC_SIDECAR_HEALTH_URL
-              value: "http://localhost:9090/arc/health"
+            - name: CHIO_SIDECAR_HEALTH_URL
+              value: "http://localhost:9090/chio/health"
           resources:
             limits:
               cpu: "1"
@@ -65,10 +65,10 @@ spec:
             failureThreshold: 3
 
         # ------------------------------------------------------------------
-        # ARC sidecar container
+        # Chio sidecar container
         # ------------------------------------------------------------------
-        - name: arc-sidecar
-          image: ghcr.io/backbay/arc-sidecar:latest
+        - name: chio-sidecar
+          image: ghcr.io/backbay/chio-sidecar:latest
           # Cloud Run sends all external traffic to the only container that
           # declares a containerPort, so the proxy must be the ingress
           # container and the app stays reachable only over localhost.
@@ -76,9 +76,9 @@ spec:
             - containerPort: 9090
           # The sidecar image's CMD default is `--help`, which exits
           # immediately. Override CMD (via `args`) with a long-running
-          # ARC subcommand so the container stays up and serves /arc/health.
+          # Chio subcommand so the container stays up and serves /chio/health.
           # `command` is intentionally omitted so the image ENTRYPOINT
-          # (`/sbin/tini -- /usr/local/bin/arc`) is preserved. `api
+          # (`/sbin/tini -- /usr/local/bin/chio`) is preserved. `api
           # protect` reverse-proxies app traffic through the kernel;
           # swap to `mcp serve-http -- <wrapped server cmd>` when the
           # sidecar is fronting an MCP tool server instead of an app.
@@ -88,64 +88,64 @@ spec:
             - "--upstream"
             - "http://127.0.0.1:8080"
             - "--spec"
-            - "/etc/arc/spec/openapi.yaml"
+            - "/etc/chio/spec/openapi.yaml"
             - "--listen"
             - "0.0.0.0:9090"
           env:
-            - name: ARC_LISTEN_ADDR
+            - name: CHIO_LISTEN_ADDR
               value: "0.0.0.0:9090"
-            - name: ARC_HEALTH_PATH
-              value: "/arc/health"
-            - name: ARC_KERNEL_CONFIG_PATH
-              value: "/etc/arc/kernel/kernel.yaml"
-            - name: ARC_POLICY_SOURCE
-              value: "gs://PROJECT_ID-arc-config/policy.yaml"
-            - name: ARC_RECEIPT_SINK
-              value: "bigquery://PROJECT_ID.arc.receipts"
-            - name: ARC_LOG_LEVEL
+            - name: CHIO_HEALTH_PATH
+              value: "/chio/health"
+            - name: CHIO_KERNEL_CONFIG_PATH
+              value: "/etc/chio/kernel/kernel.yaml"
+            - name: CHIO_POLICY_SOURCE
+              value: "gs://PROJECT_ID-chio-config/policy.yaml"
+            - name: CHIO_RECEIPT_SINK
+              value: "bigquery://PROJECT_ID.chio.receipts"
+            - name: CHIO_LOG_LEVEL
               value: "info"
-            - name: ARC_CAPABILITY_AUTHORITY_URL
+            - name: CHIO_CAPABILITY_AUTHORITY_URL
               valueFrom:
                 secretKeyRef:
-                  name: arc-capability-authority-url
+                  name: chio-capability-authority-url
                   key: latest
-            - name: ARC_SIGNING_KEY
+            - name: CHIO_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
-                  name: arc-signing-key
+                  name: chio-signing-key
                   key: latest
           volumeMounts:
-            - name: arc-kernel-config
-              mountPath: /etc/arc/kernel
-            - name: arc-openapi-spec
-              mountPath: /etc/arc/spec
+            - name: chio-kernel-config
+              mountPath: /etc/chio/kernel
+            - name: chio-openapi-spec
+              mountPath: /etc/chio/spec
           resources:
             limits:
               cpu: "500m"
               memory: 128Mi
           startupProbe:
             httpGet:
-              path: /arc/health
+              path: /chio/health
               port: 9090
             initialDelaySeconds: 1
             periodSeconds: 1
             failureThreshold: 30
           livenessProbe:
             httpGet:
-              path: /arc/health
+              path: /chio/health
               port: 9090
             periodSeconds: 10
             failureThreshold: 3
       volumes:
-        - name: arc-kernel-config
+        - name: chio-kernel-config
           secret:
-            secretName: arc-kernel-config
+            secretName: chio-kernel-config
             items:
               - key: latest
                 path: kernel.yaml
-        - name: arc-openapi-spec
+        - name: chio-openapi-spec
           secret:
-            secretName: arc-openapi-spec
+            secretName: chio-openapi-spec
             items:
               - key: latest
                 path: openapi.yaml

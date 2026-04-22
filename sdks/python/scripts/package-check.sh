@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local smoke-test for every ARC Python SDK package.
+# Local smoke-test for every Chio Python SDK package.
 #
 # For each package listed below:
 #   1. Run `uv build --sdist --wheel` into an isolated out-dir.
@@ -17,33 +17,33 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 # Packages to check. Each entry is: <path-relative-to-repo-root>
 PACKAGES=(
-  "sdks/python/arc-sdk-python"
-  "sdks/python/arc-asgi"
-  "sdks/python/arc-django"
-  "sdks/python/arc-fastapi"
-  "sdks/python/arc-langchain"
-  "sdks/python/arc-crewai"
-  "sdks/python/arc-autogen"
-  "sdks/python/arc-llamaindex"
-  "sdks/python/arc-temporal"
-  "sdks/python/arc-prefect"
-  "sdks/python/arc-dagster"
-  "sdks/python/arc-airflow"
-  "sdks/python/arc-ray"
-  "sdks/python/arc-streaming"
-  "sdks/python/arc-iac"
-  "sdks/python/arc-observability"
-  "sdks/python/arc-langgraph"
-  "sdks/python/arc-code-agent"
-  "sdks/lambda/arc-lambda-python"
+  "sdks/python/chio-sdk-python"
+  "sdks/python/chio-asgi"
+  "sdks/python/chio-django"
+  "sdks/python/chio-fastapi"
+  "sdks/python/chio-langchain"
+  "sdks/python/chio-crewai"
+  "sdks/python/chio-autogen"
+  "sdks/python/chio-llamaindex"
+  "sdks/python/chio-temporal"
+  "sdks/python/chio-prefect"
+  "sdks/python/chio-dagster"
+  "sdks/python/chio-airflow"
+  "sdks/python/chio-ray"
+  "sdks/python/chio-streaming"
+  "sdks/python/chio-iac"
+  "sdks/python/chio-observability"
+  "sdks/python/chio-langgraph"
+  "sdks/python/chio-code-agent"
+  "sdks/lambda/chio-lambda-python"
 )
 
 # Two special cases: the canonical import name does not match the
 # hyphen-to-underscore convention.
 import_name_for() {
   case "$1" in
-    arc-sdk-python) echo "arc_sdk" ;;
-    arc-lambda-python) echo "arc_lambda" ;;
+    chio-sdk-python) echo "chio_sdk" ;;
+    chio-lambda-python) echo "chio_lambda" ;;
     *) echo "${1//-/_}" ;;
   esac
 }
@@ -58,7 +58,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 127
 fi
 
-WORKDIR="$(mktemp -d -t arc-pkgcheck-XXXXXX)"
+WORKDIR="$(mktemp -d -t chio-pkgcheck-XXXXXX)"
 trap 'rm -rf "${WORKDIR}"' EXIT
 
 passed=()

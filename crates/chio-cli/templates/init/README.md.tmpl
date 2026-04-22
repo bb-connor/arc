@@ -1,0 +1,61 @@
+# {{PROJECT_NAME}}
+
+This project was scaffolded by `chio init`.
+
+## What You Get
+
+- `policy.yaml`: a minimal Chio policy that grants one governed tool call
+- `src/bin/hello_server.rs`: a tiny MCP tool server stub
+- `src/bin/demo.rs`: a smoke runner that launches `chio mcp serve`, calls the
+  governed tool, and prints the resulting receipt line
+
+## Run It
+
+1. Build the scaffold:
+
+   ```bash
+   cargo build
+   ```
+
+2. Point the demo at a `chio` binary if it is not already on your `PATH`:
+
+   ```bash
+   CHIO_BIN=/path/to/chio cargo run --quiet --bin demo
+   ```
+
+3. The demo writes the local receipt store under `.chio/receipts.db` and prints
+   the latest receipt after the governed tool call succeeds.
+
+## Prove The Loop
+
+After the demo works, prove one allow, one deny, and one receipt:
+
+```bash
+# Allow: the only governed tool in the starter policy
+chio check --policy ./policy.yaml \
+  --server hello \
+  --tool hello_world \
+  --params '{"name":"Chio"}'
+
+# Deny: any tool outside the starter capability should fail closed
+chio check --policy ./policy.yaml \
+  --server hello \
+  --tool read_file \
+  --params '{}'
+
+# Inspect the signed receipt store produced by the demo
+chio --receipt-db ./.chio/receipts.db receipt list --limit 5
+```
+
+Use the latest receipt id from that output with:
+
+```bash
+chio --receipt-db ./.chio/receipts.db receipt verify <receipt-id>
+```
+
+## Customize It
+
+- Rename `hello_world` in `src/bin/hello_server.rs` to your first tool
+- Tighten `policy.yaml` to the exact server, tool, and budget envelope you need
+- Extend `demo.rs` into your own client or replace it with a framework SDK in
+  later phases

@@ -1,6 +1,6 @@
-# ARC Native Conformance
+# Chio Native Conformance
 
-This directory contains the native ARC conformance lane introduced in phase
+This directory contains the native Chio conformance lane introduced in phase
 `314`.
 
 Structure:
@@ -27,13 +27,13 @@ The native runner supports three driver modes.
 
 ### `artifact`
 
-No external process is required. The runner validates deterministic ARC
+No external process is required. The runner validates deterministic Chio
 fixtures such as signed capabilities, delegation chains, receipts, and DPoP
 proofs.
 
 ### `stdio`
 
-The target is an executable that speaks the native ARC framed transport on
+The target is an executable that speaks the native Chio framed transport on
 stdin/stdout.
 
 Contract:
@@ -51,7 +51,7 @@ with any executable that reads and writes the documented frame format.
 
 The target is an HTTP service that exposes one test-only endpoint:
 
-- `POST /arc-conformance/v1/invoke`
+- `POST /chio-conformance/v1/invoke`
 
 Request body:
 
@@ -80,23 +80,23 @@ non-Rust implementations can wire the harness up quickly.
 Build the fixture and runner:
 
 ```bash
-cargo build -p arc-conformance --bin arc-native-conformance-runner --bin arc-native-conformance-fixture
+cargo build -p chio-conformance --bin chio-native-conformance-runner --bin chio-native-conformance-fixture
 ```
 
 Start the HTTP fixture in one terminal:
 
 ```bash
-target/debug/arc-native-conformance-fixture --http-listen 127.0.0.1:9954
+target/debug/chio-native-conformance-fixture --http-listen 127.0.0.1:9954
 ```
 
 Run the native suite in another terminal:
 
 ```bash
-target/debug/arc-native-conformance-runner \
+target/debug/chio-native-conformance-runner \
   --scenarios-dir tests/conformance/native/scenarios \
-  --results-output tests/conformance/native/results/generated/arc-self.json \
-  --report-output tests/conformance/native/reports/generated/arc-self.md \
-  --stdio-command target/debug/arc-native-conformance-fixture \
+  --results-output tests/conformance/native/results/generated/chio-self.json \
+  --report-output tests/conformance/native/reports/generated/chio-self.md \
+  --stdio-command target/debug/chio-native-conformance-fixture \
   --http-base-url http://127.0.0.1:9954
 ```
 

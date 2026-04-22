@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio KernelMessage tool_call_chunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "id", "chunk_index", "data"],
+  "properties": {
+    "type": {
+      "const": "tool_call_chunk"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "chunk_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "data": true
+  }
+}

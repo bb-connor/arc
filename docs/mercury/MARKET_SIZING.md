@@ -56,7 +56,7 @@ If the evidence platform lands, the opportunity expands through:
 2. supervised-live productionization
 3. governance, downstream-consumer, and assurance products
 4. embedded distribution, trust-network services, and companion products such
-   as ARC-Wall
+   as Chio-Wall
 
 That broader platform supports a substantially larger business than the initial
 evidence wedge alone. A plausible long-range platform range is

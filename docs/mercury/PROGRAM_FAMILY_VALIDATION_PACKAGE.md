@@ -20,7 +20,7 @@ The supported claim is narrow:
 ## Generation Command
 
 ```bash
-cargo run -p arc-mercury -- program-family validate --output target/mercury-program-family-validation
+cargo run -p chio-mercury -- program-family validate --output target/mercury-program-family-validation
 ```
 
 ## Expected Layout

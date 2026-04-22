@@ -11,7 +11,7 @@ paths:
     post:
       summary: Request a provider quote for the security-review family
       operationId: requestQuote
-      x-arc-side-effects: false
+      x-chio-side-effects: false
       requestBody:
         required: true
         content:
@@ -36,8 +36,8 @@ paths:
     post:
       summary: Create a governed purchase request from a returned quote
       operationId: createJob
-      x-arc-side-effects: true
-      x-arc-approval-required: true
+      x-chio-side-effects: true
+      x-chio-approval-required: true
       requestBody:
         required: true
         content:
@@ -74,7 +74,7 @@ paths:
     post:
       summary: Approve a previously staged job
       operationId: approveJob
-      x-arc-side-effects: true
+      x-chio-side-effects: true
       requestBody:
         required: true
         content:
@@ -100,7 +100,7 @@ paths:
     post:
       summary: Raise a post-fulfillment dispute
       operationId: disputeJob
-      x-arc-side-effects: true
+      x-chio-side-effects: true
       requestBody:
         required: true
         content:

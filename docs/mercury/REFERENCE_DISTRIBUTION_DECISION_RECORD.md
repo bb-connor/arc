@@ -31,8 +31,8 @@ Proceed with one bounded Mercury reference-distribution lane only.
 
 - additional landed-account motions or distribution surfaces
 - a generic sales platform, CRM workflow, or commercial console
-- a merged Mercury and ARC-Wall shell
-- ARC-side commercial control surfaces
+- a merged Mercury and Chio-Wall shell
+- Chio-side commercial control surfaces
 - broader Mercury product-family or universal rollout claims
 
 ---
@@ -41,6 +41,6 @@ Proceed with one bounded Mercury reference-distribution lane only.
 
 The reference-distribution lane now packages one bounded landed-account
 expansion path over the existing Mercury evidence stack without pulling
-product logic back into ARC or broadening Mercury into a generic commercial
+product logic back into Chio or broadening Mercury into a generic commercial
 platform, merged shell, or new product line. The milestone therefore closes
 with one explicit proceed decision and one narrow boundary.

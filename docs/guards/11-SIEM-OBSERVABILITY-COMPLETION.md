@@ -1,19 +1,19 @@
 # SIEM and Observability Completion Plan
 
-This document describes the current state of ARC's SIEM integration, the
+This document describes the current state of Chio's SIEM integration, the
 remaining exporters to port from ClawdStrike, and the new observability
 surfaces needed to complete the picture: OCSF format, cloud audit log
 integration, LangSmith/LangFuse bridging, and real-time receipt streaming.
 
 ---
 
-## 1. Current State: What arc-siem Has
+## 1. Current State: What chio-siem Has
 
-The `arc-siem` crate (`crates/arc-siem/src/`) provides the foundational
-infrastructure for forwarding ARC receipts to external SIEM systems. It
-depends on `arc-core` for `ArcReceipt` and `FinancialReceiptMetadata`, and
+The `chio-siem` crate (`crates/chio-siem/src/`) provides the foundational
+infrastructure for forwarding Chio receipts to external SIEM systems. It
+depends on `chio-core` for `ChioReceipt` and `FinancialReceiptMetadata`, and
 on `rusqlite` for direct read access to the kernel receipt database. It does
-NOT depend on `arc-kernel`, keeping the kernel TCB free of HTTP client
+NOT depend on `chio-kernel`, keeping the kernel TCB free of HTTP client
 dependencies.
 
 ### 1.1 Core Abstractions
@@ -21,7 +21,7 @@ dependencies.
 | File | Purpose |
 |------|---------|
 | `exporter.rs` | `Exporter` trait: `export_batch(&self, events: &[SiemEvent]) -> ExportFuture`, plus `ExportError` |
-| `event.rs` | `SiemEvent`: wraps `ArcReceipt` with extracted `FinancialReceiptMetadata` |
+| `event.rs` | `SiemEvent`: wraps `ChioReceipt` with extracted `FinancialReceiptMetadata` |
 | `manager.rs` | `ExporterManager`: cursor-pull loop that reads receipts from SQLite and fans out to exporters |
 | `dlq.rs` | `DeadLetterQueue`: bounded ring buffer for failed exports, drops oldest on overflow |
 | `ratelimit.rs` | `ExportRateLimiter`: per-exporter token bucket rate limiting |
@@ -47,7 +47,7 @@ The manager opens a single read-only SQLite connection at construction time
 
 1. SELECT receipts with `seq > cursor`, ordered ascending, limited to
    `batch_size` (default: 100).
-2. Deserialize each row into `ArcReceipt`, build `SiemEvent`.
+2. Deserialize each row into `ChioReceipt`, build `SiemEvent`.
 3. Fan out the batch to every registered exporter.
 4. On failure: retry with exponential backoff (configurable base and max
    attempts). Exhausted retries push events to the DLQ.
@@ -62,7 +62,7 @@ duplicates idempotently.
 ## 2. Missing Exporters from ClawdStrike
 
 ClawdStrike's `hushd` service has four additional exporters that have not
-been ported to `arc-siem`. Each is production-tested in ClawdStrike and
+been ported to `chio-siem`. Each is production-tested in ClawdStrike and
 implements the same exporter trait pattern.
 
 ### 2.1 Datadog (`exporters/datadog.rs`)
@@ -76,12 +76,12 @@ and by guard name, enabling Datadog dashboards and monitors out of the box.
 
 **Porting plan.**
 
-- Adapt from ClawdStrike's `SecurityEvent` to ARC's `SiemEvent`.
-- Replace `async_trait` with `Pin<Box<dyn Future>>` to match arc-siem's
+- Adapt from ClawdStrike's `SecurityEvent` to Chio's `SiemEvent`.
+- Replace `async_trait` with `Pin<Box<dyn Future>>` to match chio-siem's
   dyn-compatible `Exporter` trait.
-- Change the default service/source from `clawdstrike` to `arc`.
-- Map ARC `Decision` (Allow/Deny) and `GuardEvidence` to Datadog tags.
-- Metric prefix becomes `arc.siem` instead of `clawdstrike`.
+- Change the default service/source from `clawdstrike` to `chio`.
+- Map Chio `Decision` (Allow/Deny) and `GuardEvidence` to Datadog tags.
+- Metric prefix becomes `chio.siem` instead of `clawdstrike`.
 - Retain configurable DD site, API key, tags, and TLS settings.
 
 ### 2.2 Sumo Logic (`exporters/sumo_logic.rs`)
@@ -95,9 +95,9 @@ configurable format (JSON, plaintext, key-value). Supports gzip compression
 
 - Adapt from `SecurityEvent` to `SiemEvent`.
 - Change default source category from `security/clawdstrike` to
-  `security/arc`.
+  `security/chio`.
 - Preserve the three format modes. JSON is the default and should serialize
-  the full `ArcReceipt` payload.
+  the full `ChioReceipt` payload.
 - Keep gzip compression. The `flate2` dependency is lightweight and
   significantly reduces egress bandwidth to Sumo Logic collectors.
 
@@ -113,8 +113,8 @@ Handlebars-style template engine for custom payload rendering.
 
 - Adapt from `SecurityEvent` to `SiemEvent`.
 - Replace ClawdStrike-branded message strings ("Clawdstrike security event")
-  with ARC-branded equivalents.
-- Map ARC `Decision` and `GuardEvidence` into the Slack block and Teams
+  with Chio-branded equivalents.
+- Map Chio `Decision` and `GuardEvidence` into the Slack block and Teams
   MessageCard payloads so analysts see which guard fired and why.
 - The generic webhook path works unchanged because it serializes the full
   event as JSON.
@@ -136,10 +136,10 @@ and OpsGenie (Alerts API v2). Features:
 
 - Adapt from `SecurityEvent` to `SiemEvent`.
 - Replace ClawdStrike branding in alert summaries and source fields.
-- Map ARC `GuardEvidence` into PagerDuty `custom_details` and OpsGenie
+- Map Chio `GuardEvidence` into PagerDuty `custom_details` and OpsGenie
   `details` so on-call engineers see the full guard context.
 - The background task pattern (auto-resolve, heartbeat) ports directly
-  because `arc-siem` already uses `tokio` and `watch` channels.
+  because `chio-siem` already uses `tokio` and `watch` channels.
 
 ### 2.5 Porting Strategy (All Four)
 
@@ -151,8 +151,8 @@ All four exporters follow the same structural pattern:
 
 The primary adaptation is the event type: ClawdStrike uses
 `SecurityEvent` (rich structured type with `AgentInfo`, `SessionInfo`,
-`ThreatInfo`, `DecisionInfo`, `ResourceInfo`). ARC uses `SiemEvent`
-(wrapping `ArcReceipt`).
+`ThreatInfo`, `DecisionInfo`, `ResourceInfo`). Chio uses `SiemEvent`
+(wrapping `ChioReceipt`).
 
 Two approaches, not mutually exclusive:
 
@@ -181,9 +181,9 @@ for security events, adopted by AWS Security Lake, Splunk OCSF integration,
 and CrowdStrike Falcon. It defines event classes (Detection Finding, API
 Activity, Authorization, etc.) with normalized fields.
 
-### 3.2 Why It Matters for ARC
+### 3.2 Why It Matters for Chio
 
-ARC receipts are security attestations. They record that a tool call was
+Chio receipts are security attestations. They record that a tool call was
 evaluated against a guard pipeline and either allowed or denied, with
 cryptographic proof. This is exactly what OCSF event classes describe:
 
@@ -193,14 +193,14 @@ cryptographic proof. This is exactly what OCSF event classes describe:
   noteworthy (guard deny, secret leak, forbidden path).
 - **API Activity (class 6003)**: an API call was made (tool invocation).
 
-Without OCSF, every SOC that ingests ARC receipts must write custom parsing
-rules. With OCSF, ARC events slot into existing detection pipelines and
+Without OCSF, every SOC that ingests Chio receipts must write custom parsing
+rules. With OCSF, Chio events slot into existing detection pipelines and
 Security Lake queries immediately.
 
 ### 3.3 Receipt-to-OCSF Mapping
 
 ```
-ARC Receipt Field           OCSF Field (Authorization)
+Chio Receipt Field           OCSF Field (Authorization)
 -----------                 --------------------------
 receipt.id                  metadata.uid
 receipt.timestamp           time (epoch ms)
@@ -220,11 +220,11 @@ receipt.capability_id       actor.authorizations[].uid
 
 ### 3.4 Implementation Plan
 
-Add an `ocsf` module to `arc-siem` that transforms `SiemEvent` into the
+Add an `ocsf` module to `chio-siem` that transforms `SiemEvent` into the
 OCSF Authorization JSON structure:
 
 ```rust
-// crates/arc-siem/src/ocsf.rs
+// crates/chio-siem/src/ocsf.rs
 pub fn to_ocsf_authorization(event: &SiemEvent) -> serde_json::Value { ... }
 pub fn to_ocsf_detection_finding(event: &SiemEvent) -> serde_json::Value { ... }
 ```
@@ -242,7 +242,7 @@ applies the appropriate transform before calling `export_batch`.
 
 ## 4. Cloud Audit Log Integration
 
-Enterprise deployments need ARC receipts to appear alongside native cloud
+Enterprise deployments need Chio receipts to appear alongside native cloud
 audit events. The three targets:
 
 ### 4.1 AWS CloudTrail
@@ -251,8 +251,8 @@ CloudTrail supports custom event ingestion via CloudTrail Lake.
 
 - Use the `PutAuditEvents` API to write to a CloudTrail Lake event data
   store.
-- Map ARC receipts to CloudTrail's event structure: `eventSource` =
-  `arc.kernel`, `eventName` = tool_name, `requestParameters` =
+- Map Chio receipts to CloudTrail's event structure: `eventSource` =
+  `chio.kernel`, `eventName` = tool_name, `requestParameters` =
   action.parameters, `responseElements.decision` = Allow/Deny.
 - Implementation: new `CloudTrailExporter` implementing the `Exporter`
   trait. Uses `aws-sdk-cloudtrail` with standard credential chain
@@ -263,8 +263,8 @@ CloudTrail supports custom event ingestion via CloudTrail Lake.
 Cloud Audit Logs accepts custom audit log entries via the Cloud Logging API.
 
 - Write entries with `logName` =
-  `projects/{project}/logs/arc.googleapis.com%2Fguard_audit`.
-- Use the `AuditLog` protobuf structure: `service_name` = `arc.kernel`,
+  `projects/{project}/logs/chio.googleapis.com%2Fguard_audit`.
+- Use the `AuditLog` protobuf structure: `service_name` = `chio.kernel`,
   `method_name` = tool_name, `authorization_info[]` maps from guard
   evidence.
 - Implementation: new `CloudAuditLogExporter`. Uses `google-cloud-logging`
@@ -275,9 +275,9 @@ Cloud Audit Logs accepts custom audit log entries via the Cloud Logging API.
 Azure uses Diagnostic Settings to route to Log Analytics, Event Hubs, or
 Storage.
 
-- ARC events are sent as custom log entries to a Log Analytics workspace
+- Chio events are sent as custom log entries to a Log Analytics workspace
   via the Data Collector API (HTTP Data Collector / DCR-based ingestion).
-- Table name: `ArcGuardAudit_CL`.
+- Table name: `ChioGuardAudit_CL`.
 - Implementation: new `AzureLogAnalyticsExporter`. Uses shared key or
   Azure AD (Entra ID) authentication.
 
@@ -295,7 +295,7 @@ pulling cloud SDKs into the default build.
 
 ### 5.1 The Gap
 
-ARC receipts are security attestations. LangSmith and LangFuse are agent
+Chio receipts are security attestations. LangSmith and LangFuse are agent
 observability platforms that track LLM calls as spans in traces. Today,
 there is no connection between them: a SOC analyst sees guard decisions in
 the SIEM, but the agent developer sees tool calls in LangSmith without any
@@ -303,13 +303,13 @@ security context. Neither side has the full picture.
 
 ### 5.2 The Bridge
 
-Push ARC receipts as enriched spans into LangSmith/LangFuse so that every
+Push Chio receipts as enriched spans into LangSmith/LangFuse so that every
 tool call trace includes its guard evaluation result.
 
 **LangSmith bridge.** Use LangSmith's Run API (`POST /runs`) to create a
 child run for each receipt:
 - `run_type` = `chain`
-- `name` = `arc.guard.{tool_name}`
+- `name` = `chio.guard.{tool_name}`
 - `inputs` = action.parameters
 - `outputs` = `{ decision, evidence[] }`
 - `extra.metadata` = `{ capability_id, policy_hash, receipt_id }`
@@ -319,7 +319,7 @@ child run for each receipt:
 **LangFuse bridge.** Use LangFuse's Ingestion API (`POST /api/public/ingestion`)
 to create a span:
 - `type` = `span`
-- `name` = `arc.guard.{tool_name}`
+- `name` = `chio.guard.{tool_name}`
 - `input` = action.parameters
 - `output` = `{ decision, evidence[] }`
 - `metadata` = `{ capability_id, policy_hash, receipt_id, guard_names }`
@@ -329,7 +329,7 @@ to create a span:
 
 The agent must pass its LangSmith run ID or LangFuse trace ID to the kernel
 so it can be attached to the receipt. This propagates via the `metadata`
-field on `ArcReceiptBody`:
+field on `ChioReceiptBody`:
 
 ```json
 {
@@ -379,7 +379,7 @@ be unacceptable during active incidents. Two options:
 awaits the notification instead of sleeping for the full poll interval.
 The cursor-pull mechanics remain identical; only the wake trigger changes.
 
-This does NOT require `arc-siem` to depend on `arc-kernel`. The kernel
+This does NOT require `chio-siem` to depend on `chio-kernel`. The kernel
 exposes a `Notify` handle at construction time; the binary that wires
 kernel + manager passes it through.
 
@@ -409,7 +409,7 @@ first), while alerting exporters flush immediately on notification.
 
 ### 7.1 The Problem
 
-As ARC absorbs more guard types (WASM guards, ClawdStrike-adapted guards,
+As Chio absorbs more guard types (WASM guards, ClawdStrike-adapted guards,
 cross-protocol guards), the `GuardEvidence` array on each receipt grows
 richer. Each guard produces structured details:
 
@@ -421,7 +421,7 @@ richer. Each guard produces structured details:
 
 ### 7.2 How Evidence Enriches SIEM Events
 
-Today, `SiemEvent` wraps `ArcReceipt` as a blob. Exporters serialize the
+Today, `SiemEvent` wraps `ChioReceipt` as a blob. Exporters serialize the
 entire receipt, and SIEM analysts must drill into nested JSON to find guard
 details.
 
@@ -429,7 +429,7 @@ The enriched model extracts evidence into top-level SIEM fields:
 
 ```
 SiemEvent {
-    receipt: ArcReceipt,
+    receipt: ChioReceipt,
     financial: Option<FinancialReceiptMetadata>,
 
     // New enrichment fields (populated from evidence[]):
@@ -451,7 +451,7 @@ This structure is what drives:
 
 ### 7.3 Severity Derivation
 
-ARC receipts carry `Decision::Allow` or `Decision::Deny` but no severity
+Chio receipts carry `Decision::Allow` or `Decision::Deny` but no severity
 level. The enrichment layer derives severity from the guard type and
 decision:
 
@@ -488,7 +488,7 @@ out to all registered exporters on each poll cycle.
 
 Adding a new exporter requires:
 
-1. Create `crates/arc-siem/src/exporters/foo.rs`.
+1. Create `crates/chio-siem/src/exporters/foo.rs`.
 2. Define `FooConfig` (with `Serialize`/`Deserialize` for config file
    loading).
 3. Implement `Exporter for FooExporter`.
@@ -502,7 +502,7 @@ behind the trait boundary.
 ### 8.3 Extensions from ClawdStrike's Trait
 
 ClawdStrike's exporter trait has two additional methods not present in
-arc-siem's:
+chio-siem's:
 
 ```rust
 fn schema(&self) -> SchemaFormat;       // ECS, CEF, OCSF, Native
@@ -521,7 +521,7 @@ each exporter.
 (PagerDuty auto-resolve, OpsGenie heartbeat). Without it, the manager
 cannot cleanly stop these tasks on process exit.
 
-**Recommendation:** Extend arc-siem's `Exporter` trait with all three
+**Recommendation:** Extend chio-siem's `Exporter` trait with all three
 methods, using default implementations so existing exporters do not break:
 
 ```rust
@@ -557,19 +557,19 @@ pub trait Exporter: Send + Sync {
 | 10 | LangFuse bridge exporter | Phase 1 |
 | 11 | Cloud audit log exporters (CloudTrail, GCP, Azure) | Phase 1 |
 
-Phases 1-5 are the critical path. They bring ARC to feature parity with
+Phases 1-5 are the critical path. They bring Chio to feature parity with
 ClawdStrike's SIEM capabilities. Phases 6-7 add schema normalization.
 Phase 8 eliminates polling latency. Phases 9-11 are new capabilities that
-extend ARC's reach into agent observability and cloud compliance surfaces.
+extend Chio's reach into agent observability and cloud compliance surfaces.
 
 ---
 
 ## 10. Open Questions
 
-1. **Event type unification.** Should arc-siem adopt ClawdStrike's
+1. **Event type unification.** Should chio-siem adopt ClawdStrike's
    `SecurityEvent` type wholesale as an intermediate representation, or
-   build a leaner ARC-native enrichment? The former maximizes code reuse;
-   the latter avoids importing ClawdStrike's audit-event ontology into ARC's
+   build a leaner Chio-native enrichment? The former maximizes code reuse;
+   the latter avoids importing ClawdStrike's audit-event ontology into Chio's
    core abstractions.
 
 2. **Cursor persistence.** The current design re-exports all receipts on
@@ -577,7 +577,7 @@ extend ARC's reach into agent observability and cloud compliance surfaces.
    Should the cursor be persisted in a separate SQLite table, in the
    receipt database itself, or in a sidecar file?
 
-3. **Multi-tenant isolation.** If ARC serves multiple tenants (different
+3. **Multi-tenant isolation.** If Chio serves multiple tenants (different
    agents, different policies), should each tenant get its own exporter
    pipeline, or should the manager apply tenant-scoped filters before
    fan-out?

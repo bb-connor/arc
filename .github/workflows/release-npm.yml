@@ -1,6 +1,6 @@
 name: Release npm
 
-# Publishes ARC TypeScript SDKs to npm on git tag push, using OIDC-backed
+# Publishes Chio TypeScript SDKs to npm on git tag push, using OIDC-backed
 # `npm publish --provenance`. See `docs/install/PUBLISHING.md` for tag
 # format, npm org trust setup, and rollback procedures.
 #
@@ -8,7 +8,7 @@ name: Release npm
 #   ts/v<X.Y.Z>                 -> publishes every TypeScript package
 #   ts/<slug>-v<X.Y.Z>          -> publishes only that package
 #                                  (e.g. ts/express-v1.2.0 publishes
-#                                  @arc-protocol/express)
+#                                  @chio-protocol/express)
 #
 # workflow_dispatch exposes a `dry_run` input that builds and lints every
 # matrix leg without uploading to npm. No stored NPM_TOKEN is required;
@@ -388,6 +388,6 @@ jobs:
           set -euo pipefail
           tarball=$(find npm-dist -maxdepth 1 -name '*.tgz' -print -quit)
           echo "Publishing $tarball"
-          # `--access public` is required for scoped packages (@arc-protocol/*)
+          # `--access public` is required for scoped packages (@chio-protocol/*)
           # to be accessible without auth.
           npm publish "$tarball" --access public --provenance

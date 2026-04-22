@@ -1,7 +1,7 @@
 # GA Checklist
 
 Use this checklist before claiming general-availability readiness for the
-current post-`v2.41` ARC production candidate.
+current post-`v2.41` Chio production candidate.
 
 This checklist is procedural. Use
 [RELEASE_AUDIT.md](RELEASE_AUDIT.md) for the authoritative repo-local
@@ -22,7 +22,7 @@ release-go decision,
 - [x] trust-control deployment, backup/restore, upgrade, and rollback are documented
 - [x] hosted edge admin and health diagnostics are documented
 - [x] formal/spec launch evidence boundary is explicit in protocol and release docs
-- [x] partner-proof materials are updated to the current ARC surface
+- [x] partner-proof materials are updated to the current Chio surface
 - [x] `spec/PROTOCOL.md` reflects the shipped repository profile
 - [x] standards-submission drafts exist for receipts and portable trust
 - [x] README and SDK docs align to the current production-candidate contract

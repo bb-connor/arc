@@ -6,9 +6,9 @@
 
 ## Context
 
-Current `ArcScope` is tool-centric:
+Current `ChioScope` is tool-centric:
 
-- `ArcScope { grants: Vec<ToolGrant> }`
+- `ChioScope { grants: Vec<ToolGrant> }`
 
 That is workable for the prototype, but resources, prompts, sampling, and elicitation will not fit cleanly forever as tool-like shapes.
 
@@ -19,9 +19,9 @@ There are two timing options:
 
 ## Decision
 
-ARC will keep `ToolGrant` as the operational grant type through early MCP tool parity work.
+Chio will keep `ToolGrant` as the operational grant type through early MCP tool parity work.
 
-Before resources and prompts become first-class runtime features, ARC will introduce a broader grant model, likely an enum-based `Grant` family.
+Before resources and prompts become first-class runtime features, Chio will introduce a broader grant model, likely an enum-based `Grant` family.
 
 ## Rationale
 

@@ -72,7 +72,7 @@ This runbook does not authorize:
 - multiple sponsor-specific exchange lanes
 - multi-network witness or trust-broker services
 - generic ecosystem interoperability operations
-- ARC-Wall companion-product operations
+- Chio-Wall companion-product operations
 - multi-product platform hardening
 
 Those remain separate milestones, not hidden responsibilities inside `v2.49`.

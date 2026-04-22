@@ -20,32 +20,32 @@ run_check() {
 }
 
 run_check node-identity \
-  cargo test -p arc-cli --test trust_cluster \
+  cargo test -p chio-cli --test trust_cluster \
   trust_control_cluster_internal_status_requires_signed_node_identity -- --nocapture
 
 run_check quorum-heal \
-  cargo test -p arc-cli --test trust_cluster \
+  cargo test -p chio-cli --test trust_cluster \
   trust_control_cluster_requires_quorum_and_heals_after_partition -- --nocapture
 
 run_check stale-leader-fencing \
-  cargo test -p arc-cli --test trust_cluster \
+  cargo test -p chio-cli --test trust_cluster \
   trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart -- --nocapture
 
 run_check denied-event-replication \
-  cargo test -p arc-cli --test trust_cluster \
+  cargo test -p chio-cli --test trust_cluster \
   trust_control_cluster_replicates_denied_budget_events_without_usage_rows -- --nocapture
 
 run_check replay-and-failover \
-  cargo test -p arc-cli --test trust_cluster \
+  cargo test -p chio-cli --test trust_cluster \
   trust_control_cluster_snapshot_replays_holds_and_mutation_events -- --nocapture
 
 run_check duplicate-event-rejection \
-  cargo test -p arc-store-sqlite --lib \
+  cargo test -p chio-store-sqlite --lib \
   budget_store::tests::budget_store_event_id_reuse_rejects_authority_rollover_sqlite -- \
   --exact --nocapture
 
 run_check stale-lease-rejection \
-  cargo test -p arc-store-sqlite --test integration_smoke \
+  cargo test -p chio-store-sqlite --test integration_smoke \
   sqlite_budget_hold_authority_metadata_persists_across_reopen -- \
   --exact --nocapture
 
@@ -53,7 +53,7 @@ cat >"${report_path}" <<'EOF'
 # Trust-Control Qualification
 
 This bundle records the authoritative trust-control qualification gate for the
-current ARC closure program.
+current Chio closure program.
 
 Executed checks:
 

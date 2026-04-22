@@ -88,7 +88,7 @@ After the initial wedge proves itself, the company can expand into:
 - downstream archive, review, and surveillance distribution
 - assurance suite workflows
 - embedded OEM distribution, trust-network services, and companion products
-  such as ARC-Wall
+  such as Chio-Wall
 
 That sequencing matters. It reduces engineering burn before demand is proven
 and creates a credible commercial wedge.
@@ -101,9 +101,9 @@ platform, or broad SDK program.
 
 ---
 
-## 5. Why This Team / Why ARC
+## 5. Why This Team / Why Chio
 
-MERCURY is built on ARC, which already provides:
+MERCURY is built on Chio, which already provides:
 
 - receipt and checkpoint mechanics
 - signing primitives
@@ -165,7 +165,7 @@ is normal for software entering regulated workflows.
 
 ## 8. Moat
 
-### Existing ARC substrate
+### Existing Chio substrate
 
 The company starts with real protocol and verification infrastructure rather
 than a greenfield cryptography project.
@@ -222,7 +222,7 @@ The seed round should fund:
 MERCURY is attractive as a staged product thesis:
 
 - land a governed-change and inquiry wedge that solves a real problem now
-- use that wedge to prove ARC's broader rights-and-receipts thesis in finance
+- use that wedge to prove Chio's broader rights-and-receipts thesis in finance
 - expand into deeper workflow control and companion products only where buyer
   pull is concrete
 

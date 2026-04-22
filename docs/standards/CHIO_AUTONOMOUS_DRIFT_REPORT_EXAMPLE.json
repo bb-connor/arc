@@ -1,0 +1,63 @@
+{
+  "schema": "chio.autonomous-drift-report.v1",
+  "drift_report_id": "adr-1",
+  "generated_at": 1743379620,
+  "subject_key": "subject-1",
+  "pricing_decision_ref": "apd-1",
+  "optimization_ref": "cpo-1",
+  "drift_signals": [
+    {
+      "kind": "settlement_failure_rate",
+      "severity": "critical",
+      "metric_name": "failed_settlement_rate_bps",
+      "observed_value": 275,
+      "threshold_value": 100,
+      "description": "Settlement failures exceeded the automation safe-state threshold.",
+      "evidence_refs": [
+        {
+          "kind": "web3_settlement_receipt",
+          "reference_id": "receipt-web3-1",
+          "observed_at": 1743379000,
+          "locator": "web3-settlement:receipt-web3-1"
+        }
+      ]
+    }
+  ],
+  "rollback_plan": {
+    "schema": "chio.autonomous-rollback-plan.v1",
+    "plan_id": "arp-1",
+    "issued_at": 1743379560,
+    "subject_key": "subject-1",
+    "safe_state": "delegated_only",
+    "triggers": [
+      "settlement_failure_rate",
+      "premium_variance"
+    ],
+    "actions": [
+      "switch_to_safe_state",
+      "cancel_pending_execution",
+      "require_human_approval"
+    ],
+    "requires_operator_ack": true,
+    "note": "Falls back to delegated pricing when automation drifts beyond the accepted envelope."
+  },
+  "comparison_report": {
+    "schema": "chio.autonomous-comparison-report.v1",
+    "comparison_id": "acr-1",
+    "generated_at": 1743379500,
+    "pricing_decision_ref": "apd-1",
+    "manual_decision_ref": "uwd-manual-1",
+    "disposition": "narrower_than_manual",
+    "deltas": [
+      {
+        "field": "premium_units",
+        "automated_value": "4800",
+        "manual_value": "5100",
+        "description": "Automation priced inside the manual ceiling."
+      }
+    ],
+    "note": "Shows automation staying narrower than the comparable manual decision."
+  },
+  "fail_safe_engaged": true,
+  "note": "Fail-safe engaged after settlement drift breached the critical threshold."
+}

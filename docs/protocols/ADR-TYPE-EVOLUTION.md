@@ -32,8 +32,8 @@ If teams execute from different docs, they will produce incompatible code.
 
 ### 1. Source of Truth
 
-The source of truth for `ToolAction` is `crates/arc-guards/src/action.rs`.
-The source of truth for `Constraint` is `crates/arc-core-types/src/capability.rs`.
+The source of truth for `ToolAction` is `crates/chio-guards/src/action.rs`.
+The source of truth for `Constraint` is `crates/chio-core-types/src/capability.rs`.
 
 All doc proposals are **design sketches**. They inform the final
 implementation but are not the contract. When implementing, the developer
@@ -42,7 +42,7 @@ the canonical file.
 
 ### 2. Current State (what is in code today)
 
-**ToolAction** (in `arc-guards/src/action.rs`):
+**ToolAction** (in `chio-guards/src/action.rs`):
 
 ```rust
 pub enum ToolAction {
@@ -58,7 +58,7 @@ pub enum ToolAction {
 
 Style: tuple variants with positional fields. No struct variants.
 
-**Constraint** (in `arc-core-types/src/capability.rs`):
+**Constraint** (in `chio-core-types/src/capability.rs`):
 
 ```rust
 pub enum Constraint {
@@ -230,21 +230,21 @@ compatibility concern.
 ### 6. Additional Reconciliation Notes
 
 **Config schema drift**: `UNIFIED-CONFIGURATION.md` describes a config
-schema (nested `adapters.mcp/a2a/acp`, `kernel.keypair`, `arc start`)
-that does not match the implemented loader in `arc-config/src/schema.rs`
+schema (nested `adapters.mcp/a2a/acp`, `kernel.keypair`, `chio start`)
+that does not match the implemented loader in `chio-config/src/schema.rs`
 (flat Vec sections, `kernel.signing_key`, no `start` command). The
 UNIFIED-CONFIGURATION doc is aspirational, not current. The code in
-`arc-config` is the source of truth for what works today.
+`chio-config` is the source of truth for what works today.
 
 **CLI contract drift**: `DX-AND-ADOPTION-ROADMAP.md` references
-`arc-policy.toml` and bare policy names. The actual CLI in
-`arc-cli/src/cli/types.rs` expects a policy YAML path. DX docs should
+`chio-policy.toml` and bare policy names. The actual CLI in
+`chio-cli/src/cli/types.rs` expects a policy YAML path. DX docs should
 be updated to match the current CLI before publishing quickstart guides.
 
 **HITL approval replay (resolved)**: The kernel now has a single-use
-consumption store (`approval_replay_store` on `ArcKernel`) using the
+consumption store (`approval_replay_store` on `ChioKernel`) using the
 same LRU+TTL pattern as DPoP. Additionally, a lifetime cap
 (`MAX_APPROVAL_TTL_SECS = 3600`) rejects tokens with lifetimes exceeding
 the store's TTL, ensuring tokens expire before cache eviction can occur.
-See `arc-kernel/src/kernel/mod.rs`, steps 7-8 of
+See `chio-kernel/src/kernel/mod.rs`, steps 7-8 of
 `validate_governed_approval_token()`.
