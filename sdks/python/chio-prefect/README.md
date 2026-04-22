@@ -102,8 +102,6 @@ Receipts appear on the flow-run timeline as `chio.receipt.allow` and
 `chio.receipt.deny` events. Click through to the event payload to see
 the receipt id, capability id, and guard that produced the verdict.
 
-> Screenshot placeholder: `docs/screenshots/prefect-ui-receipts.png`
-
 ### Prefect Automations
 
 Because receipts are emitted as first-class Prefect Events, Automations

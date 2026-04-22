@@ -79,7 +79,6 @@ pub fn verify_json_str_signature_ed25519(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
         public_key_hex_matches, sign_json_str_ed25519, sign_utf8_message_ed25519,
@@ -87,38 +86,36 @@ mod tests {
     };
 
     #[test]
-    fn sign_and_verify_utf8_message() {
-        let signed = sign_utf8_message_ed25519("hello chio", &"09".repeat(32)).unwrap();
+    fn sign_and_verify_utf8_message() -> crate::Result<()> {
+        let signed = sign_utf8_message_ed25519("hello chio", &"09".repeat(32))?;
         assert!(verify_utf8_message_ed25519(
             "hello chio",
             &signed.public_key_hex,
             &signed.signature_hex,
-        )
-        .unwrap());
+        )?);
         assert!(!verify_utf8_message_ed25519(
             "hello chio!",
             &signed.public_key_hex,
             &signed.signature_hex,
-        )
-        .unwrap());
+        )?);
+        Ok(())
     }
 
     #[test]
-    fn sign_and_verify_json_string() {
-        let signed = sign_json_str_ed25519("{\"z\":1,\"a\":2}", &"09".repeat(32)).unwrap();
+    fn sign_and_verify_json_string() -> crate::Result<()> {
+        let signed = sign_json_str_ed25519("{\"z\":1,\"a\":2}", &"09".repeat(32))?;
         assert_eq!(signed.canonical_json, "{\"a\":2,\"z\":1}");
         assert!(verify_json_str_signature_ed25519(
             "{\"z\":1,\"a\":2}",
             &signed.public_key_hex,
             &signed.signature_hex,
-        )
-        .unwrap());
+        )?);
         assert!(!verify_json_str_signature_ed25519(
             "{\"z\":2,\"a\":2}",
             &signed.public_key_hex,
             &signed.signature_hex,
-        )
-        .unwrap());
+        )?);
+        Ok(())
     }
 
     #[test]

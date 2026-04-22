@@ -169,8 +169,10 @@ mod tests {
 
         // Test via the extracted pure-logic function (avoids 64-bit pointer
         // truncation issues with chio_deny_reason's i32 buf_ptr on native).
-        let json_bytes =
-            super::serialize_deny_reason().expect("deny reason should be present after Deny");
+        let json_bytes = match super::serialize_deny_reason() {
+            Some(bytes) => bytes,
+            None => panic!("deny reason should be present after Deny"),
+        };
         let resp: GuestDenyResponse = serde_json::from_slice(&json_bytes).unwrap();
         assert_eq!(resp.reason, "blocked");
     }
@@ -191,7 +193,10 @@ mod tests {
         ));
 
         // The serialized JSON for this reason is well over 2 bytes.
-        let json_bytes = super::serialize_deny_reason().expect("deny reason should be present");
+        let json_bytes = match super::serialize_deny_reason() {
+            Some(bytes) => bytes,
+            None => panic!("deny reason should be present"),
+        };
         assert!(json_bytes.len() > 2, "JSON should be longer than 2 bytes");
 
         // Verify the chio_deny_reason logic: if buf_len < json_bytes.len(), it

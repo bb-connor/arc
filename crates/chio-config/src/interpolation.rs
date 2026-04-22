@@ -57,6 +57,13 @@ pub fn interpolate(input: &str) -> Result<String, ConfigError> {
 mod tests {
     use super::*;
 
+    fn interpolation_error(result: Result<String, ConfigError>) -> ConfigError {
+        match result {
+            Ok(value) => panic!("expected interpolation error, got {value:?}"),
+            Err(error) => error,
+        }
+    }
+
     #[test]
     fn plain_text_unchanged() {
         let input = "hello world";
@@ -94,7 +101,7 @@ mod tests {
     fn missing_var_no_default_is_error() {
         env::remove_var("CHIO_TEST_MISSING_NO_DEFAULT");
         let input = "key: ${CHIO_TEST_MISSING_NO_DEFAULT}";
-        let err = interpolate(input).unwrap_err();
+        let err = interpolation_error(interpolate(input));
         match err {
             ConfigError::Interpolation(msg) => {
                 assert!(
@@ -130,7 +137,7 @@ mod tests {
         env::remove_var("CHIO_TEST_X1");
         env::remove_var("CHIO_TEST_X2");
         let input = "${CHIO_TEST_X1} ${CHIO_TEST_X2}";
-        let err = interpolate(input).unwrap_err();
+        let err = interpolation_error(interpolate(input));
         match err {
             ConfigError::Interpolation(msg) => {
                 assert!(msg.contains("CHIO_TEST_X1"), "should contain X1: {msg}");

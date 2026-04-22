@@ -41,7 +41,7 @@ finally:
 - `chio.invariants` provides canonical JSON, hashing, signing, capability,
   receipt, and manifest verification helpers.
 
-The full public reference lives in [docs/SDK_PYTHON_REFERENCE.md](../../../docs/SDK_PYTHON_REFERENCE.md).
+The full public reference lives in [docs/reference/SDK_PYTHON_REFERENCE.md](../../../docs/reference/SDK_PYTHON_REFERENCE.md).
 
 ## Official Example
 

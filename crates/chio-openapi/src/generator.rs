@@ -221,23 +221,22 @@ fn build_input_schema(params: &[Parameter], request_body: &Option<Value>) -> Val
 /// Build an output schema from the response schemas. Uses the first successful
 /// (2xx) response schema found.
 fn build_output_schema(responses: &[(String, Option<Value>)]) -> Option<Value> {
-    // Look for 200, 201, then any 2xx.
     for preferred in &["200", "201"] {
-        if let Some((_, schema)) = responses.iter().find(|(code, _)| code == preferred) {
-            if schema.is_some() {
-                return schema.clone();
+        if let Some(schema) = responses.iter().find_map(|(code, schema)| {
+            if code == preferred {
+                schema.as_ref()
+            } else {
+                None
             }
+        }) {
+            return Some(schema.clone());
         }
     }
 
-    // Fall back to any 2xx with a schema.
-    for (code, schema) in responses {
-        if code.starts_with('2') && schema.is_some() {
-            return schema.clone();
-        }
-    }
-
-    None
+    responses
+        .iter()
+        .find_map(|(code, schema)| code.starts_with('2').then_some(schema.as_ref()).flatten())
+        .cloned()
 }
 
 #[cfg(test)]

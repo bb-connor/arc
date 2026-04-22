@@ -1,4 +1,4 @@
-//! Integration tests for the Phase 5.1–5.4 CUA + SpiderSense guards.
+//! Integration tests for the Phase 5.1-5.4 CUA + SpiderSense guards.
 //!
 //! Exercises each guard through the real [`chio_kernel::Guard`] trait with
 //! a realistic [`GuardContext`].  The tests verify the roadmap acceptance
@@ -25,7 +25,7 @@ use chio_guards::{
 };
 use chio_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 
-// ─── Helpers ──────────────────────────────────────────────────────────
+// Helpers
 
 fn signed_cap(kp: &Keypair, scope: &ChioScope) -> CapabilityToken {
     let body = CapabilityTokenBody {
@@ -77,7 +77,7 @@ fn eval<G: Guard>(guard: &G, tool: &str, args: serde_json::Value) -> Verdict {
     guard.evaluate(&ctx).expect("guard evaluate")
 }
 
-// ─── Phase 5.1: ComputerUseGuard ───────────────────────────────────────
+// Phase 5.1: ComputerUseGuard
 
 #[test]
 fn computer_use_denies_navigation_to_blocked_domain() {
@@ -185,7 +185,7 @@ fn computer_use_guardrail_allows_warning_only() {
     assert!(matches!(v, Verdict::Allow));
 }
 
-// ─── Phase 5.2: InputInjectionCapabilityGuard ─────────────────────────
+// Phase 5.2: InputInjectionCapabilityGuard
 
 #[test]
 fn input_injection_denies_non_allowlisted_input_type() {
@@ -277,7 +277,7 @@ fn input_injection_detects_injection_via_action_type_arg() {
     assert!(matches!(v, Verdict::Deny), "expected Deny, got {v:?}");
 }
 
-// ─── Phase 5.3: RemoteDesktopSideChannelGuard ─────────────────────────
+// Phase 5.3: RemoteDesktopSideChannelGuard
 
 #[test]
 fn remote_desktop_denies_when_clipboard_disabled() {
@@ -375,7 +375,7 @@ fn remote_desktop_denies_invalid_transfer_size_type() {
     assert!(matches!(v, Verdict::Deny), "expected Deny, got {v:?}");
 }
 
-// ─── Phase 5.4: SpiderSenseGuard ──────────────────────────────────────
+// Phase 5.4: SpiderSenseGuard
 
 fn bundled_pattern_json() -> String {
     std::fs::read_to_string(concat!(

@@ -136,7 +136,10 @@ pub fn run_conformance_harness(
     let logs_dir = artifacts_dir.join("logs");
     fs::create_dir_all(&logs_dir)?;
 
-    let listen = options.listen.unwrap_or_else(reserve_listen_addr);
+    let listen = match options.listen {
+        Some(listen) => listen,
+        None => reserve_listen_addr()?,
+    };
     let chio_executable = ensure_chio_executable(&options.repo_root, &options.cargo_binary)?;
     let server_log_path = logs_dir.join("chio-mcp-serve-http.log");
     let server = spawn_remote_edge(&chio_executable, options, listen, &server_log_path)?;
@@ -395,14 +398,11 @@ fn run_peer(
     Ok(())
 }
 
-fn reserve_listen_addr() -> SocketAddr {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .unwrap_or_else(|_| panic!("failed to bind temporary port"));
-    let addr = listener
-        .local_addr()
-        .unwrap_or_else(|_| panic!("failed to inspect temporary listener"));
+fn reserve_listen_addr() -> Result<SocketAddr, RunnerError> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let addr = listener.local_addr()?;
     drop(listener);
-    addr
+    Ok(addr)
 }
 
 fn wait_for_server(listen: SocketAddr) -> Result<(), RunnerError> {

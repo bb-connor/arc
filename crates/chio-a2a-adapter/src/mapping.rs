@@ -210,10 +210,8 @@ fn build_tool_definition(skill: &A2aAgentSkill) -> ToolDefinition {
     if !skill.tags.is_empty() {
         description.push_str(&format!("\n\nTags: {}", skill.tags.join(", ")));
     }
-    if let Some(examples) = &skill.examples {
-        if !examples.is_empty() {
-            description.push_str(&format!("\n\nExamples: {}", examples.join(" | ")));
-        }
+    if let Some(examples) = skill.examples.as_ref().filter(|examples| !examples.is_empty()) {
+        description.push_str(&format!("\n\nExamples: {}", examples.join(" | ")));
     }
 
     ToolDefinition {

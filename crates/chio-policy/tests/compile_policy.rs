@@ -269,6 +269,121 @@ fn compile_policy_accepts_canonical_hushspec_fixture() {
 }
 
 #[test]
+fn compile_policy_emits_computer_use_guard_from_rule() {
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  computer_use:
+    enabled: true
+    mode: fail_closed
+    allowed_actions:
+      - remote.session.connect
+      - input.inject
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    assert!(
+        compiled.guard_names.contains(&"computer-use".to_string()),
+        "expected computer-use guard, got {:?}",
+        compiled.guard_names
+    );
+}
+
+#[test]
+fn compile_policy_emits_remote_desktop_side_channel_guard_from_rule() {
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  remote_desktop_channels:
+    enabled: true
+    clipboard: false
+    file_transfer: false
+    audio: true
+    drive_mapping: false
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    assert!(
+        compiled
+            .guard_names
+            .contains(&"remote-desktop-side-channel".to_string()),
+        "expected remote-desktop-side-channel guard, got {:?}",
+        compiled.guard_names
+    );
+}
+
+#[test]
+fn compile_policy_emits_input_injection_capability_guard_from_rule() {
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  input_injection:
+    enabled: true
+    allowed_types:
+      - keyboard
+      - mouse
+    require_postcondition_probe: true
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    assert!(
+        compiled
+            .guard_names
+            .contains(&"input-injection-capability".to_string()),
+        "expected input-injection-capability guard, got {:?}",
+        compiled.guard_names
+    );
+}
+
+#[test]
+fn compile_policy_emits_browser_automation_guard_from_rule() {
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  browser_automation:
+    enabled: true
+    allowed_domains:
+      - "*.example.com"
+    blocked_domains:
+      - "evil.com"
+    allowed_verbs:
+      - navigate
+      - screenshot
+    credential_detection: true
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    assert!(
+        compiled
+            .guard_names
+            .contains(&"browser-automation".to_string()),
+        "expected browser-automation guard, got {:?}",
+        compiled.guard_names
+    );
+}
+
+#[test]
+fn compile_policy_emits_code_execution_guard_from_rule() {
+    let yaml = r#"
+hushspec: "0.1.0"
+rules:
+  code_execution:
+    enabled: true
+    language_allowlist:
+      - python
+    network_access: false
+    max_execution_time_ms: 5000
+"#;
+    let spec = HushSpec::parse(yaml).expect("parse hushspec");
+    let compiled = compile_policy(&spec).expect("compile should succeed");
+    assert!(
+        compiled.guard_names.contains(&"code-execution".to_string()),
+        "expected code-execution guard, got {:?}",
+        compiled.guard_names
+    );
+}
+
+#[test]
 fn disabled_detection_blocks_do_not_emit_guards() {
     let yaml = r#"
 hushspec: "0.1.0"

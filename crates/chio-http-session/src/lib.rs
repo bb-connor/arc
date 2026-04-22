@@ -19,7 +19,7 @@
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -191,6 +191,12 @@ pub struct RecordParams {
 }
 
 impl SessionJournal {
+    fn lock_inner(&self) -> Result<MutexGuard<'_, JournalInner>, SessionJournalError> {
+        self.inner
+            .lock()
+            .map_err(|_| SessionJournalError::LockPoisoned)
+    }
+
     /// Create a new empty journal for the given session.
     pub fn new(session_id: String) -> Self {
         Self {
@@ -209,10 +215,7 @@ impl SessionJournal {
     /// The entry is hash-chained to the previous entry. Returns the
     /// sequence number of the new entry.
     pub fn record(&self, params: RecordParams) -> Result<u64, SessionJournalError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let mut inner = self.lock_inner()?;
 
         let sequence = inner.entries.len() as u64;
         let prev_hash = inner.last_hash().to_string();
@@ -221,12 +224,13 @@ impl SessionJournal {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
+        let tool_name = params.tool_name;
         let mut entry = JournalEntry {
             sequence,
             prev_hash,
-            entry_hash: String::new(), // computed below
+            entry_hash: String::new(),
             timestamp_secs,
-            tool_name: params.tool_name.clone(),
+            tool_name: tool_name.clone(),
             server_id: params.server_id,
             agent_id: params.agent_id,
             bytes_read: params.bytes_read,
@@ -246,13 +250,14 @@ impl SessionJournal {
             .total_bytes_written
             .saturating_add(params.bytes_written);
         inner.data_flow.total_invocations = inner.data_flow.total_invocations.saturating_add(1);
-        if params.delegation_depth > inner.data_flow.max_delegation_depth {
-            inner.data_flow.max_delegation_depth = params.delegation_depth;
-        }
+        inner.data_flow.max_delegation_depth = inner
+            .data_flow
+            .max_delegation_depth
+            .max(params.delegation_depth);
 
         // Update tool sequence and counts.
-        inner.tool_sequence.push(params.tool_name.clone());
-        let count = inner.tool_counts.entry(params.tool_name).or_insert(0);
+        inner.tool_sequence.push(tool_name.clone());
+        let count = inner.tool_counts.entry(tool_name).or_insert(0);
         *count = count.saturating_add(1);
 
         inner.entries.push(entry);
@@ -262,37 +267,25 @@ impl SessionJournal {
 
     /// Return a snapshot of the cumulative data flow statistics.
     pub fn data_flow(&self) -> Result<CumulativeDataFlow, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         Ok(inner.data_flow.clone())
     }
 
     /// Return the ordered tool invocation sequence.
     pub fn tool_sequence(&self) -> Result<Vec<String>, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         Ok(inner.tool_sequence.clone())
     }
 
     /// Return per-tool invocation counts.
     pub fn tool_counts(&self) -> Result<HashMap<String, u64>, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         Ok(inner.tool_counts.clone())
     }
 
     /// Return the number of entries in the journal.
     pub fn len(&self) -> Result<usize, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         Ok(inner.entries.len())
     }
 
@@ -303,19 +296,13 @@ impl SessionJournal {
 
     /// Return a clone of all journal entries.
     pub fn entries(&self) -> Result<Vec<JournalEntry>, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         Ok(inner.entries.clone())
     }
 
     /// Return the most recent N entries (or all if fewer than N exist).
     pub fn recent_entries(&self, n: usize) -> Result<Vec<JournalEntry>, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         let start = inner.entries.len().saturating_sub(n);
         Ok(inner.entries[start..].to_vec())
     }
@@ -325,23 +312,20 @@ impl SessionJournal {
     /// Returns `Ok(())` if all entries are correctly chained, or an error
     /// indicating where the chain breaks.
     pub fn verify_integrity(&self) -> Result<(), SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
 
-        for (i, entry) in inner.entries.iter().enumerate() {
+        for (index, entry) in inner.entries.iter().enumerate() {
             // Check prev_hash linkage.
-            let expected_prev = if i == 0 {
-                ZERO_HASH.to_string()
+            let expected_prev = if index == 0 {
+                ZERO_HASH
             } else {
-                inner.entries[i - 1].entry_hash.clone()
+                inner.entries[index - 1].entry_hash.as_str()
             };
 
             if entry.prev_hash != expected_prev {
                 return Err(SessionJournalError::IntegrityViolation {
-                    index: i,
-                    expected: expected_prev,
+                    index,
+                    expected: expected_prev.to_string(),
                     actual: entry.prev_hash.clone(),
                 });
             }
@@ -350,7 +334,7 @@ impl SessionJournal {
             let recomputed = compute_entry_hash(entry);
             if entry.entry_hash != recomputed {
                 return Err(SessionJournalError::IntegrityViolation {
-                    index: i,
+                    index,
                     expected: recomputed,
                     actual: entry.entry_hash.clone(),
                 });
@@ -362,10 +346,7 @@ impl SessionJournal {
 
     /// Return the hash of the most recent entry (or the zero hash if empty).
     pub fn head_hash(&self) -> Result<String, SessionJournalError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| SessionJournalError::LockPoisoned)?;
+        let inner = self.lock_inner()?;
         Ok(inner.last_hash().to_string())
     }
 }

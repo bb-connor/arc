@@ -133,11 +133,9 @@ class ChioActivityInterceptor(Interceptor):
         # Global activity-type -> grant-override hook. See
         # :meth:`register_activity_grant_override`.
         self._override_hooks: dict[str, ActivityGrantOverride] = {}
-        # HITL approval path: v2 after Phase 3.4 lands. The interceptor
-        # will need to listen for an approval Signal and re-evaluate the
-        # activity's guard before allowing execution to continue.
-        # TODO(chio-temporal v2): wire HITL approval path once Phase 3.4
-        # delivers the approval guard + Signal shape.
+        # HITL approval is intentionally outside the v1 synchronous
+        # allow/deny path. A future version can resume activities from
+        # an approval Signal once that payload shape is stable.
 
     # ------------------------------------------------------------------
     # Grant registration

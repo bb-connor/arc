@@ -207,9 +207,6 @@ pub struct AcpKernelExecutionContext {
 /// Maps Chio tools to ACP capabilities and routes invocations through
 /// the kernel guard pipeline.
 pub struct ChioAcpEdge {
-    // Retained so future ACP introspection/reload surfaces can report the
-    // effective edge configuration even though the current runtime never reads it.
-    #[allow(dead_code)]
     config: AcpEdgeConfig,
     capabilities: Vec<AcpCapability>,
     capability_fidelity: BTreeMap<String, BridgeFidelity>,
@@ -239,6 +236,11 @@ struct CapabilityBinding {
     target_protocol: DiscoveryProtocol,
     server_id: String,
     tool_name: String,
+}
+
+struct AcpRequestIds {
+    origin_request_id: String,
+    kernel_request_id: String,
 }
 
 impl CapabilityBridge for AcpCapabilityBridge {
@@ -359,9 +361,47 @@ impl ChioAcpEdge {
         format!("acp-task-{next}")
     }
 
+    fn capability_binding(&self, capability_id: &str) -> Result<CapabilityBinding, AcpEdgeError> {
+        self.capability_bindings
+            .get(capability_id)
+            .cloned()
+            .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))
+    }
+
+    fn build_execution_request(
+        &self,
+        capability_id: &str,
+        arguments: Value,
+        execution: &AcpKernelExecutionContext,
+        binding: &CapabilityBinding,
+        target_protocol: DiscoveryProtocol,
+        ids: AcpRequestIds,
+    ) -> Result<CrossProtocolExecutionRequest, AcpEdgeError> {
+        Ok(CrossProtocolExecutionRequest {
+            origin_request_id: ids.origin_request_id,
+            kernel_request_id: ids.kernel_request_id,
+            target_protocol,
+            target_server_id: binding.server_id.clone(),
+            target_tool_name: binding.tool_name.clone(),
+            agent_id: execution.agent_id.clone(),
+            arguments: arguments.clone(),
+            capability: execution.capability.clone(),
+            source_envelope: build_acp_source_envelope(capability_id, arguments)?,
+            dpop_proof: execution.dpop_proof.clone(),
+            governed_intent: execution.governed_intent.clone(),
+            approval_token: execution.approval_token.clone(),
+            model_metadata: execution.model_metadata.clone(),
+        })
+    }
+
     /// List all capabilities.
     pub fn capabilities(&self) -> &[AcpCapability] {
         &self.capabilities
+    }
+
+    /// Return the effective edge configuration.
+    pub fn config(&self) -> &AcpEdgeConfig {
+        &self.config
     }
 
     /// Get a capability by ID.
@@ -459,27 +499,19 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        let binding = self
-            .capability_bindings
-            .get(capability_id)
-            .cloned()
-            .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))?;
+        let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
-        let request = CrossProtocolExecutionRequest {
-            origin_request_id: format!("acp-request-{capability_id}-{request_suffix}"),
-            kernel_request_id: format!("acp-{capability_id}-{request_suffix}"),
-            target_protocol: binding.target_protocol,
-            target_server_id: binding.server_id,
-            target_tool_name: binding.tool_name,
-            agent_id: execution.agent_id.clone(),
-            arguments: arguments.clone(),
-            capability: execution.capability.clone(),
-            source_envelope: build_acp_source_envelope(capability_id, arguments)?,
-            dpop_proof: execution.dpop_proof.clone(),
-            governed_intent: execution.governed_intent.clone(),
-            approval_token: execution.approval_token.clone(),
-            model_metadata: execution.model_metadata.clone(),
-        };
+        let request = self.build_execution_request(
+            capability_id,
+            arguments,
+            execution,
+            &binding,
+            binding.target_protocol,
+            AcpRequestIds {
+                origin_request_id: format!("acp-request-{capability_id}-{request_suffix}"),
+                kernel_request_id: format!("acp-{capability_id}-{request_suffix}"),
+            },
+        )?;
         let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
@@ -496,27 +528,19 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        let binding = self
-            .capability_bindings
-            .get(capability_id)
-            .cloned()
-            .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))?;
+        let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
-        let request = CrossProtocolExecutionRequest {
-            origin_request_id: format!("acp-request-{capability_id}-{request_suffix}"),
-            kernel_request_id: format!("acp-mcp-{capability_id}-{request_suffix}"),
-            target_protocol: DiscoveryProtocol::Mcp,
-            target_server_id: binding.server_id,
-            target_tool_name: binding.tool_name,
-            agent_id: execution.agent_id.clone(),
-            arguments: arguments.clone(),
-            capability: execution.capability.clone(),
-            source_envelope: build_acp_source_envelope(capability_id, arguments)?,
-            dpop_proof: execution.dpop_proof.clone(),
-            governed_intent: execution.governed_intent.clone(),
-            approval_token: execution.approval_token.clone(),
-            model_metadata: execution.model_metadata.clone(),
-        };
+        let request = self.build_execution_request(
+            capability_id,
+            arguments,
+            execution,
+            &binding,
+            DiscoveryProtocol::Mcp,
+            AcpRequestIds {
+                origin_request_id: format!("acp-request-{capability_id}-{request_suffix}"),
+                kernel_request_id: format!("acp-mcp-{capability_id}-{request_suffix}"),
+            },
+        )?;
         let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
@@ -879,27 +903,19 @@ impl ChioAcpEdge {
         arguments: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
-        let binding = self
-            .capability_bindings
-            .get(capability_id)
-            .cloned()
-            .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))?;
+        let binding = self.capability_binding(capability_id)?;
         let task_id = self.next_task_id();
-        let request = CrossProtocolExecutionRequest {
-            origin_request_id: task_id.clone(),
-            kernel_request_id: format!("acp-stream-{task_id}"),
-            target_protocol: binding.target_protocol,
-            target_server_id: binding.server_id,
-            target_tool_name: binding.tool_name,
-            agent_id: execution.agent_id.clone(),
-            arguments: arguments.clone(),
-            capability: execution.capability.clone(),
-            source_envelope: build_acp_source_envelope(capability_id, arguments)?,
-            dpop_proof: execution.dpop_proof.clone(),
-            governed_intent: execution.governed_intent.clone(),
-            approval_token: execution.approval_token.clone(),
-            model_metadata: execution.model_metadata.clone(),
-        };
+        let request = self.build_execution_request(
+            capability_id,
+            arguments,
+            execution,
+            &binding,
+            binding.target_protocol,
+            AcpRequestIds {
+                origin_request_id: task_id.clone(),
+                kernel_request_id: format!("acp-stream-{task_id}"),
+            },
+        )?;
         let task = AcpInvocationTask {
             id: task_id.clone(),
             status: AcpTaskStatus::Working,

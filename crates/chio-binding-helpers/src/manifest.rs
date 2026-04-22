@@ -42,7 +42,6 @@ pub fn verify_signed_manifest_json(input: &str) -> Result<ManifestVerification> 
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::verify_signed_manifest;
     use chio_core::Keypair;
@@ -81,11 +80,11 @@ mod tests {
     }
 
     #[test]
-    fn verify_valid_signed_manifest() {
+    fn verify_valid_signed_manifest() -> crate::Result<()> {
         let server = Keypair::from_seed(&[21u8; 32]);
         let signed_manifest =
-            sign_manifest(&sample_manifest(server.public_key().to_hex()), &server).unwrap();
-        let verification = verify_signed_manifest(&signed_manifest).unwrap();
+            sign_manifest(&sample_manifest(server.public_key().to_hex()), &server)?;
+        let verification = verify_signed_manifest(&signed_manifest)?;
 
         assert_eq!(
             verification,
@@ -96,5 +95,6 @@ mod tests {
                 embedded_public_key_matches_signer: true,
             }
         );
+        Ok(())
     }
 }

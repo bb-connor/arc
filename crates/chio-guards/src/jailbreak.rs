@@ -19,8 +19,8 @@
 //!    codepoints in the original input.
 //! 3. **ML scoring** -- a configurable linear model (sigmoid-activated)
 //!    combining the layer-1 heuristic flags with layer-2 statistical features.
-//!    The LLM-as-judge layer is intentionally deferred to v2 (see
-//!    `TODO(v2)` in [`jailbreak_detector`]).
+//!    A host-function-driven judge layer is intentionally deferred; see
+//!    [`jailbreak_detector`] for the intended integration shape.
 //!
 //! Fingerprint deduplication: identical retry payloads short-circuit to the
 //! cached verdict via a bounded `Mutex<LruCache>` over the SHA-256 of the

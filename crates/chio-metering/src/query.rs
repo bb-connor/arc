@@ -125,51 +125,9 @@ pub fn execute_cost_query(records: &[CostMetadata], query: &CostQuery) -> CostQu
         .unwrap_or(MAX_COST_QUERY_LIMIT)
         .min(MAX_COST_QUERY_LIMIT);
 
-    // Filter
     let filtered: Vec<&CostMetadata> = records
         .iter()
-        .filter(|r| {
-            if let Some(ref sid) = query.session_id {
-                if r.session_id.as_ref() != Some(sid) {
-                    return false;
-                }
-            }
-            if let Some(ref aid) = query.agent_id {
-                if &r.agent_id != aid {
-                    return false;
-                }
-            }
-            if let Some(ref ts) = query.tool_server {
-                if &r.tool_server != ts {
-                    return false;
-                }
-            }
-            if let Some(ref tn) = query.tool_name {
-                if &r.tool_name != tn {
-                    return false;
-                }
-            }
-            if let Some(since) = query.since {
-                if r.timestamp < since {
-                    return false;
-                }
-            }
-            if let Some(until) = query.until {
-                if r.timestamp >= until {
-                    return false;
-                }
-            }
-            if let Some(ref cur) = query.currency {
-                if let Some(ref cost) = r.total_monetary_cost {
-                    if &cost.currency != cur {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            }
-            true
-        })
+        .filter(|record| record_matches_query(record, query))
         .collect();
 
     let truncated = filtered.len() > limit;
@@ -234,6 +192,46 @@ pub fn execute_cost_query(records: &[CostMetadata], query: &CostQuery) -> CostQu
         groups,
         truncated,
     }
+}
+
+fn record_matches_query(record: &CostMetadata, query: &CostQuery) -> bool {
+    if let Some(ref session_id) = query.session_id {
+        if record.session_id.as_ref() != Some(session_id) {
+            return false;
+        }
+    }
+    if let Some(ref agent_id) = query.agent_id {
+        if &record.agent_id != agent_id {
+            return false;
+        }
+    }
+    if let Some(ref tool_server) = query.tool_server {
+        if &record.tool_server != tool_server {
+            return false;
+        }
+    }
+    if let Some(ref tool_name) = query.tool_name {
+        if &record.tool_name != tool_name {
+            return false;
+        }
+    }
+    if let Some(since) = query.since {
+        if record.timestamp < since {
+            return false;
+        }
+    }
+    if let Some(until) = query.until {
+        if record.timestamp >= until {
+            return false;
+        }
+    }
+    if let Some(ref currency) = query.currency {
+        match record.total_monetary_cost.as_ref() {
+            Some(cost) if &cost.currency == currency => {}
+            _ => return false,
+        }
+    }
+    true
 }
 
 fn build_groups(records: &[&CostMetadata], group_by: &GroupBy) -> Vec<CostGroup> {

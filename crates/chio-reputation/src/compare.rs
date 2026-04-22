@@ -207,7 +207,7 @@ fn compute_reliability(
 }
 
 fn compute_incident_correlation(
-    subject_key: &str,
+    _subject_key: &str,
     now: u64,
     corpus: &LocalReputationCorpus,
     config: &ReputationConfig,
@@ -219,7 +219,6 @@ fn compute_incident_correlation(
         };
     };
 
-    let _ = subject_key;
     let weighted_incidents = incidents
         .iter()
         .map(|incident| {

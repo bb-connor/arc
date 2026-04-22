@@ -1,4 +1,4 @@
-//! Phase 20.2 -- end-to-end insurance flow on top of the liability market.
+//! End-to-end insurance flow on top of the liability market.
 //!
 //! This module connects the three shipped economic primitives:
 //!

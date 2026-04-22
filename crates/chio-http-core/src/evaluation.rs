@@ -7,14 +7,11 @@ use crate::{GuardEvidence, HttpReceipt, Verdict};
 
 /// Response body for sidecar HTTP request evaluation.
 ///
-/// Phase 1.1 added the optional `execution_nonce` sibling field. On an
-/// `Allow` verdict from a kernel configured with
-/// `ExecutionNonceConfig`, the response carries a short-lived signed
-/// nonce that the client MUST re-present before executing the tool call.
-/// The field is `None` on `Deny`/`Cancel`/`Incomplete` and on legacy
-/// deployments without a nonce config, preserving wire-level backward
-/// compatibility (existing SDKs continue to parse the payload because
-/// missing JSON fields deserialize into `None` via `#[serde(default)]`).
+/// On an `Allow` verdict from a kernel configured with
+/// `ExecutionNonceConfig`, the response carries a short-lived signed nonce
+/// that the client MUST re-present before executing the tool call. The
+/// field is `None` on `Deny`/`Cancel`/`Incomplete` and on deployments
+/// without a nonce config, preserving wire-level backward compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluateResponse {
     pub verdict: Verdict,

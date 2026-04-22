@@ -154,6 +154,13 @@ mod tests {
         }
     }
 
+    fn validation_error(result: Result<(), ConfigError>) -> ConfigError {
+        match result {
+            Ok(()) => panic!("expected validation error"),
+            Err(error) => error,
+        }
+    }
+
     #[test]
     fn minimal_valid_config_passes() {
         let config = minimal_config();
@@ -164,7 +171,7 @@ mod tests {
     fn no_adapters_rejected() {
         let mut config = minimal_config();
         config.adapters.clear();
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -186,7 +193,7 @@ mod tests {
             spec: None,
             auth: None,
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -206,7 +213,7 @@ mod tests {
             protocol: "mcp".to_string(),
             expose_from: "nonexistent".to_string(),
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -225,7 +232,7 @@ mod tests {
             auth_type: "bearer".to_string(),
             header: None,
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -244,7 +251,7 @@ mod tests {
             auth_type: "oauth2".to_string(),
             header: None,
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -260,7 +267,7 @@ mod tests {
     fn empty_signing_key_rejected() {
         let mut config = minimal_config();
         config.kernel.signing_key = String::new();
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -276,7 +283,7 @@ mod tests {
     fn invalid_log_level_rejected() {
         let mut config = minimal_config();
         config.logging.level = "verbose".to_string();
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -292,7 +299,7 @@ mod tests {
     fn invalid_log_format_rejected() {
         let mut config = minimal_config();
         config.logging.format = "xml".to_string();
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -310,7 +317,7 @@ mod tests {
         config.adapters.clear(); // no adapters
         config.kernel.signing_key = String::new(); // empty key
         config.logging.level = "bogus".to_string(); // bad level
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -356,7 +363,7 @@ mod tests {
     fn empty_adapter_id_rejected() {
         let mut config = minimal_config();
         config.adapters[0].id = String::new();
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -378,7 +385,7 @@ mod tests {
             protocol: "mcp".to_string(),
             expose_from: "test".to_string(),
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -399,7 +406,7 @@ mod tests {
             auth_type: "api_key".to_string(),
             header: None,
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
@@ -434,7 +441,7 @@ mod tests {
             protocol: "a2a".to_string(),
             expose_from: "test".to_string(),
         });
-        let err = validate(&config).unwrap_err();
+        let err = validation_error(validate(&config));
         match err {
             ConfigError::Validation(errors) => {
                 assert!(

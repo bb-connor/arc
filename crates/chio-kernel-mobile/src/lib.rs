@@ -1,11 +1,11 @@
 //! Mobile FFI for the Chio kernel core.
 //!
-//! Phase 14.3 adapter that wraps the portable
-//! [`chio_kernel_core`](chio_kernel_core) surface in an ergonomic,
-//! JSON-in / JSON-out Rust API and projects it across the C ABI using
-//! UniFFI. The UDL file in `src/chio_kernel_mobile.udl` drives binding
-//! generation for Swift (iOS) and Kotlin (Android); see
-//! `bindings/README.md` for the bindgen workflow.
+//! This adapter wraps the portable [`chio_kernel_core`](chio_kernel_core)
+//! surface in an ergonomic, JSON-in / JSON-out Rust API and projects it
+//! across the C ABI using UniFFI. The UDL file in
+//! `src/chio_kernel_mobile.udl` drives binding generation for Swift
+//! (iOS) and Kotlin (Android); see `bindings/README.md` for the bindgen
+//! workflow.
 //!
 //! # Why JSON-in / JSON-out
 //!
@@ -23,7 +23,7 @@
 //! - [`sign_receipt`] -- sign an `ChioReceiptBody` with a 32-byte seed.
 //! - [`verify_capability`] -- offline capability verification.
 //! - [`verify_passport`] -- offline portable-passport envelope
-//!   verification (Phase 20.1 wire format).
+//!   verification.
 //!
 //! # Offline guarantees
 //!

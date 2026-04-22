@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use chio_policy::models::{DefaultAction, Rules, ToolAccessRule};
 use chio_policy::{evaluate, is_hushspec_format, validate, Decision, EvaluationAction, HushSpec};
 

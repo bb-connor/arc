@@ -1,4 +1,4 @@
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 use super::*;
 use chio_core::capability::{
     ChioScope, Constraint, ModelMetadata, ModelSafetyTier, Operation, PromptGrant,

@@ -258,24 +258,29 @@ impl From<HttpAuthorityError> for crate::error::ProtectError {
     }
 }
 
-/// Simple path pattern matcher supporting {param} placeholders.
+/// Match OpenAPI-style path templates such as `/pets/{petId}`.
 fn path_matches_pattern(path: &str, pattern: &str) -> bool {
-    let path_segments: Vec<&str> = path.split('/').collect();
-    let pattern_segments: Vec<&str> = pattern.split('/').collect();
+    let mut path_segments = path.split('/');
+    let mut pattern_segments = pattern.split('/');
 
-    if path_segments.len() != pattern_segments.len() {
-        return false;
+    loop {
+        match (path_segments.next(), pattern_segments.next()) {
+            (Some(path_segment), Some(pattern_segment))
+                if path_segment_matches_pattern(path_segment, pattern_segment) => {}
+            (None, None) => return true,
+            _ => return false,
+        }
     }
+}
 
-    path_segments
-        .iter()
-        .zip(pattern_segments.iter())
-        .all(|(p, pat)| pat.starts_with('{') && pat.ends_with('}') || p == pat)
+fn path_segment_matches_pattern(path_segment: &str, pattern_segment: &str) -> bool {
+    pattern_segment.starts_with('{') && pattern_segment.ends_with('}')
+        || path_segment == pattern_segment
 }
 
 /// Extract caller identity from HTTP headers.
 fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
-    // Check for Authorization: Bearer <token>
+    // Authorization headers become stable hashed caller identities.
     if let Some(auth) = headers
         .get("authorization")
         .or_else(|| headers.get("Authorization"))
@@ -292,7 +297,7 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
         }
     }
 
-    // Check for API key headers
+    // API keys follow the same non-secret identity derivation.
     for key_header in &["x-api-key", "X-Api-Key", "X-API-Key"] {
         if let Some(key_value) = headers.get(*key_header) {
             let key_hash = chio_core_types::sha256_hex(key_value.as_bytes());

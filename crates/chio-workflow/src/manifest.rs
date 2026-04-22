@@ -4,6 +4,8 @@
 //! tools the skill needs, the order they run, what data flows between steps,
 //! and the budget envelope required for execution.
 
+use std::collections::BTreeSet;
+
 use chio_core::capability::MonetaryAmount;
 use serde::{Deserialize, Serialize};
 
@@ -81,13 +83,12 @@ impl SkillManifest {
     /// Each step's required inputs (except the first) must be
     /// produced by a preceding step's outputs.
     pub fn validate_io_contracts(&self) -> Result<(), String> {
-        let mut available_outputs: Vec<String> = Vec::new();
+        let mut available_outputs: BTreeSet<&str> = BTreeSet::new();
 
         for (idx, step) in self.steps.iter().enumerate() {
-            // Check that required inputs are available
             if let Some(ref input) = step.input_contract {
                 for required in &input.required_fields {
-                    if idx > 0 && !available_outputs.contains(required) {
+                    if idx > 0 && !available_outputs.contains(required.as_str()) {
                         return Err(format!(
                             "step {} ({}) requires input field '{}' not produced by any preceding step",
                             idx, step.tool_name, required
@@ -96,12 +97,9 @@ impl SkillManifest {
                 }
             }
 
-            // Register outputs
             if let Some(ref output) = step.output_contract {
                 for field in &output.produced_fields {
-                    if !available_outputs.contains(field) {
-                        available_outputs.push(field.clone());
-                    }
+                    available_outputs.insert(field);
                 }
             }
         }

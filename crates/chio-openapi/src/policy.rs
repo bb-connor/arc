@@ -115,16 +115,15 @@ mod tests {
 
     #[test]
     fn extension_side_effects_override() {
-        let mut ext = ChioExtensions::default();
-
-        // GET with explicit side-effects = true should deny
-        ext.side_effects = Some(true);
+        let mut ext = ChioExtensions {
+            side_effects: Some(true),
+            ..Default::default()
+        };
         assert_eq!(
             DefaultPolicy::for_method_with_extensions(HttpMethod::Get, &ext),
             PolicyDecision::DenyByDefault
         );
 
-        // POST with explicit side-effects = false should allow
         ext.side_effects = Some(false);
         assert_eq!(
             DefaultPolicy::for_method_with_extensions(HttpMethod::Post, &ext),
@@ -134,9 +133,11 @@ mod tests {
 
     #[test]
     fn approval_required_always_denies() {
-        let mut ext = ChioExtensions::default();
-        ext.approval_required = Some(true);
-        ext.side_effects = Some(false); // even with no side effects
+        let ext = ChioExtensions {
+            approval_required: Some(true),
+            side_effects: Some(false),
+            ..Default::default()
+        };
 
         assert_eq!(
             DefaultPolicy::for_method_with_extensions(HttpMethod::Get, &ext),
@@ -153,8 +154,10 @@ mod tests {
 
     #[test]
     fn has_side_effects_respects_override() {
-        let mut ext = ChioExtensions::default();
-        ext.side_effects = Some(true);
+        let mut ext = ChioExtensions {
+            side_effects: Some(true),
+            ..Default::default()
+        };
         assert!(DefaultPolicy::has_side_effects(HttpMethod::Get, &ext));
 
         ext.side_effects = Some(false);

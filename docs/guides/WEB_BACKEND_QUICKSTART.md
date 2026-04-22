@@ -2,8 +2,8 @@
 
 This is the supported order for web backends in Chio:
 
-1. start with [`examples/hello-openapi-sidecar/`](/Users/connor/Medica/backbay/standalone/chio/examples/hello-openapi-sidecar)
-2. move to [`examples/hello-fastapi/`](/Users/connor/Medica/backbay/standalone/chio/examples/hello-fastapi) only if you specifically want app-level Python integration
+1. start with [`examples/hello-openapi-sidecar/`](../../examples/hello-openapi-sidecar/)
+2. move to [`examples/hello-fastapi/`](../../examples/hello-fastapi/) only if you specifically want app-level Python integration
 
 That ordering is intentional.
 
@@ -27,7 +27,7 @@ Use the same proof loop for both examples:
 These examples are plain HTTP request/response governance examples. They do not
 exercise the hosted MCP session lifecycle. If you need the `initialize` ->
 `notifications/initialized` -> `GET /mcp` replay contract, use
-[`docs/guides/MIGRATING-FROM-MCP.md`](/Users/connor/Medica/backbay/standalone/chio/docs/guides/MIGRATING-FROM-MCP.md)
+[`docs/guides/MIGRATING-FROM-MCP.md`](MIGRATING-FROM-MCP.md)
 or [`examples/hello-mcp/`](../../examples/hello-mcp/).
 
 ## Commands
@@ -50,5 +50,5 @@ cd examples/hello-fastapi
 
 ## Related Guides
 
-- [`MIGRATING-FROM-MCP.md`](/Users/connor/Medica/backbay/standalone/chio/docs/guides/MIGRATING-FROM-MCP.md) for coding-agent stacks
-- [`NATIVE_ADOPTION_GUIDE.md`](/Users/connor/Medica/backbay/standalone/chio/docs/NATIVE_ADOPTION_GUIDE.md) for the native service-builder path
+- [`MIGRATING-FROM-MCP.md`](MIGRATING-FROM-MCP.md) for coding-agent stacks
+- [`NATIVE_ADOPTION_GUIDE.md`](../start-here/NATIVE_ADOPTION_GUIDE.md) for the native service-builder path

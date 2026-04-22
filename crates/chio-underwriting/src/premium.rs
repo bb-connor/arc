@@ -1,4 +1,4 @@
-//! Phase 20.2 -- agent insurance premium pricing.
+//! Agent insurance premium pricing.
 //!
 //! `price_premium` turns a 0..=1000 compliance score and optional behavioral
 //! anomaly signal into a deterministic insurance premium quote. The formula

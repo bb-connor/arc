@@ -264,25 +264,19 @@ fn make_error_receipt(
     _kernel: &mut ChioKernel,
     request: &KernelToolCallRequest,
 ) -> Result<chio_core::ChioReceipt, chio_core::error::Error> {
-    // Attempt to build a proper deny receipt through the kernel.
-    // If that also fails (unlikely), produce a minimal placeholder.
     let action = chio_core::receipt::ToolCallAction::from_parameters(request.arguments.clone());
     let action = match action {
         Ok(a) => a,
         Err(_) => chio_core::receipt::ToolCallAction::from_parameters(serde_json::json!({}))
             .unwrap_or_else(|_| {
-                // This path should never be reached, but if it is, we have a
-                // truly minimal fallback.
                 chio_core::receipt::ToolCallAction {
                     parameter_hash: "error".to_string(),
                     parameters: serde_json::json!({}),
                 }
-            }),
+        }),
     };
 
-    // Sign a receipt with the kernel's key by issuing a capability for this
-    // purpose and using the kernel's existing receipt-signing infrastructure.
-    // Since we only have pub methods, we use a simplified approach.
+    // Kernel failures still need a signed deny receipt for audit continuity.
     let kp = Keypair::generate();
     let body = chio_core::receipt::ChioReceiptBody {
         id: format!("rcpt-error-{}", request.request_id),

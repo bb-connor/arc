@@ -1,4 +1,4 @@
-//! Bilateral cross-kernel runtime co-signing (Phase 20.3).
+//! Bilateral cross-kernel runtime co-signing.
 //!
 //! When an agent from Organisation A invokes a tool hosted by Organisation B,
 //! both kernels need to sign the same receipt so that either org can

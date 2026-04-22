@@ -1192,14 +1192,11 @@ wasm_sha256: "deadbeef"
         )
         .unwrap();
 
-        // Create a fake .wasm file
-        let wasm_content = b"\x00asm\x01\x00\x00\x00fake wasm content for round-trip test";
+        let wasm_content = b"\x00asm\x01\x00\x00\x00fixture wasm content for round-trip test";
         fs::write(project_dir.path().join("test_guard.wasm"), wasm_content).unwrap();
 
-        // Pack
         pack_from_dir(project_dir.path()).unwrap();
 
-        // Verify archive exists
         let archive_path = project_dir.path().join("test-guard-0.1.0.arcguard");
         assert!(
             archive_path.exists(),

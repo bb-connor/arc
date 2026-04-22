@@ -168,23 +168,27 @@ mod tests {
 
     #[test]
     fn rate_limiter_requires_valid_config() {
-        let error = ExportRateLimiter::new(RateLimitConfig {
+        let error = match ExportRateLimiter::new(RateLimitConfig {
             max_batches_per_window: 0,
             window: Duration::from_secs(1),
             burst_factor: 1.0,
-        })
-        .expect_err("zero batches must be rejected");
+        }) {
+            Ok(_) => panic!("zero batches must be rejected"),
+            Err(error) => error,
+        };
         assert!(matches!(error, RateLimitConfigError::ZeroMaxBatches));
     }
 
     #[test]
     fn rate_limiter_refills_after_window() {
-        let mut limiter = ExportRateLimiter::new(RateLimitConfig {
+        let mut limiter = match ExportRateLimiter::new(RateLimitConfig {
             max_batches_per_window: 1,
             window: Duration::from_millis(100),
             burst_factor: 1.0,
-        })
-        .expect("valid limiter");
+        }) {
+            Ok(limiter) => limiter,
+            Err(error) => panic!("valid limiter: {error}"),
+        };
 
         assert_eq!(limiter.acquire_delay("splunk-hec"), Duration::ZERO);
         assert!(
@@ -203,12 +207,14 @@ mod tests {
 
     #[test]
     fn rate_limiter_is_per_exporter() {
-        let mut limiter = ExportRateLimiter::new(RateLimitConfig {
+        let mut limiter = match ExportRateLimiter::new(RateLimitConfig {
             max_batches_per_window: 1,
             window: Duration::from_millis(200),
             burst_factor: 1.0,
-        })
-        .expect("valid limiter");
+        }) {
+            Ok(limiter) => limiter,
+            Err(error) => panic!("valid limiter: {error}"),
+        };
 
         assert_eq!(limiter.acquire_delay("splunk-hec"), Duration::ZERO);
         assert_eq!(

@@ -162,6 +162,10 @@ pub struct Rules {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_injection: Option<InputInjectionRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser_automation: Option<BrowserAutomationRule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_execution: Option<CodeExecutionRule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub velocity: Option<VelocityRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub human_in_loop: Option<HumanInLoopRule>,
@@ -324,6 +328,46 @@ pub struct InputInjectionRule {
     pub allowed_types: Vec<String>,
     #[serde(default)]
     pub require_postcondition_probe: bool,
+}
+
+/// Browser-automation restrictions. Compiles to
+/// [`chio_guards::BrowserAutomationGuard`]: domain allowlist /
+/// blocklist, verb allowlist, credential detection in `type` actions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrowserAutomationRule {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
+    #[serde(default)]
+    pub blocked_domains: Vec<String>,
+    #[serde(default)]
+    pub allowed_verbs: Vec<String>,
+    #[serde(default = "default_true")]
+    pub credential_detection: bool,
+    #[serde(default)]
+    pub extra_credential_patterns: Vec<String>,
+}
+
+/// Sandboxed-interpreter restrictions. Compiles to
+/// [`chio_guards::CodeExecutionGuard`]: language allowlist, dangerous
+/// module denylist, network gating, execution-time bounds.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CodeExecutionRule {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub language_allowlist: Vec<String>,
+    #[serde(default)]
+    pub module_denylist: Vec<String>,
+    #[serde(default)]
+    pub network_access: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_execution_time_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_scan_bytes: Option<usize>,
 }
 
 /// Token-bucket rate and spend limiting, compiled to `VelocityGuard` +

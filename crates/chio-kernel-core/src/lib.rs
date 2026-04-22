@@ -1,10 +1,10 @@
 //! Portable Chio kernel core.
 //!
-//! Phase 14.1 extracts the pure-compute subset of Chio evaluation into its
-//! own `no_std + alloc` crate so the same verdict-producing code can run
+//! This crate contains the pure-compute subset of Chio evaluation as a
+//! `no_std + alloc` library so the same verdict-producing code can run
 //! inside a browser (wasm32-unknown-unknown), a Cloudflare Worker
-//! (wasm32-wasip1), a mobile app (UniFFI static lib), or the current
-//! desktop sidecar (`chio-kernel`). The contract is described in
+//! (wasm32-wasip1), a mobile app (UniFFI static lib), or the desktop
+//! sidecar (`chio-kernel`). The contract is described in
 //! `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`.
 //!
 //! # What lives here
@@ -35,16 +35,15 @@
 //! # `no_std` status
 //!
 //! The crate is `#![no_std]` with `extern crate alloc;`. At the source level
-//! we never name `std::*`, and the portable proof for this phase is now
-//! scripted in `scripts/check-portable-kernel.sh`.
+//! we never name `std::*`, and the portable proof is scripted in
+//! `scripts/check-portable-kernel.sh`.
 //!
 //! That proof runs both:
 //! - `cargo build -p chio-kernel-core --no-default-features`
 //! - `cargo build -p chio-kernel-core --target wasm32-unknown-unknown --no-default-features`
 //!
-//! Later portability work still has to qualify the browser and mobile adapter
-//! crates end to end, but `chio-kernel-core` itself now cross-builds cleanly
-//! for the host and `wasm32-unknown-unknown` targets with `--no-default-features`.
+//! The browser and mobile adapter crates perform their own platform-specific
+//! qualification on top of this core.
 
 #![no_std]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]

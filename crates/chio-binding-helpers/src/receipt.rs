@@ -52,21 +52,19 @@ pub fn verify_receipt_json(input: &str) -> Result<ReceiptVerification> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{verify_receipt, ReceiptDecisionKind};
     use chio_core::{
         sha256_hex, ChioReceipt, ChioReceiptBody, Decision, GuardEvidence, Keypair, ToolCallAction,
     };
 
-    fn sample_receipt() -> ChioReceipt {
+    fn sample_receipt() -> crate::Result<ChioReceipt> {
         let seed = [7u8; 32];
         let keypair = Keypair::from_seed(&seed);
         let action = ToolCallAction::from_parameters(serde_json::json!({
             "path": "/workspace/docs/roadmap.md",
             "mode": "read"
-        }))
-        .unwrap();
+        }))?;
         let body = ChioReceiptBody {
             id: "rcpt-bindings-allow".to_string(),
             timestamp: 1710000100,
@@ -89,13 +87,13 @@ mod tests {
             tenant_id: None,
             kernel_key: keypair.public_key(),
         };
-        ChioReceipt::sign(body, &keypair).unwrap()
+        Ok(ChioReceipt::sign(body, &keypair)?)
     }
 
     #[test]
-    fn verify_valid_receipt() {
-        let receipt = sample_receipt();
-        let verification = verify_receipt(&receipt).unwrap();
+    fn verify_valid_receipt() -> crate::Result<()> {
+        let receipt = sample_receipt()?;
+        let verification = verify_receipt(&receipt)?;
         assert_eq!(
             verification,
             super::ReceiptVerification {
@@ -104,5 +102,6 @@ mod tests {
                 decision: ReceiptDecisionKind::Allow,
             }
         );
+        Ok(())
     }
 }

@@ -61,7 +61,6 @@ pub fn verify_capability_json(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{verify_capability, CapabilityTimeStatus};
     use chio_core::{
@@ -85,10 +84,10 @@ mod tests {
         }
     }
 
-    fn sample_capability() -> CapabilityToken {
+    fn sample_capability() -> crate::Result<CapabilityToken> {
         let issuer = Keypair::from_seed(&[11u8; 32]);
         let subject = Keypair::from_seed(&[12u8; 32]);
-        CapabilityToken::sign(
+        Ok(CapabilityToken::sign(
             CapabilityTokenBody {
                 id: "cap-bindings-valid".to_string(),
                 issuer: issuer.public_key(),
@@ -99,14 +98,13 @@ mod tests {
                 delegation_chain: vec![],
             },
             &issuer,
-        )
-        .unwrap()
+        )?)
     }
 
     #[test]
-    fn verify_valid_capability() {
-        let capability = sample_capability();
-        let verification = verify_capability(&capability, 1710000400, None).unwrap();
+    fn verify_valid_capability() -> crate::Result<()> {
+        let capability = sample_capability()?;
+        let verification = verify_capability(&capability, 1710000400, None)?;
         assert_eq!(
             verification,
             super::CapabilityVerification {
@@ -116,5 +114,6 @@ mod tests {
                 time_status: CapabilityTimeStatus::Valid,
             }
         );
+        Ok(())
     }
 }

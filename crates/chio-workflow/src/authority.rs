@@ -136,7 +136,6 @@ impl WorkflowAuthority {
         capability_id: String,
         session_id: Option<String>,
     ) -> Result<WorkflowExecution, WorkflowError> {
-        // Validate grant matches manifest
         if grant.skill_id != manifest.skill_id || grant.skill_version != manifest.version {
             return Err(WorkflowError::UnauthorizedSkill {
                 skill_id: manifest.skill_id.clone(),
@@ -144,14 +143,12 @@ impl WorkflowAuthority {
             });
         }
 
-        // Check execution limit
         if let Some(limit) = grant.max_executions {
             if self.execution_count >= limit {
                 return Err(WorkflowError::ExecutionLimitReached { limit });
             }
         }
 
-        // Check all manifest steps are authorized
         for step in &manifest.steps {
             if !grant.authorizes_step(&step.server_id, &step.tool_name) {
                 return Err(WorkflowError::UnauthorizedStep {
@@ -208,7 +205,6 @@ impl WorkflowAuthority {
             ));
         }
 
-        // Check authorization
         if !grant.authorizes_step(&step.server_id, &step.tool_name) {
             return Err(WorkflowError::UnauthorizedStep {
                 step_index: step.index,
@@ -217,15 +213,14 @@ impl WorkflowAuthority {
             });
         }
 
-        // Check ordering
-        if !grant.is_step_in_order(step.index, execution.completed_steps()) {
+        let completed_steps = execution.completed_steps();
+        if !grant.is_step_in_order(step.index, completed_steps) {
             return Err(WorkflowError::StepOutOfOrder {
                 step_index: step.index,
-                expected: execution.completed_steps(),
+                expected: completed_steps,
             });
         }
 
-        // Check time limit
         if let Some(limit_secs) = execution.time_limit_secs {
             let elapsed = current_unix_secs().saturating_sub(execution.started_at);
             if elapsed >= limit_secs {
@@ -305,7 +300,7 @@ impl WorkflowAuthority {
             .saturating_sub(execution.started_at)
             .saturating_mul(1000);
 
-        let outcome = determine_outcome(&execution, completed_at);
+        let outcome = determine_outcome(&execution);
 
         let total_cost = if execution.budget_spent > 0 {
             execution.budget_limit.as_ref().map(|limit| MonetaryAmount {
@@ -354,8 +349,7 @@ impl WorkflowAuthority {
     }
 }
 
-fn determine_outcome(execution: &WorkflowExecution, _completed_at: u64) -> WorkflowOutcome {
-    // Check for step failures
+fn determine_outcome(execution: &WorkflowExecution) -> WorkflowOutcome {
     for step in &execution.step_records {
         if step.outcome == StepOutcome::Failed {
             return WorkflowOutcome::StepFailed {
@@ -371,7 +365,6 @@ fn determine_outcome(execution: &WorkflowExecution, _completed_at: u64) -> Workf
         }
     }
 
-    // Check budget
     if let Some(ref limit) = execution.budget_limit {
         if execution.budget_spent > limit.units {
             return WorkflowOutcome::BudgetExceeded {

@@ -52,6 +52,7 @@ fn capability(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn receipt(
     kernel: &Keypair,
     id: &str,
@@ -78,7 +79,8 @@ fn receipt(
         capability_id: capability_id.to_string(),
         tool_server: tool_server.to_string(),
         tool_name: tool_name.to_string(),
-        action: ToolCallAction::from_parameters(serde_json::json!({"ok": true})).unwrap(),
+        action: ToolCallAction::from_parameters(serde_json::json!({"ok": true}))
+            .unwrap_or_else(|error| panic!("hash receipt parameters: {error}")),
         decision,
         content_hash: "hash".to_string(),
         policy_hash: policy_hash.to_string(),
@@ -88,7 +90,15 @@ fn receipt(
         tenant_id: None,
         kernel_key: kernel.public_key(),
     };
-    ChioReceipt::sign(body, kernel).unwrap()
+    ChioReceipt::sign(body, kernel)
+        .unwrap_or_else(|error| panic!("sign reputation receipt: {error}"))
+}
+
+fn score_value(score: MetricValue, label: &str) -> f64 {
+    match score.as_option() {
+        Some(value) => value,
+        None => panic!("{label} score should be present"),
+    }
 }
 
 #[test]
@@ -572,8 +582,8 @@ fn mature_agent_scores_above_concerning_agent() {
         &ReputationConfig::default(),
     );
 
-    let mature_value = mature_score.composite_score.as_option().unwrap();
-    let concerning_value = concerning_score.composite_score.as_option().unwrap();
+    let mature_value = score_value(mature_score.composite_score, "mature");
+    let concerning_value = score_value(concerning_score.composite_score, "concerning");
 
     assert!(mature_value > concerning_value);
     assert!(mature_value > 0.6);

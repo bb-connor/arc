@@ -178,12 +178,9 @@ fn rejects_invalid_ssn_area() {
     // Area 000, 666, and 900-999 are invalid SSN areas -- the validator
     // should reject them so the dashed pattern doesn't flag them.
     let r = s.sanitize_text("SSN 000-12-3456");
-    // The dashed SSN detector rejects, but "000-12-3456" happens to also
-    // match the credit-card 13-19 digit pattern (9 digits + 2 dashes = 11
-    // chars, 9 digits, so no), so no findings expected.
-    // However, the compact 9-digit detector might fire depending on
-    // surrounding context; the regex requires a non-digit boundary which
-    // the dashes supply. Let's just assert dashed-SSN didn't fire.
+    // The compact 9-digit detector can fire depending on surrounding context;
+    // this case only needs to prove the dashed-SSN validator rejected the
+    // invalid area.
     assert!(!r.findings.iter().any(|f| f.id == "pii_ssn"));
 }
 

@@ -176,10 +176,15 @@ fn ai_agent_ruleset_adds_shell_command_patterns() {
 
 #[test]
 fn remote_desktop_ruleset_compiles_computer_use_blocks() {
-    // Chio does not yet emit guards for computer_use / remote_desktop_channels
-    // rule blocks (tracked in docs/guards/09 section 3), but the ruleset must
-    // still parse, validate, and compile to an empty guard set without error.
+    // The remote-desktop ruleset opts into computer_use,
+    // remote_desktop_channels, and input_injection. All three now compile
+    // to concrete guards on the pipeline.
     let compiled = load_builtin("remote-desktop").expect("compile remote-desktop");
-    // No rule blocks that translate to guards; compile_policy returns empty.
-    assert!(compiled.guard_names.is_empty());
+    assert!(compiled.guard_names.contains(&"computer-use".to_string()));
+    assert!(compiled
+        .guard_names
+        .contains(&"remote-desktop-side-channel".to_string()));
+    assert!(compiled
+        .guard_names
+        .contains(&"input-injection-capability".to_string()));
 }

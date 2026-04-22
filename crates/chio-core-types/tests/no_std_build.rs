@@ -25,23 +25,25 @@ use alloc::vec::Vec;
 
 use chio_core_types::{
     canonical_json_bytes, canonical_json_string, canonicalize, sha256, sha256_hex, CapabilityId,
-    Error, Hash, Keypair, MerkleTree, PublicKey, Result, ServerId, Signature, SigningAlgorithm,
+    Error, Hash, Keypair, MerkleTree, PublicKey, Result as ChioResult, ServerId, Signature,
+    SigningAlgorithm,
 };
 
 /// Touches the canonical-JSON path, which must remain the byte-identical RFC
 /// 8785 encoder regardless of whether `std` is on.
 #[test]
-fn canonical_json_roundtrip() {
+fn canonical_json_roundtrip() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let v = serde_json::json!({"b": 1, "a": 2});
-    let s = canonical_json_string(&v).expect("canonicalize");
+    let s = canonical_json_string(&v)?;
     assert_eq!(s, "{\"a\":2,\"b\":1}");
-    let bytes = canonical_json_bytes(&v).expect("bytes");
+    let bytes = canonical_json_bytes(&v)?;
     assert_eq!(bytes, s.as_bytes());
     // Round-trip through `canonicalize(&Value)` to prove the `Value`-level
     // entry point stays reachable.
-    let parsed: serde_json::Value = serde_json::from_str(&s).expect("parse");
-    let again = canonicalize(&parsed).expect("canonicalize value");
+    let parsed: serde_json::Value = serde_json::from_str(&s)?;
+    let again = canonicalize(&parsed)?;
     assert_eq!(s, again);
+    Ok(())
 }
 
 /// Keypair / Signature / PublicKey are the canonical signing surface. The
@@ -49,34 +51,37 @@ fn canonical_json_roundtrip() {
 /// have the `js` feature on wasm32 - exercise it here so the linkage stays
 /// green.
 #[test]
-fn keypair_sign_verify() {
+fn keypair_sign_verify() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let kp = Keypair::generate();
     let msg = b"portable-kernel";
     let sig: Signature = kp.sign(msg);
     assert!(kp.public_key().verify(msg, &sig));
     assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
     let pk_hex = kp.public_key().to_hex();
-    let restored = PublicKey::from_hex(&pk_hex).expect("from_hex");
+    let restored = PublicKey::from_hex(&pk_hex)?;
     assert_eq!(kp.public_key(), restored);
+    Ok(())
 }
 
 /// Hash helpers must resolve through `alloc::string::String` / `alloc::vec::Vec`.
 #[test]
-fn hashing_surface() {
+fn hashing_surface() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let h: Hash = sha256(b"hello");
     let hex: String = sha256_hex(b"hello");
     assert_eq!(h.to_hex(), hex);
     assert_eq!(hex.len(), 64);
-    let rebuilt = Hash::from_hex(&hex).expect("from_hex");
+    let rebuilt = Hash::from_hex(&hex)?;
     assert_eq!(rebuilt, h);
+    Ok(())
 }
 
 /// Merkle tree uses `Vec<Hash>` under the hood.
 #[test]
-fn merkle_root_is_reachable() {
+fn merkle_root_is_reachable() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let leaves: Vec<Vec<u8>> = alloc::vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()];
-    let tree = MerkleTree::from_leaves(&leaves).expect("merkle build");
+    let tree = MerkleTree::from_leaves(&leaves)?;
     let _root = tree.root();
+    Ok(())
 }
 
 /// Touch a handful of protocol aliases to make sure `AgentId = String`,
@@ -92,10 +97,13 @@ fn id_aliases_resolve_through_alloc() {
 /// Public error surface must keep round-tripping through the `Result` alias.
 #[test]
 fn error_result_type_alias() {
-    fn always_err() -> Result<()> {
+    fn always_err() -> ChioResult<()> {
         Err(Error::SignatureVerificationFailed)
     }
-    let e = always_err().unwrap_err();
+    let e = match always_err() {
+        Ok(()) => panic!("expected signature verification error"),
+        Err(error) => error,
+    };
     // Display must be stable on both feature paths.
     let rendered = alloc::format!("{e}");
     assert_eq!(rendered, "signature verification failed");
