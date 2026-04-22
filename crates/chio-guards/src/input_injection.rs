@@ -1,4 +1,4 @@
-//! InputInjectionCapabilityGuard — fine-grained control over `input.inject`
+//! InputInjectionCapabilityGuard - fine-grained control over `input.inject`
 //! actions.
 //!
 //! Roadmap phase 5.2.  Ported from ClawdStrike's

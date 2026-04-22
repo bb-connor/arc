@@ -648,7 +648,7 @@ fn compile_tool_constraints(
 
 /// Translate a `VelocityRule` into optional `VelocityConfig` +
 /// `AgentVelocityConfig`. If no invocation / spend / agent / session limit
-/// is set, returns `(None, None)` — i.e. the guard is effectively a no-op
+/// is set, returns `(None, None)` - i.e. the guard is effectively a no-op
 /// and no guard is pushed onto the pipeline. Wave 1.6 semantics.
 fn compile_velocity_rule(
     rule: &VelocityRule,

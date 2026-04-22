@@ -46,7 +46,7 @@ fn canonical_json_roundtrip() {
 
 /// Keypair / Signature / PublicKey are the canonical signing surface. The
 /// `Keypair::generate()` path invokes `OsRng` which requires `getrandom` to
-/// have the `js` feature on wasm32 — exercise it here so the linkage stays
+/// have the `js` feature on wasm32 - exercise it here so the linkage stays
 /// green.
 #[test]
 fn keypair_sign_verify() {

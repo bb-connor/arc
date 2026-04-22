@@ -427,7 +427,7 @@ pub fn verify_execution_nonce(
     }
 
     // Pass the nonce's signed expiry so durable stores retain the
-    // consumed marker for the full validity window — otherwise the row
+    // consumed marker for the full validity window - otherwise the row
     // can be pruned while the nonce is still cryptographically valid,
     // allowing replay within the remaining window.
     match nonce_store.reserve_until(&presented.nonce.nonce_id, presented.nonce.expires_at) {

@@ -1,4 +1,4 @@
-//! ComputerUseGuard — coarse gate for Computer Use Agent (CUA) actions.
+//! ComputerUseGuard - coarse gate for Computer Use Agent (CUA) actions.
 //!
 //! Roadmap phase 5.1.  Ported from ClawdStrike's
 //! `guards/computer_use.rs` and adapted to Chio's synchronous
@@ -7,14 +7,14 @@
 //! The guard is a coarse-grained allowlist for CUA action types.  It
 //! recognises three surfaces that arrive on the kernel:
 //!
-//! 1. **Remote-session and side-channel actions** — tool names or
+//! 1. **Remote-session and side-channel actions** - tool names or
 //!    `action_type`/`custom_type` arguments that start with `remote.` or
 //!    `input.` (e.g., `remote.clipboard`, `input.inject`).  The action-type
 //!    string is matched against a configurable allowlist.
-//! 2. **[`ToolAction::BrowserAction`]** — browser navigation verbs.  The
+//! 2. **[`ToolAction::BrowserAction`]** - browser navigation verbs.  The
 //!    guard denies navigation to configured blocked domains.
 //! 3. **Screenshot actions** (subset of [`ToolAction::BrowserAction`] with
-//!    a `screenshot`-family verb) — rate-limited via a token bucket so a
+//!    a `screenshot`-family verb) - rate-limited via a token bucket so a
 //!    runaway agent cannot drain the capture channel.
 //!
 //! Enforcement modes:
@@ -222,7 +222,7 @@ impl ComputerUseGuard {
             Some(host) => host,
             None => {
                 // Opaque navigation targets (selectors, data URIs) are
-                // allowed here — finer checks belong to
+                // allowed here - finer checks belong to
                 // `BrowserNavigationGuard`.
                 return Verdict::Allow;
             }
@@ -336,7 +336,7 @@ fn extract_host(url: &str) -> Option<String> {
     if url.starts_with('#') || url.starts_with('.') || url.starts_with('[') {
         return None;
     }
-    // Reject data / javascript / about URIs — no network host.
+    // Reject data / javascript / about URIs - no network host.
     let lowered = url.to_ascii_lowercase();
     if lowered.starts_with("data:")
         || lowered.starts_with("javascript:")

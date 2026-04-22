@@ -4,13 +4,13 @@
 //! a realistic [`GuardContext`].  The tests verify the roadmap acceptance
 //! criteria:
 //!
-//! * 5.1 ComputerUseGuard — blocked-domain navigation denies; screenshot
+//! * 5.1 ComputerUseGuard - blocked-domain navigation denies; screenshot
 //!   rate-limit enforced; Observe mode records but allows.
-//! * 5.2 InputInjectionCapabilityGuard — non-allowlisted input type
+//! * 5.2 InputInjectionCapabilityGuard - non-allowlisted input type
 //!   denies; missing postcondition probe denies in strict mode.
-//! * 5.3 RemoteDesktopSideChannelGuard — disabled clipboard denies;
+//! * 5.3 RemoteDesktopSideChannelGuard - disabled clipboard denies;
 //!   oversized transfer denies; unknown channel denies (fail-closed).
-//! * 5.4 SpiderSenseGuard — embedding above upper bound denies; below
+//! * 5.4 SpiderSenseGuard - embedding above upper bound denies; below
 //!   lower bound allows; threshold configurable.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
@@ -144,14 +144,14 @@ fn computer_use_observe_mode_allows_unknown_actions() {
     };
     let guard = ComputerUseGuard::with_config(config);
 
-    // Unknown remote.* action — Observe allows
+    // Unknown remote.* action - Observe allows
     let v = eval(&guard, "remote.unknown", serde_json::json!({}));
     assert!(
         matches!(v, Verdict::Allow),
         "Observe mode must allow, got {v:?}"
     );
 
-    // Navigation to blocked domain — Observe allows (passive)
+    // Navigation to blocked domain - Observe allows (passive)
     let v = eval(
         &guard,
         "navigate",
@@ -178,7 +178,7 @@ fn computer_use_failclosed_denies_unlisted_action_type() {
 
 #[test]
 fn computer_use_guardrail_allows_warning_only() {
-    // Default mode is Guardrail — always allow.
+    // Default mode is Guardrail - always allow.
     let guard = ComputerUseGuard::new();
     // Not in allowlist, but Guardrail allows.
     let v = eval(&guard, "remote.unknown_side_channel", serde_json::json!({}));
