@@ -351,17 +351,9 @@ fn compile_computer_use_rule(rule: &ComputerUseRule) -> ComputerUseConfig {
         ComputerUseMode::Guardrail => EnforcementMode::Guardrail,
         ComputerUseMode::FailClosed => EnforcementMode::FailClosed,
     };
-    // `allowed_actions` on the HushSpec rule is a direct override of the
-    // guard's `allowed_action_types` list. When empty, fall back to the
-    // built-in defaults so the guard is not trivially empty.
-    let allowed_action_types = if rule.allowed_actions.is_empty() {
-        chio_guards::computer_use::default_allowed_action_types()
-    } else {
-        rule.allowed_actions.clone()
-    };
     ComputerUseConfig {
         enabled: true,
-        allowed_action_types,
+        allowed_action_types: rule.allowed_actions.clone(),
         mode,
         ..ComputerUseConfig::default()
     }
@@ -383,16 +375,9 @@ fn compile_remote_desktop_rule(rule: &RemoteDesktopChannelsRule) -> RemoteDeskto
 }
 
 fn compile_input_injection_rule(rule: &InputInjectionRule) -> InputInjectionCapabilityConfig {
-    // Empty `allowed_types` means "fall back to the built-in defaults"
-    // (keyboard, mouse, touch) rather than trivially denying every input.
-    let allowed_input_types = if rule.allowed_types.is_empty() {
-        chio_guards::default_allowed_input_types()
-    } else {
-        rule.allowed_types.clone()
-    };
     InputInjectionCapabilityConfig {
         enabled: true,
-        allowed_input_types,
+        allowed_input_types: rule.allowed_types.clone(),
         require_postcondition_probe: rule.require_postcondition_probe,
         ..InputInjectionCapabilityConfig::default()
     }
@@ -1004,6 +989,48 @@ rules:
                 .contains("invalid egress allowlist pattern"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn compile_computer_use_preserves_empty_allowed_actions() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  computer_use:
+    enabled: true
+    mode: fail_closed
+    allowed_actions: []
+"#,
+        )
+        .unwrap();
+        let rule = spec.rules.as_ref().unwrap().computer_use.as_ref().unwrap();
+        let config = compile_computer_use_rule(rule);
+        assert!(config.allowed_action_types.is_empty());
+        assert_eq!(config.mode, EnforcementMode::FailClosed);
+    }
+
+    #[test]
+    fn compile_input_injection_preserves_empty_allowed_types() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  input_injection:
+    enabled: true
+    allowed_types: []
+"#,
+        )
+        .unwrap();
+        let rule = spec
+            .rules
+            .as_ref()
+            .unwrap()
+            .input_injection
+            .as_ref()
+            .unwrap();
+        let config = compile_input_injection_rule(rule);
+        assert!(config.allowed_input_types.is_empty());
     }
 
     #[test]

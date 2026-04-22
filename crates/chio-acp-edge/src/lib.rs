@@ -207,7 +207,6 @@ pub struct AcpKernelExecutionContext {
 /// Maps Chio tools to ACP capabilities and routes invocations through
 /// the kernel guard pipeline.
 pub struct ChioAcpEdge {
-    config: AcpEdgeConfig,
     capabilities: Vec<AcpCapability>,
     capability_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps capability ID to authoritative target binding metadata.
@@ -346,7 +345,6 @@ impl ChioAcpEdge {
         }
 
         Ok(Self {
-            config,
             capabilities: capabilities.into_values().collect(),
             capability_fidelity,
             capability_bindings,
@@ -397,11 +395,6 @@ impl ChioAcpEdge {
     /// List all capabilities.
     pub fn capabilities(&self) -> &[AcpCapability] {
         &self.capabilities
-    }
-
-    /// Return the effective edge configuration.
-    pub fn config(&self) -> &AcpEdgeConfig {
-        &self.config
     }
 
     /// Get a capability by ID.
