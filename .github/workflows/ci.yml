@@ -118,6 +118,7 @@ jobs:
         shell: bash
         env:
           OPAMYES: "1"
+          OPAMCONFIRMLEVEL: unsafe-yes
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-verification-tool-target
         run: |
           set -euo pipefail
