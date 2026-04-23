@@ -36,7 +36,7 @@ manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
 inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
 assumptions = tomllib.loads(assumptions_path.read_text(encoding="utf-8"))
 
-def command_output(command: str) -> dict:
+def command_output(command: str, max_lines: int | None = 3) -> dict:
     completed = subprocess.run(
         command,
         cwd=repo,
@@ -45,10 +45,13 @@ def command_output(command: str) -> dict:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
+    output = completed.stdout.strip().splitlines()
+    if max_lines is not None:
+        output = output[:max_lines]
     return {
         "command": command,
         "exitCode": completed.returncode,
-        "output": completed.stdout.strip().splitlines()[:3],
+        "output": output,
     }
 
 def sha256_file(path: Path) -> str:
@@ -204,7 +207,7 @@ tool_versions = {
 git = {
     "commit": command_output("git rev-parse HEAD"),
     "branch": command_output("git branch --show-current"),
-    "dirty": command_output("git status --short"),
+    "dirty": command_output("git status --short", max_lines=None),
 }
 
 ci = {
