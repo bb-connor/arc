@@ -100,8 +100,11 @@ jobs:
             "https://github.com/AeneasVerif/aeneas/releases/download/${CHIO_AENEAS_RELEASE_TAG}/aeneas-linux-x86_64.tar.gz" \
             -o "${archive}"
           echo "${CHIO_AENEAS_LINUX_X86_64_SHA256}  ${archive}" | sha256sum -c -
-          tar -xzf "${archive}" -C "${RUNNER_TEMP}/chio-aeneas-bin" aeneas charon
-          chmod +x "${RUNNER_TEMP}/chio-aeneas-bin/aeneas" "${RUNNER_TEMP}/chio-aeneas-bin/charon"
+          tar -xzf "${archive}" -C "${RUNNER_TEMP}/chio-aeneas-bin" aeneas charon charon-driver
+          chmod +x \
+            "${RUNNER_TEMP}/chio-aeneas-bin/aeneas" \
+            "${RUNNER_TEMP}/chio-aeneas-bin/charon" \
+            "${RUNNER_TEMP}/chio-aeneas-bin/charon-driver"
           echo "${RUNNER_TEMP}/chio-aeneas-bin" >> "${GITHUB_PATH}"
           echo "CHIO_CHARON=${RUNNER_TEMP}/chio-aeneas-bin/charon" >> "${GITHUB_ENV}"
           "${RUNNER_TEMP}/chio-aeneas-bin/aeneas" --help >/dev/null
