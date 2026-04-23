@@ -125,6 +125,7 @@ jobs:
           cargo kani setup
           sudo apt-get update
           sudo apt-get install -y opam
+          opam init --disable-sandboxing --bare -y
           git clone https://github.com/creusot-rs/creusot "${RUNNER_TEMP}/creusot"
           git -C "${RUNNER_TEMP}/creusot" checkout "${CHIO_CREUSOT_REV}"
           (
