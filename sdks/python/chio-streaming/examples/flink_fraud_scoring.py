@@ -35,7 +35,7 @@ import json
 from typing import Any
 
 from chio_sdk.client import ChioClient
-from pyflink.common import WatermarkStrategy
+from pyflink.common import Time, WatermarkStrategy
 from pyflink.common.serialization import SimpleStringEncoder
 from pyflink.common.typeinfo import Types
 from pyflink.datastream import (
@@ -129,9 +129,9 @@ def main() -> None:
     evaluated = AsyncDataStream.unordered_wait(
         transactions,
         ChioAsyncEvaluateFunction(config),
-        10_000,
-        output_type=Types.PICKLED_BYTE_ARRAY(),
-        capacity=128,
+        Time.milliseconds(10_000),
+        128,
+        Types.PICKLED_BYTE_ARRAY(),
     )
 
     split = evaluated.process(ChioVerdictSplitFunction())
@@ -151,9 +151,10 @@ def main() -> None:
     # TwoPhaseCommitSinkFunction, so receipt / DLQ writes become
     # exactly-once end-to-end once checkpointing is enabled:
     #
+    # from pyflink.datastream.connectors.base import DeliveryGuarantee
     # from pyflink.datastream.connectors.kafka import (
     #     KafkaSource, KafkaSink, KafkaRecordSerializationSchema,
-    #     KafkaOffsetsInitializer, DeliveryGuarantee,
+    #     KafkaOffsetsInitializer,
     # )
     # source = (
     #     KafkaSource.builder()

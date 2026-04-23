@@ -9,7 +9,9 @@ live outside the unit suite (gated behind ``FLINK_INTEGRATION=1``).
 
 from __future__ import annotations
 
+import asyncio
 import importlib
+import json
 import sys
 import types
 from typing import Any
@@ -33,11 +35,34 @@ from chio_streaming.receipt import build_envelope
 # unit tests we want the operator classes to be fully instantiable, so
 # we inject a tiny surrogate ``pyflink`` package before importing
 # chio_streaming.flink and then reload it.
+#
+# NOTE: the surrogate models only the PyFlink 2.2+ shape (async_invoke
+# returning a list, OutputTag(name, type_info)). Pre-2.2 ResultFuture
+# behaviour would not be caught here.
 
 
-def _install_pyflink_surrogate() -> None:
+_SURROGATE_MODULE_NAMES = (
+    "pyflink",
+    "pyflink.datastream",
+    "pyflink.common",
+    "pyflink.common.typeinfo",
+)
+
+
+def _install_pyflink_surrogate() -> bool:
+    """Install a surrogate ``pyflink`` package unless one is already present.
+
+    Returns ``True`` if this call installed the surrogate (so teardown
+    can remove it), ``False`` if a real PyFlink or a prior surrogate
+    was already loaded.
+    """
+    if "pyflink" in sys.modules and not hasattr(
+        sys.modules["pyflink"], "_chio_surrogate"
+    ):
+        # Real PyFlink is installed; do not shadow it.
+        return False
     if "pyflink" in sys.modules and hasattr(sys.modules["pyflink"], "_chio_surrogate"):
-        return
+        return False
 
     pyflink = types.ModuleType("pyflink")
     pyflink._chio_surrogate = True  # type: ignore[attr-defined]
@@ -109,15 +134,27 @@ def _install_pyflink_surrogate() -> None:
     sys.modules["pyflink.datastream"] = datastream
     sys.modules["pyflink.common"] = common
     sys.modules["pyflink.common.typeinfo"] = typeinfo
+    return True
 
 
-_install_pyflink_surrogate()
+_SURROGATE_OWNED = _install_pyflink_surrogate()
 
 # Reload (or first-load) the flink module now that PyFlink is
 # importable, so the real subclasses bind to the surrogate types.
 import chio_streaming.flink as flink_module  # noqa: E402
 
 flink_module = importlib.reload(flink_module)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _pyflink_surrogate_teardown() -> Any:
+    """Restore ``sys.modules`` if this file installed the surrogate."""
+    yield
+    if not _SURROGATE_OWNED:
+        return
+    for name in _SURROGATE_MODULE_NAMES:
+        sys.modules.pop(name, None)
+
 
 ChioAsyncEvaluateFunction = flink_module.ChioAsyncEvaluateFunction
 ChioEvaluateFunction = flink_module.ChioEvaluateFunction
@@ -184,19 +221,46 @@ class MockProcessContext:
     ``ctx.output(...)`` at all; the operator yields tuples.
     """
 
-    def __init__(self, *, topic: str | None = None) -> None:
-        self._topic = topic
-
-    def topic(self) -> str:
-        return self._topic or ""
-
-    def timestamp(self) -> int:
-        return 1234567890
+    def __init__(self) -> None:
+        pass
 
 
 class FailingChio:
     async def evaluate_tool_call(self, **_kwargs: Any) -> Any:
         raise ChioConnectionError("sidecar down")
+
+
+class SpyChio:
+    """Records the parameters passed to ``evaluate_tool_call``."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.calls: list[dict[str, Any]] = []
+
+    async def evaluate_tool_call(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        return await self._inner.evaluate_tool_call(**kwargs)
+
+
+class SpyClosableChio:
+    """``allow_all`` wrapped so ``close()`` invocations are observable."""
+
+    def __init__(self) -> None:
+        self._inner = allow_all()
+        self.close_calls = 0
+
+    async def evaluate_tool_call(self, **kwargs: Any) -> Any:
+        return await self._inner.evaluate_tool_call(**kwargs)
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+
+class _FailingDLQRouter(DLQRouter):
+    """DLQRouter whose ``build_record`` always raises."""
+
+    def build_record(self, **_kwargs: Any) -> Any:  # type: ignore[override]
+        raise RuntimeError("build_record failed")
 
 
 # ---------------------------------------------------------------------------
@@ -214,18 +278,20 @@ def _base_config(
     receipt_topic: str | None = "chio-receipts",
     on_sidecar_error: str = "raise",
     scope_map: dict[str, str] | None = None,
-    subject_extractor: Any = None,
+    subject_extractor: Any = lambda _e: "orders",
     parameters_extractor: Any = None,
     request_id_prefix: str = "chio-flink",
+    dlq_router_factory: Any = None,
+    max_in_flight: int = 4,
 ) -> ChioFlinkConfig:
     kwargs: dict[str, Any] = dict(
         capability_id="cap-flink",
         tool_server="flink://prod",
         client_factory=lambda: chio_client,
-        dlq_router_factory=_dlq_router_factory,
+        dlq_router_factory=dlq_router_factory or _dlq_router_factory,
         scope_map=scope_map or {"orders": "events:consume:orders"},
         receipt_topic=receipt_topic,
-        max_in_flight=4,
+        max_in_flight=max_in_flight,
         on_sidecar_error=on_sidecar_error,  # type: ignore[arg-type]
         request_id_prefix=request_id_prefix,
     )
@@ -258,6 +324,41 @@ def _split_outputs(
         else:
             main.append(item)
     return main, receipts, dlq
+
+
+def _run_sync(
+    config: ChioFlinkConfig,
+    element: Any,
+) -> tuple[list[Any], list[bytes], list[bytes], MockRuntimeContext]:
+    fn = ChioEvaluateFunction(config)
+    rc = MockRuntimeContext()
+    fn.open(rc)
+    try:
+        yields = _drain(fn.process_element(element, MockProcessContext()))
+    finally:
+        fn.close()
+    main, receipts, dlq = _split_outputs(yields)
+    return main, receipts, dlq, rc
+
+
+async def _run_async(
+    config: ChioFlinkConfig,
+    element: Any,
+    *,
+    runtime_context: MockRuntimeContext | None = None,
+) -> tuple[list[Any], MockRuntimeContext, ChioAsyncEvaluateFunction]:
+    fn = ChioAsyncEvaluateFunction(config)
+    rc = runtime_context or MockRuntimeContext()
+    fn.open(rc)
+    try:
+        results = await fn.async_invoke(element)
+    finally:
+        # close() uses run_coroutine_threadsafe when a loop is running,
+        # so invoke it from a worker thread (PyFlink's real call site
+        # shape) to let the future complete.
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, fn.close)
+    return results, rc, fn
 
 
 # ---------------------------------------------------------------------------
@@ -338,27 +439,27 @@ def test_config_requires_non_empty_request_id_prefix() -> None:
         )
 
 
+def test_config_default_subject_extractor_fails_closed() -> None:
+    # No explicit subject_extractor -> default returns ""; resolve_scope rejects.
+    config = ChioFlinkConfig(
+        capability_id="cap",
+        tool_server="flink://prod",
+        client_factory=lambda: allow_all(),
+        dlq_router_factory=_dlq_router_factory,
+        scope_map={"orders": "events:consume:orders"},
+    )
+    fn = ChioEvaluateFunction(config)
+    fn.open(MockRuntimeContext())
+    try:
+        with pytest.raises(ChioStreamingConfigError):
+            _drain(fn.process_element({"id": 1}, MockProcessContext()))
+    finally:
+        fn.close()
+
+
 # ---------------------------------------------------------------------------
 # ChioEvaluateFunction (sync ProcessFunction)
 # ---------------------------------------------------------------------------
-
-
-def _run_sync(
-    config: ChioFlinkConfig,
-    element: Any,
-    *,
-    topic: str | None = "orders",
-) -> tuple[list[Any], list[bytes], list[bytes], FlinkProcessingOutcome | None]:
-    fn = ChioEvaluateFunction(config)
-    rc = MockRuntimeContext()
-    fn.open(rc)
-    try:
-        ctx = MockProcessContext(topic=topic)
-        yields = _drain(fn.process_element(element, ctx))
-    finally:
-        fn.close()
-    main, receipts, dlq = _split_outputs(yields)
-    return main, receipts, dlq, None
 
 
 def test_sync_allow_yields_main_and_receipt() -> None:
@@ -367,6 +468,8 @@ def test_sync_allow_yields_main_and_receipt() -> None:
     assert main == [{"id": 1}]
     assert len(receipts) == 1
     assert dlq == []
+    payload = json.loads(receipts[0].decode("utf-8"))
+    assert payload["verdict"] == "allow"
 
 
 def test_sync_allow_without_receipt_topic_skips_receipt() -> None:
@@ -384,46 +487,54 @@ def test_sync_deny_yields_receipt_and_dlq_no_main() -> None:
     assert main == []
     assert len(receipts) == 1
     assert len(dlq) == 1
-    import json as _json
-
-    payload = _json.loads(dlq[0].decode("utf-8"))
+    payload = json.loads(dlq[0].decode("utf-8"))
     assert payload["verdict"] == "deny"
     assert payload["reason"] == "missing scope"
 
 
-def test_sync_sidecar_error_raises_by_default() -> None:
-    config = _base_config(chio_client=FailingChio())
-    fn = ChioEvaluateFunction(config)
-    fn.open(MockRuntimeContext())
-    try:
-        with pytest.raises(ChioStreamingError):
-            _drain(fn.process_element({"id": 4}, MockProcessContext(topic="orders")))
-    finally:
-        fn.close()
+@pytest.mark.parametrize(
+    ("on_error", "expect_raise"),
+    [("raise", True), ("deny", False)],
+)
+def test_sync_sidecar_error_routing(on_error: str, expect_raise: bool) -> None:
+    config = _base_config(chio_client=FailingChio(), on_sidecar_error=on_error)
+    if expect_raise:
+        fn = ChioEvaluateFunction(config)
+        fn.open(MockRuntimeContext())
+        try:
+            with pytest.raises(ChioStreamingError):
+                _drain(fn.process_element({"id": 4}, MockProcessContext()))
+        finally:
+            fn.close()
+        return
 
-
-def test_sync_sidecar_error_fails_closed() -> None:
-    config = _base_config(chio_client=FailingChio(), on_sidecar_error="deny")
-    main, receipts, dlq, _ = _run_sync(config, {"id": 5})
+    main, receipts, dlq, rc = _run_sync(config, {"id": 5})
     assert main == []
-    # Both receipt (synthesised deny) and DLQ are emitted.
     assert len(receipts) == 1
     assert len(dlq) == 1
-    import json as _json
 
-    payload = _json.loads(dlq[0].decode("utf-8"))
-    assert payload["verdict"] == "deny"
-    assert payload["receipt"]["metadata"]["chio_streaming_synthetic_marker"] == (
+    dlq_payload = json.loads(dlq[0].decode("utf-8"))
+    assert dlq_payload["verdict"] == "deny"
+    assert dlq_payload["receipt"]["metadata"]["chio_streaming_synthetic_marker"] == (
         SYNTHETIC_RECEIPT_MARKER
     )
 
+    # SYNTHETIC_RECEIPT_MARKER must live on the separate receipt envelope
+    # as well, not just the DLQ payload; verifiers reject structurally.
+    receipt_payload = json.loads(receipts[0].decode("utf-8"))
+    assert receipt_payload["receipt"]["metadata"][
+        "chio_streaming_synthetic_marker"
+    ] == SYNTHETIC_RECEIPT_MARKER
+    assert rc.metrics.counters["sidecar_errors_total"].count == 1
+    assert rc.metrics.counters["deny_total"].count == 1
+
 
 def test_sync_open_and_close_drive_factories_once() -> None:
-    clients: list[Any] = []
+    clients: list[SpyClosableChio] = []
     routers: list[DLQRouter] = []
 
     def client_factory() -> Any:
-        client = allow_all()
+        client = SpyClosableChio()
         clients.append(client)
         return client
 
@@ -437,49 +548,38 @@ def test_sync_open_and_close_drive_factories_once() -> None:
         tool_server="flink://prod",
         client_factory=client_factory,
         dlq_router_factory=router_factory,
+        subject_extractor=lambda _e: "orders",
     )
     fn = ChioEvaluateFunction(config)
     fn.open(MockRuntimeContext())
     fn.close()
     assert len(clients) == 1
     assert len(routers) == 1
+    assert clients[0].close_calls == 1
 
 
 def test_sync_process_element_before_open_raises() -> None:
     config = _base_config(chio_client=allow_all())
     fn = ChioEvaluateFunction(config)
     with pytest.raises(ChioStreamingConfigError):
-        _drain(fn.process_element({"id": 6}, MockProcessContext(topic="orders")))
+        _drain(fn.process_element({"id": 6}, MockProcessContext()))
 
 
-def test_sync_request_id_prefix_applied() -> None:
-    config = _base_config(chio_client=allow_all())
+@pytest.mark.parametrize(
+    "prefix",
+    ["chio-flink", "chio-fraud-job"],
+)
+def test_sync_request_id_prefix_applied(prefix: str) -> None:
+    config = _base_config(chio_client=allow_all(), request_id_prefix=prefix)
     fn = ChioEvaluateFunction(config)
     fn.open(MockRuntimeContext())
     try:
-        yields = _drain(fn.process_element({"id": 7}, MockProcessContext(topic="orders")))
+        yields = _drain(fn.process_element({"id": 7}, MockProcessContext()))
     finally:
         fn.close()
     _, receipts, _ = _split_outputs(yields)
-    import json as _json
-
-    payload = _json.loads(receipts[0].decode("utf-8"))
-    assert payload["request_id"].startswith("chio-flink-")
-
-
-def test_sync_custom_request_id_prefix_applied() -> None:
-    config = _base_config(chio_client=allow_all(), request_id_prefix="chio-fraud-job")
-    fn = ChioEvaluateFunction(config)
-    fn.open(MockRuntimeContext())
-    try:
-        yields = _drain(fn.process_element({"id": 8}, MockProcessContext(topic="orders")))
-    finally:
-        fn.close()
-    _, receipts, _ = _split_outputs(yields)
-    import json as _json
-
-    payload = _json.loads(receipts[0].decode("utf-8"))
-    assert payload["request_id"].startswith("chio-fraud-job-")
+    payload = json.loads(receipts[0].decode("utf-8"))
+    assert payload["request_id"].startswith(f"{prefix}-")
 
 
 def test_sync_custom_subject_extractor_used() -> None:
@@ -490,36 +590,178 @@ def test_sync_custom_subject_extractor_used() -> None:
         return "orders"
 
     config = _base_config(chio_client=allow_all(), subject_extractor=extract)
-    _run_sync(config, {"id": 9}, topic=None)
+    _run_sync(config, {"id": 9})
     assert extractor_calls == [{"id": 9}]
 
 
-def test_sync_custom_parameters_extractor_used() -> None:
+def test_sync_custom_parameters_extractor_reaches_sidecar() -> None:
     def params(element: Any) -> dict[str, Any]:
-        return {"custom": True, "element_id": element.get("id")}
+        return {"custom": True, "element_id": element["id"]}
 
+    spy = SpyChio(allow_all())
     config = _base_config(
-        chio_client=allow_all(),
+        chio_client=spy,
         parameters_extractor=params,
     )
-    # Should succeed; the operator merges request_id / subject defaults.
     main, receipts, _, _ = _run_sync(config, {"id": 10})
     assert main == [{"id": 10}]
     assert len(receipts) == 1
+    assert len(spy.calls) == 1
+    call_params = spy.calls[0]["parameters"]
+    assert call_params["custom"] is True
+    assert call_params["element_id"] == 10
+    # Operator still back-fills request_id and subject for determinism.
+    assert call_params["subject"] == "orders"
+    assert call_params["request_id"].startswith("chio-flink-")
 
 
-def test_sync_metrics_registered() -> None:
-    config = _base_config(chio_client=allow_all())
+def test_sync_scope_map_resolution_uses_mapped_tool_name() -> None:
+    spy = SpyChio(allow_all())
+    config = _base_config(
+        chio_client=spy,
+        scope_map={"orders": "events:consume:orders-explicit"},
+    )
+    _run_sync(config, {"id": 11})
+    assert spy.calls[0]["tool_name"] == "events:consume:orders-explicit"
+
+
+def test_sync_scope_map_fallback_uses_default_prefix() -> None:
+    spy = SpyChio(allow_all())
+    config = _base_config(
+        chio_client=spy,
+        scope_map={},
+        subject_extractor=lambda _e: "unknown-topic",
+    )
+    _run_sync(config, {"id": 12})
+    assert spy.calls[0]["tool_name"] == "events:consume:unknown-topic"
+
+
+@pytest.mark.parametrize(
+    ("chio_factory", "expected_counter"),
+    [
+        (lambda: allow_all(), "allow_total"),
+        (
+            lambda: deny_all("denied", guard="g", raise_on_deny=False),
+            "deny_total",
+        ),
+    ],
+)
+def test_sync_metrics_counter_increments(
+    chio_factory: Any, expected_counter: str
+) -> None:
+    config = _base_config(chio_client=chio_factory())
+    _, _, _, rc = _run_sync(config, {"id": 13})
+    assert rc.metrics.counters["evaluations_total"].count == 1
+    assert rc.metrics.counters[expected_counter].count == 1
+    # in_flight gauge is registered and callable; post-drain it is zero.
+    assert rc.metrics.gauges["in_flight"]() == 0
+
+
+def test_sync_metrics_sidecar_errors_counter_increments() -> None:
+    config = _base_config(chio_client=FailingChio(), on_sidecar_error="deny")
+    _, _, _, rc = _run_sync(config, {"id": 14})
+    assert rc.metrics.counters["sidecar_errors_total"].count == 1
+
+
+# ---------------------------------------------------------------------------
+# Sync backpressure and DLQ-publish-failure
+# ---------------------------------------------------------------------------
+
+
+async def test_sync_backpressure_respects_max_in_flight() -> None:
+    # The sync operator runs its own event loop in open(); exercise the
+    # underlying Slots directly via the shared evaluator so we can assert
+    # the semaphore bounds concurrency without fighting the sync loop.
+    release = asyncio.Event()
+    started = 0
+    first_started = asyncio.Event()
+
+    class SlowChio:
+        async def evaluate_tool_call(self, **_kwargs: Any) -> Any:
+            nonlocal started
+            started += 1
+            if started == 1:
+                first_started.set()
+            await release.wait()
+            return await allow_all().evaluate_tool_call(**_kwargs)
+
+    config = _base_config(chio_client=SlowChio(), max_in_flight=1)
+    evaluator = flink_module._ChioFlinkEvaluator(config)
+    evaluator.bind(MockRuntimeContext())
+
+    t1 = asyncio.create_task(evaluator.evaluate({"id": 1}, ctx=None))
+    await first_started.wait()
+    assert evaluator.slots.in_flight == 1
+
+    t2 = asyncio.create_task(evaluator.evaluate({"id": 2}, ctx=None))
+    await asyncio.sleep(0.05)
+    assert started == 1, "second evaluation ran before slot released"
+
+    release.set()
+    await asyncio.wait_for(t1, timeout=2.0)
+    await asyncio.wait_for(t2, timeout=2.0)
+    assert started == 2
+    assert evaluator.slots.in_flight == 0
+    await evaluator.shutdown()
+
+
+def test_sync_dlq_router_failure_propagates_and_suppresses_emission() -> None:
+    # When DLQRouter.build_record raises, the exception propagates and
+    # no main / receipt / DLQ emissions happen. Flink's task then fails
+    # and the source rewinds; fail-closed is preserved.
+    chio = deny_all("denied", guard="g", raise_on_deny=False)
+    config = _base_config(
+        chio_client=chio,
+        dlq_router_factory=lambda: _FailingDLQRouter(default_topic="chio-dlq"),
+    )
     fn = ChioEvaluateFunction(config)
-    rc = MockRuntimeContext()
-    fn.open(rc)
+    fn.open(MockRuntimeContext())
     try:
-        _drain(fn.process_element({"id": 11}, MockProcessContext(topic="orders")))
+        with pytest.raises(RuntimeError, match="build_record failed"):
+            _drain(fn.process_element({"id": 1}, MockProcessContext()))
     finally:
         fn.close()
-    assert rc.metrics.counters["evaluations_total"].count == 1
-    assert rc.metrics.counters["allow_total"].count == 1
-    assert "in_flight" in rc.metrics.gauges
+    # After the failure the shared Slots returns to zero (released in finally).
+    assert fn._evaluator.slots.in_flight == 0
+
+
+# ---------------------------------------------------------------------------
+# Outcome shape (FlinkProcessingOutcome): driven directly through evaluator
+# ---------------------------------------------------------------------------
+
+
+async def test_evaluator_outcome_populates_subtask_attempt_and_dlq_record() -> None:
+    chio = deny_all("denied", guard="g", raise_on_deny=False)
+    config = _base_config(chio_client=chio)
+    evaluator = flink_module._ChioFlinkEvaluator(config)
+    evaluator.bind(MockRuntimeContext(subtask=3, attempt=2))
+
+    outcome = await evaluator.evaluate({"id": 7}, ctx=None)
+    assert isinstance(outcome, FlinkProcessingOutcome)
+    assert outcome.allowed is False
+    assert outcome.subtask_index == 3
+    assert outcome.attempt_number == 2
+    assert outcome.element == {"id": 7}
+    assert outcome.receipt_bytes is not None
+    assert outcome.dlq_bytes is not None
+    assert outcome.dlq_record is not None
+    assert outcome.dlq_record.value == outcome.dlq_bytes
+    await evaluator.shutdown()
+
+
+async def test_evaluator_outcome_allow_has_no_dlq_record() -> None:
+    config = _base_config(chio_client=allow_all())
+    evaluator = flink_module._ChioFlinkEvaluator(config)
+    evaluator.bind(MockRuntimeContext(subtask=1, attempt=0))
+
+    outcome = await evaluator.evaluate({"id": 8}, ctx=None)
+    assert outcome.allowed is True
+    assert outcome.subtask_index == 1
+    assert outcome.attempt_number == 0
+    assert outcome.receipt_bytes is not None
+    assert outcome.dlq_bytes is None
+    assert outcome.dlq_record is None
+    await evaluator.shutdown()
 
 
 # ---------------------------------------------------------------------------
@@ -528,83 +770,133 @@ def test_sync_metrics_registered() -> None:
 
 
 async def test_async_allow_returns_evaluation_result() -> None:
-    config = _base_config(
-        chio_client=allow_all(),
-        subject_extractor=lambda _e: "orders",
-    )
-    fn = ChioAsyncEvaluateFunction(config)
-    fn.open(MockRuntimeContext())
-    try:
-        results = await fn.async_invoke({"id": 12})
-    finally:
-        fn.close()
+    config = _base_config(chio_client=allow_all())
+    results, _, _ = await _run_async(config, {"id": 12})
     assert len(results) == 1
     result = results[0]
     assert isinstance(result, EvaluationResult)
     assert result.allowed is True
     assert result.element == {"id": 12}
     assert result.receipt_bytes is not None
+    assert result.receipt_bytes.startswith(b"{")
     assert result.dlq_bytes is None
 
 
 async def test_async_deny_returns_dlq_bytes() -> None:
     chio = deny_all("blocked", guard="scope-guard", raise_on_deny=False)
-    config = _base_config(
-        chio_client=chio,
-        subject_extractor=lambda _e: "orders",
-    )
-    fn = ChioAsyncEvaluateFunction(config)
-    fn.open(MockRuntimeContext())
-    try:
-        results = await fn.async_invoke({"id": 13})
-    finally:
-        fn.close()
-    assert len(results) == 1
+    config = _base_config(chio_client=chio)
+    results, _, _ = await _run_async(config, {"id": 13})
     result = results[0]
     assert result.allowed is False
     assert result.receipt_bytes is not None
     assert result.dlq_bytes is not None
-    import json as _json
-
-    payload = _json.loads(result.dlq_bytes.decode("utf-8"))
+    payload = json.loads(result.dlq_bytes.decode("utf-8"))
     assert payload["verdict"] == "deny"
 
 
-async def test_async_sidecar_error_fails_closed() -> None:
-    config = _base_config(
-        chio_client=FailingChio(),
-        on_sidecar_error="deny",
-        subject_extractor=lambda _e: "orders",
-    )
+@pytest.mark.parametrize(
+    ("on_error", "expect_raise"),
+    [("raise", True), ("deny", False)],
+)
+async def test_async_sidecar_error_routing(
+    on_error: str, expect_raise: bool
+) -> None:
+    config = _base_config(chio_client=FailingChio(), on_sidecar_error=on_error)
     fn = ChioAsyncEvaluateFunction(config)
     fn.open(MockRuntimeContext())
     try:
+        if expect_raise:
+            with pytest.raises(ChioStreamingError):
+                await fn.async_invoke({"id": 15})
+            return
+
         results = await fn.async_invoke({"id": 14})
+        result = results[0]
+        assert result.allowed is False
+        assert result.receipt_bytes is not None
+        assert result.dlq_bytes is not None
+
+        # Marker must appear on both the receipt envelope and the DLQ
+        # payload so downstream verifiers reject structurally.
+        receipt_payload = json.loads(result.receipt_bytes.decode("utf-8"))
+        dlq_payload = json.loads(result.dlq_bytes.decode("utf-8"))
+        assert receipt_payload["receipt"]["metadata"][
+            "chio_streaming_synthetic_marker"
+        ] == SYNTHETIC_RECEIPT_MARKER
+        assert dlq_payload["receipt"]["metadata"][
+            "chio_streaming_synthetic_marker"
+        ] == SYNTHETIC_RECEIPT_MARKER
     finally:
-        fn.close()
-    result = results[0]
-    assert result.allowed is False
-    assert result.dlq_bytes is not None
-    import json as _json
-
-    payload = _json.loads(result.dlq_bytes.decode("utf-8"))
-    assert payload["receipt"]["metadata"]["chio_streaming_synthetic_marker"] == (
-        SYNTHETIC_RECEIPT_MARKER
-    )
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, fn.close)
 
 
-async def test_async_sidecar_error_raises_by_default() -> None:
-    config = _base_config(
-        chio_client=FailingChio(),
+async def test_async_close_inside_running_loop_awaits_shutdown() -> None:
+    # Exercises the running-loop branch of ChioAsyncEvaluateFunction.close():
+    # the scheduled shutdown must actually complete (via run_coroutine_threadsafe
+    # + future.result) so the ChioClient pool is closed, not leaked.
+    spy = SpyClosableChio()
+    config = ChioFlinkConfig(
+        capability_id="cap",
+        tool_server="flink://prod",
+        client_factory=lambda: spy,
+        dlq_router_factory=_dlq_router_factory,
+        scope_map={"orders": "events:consume:orders"},
+        receipt_topic="chio-receipts",
+        max_in_flight=4,
         subject_extractor=lambda _e: "orders",
     )
     fn = ChioAsyncEvaluateFunction(config)
     fn.open(MockRuntimeContext())
-    try:
-        with pytest.raises(ChioStreamingError):
-            await fn.async_invoke({"id": 15})
-    finally:
-        fn.close()
+    await fn.async_invoke({"id": 99})
+    # close() is a synchronous method; the running-loop branch uses
+    # run_coroutine_threadsafe. Call it from a worker thread so the
+    # main event loop is able to drive the scheduled coroutine.
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, fn.close)
+    assert spy.close_calls == 1
+
+
+async def test_async_receipt_bytes_match_build_envelope_exactly() -> None:
+    config = _base_config(chio_client=allow_all())
+    results, _, _ = await _run_async(config, {"id": 50})
+    result = results[0]
+    payload = json.loads(result.receipt_bytes.decode("utf-8"))
+    from chio_sdk.models import ChioReceipt
+
+    receipt = ChioReceipt.model_validate(payload["receipt"])
+    expected = build_envelope(
+        request_id=payload["request_id"],
+        receipt=receipt,
+        source_topic="orders",
+    )
+    assert result.receipt_bytes == expected.value
+
+
+async def test_async_dlq_bytes_match_dlq_router_build_record() -> None:
+    chio = deny_all("denied", guard="g", raise_on_deny=False)
+    config = _base_config(chio_client=chio)
+    results, _, _ = await _run_async(config, {"id": 51})
+    result = results[0]
+    payload = json.loads(result.dlq_bytes.decode("utf-8"))
+    assert payload["verdict"] == "deny"
+    # Round-trip through DLQRouter with identical inputs to prove byte parity.
+    from chio_sdk.models import ChioReceipt
+
+    receipt = ChioReceipt.model_validate(payload["receipt"])
+    router = DLQRouter(default_topic="chio-dlq")
+    rebuilt = router.build_record(
+        source_topic="orders",
+        source_partition=None,
+        source_offset=None,
+        original_key=None,
+        original_value=json.dumps(
+            {"id": 51}, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8"),
+        request_id=payload["request_id"],
+        receipt=receipt,
+    )
+    assert result.dlq_bytes == rebuilt.value
 
 
 # ---------------------------------------------------------------------------
@@ -612,8 +904,14 @@ async def test_async_sidecar_error_raises_by_default() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_split_allow_yields_main_and_receipt() -> None:
+def _split_with_open() -> ChioVerdictSplitFunction:
     split = ChioVerdictSplitFunction()
+    split.open(MockRuntimeContext())
+    return split
+
+
+def test_split_allow_yields_main_and_receipt() -> None:
+    split = _split_with_open()
     result = EvaluationResult(
         allowed=True,
         element={"id": 16},
@@ -628,7 +926,7 @@ def test_split_allow_yields_main_and_receipt() -> None:
 
 
 def test_split_deny_yields_receipt_and_dlq_no_main() -> None:
-    split = ChioVerdictSplitFunction()
+    split = _split_with_open()
     result = EvaluationResult(
         allowed=False,
         element={"id": 17},
@@ -643,7 +941,7 @@ def test_split_deny_yields_receipt_and_dlq_no_main() -> None:
 
 
 def test_split_allow_without_receipt_bytes_yields_main_only() -> None:
-    split = ChioVerdictSplitFunction()
+    split = _split_with_open()
     result = EvaluationResult(
         allowed=True,
         element={"id": 18},
@@ -663,28 +961,56 @@ def test_split_allow_without_receipt_bytes_yields_main_only() -> None:
 
 
 def test_receipt_bytes_match_build_envelope_exactly() -> None:
-    chio = allow_all()
-    config = _base_config(chio_client=chio)
-    fn = ChioEvaluateFunction(config)
-    fn.open(MockRuntimeContext())
-    try:
-        yields = _drain(fn.process_element({"id": 19}, MockProcessContext(topic="orders")))
-    finally:
-        fn.close()
-    _, receipts, _ = _split_outputs(yields)
-    import json as _json
-
-    envelope_payload = _json.loads(receipts[0].decode("utf-8"))
+    config = _base_config(chio_client=allow_all())
+    _, receipts, _, _ = _run_sync(config, {"id": 19})
+    envelope_payload = json.loads(receipts[0].decode("utf-8"))
     request_id = envelope_payload["request_id"]
-    # Reconstruct the ChioReceipt from the envelope and rebuild to
-    # prove byte-exactness of the canonical-JSON layer.
     from chio_sdk.models import ChioReceipt
 
     receipt = ChioReceipt.model_validate(envelope_payload["receipt"])
     expected = build_envelope(
         request_id=request_id,
         receipt=receipt,
-        source_topic="chio-receipts",
+        source_topic="orders",
+    )
+    assert receipts[0] == expected.value
+
+
+def test_sync_dlq_bytes_match_dlq_router_build_record() -> None:
+    chio = deny_all("denied", guard="g", raise_on_deny=False)
+    config = _base_config(chio_client=chio)
+    _, _, dlq, _ = _run_sync(config, {"id": 20})
+    payload = json.loads(dlq[0].decode("utf-8"))
+    from chio_sdk.models import ChioReceipt
+
+    receipt = ChioReceipt.model_validate(payload["receipt"])
+    router = DLQRouter(default_topic="chio-dlq")
+    rebuilt = router.build_record(
+        source_topic="orders",
+        source_partition=None,
+        source_offset=None,
+        original_key=None,
+        original_value=json.dumps(
+            {"id": 20}, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8"),
+        request_id=payload["request_id"],
+        receipt=receipt,
+    )
+    assert dlq[0] == rebuilt.value
+
+
+def test_sync_deny_receipt_bytes_match_build_envelope_exactly() -> None:
+    chio = deny_all("denied", guard="g", raise_on_deny=False)
+    config = _base_config(chio_client=chio)
+    _, receipts, _, _ = _run_sync(config, {"id": 21})
+    envelope_payload = json.loads(receipts[0].decode("utf-8"))
+    from chio_sdk.models import ChioReceipt
+
+    receipt = ChioReceipt.model_validate(envelope_payload["receipt"])
+    expected = build_envelope(
+        request_id=envelope_payload["request_id"],
+        receipt=receipt,
+        source_topic="orders",
     )
     assert receipts[0] == expected.value
 

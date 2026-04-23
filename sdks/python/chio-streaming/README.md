@@ -396,6 +396,7 @@ of source.
 Two operator shapes ship. Prefer the async pair:
 
 ```python
+from pyflink.common import Time
 from pyflink.common.typeinfo import Types
 from pyflink.datastream import (
     AsyncDataStream,
@@ -436,9 +437,9 @@ config = ChioFlinkConfig(
 evaluated = AsyncDataStream.unordered_wait(
     transactions,
     ChioAsyncEvaluateFunction(config),
-    10_000,
-    output_type=Types.PICKLED_BYTE_ARRAY(),
-    capacity=128,
+    Time.milliseconds(10_000),
+    128,
+    Types.PICKLED_BYTE_ARRAY(),
 )
 split = evaluated.process(ChioVerdictSplitFunction())
 receipts = split.get_side_output(RECEIPT_TAG)
@@ -478,19 +479,23 @@ documented in the PyFlink guide.
 
 ### Known limitations
 
-1. **Non-Kafka 2PC sinks**: PyFlink does not ship a
+1. **Flink version floor**: `apache-flink >= 2.2.0, < 3.0`. PyFlink's
+   `AsyncFunction` surface shipped in 2.2 (FLINK-38560). Users on older
+   Flink can fall back to `chio_streaming.middleware` (the Kafka
+   middleware) as an interim.
+2. **Non-Kafka 2PC sinks**: PyFlink does not ship a
    `TwoPhaseCommitSinkFunction` base class. For non-Kafka receipt
    sinks (HTTP, JDBC, ...) you either write a Java 2PC sink, accept
    at-least-once with `request_id` dedupe, or bridge through an
    intermediate Kafka topic.
-2. **AsyncFunction and side outputs**: PyFlink's `AsyncFunction` has
+3. **AsyncFunction and side outputs**: PyFlink's `AsyncFunction` has
    no `Context` parameter and cannot emit side outputs. The async
    path must chain into `ChioVerdictSplitFunction` to recover the
    receipt / DLQ streams.
-3. **Kafka `transaction.timeout.ms`**: must exceed checkpoint
+4. **Kafka `transaction.timeout.ms`**: must exceed checkpoint
    interval + commit latency. Receipts are lost when transactions
    expire mid-commit.
-4. **Sidecar capacity**: total in-flight against the sidecar is
+5. **Sidecar capacity**: total in-flight against the sidecar is
    `capacity * parallelism`. Size the sidecar pool accordingly.
 
 See `examples/flink_fraud_scoring.py` for an end-to-end runnable

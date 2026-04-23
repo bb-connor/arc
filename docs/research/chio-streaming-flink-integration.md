@@ -169,3 +169,29 @@ Mostly closed, but worth the user's attention:
 ## Recommendation
 
 Proceed to implementation. PyFlink-first, `AsyncFunction → ProcessFunction(split)` as the primary topology, single-operator sync as a simpler fallback. 2PC via `KafkaSink EXACTLY_ONCE`; non-Kafka 2PC documented as a limitation. Example job doubles as the integration test. Defer JVM and keyed-state operator to later milestones.
+
+## Post-implementation review notes
+
+Three review agents (correctness, PyFlink-API, tests) audited the
+initial implementation (commit 84c1dd8e). Cleanup pass findings:
+
+- **source_topic fix (P2)**: initial implementation passed the receipt
+  *destination* topic as `build_envelope(..., source_topic=...)`, which
+  drifted from Pulsar / Pub/Sub (which pass the resolved subject). Fixed
+  to pass the event origin subject so audit queries correlate receipts
+  back to source.
+- **Async `close()` fallback (P2)**: the running-loop branch scheduled
+  `shutdown()` as a fire-and-forget task, leaking the HTTP connection
+  pool. Resolved by bounding the wait via
+  `asyncio.run_coroutine_threadsafe(...).result(timeout=5s)`. Production
+  PyFlink invokes close synchronously (no running loop), so this branch
+  is only exercised by in-process test harnesses.
+- **Example timeout (P1)**: `AsyncDataStream.unordered_wait` takes a
+  `pyflink.common.Time`, not an int. Fixed in the example and the README
+  snippet.
+- **Coverage gaps**: backpressure, DLQ-router-failure, running-loop
+  close(), counter verification, subtask/attempt/dlq_record assertions,
+  and byte parity for async + DLQ paths were all added in the cleanup
+  pass.
+
+No new coverage gaps remain open.

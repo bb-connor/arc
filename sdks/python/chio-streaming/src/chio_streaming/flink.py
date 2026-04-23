@@ -78,6 +78,11 @@ RECEIPT_TAG_NAME = "chio-receipt"
 #: Name of the side output tag carrying canonical DLQ envelopes.
 DLQ_TAG_NAME = "chio-dlq"
 
+# Upper bound (seconds) for the running-loop branch in
+# ChioAsyncEvaluateFunction.close() to await shutdown. PyFlink's Function
+# close contract is synchronous, so we cannot block indefinitely.
+_CLOSE_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+
 
 # PyFlink is an optional dependency. Import the symbols we subclass or
 # construct at module import time when available; otherwise define
@@ -181,8 +186,11 @@ class ChioFlinkConfig:
         ``request_id``, ``subject``, ``body_length``, ``body_hash``
         (mirroring the broker middlewares). ``body_hash`` is the SHA-256
         of canonical-JSON bytes for dicts or ``str(element).encode()``
-        otherwise. Users with binary / protobuf elements should supply
-        their own extractor so ``body_hash`` is meaningful.
+        otherwise. Custom extractors should include ``body_length`` and
+        ``body_hash`` themselves; the operator only back-fills
+        ``request_id`` / ``subject``, not the body-derived fields.
+        Missing body-hash weakens replay determinism for downstream
+        receipt verifiers.
     client_factory:
         Required. Factory that builds a :class:`ChioClientLike` once per
         Flink subtask inside ``open()``. ``ChioClient`` holds a
@@ -309,17 +317,13 @@ class EvaluationResult:
     dlq_bytes: bytes | None = None
 
 
-def _default_subject_extractor(_element: Any, ctx: Any | None) -> str:
-    """Try to read a broker-ish ``topic`` off ``ctx``; fall back to ""."""
-    if ctx is None:
-        return ""
-    topic_getter = getattr(ctx, "topic", None)
-    if callable(topic_getter):
-        try:
-            topic = topic_getter()
-        except Exception:  # pragma: no cover - defensive
-            return ""
-        return str(topic) if topic is not None else ""
+def _default_subject_extractor(_element: Any, _ctx: Any | None) -> str:
+    """Return empty so :func:`resolve_scope` fails closed.
+
+    PyFlink ``ProcessFunction.Context`` / ``AsyncFunction`` do not expose
+    a topic, so there is no sensible generic default. Users must supply
+    :attr:`ChioFlinkConfig.subject_extractor`.
+    """
     return ""
 
 
@@ -540,10 +544,13 @@ class _ChioFlinkEvaluator:
 
         receipt_bytes: bytes | None = None
         if self._config.receipt_topic is not None:
+            # source_topic is the origin of the event (matching pulsar /
+            # pubsub semantics); receipt_topic is a sink target and must
+            # not leak into the envelope payload.
             envelope = build_envelope(
                 request_id=request_id,
                 receipt=receipt,
-                source_topic=self._config.receipt_topic,
+                source_topic=subject,
             )
             receipt_bytes = envelope.value
 
@@ -602,6 +609,8 @@ class ChioEvaluateFunction(_ProcessFunctionBase):
         self._config = config
         self._evaluator = _ChioFlinkEvaluator(config)
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._receipt_tag: _PyFlinkOutputTag | None = None
+        self._dlq_tag: _PyFlinkOutputTag | None = None
 
     @property
     def config(self) -> ChioFlinkConfig:
@@ -610,6 +619,8 @@ class ChioEvaluateFunction(_ProcessFunctionBase):
     def open(self, runtime_context: _PyFlinkRuntimeContext) -> None:
         self._evaluator.bind(runtime_context)
         self._loop = asyncio.new_event_loop()
+        self._receipt_tag = _receipt_tag()
+        self._dlq_tag = _dlq_tag()
 
     def close(self) -> None:
         if self._loop is None:
@@ -621,12 +632,12 @@ class ChioEvaluateFunction(_ProcessFunctionBase):
             self._loop = None
 
     def process_element(self, value: Any, ctx: Any) -> Any:
-        if self._loop is None:
+        if self._loop is None or self._receipt_tag is None or self._dlq_tag is None:
             raise ChioStreamingConfigError(
                 "ChioEvaluateFunction.process_element called before open()"
             )
         outcome = self._loop.run_until_complete(self._evaluator.evaluate(value, ctx=ctx))
-        yield from _yield_outcome(outcome)
+        yield from _yield_outcome(outcome, self._receipt_tag, self._dlq_tag)
 
 
 class ChioAsyncEvaluateFunction(_AsyncFunctionBase):
@@ -653,18 +664,28 @@ class ChioAsyncEvaluateFunction(_AsyncFunctionBase):
         self._evaluator.bind(runtime_context)
 
     def close(self) -> None:
-        # PyFlink drives close() from the worker thread when the event
-        # loop is already torn down, so we run a one-shot loop here.
-        # If called while a loop is running (in-process tests / odd
-        # runtime shapes) we fall back to scheduling shutdown on that
-        # loop and waiting briefly; best-effort because PyFlink's
-        # contract is a synchronous close().
+        # Production PyFlink drives close() from the worker thread with
+        # no running loop, so the one-shot loop below is the common path.
+        # The running-loop branch covers in-process test harnesses; we
+        # block up to CLOSE_SHUTDOWN_TIMEOUT_SECONDS so the HTTP client
+        # pool is actually closed rather than leaked.
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
             running = None
         if running is not None:
-            running.create_task(self._evaluator.shutdown())
+            future = asyncio.run_coroutine_threadsafe(
+                self._evaluator.shutdown(), running
+            )
+            try:
+                future.result(timeout=_CLOSE_SHUTDOWN_TIMEOUT_SECONDS)
+            except Exception as exc:  # pragma: no cover - best effort
+                logger.warning(
+                    "chio-flink: async close() shutdown did not complete "
+                    "within %.1fs: %s",
+                    _CLOSE_SHUTDOWN_TIMEOUT_SECONDS,
+                    exc,
+                )
             return
         loop = asyncio.new_event_loop()
         try:
@@ -697,10 +718,16 @@ class ChioVerdictSplitFunction(_ProcessFunctionBase):
     def __init__(self) -> None:
         _require_pyflink("ChioVerdictSplitFunction")
         super().__init__()
+        self._receipt_tag: _PyFlinkOutputTag | None = None
+        self._dlq_tag: _PyFlinkOutputTag | None = None
+
+    def open(self, runtime_context: _PyFlinkRuntimeContext) -> None:
+        self._receipt_tag = _receipt_tag()
+        self._dlq_tag = _dlq_tag()
 
     def process_element(self, value: EvaluationResult, ctx: Any) -> Any:
-        receipt_tag = _receipt_tag()
-        dlq_tag = _dlq_tag()
+        receipt_tag = self._receipt_tag if self._receipt_tag is not None else _receipt_tag()
+        dlq_tag = self._dlq_tag if self._dlq_tag is not None else _dlq_tag()
         if value.allowed:
             yield value.element
         if value.receipt_bytes is not None:
@@ -709,10 +736,12 @@ class ChioVerdictSplitFunction(_ProcessFunctionBase):
             yield dlq_tag, value.dlq_bytes
 
 
-def _yield_outcome(outcome: FlinkProcessingOutcome) -> Any:
+def _yield_outcome(
+    outcome: FlinkProcessingOutcome,
+    receipt_tag: _PyFlinkOutputTag,
+    dlq_tag: _PyFlinkOutputTag,
+) -> Any:
     """Generator helper shared by the sync operator."""
-    receipt_tag = _receipt_tag()
-    dlq_tag = _dlq_tag()
     if outcome.allowed:
         yield outcome.element
     if outcome.receipt_bytes is not None:
