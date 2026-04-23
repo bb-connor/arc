@@ -294,6 +294,7 @@ for lean_file in (repo / "formal" / "lean4" / "Chio").rglob("*.lean"):
 
 declared_theorem_names = {name for name, _ in declared_theorems}
 inventory_theorem_ids = {theorem.get("id") for theorem in theorems}
+inventory_theorem_maps = {}
 inventory_maps_to = {property_id: [] for property_id in required_property_ids}
 
 for theorem in theorems:
@@ -310,6 +311,7 @@ for theorem in theorems:
     maps_to = theorem.get("mapsTo", [])
     if not maps_to:
         raise SystemExit(f"theorem missing mapsTo: {theorem.get('id')}")
+    inventory_theorem_maps[theorem.get("id")] = set(maps_to)
     for property_id in maps_to:
         if property_id not in required_property_ids:
             raise SystemExit(f"theorem maps to unknown property {property_id}: {theorem.get('id')}")
@@ -319,6 +321,11 @@ for property_id, theorem_ids in property_matrix.items():
     for theorem_id in theorem_ids:
         if theorem_id not in inventory_theorem_ids:
             raise SystemExit(f"property matrix references missing theorem id: {property_id} -> {theorem_id}")
+        if property_id not in inventory_theorem_maps.get(theorem_id, set()):
+            raise SystemExit(
+                "property matrix theorem mapping mismatch: "
+                f"{property_id} lists {theorem_id}, but theorem mapsTo={sorted(inventory_theorem_maps.get(theorem_id, set()))}"
+            )
     if not inventory_maps_to[property_id]:
         raise SystemExit(f"no theorem inventory coverage for property: {property_id}")
 

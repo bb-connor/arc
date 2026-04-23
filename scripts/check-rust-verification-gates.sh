@@ -40,8 +40,8 @@ for rel, schema in expected.items():
         raise SystemExit(f"missing coverage declaration in {rel}")
 PY
 
-if [[ "${CHIO_STRICT_RUST_VERIFICATION:-0}" != "1" ]]; then
-  echo "Rust verification gate metadata passed; set CHIO_STRICT_RUST_VERIFICATION=1 to require local Creusot/Kani tools"
+if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
+  echo "Rust verification gate metadata passed; strict Creusot/Kani execution explicitly disabled"
   exit 0
 fi
 

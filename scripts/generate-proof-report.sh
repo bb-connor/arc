@@ -118,7 +118,7 @@ if run_gates:
             continue
         env = os.environ.copy()
         if command == "./scripts/check-rust-verification-gates.sh":
-            env.setdefault("CHIO_STRICT_RUST_VERIFICATION", "1")
+            env.pop("CHIO_RUST_VERIFICATION_METADATA_ONLY", None)
         completed = subprocess.run(
             command,
             cwd=repo,

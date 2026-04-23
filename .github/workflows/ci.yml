@@ -16,6 +16,8 @@ env:
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
   CHIO_AENEAS_LINUX_X86_64_SHA256: 11b4e88776655c9fd5e391bfd2824e8b52916590962fbcb392768c57b7b32ca7
+  CHIO_CREUSOT_REV: a12f3ac7f688c7b93cee2c2eb60282004a2bdb30
+  CHIO_KANI_VERSION: 0.67.0
 
 jobs:
   check:
@@ -111,6 +113,26 @@ jobs:
           "${RUNNER_TEMP}/chio-aeneas-bin/charon" --help >/dev/null
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install Rust verification tools
+        shell: bash
+        env:
+          OPAMYES: "1"
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-verification-tool-target
+        run: |
+          set -euo pipefail
+          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
+          cargo kani setup
+          sudo apt-get update
+          sudo apt-get install -y opam
+          git clone https://github.com/creusot-rs/creusot "${RUNNER_TEMP}/creusot"
+          git -C "${RUNNER_TEMP}/creusot" checkout "${CHIO_CREUSOT_REV}"
+          (
+            cd "${RUNNER_TEMP}/creusot"
+            ./INSTALL
+          )
+          cargo creusot version
+          cargo kani --version
 
       - name: Install portable qualification dependencies
         run: |
