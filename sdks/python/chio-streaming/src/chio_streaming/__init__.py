@@ -36,6 +36,17 @@ from chio_streaming.eventbridge import (
     EventBridgeProcessingOutcome,
     build_eventbridge_handler,
 )
+from chio_streaming.flink import (
+    DLQ_TAG_NAME,
+    RECEIPT_TAG_NAME,
+    ChioAsyncEvaluateFunction,
+    ChioEvaluateFunction,
+    ChioFlinkConfig,
+    ChioVerdictSplitFunction,
+    EvaluationResult,
+    FlinkProcessingOutcome,
+    register_dependencies,
+)
 from chio_streaming.middleware import (
     ChioClientLike,
     ChioConsumerConfig,
@@ -83,15 +94,20 @@ from chio_streaming.redis_streams import (
 )
 
 __all__ = [
+    "DLQ_TAG_NAME",
     "ENVELOPE_VERSION",
     "RECEIPT_HEADER",
+    "RECEIPT_TAG_NAME",
     "VERDICT_HEADER",
     "BaseProcessingOutcome",
+    "ChioAsyncEvaluateFunction",
     "ChioClientLike",
     "ChioConsumerConfig",
     "ChioConsumerMiddleware",
+    "ChioEvaluateFunction",
     "ChioEventBridgeConfig",
     "ChioEventBridgeHandler",
+    "ChioFlinkConfig",
     "ChioNatsConsumerConfig",
     "ChioNatsMiddleware",
     "ChioPubSubConfig",
@@ -102,9 +118,12 @@ __all__ = [
     "ChioRedisStreamsMiddleware",
     "ChioStreamingConfigError",
     "ChioStreamingError",
+    "ChioVerdictSplitFunction",
     "DLQRecord",
     "DLQRouter",
+    "EvaluationResult",
     "EventBridgeProcessingOutcome",
+    "FlinkProcessingOutcome",
     "KafkaConsumerLike",
     "KafkaMessageLike",
     "KafkaProducerLike",
@@ -125,4 +144,5 @@ __all__ = [
     "build_redis_streams_middleware",
     "canonical_json",
     "new_request_id",
+    "register_dependencies",
 ]

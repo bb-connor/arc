@@ -10,6 +10,7 @@ Chio protocol middleware for every mainstream event bus.
 | AWS EventBridge | `chio_streaming.eventbridge` | Lambda target | `events.put_events(receipt_bus, ...)` | `events.put_events(dlq_bus, ...)` |
 | Google Cloud Pub/Sub | `chio_streaming.pubsub` | `google-cloud-pubsub` | `publisher.publish(receipt_topic, ...)` + `message.ack()` | `publisher.publish(dlq_topic, ...)` + `message.ack()` (or `nack`) |
 | Redis Streams | `chio_streaming.redis_streams` | `redis.asyncio` | `XADD receipt_stream ...` + `XACK` | `XADD dlq_stream ...` + `XACK` (or keep in PEL) |
+| Apache Flink | `chio_streaming.flink` | PyFlink DataStream | receipt side output + `KafkaSink EXACTLY_ONCE` (2PC) | DLQ side output + `KafkaSink EXACTLY_ONCE` (2PC) |
 
 Every middleware shares the same evaluation pipeline: call the Chio
 sidecar with ``(capability_id, tool_server, tool_name, parameters)``,
@@ -30,6 +31,7 @@ pip install "chio-streaming[pulsar]"
 pip install "chio-streaming[eventbridge]"
 pip install "chio-streaming[pubsub]"
 pip install "chio-streaming[redis]"
+pip install "chio-streaming[flink]"
 
 # everything
 pip install "chio-streaming[all]"
@@ -380,6 +382,121 @@ while True:
 - Handler errors leave the entry in the PEL by default; Redis's
   consumer-group redelivery (or `XAUTOCLAIM`) handles retries.
 
+## Apache Flink
+
+Flink owns exactly-once end-to-end via aligned checkpoints and 2PC
+sinks, so this integration does not drive transactions itself. It
+evaluates each record against a Chio capability and emits canonical
+receipt / DLQ envelopes to Flink side outputs. The bytes on the
+receipt and DLQ streams are byte-identical to every other
+middleware's output (same `build_envelope` / `DLQRouter.build_record`
+path), so a single downstream consumer audits all ingress regardless
+of source.
+
+Two operator shapes ship. Prefer the async pair:
+
+```python
+from pyflink.common.typeinfo import Types
+from pyflink.datastream import (
+    AsyncDataStream,
+    OutputTag,
+    StreamExecutionEnvironment,
+)
+
+from chio_sdk.client import ChioClient
+from chio_streaming import DLQRouter
+from chio_streaming.flink import (
+    DLQ_TAG_NAME,
+    RECEIPT_TAG_NAME,
+    ChioAsyncEvaluateFunction,
+    ChioFlinkConfig,
+    ChioVerdictSplitFunction,
+    register_dependencies,
+)
+
+RECEIPT_TAG = OutputTag(RECEIPT_TAG_NAME, Types.PICKLED_BYTE_ARRAY())
+DLQ_TAG = OutputTag(DLQ_TAG_NAME, Types.PICKLED_BYTE_ARRAY())
+
+env = StreamExecutionEnvironment.get_execution_environment()
+env.enable_checkpointing(60_000)
+register_dependencies(env)
+
+config = ChioFlinkConfig(
+    capability_id="cap-fraud",
+    tool_server="flink://fraud-job",
+    client_factory=lambda: ChioClient("http://127.0.0.1:9090"),
+    dlq_router_factory=lambda: DLQRouter(default_topic="chio-fraud-dlq"),
+    scope_map={"transactions": "events:consume:transactions"},
+    receipt_topic="chio-fraud-receipts",
+    max_in_flight=64,
+    on_sidecar_error="deny",
+    subject_extractor=lambda event: "transactions",
+)
+
+evaluated = AsyncDataStream.unordered_wait(
+    transactions,
+    ChioAsyncEvaluateFunction(config),
+    10_000,
+    output_type=Types.PICKLED_BYTE_ARRAY(),
+    capacity=128,
+)
+split = evaluated.process(ChioVerdictSplitFunction())
+receipts = split.get_side_output(RECEIPT_TAG)
+dlq = split.get_side_output(DLQ_TAG)
+
+split.sink_to(downstream)           # allowed events
+receipts.sink_to(kafka_receipt_eos)  # 2PC receipt sink
+dlq.sink_to(kafka_dlq_eos)           # 2PC DLQ sink
+```
+
+- `ChioAsyncEvaluateFunction` is the primary path. It is an
+  `AsyncFunction`, so PyFlink drives the coroutine under
+  `AsyncDataStream.unordered_wait(capacity=...)`.
+- `ChioVerdictSplitFunction` chains after it to fan out into main /
+  receipt / DLQ side outputs. Chained execution means no serialisation
+  cost between the two operators.
+- `ChioEvaluateFunction` is a single-operator synchronous alternative
+  for low-throughput or co-located sidecar deployments.
+- `client_factory` and `dlq_router_factory` are required because
+  `ChioClient` holds a connection pool that cannot survive cloudpickle
+  across the JobManager -> TaskManager boundary.
+
+Wire-compatibility is guaranteed: the bytes on the `chio-receipt`
+side output equal `build_envelope(...).value` exactly, and the bytes
+on `chio-dlq` equal `DLQRouter.build_record(...).value` exactly.
+
+### Dependency packaging
+
+`register_dependencies(env, requirements_path="./requirements.txt")`
+calls `env.set_python_requirements(...)` so workers pip-install
+`chio-streaming[flink]` and your Chio SDK at startup. Pass
+`python_files=[...]` to additionally ship local packages /
+directories via `env.add_python_file(...)`. For air-gapped clusters
+or C-extension-hostile images, fall back to
+`env.add_python_archive(...)` + `env.set_python_executable(...)`
+documented in the PyFlink guide.
+
+### Known limitations
+
+1. **Non-Kafka 2PC sinks**: PyFlink does not ship a
+   `TwoPhaseCommitSinkFunction` base class. For non-Kafka receipt
+   sinks (HTTP, JDBC, ...) you either write a Java 2PC sink, accept
+   at-least-once with `request_id` dedupe, or bridge through an
+   intermediate Kafka topic.
+2. **AsyncFunction and side outputs**: PyFlink's `AsyncFunction` has
+   no `Context` parameter and cannot emit side outputs. The async
+   path must chain into `ChioVerdictSplitFunction` to recover the
+   receipt / DLQ streams.
+3. **Kafka `transaction.timeout.ms`**: must exceed checkpoint
+   interval + commit latency. Receipts are lost when transactions
+   expire mid-commit.
+4. **Sidecar capacity**: total in-flight against the sidecar is
+   `capacity * parallelism`. Size the sidecar pool accordingly.
+
+See `examples/flink_fraud_scoring.py` for an end-to-end runnable
+example (FileSource -> async evaluate -> split -> FileSink, with a
+commented Kafka upgrade path).
+
 ## Transactional semantics summary
 
 | Broker | Allow atomicity | Deny atomicity | Handler error |
@@ -390,6 +507,7 @@ while True:
 | EventBridge | put_events then return | put_events then return | raise -> Lambda retry |
 | Pub/Sub | publish then ack | publish then ack (or nack) | nack (or ack) |
 | Redis Streams | XADD then XACK | XADD then XACK (or keep) | leave in PEL (or XACK) |
+| Flink | receipt side output + KafkaSink 2PC (EOS) | DLQ side output + KafkaSink 2PC (EOS) | task restart + source rewind |
 
 Everything except Kafka is publish-then-ack: a crash between the
 publish and the ack costs a duplicate receipt or DLQ entry, which
