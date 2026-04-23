@@ -249,6 +249,19 @@ class ChioFlinkConfig:
             )
         if not self.request_id_prefix:
             raise ChioStreamingConfigError("ChioFlinkConfig.request_id_prefix must be non-empty")
+        if self.subject_extractor is None:
+            # PyFlink ProcessFunction.Context / AsyncFunction do not expose
+            # a topic, so there is no sensible generic default. Without an
+            # extractor the default would return "" and resolve_scope would
+            # raise on every record. Fail at config time so operators never
+            # hit a restart loop in production with default settings.
+            raise ChioStreamingConfigError(
+                "ChioFlinkConfig.subject_extractor is required: Flink "
+                "elements have no broker-provided subject, and an empty "
+                "subject would make resolve_scope reject every record. "
+                "Supply a Callable[[Any], str] that pulls the scope subject "
+                "from your event shape (e.g. `lambda e: e['type']`)."
+            )
 
 
 @dataclass
@@ -609,8 +622,11 @@ class ChioEvaluateFunction(_ProcessFunctionBase):
         self._config = config
         self._evaluator = _ChioFlinkEvaluator(config)
         self._loop: asyncio.AbstractEventLoop | None = None
-        self._receipt_tag: _PyFlinkOutputTag | None = None
-        self._dlq_tag: _PyFlinkOutputTag | None = None
+        # PyFlink is confirmed available by _require_pyflink, so the
+        # tags can be constructed once at operator-build time. Avoids
+        # per-element OutputTag allocation in the hot path.
+        self._receipt_tag: _PyFlinkOutputTag = _receipt_tag()
+        self._dlq_tag: _PyFlinkOutputTag = _dlq_tag()
 
     @property
     def config(self) -> ChioFlinkConfig:
@@ -619,8 +635,6 @@ class ChioEvaluateFunction(_ProcessFunctionBase):
     def open(self, runtime_context: _PyFlinkRuntimeContext) -> None:
         self._evaluator.bind(runtime_context)
         self._loop = asyncio.new_event_loop()
-        self._receipt_tag = _receipt_tag()
-        self._dlq_tag = _dlq_tag()
 
     def close(self) -> None:
         if self._loop is None:
@@ -632,7 +646,7 @@ class ChioEvaluateFunction(_ProcessFunctionBase):
             self._loop = None
 
     def process_element(self, value: Any, ctx: Any) -> Any:
-        if self._loop is None or self._receipt_tag is None or self._dlq_tag is None:
+        if self._loop is None:
             raise ChioStreamingConfigError(
                 "ChioEvaluateFunction.process_element called before open()"
             )
@@ -718,22 +732,19 @@ class ChioVerdictSplitFunction(_ProcessFunctionBase):
     def __init__(self) -> None:
         _require_pyflink("ChioVerdictSplitFunction")
         super().__init__()
-        self._receipt_tag: _PyFlinkOutputTag | None = None
-        self._dlq_tag: _PyFlinkOutputTag | None = None
-
-    def open(self, runtime_context: _PyFlinkRuntimeContext) -> None:
-        self._receipt_tag = _receipt_tag()
-        self._dlq_tag = _dlq_tag()
+        # PyFlink is confirmed available by _require_pyflink, so the
+        # tags can be constructed once at operator-build time. Avoids
+        # per-element OutputTag allocation in the hot path.
+        self._receipt_tag: _PyFlinkOutputTag = _receipt_tag()
+        self._dlq_tag: _PyFlinkOutputTag = _dlq_tag()
 
     def process_element(self, value: EvaluationResult, ctx: Any) -> Any:
-        receipt_tag = self._receipt_tag if self._receipt_tag is not None else _receipt_tag()
-        dlq_tag = self._dlq_tag if self._dlq_tag is not None else _dlq_tag()
         if value.allowed:
             yield value.element
         if value.receipt_bytes is not None:
-            yield receipt_tag, value.receipt_bytes
+            yield self._receipt_tag, value.receipt_bytes
         if value.dlq_bytes is not None:
-            yield dlq_tag, value.dlq_bytes
+            yield self._dlq_tag, value.dlq_bytes
 
 
 def _yield_outcome(

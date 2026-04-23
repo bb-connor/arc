@@ -439,22 +439,18 @@ def test_config_requires_non_empty_request_id_prefix() -> None:
         )
 
 
-def test_config_default_subject_extractor_fails_closed() -> None:
-    # No explicit subject_extractor -> default returns ""; resolve_scope rejects.
-    config = ChioFlinkConfig(
-        capability_id="cap",
-        tool_server="flink://prod",
-        client_factory=lambda: allow_all(),
-        dlq_router_factory=_dlq_router_factory,
-        scope_map={"orders": "events:consume:orders"},
-    )
-    fn = ChioEvaluateFunction(config)
-    fn.open(MockRuntimeContext())
-    try:
-        with pytest.raises(ChioStreamingConfigError):
-            _drain(fn.process_element({"id": 1}, MockProcessContext()))
-    finally:
-        fn.close()
+def test_config_requires_subject_extractor() -> None:
+    # Flink elements have no broker-provided subject; without an
+    # extractor resolve_scope would raise on every record and the
+    # operator would live in a restart loop. Reject at config time.
+    with pytest.raises(ChioStreamingConfigError, match="subject_extractor"):
+        ChioFlinkConfig(
+            capability_id="cap",
+            tool_server="flink://prod",
+            client_factory=lambda: allow_all(),
+            dlq_router_factory=_dlq_router_factory,
+            scope_map={"orders": "events:consume:orders"},
+        )
 
 
 # ---------------------------------------------------------------------------
