@@ -49,9 +49,7 @@ def canonical_json(obj: Any) -> bytes:
     Rust kernel so content hashes remain byte-compatible across
     languages.
     """
-    return json.dumps(
-        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True
-    ).encode("utf-8")
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
 @dataclass(frozen=True)
@@ -115,9 +113,7 @@ def build_envelope(
         If ``request_id`` is empty.
     """
     if not request_id:
-        raise ChioStreamingConfigError(
-            "build_envelope requires a non-empty request_id"
-        )
+        raise ChioStreamingConfigError("build_envelope requires a non-empty request_id")
 
     verdict = "allow" if receipt.is_allowed else "deny"
     metadata = dict(extra_metadata or {})

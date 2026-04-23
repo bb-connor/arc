@@ -4,14 +4,27 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chio-streaming"
-version = "0.1.0"
-description = "Kafka consumer middleware for the Chio protocol -- per-event capability evaluation, transactional receipt commit, and DLQ governance"
+version = "0.2.0"
+description = "Chio streaming middleware: per-event capability evaluation, receipt publishing, and DLQ governance for Kafka, NATS, Pulsar, EventBridge, Pub/Sub, and Redis Streams"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
     { name = "Backbay Industries" },
 ]
-keywords = ["chio", "kafka", "streaming", "consumer", "dlq", "security", "capability"]
+keywords = [
+    "chio",
+    "kafka",
+    "nats",
+    "pulsar",
+    "eventbridge",
+    "pubsub",
+    "redis",
+    "streaming",
+    "consumer",
+    "dlq",
+    "security",
+    "capability",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -24,11 +37,39 @@ classifiers = [
 
 dependencies = [
     "chio-sdk-python>=0.1.0",
-    "confluent-kafka>=2.4,<3",
     "pydantic>=2.5,<3",
 ]
 
 [project.optional-dependencies]
+# Broker-specific extras. The middlewares use duck-typed protocols so
+# the underlying client library is only required when the user
+# actually connects to that broker.
+kafka = [
+    "confluent-kafka>=2.4,<3",
+]
+nats = [
+    "nats-py>=2.6,<3",
+]
+pulsar = [
+    "pulsar-client>=3.5,<4",
+]
+eventbridge = [
+    "boto3>=1.34,<2",
+]
+pubsub = [
+    "google-cloud-pubsub>=2.21,<3",
+]
+redis = [
+    "redis>=5.0,<6",
+]
+all = [
+    "confluent-kafka>=2.4,<3",
+    "nats-py>=2.6,<3",
+    "pulsar-client>=3.5,<4",
+    "boto3>=1.34,<2",
+    "google-cloud-pubsub>=2.21,<3",
+    "redis>=5.0,<6",
+]
 dev = [
     "pytest>=8,<9",
     "pytest-asyncio>=0.23,<1",

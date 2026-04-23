@@ -1,28 +1,41 @@
-"""Chio streaming integration for Kafka consumers.
+"""Chio streaming integrations for agent choreography governance.
 
-Wraps ``confluent-kafka`` so every consumed event is evaluated through
-the Chio sidecar before the application handler runs. Denials are
-routed to a DLQ via :class:`DLQRouter`; the DLQ publish and consumer
-offset commit run inside a single Kafka transaction so either both
-become visible or both roll back.
+The package wraps every mainstream event bus Chio supports so each
+consumed event is evaluated through the Chio sidecar before the
+application handler runs. Denials are routed to a broker-specific DLQ
+alongside a signed denial receipt; allows publish a receipt envelope
+to a receipt topic so the full choreography becomes attestable.
 
-Public surface:
+Supported brokers:
 
-* :class:`ChioConsumerMiddleware` -- the consumer-side middleware.
-* :class:`ChioConsumerConfig` -- dataclass capturing capability id,
-  tool server, scope map, transactional wiring, and backpressure
-  limits.
-* :class:`DLQRouter` -- DLQ topic router + denial envelope builder.
-* :class:`ProcessingOutcome` -- per-message outcome struct returned by
-  :meth:`ChioConsumerMiddleware.poll_and_process`.
-* :class:`ChioStreamingError` / :class:`ChioStreamingConfigError` --
-  error types.
-* :data:`ENVELOPE_VERSION`, :data:`RECEIPT_HEADER`,
-  :data:`VERDICT_HEADER` -- wire constants.
+* **Kafka** via :class:`ChioConsumerMiddleware` (EOS v2 transactions).
+* **NATS JetStream** via :class:`ChioNatsMiddleware`.
+* **Apache Pulsar** via :class:`ChioPulsarMiddleware`.
+* **AWS EventBridge** via :class:`ChioEventBridgeHandler` (Lambda
+  targets).
+* **Google Cloud Pub/Sub** via :class:`ChioPubSubMiddleware`.
+* **Redis Streams** via :class:`ChioRedisStreamsMiddleware`.
+
+All middlewares share :class:`DLQRouter`, :class:`ReceiptEnvelope`, and
+the :data:`RECEIPT_HEADER` / :data:`VERDICT_HEADER` wire constants, and
+every per-broker ``*ProcessingOutcome`` subclasses
+:class:`BaseProcessingOutcome`.
+
+Per-broker submodules (``chio_streaming.nats``,
+``chio_streaming.pulsar``, ``chio_streaming.eventbridge``,
+``chio_streaming.pubsub``, ``chio_streaming.redis_streams``) remain
+importable for callers that prefer fully-qualified paths.
 """
 
+from chio_streaming.core import BaseProcessingOutcome
 from chio_streaming.dlq import DLQRecord, DLQRouter
 from chio_streaming.errors import ChioStreamingConfigError, ChioStreamingError
+from chio_streaming.eventbridge import (
+    ChioEventBridgeConfig,
+    ChioEventBridgeHandler,
+    EventBridgeProcessingOutcome,
+    build_eventbridge_handler,
+)
 from chio_streaming.middleware import (
     ChioClientLike,
     ChioConsumerConfig,
@@ -34,6 +47,24 @@ from chio_streaming.middleware import (
     ProcessingOutcome,
     build_middleware,
 )
+from chio_streaming.nats import (
+    ChioNatsConsumerConfig,
+    ChioNatsMiddleware,
+    NatsProcessingOutcome,
+    build_nats_middleware,
+)
+from chio_streaming.pubsub import (
+    ChioPubSubConfig,
+    ChioPubSubMiddleware,
+    PubSubProcessingOutcome,
+    build_pubsub_middleware,
+)
+from chio_streaming.pulsar import (
+    ChioPulsarConsumerConfig,
+    ChioPulsarMiddleware,
+    PulsarProcessingOutcome,
+    build_pulsar_middleware,
+)
 from chio_streaming.receipt import (
     ENVELOPE_VERSION,
     RECEIPT_HEADER,
@@ -43,26 +74,55 @@ from chio_streaming.receipt import (
     canonical_json,
     new_request_id,
 )
+from chio_streaming.redis_streams import (
+    ChioRedisStreamsConfig,
+    ChioRedisStreamsMiddleware,
+    RedisStreamEntry,
+    RedisStreamsProcessingOutcome,
+    build_redis_streams_middleware,
+)
 
 __all__ = [
+    "ENVELOPE_VERSION",
+    "RECEIPT_HEADER",
+    "VERDICT_HEADER",
+    "BaseProcessingOutcome",
     "ChioClientLike",
     "ChioConsumerConfig",
     "ChioConsumerMiddleware",
+    "ChioEventBridgeConfig",
+    "ChioEventBridgeHandler",
+    "ChioNatsConsumerConfig",
+    "ChioNatsMiddleware",
+    "ChioPubSubConfig",
+    "ChioPubSubMiddleware",
+    "ChioPulsarConsumerConfig",
+    "ChioPulsarMiddleware",
+    "ChioRedisStreamsConfig",
+    "ChioRedisStreamsMiddleware",
     "ChioStreamingConfigError",
     "ChioStreamingError",
     "DLQRecord",
     "DLQRouter",
-    "ENVELOPE_VERSION",
+    "EventBridgeProcessingOutcome",
     "KafkaConsumerLike",
     "KafkaMessageLike",
     "KafkaProducerLike",
     "MessageHandler",
+    "NatsProcessingOutcome",
     "ProcessingOutcome",
-    "RECEIPT_HEADER",
+    "PubSubProcessingOutcome",
+    "PulsarProcessingOutcome",
     "ReceiptEnvelope",
-    "VERDICT_HEADER",
+    "RedisStreamEntry",
+    "RedisStreamsProcessingOutcome",
     "build_envelope",
+    "build_eventbridge_handler",
     "build_middleware",
+    "build_nats_middleware",
+    "build_pubsub_middleware",
+    "build_pulsar_middleware",
+    "build_redis_streams_middleware",
     "canonical_json",
     "new_request_id",
 ]
