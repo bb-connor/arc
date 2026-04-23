@@ -246,18 +246,43 @@ def lean_named_declarations_in_file(lean_file):
             declarations.add((full_name, lean_file.relative_to(repo).as_posix()))
     return declarations
 
+lean_project_root = repo / "formal" / "lean4" / "Chio"
+lean_project_root_resolved = lean_project_root.resolve()
+
+def require_project_lean_file(path_value, item_kind, item_id):
+    if not path_value:
+        raise SystemExit(f"{item_kind} file missing: {item_id}")
+    path = repo / path_value
+    if not path.exists():
+        raise SystemExit(f"{item_kind} file missing: {item_id}")
+    try:
+        rel = path.resolve().relative_to(lean_project_root_resolved)
+    except ValueError as exc:
+        raise SystemExit(f"{item_kind} file outside Chio Lean project: {item_id}") from exc
+    if ".lake" in rel.parts:
+        raise SystemExit(f"{item_kind} file points into Lean build/dependency tree: {item_id}")
+    return path
+
+project_lean_files = sorted(
+    path
+    for path in lean_project_root.rglob("*.lean")
+    if ".lake" not in path.resolve().relative_to(lean_project_root_resolved).parts
+)
+
 for assumption in assumptions:
     if assumption.get("kind") != "axiom":
         raise SystemExit(f"assumption is not marked as axiom: {assumption.get('id')}")
     if not assumption.get("rootImported"):
         raise SystemExit(f"assumption not marked rootImported: {assumption.get('id')}")
-    assumption_file = assumption.get("file")
-    if not assumption_file or not (repo / assumption_file).exists():
-        raise SystemExit(f"assumption file missing: {assumption.get('id')}")
+    assumption_file = require_project_lean_file(
+        assumption.get("file"),
+        "assumption",
+        assumption.get("id"),
+    )
     lean_name = assumption.get("leanName", "")
     if not lean_name:
         raise SystemExit(f"assumption leanName missing: {assumption.get('id')}")
-    assumption_axioms = {name for name, _ in lean_axioms_in_file(repo / assumption_file)}
+    assumption_axioms = {name for name, _ in lean_axioms_in_file(assumption_file)}
     if lean_name not in assumption_axioms:
         raise SystemExit(f"assumption definition missing from file: {assumption.get('id')}")
 
@@ -288,11 +313,6 @@ if set(property_matrix) != required_property_ids:
     missing = sorted(required_property_ids - set(property_matrix))
     raise SystemExit(f"property matrix missing required properties: {missing}")
 
-declared_theorems = set()
-for lean_file in (repo / "formal" / "lean4" / "Chio").rglob("*.lean"):
-    declared_theorems.update(lean_named_declarations_in_file(lean_file))
-
-declared_theorem_names = {name for name, _ in declared_theorems}
 inventory_theorem_ids = {theorem.get("id") for theorem in theorems}
 inventory_theorem_maps = {}
 inventory_maps_to = {property_id: [] for property_id in required_property_ids}
@@ -300,14 +320,17 @@ inventory_maps_to = {property_id: [] for property_id in required_property_ids}
 for theorem in theorems:
     if not theorem.get("rootImported"):
         raise SystemExit(f"theorem not marked rootImported: {theorem.get('id')}")
-    theorem_file = theorem.get("file")
-    if not theorem_file or not (repo / theorem_file).exists():
-        raise SystemExit(f"theorem file missing: {theorem.get('id')}")
+    theorem_file = require_project_lean_file(
+        theorem.get("file"),
+        "theorem",
+        theorem.get("id"),
+    )
     lean_name = theorem.get("leanName")
     if not lean_name:
         raise SystemExit(f"theorem leanName missing: {theorem.get('id')}")
-    if lean_name not in declared_theorem_names:
-        raise SystemExit(f"theorem definition missing from Lean tree: {theorem.get('id')}")
+    theorem_names = {name for name, _ in lean_named_declarations_in_file(theorem_file)}
+    if lean_name not in theorem_names:
+        raise SystemExit(f"theorem definition missing from declared file: {theorem.get('id')}")
     maps_to = theorem.get("mapsTo", [])
     if not maps_to:
         raise SystemExit(f"theorem missing mapsTo: {theorem.get('id')}")
@@ -339,7 +362,7 @@ found_axioms = []
 found_open_modules = []
 found_exports = []
 found_abbrevs = []
-for lean_file in (repo / "formal" / "lean4" / "Chio").rglob("*.lean"):
+for lean_file in project_lean_files:
     found_axioms.extend(lean_axioms_in_file(lean_file))
     opens, exports, abbrevs = lean_surface_controls_in_file(lean_file)
     found_open_modules.extend(opens)

@@ -34,6 +34,10 @@ checks = [
 ]
 
 failures = []
+process_lifecycle_spawns = {
+    Path("crates/chio-acp-proxy/src/transport.rs"):
+        "ACP transport spawn starts the wrapped agent process; ACP messages are mediated by the proxy interceptor before forwarding",
+}
 for check in checks:
     path = Path(check["file"])
     if not path.exists():
@@ -46,13 +50,19 @@ for check in checks:
         if required not in text:
             failures.append(f"{path} missing mediation marker: {required}")
 
-adapter_roots = [
-    Path("crates/chio-mcp-edge/src"),
-    Path("crates/chio-mcp-adapter/src"),
-    Path("crates/chio-api-protect/src"),
-    Path("crates/chio-openapi/src"),
-]
-for root in adapter_roots:
+adapter_roots = set()
+for crate in Path("crates").glob("chio-*"):
+    if not crate.is_dir():
+        continue
+    if any(part in crate.name for part in ("adapter", "edge", "bridge", "proxy")):
+        adapter_roots.add(crate / "src")
+for explicit in (
+    "crates/chio-api-protect/src",
+    "crates/chio-cross-protocol/src",
+    "crates/chio-openapi/src",
+):
+    adapter_roots.add(Path(explicit))
+for root in sorted(adapter_roots):
     if not root.exists():
         continue
     for path in root.rglob("*.rs"):
@@ -62,6 +72,8 @@ for root in adapter_roots:
             if marker in text and "evaluate" not in text and "kernel" not in text:
                 forbidden_hits.append(marker)
         if forbidden_hits:
+            if path in process_lifecycle_spawns:
+                continue
             failures.append(
                 f"{path} contains side-effect marker(s) without local mediation marker: {forbidden_hits}"
             )
