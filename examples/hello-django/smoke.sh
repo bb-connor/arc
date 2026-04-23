@@ -43,6 +43,7 @@ trap cleanup EXIT
 TRUST_PID=$!
 
 wait_for_http "${CONTROL_URL}/health"
+TRUSTED_ISSUER_KEY="$(trust_authority_public_key "${CONTROL_URL}" "${SERVICE_TOKEN}")"
 
 (
   export CHIO_SIDECAR_URL="${SIDECAR_URL}"
@@ -54,6 +55,7 @@ APP_PID=$!
 wait_for_http "${APP_URL}/healthz"
 
 (
+  export CHIO_TRUSTED_ISSUER_KEY="${TRUSTED_ISSUER_KEY}"
   exec "${CHIO_BIN}" \
     --control-url "${CONTROL_URL}" \
     --control-token "${SERVICE_TOKEN}" \
@@ -132,4 +134,3 @@ hello receipt: ${HELLO_RECEIPT_ID}
 deny receipt: ${DENY_RECEIPT_ID}
 allow receipt: ${ALLOW_RECEIPT_ID}
 EOF
-

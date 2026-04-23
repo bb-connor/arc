@@ -92,6 +92,8 @@ def parse_manifest_subset(text):
             array_values = []
         elif value.startswith('"'):
             manifest[key] = parse_string(value.rstrip(","))
+        elif value.startswith("[") and value.endswith("]"):
+            manifest[key] = json.loads(value)
         elif value.isdigit():
             manifest[key] = int(value)
         else:
@@ -108,8 +110,11 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         tomllib = None
 
-manifest_text = manifest_path.read_text(encoding="utf-8")
-manifest = tomllib.loads(manifest_text) if tomllib else parse_manifest_subset(manifest_text)
+def load_toml_subset(path):
+    text = path.read_text(encoding="utf-8")
+    return tomllib.loads(text) if tomllib else parse_manifest_subset(text)
+
+manifest = load_toml_subset(manifest_path)
 if manifest.get("schema") != "chio.proof-manifest.v1":
     raise SystemExit("proof manifest schema mismatch")
 
@@ -120,6 +125,38 @@ for rel in manifest.get("root_modules", []):
 for rel in manifest.get("covered_rust_modules", []):
     if not (repo / rel).exists():
         raise SystemExit(f"proof manifest covered module missing: {rel}")
+
+assumption_registry = manifest.get("assumption_registry")
+if not assumption_registry:
+    raise SystemExit("proof manifest missing assumption_registry")
+assumption_registry_path = repo / assumption_registry
+if not assumption_registry_path.exists():
+    raise SystemExit(f"assumption registry missing: {assumption_registry}")
+assumption_manifest = load_toml_subset(assumption_registry_path)
+if assumption_manifest.get("schema") != "chio.formal-assumptions.v1":
+    raise SystemExit("formal assumption registry schema mismatch")
+required_assumption_ids = set(assumption_manifest.get("required_assumption_ids", []))
+actual_assumption_ids = set()
+for encoded in assumption_manifest.get("assumptions", []):
+    parts = encoded.split("|")
+    if len(parts) != 4:
+        raise SystemExit(f"malformed formal assumption entry: {encoded}")
+    assumption_id, posture, contract, maps_to = parts
+    if not assumption_id or not posture or not contract or not maps_to:
+        raise SystemExit(f"incomplete formal assumption entry: {encoded}")
+    actual_assumption_ids.add(assumption_id)
+if required_assumption_ids != actual_assumption_ids:
+    missing = sorted(required_assumption_ids - actual_assumption_ids)
+    extra = sorted(actual_assumption_ids - required_assumption_ids)
+    raise SystemExit(f"formal assumption registry mismatch; missing={missing} extra={extra}")
+
+for encoded in manifest.get("rust_refinement_lanes", []):
+    parts = encoded.split("|")
+    if len(parts) != 3:
+        raise SystemExit(f"malformed rust refinement lane entry: {encoded}")
+    _tool, _status, rel = parts
+    if not (repo / rel).exists():
+        raise SystemExit(f"rust refinement lane file missing: {rel}")
 
 inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
 if inventory.get("schema") != "chio.theorem-inventory.v1":
@@ -186,6 +223,29 @@ def lean_surface_controls_in_file(lean_file):
             abbrevs.append((full_name, short_name, lean_file.relative_to(repo).as_posix(), line_number))
     return opens, exports, abbrevs
 
+def lean_named_declarations_in_file(lean_file):
+    namespace_stack = []
+    declarations = set()
+    for line in lean_file.read_text(encoding="utf-8").splitlines():
+        namespace_match = re.match(r"^\s*namespace\s+([A-Za-z0-9_.']+)\b", line)
+        if namespace_match:
+            namespace_stack.append(namespace_match.group(1))
+            continue
+        end_match = re.match(r"^\s*end(?:\s+([A-Za-z0-9_.']+))?\s*$", line)
+        if end_match and namespace_stack:
+            namespace_stack.pop()
+            continue
+        declaration_match = re.match(
+            r"^\s*(?:theorem|lemma)\s+([A-Za-z0-9_.']+)\b",
+            line,
+        )
+        if declaration_match:
+            prefix = ".".join(namespace_stack)
+            short_name = declaration_match.group(1)
+            full_name = f"{prefix}.{short_name}" if prefix else short_name
+            declarations.add((full_name, lean_file.relative_to(repo).as_posix()))
+    return declarations
+
 for assumption in assumptions:
     if assumption.get("kind") != "axiom":
         raise SystemExit(f"assumption is not marked as axiom: {assumption.get('id')}")
@@ -205,12 +265,66 @@ theorems = inventory.get("theorems", [])
 if not theorems:
     raise SystemExit("theorem inventory is empty")
 
+required_property_ids = set(manifest.get("required_property_ids", []))
+if required_property_ids != {f"P{i}" for i in range(1, 11)}:
+    raise SystemExit("proof manifest must require exactly P1 through P10")
+
+property_matrix_entries = manifest.get("property_matrix", [])
+property_matrix = {}
+for encoded in property_matrix_entries:
+    parts = encoded.split("|")
+    if len(parts) != 4:
+        raise SystemExit(f"malformed property matrix entry: {encoded}")
+    property_id, summary, evidence, theorem_ids = parts
+    if property_id not in required_property_ids:
+        raise SystemExit(f"unknown property in matrix: {property_id}")
+    if property_id in property_matrix:
+        raise SystemExit(f"duplicate property matrix entry: {property_id}")
+    theorem_list = [theorem_id.strip() for theorem_id in theorem_ids.split(",") if theorem_id.strip()]
+    if not summary or not evidence or not theorem_list:
+        raise SystemExit(f"incomplete property matrix entry: {encoded}")
+    property_matrix[property_id] = theorem_list
+if set(property_matrix) != required_property_ids:
+    missing = sorted(required_property_ids - set(property_matrix))
+    raise SystemExit(f"property matrix missing required properties: {missing}")
+
+declared_theorems = set()
+for lean_file in (repo / "formal" / "lean4" / "Chio").rglob("*.lean"):
+    declared_theorems.update(lean_named_declarations_in_file(lean_file))
+
+declared_theorem_names = {name for name, _ in declared_theorems}
+inventory_theorem_ids = {theorem.get("id") for theorem in theorems}
+inventory_maps_to = {property_id: [] for property_id in required_property_ids}
+
 for theorem in theorems:
     if not theorem.get("rootImported"):
         raise SystemExit(f"theorem not marked rootImported: {theorem.get('id')}")
     theorem_file = theorem.get("file")
     if not theorem_file or not (repo / theorem_file).exists():
         raise SystemExit(f"theorem file missing: {theorem.get('id')}")
+    lean_name = theorem.get("leanName")
+    if not lean_name:
+        raise SystemExit(f"theorem leanName missing: {theorem.get('id')}")
+    if lean_name not in declared_theorem_names:
+        raise SystemExit(f"theorem definition missing from Lean tree: {theorem.get('id')}")
+    maps_to = theorem.get("mapsTo", [])
+    if not maps_to:
+        raise SystemExit(f"theorem missing mapsTo: {theorem.get('id')}")
+    for property_id in maps_to:
+        if property_id not in required_property_ids:
+            raise SystemExit(f"theorem maps to unknown property {property_id}: {theorem.get('id')}")
+        inventory_maps_to[property_id].append(theorem.get("id"))
+
+for property_id, theorem_ids in property_matrix.items():
+    for theorem_id in theorem_ids:
+        if theorem_id not in inventory_theorem_ids:
+            raise SystemExit(f"property matrix references missing theorem id: {property_id} -> {theorem_id}")
+    if not inventory_maps_to[property_id]:
+        raise SystemExit(f"no theorem inventory coverage for property: {property_id}")
+
+for tool_name in ("lean4", "creusot", "kani", "aeneas"):
+    if tool_name not in manifest.get("primary_toolchain", []):
+        raise SystemExit(f"proof manifest primary toolchain missing {tool_name}")
 
 approved_axiom_names = set(approved_axioms)
 approved_axiom_short_names = {name.rsplit(".", 1)[-1] for name in approved_axioms}

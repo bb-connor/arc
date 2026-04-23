@@ -38,3 +38,6 @@ std = ["chio-core-types/std", "serde/std", "serde_json/std"]
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

@@ -27,6 +27,7 @@ use chio_core_types::capability::{CapabilityToken, ChioScope};
 use chio_core_types::crypto::PublicKey;
 
 use crate::clock::Clock;
+use crate::formal_core::{classify_time_window, TimeWindowStatus};
 use crate::normalized::{NormalizationError, NormalizedVerifiedCapability};
 
 /// The subset of a verified capability that portable callers actually need.
@@ -103,11 +104,10 @@ pub fn verify_capability(
 
     // Time-bound check.
     let now = clock.now_unix_secs();
-    if now < token.issued_at {
-        return Err(CapabilityError::NotYetValid);
-    }
-    if now >= token.expires_at {
-        return Err(CapabilityError::Expired);
+    match classify_time_window(now, token.issued_at, token.expires_at) {
+        TimeWindowStatus::Valid => {}
+        TimeWindowStatus::NotYetValid => return Err(CapabilityError::NotYetValid),
+        TimeWindowStatus::Expired => return Err(CapabilityError::Expired),
     }
 
     Ok(VerifiedCapability {

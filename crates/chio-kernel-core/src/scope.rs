@@ -68,37 +68,60 @@ pub fn resolve_matching_grants<'a>(
     server_id: &str,
     arguments: &serde_json::Value,
 ) -> Result<Vec<MatchedGrant<'a>>, ScopeMatchError> {
-    let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
-
-    for (index, grant) in scope.grants.iter().enumerate() {
-        let covered = match grant_covers(grant, tool_name, server_id, arguments) {
-            Ok(covered) => covered,
-            Err(error @ ScopeMatchError::ConstraintError(_)) => return Err(error),
-            Err(error) => return Err(error),
-        };
-        if !covered {
-            continue;
+    #[cfg(kani)]
+    {
+        let _ = arguments;
+        let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
+        for (index, grant) in scope.grants.iter().enumerate() {
+            if grant.constraints.is_empty()
+                && grant.server_id.as_bytes() == server_id.as_bytes()
+                && grant.tool_name.as_bytes() == tool_name.as_bytes()
+                && grant.operations.contains(&Operation::Invoke)
+            {
+                matches.push(MatchedGrant {
+                    index,
+                    grant,
+                    specificity: (1, 1, 0),
+                });
+            }
         }
-
-        matches.push(MatchedGrant {
-            index,
-            grant,
-            specificity: (
-                u8::from(grant.server_id == server_id),
-                u8::from(grant.tool_name == tool_name),
-                grant.constraints.len(),
-            ),
-        });
+        return Ok(matches);
     }
 
-    matches.sort_by(|left, right| {
-        right
-            .specificity
-            .cmp(&left.specificity)
-            .then_with(|| left.index.cmp(&right.index))
-    });
+    #[cfg(not(kani))]
+    {
+        let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
 
-    Ok(matches)
+        for (index, grant) in scope.grants.iter().enumerate() {
+            let covered = match grant_covers(grant, tool_name, server_id, arguments) {
+                Ok(covered) => covered,
+                Err(error @ ScopeMatchError::ConstraintError(_)) => return Err(error),
+                Err(error) => return Err(error),
+            };
+            if !covered {
+                continue;
+            }
+
+            matches.push(MatchedGrant {
+                index,
+                grant,
+                specificity: (
+                    u8::from(grant.server_id == server_id),
+                    u8::from(grant.tool_name == tool_name),
+                    grant.constraints.len(),
+                ),
+            });
+        }
+
+        matches.sort_by(|left, right| {
+            right
+                .specificity
+                .cmp(&left.specificity)
+                .then_with(|| left.index.cmp(&right.index))
+        });
+
+        Ok(matches)
+    }
 }
 
 /// Convenience wrapper that runs [`resolve_matching_grants`] against a

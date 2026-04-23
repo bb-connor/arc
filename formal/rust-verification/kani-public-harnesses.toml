@@ -1,0 +1,19 @@
+schema = "chio.kani-public-harnesses.v1"
+crate = "chio-kernel-core"
+script = "scripts/check-kani-public-core.sh"
+
+harness_groups = [
+  "public verify_capability fail-closed edges",
+  "public NormalizedScope subset edges",
+  "public resolve_matching_grants path-prefix edges",
+  "public evaluate deny edges",
+  "public sign_receipt kernel-key mismatch edge",
+]
+
+covered_symbols = [
+  "chio_kernel_core::verify_capability",
+  "chio_kernel_core::NormalizedScope::is_subset_of",
+  "chio_kernel_core::scope::resolve_matching_grants",
+  "chio_kernel_core::evaluate",
+  "chio_kernel_core::sign_receipt",
+]

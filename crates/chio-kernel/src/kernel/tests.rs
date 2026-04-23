@@ -8,3 +8,4 @@ include!("tests/compliance_score.rs");
 include!("tests/multi_tenant_receipt.rs");
 include!("tests/memory_provenance.rs");
 include!("tests/federation_cosign.rs");
+include!("tests/formal_closure.rs");

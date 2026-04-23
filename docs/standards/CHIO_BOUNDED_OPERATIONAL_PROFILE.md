@@ -61,4 +61,5 @@ This profile explicitly excludes:
   verified lineage artifacts Chio actually validates
 - public transparency-log semantics
 - full receipt-family append-only sequencing or strong non-repudiation
-- theorem-prover completion for every protocol claim
+- first-principles theorem-prover completion for concrete crypto, platform, or
+  external-service behavior beyond the audited assumption registry

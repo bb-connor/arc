@@ -126,7 +126,7 @@ from pathlib import Path
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 assert payload["tool"] == "read_file", payload
-assert payload["verdict"] == "Allow", payload
+assert payload["verdict"].lower() == "allow", payload
 assert payload["receipt_id"], payload
 assert payload["policy_hash"], payload
 PY

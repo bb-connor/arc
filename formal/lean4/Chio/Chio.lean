@@ -4,6 +4,12 @@ import Chio.Core.Capability
 import Chio.Core.Receipt
 import Chio.Core.Scope
 import Chio.Core.Revocation
+import Chio.Core.Protocol
 import Chio.Spec.Properties
 import Chio.Proofs.Monotonicity
 import Chio.Proofs.Receipt
+import Chio.Proofs.Revocation
+import Chio.Proofs.Evaluation
+import Chio.Proofs.Protocol
+import Chio.Proofs.AeneasEquivalence
+import Chio.Proofs.FormalClosure

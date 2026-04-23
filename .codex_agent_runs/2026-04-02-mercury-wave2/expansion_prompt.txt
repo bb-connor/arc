@@ -1,6 +1,0 @@
-Research MERCURY from the expansion and ecosystem angle. Read the current docs in docs/mercury as needed. Evaluate the best post-pilot expansion tracks among assurance, governance, OEM, trust network, ARC-Wall, and any better alternatives. Challenge whether the current ordering is right. Use current external research where helpful. Output markdown with sections exactly:
-1. Top 5 Insights
-2. Top 3 Risks
-3. Top 3 Expansion Paths in Order
-4. Roadmap Changes
-5. Sources

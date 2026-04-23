@@ -58,7 +58,8 @@ The strongest honest ship-facing claim Chio can now make is:
 
 That bounded release does **not** qualify:
 
-- theorem-prover completion for every protocol claim
+- first-principles theorem-prover completion for concrete crypto, OS, storage,
+  transport, subprocess, hosted-registry, chain, or settlement implementations
 - verifier-backed runtime assurance as the sole admission boundary
 - consensus-grade HA or distributed-linearizable budget truth
 - public transparency-log or strong non-repudiation semantics

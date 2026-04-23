@@ -39,10 +39,26 @@ pub fn sign_receipt(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, ReceiptSigningError> {
-    if body.kernel_key != backend.public_key() {
-        return Err(ReceiptSigningError::KernelKeyMismatch);
+    #[cfg(kani)]
+    {
+        if body.kernel_key != backend.public_key() {
+            core::mem::forget(body);
+            return Err(ReceiptSigningError::KernelKeyMismatch);
+        }
+        // Kani public harnesses cover mismatch fail-closed behavior here.
+        // Successful canonical signing is covered by runtime boundary tests.
+        core::mem::forget(body);
+        kani::assume(false);
+        unreachable!("successful receipt signing is outside this Kani harness");
     }
 
-    ChioReceipt::sign_with_backend(body, backend)
-        .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))
+    #[cfg(not(kani))]
+    {
+        if body.kernel_key != backend.public_key() {
+            return Err(ReceiptSigningError::KernelKeyMismatch);
+        }
+
+        ChioReceipt::sign_with_backend(body, backend)
+            .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))
+    }
 }

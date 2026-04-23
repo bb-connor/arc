@@ -57,10 +57,12 @@ Qualified claim:
   policy, freshness, and conflict visibility; it is not yet a general public
   transparency-log or strong non-repudiation surface.
 
-Not yet qualified:
+Not qualified by the formal lane:
 
-- theorem-prover completion for every protocol claim
-- broad Lean 4 verification claims beyond the bounded proof manifest and claim registry
+- first-principles theorem-prover completion for concrete crypto, OS, storage,
+  transport, subprocess, hosted-registry, chain, or settlement implementations
+- broad Lean 4 verification claims beyond the implementation-linked proof
+  manifest, theorem inventory, assumption registry, and claim registry
 - authenticated recursive delegation ancestry beyond the preserved presented
   chain
 - verifier-backed runtime assurance as the sole admission boundary
@@ -84,6 +86,7 @@ Primary bounded-ship machine-readable gate:
 Formal boundary artifacts:
 
 - [`../../formal/proof-manifest.toml`](../../formal/proof-manifest.toml)
+- [`../../formal/assumptions.toml`](../../formal/assumptions.toml)
 - [`../../formal/theorem-inventory.json`](../../formal/theorem-inventory.json)
 - [../CLAIM_REGISTRY.md](../CLAIM_REGISTRY.md)
 
@@ -351,7 +354,8 @@ These are intentionally not blockers for the current Chio production candidate:
 - synthetic cross-issuer passport trust aggregation
 - public identity, issuer, verifier, or wallet discovery that auto-admits
   visible trust material
-- theorem-prover completion for every protocol claim
+- first-principles theorem-prover completion for concrete crypto, OS, storage,
+  transport, subprocess, hosted-registry, chain, or settlement implementations
 - performance-first rewrite work
 
 ## Procedural Note

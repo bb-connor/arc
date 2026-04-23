@@ -1,9 +1,14 @@
 schema = "chio.proof-manifest.v1"
 manifest_version = 1
-proof_boundary_status = "bounded_verified_core"
+proof_boundary_status = "implementation_linked_protocol_core"
+verification_target = "security_critical_protocol_semantics"
+assumption_registry = "formal/assumptions.toml"
+claim_registry = "docs/reference/CLAIM_REGISTRY.md"
 lean_root_module = "Chio"
 boundary_doc = "docs/architecture/CHIO_RUNTIME_BOUNDARIES.md"
 spec_anchor = "spec/PROTOCOL.md#55-verified-core-boundary"
+primary_toolchain = ["lean4", "creusot", "kani", "aeneas"]
+pilot_toolchain = []
 
 root_modules = [
   "formal/lean4/Chio/Chio.lean",
@@ -11,18 +16,36 @@ root_modules = [
   "formal/lean4/Chio/Chio/Core/Scope.lean",
   "formal/lean4/Chio/Chio/Core/Receipt.lean",
   "formal/lean4/Chio/Chio/Core/Revocation.lean",
+  "formal/lean4/Chio/Chio/Core/Protocol.lean",
+  "formal/lean4/Chio/Chio/Spec/Properties.lean",
+  "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
+  "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
+  "formal/lean4/Chio/Chio/Proofs/Revocation.lean",
+  "formal/lean4/Chio/Chio/Proofs/Evaluation.lean",
+  "formal/lean4/Chio/Chio/Proofs/Protocol.lean",
+  "formal/lean4/Chio/Chio/Proofs/AeneasEquivalence.lean",
+  "formal/lean4/Chio/Chio/Proofs/FormalClosure.lean",
 ]
 
 gate_commands = [
   "./scripts/check-formal-proofs.sh",
+  "./scripts/check-aeneas-pilot.sh",
+  "./scripts/check-aeneas-production.sh",
+  "./scripts/check-aeneas-equivalence.sh",
+  "./scripts/check-rust-verification-gates.sh",
+  "./scripts/check-kani-public-core.sh",
+  "./scripts/check-adapter-no-bypass.sh",
   "cargo test -p chio-formal-diff-tests",
   "./scripts/check-portable-kernel.sh",
+  "./scripts/check-proof-report.sh",
 ]
 
 covered_rust_modules = [
   "crates/chio-kernel-core/src/capability_verify.rs",
   "crates/chio-kernel-core/src/scope.rs",
   "crates/chio-kernel-core/src/evaluate.rs",
+  "crates/chio-kernel-core/src/formal_aeneas.rs",
+  "crates/chio-kernel-core/src/formal_core.rs",
   "crates/chio-kernel-core/src/normalized.rs",
   "crates/chio-kernel-core/src/receipts.rs",
 ]
@@ -39,11 +62,48 @@ covered_rust_symbols = [
   "chio_kernel_core::normalized::NormalizedScope::is_subset_of",
   "chio_kernel_core::normalized::NormalizedEvaluationVerdict::try_from_evaluation",
   "chio_kernel_core::receipts::sign_receipt",
+  "chio_kernel_core::formal_core::classify_time_window",
+  "chio_kernel_core::formal_core::budget_commit",
+  "chio_kernel_core::formal_core::dpop_admits",
+  "chio_kernel_core::formal_core::guard_pipeline_allows",
+  "chio_kernel_core::formal_core::receipt_fields_coupled",
 ]
 
 shell_entrypoints = [
   "chio_kernel::ChioKernel::evaluate_portable_verdict",
   "chio_kernel::ChioKernel::build_and_sign_receipt",
+]
+
+required_property_ids = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
+
+property_matrix = [
+  "P1|capability attenuation|lean_root_imported,differential_test,rust_projection,aeneas_equivalence,public_kani|spec.capability_monotonicity,proof.scope_subset_of_grants_subset,proof.reduced_budget_is_subset,proof.added_constraint_is_subset,proof.aeneas_optionalCapIsSubset_preserves_parent_cap",
+  "P2|presented revocation coverage|lean_root_imported,audited_storage_assumption,sqlite_projection,aeneas_equivalence|proof.revoke_marks_capability_revoked,proof.checkRevocation_revoked_token_errors,proof.evalToolCall_revoked_token_never_allows,proof.revocationSnapshot_revoked_token_denies,proof.revocationSnapshot_revoked_ancestor_denies,proof.aeneas_revocationSnapshot_equiv_model",
+  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,public_kani,adapter_no_bypass|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.delegation_max_depth_failure_denies",
+  "P4|receipt integrity|lean_root_imported,symbolic_crypto,audited_crypto_assumption,receipt_totality,aeneas_equivalence|proof.membership_proof_sound,proof.receipt_sign_then_verify,proof.receipt_immutability,proof.receiptFieldsCoupled_preserves_all_fields,proof.aeneas_receiptCoupling_equiv_model",
+  "P5|presented delegation-chain semantic validity|lean_root_imported,sqlite_projection|proof.delegation_chain_integrity,proof.delegation_step_allow_requires_attenuation,proof.delegation_step_allow_requires_subject_continuity,proof.delegation_step_allow_requires_expiry_monotonicity,proof.delegation_revoked_ancestor_denies,proof.delegation_max_depth_failure_denies",
+  "P6|local parent-link soundness|lean_root_imported,audited_storage_assumption|proof.observed_parent_edge_sound",
+  "P7|receipt-lineage soundness|lean_root_imported,symbolic_crypto,audited_crypto_assumption|proof.verified_receipt_lineage_sound",
+  "P8|session continuity soundness|lean_root_imported,audited_transport_assumption,dpop_binding_tests|proof.session_continuity_sound,proof.admitSession_invalid_anchor_rejects,proof.dpop_reused_nonce_rejects,proof.dpop_binding_allows_only_when_all_fields_match,proof.aeneas_dpopAdmits_equiv_model",
+  "P9|delegation and provenance consistency|lean_root_imported,audited_registry_assumption|proof.capability_lineage_consistency_sound",
+  "P10|report truthfulness|lean_root_imported,claim_gate|proof.report_truthfulness_asserted_not_verified,proof.report_truthfulness_observed_not_verified",
+]
+
+rust_refinement_lanes = [
+  "creusot|required|formal/rust-verification/creusot-contracts.toml",
+  "kani|required|formal/rust-verification/kani-harnesses.toml",
+  "kani|required|formal/rust-verification/kani-public-harnesses.toml",
+  "aeneas|pilot|formal/aeneas/pilot.toml",
+  "aeneas|production|formal/aeneas/production.toml",
+]
+
+claim_gate_inputs = [
+  "README.md",
+  "docs/start-here/VISION.md",
+  "docs/protocols/STRATEGIC-VISION.md",
+  "docs/reference/CLAIM_REGISTRY.md",
+  "docs/release/RISK_REGISTER.md",
+  "spec/PROTOCOL.md",
 ]
 
 allowed_assumption_modules = [
@@ -65,16 +125,17 @@ allowed_open_modules = [
 ]
 
 excluded_surfaces = [
-  "chio-kernel revocation-store lookups and delegation-store lineage checks",
-  "budget mutation, authorize/commit/reconcile hold flows, and payment authorization",
-  "DPoP verification, nonce replay caches, and transport admission",
-  "governed transaction evaluation, approval-token policy, and runtime-attestation enforcement",
-  "tool dispatch, subprocess or network effects, and hosted/session orchestration",
-  "receipt persistence, checkpoint publication, clustered trust-control, and external settlement rails",
+  "concrete Ed25519, SHA-256, canonical JSON, TLS, OS clock, SQLite, chain, and hosted-registry implementations beyond their audited assumptions",
+  "async scheduling, network delivery, subprocess effects, and tool-server behavior after the verified decision core allows a call",
+  "cluster consensus, external settlement rails, and third-party registry availability beyond fail-closed Chio handling",
+  "Aeneas extraction from async, IO, SQLite, crypto, and string-heavy production modules outside crates/chio-kernel-core/src/formal_aeneas.rs",
+  "Symlink resolution and OS filesystem root enforcement beyond Chio's normalized path-prefix fail-closed checks",
 ]
 
 notes = [
-  "The bounded verified core is the pure authorization and receipt-signing subset that can run in chio-kernel-core without transport, database, or runtime side effects.",
-  "Lean assets remain informative unless they are root-imported, sorry-free, and mapped to the covered Rust symbols above.",
-  "Release-facing runtime claims must not extend beyond the covered symbols and shell entrypoints named here until FORM-REG, FORM-REF, and GATE-CI land.",
+  "The implementation-linked protocol core is the pure security decision surface plus bounded models for adjacent state transitions. Concrete platform effects are tracked as audited assumptions.",
+  "Lean assets are release evidence only when root-imported, sorry-free, and mapped to property_matrix entries.",
+  "Creusot and Kani are required strict-CI lanes for production implementation linkage; public Kani harnesses target verify_capability, NormalizedScope::is_subset_of, resolve_matching_grants, evaluate, and sign_receipt.",
+  "Aeneas production extraction covers the pure numeric/boolean core and is paired with tracked Lean equivalence theorems.",
+  "Release-facing formal claims must name this manifest, the theorem inventory, and the audited assumptions.",
 ]

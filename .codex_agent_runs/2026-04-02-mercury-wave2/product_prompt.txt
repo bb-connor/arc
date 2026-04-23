@@ -1,7 +1,0 @@
-Research MERCURY from the product and ICP angle. Read the current docs in docs/mercury as needed. Challenge whether approval, override, exception review, and model or policy change review evidence is truly the strongest first wedge, or whether there is a better first product. Focus on buyer, workflow, packaging, pricing, and proof of value. Use current external research where useful. Output markdown with sections exactly:
-1. Top 5 Insights
-2. Top 3 Risks
-3. Top 3 Better Ideas
-4. Concrete Doc or Roadmap Changes
-5. Sources
-Prefer primary or official sources.
