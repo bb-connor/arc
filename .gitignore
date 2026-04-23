@@ -63,7 +63,6 @@ formal/lean4/**/.lake/
 formal/rust-verification/creusot-core/.why3find/
 formal/rust-verification/creusot-core/target/
 formal/rust-verification/creusot-core/verif/
-formal/rust-verification/creusot-core/why3find.json
 
 # Build outputs (flagged by scripts/check-release-inputs.sh)
 packages/sdk/chio-ts/dist/
