@@ -540,7 +540,7 @@ async def test_dlq_publish_failure_raises_and_does_not_ack() -> None:
     assert mw.in_flight == 0
 
 
-async def test_receipt_publish_failure_does_not_ack() -> None:
+async def test_receipt_publish_failure_propagates_and_does_not_ack() -> None:
     client = FakeRedisStreams(fail_streams={"chio-receipts"})
     mw, _ = _middleware(chio_client=allow_all(), client=client)
 
@@ -549,18 +549,45 @@ async def test_receipt_publish_failure_does_not_ack() -> None:
     async def handler(_e: Any, _r: Any) -> None:
         ran.append(1)
 
-    outcome = await mw.dispatch(
-        stream="tasks",
-        entry_id="10-0",
-        fields={b"k": b"v"},
-        handler=handler,
-    )
+    # Receipt XADD is infrastructure, not handler failure. The exception
+    # propagates so Redis can redeliver via XCLAIM / XAUTOCLAIM;
+    # handler_error_strategy does not reclassify it (otherwise
+    # ``handler_error_strategy="ack"`` would drop the source without a
+    # receipt).
+    with pytest.raises(RuntimeError, match="xadd failed"):
+        await mw.dispatch(
+            stream="tasks",
+            entry_id="10-0",
+            fields={b"k": b"v"},
+            handler=handler,
+        )
+
     assert ran == [1]
-    assert outcome.allowed is True
-    assert outcome.acked is False
-    assert isinstance(outcome.handler_error, RuntimeError)
     assert client.xacked == []
     assert mw.in_flight == 0
+
+
+async def test_receipt_publish_failure_not_reclassified_as_handler_error_ack() -> None:
+    # Regression: a failed receipt XADD under ``handler_error_strategy="ack"``
+    # must NOT silently XACK the source. The bug was a single
+    # ``except Exception`` wrapping invoke_handler AND the receipt XADD,
+    # so a publish failure hit the handler-error branch and acked the source.
+    client = FakeRedisStreams(fail_streams={"chio-receipts"})
+    cfg = _cfg(handler_error_strategy="ack")
+    mw, _ = _middleware(chio_client=allow_all(), client=client, config=cfg)
+
+    async def handler(_e: Any, _r: Any) -> None:
+        return None
+
+    with pytest.raises(RuntimeError, match="xadd failed"):
+        await mw.dispatch(
+            stream="tasks",
+            entry_id="10-0",
+            fields={b"k": b"v"},
+            handler=handler,
+        )
+
+    assert client.xacked == []
 
 
 # ---------------------------------------------------------------------------

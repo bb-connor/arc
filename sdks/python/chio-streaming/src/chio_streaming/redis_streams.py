@@ -297,33 +297,18 @@ class ChioRedisStreamsMiddleware:
             source_offset=None,
             extra_metadata={"source_entry_id": entry_id},
         )
-        handler_error: Exception | None = None
-        acked = False
+        # handler_error_strategy applies to handler failures only. Receipt
+        # XADD and XACK errors are infrastructure failures; they propagate
+        # so Redis can redeliver via XCLAIM / XAUTOCLAIM instead of being
+        # silently acked under handler_error_strategy="ack".
         try:
             await invoke_handler(
                 handler,
                 RedisStreamEntry(stream=stream, entry_id=entry_id, fields=fields),
                 receipt,
             )
-            if self._config.receipt_stream is not None:
-                ack_count = await self._xadd_and_xack(
-                    stream=stream,
-                    entry_id=entry_id,
-                    envelope=envelope,
-                )
-            else:
-                ack_count = await self._xack(stream, entry_id)
-            acked = ack_count > 0
-            if not acked:
-                logger.warning(
-                    "chio-redis: XACK returned 0 for stream=%s entry_id=%s "
-                    "request_id=%s (entry claimed by another consumer?)",
-                    stream,
-                    entry_id,
-                    request_id,
-                )
         except Exception as exc:
-            handler_error = exc
+            acked = False
             if self._config.handler_error_strategy == "ack":
                 # Config requires receipt_stream here so the failure
                 # always leaves an audit trail.
@@ -361,6 +346,33 @@ class ChioRedisStreamsMiddleware:
                 self._config.handler_error_strategy,
                 exc,
             )
+            return RedisStreamsProcessingOutcome(
+                allowed=True,
+                receipt=receipt,
+                request_id=request_id,
+                stream=stream,
+                entry_id=entry_id,
+                acked=acked,
+                handler_error=exc,
+            )
+
+        if self._config.receipt_stream is not None:
+            ack_count = await self._xadd_and_xack(
+                stream=stream,
+                entry_id=entry_id,
+                envelope=envelope,
+            )
+        else:
+            ack_count = await self._xack(stream, entry_id)
+        acked = ack_count > 0
+        if not acked:
+            logger.warning(
+                "chio-redis: XACK returned 0 for stream=%s entry_id=%s "
+                "request_id=%s (entry claimed by another consumer?)",
+                stream,
+                entry_id,
+                request_id,
+            )
         return RedisStreamsProcessingOutcome(
             allowed=True,
             receipt=receipt,
@@ -368,7 +380,6 @@ class ChioRedisStreamsMiddleware:
             stream=stream,
             entry_id=entry_id,
             acked=acked,
-            handler_error=handler_error,
         )
 
     async def _handle_deny(

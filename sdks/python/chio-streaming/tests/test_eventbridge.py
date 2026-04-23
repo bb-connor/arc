@@ -306,11 +306,15 @@ def test_config_rejects_bad_sidecar_error() -> None:
 
 
 def test_handler_requires_events_client_when_dlq_bus_set() -> None:
-    with pytest.raises(ChioStreamingConfigError):
+    # Pass dlq_fallback_topic so the factory reaches the constructor's
+    # events_client guard; otherwise the missing-dlq-router check raises
+    # first and the test would pass for the wrong reason.
+    with pytest.raises(ChioStreamingConfigError, match="events_client"):
         build_eventbridge_handler(
             chio_client=allow_all(),
             events_client=None,
             config=_cfg(),
+            dlq_fallback_topic="chio-eventbridge-dlq",
         )
 
 

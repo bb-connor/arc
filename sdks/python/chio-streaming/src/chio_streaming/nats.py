@@ -282,6 +282,10 @@ class ChioNatsMiddleware:
             await invoke_handler(handler, msg, receipt)
         except Exception as exc:
             await self._negative_ack(msg)
+            # term() terminally settles the message (JetStream drops it,
+            # no redelivery); mirrors the deny-term path which also sets
+            # acked=True. nak() leaves it pending for redelivery.
+            acked = self._config.handler_error_strategy == "term"
             logger.warning(
                 "chio-nats: handler raised for subject=%s; redelivered via %s: %s",
                 msg.subject,
@@ -293,7 +297,7 @@ class ChioNatsMiddleware:
                 receipt=receipt,
                 request_id=request_id,
                 message=msg,
-                acked=False,
+                acked=acked,
                 handler_error=exc,
             )
 
