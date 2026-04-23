@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ ! -f target/formal/proof-report.json ]]; then
-  ./scripts/generate-proof-report.sh --no-run-gates
+  ./scripts/generate-proof-report.sh
 fi
 
 python3 - <<'PY'
@@ -30,12 +30,19 @@ if missing:
 if report["claimGate"].get("status") != "passed":
     raise SystemExit("proof report claim gate did not pass")
 
-failed = [
+gate_results = report.get("gateResults", [])
+if not gate_results:
+    raise SystemExit("proof report missing gate results")
+
+not_passed = [
     result for result in report.get("gateResults", [])
-    if result.get("status") == "failed"
+    if result.get("status") != "passed"
 ]
-if failed:
-    raise SystemExit(f"proof report contains failed gate: {failed[0].get('command')}")
+if not_passed:
+    first = not_passed[0]
+    command = first.get("command")
+    status = first.get("status")
+    raise SystemExit(f"proof report gate did not pass: {command} status={status}")
 
 if not report.get("toolVersions"):
     raise SystemExit("proof report missing tool versions")
