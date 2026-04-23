@@ -237,8 +237,10 @@ async def test_allow_handler_error_acknowledge_strategy() -> None:
         raise RuntimeError("boom")
 
     outcome = await mw.dispatch(msg, handler)
-    assert outcome.acked is False  # handler still failed
-    # But acknowledge (not nack) was called so Pulsar drops the message.
+    # acked reflects broker-level acknowledgement; the handler still
+    # failed (surfaced via handler_error) but the message was acked.
+    assert outcome.acked is True
+    assert outcome.handler_error is not None
     assert len(consumer.acked) == 1
     assert consumer.nacked == []
 

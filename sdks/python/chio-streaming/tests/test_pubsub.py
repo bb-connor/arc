@@ -251,6 +251,9 @@ async def test_allow_handler_error_can_ack() -> None:
 
     outcome = await mw.dispatch(msg, handler)
     assert outcome.handler_error is not None
+    # acked reflects the broker-level ack; handler failure is surfaced
+    # separately via handler_error.
+    assert outcome.acked is True
     assert msg.ack_called is True
     assert msg.nack_called is False
 

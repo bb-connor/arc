@@ -222,8 +222,6 @@ class ChioEventBridgeHandler:
         )
         parameters = self._parameters_for(event, request_id=request_id)
 
-        from chio_sdk.errors import ChioError
-
         try:
             receipt = await evaluate_with_chio(
                 chio_client=self._chio_client,
@@ -236,7 +234,7 @@ class ChioEventBridgeHandler:
                     "request_id": request_id,
                 },
             )
-        except ChioError:
+        except ChioStreamingError:
             if self._config.on_sidecar_error == "deny":
                 from chio_streaming.core import synthesize_deny_receipt
 

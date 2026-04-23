@@ -211,8 +211,9 @@ async def test_allow_handler_error_ack_strategy_xacks() -> None:
         stream="tasks", entry_id="301-0", fields={b"k": b"v"}, handler=handler
     )
     assert outcome.handler_error is not None
-    # Entry XACK'd despite the failure, but "acked" still reflects
-    # whether the happy-path completed.
+    # acked reflects broker-level XACK; the handler still failed
+    # (surfaced via handler_error) but the entry left the PEL.
+    assert outcome.acked is True
     assert len(r.xacked) == 1
     # A handler-error receipt envelope must still be published so the
     # audit trail records the dropped entry -- otherwise "ack" strategy

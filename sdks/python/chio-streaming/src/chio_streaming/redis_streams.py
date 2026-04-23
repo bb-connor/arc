@@ -343,7 +343,8 @@ class ChioRedisStreamsMiddleware:
                     entry_id=entry_id,
                     envelope=error_envelope,
                 )
-                if ack_count == 0:
+                acked = ack_count > 0
+                if not acked:
                     logger.warning(
                         "chio-redis: XACK returned 0 for stream=%s entry_id=%s "
                         "request_id=%s after handler error (claimed elsewhere?)",

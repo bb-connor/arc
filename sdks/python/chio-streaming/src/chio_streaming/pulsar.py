@@ -294,6 +294,11 @@ class ChioPulsarMiddleware:
         except Exception as exc:
             handler_error = exc
             await self._negative_ack(msg)
+            # handler_error_strategy="ack" means _negative_ack calls
+            # acknowledge (not negative_acknowledge), so the message was
+            # acked despite the failure; reflect that in the outcome.
+            if self._config.handler_error_strategy == "ack":
+                acked = True
             logger.warning(
                 "chio-pulsar: handler raised for topic=%s request_id=%s; redelivery scheduled: %s",
                 msg.topic_name(),

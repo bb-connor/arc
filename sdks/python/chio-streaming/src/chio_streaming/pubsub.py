@@ -305,6 +305,7 @@ class ChioPubSubMiddleware:
             handler_error = exc
             if self._config.handler_error_strategy == "ack":
                 message.ack()
+                acked = True
             else:
                 message.nack()
             logger.warning(
