@@ -1,0 +1,32 @@
+[versions]
+kotlin = "2.3.0"
+springBoot = "3.2.2"
+flink = "2.2.0"
+jackson = "2.17.2"
+junit = "5.11.4"
+spotless = "7.0.2"
+ktlint = "1.5.0"
+
+[libraries]
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
+
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
+
+springBoot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
+springBoot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+springBoot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+
+flink-streaming-java = { module = "org.apache.flink:flink-streaming-java", version.ref = "flink" }
+flink-clients = { module = "org.apache.flink:flink-clients", version.ref = "flink" }
+flink-test-utils = { module = "org.apache.flink:flink-test-utils", version.ref = "flink" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+springBoot = { id = "org.springframework.boot", version.ref = "springBoot" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

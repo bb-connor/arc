@@ -6,20 +6,8 @@
  */
 package io.backbay.chio
 
+import io.backbay.chio.sdk.Hashing.sha256Hex
 import jakarta.servlet.http.HttpServletRequest
-import java.security.MessageDigest
-
-/** Compute SHA-256 hex digest of a string. */
-fun sha256Hex(input: String): String {
-    return sha256Hex(input.toByteArray(Charsets.UTF_8))
-}
-
-/** Compute SHA-256 hex digest of raw bytes. */
-fun sha256Hex(input: ByteArray): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val hash = digest.digest(input)
-    return hash.joinToString("") { "%02x".format(it) }
-}
 
 /** Function type for extracting caller identity from a request. */
 typealias IdentityExtractorFn = (HttpServletRequest) -> CallerIdentity
@@ -62,11 +50,12 @@ fun defaultIdentityExtractor(request: HttpServletRequest): CallerIdentity {
         val cookieHash = sha256Hex(cookie.value)
         return CallerIdentity(
             subject = "cookie:${cookieHash.take(16)}",
-            authMethod = AuthMethod(
-                method = "cookie",
-                cookieName = cookie.name,
-                cookieHash = cookieHash,
-            ),
+            authMethod =
+                AuthMethod(
+                    method = "cookie",
+                    cookieName = cookie.name,
+                    cookieHash = cookieHash,
+                ),
         )
     }
 

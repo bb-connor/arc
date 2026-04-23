@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "hello-spring-boot"
 
-includeBuild("../../sdks/jvm/chio-spring-boot")
+includeBuild("../../sdks/jvm")

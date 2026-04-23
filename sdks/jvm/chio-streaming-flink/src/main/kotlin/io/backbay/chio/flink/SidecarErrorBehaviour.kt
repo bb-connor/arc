@@ -1,0 +1,11 @@
+/**
+ * Sidecar failure behaviour for Chio Flink operators. Mirrors the
+ * Python Literal["raise", "deny"] (flink.py:72).
+ *
+ * RAISE: propagate sidecar unavailability so Flink restarts the task
+ *        and the source rewinds.
+ * DENY:  synthesise a deny receipt, emit to DLQ, continue processing.
+ */
+package io.backbay.chio.flink
+
+enum class SidecarErrorBehaviour { RAISE, DENY }

@@ -16,7 +16,6 @@ import java.nio.charset.Charset
 class CachedBodyHttpServletRequest(
     request: HttpServletRequest,
 ) : HttpServletRequestWrapper(request) {
-
     val cachedBody: ByteArray = request.inputStream.readAllBytes()
 
     override fun getInputStream(): ServletInputStream {
