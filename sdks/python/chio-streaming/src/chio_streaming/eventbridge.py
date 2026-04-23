@@ -35,6 +35,7 @@ from chio_streaming.receipt import ReceiptEnvelope, build_envelope
 logger = logging.getLogger(__name__)
 
 SidecarErrorBehaviour = Literal["raise", "deny"]
+HandlerErrorStrategy = Literal["raise", "return"]
 
 # EventBridge per-entry cap is 256 KB; budget 240 KB for Detail to
 # leave room for Source, DetailType, EventBusName, Resources, framing.
@@ -84,6 +85,12 @@ class ChioEventBridgeConfig:
         so Lambda retry / DLQ handles them. ``"deny"`` treats sidecar
         failures as terminal denials (fail-closed, useful behind a
         circuit breaker).
+    handler_error_strategy:
+        ``"raise"`` (default) re-raises handler exceptions from
+        ``evaluate()`` so the Lambda invocation fails and EventBridge
+        retries / target DLQ fire. ``"return"`` swallows the exception
+        and returns an outcome with ``handler_error`` populated
+        (Lambda invocation succeeds; no retry).
     """
 
     capability_id: str
@@ -96,6 +103,7 @@ class ChioEventBridgeConfig:
     dlq_source: str = "chio.protocol.dlq"
     dlq_detail_type: str = "ChioCapabilityDenied"
     on_sidecar_error: SidecarErrorBehaviour = "raise"
+    handler_error_strategy: HandlerErrorStrategy = "raise"
 
     def __post_init__(self) -> None:
         if not self.capability_id:
@@ -104,6 +112,8 @@ class ChioEventBridgeConfig:
             raise ChioStreamingConfigError("ChioEventBridgeConfig.tool_server must be non-empty")
         if self.on_sidecar_error not in ("raise", "deny"):
             raise ChioStreamingConfigError("on_sidecar_error must be 'raise' or 'deny'")
+        if self.handler_error_strategy not in ("raise", "return"):
+            raise ChioStreamingConfigError("handler_error_strategy must be 'raise' or 'return'")
 
 
 @dataclass
@@ -295,12 +305,19 @@ class ChioEventBridgeHandler:
                     request_id,
                     exc,
                 )
+                # EventBridge retry + target DLQ only fire when the
+                # Lambda invocation itself errors. Default strategy
+                # re-raises so the failed business logic is not
+                # silently dropped; "return" is opt-in for soft-fail.
+                if self._config.handler_error_strategy == "raise":
+                    raise
         if handler_error is None and self._config.receipt_bus is not None:
             await self._put_receipt(envelope)
         return EventBridgeProcessingOutcome(
             allowed=True,
             receipt=receipt,
             request_id=request_id,
+            acked=True,
             event=event,
             detail_type=detail_type,
             handler_error=handler_error,
@@ -337,6 +354,7 @@ class ChioEventBridgeHandler:
             allowed=False,
             receipt=receipt,
             request_id=request_id,
+            acked=True,
             event=event,
             detail_type=detail_type,
             dlq_record=record,

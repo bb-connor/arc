@@ -379,16 +379,25 @@ class ChioConsumerMiddleware:
 
         self._begin_transaction()
         handler_error: Exception | None = None
+        committed = False
         try:
-            await invoke_handler(handler, message, receipt)
-            if self._config.receipt_topic is not None:
-                self._produce_envelope(self._config.receipt_topic, envelope)
-            self._commit_transaction(message)
-            acked = True
-        except Exception as exc:
-            handler_error = exc
-            self._abort_transaction_safely()
-            acked = False
+            try:
+                await invoke_handler(handler, message, receipt)
+                if self._config.receipt_topic is not None:
+                    self._produce_envelope(self._config.receipt_topic, envelope)
+                self._commit_transaction(message)
+                committed = True
+            except Exception as exc:
+                handler_error = exc
+                self._abort_transaction_safely()
+        finally:
+            # BaseException (SystemExit, KeyboardInterrupt,
+            # CancelledError) bypasses the Exception handler above; the
+            # transaction must still be aborted so the producer is not
+            # left with an open tx that fences the next begin.
+            if not committed and handler_error is None:
+                self._abort_transaction_safely()
+        acked = committed
 
         if handler_error is not None:
             logger.warning(
@@ -427,14 +436,20 @@ class ChioConsumerMiddleware:
         )
 
         self._begin_transaction()
+        acked = False
         try:
-            self._produce_dlq(record)
-            self._commit_transaction(message)
-            acked = True
-        except Exception:
-            self._abort_transaction_safely()
-            acked = False
-            raise
+            try:
+                self._produce_dlq(record)
+                self._commit_transaction(message)
+                acked = True
+            except Exception:
+                self._abort_transaction_safely()
+                raise
+        finally:
+            # Abort on BaseException (SystemExit / CancelledError) too;
+            # a leaked open transaction fences the next begin.
+            if not acked:
+                self._abort_transaction_safely()
         return ProcessingOutcome(
             allowed=False,
             receipt=receipt,

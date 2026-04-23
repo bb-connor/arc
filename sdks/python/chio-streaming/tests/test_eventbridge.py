@@ -125,7 +125,26 @@ async def test_allow_without_receipt_bus_skips_put_events() -> None:
     h, ec = _handler(chio_client=allow_all(), config=cfg)
     outcome = await h.evaluate(_event())
     assert outcome.allowed is True
+    assert outcome.acked is True
     assert ec.calls == []
+
+
+async def test_allow_outcome_reports_acked_true() -> None:
+    # Successful evaluations must surface acked=True so broker-agnostic
+    # observability code does not misclassify Lambda completions as
+    # uncommitted.
+    h, _ec = _handler(chio_client=allow_all())
+    outcome = await h.evaluate(_event())
+    assert outcome.allowed is True
+    assert outcome.acked is True
+
+
+async def test_deny_outcome_reports_acked_true() -> None:
+    chio = deny_all("forbidden", raise_on_deny=False)
+    h, _ec = _handler(chio_client=chio)
+    outcome = await h.evaluate(_event())
+    assert outcome.allowed is False
+    assert outcome.acked is True
 
 
 @pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
@@ -143,8 +162,25 @@ async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
     assert ec.calls == []
 
 
-async def test_allow_handler_error_suppresses_receipt_publish() -> None:
+async def test_allow_handler_error_re_raises_by_default() -> None:
+    # Default handler_error_strategy="raise" so the Lambda invocation
+    # errors and EventBridge retry / target DLQ fire. A strategy that
+    # swallowed the exception would silently drop failed business work.
     h, ec = _handler(chio_client=allow_all())
+
+    def handler(_evt: Any, _r: Any) -> None:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await h.evaluate(_event(), handler=handler)
+    assert ec.calls == []
+
+
+async def test_allow_handler_error_return_strategy_surfaces_outcome() -> None:
+    # Opt-in soft-fail mode keeps the pre-0.3 behaviour: the Lambda
+    # invocation succeeds and the caller inspects outcome.handler_error.
+    cfg = _cfg(handler_error_strategy="return")
+    h, ec = _handler(chio_client=allow_all(), config=cfg)
 
     def handler(_evt: Any, _r: Any) -> None:
         raise RuntimeError("boom")
@@ -152,9 +188,6 @@ async def test_allow_handler_error_suppresses_receipt_publish() -> None:
     outcome = await h.evaluate(_event(), handler=handler)
     assert outcome.allowed is True
     assert isinstance(outcome.handler_error, RuntimeError)
-    # No receipt published on handler failure: the caller retries via
-    # Lambda's native retry (or raises themselves to trigger target
-    # DLQ).
     assert ec.calls == []
     assert outcome.lambda_response()["statusCode"] == 500
 

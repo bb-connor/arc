@@ -357,6 +357,26 @@ async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
         await mw.poll_and_process(handler)
 
 
+@pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
+async def test_handler_shutdown_signal_aborts_open_transaction(shutdown_exc: type) -> None:
+    # BaseException subclasses bypass the `except Exception` catch in
+    # _handle_allow; the transaction must still be aborted in a finally
+    # or the producer stays fenced on the next begin_transaction.
+    chio = allow_all()
+    mw, consumer, producer = _build_middleware(chio_client=chio)
+    consumer.enqueue(_fake_message(offset=91))
+
+    def handler(_msg: Any, _receipt: Any) -> None:
+        raise shutdown_exc()
+
+    with pytest.raises(shutdown_exc):
+        await mw.poll_and_process(handler)
+
+    assert producer.transactions_begun == 1
+    assert producer.transactions_committed == 0
+    assert producer.transactions_aborted == 1
+
+
 # ---------------------------------------------------------------------------
 # Deny path
 # ---------------------------------------------------------------------------

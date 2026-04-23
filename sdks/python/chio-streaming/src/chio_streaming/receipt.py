@@ -20,12 +20,14 @@ bumps only happen on breaking wire changes.
 from __future__ import annotations
 
 import json
-import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from chio_sdk.models import ChioReceipt
 
+# Re-exported at module level; defined in core.py so every broker
+# middleware can call it without importing through receipt.py.
+from chio_streaming.core import new_request_id
 from chio_streaming.errors import ChioStreamingConfigError
 
 #: Envelope schema version. Bump on any breaking change to the wire
@@ -145,16 +147,6 @@ def build_envelope(
         request_id=request_id,
         receipt_id=receipt.id,
     )
-
-
-def new_request_id() -> str:
-    """Generate a fresh request id for an inbound event.
-
-    Kafka messages do not carry an Chio request id natively. The
-    middleware synthesises one per consumed record so the resulting
-    receipt can be keyed consistently into the receipt topic.
-    """
-    return f"chio-evt-{uuid.uuid4().hex}"
 
 
 __all__ = [
