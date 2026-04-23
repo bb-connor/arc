@@ -601,3 +601,24 @@ async def test_receipt_envelope_matches_build_envelope() -> None:
         source_topic="tasks:research",
     )
     assert pub.published[0]["data"] == expected.value
+
+
+async def test_request_id_is_deterministic_on_redelivery() -> None:
+    # Pub/Sub redelivers the same message_id after a failed ack. The
+    # middleware must produce the same request_id both times so the
+    # receipt stream stays deduplicable on request_id and sidecar
+    # evaluations produce byte-identical receipts.
+    mw, _pub = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    first = await mw.dispatch(
+        FakePubSubMessage(message_id="mid-stable-42", attributes={"subject": "t"}),
+        handler,
+    )
+    second = await mw.dispatch(
+        FakePubSubMessage(message_id="mid-stable-42", attributes={"subject": "t"}),
+        handler,
+    )
+    assert first.request_id == second.request_id == "chio-pubsub-mid-stable-42"

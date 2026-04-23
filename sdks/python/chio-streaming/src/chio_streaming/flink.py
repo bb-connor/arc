@@ -78,12 +78,6 @@ RECEIPT_TAG_NAME = "chio-receipt"
 #: Name of the side output tag carrying canonical DLQ envelopes.
 DLQ_TAG_NAME = "chio-dlq"
 
-# Upper bound (seconds) for the running-loop branch in
-# ChioAsyncEvaluateFunction.close() to await shutdown. PyFlink's Function
-# close contract is synchronous, so we cannot block indefinitely.
-_CLOSE_SHUTDOWN_TIMEOUT_SECONDS = 5.0
-
-
 # PyFlink is an optional dependency. Import the symbols we subclass or
 # construct at module import time when available; otherwise define
 # placeholders so the module still imports. The real operators guard
@@ -330,16 +324,6 @@ class EvaluationResult:
     dlq_bytes: bytes | None = None
 
 
-def _default_subject_extractor(_element: Any, _ctx: Any | None) -> str:
-    """Return empty so :func:`resolve_scope` fails closed.
-
-    PyFlink ``ProcessFunction.Context`` / ``AsyncFunction`` do not expose
-    a topic, so there is no sensible generic default. Users must supply
-    :attr:`ChioFlinkConfig.subject_extractor`.
-    """
-    return ""
-
-
 def _canonical_body_bytes(element: Any) -> bytes:
     """Coerce an arbitrary element to stable bytes for ``hash_body``."""
     if isinstance(element, bytes | bytearray):
@@ -477,10 +461,9 @@ class _ChioFlinkEvaluator:
         self._dlq_router = None
 
     def _subject_for(self, element: Any, ctx: Any | None) -> str:
-        extractor = self._config.subject_extractor
-        if extractor is not None:
-            return str(extractor(element))
-        return _default_subject_extractor(element, ctx)
+        # subject_extractor is required by __post_init__; the call site
+        # cannot be reached with extractor=None.
+        return str(self._config.subject_extractor(element))  # type: ignore[misc]
 
     def _parameters_for(
         self,
@@ -555,18 +538,6 @@ class _ChioFlinkEvaluator:
                 guard="chio-streaming-sidecar",
             )
 
-        receipt_bytes: bytes | None = None
-        if self._config.receipt_topic is not None:
-            # source_topic is the origin of the event (matching pulsar /
-            # pubsub semantics); receipt_topic is a sink target and must
-            # not leak into the envelope payload.
-            envelope = build_envelope(
-                request_id=request_id,
-                receipt=receipt,
-                source_topic=subject,
-            )
-            receipt_bytes = envelope.value
-
         if receipt.is_denied:
             _bump(self._metrics, "deny_total")
             dlq_record = self._dlq_router.build_record(  # type: ignore[union-attr]
@@ -578,6 +549,11 @@ class _ChioFlinkEvaluator:
                 request_id=request_id,
                 receipt=receipt,
             )
+            # Match every other broker: the receipt envelope is an
+            # allow-path signal. The DLQ record carries the deny receipt
+            # inside its payload for audit; emitting a separate deny
+            # receipt to the allow stream would break the "single
+            # receipt consumer" wire-compat guarantee.
             return FlinkProcessingOutcome(
                 allowed=False,
                 receipt=receipt,
@@ -585,10 +561,21 @@ class _ChioFlinkEvaluator:
                 element=element,
                 subtask_index=self._subtask,
                 attempt_number=self._attempt,
-                receipt_bytes=receipt_bytes,
                 dlq_bytes=dlq_record.value,
                 dlq_record=dlq_record,
             )
+
+        receipt_bytes: bytes | None = None
+        if self._config.receipt_topic is not None:
+            # source_topic is the origin of the event (matching pulsar /
+            # pubsub semantics); receipt_topic is a sink target and must
+            # not leak into the envelope payload.
+            envelope = build_envelope(
+                request_id=request_id,
+                receipt=receipt,
+                source_topic=subject,
+            )
+            receipt_bytes = envelope.value
 
         _bump(self._metrics, "allow_total")
         return FlinkProcessingOutcome(
@@ -680,26 +667,24 @@ class ChioAsyncEvaluateFunction(_AsyncFunctionBase):
     def close(self) -> None:
         # Production PyFlink drives close() from the worker thread with
         # no running loop, so the one-shot loop below is the common path.
-        # The running-loop branch covers in-process test harnesses; we
-        # block up to CLOSE_SHUTDOWN_TIMEOUT_SECONDS so the HTTP client
-        # pool is actually closed rather than leaked.
+        # If close() is reached from inside a running loop (typically an
+        # in-process test harness that forgot to dispatch close to a
+        # worker thread), a sync blocking wait on the same thread would
+        # deadlock the loop. Schedule a best-effort shutdown task and
+        # warn; callers that need deterministic cleanup must invoke
+        # close() from a non-loop thread (e.g. `loop.run_in_executor`).
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
             running = None
         if running is not None:
-            future = asyncio.run_coroutine_threadsafe(
-                self._evaluator.shutdown(), running
+            running.create_task(self._evaluator.shutdown())
+            logger.warning(
+                "chio-flink: close() called from inside a running event "
+                "loop; scheduled shutdown as a fire-and-forget task. "
+                "Call close() from a worker thread for deterministic "
+                "cleanup."
             )
-            try:
-                future.result(timeout=_CLOSE_SHUTDOWN_TIMEOUT_SECONDS)
-            except Exception as exc:  # pragma: no cover - best effort
-                logger.warning(
-                    "chio-flink: async close() shutdown did not complete "
-                    "within %.1fs: %s",
-                    _CLOSE_SHUTDOWN_TIMEOUT_SECONDS,
-                    exc,
-                )
             return
         loop = asyncio.new_event_loop()
         try:

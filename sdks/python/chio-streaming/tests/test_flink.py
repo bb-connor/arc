@@ -476,16 +476,23 @@ def test_sync_allow_without_receipt_topic_skips_receipt() -> None:
     assert dlq == []
 
 
-def test_sync_deny_yields_receipt_and_dlq_no_main() -> None:
+def test_sync_deny_yields_dlq_only_no_receipt_or_main() -> None:
+    # Deny emits only the DLQ record. The deny receipt is embedded in
+    # the DLQ payload; emitting a separate deny envelope to the receipt
+    # topic would break the "single receipt consumer across all
+    # brokers" guarantee (every other broker skips the receipt topic on
+    # deny).
     chio = deny_all("missing scope", guard="scope-guard", raise_on_deny=False)
     config = _base_config(chio_client=chio)
     main, receipts, dlq, _ = _run_sync(config, {"id": 3})
     assert main == []
-    assert len(receipts) == 1
+    assert receipts == []
     assert len(dlq) == 1
     payload = json.loads(dlq[0].decode("utf-8"))
     assert payload["verdict"] == "deny"
     assert payload["reason"] == "missing scope"
+    # The deny receipt rides inside the DLQ payload for audit.
+    assert payload["receipt"]["decision"]["verdict"] == "deny"
 
 
 @pytest.mark.parametrize(
@@ -506,7 +513,9 @@ def test_sync_sidecar_error_routing(on_error: str, expect_raise: bool) -> None:
 
     main, receipts, dlq, rc = _run_sync(config, {"id": 5})
     assert main == []
-    assert len(receipts) == 1
+    # Deny path does not publish to the receipt topic; the synthesised
+    # deny receipt rides inside the DLQ payload for audit.
+    assert receipts == []
     assert len(dlq) == 1
 
     dlq_payload = json.loads(dlq[0].decode("utf-8"))
@@ -514,13 +523,6 @@ def test_sync_sidecar_error_routing(on_error: str, expect_raise: bool) -> None:
     assert dlq_payload["receipt"]["metadata"]["chio_streaming_synthetic_marker"] == (
         SYNTHETIC_RECEIPT_MARKER
     )
-
-    # SYNTHETIC_RECEIPT_MARKER must live on the separate receipt envelope
-    # as well, not just the DLQ payload; verifiers reject structurally.
-    receipt_payload = json.loads(receipts[0].decode("utf-8"))
-    assert receipt_payload["receipt"]["metadata"][
-        "chio_streaming_synthetic_marker"
-    ] == SYNTHETIC_RECEIPT_MARKER
     assert rc.metrics.counters["sidecar_errors_total"].count == 1
     assert rc.metrics.counters["deny_total"].count == 1
 
@@ -738,7 +740,8 @@ async def test_evaluator_outcome_populates_subtask_attempt_and_dlq_record() -> N
     assert outcome.subtask_index == 3
     assert outcome.attempt_number == 2
     assert outcome.element == {"id": 7}
-    assert outcome.receipt_bytes is not None
+    # Deny emits only the DLQ record; no allow-path receipt envelope.
+    assert outcome.receipt_bytes is None
     assert outcome.dlq_bytes is not None
     assert outcome.dlq_record is not None
     assert outcome.dlq_record.value == outcome.dlq_bytes
@@ -778,16 +781,20 @@ async def test_async_allow_returns_evaluation_result() -> None:
     assert result.dlq_bytes is None
 
 
-async def test_async_deny_returns_dlq_bytes() -> None:
+async def test_async_deny_returns_dlq_bytes_only() -> None:
     chio = deny_all("blocked", guard="scope-guard", raise_on_deny=False)
     config = _base_config(chio_client=chio)
     results, _, _ = await _run_async(config, {"id": 13})
     result = results[0]
     assert result.allowed is False
-    assert result.receipt_bytes is not None
+    # Deny emits only the DLQ bytes; the receipt_bytes side output is
+    # reserved for allow-path envelopes to match cross-broker wire
+    # semantics.
+    assert result.receipt_bytes is None
     assert result.dlq_bytes is not None
     payload = json.loads(result.dlq_bytes.decode("utf-8"))
     assert payload["verdict"] == "deny"
+    assert payload["receipt"]["decision"]["verdict"] == "deny"
 
 
 @pytest.mark.parametrize(
@@ -809,16 +816,12 @@ async def test_async_sidecar_error_routing(
         results = await fn.async_invoke({"id": 14})
         result = results[0]
         assert result.allowed is False
-        assert result.receipt_bytes is not None
+        # Deny path does not emit receipt_bytes; the synthesised deny
+        # receipt rides inside the DLQ payload.
+        assert result.receipt_bytes is None
         assert result.dlq_bytes is not None
 
-        # Marker must appear on both the receipt envelope and the DLQ
-        # payload so downstream verifiers reject structurally.
-        receipt_payload = json.loads(result.receipt_bytes.decode("utf-8"))
         dlq_payload = json.loads(result.dlq_bytes.decode("utf-8"))
-        assert receipt_payload["receipt"]["metadata"][
-            "chio_streaming_synthetic_marker"
-        ] == SYNTHETIC_RECEIPT_MARKER
         assert dlq_payload["receipt"]["metadata"][
             "chio_streaming_synthetic_marker"
         ] == SYNTHETIC_RECEIPT_MARKER
@@ -827,10 +830,11 @@ async def test_async_sidecar_error_routing(
         await loop.run_in_executor(None, fn.close)
 
 
-async def test_async_close_inside_running_loop_awaits_shutdown() -> None:
-    # Exercises the running-loop branch of ChioAsyncEvaluateFunction.close():
-    # the scheduled shutdown must actually complete (via run_coroutine_threadsafe
-    # + future.result) so the ChioClient pool is closed, not leaked.
+async def test_async_close_from_worker_thread_shuts_down_client() -> None:
+    # close() is synchronous; calling it from the loop's thread would
+    # leave shutdown as fire-and-forget (with a warning log). Production
+    # PyFlink drives close() from a worker thread, exercising the
+    # one-shot-loop path where we can actually await shutdown.
     spy = SpyClosableChio()
     config = ChioFlinkConfig(
         capability_id="cap",
@@ -845,12 +849,44 @@ async def test_async_close_inside_running_loop_awaits_shutdown() -> None:
     fn = ChioAsyncEvaluateFunction(config)
     fn.open(MockRuntimeContext())
     await fn.async_invoke({"id": 99})
-    # close() is a synchronous method; the running-loop branch uses
-    # run_coroutine_threadsafe. Call it from a worker thread so the
-    # main event loop is able to drive the scheduled coroutine.
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, fn.close)
     assert spy.close_calls == 1
+
+
+async def test_async_close_from_loop_thread_does_not_deadlock(
+    caplog: Any,
+) -> None:
+    # Defensive: close() from the same thread as a running loop cannot
+    # block on a loop-scheduled coroutine without deadlock. Schedule as
+    # fire-and-forget and log a warning; callers that need deterministic
+    # cleanup must dispatch close to a worker thread.
+    import logging
+
+    spy = SpyClosableChio()
+    config = ChioFlinkConfig(
+        capability_id="cap",
+        tool_server="flink://prod",
+        client_factory=lambda: spy,
+        dlq_router_factory=_dlq_router_factory,
+        scope_map={"orders": "events:consume:orders"},
+        receipt_topic="chio-receipts",
+        max_in_flight=4,
+        subject_extractor=lambda _e: "orders",
+    )
+    fn = ChioAsyncEvaluateFunction(config)
+    fn.open(MockRuntimeContext())
+    await fn.async_invoke({"id": 100})
+    with caplog.at_level(logging.WARNING, logger="chio_streaming.flink"):
+        fn.close()
+    assert any(
+        "close() called from inside a running event loop" in record.message
+        for record in caplog.records
+    )
+    # Drain the scheduled task so the event loop closes cleanly after
+    # the test (pytest-asyncio complains about pending tasks otherwise).
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
 
 
 async def test_async_receipt_bytes_match_build_envelope_exactly() -> None:
@@ -995,20 +1031,16 @@ def test_sync_dlq_bytes_match_dlq_router_build_record() -> None:
     assert dlq[0] == rebuilt.value
 
 
-def test_sync_deny_receipt_bytes_match_build_envelope_exactly() -> None:
+def test_sync_deny_emits_no_receipt_envelope() -> None:
+    # Complements the DLQ-byte-parity test: the allow-path receipt
+    # stream must stay deny-free so a single consumer works across all
+    # brokers. The deny receipt lives inside the DLQ payload.
     chio = deny_all("denied", guard="g", raise_on_deny=False)
     config = _base_config(chio_client=chio)
-    _, receipts, _, _ = _run_sync(config, {"id": 21})
-    envelope_payload = json.loads(receipts[0].decode("utf-8"))
-    from chio_sdk.models import ChioReceipt
-
-    receipt = ChioReceipt.model_validate(envelope_payload["receipt"])
-    expected = build_envelope(
-        request_id=envelope_payload["request_id"],
-        receipt=receipt,
-        source_topic="orders",
-    )
-    assert receipts[0] == expected.value
+    _, receipts, dlq, _ = _run_sync(config, {"id": 21})
+    assert receipts == []
+    dlq_payload = json.loads(dlq[0].decode("utf-8"))
+    assert dlq_payload["receipt"]["decision"]["verdict"] == "deny"
 
 
 # ---------------------------------------------------------------------------
