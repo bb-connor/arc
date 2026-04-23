@@ -73,9 +73,11 @@ can you prove it?
 
 This is not a pitch deck for vaporware. Chio is a shipped and tested protocol
 implementation with real runtime governance surfaces, signed receipts, and a
-substantial formal-methods track, but it is not yet honest to describe the
-entire system as fully formally verified or qualification-complete. Here is
-what exists today:
+substantial implementation-linked formal-methods track. The formal claim is
+precise: Chio's security-critical protocol semantics are mechanically checked
+subject to published audited assumptions, while platform and external-service
+behavior stays inside the explicit trusted boundary. Here is what exists
+today:
 
 ### Kernel as Trusted Computing Base
 
@@ -101,13 +103,18 @@ The guard pipeline runs in sequence. If any guard denies, the pipeline denies. E
 
 Guards are composable. Operators configure them through HushSpec policy files.
 The pipeline is fail-closed by design. Core capability properties have formal
-support in the Lean track, while end-to-end runtime closure is still defended
-through executed qualification lanes rather than a claim of full implementation
-proof.
+support in the Lean track, the pure Rust decision core is the implementation
+linkage target, and side-effecting runtime closure is defended through executed
+qualification lanes plus audited assumptions.
 
 ### Cascade Revocation Through Delegation Chains
 
-Revoking a capability token revokes every token delegated from it. This is not a best-effort propagation. It is a structural property of the delegation chain: the kernel checks every ancestor link on every invocation. Revoke the root, and the entire tree dies. This is proven in Lean 4 (P2: Revocation Completeness).
+Revoking a capability token revokes every token delegated from it on the
+supported runtime path. This is not a best-effort propagation. It is a
+structural property of the delegation chain: the kernel checks ancestor links
+on invocation and fails closed when revocation state invalidates the chain.
+This is a runtime-qualified property, not a current theorem-prover claim over
+the full Rust revocation-store path.
 
 ### Subject-Bound Tokens
 
@@ -122,24 +129,57 @@ Receipts are not flat. Nested operations -- an agent calling a tool that calls a
 
 ### Per-Grant Budgets with Constraint Narrowing
 
-Every grant in a capability token can carry invocation limits and parameter constraints. Delegation can tighten these constraints but never loosen them. An agent authorized to read files in `/data/reports` cannot delegate access to `/data/`. An agent with a 10-invocation budget cannot delegate a 20-invocation budget. Monotonic attenuation is enforced at the protocol level and proven in Lean 4 (P1: Capability Monotonicity).
+Every grant in a capability token can carry invocation limits and parameter
+constraints. Delegation can tighten these constraints but never loosen them. An
+agent authorized to read files in `/data/reports` cannot delegate access to
+`/data/`. An agent with a 10-invocation budget cannot delegate a 20-invocation
+budget. Monotonic attenuation is supported by bounded Lean mechanization over
+the current verified-core model plus executable differential tests. Budget
+mutation now has a bounded model for the precheck/commit decision, while
+settlement-side state transitions remain assumption-bound outside the pure
+protocol core.
 
-### Lean 4 Machine-Checked Proofs
+### Formal Evidence Boundary
 
-Five core safety properties have substantive Lean 4 mechanization behind them,
-not just whitepaper prose:
+Chio has an implementation-linked formal evidence boundary. The
+machine-readable boundary is `formal/proof-manifest.toml`, audited external
+contracts live in `formal/assumptions.toml`, theorem coverage lives in
+`formal/theorem-inventory.json`, and public claim rules live in
+`docs/reference/CLAIM_REGISTRY.md`.
 
-- **P1: Capability Monotonicity** -- delegation can only attenuate, never amplify
-- **P2: Revocation Completeness** -- revoking an ancestor invalidates all descendants
-- **P3: Fail-Closed Guarantee** -- every evaluation path produces allow or deny, never an unhandled error
-- **P4: Receipt Chain Integrity** -- every action produces a signed, verifiable receipt
-- **P5: Delegation Graph Acyclicity** -- delegation chains cannot form cycles
+The current formal evidence supports:
 
-The current Lean track models these properties with standard axiomatization of
-cryptographic primitives, but Chio does not currently claim that the full Rust
-runtime is end-to-end formally verified. The Monotonicity proof still has one
-outstanding `sorry` for BEq transitivity, and the repo treats the Lean lane as
-meaningful but narrower than the full shipped implementation surface.
+- **P1 capability attenuation**: Lean mechanization over the verified-core
+  model plus executable differential tests.
+- **P2 revocation denial**: Lean proofs that revoked tokens and
+  revoked presented ancestors cannot pass the pure revocation/evaluation
+  model.
+- **P3 fail-closed evaluation**: Lean proofs that the pure evaluator and
+  adjacent admission models deny invalid signatures, invalid time windows,
+  revoked capabilities, revoked ancestors, out-of-scope requests, invalid DPoP,
+  invalid session anchors, exhausted budgets, and missing approvals.
+- **P4 receipt and checkpoint properties**: symbolic Lean proofs and runtime
+  receipt-signing tests. This is not a proof of the concrete Ed25519 or
+  SHA-256 implementations.
+- **P5 presented delegation-chain structure**: bounded model theorems for
+  presented chains, not a proof of every runtime graph or store behavior.
+- **P6 local parent-link soundness**: observed parent edges require a parent
+  request in the same authenticated session.
+- **P7 receipt-lineage soundness**: verified lineage requires verifying both
+  receipts, trusted kernel signature, and signed linkage.
+- **P8 session continuity soundness**: verified continuity requires a valid
+  session anchor and continuation artifact.
+- **P9 delegation/provenance consistency**: verified call chains require
+  consistent subjects and parent capability references.
+- **P10 report truthfulness**: reports and exports cannot upgrade asserted or
+  observed evidence into verified evidence.
+
+The current release does not claim first-principles proofs of crypto
+libraries, OS clocks, TLS, SQLite, subprocess isolation, hosted registries,
+external chains, clustering, or settlement. Those surfaces are defended through
+audited assumptions, Rust tests, conformance tests, smoke tests, release
+qualification, and the strict Rust verification lanes declared for
+Creusot/Kani.
 
 ### HA Distributed Control Plane
 
@@ -245,10 +285,10 @@ implementation plan.
 | **Capability delegation** | Attenuated, time-bounded, chain-tracked | None | None | None | None | None | None |
 | **Budget/spending controls** | Per-grant, constraint-narrowing | None | None | None | Payment only | Payment only | None |
 | **Signed receipts** | Every outcome, signed and append-only | None | None | None | Payment receipt | Payment receipt | None |
-| **Cascade revocation** | Delegation-chain-aware, formally proven | None | None | None | None | None | None |
+| **Cascade revocation** | Delegation-chain-aware, runtime-qualified | None | None | None | None | None | None |
 | **Cross-org trust** | Delegated capability chains with subject binding | OAuth-based | None | Directory-based | None | None | Proposed |
-| **Formal verification** | Lean 4 proofs (P1-P5) | None | None | None | None | None | None |
-| **Fail-closed guarantee** | Proven total (P3) | Implementation-dependent | No enforcement layer | Implementation-dependent | N/A | N/A | Proposed |
+| **Formal verification** | Implementation-linked P1-P10 core with audited assumptions | None | None | None | None | None | None |
+| **Fail-closed guarantee** | Runtime-tested and fail-closed by design | Implementation-dependent | No enforcement layer | Implementation-dependent | N/A | N/A | Proposed |
 | **Guard pipeline** | 7 composable guards with evidence capture | N/A | N/A | N/A | N/A | N/A | N/A |
 | **MCP compatibility** | Full wrap-and-run migration | N/A | Native | N/A | N/A | N/A | N/A |
 

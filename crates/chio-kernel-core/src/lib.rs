@@ -54,6 +54,8 @@ extern crate alloc;
 pub mod capability_verify;
 pub mod clock;
 pub mod evaluate;
+pub(crate) mod formal_aeneas;
+pub(crate) mod formal_core;
 pub mod guard;
 pub mod normalized;
 pub mod passport_verify;
@@ -78,6 +80,12 @@ pub use passport_verify::{
 pub use receipts::{sign_receipt, ReceiptSigningError};
 pub use rng::{NullRng, Rng};
 pub use scope::{MatchedGrant, ScopeMatchError};
+
+#[cfg(kani)]
+mod kani_harnesses;
+
+#[cfg(kani)]
+mod kani_public_harnesses;
 
 /// Three-valued outcome of a kernel evaluation step.
 ///

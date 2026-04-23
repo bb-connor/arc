@@ -89,6 +89,19 @@ impl Guard for DenyGuard {
     }
 }
 
+struct ErrorGuard;
+
+impl Guard for ErrorGuard {
+    fn name(&self) -> &str {
+        "error-all"
+    }
+    fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<Verdict, KernelCoreError> {
+        Err(KernelCoreError::ConstraintError {
+            reason: "guard failed internally".to_string(),
+        })
+    }
+}
+
 #[test]
 fn evaluate_allow_path() {
     let subject = Keypair::generate();
@@ -137,6 +150,32 @@ fn evaluate_deny_on_guard() {
     assert!(verdict.is_deny());
     let reason = verdict.reason.unwrap();
     assert!(reason.contains("deny-all"), "reason was: {reason}");
+}
+
+#[test]
+fn evaluate_deny_on_guard_error() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let request = make_request(&subject);
+    let clock = FixedClock::new(ISSUED_AT + 1);
+    let trusted = [issuer.public_key()];
+    let error_guard = ErrorGuard;
+    let guards: Vec<&dyn Guard> = vec![&error_guard];
+
+    let verdict = evaluate(EvaluateInput {
+        request: &request,
+        capability: &capability,
+        trusted_issuers: &trusted,
+        clock: &clock,
+        guards: &guards,
+        session_filesystem_roots: None,
+    });
+
+    assert!(verdict.is_deny());
+    let reason = verdict.reason.unwrap();
+    assert!(reason.contains("fail-closed"), "reason was: {reason}");
+    assert!(reason.contains("error-all"), "reason was: {reason}");
 }
 
 #[test]
@@ -352,6 +391,63 @@ fn resolve_matching_grants_fails_closed_when_target_match_has_unsupported_constr
 }
 
 #[test]
+fn resolve_matching_grants_ignores_unsupported_constraints_on_unrelated_grants() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-1".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope {
+                grants: vec![
+                    ToolGrant {
+                        server_id: "srv-b".to_string(),
+                        tool_name: "echo".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![Constraint::MinimumRuntimeAssurance(
+                            chio_core_types::capability::RuntimeAssuranceTier::Attested,
+                        )],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    },
+                    ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "echo".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    },
+                ],
+                resource_grants: vec![],
+                prompt_grants: vec![],
+            },
+            issued_at: ISSUED_AT,
+            expires_at: EXPIRES_AT,
+            delegation_chain: vec![],
+        },
+        &issuer,
+    )
+    .unwrap();
+
+    let matches = chio_kernel_core::scope::resolve_matching_grants(
+        &capability.scope,
+        "echo",
+        "srv-a",
+        &serde_json::json!({"msg": "hello"}),
+    )
+    .expect("unrelated unsupported constraints must not block authorized matches");
+
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].grant.server_id, "srv-a");
+}
+
+#[test]
 fn evaluate_expired_capability() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -436,6 +532,73 @@ fn sign_receipt_with_backend() {
 
     let receipt = sign_receipt(body, &backend).unwrap();
     assert!(receipt.verify_signature().unwrap());
+}
+
+#[test]
+fn sign_receipt_preserves_signed_body_fields() {
+    let keypair = Keypair::generate();
+    let backend = chio_core_types::crypto::Ed25519Backend::new(keypair.clone());
+
+    let body = ChioReceiptBody {
+        id: "rcpt-preserve-1".to_string(),
+        timestamp: ISSUED_AT,
+        capability_id: "cap-preserve-1".to_string(),
+        tool_server: "srv-a".to_string(),
+        tool_name: "echo".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({"msg": "hi"})).unwrap(),
+        decision: Decision::Deny {
+            reason: "blocked".to_string(),
+            guard: "test-guard".to_string(),
+        },
+        content_hash: "3".repeat(64),
+        policy_hash: "4".repeat(64),
+        evidence: vec![],
+        metadata: None,
+        trust_level: TrustLevel::Mediated,
+        tenant_id: Some("tenant-a".to_string()),
+        kernel_key: keypair.public_key(),
+    };
+
+    let receipt = sign_receipt(body.clone(), &backend).unwrap();
+
+    assert!(receipt.verify_signature().unwrap());
+    assert_eq!(receipt.body().id, body.id);
+    assert_eq!(receipt.body().capability_id, body.capability_id);
+    assert_eq!(receipt.body().tool_server, body.tool_server);
+    assert_eq!(receipt.body().tool_name, body.tool_name);
+    assert_eq!(receipt.body().decision, body.decision);
+    assert_eq!(receipt.body().policy_hash, body.policy_hash);
+    assert_eq!(receipt.body().tenant_id, body.tenant_id);
+}
+
+#[test]
+fn sign_receipt_rejects_kernel_key_mismatch() {
+    let keypair = Keypair::generate();
+    let other_keypair = Keypair::generate();
+    let backend = chio_core_types::crypto::Ed25519Backend::new(keypair);
+
+    let body = ChioReceiptBody {
+        id: "rcpt-mismatch-1".to_string(),
+        timestamp: ISSUED_AT,
+        capability_id: "cap-mismatch-1".to_string(),
+        tool_server: "srv-a".to_string(),
+        tool_name: "echo".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({"msg": "hi"})).unwrap(),
+        decision: Decision::Allow,
+        content_hash: "5".repeat(64),
+        policy_hash: "6".repeat(64),
+        evidence: vec![],
+        metadata: None,
+        trust_level: TrustLevel::Mediated,
+        tenant_id: None,
+        kernel_key: other_keypair.public_key(),
+    };
+
+    let error = sign_receipt(body, &backend).unwrap_err();
+    assert_eq!(
+        error,
+        chio_kernel_core::ReceiptSigningError::KernelKeyMismatch
+    );
 }
 
 #[test]

@@ -6,7 +6,18 @@ cd "$(dirname "$0")/.."
 ./scripts/check-release-inputs.sh
 ./scripts/check-workspace-layering.sh
 ./scripts/check-formal-proofs.sh
+./scripts/check-aeneas-pilot.sh
+./scripts/check-aeneas-production.sh
+./scripts/check-aeneas-equivalence.sh
+./scripts/check-rust-verification-gates.sh
+./scripts/check-adapter-no-bypass.sh
 ./scripts/check-portable-kernel.sh
+if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
+  echo "Skipping proof report generation because Rust verification is in metadata-only mode"
+else
+  ./scripts/generate-proof-report.sh
+  ./scripts/check-proof-report.sh
+fi
 cargo fmt --all -- --check
 # Keep the CI warning gate focused on repo-shipping targets; test/bench-only
 # lint backlogs are exercised by `cargo test` and can be migrated separately.

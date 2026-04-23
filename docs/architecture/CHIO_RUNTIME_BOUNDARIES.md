@@ -28,11 +28,12 @@ quietly collapse back into monolithic shells.
   the main kernel flow so policy and dispatch changes do not hide low-level
   security drift.
 
-## Verified Core Boundary
+## Implementation-Linked Verified Core Boundary
 
-The current bounded verified-core contract is defined machine-readably in
-`formal/proof-manifest.toml`. It is intentionally narrower than the full Chio
-runtime and names exactly which pure symbols can participate in the current
+The current implementation-linked verified-core contract is defined
+machine-readably in `formal/proof-manifest.toml`. It names the pure Rust
+symbols, root-imported Lean modules, P1-P10 theorem coverage, audited external
+assumptions, and Rust verification lanes that participate in the current
 formal-evidence story.
 
 ### Covered Pure Core
@@ -51,19 +52,24 @@ formal-evidence story.
 | `chio_kernel::ChioKernel::evaluate_portable_verdict` | direct delegation into `chio_kernel_core::evaluate` with trusted issuer and portable guard wiring |
 | `chio_kernel::ChioKernel::build_and_sign_receipt` | direct delegation into `chio_kernel_core::sign_receipt` after the shell has assembled the receipt body |
 
-### Explicit Exclusions
+### Audited Assumptions And Exclusions
 
-The current verified-core boundary does **not** cover:
+The current verified-core boundary proves Chio's own pure protocol decisions
+and treats these concrete effects as audited assumptions rather than
+first-principles theorems:
 
-- revocation-store lookups or receipt-store lineage joins
-- budget mutation, payment authorization, or any metering state transition
-- DPoP verification, nonce replay caches, or hosted/session transport admission
-- governed transaction policy, approval-token flow, or runtime-attestation enforcement
-- tool dispatch, subprocess effects, network effects, or remote MCP orchestration
-- receipt persistence, checkpoint publication, trust-control clustering, or settlement rails
+- concrete Ed25519, SHA-256, canonical JSON, TLS, OS clock, SQLite, chain, and
+  hosted-registry implementations
+- async scheduling, network delivery, subprocess effects, and tool-server
+  behavior after the verified decision core allows a call
+- cluster consensus, external settlement rails, and third-party registry
+  availability beyond fail-closed Chio handling
+- Aeneas extraction from production `chio-kernel-core` modules until the pilot
+  promotion criteria pass
 
-Those surfaces stay in the operational shell until a later formal phase names a
-smaller normalized model and a corresponding refinement story.
+Those assumptions are published in `formal/assumptions.toml`. Creusot/Kani
+strict lanes are declared in `formal/rust-verification`, and the active Aeneas
+pilot lives in `formal/aeneas`.
 
 ## Regression Guard
 

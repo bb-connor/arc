@@ -1,6 +1,0 @@
-Research MERCURY from the technical architecture and trust-model angle. Read the current docs in docs/mercury as needed. Critique the proof model, publication semantics, verifier model, artifact retention, chronology and causality, and operational design. Focus on whether Proof Package v1 and Publication Profile v1 are sufficient and what could break credibility in production. Use current external research where helpful. Output markdown with sections exactly:
-1. Top 5 Insights
-2. Top 3 Risks
-3. Top 3 Stronger Technical Ideas
-4. Concrete Doc or Roadmap Changes
-5. Sources

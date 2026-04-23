@@ -115,7 +115,7 @@ canonical example links back to the supported web-backend flow.
 - Install options: [docs/install/README.md](docs/install/README.md)
 - Progressive tutorial: [docs/PROGRESSIVE_TUTORIAL.md](docs/PROGRESSIVE_TUTORIAL.md)
 - Protocol specification: [spec/PROTOCOL.md](spec/PROTOCOL.md)
-- Formal boundary and claims: [docs/CLAIM_REGISTRY.md](docs/CLAIM_REGISTRY.md)
+- Formal boundary and claims: [docs/reference/CLAIM_REGISTRY.md](docs/reference/CLAIM_REGISTRY.md)
 - Release and operations docs: [docs/release/](docs/release/)
 
 ## License

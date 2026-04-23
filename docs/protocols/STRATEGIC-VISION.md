@@ -214,11 +214,11 @@ the multi-surface story holds under real operator workloads.
 
 | Area | Chio position | Status / caveat |
 |------|--------------|-----------------|
-| **Capability tokens** | Attenuated, time-bounded, subject-bound, revocable, formally verified (Lean 4 P1) | Shipped in the core model |
+| **Capability tokens** | Attenuated, time-bounded, subject-bound, revocable, with bounded Lean support for attenuation | Shipped in the core model |
 | **Guard evidence** | Composable fail-closed guards with signed evidence capture | Shipped; advanced stateful guards remain planned |
 | **Receipt signing** | Kernel-signed receipts on shipped MCP, A2A, ACP live-path, OpenAI, and HTTP/API substrate flows | Shipped on current live paths; generic orchestration remains future |
 | **Merkle commitment** | Append-only receipt log with checkpoint publication | Shipped in the receipt architecture |
-| **Formal verification** | Capability monotonicity and cascade revocation proofs in Lean 4 | Real but scoped to specific subsystems |
+| **Formal verification** | Bounded verified-core model, claim registry, and runtime qualification outside that boundary | Real but not full theorem-prover coverage |
 | **Economic primitives** | Budgets, settlement hooks, and insurance-linked framing in the security path | Mixed: some pieces shipped, broader market story is a strategic bet |
 | **Cross-protocol lineage** | One evidence model spanning MCP, A2A, ACP, HTTP/API substrates, and future native surfaces | Shipped evidence model on current live paths; generic orchestrator and larger-scale operator proof still needed |
 
@@ -340,7 +340,10 @@ When Agent A delegates a capability to Agent B, the delegated token is a
 provable subset of the parent token. Delegation can narrow scope, reduce
 invocation limits, shorten time windows, and tighten parameter constraints.
 Delegation cannot amplify. This is not a convention. It is a structural
-property proven in Lean 4 (P1: Capability Monotonicity).
+property with bounded Lean mechanization and executable differential tests for
+the current verified-core model. It is not a claim that every production
+delegation, budget, revocation-store, or transport path is theorem-prover
+complete.
 
 Sub-agent tokens carry their full ancestry. Any verifier can walk the
 delegation chain and confirm that every hop only narrowed authority.

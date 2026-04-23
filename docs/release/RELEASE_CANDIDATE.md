@@ -488,7 +488,8 @@ The current Chio candidate does not claim:
 - permissionless or ambient open-market penalties, slashing, or trust
   widening outside Chio's documented fee-schedule, trust-activation, and
   governance-case surfaces
-- full theorem-prover completion for all protocol claims
+- first-principles theorem-prover completion for concrete crypto, platform, or
+  external-service behavior beyond the audited assumption registry
 - performance-first throughput tuning beyond the documented qualification lane
 
 ## Migration Story

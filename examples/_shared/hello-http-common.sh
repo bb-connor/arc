@@ -55,7 +55,39 @@ PY
   return 1
 }
 
+trust_authority_public_key() {
+  local control_url="$1"
+  local service_token="${2:-}"
+
+  python3 - "${control_url}" "${service_token}" <<'PY'
+import json
+import sys
+import urllib.request
+
+control_url = sys.argv[1].rstrip("/")
+service_token = sys.argv[2]
+request = urllib.request.Request(f"{control_url}/v1/authority")
+if service_token:
+    request.add_header("Authorization", f"Bearer {service_token}")
+with urllib.request.urlopen(request, timeout=5) as response:
+    body = json.loads(response.read().decode("utf-8"))
+public_key = body.get("publicKey")
+if not public_key:
+    raise SystemExit(f"trust service did not report an authority public key: {body!r}")
+print(public_key)
+PY
+}
+
 ensure_chio_bin() {
+  if [[ -n "${CHIO_BIN:-}" ]]; then
+    if [[ ! -x "${CHIO_BIN}" ]]; then
+      echo "CHIO_BIN is set but is not executable: ${CHIO_BIN}" >&2
+      return 1
+    fi
+    printf '%s\n' "${CHIO_BIN}"
+    return 0
+  fi
+
   local chio_bin="${ROOT}/target/debug/chio"
   if [[ ! -x "${chio_bin}" ]]; then
     (cd "${ROOT}" && cargo build --bin chio >/dev/null)

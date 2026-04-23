@@ -99,7 +99,8 @@ The shipped `v2` contract does not claim:
 - a public certification marketplace
 - automatic SCIM provisioning lifecycle
 - synthetic cross-issuer passport scoring
-- full theorem-prover completion for every security property
+- theorem-prover completion for concrete crypto, platform, or external-service
+  behavior beyond the published audited assumptions
 - arbitrary plugins that can redefine signed Chio truth or widen trust outside
   named extension points
 - permissionless public identity or wallet discovery that widens local trust
@@ -406,24 +407,43 @@ The current launch-candidate safety inventory is:
 
 Chio intentionally distinguishes evidence classes for these claims:
 
-- executable differential tests in `formal/diff-tests` are the release gate for
-  scope-attenuation semantics
-- kernel, control-plane, and integration tests verify fail-closed runtime
-  behavior for revocation, DPoP, governed approvals, monetary budgets, and
-  runtime assurance
+- root-imported Lean proofs in `formal/lean4` cover the bounded P1-P10
+  protocol models named by `formal/theorem-inventory.json`
+- `formal/assumptions.toml` names the audited external primitives and platform
+  services that are trusted rather than proved from first principles
+- executable differential tests in `formal/diff-tests` are the Rust/spec drift
+  gate for scope-attenuation semantics
+- `scripts/check-aeneas-production.sh` extracts the production-linked pure
+  core in `chio-kernel-core` through Charon/Aeneas into Lean, and
+  `scripts/check-aeneas-equivalence.sh` hard-gates tracked Lean equivalence
+  for that extracted lane; the older pilot lane remains as compatibility
+  evidence
+- Creusot/Kani strict lanes are declared in `formal/rust-verification` for
+  production implementation linkage, including public Kani harnesses for
+  `verify_capability`, `NormalizedScope::is_subset_of`,
+  `resolve_matching_grants`, `evaluate`, and `sign_receipt`
+- `scripts/check-adapter-no-bypass.sh` checks adapter mediation markers so
+  MCP, API protect, and OpenAPI sidecar flows cannot drift away from kernel
+  evaluation and receipt production unnoticed
+- `scripts/generate-proof-report.sh` emits `target/formal/proof-report.json`
+  from the manifest, theorem inventory, assumptions, claim gate inputs, tool
+  versions, theorem source locations, artifact hashes, git state, and
+  optional live gate results
 - conformance and release-qualification lanes verify mediated protocol
   behavior, packaging, and clustered operator workflows
 
-Chio does not currently claim theorem-prover completion for every protocol
-property. The Lean tree under `formal/lean4` is informative and useful for
-ongoing proof work, but standalone proof modules that are not root-imported or
-still contain `sorry` are not part of the shipped release gate or launch
-claims.
+Chio's formal claim is implementation-linked and assumption-bounded: the
+security-critical protocol semantics are mechanically checked in Lean and tied
+to the pure Rust decision core, while concrete crypto, clock, storage,
+transport, subprocess, hosted-registry, and chain behavior remains inside the
+published audited assumptions.
 
 ### 5.5 Verified Core Boundary
 
-The current bounded verified-core contract is defined in
-`formal/proof-manifest.toml`.
+The current implementation-linked verified-core contract is defined in
+`formal/proof-manifest.toml`, with external-system assumptions in
+`formal/assumptions.toml` and theorem coverage in
+`formal/theorem-inventory.json`.
 
 That manifest names the Rust symbols inside the present proof-facing boundary:
 
@@ -438,10 +458,10 @@ core today:
 - `chio_kernel::ChioKernel::evaluate_portable_verdict`
 - `chio_kernel::ChioKernel::build_and_sign_receipt`
 
-Anything outside that manifest is outside the current bounded proof boundary,
-including revocation-store queries, budget mutation, DPoP, governed approvals,
-tool dispatch, receipt persistence, clustered control-plane behavior, and
-external settlement rails.
+Anything outside that manifest is outside the current proof boundary. Concrete
+cryptography, clocks, storage, transport, subprocess behavior, hosted
+registries, clustering, and external settlement rails are assumption-bound
+unless and until they receive their own manifest entry and proof lane.
 
 ## 6. Receipt Contract
 
@@ -1798,8 +1818,8 @@ They must not imply permissionless or arbitrary external capital dispatch
 beyond the documented official web3 lane, implicit regulated-actor status,
 autonomous insurer pricing beyond the documented bounded autonomous-pricing
 surface, claim or dispute adjudication beyond the documented liability-market
-surface, or theorem-prover completion beyond the boundary defined in Section
-5.4.
+surface, or theorem-prover completion beyond the boundary and assumptions
+defined in Section 5.4.
 
 ## 10. Portable Trust And Federation
 

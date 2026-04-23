@@ -1,6 +1,0 @@
-Research MERCURY from the regulatory, compliance, and records angle. Read the current docs in docs/mercury as needed. Critique whether the framing is still missing anything crucial around books-and-records, communications, supervision, model governance, legal hold, market access, or client disclosures. Use current official and primary sources. Output markdown with sections exactly:
-1. Top 5 Insights
-2. Top 3 Risks
-3. Top 3 Missing Controls
-4. Concrete Doc or Roadmap Changes
-5. Sources

@@ -124,6 +124,63 @@ fn dpop_wrong_action_hash_rejected() {
     );
 }
 
+fn assert_dpop_binding_mismatch_rejected(
+    body: DpopProofBody,
+    agent_kp: &Keypair,
+    cap: &CapabilityToken,
+) {
+    let proof = DpopProof::sign(body, agent_kp).expect("sign proof");
+    let config = default_config();
+    let store = default_store(&config);
+
+    let result = verify_dpop_proof(
+        &proof,
+        cap,
+        "srv-a",
+        "read_file",
+        &sha256_hex(b"{}"),
+        &store,
+        &config,
+    );
+
+    assert!(result.is_err(), "binding mismatch should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("binding fields do not match"),
+        "unexpected error message: {err_msg}"
+    );
+}
+
+#[test]
+fn dpop_wrong_capability_id_rejected() {
+    let agent_kp = Keypair::generate();
+    let cap = make_capability(&agent_kp);
+    let mut body = make_proof_body(&cap, &agent_kp);
+    body.capability_id = "cap-other".to_string();
+
+    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap);
+}
+
+#[test]
+fn dpop_wrong_tool_server_rejected() {
+    let agent_kp = Keypair::generate();
+    let cap = make_capability(&agent_kp);
+    let mut body = make_proof_body(&cap, &agent_kp);
+    body.tool_server = "srv-b".to_string();
+
+    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap);
+}
+
+#[test]
+fn dpop_wrong_tool_name_rejected() {
+    let agent_kp = Keypair::generate();
+    let cap = make_capability(&agent_kp);
+    let mut body = make_proof_body(&cap, &agent_kp);
+    body.tool_name = "write_file".to_string();
+
+    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap);
+}
+
 // ---------------------------------------------------------------------------
 // Test 3: Proof signed by wrong agent key is rejected
 // ---------------------------------------------------------------------------
