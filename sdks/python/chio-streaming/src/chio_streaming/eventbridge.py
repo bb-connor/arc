@@ -224,8 +224,14 @@ class ChioEventBridgeHandler:
         Allow + handler error: outcome carries the exception, no receipt.
         Deny: DLQ entry published (if ``dlq_bus`` set).
         Sidecar failure: re-raises unless ``on_sidecar_error="deny"``.
+
+        ``request_id`` is derived from ``event["id"]`` (the stable
+        EventBridge event id) so target retries reuse the same id and
+        receipt / DLQ dedupe works. A fresh UUID is used only when the
+        id is absent (e.g. a synthetic event from a test harness).
         """
-        request_id = new_request_id("chio-eb")
+        event_id = event.get("id")
+        request_id = f"chio-eb-{event_id}" if event_id else new_request_id("chio-eb")
         detail_type = str(event.get("detail-type") or event.get("detailType") or "")
         tool_name = resolve_scope(
             scope_map=self._config.scope_map, subject=detail_type or "unknown"

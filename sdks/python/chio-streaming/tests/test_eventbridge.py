@@ -292,6 +292,45 @@ async def test_camel_case_detailType_is_recognised() -> None:
 
 
 # ---------------------------------------------------------------------------
+# request_id derivation
+# ---------------------------------------------------------------------------
+
+
+async def test_request_id_derived_from_event_id() -> None:
+    # EventBridge target retries reuse the same event id; request_id must
+    # follow so receipt / DLQ dedupe collapses them instead of minting a
+    # fresh UUID on every invocation.
+    h, _ec = _handler(chio_client=allow_all())
+    event = _event()
+    event["id"] = "evt-stable-123"
+    outcome = await h.evaluate(event)
+    assert outcome.request_id == "chio-eb-evt-stable-123"
+
+
+async def test_request_id_is_stable_across_retries() -> None:
+    h, _ec = _handler(chio_client=allow_all())
+    event = _event()
+    first = await h.evaluate(event)
+    second = await h.evaluate(event)
+    assert first.request_id == second.request_id
+
+
+async def test_request_id_falls_back_to_uuid_when_event_id_missing() -> None:
+    # Synthetic events (or misconfigured producers) may omit id; the
+    # handler must still evaluate, minting a UUID-suffixed request_id.
+    h, _ec = _handler(chio_client=allow_all())
+    event = {
+        "version": "0",
+        "detail-type": "OrderPlaced",
+        "source": "com.example.orders",
+        "detail": {"k": 1},
+    }
+    outcome = await h.evaluate(event)
+    assert outcome.request_id.startswith("chio-eb-")
+    assert outcome.request_id != "chio-eb-"
+
+
+# ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
