@@ -2,162 +2,170 @@
 
 ## Status
 
-Research / design proposal. No code. Supersedes nothing.
+Ready for implementation. Supporting research under `docs/research/flink/`:
+
+- `flink/01-flink-internals.md` — 2PC contract, side outputs, failure scenarios, AsyncFunction limits, checkpoint backpressure.
+- `flink/02-pyflink-api.md` — PyFlink ProcessFunction / AsyncFunction / keyed state / KafkaSink / dependency management / testing. Versions: Flink 2.2.0 (Dec 2025) stable.
+- `flink/03-operator-design.md` — config / outcome / lifecycle spec grounded in existing middleware conventions.
 
 ## Goal
 
-Let Flink jobs evaluate each event against a Chio capability, emit signed receipts, and route denials to a DLQ — with the same semantics the other broker middlewares promise (fail-closed, deduplicable, receipts chain via `request_id`).
+Ship a PyFlink-native operator that evaluates each event against a Chio capability, emits signed receipts, and routes denials to a DLQ — with the same semantics and byte-compatible envelope the other broker middlewares emit.
 
-Scope boundary: this is a *native* Flink integration. Running the existing `chio_streaming.middleware` (Kafka) from a `RichFlatMapFunction` would work but would throw away the parts of Flink that make the integration worth doing.
+## Why native, not a shim over the Kafka middleware
 
-## Why not just run the Kafka middleware inside Flink
+Summarised from the prior draft, unchanged:
 
-A Flink job backed by Kafka can in principle use `ChioKafkaMiddleware` inside a `ProcessFunction`:
+- The Kafka middleware drives its own Kafka transactions; Flink also manages exactly-once via aligned barriers and 2PC sinks. Two transaction coordinators on the same offsets fight.
+- Per-event ack in the middleware is coarser than Flink's checkpoint granularity.
+- A middleware in `ProcessFunction` has no access to keyed state, windows, or joins. Chio can only see raw event fields, not derived state.
+- Two competing backpressure systems (`Slots(max_in_flight)` vs credit-based flow control) produce pathological stalls.
 
-- consume from Kafka source
-- call `mw.dispatch(record, handler)` per event
-- sink handler output to another Kafka topic
+Running the Kafka middleware inside a Flink job works as a stopgap. A native operator does strictly more.
 
-Reasons this is a poor fit:
+## Architecture (revised after research)
 
-- **Ownership of checkpointing conflicts.** The Kafka middleware drives `commit_transaction` / `send_offsets_to_transaction` itself. Flink also manages exactly-once via aligned barriers and a two-phase commit sink. Two transaction coordinators on the same stream fight over the same offsets.
-- **Per-event ack is coarser than Flink's granularity.** Flink can emit partial results within a checkpoint interval, buffer them, and only materialise on checkpoint commit. The Kafka middleware acks every event as it is processed — so side effects from the handler are committed independently of Flink's checkpoint state.
-- **No access to operator state.** Keyed state, windows, CEP patterns, joins — none of that is visible to the middleware. Chio can only evaluate on raw event fields, not on *derived* state like "this user's rolling spend in the last 10 minutes" or "this event is the third retry of a failed upstream task."
-- **Backpressure is wrong.** `Slots(max_in_flight)` is a per-middleware semaphore; Flink already has its own credit-based flow control. Two competing backpressure systems produces pathological stalls.
-
-So: the Kafka middleware is usable as a stopgap, but a native integration does strictly more, and the two are not interchangeable.
-
-## What a native Flink integration looks like
-
-The primary shape is an **operator**, not a middleware. Users wrap a Flink stream in a Chio operator, and receipts flow out as a **side output**.
-
-### Operator surface
+The preliminary design said "ProcessFunction + AsyncFunction pair" as if they were interchangeable. Research 01 §4 corrects this: **`AsyncFunction` cannot emit to side outputs.** Its interface is `async def async_invoke(value) -> list`, with no `Context` parameter. So the async path has to be a two-operator chain:
 
 ```
-class ChioEvaluateOperator[IN, OUT] extends ProcessFunction[IN, OUT]
-    with CheckpointedFunction
+source
+  └─ AsyncDataStream.unordered_wait(ChioAsyncEvaluateFunction)      # sidecar call
+       └─ ProcessFunction(ChioVerdictSplitFunction)                  # split by verdict
+            ├─ main output ──── allowed events → downstream
+            ├─ RECEIPT_TAG ──── receipt envelopes (bytes) → KafkaSink EXACTLY_ONCE
+            └─ DLQ_TAG ──────── DLQ envelopes (bytes) → KafkaSink EXACTLY_ONCE
 ```
 
+Chained operators run in the same task thread with no serialization cost; the two-operator split is free at runtime.
+
+For teams that accept a throughput cap in exchange for simpler topology, we also ship a single-operator `ChioEvaluateFunction(ProcessFunction)` that runs the sidecar call synchronously on the task thread. Fine for low-throughput / low-latency sidecar deployments; not the primary path.
+
+### Checkpoint semantics
+
+- `KafkaSink` with `DeliveryGuarantee.EXACTLY_ONCE` implements `TwoPhaseCommitSinkFunction` internally. We do NOT write our own 2PC sink for Kafka — we configure Flink's.
+- Side outputs flow through the same barrier mechanism as the main output. A receipt emitted during `process_element` of an event before barrier N is part of checkpoint N. On success, the sink commits atomically. On failure, the source rewinds and the sink's prepared transaction aborts — so the first run's receipts are never visible (research 01 §3).
+- Sidecar determinism (Chio evaluates deterministically on `(policy_hash, input)`) is a correctness requirement, not a nice-to-have: re-evaluation after replay must produce byte-identical receipts or the aborted-and-redone sink writes could diverge.
+- Non-Kafka receipt sinks (HTTP receipt store, JDBC, etc.) have **no Python `TwoPhaseCommitSinkFunction` base class** (research 02 §4). Users who need non-Kafka sinks either write Java 2PC sinks, accept at-least-once with `request_id` dedupe, or write to an intermediate Kafka topic and bridge.
+
+## Decisions on the four open questions
+
+All four are now answered (research 03 §Part 1).
+
+### 1. Transform mode or callback mode?
+
+**Transform mode only in v1.** The Flink dataflow graph already *is* the handler; forcing a callback inside `ProcessFunction` blocks downstream parallelism and forfeits keyed state. A callback adapter is trivially additive later; reverse migration would force users to restructure their job graph.
+
+### 2. Keyed-state-aware variant?
+
+**Stateless `ChioEvaluateFunction` only in v1.** The stateless operator already composes *after* `keyBy().window().aggregate()`, which covers "Chio-evaluate the aggregate." A `KeyedChioEvaluateFunction` that reads state *inside* the operator depends on unvalidated design choices about state population (CDC join? side input? prior Chio evaluation?). v1.1 material.
+
+### 3. Minimum Flink version?
+
+**`apache-flink >= 2.2.0, < 3.0`.** Research 02 §7 is authoritative: PyFlink `AsyncFunction` shipped in Flink 2.2.0 (Dec 2025) via FLINK-38560 / 38561 / 38563 / 38591. Prior researcher claims that AsyncFunction "stabilized in 1.18" were wrong — 1.18 has Python async I/O for a different shape. We want the 2.2 `async def async_invoke` interface + `AsyncDataStream.unordered_wait_with_retry` + `AsyncRetryStrategy`.
+
+Consequence: we drop the prior doc's "1.18" floor. Users on older Flink can still use `chio_streaming.middleware` (the Kafka middleware) as an interim.
+
+Confirm before shipping: that `flink-connector-kafka` has a 2.2-compatible Python wheel release (research 02 §Remaining uncertainty 4).
+
+### 4. Example job?
+
+**Ship `examples/flink_fraud_scoring.py` (under ~150 lines).** Doubles as the integration-test harness. Side outputs + 2PC sink wiring will not be guessed from a docstring.
+
+## Operator spec (v1)
+
+Full spec in `flink/03-operator-design.md`. Summary:
+
+### Module
+
+`sdks/python/chio-streaming/src/chio_streaming/flink.py`. `[flink]` extra in `pyproject.toml`: `apache-flink >= 2.2.0, < 3.0`; `aiohttp` optional (users supply their own `ChioClient`).
+
+### Exports
+
+- `ChioAsyncEvaluateFunction(AsyncFunction)` — primary path; calls the sidecar; emits a wrapped `EvaluationResult` tuple.
+- `ChioVerdictSplitFunction(ProcessFunction)` — chained after the async one; splits by verdict into main / RECEIPT_TAG / DLQ_TAG.
+- `ChioEvaluateFunction(ProcessFunction)` — single-operator sync alternative for low-throughput cases.
+- `ChioFlinkConfig` — dataclass mirroring `ChioPulsarConsumerConfig` / `ChioPubSubConfig` conventions, with Flink-specific `subject_extractor`, `parameters_extractor`, `client_factory`, `dlq_router_factory`.
+- `FlinkProcessingOutcome` — `BaseProcessingOutcome` subclass; adds `element`, `subtask_index`, `attempt_number`, `checkpoint_id`.
+- `RECEIPT_TAG`, `DLQ_TAG` — `OutputTag("chio-receipt" / "chio-dlq", Types.PICKLED_BYTE_ARRAY())`.
+- `register_dependencies(env, *, requirements_path=None)` — helper that wraps `add_python_file` + `set_python_requirements` so users don't have to remember the incantation.
+
+### Config (abbreviated)
+
+```python
+@dataclass
+class ChioFlinkConfig:
+    # Shared with every other middleware (byte-compatible semantics)
+    capability_id: str
+    tool_server: str
+    scope_map: Mapping[str, str] = field(default_factory=dict)
+    receipt_topic: str | None = None               # logical name carried in envelope
+    max_in_flight: int = 64
+    on_sidecar_error: Literal["raise", "deny"] = "raise"
+
+    # Flink-specific (events have no broker headers)
+    subject_extractor: Callable[[Any], str] | None = None
+    parameters_extractor: Callable[[Any], dict[str, Any]] | None = None
+
+    # Non-serializable collaborators: built in open() on each worker
+    client_factory: Callable[[], ChioClientLike]
+    dlq_router_factory: Callable[[], DLQRouter]
+
+    request_id_prefix: str = "chio-flink"          # matches chio-pulsar / chio-nats / ...
 ```
-stream
-  .process(new ChioEvaluateOperator[Event, Event](config))
-  .getSideOutput(RECEIPT_TAG) -> receiptSink       // Kafka / file / whatever
-  .getSideOutput(DLQ_TAG)     -> dlqSink
+
+Factories (not instances) are required because `ChioClient` holds a connection pool that will not survive cloudpickle across the JobManager → TaskManager boundary. Every PyFlink user function imposes the same constraint.
+
+### Side output tags
+
+```python
+RECEIPT_TAG = OutputTag("chio-receipt", Types.PICKLED_BYTE_ARRAY())
+DLQ_TAG     = OutputTag("chio-dlq",     Types.PICKLED_BYTE_ARRAY())
 ```
 
-Inputs:
+Carry the canonical-JSON bytes from `build_envelope` / `DLQRouter.build_record`. Byte-identical to every other middleware so a single receipt consumer works across all sources.
 
-- the source stream of domain events
-- a `ChioClient` handle (sidecar URL + credentials)
-- a Chio `capability_id`, `tool_server`, and scope mapping (topic or key -> `tool_name`)
-- an optional keyed path, so evaluation can see keyed state
+### Lifecycle
 
-Outputs:
+- `open(runtime_context)`: build `ChioClient`, `DLQRouter`, `Slots(max_in_flight)`, event loop (sync variant only), metrics group. Capture `subtask_index` / `attempt_number`.
+- `async_invoke(value)` (async variant) OR `process_element(value, ctx)` (sync variant): resolve scope, call sidecar via `evaluate_with_chio`, handle `ChioStreamingError` per `on_sidecar_error`, build envelope, emit.
+- `close()`: drain loop and close HTTP session.
+- `snapshot_state` / `initialize_state`: no-ops in v1. No operator state — the receipt side output rides the sink's 2PC.
 
-- **Main output:** the original event on allow, or nothing on deny (user-configurable: drop, pass through annotated, emit deny marker).
-- **Side output `RECEIPT_TAG`:** receipt envelopes (same byte format as `receipt.build_envelope`).
-- **Side output `DLQ_TAG`:** `DLQRecord` envelopes for denies.
+### Error taxonomy
 
-Side outputs are the right primitive because they ride Flink's checkpoint snapshots end-to-end — the receipt is emitted *by* the checkpoint, not alongside it.
-
-### Checkpoint-coupled receipts (the key design choice)
-
-The non-Flink brokers do publish-then-ack, which is not atomic. Duplicates are expected and tolerated via `request_id` dedupe downstream.
-
-Flink can do strictly better:
-
-- Emit the receipt into the side output stream during `processElement`.
-- Do NOT flush the receipt sink until `snapshotState()` is called on the checkpoint barrier.
-- The receipt sink must be a 2PC sink (Kafka has a native one; for other sinks implement `TwoPhaseCommitSinkFunction`).
-- On checkpoint commit: receipts are visible atomically. On replay after failure: the source rewinds, events are re-evaluated, and the previous receipts (which never committed) are discarded by the transactional sink.
-
-Result: **no duplicate receipts and no lost receipts across operator restarts**, as long as the sidecar evaluation is deterministic on the same input (which it is — Chio is a pure evaluation against a known policy hash).
-
-The Kafka middleware's EOS story extends only across `(source topic, DLQ/receipt topic, offset commit)`. A Flink 2PC-sink story extends across *any* sink you plug in, including non-Kafka.
-
-### Window-scoped and keyed evaluation
-
-Because the operator lives inside a Flink dataflow, users can put it after windows, joins, or keyed state:
-
-```
-stream
-  .keyBy(_.userId)
-  .window(TumblingEventTime(minutes=5))
-  .aggregate(new SpendAggregator)
-  .process(new ChioEvaluateOperator[SpendSummary, Approval](config))
-```
-
-The Chio evaluation now runs on *windowed aggregates*, not raw events. This is a genuinely new capability the broker middlewares cannot express.
-
-Open design question: should the operator have a `KeyedChioEvaluateOperator` variant that can consult Flink keyed state in its parameter builder? Probably yes — the plainest use case is "approve this transaction *if* this user hasn't been flagged in the last hour," which needs per-key state.
-
-### Handler semantics
-
-Two deployment modes:
-
-1. **Transform mode:** the operator is purely a gate — allow passes the event through, deny routes to DLQ side output, receipts go to the receipt side output. The "handler" is the downstream operator.
-2. **Callback mode:** the user provides a `Function[(IN, ChioReceipt), OUT]` invoked on allow. Matches the Python middleware API more closely. Less idiomatic in Flink since downstream operators usually do the work.
-
-Recommendation: ship transform mode as primary. Callback mode is a thin adapter on top.
-
-## Distribution story
-
-Flink's users split cleanly into two camps:
-
-### PyFlink
-
-- Distributed via `pyproject.toml` extras: `chio-streaming[flink]`
-- Provides `chio_streaming.flink.ChioEvaluateFunction` — a `ProcessFunction` callable from PyFlink's Table API or DataStream API.
-- Reuses `chio_streaming.core` (`ChioClientLike`, `evaluate_with_chio`, `new_request_id`, `resolve_scope`) verbatim. The operator is a thin wrapper.
-- PyFlink runs user functions in a Python worker via Beam's portable runner. The sidecar call is a normal async HTTP; the wrapper bridges Flink's sync function signature to `asyncio.run` on the first call and re-uses the event loop across invocations.
-
-### JVM (Java / Scala / Kotlin)
-
-- Distributed as a new artifact: `com.backbay:chio-streaming-flink` (Maven coordinates TBD).
-- Depends on `chio-sdk-java` (not yet written — see gap below).
-- Provides the same `ChioEvaluateOperator` surface as a first-class `ProcessFunction` subclass.
-- Probably the more serious target: most production Flink runs are JVM.
-
-**Gap:** there is currently no Java SDK for Chio. The JVM Flink story is blocked on a Java port of `chio_sdk.client` (evaluate_tool_call over HTTP, receipt models, error types). Two options:
-
-- Build a minimal `chio-sdk-java` with just the client + models. ~1-2 weeks.
-- Ship the Flink integration PyFlink-first; defer JVM to a follow-up milestone.
-
-Recommendation: **PyFlink-first**, defer JVM. Gets value to Python teams using PyFlink without blocking on Java SDK work.
-
-## Wire compatibility
-
-The receipt envelope format (`chio-streaming/v1`) is shared byte-for-byte across brokers. The Flink integration must emit envelopes that are byte-identical to what the Kafka / NATS / etc. middlewares emit, so the same receipt consumer works regardless of source.
-
-Concretely, reuse `chio_streaming.receipt.build_envelope` unchanged from PyFlink. From JVM, port `canonical_json` and `build_envelope` verbatim (small, well-specified).
-
-## Risks
-
-1. **Sidecar RTT inside an operator.** Flink operators are latency-sensitive; a synchronous sidecar call per event bounds throughput to `1 / RTT * parallelism`. Mitigation: Flink's `AsyncDataStream.unorderedWait` / `AsyncFunction` lets the sidecar call be async, so the operator stays non-blocking. The Python middleware already uses async; the Flink wrapper would plug into `AsyncFunction` rather than `ProcessFunction` for the latency-critical path.
-2. **Checkpoint size growth.** If we hold receipts in operator state until checkpoint commit, a slow checkpoint backs up unbounded receipts. Mitigation: receipts go straight to the side output (Flink buffers them in the sink), not into operator state. Only the sink needs 2PC semantics.
-3. **PyFlink worker startup cost.** PyFlink's Python workers have per-job startup overhead. Negligible for long-running streams; measurable for CI jobs. No mitigation — this is Flink's own constraint.
-4. **JVM gap is real.** Without a Java SDK, the Flink integration serves only the PyFlink subset of users, which is not the majority. A separate milestone for `chio-sdk-java` may end up being a prerequisite.
+- `on_sidecar_error="raise"` (default): sidecar unavailability re-raises → Flink restarts the task → source rewinds → replay. Matches fail-closed.
+- `on_sidecar_error="deny"`: synthesize a deny receipt via `synthesize_deny_receipt` and route to DLQ. Structural `SYNTHETIC_RECEIPT_MARKER` so verifiers reject them without string-matching.
+- DLQ publish error: propagate. Flink's backpressure handles buffer pressure; on checkpoint failure the source rewinds.
 
 ## Scope estimate
 
-PyFlink operator on top of the existing Python SDK:
+- `src/chio_streaming/flink.py`: ~400-500 lines. ChioAsyncEvaluateFunction + ChioVerdictSplitFunction + ChioEvaluateFunction (sync) + config + outcome + helpers.
+- `tests/test_flink.py`: ~300 lines on top of `PyFlinkStreamingTestCase` (research 02 §6). Covers allow, deny, sidecar error paths, fail-closed synthesis, side-output routing. No receipt-sink 2PC replay test in v1 (requires broker + orchestration; deferred to integration lane).
+- `examples/flink_fraud_scoring.py`: ~150 lines. FileSource for local runs, KafkaSource swap documented.
+- `pyproject.toml`: `[flink]` extra pinning `apache-flink >= 2.2, < 3.0`.
+- README section: quickstart + wire compatibility note + dependency packaging (research 02 §5).
 
-- `chio_streaming/flink.py` — `ChioEvaluateFunction(ProcessFunction)`, `ChioAsyncEvaluateFunction(AsyncFunction)`, config + side-output tags.
-- Tests using a Flink mini-cluster fixture (the PyFlink test utilities). Covers checkpoint commit semantics on both success and failure-replay paths.
-- README section + example job.
-- `[flink]` extra in `pyproject.toml` pinning `apache-flink >= 1.18`.
+## Known limitations (document in README)
 
-Rough size: ~400-600 lines of source, comparable to the Pulsar or Pub/Sub middlewares but with the extra test apparatus for checkpointing.
+1. **Non-Kafka 2PC sinks**: no Python `TwoPhaseCommitSinkFunction`. For non-Kafka receipt sinks, users get at-least-once unless they write Java.
+2. **AsyncFunction + side outputs**: must chain through `ChioVerdictSplitFunction`. Extra operator, no cost at runtime (chained), but extra mental model.
+3. **Kafka `transaction.timeout.ms`**: must exceed checkpoint interval + commit latency or receipts are lost on transaction expiry. Document.
+4. **Sidecar capacity**: total in-flight against the sidecar is `capacity * parallelism`. Size the sidecar pool accordingly (research 02 §Remaining uncertainty 5).
 
-JVM operator is a separate effort, blocked on `chio-sdk-java`. Estimate once that exists: similar size to the PyFlink side, plus Maven publishing setup.
+## Open questions before implementation
+
+Mostly closed, but worth the user's attention:
+
+1. **Kafka connector wheel availability on 2.2.** Research 02 flagged this. Confirm `flink-connector-kafka` ships a 2.2-compatible Python wheel before committing to the 2.2 floor. If not, the interim is to ship the sync `ChioEvaluateFunction` only (1.18+) and add async in a follow-up when 2.2 connectors land.
+2. **Metrics naming convention.** Mirror broker names (`in_flight`, `allow_total`) or adopt OpenTelemetry-ish (`chio.evaluations.total{verdict}`)? The existing middlewares expose a property; Flink has a typed metrics group. Small decision with long tail.
+3. **JVM milestone timing.** Still deferred; decide now whether it's v1.1 or v2.0 to prevent PyFlink-only choices that Java has to mirror awkwardly.
+
+## Risks
+
+1. **PyFlink 2.2 connector churn.** Flink connectors ship on separate cadences post-1.17. If `flink-connector-kafka` lags, our 2.2 floor bites. Mitigation above.
+2. **Mini-cluster flakiness on macOS ARM / CI.** Gate integration tests behind `FLINK_INTEGRATION=1` and run in a dedicated lane.
+3. **Cloudpickle + closures.** `subject_extractor` / `parameters_extractor` callables serialize via cloudpickle. Closures over unpicklable handles fail at `open()`-time. Document "pure function, no closures."
 
 ## Recommendation
 
-Start with PyFlink. Write the operator as a ProcessFunction + AsyncFunction pair so latency-sensitive jobs can opt into the async path. Wire the receipt sink via Flink's native Kafka 2PC sink for the common case; document the `TwoPhaseCommitSinkFunction` contract for other sinks. Defer JVM until there's a `chio-sdk-java`.
-
-Open questions before implementation starts:
-
-1. Transform-mode only, or support callback mode from day one?
-2. Keyed-state-aware variant now or in a follow-up?
-3. Minimum PyFlink / Flink version? 1.18 has the stable async I/O in Python, 1.17 doesn't.
-4. Do we ship an example job (e.g. real-time fraud scoring over a Kafka source) or just the operator + unit tests?
+Proceed to implementation. PyFlink-first, `AsyncFunction → ProcessFunction(split)` as the primary topology, single-operator sync as a simpler fallback. 2PC via `KafkaSink EXACTLY_ONCE`; non-Kafka 2PC documented as a limitation. Example job doubles as the integration test. Defer JVM and keyed-state operator to later milestones.
