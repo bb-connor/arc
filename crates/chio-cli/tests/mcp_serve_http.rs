@@ -1972,7 +1972,7 @@ fn initialize_session(client: &Client, base_url: &str, token: &str) -> (String, 
         token,
         json!({
             "sampling": {
-                "includeContext": true,
+                "context": {},
                 "tools": {}
             }
         }),
@@ -3050,7 +3050,7 @@ fn mcp_serve_http_isolates_multiple_sessions() {
 
     let shared_owner_capabilities = json!({
         "sampling": {
-            "includeContext": true,
+            "context": {},
             "tools": {}
         },
         "resources": {

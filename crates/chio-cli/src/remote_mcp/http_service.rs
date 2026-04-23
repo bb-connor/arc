@@ -1020,9 +1020,11 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
             .unwrap_or(false),
         supports_sampling: declared_peer_capability(capabilities, "sampling"),
         sampling_context: sampling
-            .and_then(|value| value.get("includeContext"))
-            .is_some(),
-        sampling_tools: sampling.and_then(|value| value.get("tools")).is_some(),
+            .and_then(|value| value.get("context"))
+            .is_some_and(Value::is_object),
+        sampling_tools: sampling
+            .and_then(|value| value.get("tools"))
+            .is_some_and(Value::is_object),
         supports_elicitation: declared_peer_capability(capabilities, "elicitation"),
         elicitation_form,
         elicitation_url,
@@ -1105,7 +1107,7 @@ mod http_service_tests {
         let declared = parse_remote_session_peer_capabilities(&json!({
             "capabilities": {
                 "sampling": {
-                    "includeContext": "thisServer",
+                    "context": {},
                     "tools": {}
                 }
             }
