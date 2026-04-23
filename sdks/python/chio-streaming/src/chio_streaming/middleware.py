@@ -437,18 +437,23 @@ class ChioConsumerMiddleware:
 
         self._begin_transaction()
         acked = False
+        needs_abort = True
         try:
             try:
                 self._produce_dlq(record)
                 self._commit_transaction(message)
                 acked = True
+                needs_abort = False
             except Exception:
                 self._abort_transaction_safely()
+                needs_abort = False
                 raise
         finally:
-            # Abort on BaseException (SystemExit / CancelledError) too;
-            # a leaked open transaction fences the next begin.
-            if not acked:
+            # Only BaseException (SystemExit / CancelledError) reaches
+            # here without having run the Exception branch; abort so
+            # the producer does not fence the next begin. The flag
+            # guards against a double-abort on ordinary Exceptions.
+            if needs_abort:
                 self._abort_transaction_safely()
         return ProcessingOutcome(
             allowed=False,

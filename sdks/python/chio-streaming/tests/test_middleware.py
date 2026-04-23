@@ -129,6 +129,11 @@ class FakeProducer:
         self.transactions_begun = 0
         self.transactions_committed = 0
         self.transactions_aborted = 0
+        # Raw call count (every abort_transaction invocation), separate
+        # from transactions_aborted which only increments when the fake
+        # was in a transaction. confluent-kafka raises on an abort call
+        # outside a tx; tracking raw calls surfaces double-abort bugs.
+        self.abort_transaction_calls = 0
         self._in_tx = False
         self._buffer: list[dict[str, Any]] = []
         self._fail_on_commit = fail_on_commit
@@ -173,6 +178,7 @@ class FakeProducer:
         self.transactions_committed += 1
 
     def abort_transaction(self, timeout: float = 10.0) -> None:
+        self.abort_transaction_calls += 1
         if not self._in_tx:
             return
         self._buffer = []
@@ -800,6 +806,9 @@ async def test_dlq_publish_failure_raises_and_does_not_ack() -> None:
     assert producer.produced == []
     assert producer.committed_offsets == []
     assert producer.transactions_aborted == 1
+    # Abort should run exactly once; the finally guard must not re-abort
+    # an already-aborted transaction (confluent-kafka raises on that).
+    assert producer.abort_transaction_calls == 1
     assert mw.in_flight == 0
 
 
