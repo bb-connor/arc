@@ -228,8 +228,8 @@ async def test_allow_handler_error_terms_when_configured() -> None:
         raise RuntimeError("boom")
 
     outcome = await mw.dispatch(msg, handler)
-    # term() terminally settles the message — mirrors the deny-term
-    # path which also reports acked=True.
+    # term() terminally settles the message; matches the deny-term
+    # path's acked=True invariant.
     assert outcome.acked is True
     assert msg.term_called is True
     assert msg.nak_no_delay is False

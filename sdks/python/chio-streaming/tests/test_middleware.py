@@ -698,7 +698,6 @@ def test_build_middleware_with_explicit_router() -> None:
 
 
 async def test_scope_map_hit_uses_custom_tool_name() -> None:
-    # Assert the Chio client sees the mapped tool_name.
     recorded: list[str] = []
 
     def policy(tool_name: str, _scope: dict, _ctx: dict) -> MockVerdict:
