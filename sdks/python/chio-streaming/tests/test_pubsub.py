@@ -535,7 +535,7 @@ async def test_dlq_publish_failure_raises_and_does_not_ack() -> None:
     assert mw.in_flight == 0
 
 
-async def test_receipt_publish_failure_does_not_ack() -> None:
+async def test_receipt_publish_failure_propagates_and_does_not_ack() -> None:
     pub = FakeFuturePublisher(fail_topics={"projects/p/topics/chio-receipts"})
     mw, _ = _middleware(chio_client=allow_all(), publisher=pub)
     msg = FakePubSubMessage(attributes={"subject": "tasks:research"})
@@ -545,15 +545,37 @@ async def test_receipt_publish_failure_does_not_ack() -> None:
     async def handler(_m: Any, _r: Any) -> None:
         ran.append(1)
 
-    outcome = await mw.dispatch(msg, handler)
+    # Receipt publish is infrastructure, not handler failure. The
+    # exception propagates so Pub/Sub redelivers; handler_error_strategy
+    # does not reclassify it (otherwise ``handler_error_strategy="ack"``
+    # would drop the source message without a receipt).
+    with pytest.raises(RuntimeError, match="publish failed"):
+        await mw.dispatch(msg, handler)
+
     assert ran == [1]
-    assert outcome.allowed is True
-    assert outcome.acked is False
-    assert isinstance(outcome.handler_error, RuntimeError)
-    # Handler-error strategy defaults to "nack".
     assert msg.ack_called is False
-    assert msg.nack_called is True
+    assert msg.nack_called is False
     assert mw.in_flight == 0
+
+
+async def test_receipt_publish_failure_not_reclassified_as_handler_error_ack() -> None:
+    # Regression: a failed receipt publish under ``handler_error_strategy="ack"``
+    # must NOT silently acknowledge the source. The bug was a single
+    # ``except Exception`` wrapping invoke_handler AND the receipt publish,
+    # so a publish failure hit the handler-error branch and acked the source.
+    pub = FakeFuturePublisher(fail_topics={"projects/p/topics/chio-receipts"})
+    cfg = _cfg(handler_error_strategy="ack")
+    mw, _ = _middleware(chio_client=allow_all(), config=cfg, publisher=pub)
+    msg = FakePubSubMessage(attributes={"subject": "tasks:research"})
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    with pytest.raises(RuntimeError, match="publish failed"):
+        await mw.dispatch(msg, handler)
+
+    assert msg.ack_called is False
+    assert msg.nack_called is False
 
 
 # ---------------------------------------------------------------------------

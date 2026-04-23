@@ -485,7 +485,7 @@ async def test_dlq_publish_failure_raises_and_does_not_ack() -> None:
     assert mw.in_flight == 0
 
 
-async def test_receipt_publish_failure_does_not_ack() -> None:
+async def test_receipt_publish_failure_propagates_and_does_not_ack() -> None:
     receipt = FakePulsarProducer(fail=True)
     mw, consumer, _receipt_p, _dlq = _middleware(chio_client=allow_all(), receipt_producer=receipt)
     msg = FakePulsarMessage(topic="persistent://public/default/orders")
@@ -495,15 +495,41 @@ async def test_receipt_publish_failure_does_not_ack() -> None:
     async def handler(_m: Any, _r: Any) -> None:
         ran.append(1)
 
-    outcome = await mw.dispatch(msg, handler)
+    # Receipt send is infrastructure, not handler failure. The exception
+    # propagates so Pulsar redelivers; handler_error_strategy does not
+    # reclassify it (otherwise ``handler_error_strategy="ack"`` would
+    # drop the source message without a receipt).
+    with pytest.raises(RuntimeError, match="send failed"):
+        await mw.dispatch(msg, handler)
+
     assert ran == [1]
-    assert outcome.allowed is True
-    assert outcome.acked is False
-    assert isinstance(outcome.handler_error, RuntimeError)
     assert consumer.acked == []
-    # Handler error path nacks the source.
-    assert len(consumer.nacked) == 1
+    assert consumer.nacked == []
     assert mw.in_flight == 0
+
+
+async def test_receipt_publish_failure_not_reclassified_as_handler_error_ack() -> None:
+    # Regression: a failed receipt send under ``handler_error_strategy="ack"``
+    # must NOT silently acknowledge the source. The bug was a single
+    # ``except Exception`` wrapping invoke_handler AND the receipt send,
+    # so a publish failure hit the handler-error branch and acked the source.
+    receipt = FakePulsarProducer(fail=True)
+    cfg = _cfg(handler_error_strategy="ack")
+    mw, consumer, _receipt_p, _dlq = _middleware(
+        chio_client=allow_all(),
+        config=cfg,
+        receipt_producer=receipt,
+    )
+    msg = FakePulsarMessage(topic="persistent://public/default/orders")
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    with pytest.raises(RuntimeError, match="send failed"):
+        await mw.dispatch(msg, handler)
+
+    assert consumer.acked == []
+    assert consumer.nacked == []
 
 
 # ---------------------------------------------------------------------------

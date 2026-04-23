@@ -476,7 +476,7 @@ async def test_dlq_publish_failure_raises_and_does_not_ack() -> None:
     assert mw.in_flight == 0
 
 
-async def test_receipt_publish_failure_does_not_ack() -> None:
+async def test_receipt_publish_failure_propagates_and_does_not_ack() -> None:
     js = FakeJetStream(fail_subjects={"chio.receipts"})
     mw, _ = _middleware(chio_client=allow_all(), js=js)
     msg = FakeNatsMsg(subject="tasks.research", data=b"x")
@@ -486,16 +486,39 @@ async def test_receipt_publish_failure_does_not_ack() -> None:
     async def handler(_m: Any, _r: Any) -> None:
         ran.append(1)
 
-    outcome = await mw.dispatch(msg, handler)
-    # Handler ran, then receipt publish raised; middleware treats this
-    # as a handler-error and naks. Source must NOT be acked.
+    # Handler ran successfully, but the receipt publish is an
+    # infrastructure failure, not a handler error. The exception
+    # propagates so the caller can nak / retry; handler_error_strategy
+    # does not reclassify it.
+    with pytest.raises(RuntimeError, match="publish failed"):
+        await mw.dispatch(msg, handler)
+
     assert ran == [1]
-    assert outcome.allowed is True
-    assert outcome.acked is False
-    assert isinstance(outcome.handler_error, RuntimeError)
     assert msg.ack_called is False
-    assert msg.nak_no_delay is True
+    assert msg.nak_no_delay is False
     assert mw.in_flight == 0
+
+
+async def test_receipt_publish_failure_not_reclassified_under_term_strategy() -> None:
+    # Regression: a failed receipt publish must not route through
+    # _negative_ack and consume the message via term(). The bug was a
+    # single ``except Exception`` wrapping invoke_handler AND the receipt
+    # publish; with ``handler_error_strategy="term"`` that silently
+    # terminated the source on infra failures.
+    js = FakeJetStream(fail_subjects={"chio.receipts"})
+    cfg = _cfg(handler_error_strategy="term")
+    mw, _ = _middleware(chio_client=allow_all(), js=js, config=cfg)
+    msg = FakeNatsMsg(subject="tasks.research", data=b"x")
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    with pytest.raises(RuntimeError, match="publish failed"):
+        await mw.dispatch(msg, handler)
+
+    assert msg.ack_called is False
+    assert msg.term_called is False
+    assert msg.nak_no_delay is False
 
 
 # ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ from chio_streaming.core import (
     new_request_id,
     normalise_headers,
     resolve_scope,
+    stringify_header_value,
     synthesize_deny_receipt,
 )
 from chio_streaming.dlq import DLQRecord, DLQRouter
@@ -273,16 +274,13 @@ class ChioNatsMiddleware:
             receipt=receipt,
             source_topic=msg.subject,
         )
-        handler_error: Exception | None = None
+        # handler_error_strategy applies to handler failures only. Receipt
+        # publish and ack errors are infrastructure failures; they
+        # propagate so the caller can nak / retry without being silently
+        # reclassified as handler errors.
         try:
             await invoke_handler(handler, msg, receipt)
-            if self._config.receipt_subject is not None:
-                await self._publish_envelope(self._config.receipt_subject, envelope)
-            await msg.ack()
-            acked = True
         except Exception as exc:
-            handler_error = exc
-            acked = False
             await self._negative_ack(msg)
             logger.warning(
                 "chio-nats: handler raised for subject=%s; redelivered via %s: %s",
@@ -290,13 +288,24 @@ class ChioNatsMiddleware:
                 self._config.handler_error_strategy,
                 exc,
             )
+            return NatsProcessingOutcome(
+                allowed=True,
+                receipt=receipt,
+                request_id=request_id,
+                message=msg,
+                acked=False,
+                handler_error=exc,
+            )
+
+        if self._config.receipt_subject is not None:
+            await self._publish_envelope(self._config.receipt_subject, envelope)
+        await msg.ack()
         return NatsProcessingOutcome(
             allowed=True,
             receipt=receipt,
             request_id=request_id,
             message=msg,
-            acked=acked,
-            handler_error=handler_error,
+            acked=True,
         )
 
     async def _handle_deny(
@@ -383,20 +392,8 @@ class ChioNatsMiddleware:
 def _bytes_headers_to_str(
     headers: list[tuple[str, bytes]],
 ) -> dict[str, str]:
-    """Kafka-shaped ``list[tuple[str, bytes]]`` to NATS-shaped ``dict[str, str]``.
-
-    Non-UTF-8 values fall back to hex.
-    """
-    out: dict[str, str] = {}
-    for name, value in headers:
-        if isinstance(value, bytes | bytearray):
-            try:
-                out[name] = bytes(value).decode("utf-8")
-            except UnicodeDecodeError:
-                out[name] = bytes(value).hex()
-        else:
-            out[name] = str(value)
-    return out
+    """Kafka-shaped ``list[tuple[str, bytes]]`` to NATS-shaped ``dict[str, str]``."""
+    return {name: str(stringify_header_value(value)) for name, value in headers}
 
 
 def build_nats_middleware(

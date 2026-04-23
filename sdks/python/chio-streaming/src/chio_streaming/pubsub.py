@@ -29,6 +29,7 @@ from chio_streaming.core import (
     new_request_id,
     normalise_headers,
     resolve_scope,
+    stringify_header_value,
     synthesize_deny_receipt,
 )
 from chio_streaming.dlq import DLQRecord, DLQRouter
@@ -293,21 +294,19 @@ class ChioPubSubMiddleware:
             receipt=receipt,
             source_topic=subject,
         )
-        handler_error: Exception | None = None
-        acked = False
+        # handler_error_strategy applies to handler failures only. Receipt
+        # publish and ack errors are infrastructure failures; they
+        # propagate so Pub/Sub redelivers instead of handler_error_strategy
+        # silently acking the source without a receipt.
         try:
             await invoke_handler(handler, message, receipt)
-            if self._config.receipt_topic is not None:
-                await self._publish_envelope(self._config.receipt_topic, envelope)
-            message.ack()
-            acked = True
         except Exception as exc:
-            handler_error = exc
             if self._config.handler_error_strategy == "ack":
                 message.ack()
                 acked = True
             else:
                 message.nack()
+                acked = False
             logger.warning(
                 "chio-pubsub: handler raised for subject=%s request_id=%s; redelivery via %s: %s",
                 subject,
@@ -315,14 +314,26 @@ class ChioPubSubMiddleware:
                 self._config.handler_error_strategy,
                 exc,
             )
+            return PubSubProcessingOutcome(
+                allowed=True,
+                receipt=receipt,
+                request_id=request_id,
+                message=message,
+                subject=subject,
+                acked=acked,
+                handler_error=exc,
+            )
+
+        if self._config.receipt_topic is not None:
+            await self._publish_envelope(self._config.receipt_topic, envelope)
+        message.ack()
         return PubSubProcessingOutcome(
             allowed=True,
             receipt=receipt,
             request_id=request_id,
             message=message,
             subject=subject,
-            acked=acked,
-            handler_error=handler_error,
+            acked=True,
         )
 
     async def _handle_deny(
@@ -430,28 +441,14 @@ async def _await_publish_result(future: Any) -> Any:
 
 def _envelope_attributes(envelope: ReceiptEnvelope) -> dict[str, str]:
     """Project envelope headers onto Pub/Sub attributes."""
-    out: dict[str, str] = {}
-    for name, value in envelope.headers:
-        out[name] = _decode_attr(value)
+    out = {name: str(stringify_header_value(value)) for name, value in envelope.headers}
     out["X-Chio-Request-Id"] = envelope.request_id
     return out
 
 
 def _record_attributes(record: DLQRecord) -> dict[str, str]:
     """Project DLQ record headers onto Pub/Sub attributes."""
-    out: dict[str, str] = {}
-    for name, value in record.headers:
-        out[name] = _decode_attr(value)
-    return out
-
-
-def _decode_attr(value: Any) -> str:
-    if isinstance(value, bytes | bytearray):
-        try:
-            return bytes(value).decode("utf-8")
-        except UnicodeDecodeError:
-            return bytes(value).hex()
-    return str(value)
+    return {name: str(stringify_header_value(value)) for name, value in record.headers}
 
 
 def build_pubsub_middleware(

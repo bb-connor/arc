@@ -27,6 +27,7 @@ from chio_streaming.core import (
     new_request_id,
     normalise_headers,
     resolve_scope,
+    stringify_header_value,
     synthesize_deny_receipt,
 )
 from chio_streaming.dlq import DLQRecord, DLQRouter
@@ -276,42 +277,48 @@ class ChioPulsarMiddleware:
             receipt=receipt,
             source_topic=msg.topic_name(),
         )
-        handler_error: Exception | None = None
-        acked = False
+        # handler_error_strategy applies to handler failures only. Receipt
+        # send and acknowledge errors are infrastructure failures; they
+        # propagate so Pulsar redelivers instead of handler_error_strategy
+        # silently acking the source without a receipt.
         try:
             await invoke_handler(handler, msg, receipt)
-            if self._config.receipt_topic is not None:
-                assert self._receipt_producer is not None  # guaranteed by __init__
-                await _maybe_await(
-                    self._receipt_producer.send(
-                        envelope.value,
-                        properties=_envelope_properties(envelope),
-                        partition_key=envelope.key.decode("utf-8", errors="replace"),
-                    )
-                )
-            await _maybe_await(self._consumer.acknowledge(msg))
-            acked = True
         except Exception as exc:
-            handler_error = exc
             await self._negative_ack(msg)
-            # handler_error_strategy="ack" means _negative_ack calls
-            # acknowledge (not negative_acknowledge), so the message was
-            # acked despite the failure; reflect that in the outcome.
-            if self._config.handler_error_strategy == "ack":
-                acked = True
+            # handler_error_strategy="ack" means _negative_ack called
+            # acknowledge, so the source was acked despite the failure.
+            acked = self._config.handler_error_strategy == "ack"
             logger.warning(
                 "chio-pulsar: handler raised for topic=%s request_id=%s; redelivery scheduled: %s",
                 msg.topic_name(),
                 request_id,
                 exc,
             )
+            return PulsarProcessingOutcome(
+                allowed=True,
+                receipt=receipt,
+                request_id=request_id,
+                message=msg,
+                acked=acked,
+                handler_error=exc,
+            )
+
+        if self._config.receipt_topic is not None:
+            assert self._receipt_producer is not None  # guaranteed by __init__
+            await _maybe_await(
+                self._receipt_producer.send(
+                    envelope.value,
+                    properties=_envelope_properties(envelope),
+                    partition_key=envelope.key.decode("utf-8", errors="replace"),
+                )
+            )
+        await _maybe_await(self._consumer.acknowledge(msg))
         return PulsarProcessingOutcome(
             allowed=True,
             receipt=receipt,
             request_id=request_id,
             message=msg,
-            acked=acked,
-            handler_error=handler_error,
+            acked=True,
         )
 
     async def _handle_deny(
@@ -390,28 +397,14 @@ def _envelope_properties(
     envelope: ReceiptEnvelope,
 ) -> dict[str, str]:
     """Project envelope headers onto Pulsar properties (``Mapping[str, str]``)."""
-    out: dict[str, str] = {}
-    for name, value in envelope.headers:
-        out[name] = _decode_property_value(value)
+    out = {name: str(stringify_header_value(value)) for name, value in envelope.headers}
     out.setdefault("X-Chio-Request-Id", envelope.request_id)
     return out
 
 
 def _record_properties(record: DLQRecord) -> dict[str, str]:
     """Project DLQ record headers onto Pulsar properties."""
-    out: dict[str, str] = {}
-    for name, value in record.headers:
-        out[name] = _decode_property_value(value)
-    return out
-
-
-def _decode_property_value(value: Any) -> str:
-    if isinstance(value, bytes | bytearray):
-        try:
-            return bytes(value).decode("utf-8")
-        except UnicodeDecodeError:
-            return bytes(value).hex()
-    return str(value)
+    return {name: str(stringify_header_value(value)) for name, value in record.headers}
 
 
 def build_pulsar_middleware(
