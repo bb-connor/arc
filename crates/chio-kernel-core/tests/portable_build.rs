@@ -391,6 +391,63 @@ fn resolve_matching_grants_fails_closed_when_target_match_has_unsupported_constr
 }
 
 #[test]
+fn resolve_matching_grants_ignores_unsupported_constraints_on_unrelated_grants() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-1".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope {
+                grants: vec![
+                    ToolGrant {
+                        server_id: "srv-b".to_string(),
+                        tool_name: "echo".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![Constraint::MinimumRuntimeAssurance(
+                            chio_core_types::capability::RuntimeAssuranceTier::Attested,
+                        )],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    },
+                    ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "echo".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    },
+                ],
+                resource_grants: vec![],
+                prompt_grants: vec![],
+            },
+            issued_at: ISSUED_AT,
+            expires_at: EXPIRES_AT,
+            delegation_chain: vec![],
+        },
+        &issuer,
+    )
+    .unwrap();
+
+    let matches = chio_kernel_core::scope::resolve_matching_grants(
+        &capability.scope,
+        "echo",
+        "srv-a",
+        &serde_json::json!({"msg": "hello"}),
+    )
+    .expect("unrelated unsupported constraints must not block authorized matches");
+
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].grant.server_id, "srv-a");
+}
+
+#[test]
 fn evaluate_expired_capability() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();

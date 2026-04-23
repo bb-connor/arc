@@ -158,6 +158,13 @@ fn grant_covers(
     server_id: &str,
     arguments: &serde_json::Value,
 ) -> Result<bool, ScopeMatchError> {
+    if !matches_pattern(&grant.server_id, server_id)
+        || !matches_pattern(&grant.tool_name, tool_name)
+        || !grant.operations.contains(&Operation::Invoke)
+    {
+        return Ok(false);
+    }
+
     #[cfg(kani)]
     let constraints_ok = if grant.constraints.is_empty() {
         true
@@ -168,10 +175,7 @@ fn grant_covers(
     #[cfg(not(kani))]
     let constraints_ok = constraints_match(&grant.constraints, arguments)?;
 
-    Ok(matches_pattern(&grant.server_id, server_id)
-        && matches_pattern(&grant.tool_name, tool_name)
-        && grant.operations.contains(&Operation::Invoke)
-        && constraints_ok)
+    Ok(constraints_ok)
 }
 
 fn constraints_match(

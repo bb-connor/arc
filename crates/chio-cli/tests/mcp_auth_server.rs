@@ -5,6 +5,7 @@ use std::io::Read;
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -31,6 +32,13 @@ fn reserve_listen_addr() -> SocketAddr {
     let addr = listener.local_addr().expect("listener addr");
     drop(listener);
     addr
+}
+
+fn auth_server_test_guard() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .expect("lock auth server integration tests")
 }
 
 struct ServerGuard {
@@ -365,6 +373,7 @@ fn decode_jwt_payload(token: &str) -> Value {
 
 #[test]
 fn mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange() {
+    let _guard = auth_server_test_guard();
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create test dir");
     let listen = reserve_listen_addr();
@@ -736,6 +745,7 @@ fn mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange() {
 
 #[test]
 fn mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion() {
+    let _guard = auth_server_test_guard();
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create test dir");
     let listen = reserve_listen_addr();
@@ -837,6 +847,7 @@ fn mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_asserti
 
 #[test]
 fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime() {
+    let _guard = auth_server_test_guard();
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create test dir");
     let listen = reserve_listen_addr();
@@ -954,6 +965,7 @@ fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token
 
 #[test]
 fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_constraint() {
+    let _guard = auth_server_test_guard();
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create test dir");
     let listen = reserve_listen_addr();
@@ -1087,6 +1099,7 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
 
 #[test]
 fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpop_or_mtls() {
+    let _guard = auth_server_test_guard();
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create test dir");
     let listen = reserve_listen_addr();

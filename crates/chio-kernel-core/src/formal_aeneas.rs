@@ -101,9 +101,7 @@ pub fn budget_commit(
 }
 
 pub fn dpop_freshness_valid(now: u64, issued_at: u64, ttl_secs: u64, max_skew_secs: u64) -> bool {
-    issued_at <= now.saturating_add(max_skew_secs)
-        && issued_at.saturating_add(ttl_secs) >= now
-        && issued_at >= now.saturating_sub(ttl_secs.saturating_add(max_skew_secs))
+    issued_at <= now.saturating_add(max_skew_secs) && issued_at.saturating_add(ttl_secs) >= now
 }
 
 pub fn dpop_admits(
