@@ -225,10 +225,9 @@ class ChioEventBridgeHandler:
         Deny: DLQ entry published (if ``dlq_bus`` set).
         Sidecar failure: re-raises unless ``on_sidecar_error="deny"``.
 
-        ``request_id`` is derived from ``event["id"]`` (the stable
-        EventBridge event id) so target retries reuse the same id and
-        receipt / DLQ dedupe works. A fresh UUID is used only when the
-        id is absent (e.g. a synthetic event from a test harness).
+        ``request_id`` is derived from ``event["id"]`` so target
+        retries reuse the same id and receipt / DLQ dedupe collapses
+        duplicates. Falls back to a UUID when id is absent.
         """
         event_id = event.get("id")
         request_id = f"chio-eb-{event_id}" if event_id else new_request_id("chio-eb")
@@ -383,8 +382,8 @@ class ChioEventBridgeHandler:
             "Detail": detail_bytes.decode("utf-8"),
             "EventBusName": self._config.receipt_bus,
         }
-        # boto3's put_events is sync; called directly because Lambda
-        # invocations are typically sync. Tests supply async doubles.
+        # boto3's put_events is sync; the await guard lets async
+        # doubles work without wrapping in asyncio.to_thread.
         result = self._events_client.put_events(Entries=[entry])
         response = await result if hasattr(result, "__await__") else result
         _raise_on_failed_entries(response, context="receipt")

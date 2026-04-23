@@ -297,9 +297,8 @@ async def test_camel_case_detailType_is_recognised() -> None:
 
 
 async def test_request_id_derived_from_event_id() -> None:
-    # EventBridge target retries reuse the same event id; request_id must
-    # follow so receipt / DLQ dedupe collapses them instead of minting a
-    # fresh UUID on every invocation.
+    # Target retries must land on the same request_id so receipt/DLQ
+    # dedupe can collapse them.
     h, _ec = _handler(chio_client=allow_all())
     event = _event()
     event["id"] = "evt-stable-123"
@@ -316,8 +315,6 @@ async def test_request_id_is_stable_across_retries() -> None:
 
 
 async def test_request_id_falls_back_to_uuid_when_event_id_missing() -> None:
-    # Synthetic events (or misconfigured producers) may omit id; the
-    # handler must still evaluate, minting a UUID-suffixed request_id.
     h, _ec = _handler(chio_client=allow_all())
     event = {
         "version": "0",
