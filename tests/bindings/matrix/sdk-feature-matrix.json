@@ -16,6 +16,9 @@
     },
     "go": {
       "label": "Go"
+    },
+    "cpp": {
+      "label": "C++"
     }
   },
   "features": [
@@ -41,6 +44,12 @@
           "evidence": [
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
+          ]
+        },
+        "cpp": {
+          "status": "package_backed",
+          "evidence": [
+            "./scripts/check-chio-cpp.sh"
           ]
         }
       }
@@ -69,6 +78,13 @@
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
           ]
+        },
+        "cpp": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-chio-cpp.sh",
+            "cargo run -p chio-conformance --bin chio-conformance-runner -- --peer cpp --scenarios-dir tests/conformance/scenarios/wave1 --results-dir target/chio-cpp-wave1-results --report-output target/chio-cpp-wave1-report.md"
+          ]
         }
       }
     },
@@ -95,6 +111,13 @@
           "evidence": [
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
+          ]
+        },
+        "cpp": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-chio-cpp.sh",
+            "cargo run -p chio-conformance --bin chio-conformance-runner -- --peer cpp --scenarios-dir tests/conformance/scenarios/wave1 --results-dir target/chio-cpp-wave1-results --report-output target/chio-cpp-wave1-report.md"
           ]
         }
       }
@@ -123,6 +146,12 @@
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave4_go_live -- --nocapture"
           ]
+        },
+        "cpp": {
+          "status": "in_progress",
+          "evidence": [
+            "./scripts/check-chio-cpp.sh"
+          ]
         }
       }
     },
@@ -149,6 +178,13 @@
           "evidence": [
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave2_go_live -- --nocapture"
+          ]
+        },
+        "cpp": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-chio-cpp.sh",
+            "cargo run -p chio-conformance --bin chio-conformance-runner -- --peer cpp --scenarios-dir tests/conformance/scenarios/wave2 --results-dir target/chio-cpp-wave2-results --report-output target/chio-cpp-wave2-report.md"
           ]
         }
       }
@@ -177,6 +213,12 @@
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave3_go_live -- --nocapture"
           ]
+        },
+        "cpp": {
+          "status": "in_progress",
+          "evidence": [
+            "./scripts/check-chio-cpp.sh"
+          ]
         }
       }
     },
@@ -204,6 +246,10 @@
             "./scripts/check-chio-go.sh",
             "cargo test -p chio-conformance --test wave5_go_live -- --nocapture"
           ]
+        },
+        "cpp": {
+          "status": "planned",
+          "evidence": []
         }
       }
     }

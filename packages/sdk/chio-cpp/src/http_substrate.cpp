@@ -1,0 +1,134 @@
+#include "chio/http_substrate.hpp"
+
+#include <utility>
+
+#include "json.hpp"
+
+namespace chio::http {
+
+std::string AuthMethod::to_json() const {
+  std::string out = "{\"method\":" + detail::quote(method);
+  for (const auto& field : fields) {
+    out += ",";
+    out += detail::quote(field.first);
+    out += ":";
+    out += detail::quote(field.second);
+  }
+  out += "}";
+  return out;
+}
+
+std::string CallerIdentity::to_json() const {
+  std::string out = "{\"subject\":" + detail::quote(subject) +
+                    ",\"auth_method\":" + auth_method.to_json() +
+                    ",\"verified\":" + (verified ? "true" : "false");
+  if (!tenant.empty()) {
+    out += ",\"tenant\":" + detail::quote(tenant);
+  }
+  if (!agent_id.empty()) {
+    out += ",\"agent_id\":" + detail::quote(agent_id);
+  }
+  out += "}";
+  return out;
+}
+
+std::string ChioHttpRequest::to_json() const {
+  std::string out = "{";
+  out += "\"request_id\":" + detail::quote(request_id);
+  out += ",\"method\":" + detail::quote(method);
+  out += ",\"route_pattern\":" + detail::quote(route_pattern);
+  out += ",\"path\":" + detail::quote(path);
+  out += ",\"query\":" + detail::json_string_map(query);
+  out += ",\"headers\":" + detail::json_string_map(headers);
+  out += ",\"caller\":" + caller.to_json();
+  if (!body_hash.empty()) {
+    out += ",\"body_hash\":" + detail::quote(body_hash);
+  }
+  out += ",\"body_length\":" + std::to_string(body_length);
+  if (!session_id.empty()) {
+    out += ",\"session_id\":" + detail::quote(session_id);
+  }
+  if (!capability_id.empty()) {
+    out += ",\"capability_id\":" + detail::quote(capability_id);
+  }
+  out += ",\"timestamp\":" + std::to_string(timestamp);
+  out += "}";
+  return out;
+}
+
+Evaluator::Evaluator(std::string sidecar_url, HttpTransportPtr transport, std::uint32_t timeout_ms)
+    : sidecar_url_(detail::trim_right_slash(std::move(sidecar_url))),
+      transport_(std::move(transport)),
+      timeout_ms_(timeout_ms) {}
+
+Result<std::string> Evaluator::evaluate(const ChioHttpRequest& request) const {
+  if (!transport_) {
+    return Result<std::string>::failure(Error{ErrorCode::Transport, "missing HTTP transport"});
+  }
+  HttpRequest http_request{
+      "POST",
+      sidecar_url_ + "/chio/evaluate",
+      {
+          {"Content-Type", "application/json"},
+          {"Accept", "application/json"},
+          {"X-Chio-Timeout-Ms", std::to_string(timeout_ms_)},
+      },
+      request.to_json(),
+  };
+  auto response = transport_->send(http_request);
+  if (!response) {
+    return Result<std::string>::failure(response.error());
+  }
+  if (response.value().status != 200) {
+    return Result<std::string>::failure(
+        Error{ErrorCode::Protocol, "sidecar evaluate returned HTTP " +
+                                      std::to_string(response.value().status)});
+  }
+  return Result<std::string>::success(response.value().body);
+}
+
+Result<bool> Evaluator::verify_receipt(std::string receipt_json) const {
+  if (!transport_) {
+    return Result<bool>::failure(Error{ErrorCode::Transport, "missing HTTP transport"});
+  }
+  HttpRequest request{
+      "POST",
+      sidecar_url_ + "/chio/verify",
+      {{"Content-Type", "application/json"}, {"Accept", "application/json"}},
+      std::move(receipt_json),
+  };
+  auto response = transport_->send(request);
+  if (!response) {
+    return Result<bool>::failure(response.error());
+  }
+  if (response.value().status != 200) {
+    return Result<bool>::failure(
+        Error{ErrorCode::Protocol, "sidecar verify returned HTTP " +
+                                      std::to_string(response.value().status)});
+  }
+  return Result<bool>::success(response.value().body.find("\"valid\":true") != std::string::npos);
+}
+
+Result<std::string> Evaluator::health() const {
+  if (!transport_) {
+    return Result<std::string>::failure(Error{ErrorCode::Transport, "missing HTTP transport"});
+  }
+  HttpRequest request{
+      "GET",
+      sidecar_url_ + "/chio/health",
+      {{"Accept", "application/json"}},
+      "",
+  };
+  auto response = transport_->send(request);
+  if (!response) {
+    return Result<std::string>::failure(response.error());
+  }
+  if (response.value().status != 200 && response.value().status != 503) {
+    return Result<std::string>::failure(
+        Error{ErrorCode::Protocol, "sidecar health returned HTTP " +
+                                      std::to_string(response.value().status)});
+  }
+  return Result<std::string>::success(response.value().body);
+}
+
+}  // namespace chio::http

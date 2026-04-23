@@ -113,6 +113,20 @@ cargo run -p chio-conformance --bin chio-conformance-runner -- \
   --report-output tests/conformance/reports/generated/wave3-go-live.md
 ```
 
+Run the C++ hosted MCP lane with:
+
+```bash
+cargo run -p chio-conformance --bin chio-conformance-runner -- \
+  --peer cpp \
+  --scenarios-dir tests/conformance/scenarios/wave1 \
+  --results-dir tests/conformance/results/generated/wave1-cpp-live \
+  --report-output tests/conformance/reports/generated/wave1-cpp-live.md
+```
+
+The C++ peer builds `packages/sdk/chio-cpp` and uses the system `curl` command
+for live HTTP. It reports unsupported results for OAuth discovery, streaming
+subscriptions, and nested callbacks until those SDK flows are implemented.
+
 Run the dedicated native Chio lane with:
 
 ```bash

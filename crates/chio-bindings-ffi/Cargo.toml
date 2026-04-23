@@ -1,0 +1,22 @@
+[package]
+name = "chio-bindings-ffi"
+description = "C ABI bindings for deterministic Chio SDK invariant helpers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_bindings_ffi"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+chio-binding-helpers = { path = "../chio-binding-helpers" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

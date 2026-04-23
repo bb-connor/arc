@@ -15,6 +15,7 @@ pub enum PeerTarget {
     Js,
     Python,
     Go,
+    Cpp,
 }
 
 impl PeerTarget {
@@ -23,6 +24,7 @@ impl PeerTarget {
             Self::Js => "js",
             Self::Python => "python",
             Self::Go => "go",
+            Self::Cpp => "cpp",
         }
     }
 }
@@ -352,6 +354,13 @@ fn run_peer(
                 .arg("./cmd/conformance-peer");
             command
         }
+        PeerTarget::Cpp => {
+            let executable = ensure_cpp_peer_executable(&options.repo_root)?;
+            command_description = executable.display().to_string();
+            let mut command = Command::new(executable);
+            command.current_dir(&options.repo_root);
+            command
+        }
     };
 
     let status = command
@@ -396,6 +405,70 @@ fn run_peer(
         });
     }
     Ok(())
+}
+
+fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> {
+    let build_dir = repo_root.join("target/chio-cpp-conformance");
+    let executable = build_dir.join(format!(
+        "chio_cpp_conformance_peer{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    if executable.exists() {
+        return Ok(executable);
+    }
+
+    let source_dir = repo_root.join("packages/sdk/chio-cpp");
+    let configure_status = Command::new("cmake")
+        .current_dir(repo_root)
+        .arg("-S")
+        .arg(&source_dir)
+        .arg("-B")
+        .arg(&build_dir)
+        .arg("-DCHIO_CPP_BUILD_TESTS=OFF")
+        .arg("-DCHIO_CPP_BUILD_EXAMPLES=OFF")
+        .arg("-DCHIO_CPP_ENABLE_CURL=OFF")
+        .arg("-DCHIO_CPP_BUILD_CONFORMANCE_PEER=ON")
+        .status()
+        .map_err(|source| RunnerError::Spawn {
+            command: "cmake configure chio_cpp_conformance_peer".to_string(),
+            source,
+        })?;
+    if !configure_status.success() {
+        return Err(RunnerError::ProcessFailed {
+            command: "cmake configure chio_cpp_conformance_peer".to_string(),
+            status: configure_status.code().unwrap_or(1),
+            log_path: "<stderr>".to_string(),
+        });
+    }
+
+    let build_status = Command::new("cmake")
+        .current_dir(repo_root)
+        .arg("--build")
+        .arg(&build_dir)
+        .arg("--target")
+        .arg("chio_cpp_conformance_peer")
+        .status()
+        .map_err(|source| RunnerError::Spawn {
+            command: "cmake --build chio_cpp_conformance_peer".to_string(),
+            source,
+        })?;
+    if !build_status.success() {
+        return Err(RunnerError::ProcessFailed {
+            command: "cmake --build chio_cpp_conformance_peer".to_string(),
+            status: build_status.code().unwrap_or(1),
+            log_path: "<stderr>".to_string(),
+        });
+    }
+
+    if executable.exists() {
+        Ok(executable)
+    } else {
+        Err(RunnerError::ProcessFailed {
+            command: "cmake --build chio_cpp_conformance_peer".to_string(),
+            status: 1,
+            log_path: "<stderr>".to_string(),
+        })
+    }
 }
 
 fn reserve_listen_addr() -> Result<SocketAddr, RunnerError> {

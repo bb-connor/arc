@@ -79,11 +79,14 @@ EOF
 ./scripts/check-bindings-parity.sh
 ./scripts/check-chio-py.sh
 ./scripts/check-chio-go.sh
+./scripts/check-chio-cpp.sh
 
 echo "Python live parity is package-backed for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"
 echo "Go live parity is conformance-green for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"
+echo "C++ parity is package-backed for hosted MCP sessions, invariant helpers, DPoP proofs, receipt queries, and HTTP substrate helpers:"
+echo "  ./scripts/check-chio-cpp.sh"
 echo "Current live evidence runs through these lanes:"
 echo "  cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
 echo "  cargo test -p chio-conformance --test wave2_go_live -- --nocapture"
