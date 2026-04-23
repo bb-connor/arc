@@ -228,7 +228,16 @@ class ChioNatsMiddleware:
         msg: NatsMsgLike,
         handler: MessageHandler,
     ) -> NatsProcessingOutcome:
-        request_id = new_request_id("chio-nats")
+        # Derive request_id from the Nats-Msg-Id header when the
+        # producer set one so JetStream redelivery produces byte-identical
+        # receipts. Fall back to a UUID when the header is absent (the
+        # header is optional in the NATS protocol; producers must opt
+        # in via the `Nats-Msg-Id` header to get broker-side dedupe).
+        headers = msg.headers or {}
+        msg_id = headers.get("Nats-Msg-Id")
+        request_id = (
+            f"chio-nats-{msg_id}" if msg_id else new_request_id("chio-nats")
+        )
         subject = msg.subject or ""
         tool_name = resolve_scope(scope_map=self._config.scope_map, subject=subject)
         parameters = self._parameters_for(msg, request_id=request_id)

@@ -616,3 +616,31 @@ async def test_receipt_envelope_matches_build_envelope() -> None:
     receipt_xadd = client.xadded[0]
     assert receipt_xadd["stream"] == "chio-receipts"
     assert receipt_xadd["fields"]["payload"] == expected.value
+
+
+async def test_request_id_is_deterministic_on_redelivery() -> None:
+    # XCLAIM / XAUTOCLAIM redelivers the same stream + entry_id after
+    # a failed XACK. The middleware derives request_id from that tuple
+    # so receipts stay byte-identical across attempts.
+    mw, _ = _middleware(chio_client=allow_all())
+
+    async def handler(_e: Any, _r: Any) -> None:
+        return None
+
+    first = await mw.dispatch(
+        stream="tasks",
+        entry_id="1700000000-0",
+        fields={b"k": b"v"},
+        handler=handler,
+    )
+    second = await mw.dispatch(
+        stream="tasks",
+        entry_id="1700000000-0",
+        fields={b"k": b"v"},
+        handler=handler,
+    )
+    assert (
+        first.request_id
+        == second.request_id
+        == "chio-redis-tasks-1700000000-0"
+    )

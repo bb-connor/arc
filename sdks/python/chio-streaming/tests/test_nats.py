@@ -570,3 +570,38 @@ async def test_receipt_envelope_matches_build_envelope() -> None:
     )
     published = js.published[0]
     assert published["payload"] == expected.value
+
+
+async def test_request_id_is_deterministic_on_redelivery_with_msg_id_header() -> None:
+    # JetStream redelivers the same message after a failed ack. If
+    # producers set the Nats-Msg-Id header (for broker-side dedupe),
+    # the middleware must produce the same request_id both times so
+    # receipts stay deduplicable downstream.
+    mw, _ = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    first = await mw.dispatch(
+        FakeNatsMsg(subject="tasks.research", headers={"Nats-Msg-Id": "stable-42"}),
+        handler,
+    )
+    second = await mw.dispatch(
+        FakeNatsMsg(subject="tasks.research", headers={"Nats-Msg-Id": "stable-42"}),
+        handler,
+    )
+    assert first.request_id == second.request_id == "chio-nats-stable-42"
+
+
+async def test_request_id_falls_back_to_uuid_without_msg_id_header() -> None:
+    # Producers that do not set Nats-Msg-Id get the UUID fallback; each
+    # delivery gets a fresh id (no broker dedupe opted in).
+    mw, _ = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    first = await mw.dispatch(FakeNatsMsg(subject="tasks.research"), handler)
+    second = await mw.dispatch(FakeNatsMsg(subject="tasks.research"), handler)
+    assert first.request_id.startswith("chio-nats-")
+    assert first.request_id != second.request_id

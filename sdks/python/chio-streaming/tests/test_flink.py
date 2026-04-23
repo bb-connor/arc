@@ -854,15 +854,11 @@ async def test_async_close_from_worker_thread_shuts_down_client() -> None:
     assert spy.close_calls == 1
 
 
-async def test_async_close_from_loop_thread_does_not_deadlock(
-    caplog: Any,
-) -> None:
-    # Defensive: close() from the same thread as a running loop cannot
-    # block on a loop-scheduled coroutine without deadlock. Schedule as
-    # fire-and-forget and log a warning; callers that need deterministic
-    # cleanup must dispatch close to a worker thread.
-    import logging
-
+async def test_async_close_from_loop_thread_raises() -> None:
+    # close() is synchronous and cannot await the HTTP client shutdown
+    # from the loop's own thread without deadlocking or leaking the
+    # pool. Raise a ChioStreamingConfigError rather than either: tell
+    # the caller to dispatch close() to a worker thread instead.
     spy = SpyClosableChio()
     config = ChioFlinkConfig(
         capability_id="cap",
@@ -877,16 +873,13 @@ async def test_async_close_from_loop_thread_does_not_deadlock(
     fn = ChioAsyncEvaluateFunction(config)
     fn.open(MockRuntimeContext())
     await fn.async_invoke({"id": 100})
-    with caplog.at_level(logging.WARNING, logger="chio_streaming.flink"):
+    with pytest.raises(ChioStreamingConfigError, match="worker thread"):
         fn.close()
-    assert any(
-        "close() called from inside a running event loop" in record.message
-        for record in caplog.records
-    )
-    # Drain the scheduled task so the event loop closes cleanly after
-    # the test (pytest-asyncio complains about pending tasks otherwise).
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    # Cleanup: dispatch the real close to a worker thread so the client
+    # is actually shut down before pytest-asyncio tears the loop down.
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, fn.close)
+    assert spy.close_calls == 1
 
 
 async def test_async_receipt_bytes_match_build_envelope_exactly() -> None:

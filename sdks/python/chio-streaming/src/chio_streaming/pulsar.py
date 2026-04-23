@@ -232,7 +232,14 @@ class ChioPulsarMiddleware:
         msg: PulsarMessageLike,
         handler: MessageHandler,
     ) -> PulsarProcessingOutcome:
-        request_id = new_request_id("chio-pulsar")
+        # Derive request_id from the Pulsar message id so a redelivery
+        # after a failed ack produces byte-identical receipts. A fresh
+        # UUID per attempt would bypass downstream dedupe-by-request-id
+        # and cause the signed receipt to diverge across retries.
+        message_id = msg.message_id()
+        request_id = (
+            f"chio-pulsar-{message_id}" if message_id else new_request_id("chio-pulsar")
+        )
         topic = msg.topic_name() or ""
         tool_name = resolve_scope(scope_map=self._config.scope_map, subject=topic)
         parameters = self._parameters_for(msg, request_id=request_id)

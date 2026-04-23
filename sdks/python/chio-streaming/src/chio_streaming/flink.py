@@ -586,6 +586,7 @@ class _ChioFlinkEvaluator:
             subtask_index=self._subtask,
             attempt_number=self._attempt,
             receipt_bytes=receipt_bytes,
+            acked=True,
         )
 
 
@@ -667,25 +668,23 @@ class ChioAsyncEvaluateFunction(_AsyncFunctionBase):
     def close(self) -> None:
         # Production PyFlink drives close() from the worker thread with
         # no running loop, so the one-shot loop below is the common path.
-        # If close() is reached from inside a running loop (typically an
-        # in-process test harness that forgot to dispatch close to a
-        # worker thread), a sync blocking wait on the same thread would
-        # deadlock the loop. Schedule a best-effort shutdown task and
-        # warn; callers that need deterministic cleanup must invoke
-        # close() from a non-loop thread (e.g. `loop.run_in_executor`).
+        # Calling close() from inside a running loop cannot be handled
+        # without either deadlocking (sync wait on the loop's own
+        # thread) or leaking the HTTP pool (fire-and-forget task). The
+        # correct invocation pattern is to dispatch close() off the
+        # loop thread (e.g. `await loop.run_in_executor(None, fn.close)`).
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
             running = None
         if running is not None:
-            running.create_task(self._evaluator.shutdown())
-            logger.warning(
-                "chio-flink: close() called from inside a running event "
-                "loop; scheduled shutdown as a fire-and-forget task. "
-                "Call close() from a worker thread for deterministic "
-                "cleanup."
+            raise ChioStreamingConfigError(
+                "ChioAsyncEvaluateFunction.close() was called from inside "
+                "a running event loop. close() is synchronous and cannot "
+                "await the HTTP client shutdown without either deadlocking "
+                "or leaking the pool. Dispatch close() to a worker thread, "
+                "e.g. `await loop.run_in_executor(None, fn.close)`."
             )
-            return
         loop = asyncio.new_event_loop()
         try:
             loop.run_until_complete(self._evaluator.shutdown())

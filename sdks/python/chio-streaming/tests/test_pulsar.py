@@ -30,12 +30,13 @@ class FakePulsarMessage:
         data: bytes = b"",
         properties: dict[str, str] | None = None,
         partition_key: str | None = None,
+        message_id: Any = None,
     ) -> None:
         self._topic = topic
         self._data = data
         self._props = properties or {}
         self._key = partition_key
-        self._mid = object()
+        self._mid = message_id if message_id is not None else object()
 
     def data(self) -> bytes:
         return self._data
@@ -556,3 +557,31 @@ async def test_receipt_envelope_matches_build_envelope() -> None:
         source_topic="persistent://public/default/orders",
     )
     assert receipt_p.sent[0]["content"] == expected.value
+
+
+async def test_request_id_is_deterministic_on_redelivery() -> None:
+    # Pulsar redelivers the same message after a failed ack. The
+    # middleware derives request_id from message_id so receipts stay
+    # byte-identical across attempts (the sidecar hashes request_id
+    # into parameters, so divergence would also diverge the signed
+    # receipt).
+    mw, _consumer, _receipt_p, _dlq_p = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    first = await mw.dispatch(
+        FakePulsarMessage(
+            topic="persistent://public/default/orders",
+            message_id="msg-stable-42",
+        ),
+        handler,
+    )
+    second = await mw.dispatch(
+        FakePulsarMessage(
+            topic="persistent://public/default/orders",
+            message_id="msg-stable-42",
+        ),
+        handler,
+    )
+    assert first.request_id == second.request_id == "chio-pulsar-msg-stable-42"

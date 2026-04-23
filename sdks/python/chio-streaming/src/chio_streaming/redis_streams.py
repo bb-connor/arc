@@ -25,7 +25,6 @@ from chio_streaming.core import (
     evaluate_with_chio,
     hash_body,
     invoke_handler,
-    new_request_id,
     resolve_scope,
     synthesize_deny_receipt,
 )
@@ -218,7 +217,11 @@ class ChioRedisStreamsMiddleware:
         fields: Mapping[Any, Any],
         handler: MessageHandler,
     ) -> RedisStreamsProcessingOutcome:
-        request_id = new_request_id("chio-redis")
+        # Derive request_id from the stream + entry_id so XCLAIM /
+        # XAUTOCLAIM redelivery produces byte-identical receipts. A
+        # fresh UUID per delivery would bypass downstream dedupe-by-
+        # request-id and cause the signed receipt to diverge.
+        request_id = f"chio-redis-{stream}-{entry_id}"
         tool_name = resolve_scope(scope_map=self._config.scope_map, subject=stream)
         normalised_fields = _normalise_fields(fields)
         body = _canonical_fields_bytes(normalised_fields)
