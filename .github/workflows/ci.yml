@@ -14,6 +14,7 @@ env:
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
+  CHIO_AENEAS_REV: 38d10a22642d75d051e14006cc6e45055381f10e
 
 jobs:
   check:
@@ -87,6 +88,32 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.0"
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Configure Aeneas and Charon wrappers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/chio-aeneas-bin"
+          cat > "${RUNNER_TEMP}/chio-aeneas-bin/aeneas" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec nix run --extra-experimental-features "nix-command flakes" "github:AeneasVerif/aeneas/${CHIO_AENEAS_REV}" -- "\$@"
+          EOF
+          cat > "${RUNNER_TEMP}/chio-aeneas-bin/charon" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec nix run --extra-experimental-features "nix-command flakes" "github:AeneasVerif/aeneas/${CHIO_AENEAS_REV}#charon" -- "\$@"
+          EOF
+          chmod +x "${RUNNER_TEMP}/chio-aeneas-bin/aeneas" "${RUNNER_TEMP}/chio-aeneas-bin/charon"
+          echo "${RUNNER_TEMP}/chio-aeneas-bin" >> "${GITHUB_PATH}"
+          echo "CHIO_CHARON=${RUNNER_TEMP}/chio-aeneas-bin/charon" >> "${GITHUB_ENV}"
+          "${RUNNER_TEMP}/chio-aeneas-bin/aeneas" --help >/dev/null
+          "${RUNNER_TEMP}/chio-aeneas-bin/charon" --help >/dev/null
 
       - uses: Swatinem/rust-cache@v2
 

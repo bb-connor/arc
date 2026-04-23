@@ -16,9 +16,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability_verify::VerifiedCapability;
 use crate::evaluate::EvaluationVerdict;
+#[cfg(not(kani))]
+use crate::formal_core::monetary_cap_is_subset_by_parts;
 use crate::formal_core::{
-    exact_or_wildcard_covers, monetary_cap_is_subset_by_parts, optional_u32_cap_is_subset,
-    prefix_wildcard_or_exact_covers, required_true_is_preserved,
+    exact_or_wildcard_covers, optional_u32_cap_is_subset, prefix_wildcard_or_exact_covers,
+    required_true_is_preserved,
 };
 use crate::guard::PortableToolCallRequest;
 use crate::Verdict;
@@ -97,21 +99,79 @@ impl NormalizedToolGrant {
     /// Mirrors `ToolGrant::is_subset_of` over the normalized proof-facing AST.
     #[must_use]
     pub fn is_subset_of(&self, parent: &Self) -> bool {
+        #[cfg(kani)]
+        {
+            return self.is_subset_of_bounded_kani(parent);
+        }
+
+        #[cfg(not(kani))]
+        {
+            if !exact_or_wildcard_covers(&parent.server_id, &self.server_id) {
+                return false;
+            }
+            if !exact_or_wildcard_covers(&parent.tool_name, &self.tool_name) {
+                return false;
+            }
+
+            if !self
+                .operations
+                .iter()
+                .all(|operation| parent.operations.contains(operation))
+            {
+                return false;
+            }
+
+            if !optional_u32_cap_is_subset(
+                self.max_invocations.is_some(),
+                self.max_invocations.unwrap_or(0),
+                parent.max_invocations.is_some(),
+                parent.max_invocations.unwrap_or(0),
+            ) {
+                return false;
+            }
+
+            if !parent
+                .constraints
+                .iter()
+                .all(|constraint| self.constraints.contains(constraint))
+            {
+                return false;
+            }
+
+            if !monetary_cap_is_subset(
+                self.max_cost_per_invocation.as_ref(),
+                parent.max_cost_per_invocation.as_ref(),
+            ) {
+                return false;
+            }
+
+            if !monetary_cap_is_subset(self.max_total_cost.as_ref(), parent.max_total_cost.as_ref())
+            {
+                return false;
+            }
+
+            if !required_true_is_preserved(
+                parent.dpop_required == Some(true),
+                self.dpop_required == Some(true),
+            ) {
+                return false;
+            }
+
+            true
+        }
+    }
+
+    #[cfg(kani)]
+    fn is_subset_of_bounded_kani(&self, parent: &Self) -> bool {
         if !exact_or_wildcard_covers(&parent.server_id, &self.server_id) {
             return false;
         }
         if !exact_or_wildcard_covers(&parent.tool_name, &self.tool_name) {
             return false;
         }
-
-        if !self
-            .operations
-            .iter()
-            .all(|operation| parent.operations.contains(operation))
-        {
+        if !normalized_operations_subset_bounded_kani(&self.operations, &parent.operations) {
             return false;
         }
-
         if !optional_u32_cap_is_subset(
             self.max_invocations.is_some(),
             self.max_invocations.unwrap_or(0),
@@ -120,26 +180,21 @@ impl NormalizedToolGrant {
         ) {
             return false;
         }
-
-        if !parent
-            .constraints
-            .iter()
-            .all(|constraint| self.constraints.contains(constraint))
-        {
+        if !normalized_constraints_subset_bounded_kani(&self.constraints, &parent.constraints) {
             return false;
         }
-
-        if !monetary_cap_is_subset(
+        if !monetary_cap_is_subset_bounded_kani(
             self.max_cost_per_invocation.as_ref(),
             parent.max_cost_per_invocation.as_ref(),
         ) {
             return false;
         }
-
-        if !monetary_cap_is_subset(self.max_total_cost.as_ref(), parent.max_total_cost.as_ref()) {
+        if !monetary_cap_is_subset_bounded_kani(
+            self.max_total_cost.as_ref(),
+            parent.max_total_cost.as_ref(),
+        ) {
             return false;
         }
-
         if !required_true_is_preserved(
             parent.dpop_required == Some(true),
             self.dpop_required == Some(true),
@@ -201,24 +256,20 @@ impl NormalizedScope {
     pub fn is_subset_of(&self, parent: &Self) -> bool {
         #[cfg(kani)]
         {
-            if self.grants.len() != 1
-                || parent.grants.len() != 1
-                || !self.resource_grants.is_empty()
+            if !self.resource_grants.is_empty()
                 || !parent.resource_grants.is_empty()
                 || !self.prompt_grants.is_empty()
                 || !parent.prompt_grants.is_empty()
             {
                 return false;
             }
-            let child = &self.grants[0];
-            let parent = &parent.grants[0];
-            if child.max_invocations.is_none() && parent.max_invocations.is_some() {
-                return false;
+            if self.grants.is_empty() {
+                return true;
             }
-            if child.dpop_required.is_none() && parent.dpop_required.is_some() {
-                return false;
+            if self.grants.len() == 1 && parent.grants.len() == 1 {
+                return self.grants[0].is_subset_of(&parent.grants[0]);
             }
-            return true;
+            return false;
         }
 
         #[cfg(not(kani))]
@@ -510,6 +561,7 @@ impl TryFrom<&Constraint> for NormalizedConstraint {
     }
 }
 
+#[cfg(not(kani))]
 fn monetary_cap_is_subset(
     child: Option<&NormalizedMonetaryAmount>,
     parent: Option<&NormalizedMonetaryAmount>,
@@ -527,6 +579,42 @@ fn monetary_cap_is_subset(
         parent_units,
         currency_matches,
     )
+}
+
+#[cfg(kani)]
+fn normalized_operations_subset_bounded_kani(
+    child: &[NormalizedOperation],
+    parent: &[NormalizedOperation],
+) -> bool {
+    if child.is_empty() {
+        return true;
+    }
+    if child.len() == 1 && parent.len() == 1 {
+        return child[0] == parent[0];
+    }
+    false
+}
+
+#[cfg(kani)]
+fn normalized_constraints_subset_bounded_kani(
+    _child: &[NormalizedConstraint],
+    parent: &[NormalizedConstraint],
+) -> bool {
+    parent.is_empty()
+}
+
+#[cfg(kani)]
+fn monetary_cap_is_subset_bounded_kani(
+    child: Option<&NormalizedMonetaryAmount>,
+    parent: Option<&NormalizedMonetaryAmount>,
+) -> bool {
+    match (child, parent) {
+        (None, None) | (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (Some(child_cap), Some(parent_cap)) => {
+            child_cap.units <= parent_cap.units && child_cap.currency == parent_cap.currency
+        }
+    }
 }
 
 fn pattern_covers(parent: &str, child: &str) -> bool {

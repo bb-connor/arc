@@ -39,26 +39,44 @@ pub fn sign_receipt(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, ReceiptSigningError> {
+    let backend_key = backend.public_key();
+    if body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key {
+        #[cfg(kani)]
+        core::mem::forget(body);
+
+        return Err(ReceiptSigningError::KernelKeyMismatch);
+    }
+
     #[cfg(kani)]
     {
-        if body.kernel_key != backend.public_key() {
-            core::mem::forget(body);
-            return Err(ReceiptSigningError::KernelKeyMismatch);
-        }
-        // Kani public harnesses cover mismatch fail-closed behavior here.
-        // Successful canonical signing is covered by runtime boundary tests.
-        core::mem::forget(body);
-        kani::assume(false);
-        unreachable!("successful receipt signing is outside this Kani harness");
+        // Kani cannot practically symbolically execute the serde/RFC 8785
+        // canonicalization stack. This model still exercises the successful
+        // public branch: matching kernel key, backend signing, and field
+        // preservation into the returned receipt.
+        let signature = backend
+            .sign_bytes(b"kani-receipt-signing-model")
+            .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))?;
+        return Ok(ChioReceipt {
+            id: body.id,
+            timestamp: body.timestamp,
+            capability_id: body.capability_id,
+            tool_server: body.tool_server,
+            tool_name: body.tool_name,
+            action: body.action,
+            decision: body.decision,
+            content_hash: body.content_hash,
+            policy_hash: body.policy_hash,
+            evidence: body.evidence,
+            metadata: body.metadata,
+            trust_level: body.trust_level,
+            tenant_id: body.tenant_id,
+            kernel_key: body.kernel_key,
+            algorithm: Some(backend.algorithm()),
+            signature,
+        });
     }
 
     #[cfg(not(kani))]
-    {
-        if body.kernel_key != backend.public_key() {
-            return Err(ReceiptSigningError::KernelKeyMismatch);
-        }
-
-        ChioReceipt::sign_with_backend(body, backend)
-            .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))
-    }
+    ChioReceipt::sign_with_backend(body, backend)
+        .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))
 }

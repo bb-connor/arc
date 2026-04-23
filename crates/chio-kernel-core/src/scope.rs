@@ -22,6 +22,8 @@
 
 use alloc::format;
 use alloc::string::{String, ToString};
+#[cfg(kani)]
+use alloc::vec;
 use alloc::vec::Vec;
 
 use chio_core_types::capability::{CapabilityToken, ChioScope, Constraint, Operation, ToolGrant};
@@ -69,59 +71,70 @@ pub fn resolve_matching_grants<'a>(
     arguments: &serde_json::Value,
 ) -> Result<Vec<MatchedGrant<'a>>, ScopeMatchError> {
     #[cfg(kani)]
-    {
-        let _ = arguments;
-        let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
-        for (index, grant) in scope.grants.iter().enumerate() {
-            if grant.constraints.is_empty()
-                && grant.server_id.as_bytes() == server_id.as_bytes()
-                && grant.tool_name.as_bytes() == tool_name.as_bytes()
-                && grant.operations.contains(&Operation::Invoke)
-            {
-                matches.push(MatchedGrant {
-                    index,
-                    grant,
-                    specificity: (1, 1, 0),
-                });
-            }
+    if scope.grants.len() == 1 {
+        let grant = &scope.grants[0];
+        if !grant.constraints.is_empty() {
+            return Err(ScopeMatchError::ConstraintError(
+                "portable kernel cannot safely evaluate constrained Kani fixture".to_string(),
+            ));
         }
+
+        if matches_pattern(&grant.server_id, server_id)
+            && matches_pattern(&grant.tool_name, tool_name)
+            && grant.operations.contains(&Operation::Invoke)
+        {
+            return Ok(vec![MatchedGrant {
+                index: 0,
+                grant,
+                specificity: (
+                    u8::from(pattern_exact(&grant.server_id, server_id)),
+                    u8::from(pattern_exact(&grant.tool_name, tool_name)),
+                    grant.constraints.len(),
+                ),
+            }]);
+        }
+
+        return Ok(Vec::new());
+    }
+
+    let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
+
+    for (index, grant) in scope.grants.iter().enumerate() {
+        let covered = match grant_covers(grant, tool_name, server_id, arguments) {
+            Ok(covered) => covered,
+            Err(error @ ScopeMatchError::ConstraintError(_)) => return Err(error),
+            Err(error) => return Err(error),
+        };
+        if !covered {
+            continue;
+        }
+
+        matches.push(MatchedGrant {
+            index,
+            grant,
+            specificity: (
+                u8::from(grant.server_id == server_id),
+                u8::from(grant.tool_name == tool_name),
+                grant.constraints.len(),
+            ),
+        });
+    }
+
+    #[cfg(kani)]
+    if matches.len() <= 1 {
+        // A zero-or-one element vector is already sorted; this keeps Kani
+        // focused on grant coverage rather than allocator internals.
         return Ok(matches);
     }
 
-    #[cfg(not(kani))]
-    {
-        let mut matches: Vec<MatchedGrant<'a>> = Vec::new();
+    matches.sort_by(|left, right| {
+        right
+            .specificity
+            .cmp(&left.specificity)
+            .then_with(|| left.index.cmp(&right.index))
+    });
 
-        for (index, grant) in scope.grants.iter().enumerate() {
-            let covered = match grant_covers(grant, tool_name, server_id, arguments) {
-                Ok(covered) => covered,
-                Err(error @ ScopeMatchError::ConstraintError(_)) => return Err(error),
-                Err(error) => return Err(error),
-            };
-            if !covered {
-                continue;
-            }
-
-            matches.push(MatchedGrant {
-                index,
-                grant,
-                specificity: (
-                    u8::from(grant.server_id == server_id),
-                    u8::from(grant.tool_name == tool_name),
-                    grant.constraints.len(),
-                ),
-            });
-        }
-
-        matches.sort_by(|left, right| {
-            right
-                .specificity
-                .cmp(&left.specificity)
-                .then_with(|| left.index.cmp(&right.index))
-        });
-
-        Ok(matches)
-    }
+    Ok(matches)
 }
 
 /// Convenience wrapper that runs [`resolve_matching_grants`] against a
@@ -145,10 +158,20 @@ fn grant_covers(
     server_id: &str,
     arguments: &serde_json::Value,
 ) -> Result<bool, ScopeMatchError> {
+    #[cfg(kani)]
+    let constraints_ok = if grant.constraints.is_empty() {
+        true
+    } else {
+        constraints_match(&grant.constraints, arguments)?
+    };
+
+    #[cfg(not(kani))]
+    let constraints_ok = constraints_match(&grant.constraints, arguments)?;
+
     Ok(matches_pattern(&grant.server_id, server_id)
         && matches_pattern(&grant.tool_name, tool_name)
         && grant.operations.contains(&Operation::Invoke)
-        && constraints_match(&grant.constraints, arguments)?)
+        && constraints_ok)
 }
 
 fn constraints_match(
@@ -227,7 +250,39 @@ fn constraint_matches(
 }
 
 fn matches_pattern(pattern: &str, candidate: &str) -> bool {
+    #[cfg(kani)]
+    {
+        let pattern = pattern.as_bytes();
+        let candidate = candidate.as_bytes();
+        if pattern.len() == 1 && pattern[0] == b'*' {
+            return true;
+        }
+        if pattern.len() != candidate.len() {
+            return false;
+        }
+        if pattern.len() == 1 {
+            return pattern[0] == candidate[0];
+        }
+    }
+
     pattern == "*" || pattern == candidate
+}
+
+#[cfg(kani)]
+fn pattern_exact(pattern: &str, candidate: &str) -> bool {
+    #[cfg(kani)]
+    {
+        let pattern = pattern.as_bytes();
+        let candidate = candidate.as_bytes();
+        if pattern.len() != candidate.len() {
+            return false;
+        }
+        if pattern.len() == 1 {
+            return pattern[0] == candidate[0];
+        }
+    }
+
+    pattern == candidate
 }
 
 fn path_has_prefix(candidate: &str, prefix: &str) -> bool {
