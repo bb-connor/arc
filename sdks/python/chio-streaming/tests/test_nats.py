@@ -604,3 +604,61 @@ async def test_request_id_falls_back_to_uuid_without_msg_id_header() -> None:
     second = await mw.dispatch(FakeNatsMsg(subject="tasks.research"), handler)
     assert first.request_id.startswith("chio-nats-")
     assert first.request_id != second.request_id
+
+
+class _FakeJsSeq:
+    def __init__(self, stream: int) -> None:
+        self.stream = stream
+        self.consumer = stream
+
+
+class _FakeJsMetadata:
+    def __init__(self, *, stream: str, sequence: int) -> None:
+        self.stream = stream
+        self.sequence = _FakeJsSeq(sequence)
+
+
+class FakeJsNatsMsg(FakeNatsMsg):
+    """FakeNatsMsg with JetStream metadata exposed."""
+
+    def __init__(self, *, stream: str, stream_seq: int, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.metadata = _FakeJsMetadata(stream=stream, sequence=stream_seq)
+
+
+async def test_request_id_uses_jetstream_metadata_when_no_header() -> None:
+    # JetStream pulls expose msg.metadata.sequence even when the
+    # publisher did not set Nats-Msg-Id; redeliveries replay the same
+    # sequence so the middleware must collapse onto a stable request_id.
+    mw, _ = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    first = await mw.dispatch(
+        FakeJsNatsMsg(subject="tasks.research", stream="ORDERS", stream_seq=42),
+        handler,
+    )
+    second = await mw.dispatch(
+        FakeJsNatsMsg(subject="tasks.research", stream="ORDERS", stream_seq=42),
+        handler,
+    )
+    assert first.request_id == second.request_id == "chio-nats-js-ORDERS-42"
+
+
+async def test_request_id_header_wins_over_jetstream_metadata() -> None:
+    mw, _ = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    outcome = await mw.dispatch(
+        FakeJsNatsMsg(
+            subject="tasks.research",
+            stream="ORDERS",
+            stream_seq=42,
+            headers={"Nats-Msg-Id": "publisher-set"},
+        ),
+        handler,
+    )
+    assert outcome.request_id == "chio-nats-publisher-set"

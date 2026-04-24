@@ -228,16 +228,15 @@ class ChioNatsMiddleware:
         msg: NatsMsgLike,
         handler: MessageHandler,
     ) -> NatsProcessingOutcome:
-        # Derive request_id from the Nats-Msg-Id header when the
-        # producer set one so JetStream redelivery produces byte-identical
-        # receipts. Fall back to a UUID when the header is absent (the
-        # header is optional in the NATS protocol; producers must opt
-        # in via the `Nats-Msg-Id` header to get broker-side dedupe).
-        headers = msg.headers or {}
-        msg_id = headers.get("Nats-Msg-Id")
-        request_id = (
-            f"chio-nats-{msg_id}" if msg_id else new_request_id("chio-nats")
-        )
+        # Derivation precedence for request_id (each step keeps redeliveries
+        # collapsed on the same id so downstream dedupe holds):
+        #   1. Nats-Msg-Id header set by a deduping publisher.
+        #   2. JetStream stream/consumer sequence from msg.metadata; nats-py
+        #      exposes this on every JetStream-pulled Msg even when the
+        #      publisher did not set a header.
+        #   3. UUID fallback for core-NATS subscribers (no JetStream
+        #      metadata) and producers that opted out of message ids.
+        request_id = _derive_nats_request_id(msg)
         subject = msg.subject or ""
         tool_name = resolve_scope(scope_map=self._config.scope_map, subject=subject)
         parameters = self._parameters_for(msg, request_id=request_id)
@@ -407,6 +406,23 @@ def _bytes_headers_to_str(
 ) -> dict[str, str]:
     """Kafka-shaped ``list[tuple[str, bytes]]`` to NATS-shaped ``dict[str, str]``."""
     return {name: str(stringify_header_value(value)) for name, value in headers}
+
+
+def _derive_nats_request_id(msg: NatsMsgLike) -> str:
+    headers = msg.headers or {}
+    msg_id = headers.get("Nats-Msg-Id")
+    if msg_id:
+        return f"chio-nats-{msg_id}"
+    # JetStream Msg.metadata.sequence carries (stream, consumer) seqs.
+    # nats-py raises if metadata is read on a core-NATS message, so guard.
+    metadata = getattr(msg, "metadata", None)
+    if metadata is not None:
+        sequence = getattr(metadata, "sequence", None)
+        stream_seq = getattr(sequence, "stream", None) if sequence is not None else None
+        if stream_seq is not None:
+            stream_name = getattr(metadata, "stream", "") or ""
+            return f"chio-nats-js-{stream_name}-{stream_seq}"
+    return new_request_id("chio-nats")
 
 
 def build_nats_middleware(
