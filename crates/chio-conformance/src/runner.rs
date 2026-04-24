@@ -413,10 +413,6 @@ fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> 
         "chio_cpp_conformance_peer{}",
         std::env::consts::EXE_SUFFIX
     ));
-    if executable.exists() {
-        return Ok(executable);
-    }
-
     let source_dir = repo_root.join("packages/sdk/chio-cpp");
     let configure_status = Command::new("cmake")
         .current_dir(repo_root)
@@ -426,7 +422,7 @@ fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> 
         .arg(&build_dir)
         .arg("-DCHIO_CPP_BUILD_TESTS=OFF")
         .arg("-DCHIO_CPP_BUILD_EXAMPLES=OFF")
-        .arg("-DCHIO_CPP_ENABLE_CURL=OFF")
+        .arg("-DCHIO_CPP_ENABLE_CURL=ON")
         .arg("-DCHIO_CPP_BUILD_CONFORMANCE_PEER=ON")
         .status()
         .map_err(|source| RunnerError::Spawn {

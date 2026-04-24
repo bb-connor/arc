@@ -1781,6 +1781,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-cpp-kernel-ffi"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel-core",
+ "hex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-credentials"
 version = "0.1.0"
 dependencies = [

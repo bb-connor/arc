@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <iomanip>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace chio::detail {
 
@@ -137,6 +140,362 @@ inline std::string url_encode(std::string_view input) {
     }
   }
   return escaped.str();
+}
+
+class JsonValue {
+ public:
+  enum class Kind {
+    Null,
+    Bool,
+    Number,
+    String,
+    Array,
+    Object,
+  };
+
+  static JsonValue null() { return JsonValue(); }
+  static JsonValue boolean(bool value) {
+    JsonValue out;
+    out.kind_ = Kind::Bool;
+    out.bool_ = value;
+    return out;
+  }
+  static JsonValue number(std::string value) {
+    JsonValue out;
+    out.kind_ = Kind::Number;
+    out.string_ = std::move(value);
+    return out;
+  }
+  static JsonValue string(std::string value) {
+    JsonValue out;
+    out.kind_ = Kind::String;
+    out.string_ = std::move(value);
+    return out;
+  }
+  static JsonValue array(std::vector<JsonValue> value = {}) {
+    JsonValue out;
+    out.kind_ = Kind::Array;
+    out.array_ = std::move(value);
+    return out;
+  }
+  static JsonValue object(std::map<std::string, JsonValue> value = {}) {
+    JsonValue out;
+    out.kind_ = Kind::Object;
+    out.object_ = std::move(value);
+    return out;
+  }
+
+  Kind kind() const { return kind_; }
+  bool is_object() const { return kind_ == Kind::Object; }
+  bool is_array() const { return kind_ == Kind::Array; }
+  bool is_string() const { return kind_ == Kind::String; }
+
+  const std::string& as_string() const { return string_; }
+  const std::vector<JsonValue>& as_array() const { return array_; }
+  const std::map<std::string, JsonValue>& as_object() const { return object_; }
+
+  const JsonValue* get(std::string_view key) const {
+    if (!is_object()) {
+      return nullptr;
+    }
+    auto found = object_.find(std::string(key));
+    return found == object_.end() ? nullptr : &found->second;
+  }
+
+  std::string string_field(std::string_view key) const {
+    const auto* value = get(key);
+    if (value == nullptr || !value->is_string()) {
+      return {};
+    }
+    return value->as_string();
+  }
+
+  std::string dump() const {
+    switch (kind_) {
+      case Kind::Null:
+        return "null";
+      case Kind::Bool:
+        return bool_ ? "true" : "false";
+      case Kind::Number:
+        return string_;
+      case Kind::String:
+        return quote(string_);
+      case Kind::Array: {
+        std::string out = "[";
+        for (std::size_t i = 0; i < array_.size(); ++i) {
+          if (i != 0) {
+            out += ",";
+          }
+          out += array_[i].dump();
+        }
+        out += "]";
+        return out;
+      }
+      case Kind::Object: {
+        std::string out = "{";
+        bool first = true;
+        for (const auto& entry : object_) {
+          if (!first) {
+            out += ",";
+          }
+          first = false;
+          out += quote(entry.first);
+          out += ":";
+          out += entry.second.dump();
+        }
+        out += "}";
+        return out;
+      }
+    }
+    return "null";
+  }
+
+ private:
+  Kind kind_ = Kind::Null;
+  bool bool_ = false;
+  std::string string_;
+  std::vector<JsonValue> array_;
+  std::map<std::string, JsonValue> object_;
+};
+
+class JsonParser {
+ public:
+  explicit JsonParser(std::string_view input) : input_(input) {}
+
+  std::optional<JsonValue> parse() {
+    skip_ws();
+    auto value = parse_value();
+    skip_ws();
+    if (!value || pos_ != input_.size()) {
+      return std::nullopt;
+    }
+    return value;
+  }
+
+ private:
+  void skip_ws() {
+    while (pos_ < input_.size() &&
+           std::isspace(static_cast<unsigned char>(input_[pos_]))) {
+      ++pos_;
+    }
+  }
+
+  bool consume(char c) {
+    skip_ws();
+    if (pos_ >= input_.size() || input_[pos_] != c) {
+      return false;
+    }
+    ++pos_;
+    return true;
+  }
+
+  bool consume_literal(std::string_view literal) {
+    skip_ws();
+    if (input_.substr(pos_, literal.size()) != literal) {
+      return false;
+    }
+    pos_ += literal.size();
+    return true;
+  }
+
+  std::optional<JsonValue> parse_value() {
+    skip_ws();
+    if (pos_ >= input_.size()) {
+      return std::nullopt;
+    }
+    switch (input_[pos_]) {
+      case 'n':
+        return consume_literal("null") ? std::optional<JsonValue>(JsonValue::null())
+                                       : std::nullopt;
+      case 't':
+        return consume_literal("true") ? std::optional<JsonValue>(JsonValue::boolean(true))
+                                       : std::nullopt;
+      case 'f':
+        return consume_literal("false") ? std::optional<JsonValue>(JsonValue::boolean(false))
+                                        : std::nullopt;
+      case '"':
+        return parse_string_value();
+      case '[':
+        return parse_array();
+      case '{':
+        return parse_object();
+      default:
+        if (input_[pos_] == '-' || std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+          return parse_number();
+        }
+        return std::nullopt;
+    }
+  }
+
+  std::optional<std::string> parse_string_raw() {
+    if (!consume('"')) {
+      return std::nullopt;
+    }
+    std::string out;
+    while (pos_ < input_.size()) {
+      char c = input_[pos_++];
+      if (c == '"') {
+        return out;
+      }
+      if (c != '\\') {
+        out.push_back(c);
+        continue;
+      }
+      if (pos_ >= input_.size()) {
+        return std::nullopt;
+      }
+      char esc = input_[pos_++];
+      switch (esc) {
+        case '"':
+        case '\\':
+        case '/':
+          out.push_back(esc);
+          break;
+        case 'b':
+          out.push_back('\b');
+          break;
+        case 'f':
+          out.push_back('\f');
+          break;
+        case 'n':
+          out.push_back('\n');
+          break;
+        case 'r':
+          out.push_back('\r');
+          break;
+        case 't':
+          out.push_back('\t');
+          break;
+        case 'u':
+          if (pos_ + 4 > input_.size()) {
+            return std::nullopt;
+          }
+          // Keep non-ASCII escapes in escaped form for this lightweight
+          // private parser. Canonical byte-sensitive work stays in Rust FFI.
+          out += "\\u";
+          out.append(input_.substr(pos_, 4));
+          pos_ += 4;
+          break;
+        default:
+          return std::nullopt;
+      }
+    }
+    return std::nullopt;
+  }
+
+  std::optional<JsonValue> parse_string_value() {
+    auto value = parse_string_raw();
+    if (!value) {
+      return std::nullopt;
+    }
+    return JsonValue::string(std::move(*value));
+  }
+
+  std::optional<JsonValue> parse_number() {
+    const auto start = pos_;
+    if (input_[pos_] == '-') {
+      ++pos_;
+    }
+    while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+      ++pos_;
+    }
+    if (pos_ < input_.size() && input_[pos_] == '.') {
+      ++pos_;
+      while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+        ++pos_;
+      }
+    }
+    if (pos_ < input_.size() && (input_[pos_] == 'e' || input_[pos_] == 'E')) {
+      ++pos_;
+      if (pos_ < input_.size() && (input_[pos_] == '+' || input_[pos_] == '-')) {
+        ++pos_;
+      }
+      while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+        ++pos_;
+      }
+    }
+    return JsonValue::number(std::string(input_.substr(start, pos_ - start)));
+  }
+
+  std::optional<JsonValue> parse_array() {
+    if (!consume('[')) {
+      return std::nullopt;
+    }
+    std::vector<JsonValue> values;
+    skip_ws();
+    if (consume(']')) {
+      return JsonValue::array(std::move(values));
+    }
+    while (true) {
+      auto value = parse_value();
+      if (!value) {
+        return std::nullopt;
+      }
+      values.push_back(std::move(*value));
+      if (consume(']')) {
+        return JsonValue::array(std::move(values));
+      }
+      if (!consume(',')) {
+        return std::nullopt;
+      }
+    }
+  }
+
+  std::optional<JsonValue> parse_object() {
+    if (!consume('{')) {
+      return std::nullopt;
+    }
+    std::map<std::string, JsonValue> values;
+    skip_ws();
+    if (consume('}')) {
+      return JsonValue::object(std::move(values));
+    }
+    while (true) {
+      auto key = parse_string_raw();
+      if (!key || !consume(':')) {
+        return std::nullopt;
+      }
+      auto value = parse_value();
+      if (!value) {
+        return std::nullopt;
+      }
+      values[*key] = std::move(*value);
+      if (consume('}')) {
+        return JsonValue::object(std::move(values));
+      }
+      if (!consume(',')) {
+        return std::nullopt;
+      }
+    }
+  }
+
+  std::string_view input_;
+  std::size_t pos_ = 0;
+};
+
+inline std::optional<JsonValue> parse_json(std::string_view input) {
+  return JsonParser(input).parse();
+}
+
+inline const JsonValue* json_path(const JsonValue& root,
+                                  std::initializer_list<std::string_view> path) {
+  const JsonValue* current = &root;
+  for (auto key : path) {
+    current = current->get(key);
+    if (current == nullptr) {
+      return nullptr;
+    }
+  }
+  return current;
+}
+
+inline std::string json_string_at(const JsonValue& root,
+                                  std::initializer_list<std::string_view> path) {
+  const auto* value = json_path(root, path);
+  if (value == nullptr || !value->is_string()) {
+    return {};
+  }
+  return value->as_string();
 }
 
 }  // namespace chio::detail

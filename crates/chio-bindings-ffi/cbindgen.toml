@@ -10,5 +10,6 @@ usize_is_size_t = true
 include = [
   "ChioFfiBuffer",
   "ChioFfiResult",
+  "CHIO_FFI_ABI_VERSION",
   "CHIO_FFI_NO_MAX_DELEGATION_DEPTH",
 ]

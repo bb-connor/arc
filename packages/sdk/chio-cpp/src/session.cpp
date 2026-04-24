@@ -1,21 +1,266 @@
 #include "chio/session.hpp"
 
+#include <cctype>
+#include <memory>
+#include <sstream>
 #include <utility>
 
 #include "json.hpp"
+#include "transport_util.hpp"
 
 namespace chio {
+namespace {
+
+JsonMessage to_message(const detail::JsonValue& value) {
+  JsonMessage message;
+  message.raw_json = value.dump();
+  message.method = value.string_field("method");
+  const auto* id = value.get("id");
+  if (id != nullptr) {
+    message.id_json = id->dump();
+    message.id = id->is_string() ? id->as_string() : id->dump();
+  }
+  return message;
+}
+
+Result<void> deliver_message(const detail::JsonValue& value,
+                             const MessageHandler& primary,
+                             const MessageHandler& secondary) {
+  const auto message = to_message(value);
+  if (message.method.empty()) {
+    return Result<void>::success();
+  }
+  if (primary) {
+    auto handled = primary(message);
+    if (!handled) {
+      return handled;
+    }
+  }
+  if (secondary) {
+    auto handled = secondary(message);
+    if (!handled) {
+      return handled;
+    }
+  }
+  return Result<void>::success();
+}
+
+const detail::JsonValue* result_array(const detail::JsonValue& root, std::string_view name) {
+  const auto* direct = root.get(name);
+  if (direct != nullptr && direct->kind() == detail::JsonValue::Kind::Array) {
+    return direct;
+  }
+  const auto* result = root.get("result");
+  if (result == nullptr) {
+    return nullptr;
+  }
+  const auto* nested = result->get(name);
+  if (nested != nullptr && nested->kind() == detail::JsonValue::Kind::Array) {
+    return nested;
+  }
+  return nullptr;
+}
+
+std::vector<Tool> parse_tools(const detail::JsonValue& root) {
+  std::vector<Tool> out;
+  const auto* values = result_array(root, "tools");
+  if (values == nullptr) {
+    return out;
+  }
+  for (const auto& value : values->as_array()) {
+    if (!value.is_object()) {
+      continue;
+    }
+    Tool tool;
+    tool.name = value.string_field("name");
+    tool.title = value.string_field("title");
+    tool.description = value.string_field("description");
+    const auto* input_schema = value.get("inputSchema");
+    if (input_schema == nullptr) {
+      input_schema = value.get("input_schema");
+    }
+    if (input_schema != nullptr) {
+      tool.input_schema_json = input_schema->dump();
+    }
+    const auto* annotations = value.get("annotations");
+    if (annotations != nullptr && annotations->is_object()) {
+      for (const auto& entry : annotations->as_object()) {
+        if (entry.second.is_string()) {
+          tool.annotations[entry.first] = entry.second.as_string();
+        }
+      }
+    }
+    out.push_back(std::move(tool));
+  }
+  return out;
+}
+
+std::vector<Resource> parse_resources(const detail::JsonValue& root) {
+  std::vector<Resource> out;
+  const auto* values = result_array(root, "resources");
+  if (values == nullptr) {
+    return out;
+  }
+  for (const auto& value : values->as_array()) {
+    if (!value.is_object()) {
+      continue;
+    }
+    Resource resource;
+    resource.uri = value.string_field("uri");
+    resource.name = value.string_field("name");
+    resource.description = value.string_field("description");
+    resource.mime_type = value.string_field("mimeType");
+    if (resource.mime_type.empty()) {
+      resource.mime_type = value.string_field("mime_type");
+    }
+    out.push_back(std::move(resource));
+  }
+  return out;
+}
+
+std::vector<Prompt> parse_prompts(const detail::JsonValue& root) {
+  std::vector<Prompt> out;
+  const auto* values = result_array(root, "prompts");
+  if (values == nullptr) {
+    return out;
+  }
+  for (const auto& value : values->as_array()) {
+    if (!value.is_object()) {
+      continue;
+    }
+    Prompt prompt;
+    prompt.name = value.string_field("name");
+    prompt.title = value.string_field("title");
+    prompt.description = value.string_field("description");
+    out.push_back(std::move(prompt));
+  }
+  return out;
+}
+
+std::vector<Task> parse_tasks(const detail::JsonValue& root) {
+  std::vector<Task> out;
+  const auto* values = result_array(root, "tasks");
+  if (values == nullptr) {
+    return out;
+  }
+  for (const auto& value : values->as_array()) {
+    if (!value.is_object()) {
+      continue;
+    }
+    Task task;
+    task.task_id = value.string_field("taskId");
+    if (task.task_id.empty()) {
+      task.task_id = value.string_field("id");
+    }
+    task.status = value.string_field("status");
+    const auto* status = value.get("status");
+    if (task.status.empty() && status != nullptr) {
+      task.status = status->dump();
+    }
+    task.raw_json = value.dump();
+    out.push_back(std::move(task));
+  }
+  return out;
+}
+
+Error parse_error(std::string operation, const std::string& raw_json) {
+  return Error{ErrorCode::Json,
+               "failed to parse JSON response",
+               std::move(operation),
+               {},
+               detail::body_snippet(raw_json)};
+}
+
+}  // namespace
+
+NestedCallbackRouter& NestedCallbackRouter::on_sampling(SamplingHandler handler) {
+  sampling_handler_ = std::move(handler);
+  return *this;
+}
+
+NestedCallbackRouter& NestedCallbackRouter::on_elicitation(ElicitationHandler handler) {
+  elicitation_handler_ = std::move(handler);
+  return *this;
+}
+
+NestedCallbackRouter& NestedCallbackRouter::on_roots(RootsHandler handler) {
+  roots_handler_ = std::move(handler);
+  return *this;
+}
+
+MessageHandler NestedCallbackRouter::bind(Session& session) const {
+  auto sampling = sampling_handler_;
+  auto elicitation = elicitation_handler_;
+  auto roots = roots_handler_;
+  return [&session, sampling, elicitation, roots](const JsonMessage& message) {
+    Result<std::string> response = Result<std::string>::failure(
+        Error{ErrorCode::Protocol, "no nested callback handler matched",
+              "NestedCallbackRouter::bind"});
+    if (message.method == "sampling/createMessage" && sampling) {
+      response = sampling(message);
+    } else if (message.method == "elicitation/create" && elicitation) {
+      response = elicitation(message);
+    } else if (message.method == "roots/list" && roots) {
+      response = roots(message);
+    } else {
+      return Result<void>::success();
+    }
+    if (!response) {
+      return Result<void>::failure(response.error());
+    }
+    auto sent = session.send_envelope(response.value());
+    if (!sent) {
+      return Result<void>::failure(sent.error());
+    }
+    return Result<void>::success();
+  };
+}
+
+std::string NestedCallbackRouter::sampling_text_result(const JsonMessage& message,
+                                                       std::string text,
+                                                       std::string model,
+                                                       std::string stop_reason) {
+  const auto id = message.id_json.empty() ? "null" : message.id_json;
+  return "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+         ",\"result\":{\"role\":\"assistant\",\"content\":{\"type\":\"text\",\"text\":" +
+         detail::quote(text) + "},\"model\":" + detail::quote(model) +
+         ",\"stopReason\":" + detail::quote(stop_reason) + "}}";
+}
+
+std::string NestedCallbackRouter::elicitation_accept_result(const JsonMessage& message,
+                                                            std::string content_json) {
+  const auto id = message.id_json.empty() ? "null" : message.id_json;
+  std::string result = "{\"action\":\"accept\"";
+  if (!content_json.empty() && content_json != "{}") {
+    result += ",\"content\":" + content_json;
+  }
+  result += "}";
+  return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + result + "}";
+}
+
+std::string NestedCallbackRouter::roots_list_result(const JsonMessage& message,
+                                                    std::string roots_json) {
+  const auto id = message.id_json.empty() ? "null" : message.id_json;
+  return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":{\"roots\":" +
+         roots_json + "}}";
+}
 
 Session::Session(std::string base_url,
                  std::string bearer_token,
                  std::string session_id,
                  std::string protocol_version,
-                 HttpTransportPtr transport)
+                 HttpTransportPtr transport,
+                 RetryPolicy retry_policy,
+                 TraceSinkPtr trace_sink,
+                 std::chrono::milliseconds timeout)
     : base_url_(detail::trim_right_slash(std::move(base_url))),
       bearer_token_(std::move(bearer_token)),
       session_id_(std::move(session_id)),
       protocol_version_(std::move(protocol_version)),
-      transport_(std::move(transport)) {}
+      transport_(std::move(transport)),
+      retry_policy_(retry_policy),
+      trace_sink_(std::move(trace_sink)),
+      timeout_(timeout) {}
 
 Session::Session(Session&& other) noexcept
     : base_url_(std::move(other.base_url_)),
@@ -23,6 +268,10 @@ Session::Session(Session&& other) noexcept
       session_id_(std::move(other.session_id_)),
       protocol_version_(std::move(other.protocol_version_)),
       transport_(std::move(other.transport_)),
+      retry_policy_(other.retry_policy_),
+      trace_sink_(std::move(other.trace_sink_)),
+      timeout_(other.timeout_),
+      message_handler_(std::move(other.message_handler_)),
       next_request_id_(other.next_request_id_.load()) {}
 
 Session& Session::operator=(Session&& other) noexcept {
@@ -34,11 +283,16 @@ Session& Session::operator=(Session&& other) noexcept {
   session_id_ = std::move(other.session_id_);
   protocol_version_ = std::move(other.protocol_version_);
   transport_ = std::move(other.transport_);
+  retry_policy_ = other.retry_policy_;
+  trace_sink_ = std::move(other.trace_sink_);
+  timeout_ = other.timeout_;
+  message_handler_ = std::move(other.message_handler_);
   next_request_id_.store(other.next_request_id_.load());
   return *this;
 }
 
-HttpRequest Session::make_post(std::string body_json) const {
+HttpRequest Session::make_post(std::string body_json, bool stream_response) const {
+  (void)stream_response;
   return HttpRequest{
       "POST",
       base_url_ + "/mcp",
@@ -50,6 +304,24 @@ HttpRequest Session::make_post(std::string body_json) const {
           {"MCP-Protocol-Version", protocol_version_},
       },
       std::move(body_json),
+      timeout_,
+  };
+}
+
+HttpRequest Session::make_get_stream(std::shared_ptr<CancellationToken> cancellation) const {
+  return HttpRequest{
+      "GET",
+      base_url_ + "/mcp",
+      {
+          {"Authorization", "Bearer " + bearer_token_},
+          {"Accept", "text/event-stream"},
+          {"MCP-Session-Id", session_id_},
+          {"MCP-Protocol-Version", protocol_version_},
+      },
+      "",
+      std::chrono::milliseconds(0),
+      1,
+      std::move(cancellation),
   };
 }
 
@@ -58,18 +330,58 @@ std::int64_t Session::next_id() const {
 }
 
 Result<std::string> Session::send_envelope(std::string body_json) const {
-  if (!transport_) {
-    return Result<std::string>::failure(Error{ErrorCode::Transport, "missing HTTP transport"});
-  }
-  auto response = transport_->send(make_post(std::move(body_json)));
+  auto response = send_envelope_response(std::move(body_json));
   if (!response) {
     return Result<std::string>::failure(response.error());
   }
-  if (response.value().status < 200 || response.value().status >= 300) {
-    return Result<std::string>::failure(
-        Error{ErrorCode::Protocol, "MCP request returned HTTP " + std::to_string(response.value().status)});
+  return Result<std::string>::success(std::move(response.value().value));
+}
+
+Result<TypedResponse<std::string>> Session::send_envelope_response(std::string body_json) const {
+  if (!transport_) {
+    return Result<TypedResponse<std::string>>::failure(
+        Error{ErrorCode::Transport, "missing HTTP transport", "Session::send_envelope"});
   }
-  return Result<std::string>::success(response.value().body);
+  auto request = make_post(std::move(body_json));
+  auto stream_dispatched = std::make_shared<bool>(false);
+  if (message_handler_) {
+    request.stream_message = [this, stream_dispatched](const std::string& raw_json) {
+      auto parsed = detail::parse_json(raw_json);
+      if (!parsed) {
+        return Result<void>::failure(
+            Error{ErrorCode::Json, "failed to parse streamed JSON message",
+                  "Session::send_envelope", {}, detail::body_snippet(raw_json)});
+      }
+      *stream_dispatched = true;
+      return deliver_message(*parsed, {}, message_handler_);
+    };
+  }
+  auto response = detail::send_with_policy(
+      transport_, std::move(request), retry_policy_, trace_sink_, "Session::send_envelope");
+  if (!response) {
+    return Result<TypedResponse<std::string>>::failure(response.error());
+  }
+  auto http = response.move_value();
+  if (http.status < 200 || http.status >= 300) {
+    return Result<TypedResponse<std::string>>::failure(
+        Error{ErrorCode::Protocol,
+              "MCP request returned HTTP " + std::to_string(http.status),
+              "Session::send_envelope",
+              http.status,
+              detail::body_snippet(http.body),
+              {},
+              {},
+              detail::retryable_status(http.status)});
+  }
+  const auto raw = http.body;
+  if (message_handler_ && !*stream_dispatched) {
+    auto dispatched = dispatch_messages(raw, {});
+    if (!dispatched) {
+      return Result<TypedResponse<std::string>>::failure(dispatched.error());
+    }
+  }
+  return Result<TypedResponse<std::string>>::success(
+      TypedResponse<std::string>{raw, raw, std::move(http)});
 }
 
 Result<std::string> Session::request(std::string method, std::string params_json) const {
@@ -78,6 +390,53 @@ Result<std::string> Session::request(std::string method, std::string params_json
                      ",\"method\":" + detail::quote(method) + ",\"params\":" +
                      params_json + "}";
   return send_envelope(std::move(body));
+}
+
+Result<std::string> Session::request_streaming(std::string method,
+                                               std::string params_json,
+                                               MessageHandler handler) const {
+  const auto id = next_id();
+  std::string body = "{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
+                     ",\"method\":" + detail::quote(method) + ",\"params\":" +
+                     params_json + "}";
+  auto request = make_post(std::move(body), true);
+  request.stream_message = [this, handler](const std::string& raw_json) {
+    auto parsed = detail::parse_json(raw_json);
+    if (!parsed) {
+      return Result<void>::failure(
+          Error{ErrorCode::Json, "failed to parse streamed JSON message",
+                "Session::request_streaming", {}, detail::body_snippet(raw_json)});
+    }
+    return deliver_message(*parsed, handler, message_handler_);
+  };
+  auto http_response = detail::send_with_policy(
+      transport_, std::move(request), retry_policy_, trace_sink_,
+      "Session::request_streaming");
+  if (!http_response) {
+    return Result<std::string>::failure(http_response.error());
+  }
+  auto http = http_response.move_value();
+  if (http.status < 200 || http.status >= 300) {
+    return Result<std::string>::failure(
+        Error{ErrorCode::Protocol,
+              "MCP streaming request returned HTTP " + std::to_string(http.status),
+              "Session::request_streaming",
+              http.status,
+              detail::body_snippet(http.body),
+              {},
+              {},
+              detail::retryable_status(http.status)});
+  }
+  auto response = Result<TypedResponse<std::string>>::success(
+      TypedResponse<std::string>{http.body, http.body, std::move(http)});
+  if (!response) {
+    return Result<std::string>::failure(response.error());
+  }
+  auto dispatched = dispatch_messages(response.value().value, std::move(handler));
+  if (!dispatched) {
+    return Result<std::string>::failure(dispatched.error());
+  }
+  return Result<std::string>::success(std::move(response.value().value));
 }
 
 Result<std::string> Session::notification(std::string method, std::string params_json) const {
@@ -90,21 +449,89 @@ Result<std::string> Session::list_tools() const {
   return request("tools/list");
 }
 
+Result<TypedResponse<std::vector<Tool>>> Session::list_tools_typed() const {
+  const auto id = next_id();
+  auto raw = send_envelope_response("{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
+                                    ",\"method\":\"tools/list\",\"params\":{}}");
+  if (!raw) {
+    return Result<TypedResponse<std::vector<Tool>>>::failure(raw.error());
+  }
+  auto parsed = detail::parse_json(raw.value().raw_json);
+  if (!parsed) {
+    return Result<TypedResponse<std::vector<Tool>>>::failure(
+        parse_error("Session::list_tools_typed", raw.value().raw_json));
+  }
+  return Result<TypedResponse<std::vector<Tool>>>::success(
+      TypedResponse<std::vector<Tool>>{parse_tools(*parsed), raw.value().raw_json,
+                                       std::move(raw.value().response)});
+}
+
 Result<std::string> Session::call_tool(std::string name, std::string arguments_json) const {
   return request("tools/call", "{\"name\":" + detail::quote(name) +
                                   ",\"arguments\":" + arguments_json + "}");
+}
+
+Result<std::string> Session::call_tool(std::string name,
+                                       std::string arguments_json,
+                                       MessageHandler handler) const {
+  return request_streaming("tools/call",
+                           "{\"name\":" + detail::quote(name) +
+                               ",\"arguments\":" + arguments_json + "}",
+                           std::move(handler));
 }
 
 Result<std::string> Session::list_resources() const {
   return request("resources/list");
 }
 
+Result<TypedResponse<std::vector<Resource>>> Session::list_resources_typed() const {
+  const auto id = next_id();
+  auto raw = send_envelope_response("{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
+                                    ",\"method\":\"resources/list\",\"params\":{}}");
+  if (!raw) {
+    return Result<TypedResponse<std::vector<Resource>>>::failure(raw.error());
+  }
+  auto parsed = detail::parse_json(raw.value().raw_json);
+  if (!parsed) {
+    return Result<TypedResponse<std::vector<Resource>>>::failure(
+        parse_error("Session::list_resources_typed", raw.value().raw_json));
+  }
+  return Result<TypedResponse<std::vector<Resource>>>::success(
+      TypedResponse<std::vector<Resource>>{parse_resources(*parsed), raw.value().raw_json,
+                                           std::move(raw.value().response)});
+}
+
 Result<std::string> Session::read_resource(std::string uri) const {
   return request("resources/read", "{\"uri\":" + detail::quote(uri) + "}");
 }
 
+Result<std::string> Session::subscribe_resource(std::string uri) const {
+  return request("resources/subscribe", "{\"uri\":" + detail::quote(uri) + "}");
+}
+
+Result<std::string> Session::unsubscribe_resource(std::string uri) const {
+  return request("resources/unsubscribe", "{\"uri\":" + detail::quote(uri) + "}");
+}
+
 Result<std::string> Session::list_prompts() const {
   return request("prompts/list");
+}
+
+Result<TypedResponse<std::vector<Prompt>>> Session::list_prompts_typed() const {
+  const auto id = next_id();
+  auto raw = send_envelope_response("{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
+                                    ",\"method\":\"prompts/list\",\"params\":{}}");
+  if (!raw) {
+    return Result<TypedResponse<std::vector<Prompt>>>::failure(raw.error());
+  }
+  auto parsed = detail::parse_json(raw.value().raw_json);
+  if (!parsed) {
+    return Result<TypedResponse<std::vector<Prompt>>>::failure(
+        parse_error("Session::list_prompts_typed", raw.value().raw_json));
+  }
+  return Result<TypedResponse<std::vector<Prompt>>>::success(
+      TypedResponse<std::vector<Prompt>>{parse_prompts(*parsed), raw.value().raw_json,
+                                         std::move(raw.value().response)});
 }
 
 Result<std::string> Session::get_prompt(std::string name, std::string arguments_json) const {
@@ -114,6 +541,23 @@ Result<std::string> Session::get_prompt(std::string name, std::string arguments_
 
 Result<std::string> Session::list_tasks() const {
   return request("tasks/list");
+}
+
+Result<TypedResponse<std::vector<Task>>> Session::list_tasks_typed() const {
+  const auto id = next_id();
+  auto raw = send_envelope_response("{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
+                                    ",\"method\":\"tasks/list\",\"params\":{}}");
+  if (!raw) {
+    return Result<TypedResponse<std::vector<Task>>>::failure(raw.error());
+  }
+  auto parsed = detail::parse_json(raw.value().raw_json);
+  if (!parsed) {
+    return Result<TypedResponse<std::vector<Task>>>::failure(
+        parse_error("Session::list_tasks_typed", raw.value().raw_json));
+  }
+  return Result<TypedResponse<std::vector<Task>>>::success(
+      TypedResponse<std::vector<Task>>{parse_tasks(*parsed), raw.value().raw_json,
+                                       std::move(raw.value().response)});
 }
 
 Result<std::string> Session::get_task(std::string task_id) const {
@@ -130,7 +574,8 @@ Result<std::string> Session::cancel_task(std::string task_id) const {
 
 Result<HttpResponse> Session::close() const {
   if (!transport_) {
-    return Result<HttpResponse>::failure(Error{ErrorCode::Transport, "missing HTTP transport"});
+    return Result<HttpResponse>::failure(
+        Error{ErrorCode::Transport, "missing HTTP transport", "Session::close"});
   }
   HttpRequest request{
       "DELETE",
@@ -140,8 +585,87 @@ Result<HttpResponse> Session::close() const {
           {"MCP-Session-Id", session_id_},
       },
       "",
+      timeout_,
   };
-  return transport_->send(request);
+  return detail::send_with_policy(transport_, std::move(request), retry_policy_, trace_sink_,
+                                  "Session::close");
+}
+
+void Session::on_message(MessageHandler handler) {
+  message_handler_ = std::move(handler);
+}
+
+std::thread Session::start_receive_loop(
+    MessageHandler handler,
+    std::shared_ptr<CancellationToken> cancellation) const {
+  auto transport = transport_;
+  auto retry_policy = retry_policy_;
+  auto trace_sink = trace_sink_;
+  auto request = make_get_stream(std::move(cancellation));
+  request.stream_message = [handler = std::move(handler)](const std::string& raw_json) {
+    auto parsed = detail::parse_json(raw_json);
+    if (!parsed) {
+      return Result<void>::failure(
+          Error{ErrorCode::Json, "failed to parse streamed JSON message",
+                "Session::start_receive_loop", {}, detail::body_snippet(raw_json)});
+    }
+    return deliver_message(*parsed, handler, {});
+  };
+  return std::thread([transport, retry_policy, trace_sink, request = std::move(request)]() mutable {
+    (void)detail::send_with_policy(transport, std::move(request), retry_policy, trace_sink,
+                                   "Session::start_receive_loop");
+  });
+}
+
+SessionInfo Session::info() const {
+  return SessionInfo{session_id_, protocol_version_, {}, {}};
+}
+
+Result<void> Session::dispatch_messages(const std::string& body,
+                                        MessageHandler handler) const {
+  auto parsed = detail::parse_json(body);
+  if (parsed) {
+    auto delivered = deliver_message(*parsed, handler, message_handler_);
+    if (!delivered) {
+      return delivered;
+    }
+    const auto* messages = result_array(*parsed, "messages");
+    if (messages != nullptr) {
+      for (const auto& message : messages->as_array()) {
+        delivered = deliver_message(message, handler, message_handler_);
+        if (!delivered) {
+          return delivered;
+        }
+      }
+    }
+    return Result<void>::success();
+  }
+
+  std::istringstream stream(body);
+  std::string line;
+  while (std::getline(stream, line)) {
+    if (line.rfind("data:", 0) != 0) {
+      continue;
+    }
+    auto payload = line.substr(5);
+    while (!payload.empty() && std::isspace(static_cast<unsigned char>(payload.front()))) {
+      payload.erase(payload.begin());
+    }
+    if (payload.empty() || payload == "[DONE]") {
+      continue;
+    }
+    auto event = detail::parse_json(payload);
+    if (!event) {
+      return Result<void>::failure(
+          Error{ErrorCode::Json, "failed to parse JSON stream event",
+                "Session::dispatch_messages", {}, detail::body_snippet(payload)});
+    }
+    auto delivered = deliver_message(*event, handler, message_handler_);
+    if (!delivered) {
+      return delivered;
+    }
+  }
+  return Result<void>::success();
 }
 
 }  // namespace chio

@@ -1,0 +1,156 @@
+name: Chio C++ SDK
+
+on:
+  push:
+    paths:
+      - ".github/workflows/chio-cpp.yml"
+      - "crates/chio-bindings-ffi/**"
+      - "crates/chio-cpp-kernel-ffi/**"
+      - "crates/chio-conformance/**"
+      - "packages/sdk/chio-cpp/**"
+      - "packages/sdk/chio-cpp-kernel/**"
+      - "packages/sdk/chio-guard-cpp/**"
+      - "scripts/check-chio-cpp*.sh"
+      - "scripts/check-sdk-release.sh"
+      - "tests/abi/**"
+      - "tests/bindings/**"
+      - "tests/conformance/**"
+  pull_request:
+    paths:
+      - ".github/workflows/chio-cpp.yml"
+      - "crates/chio-bindings-ffi/**"
+      - "crates/chio-cpp-kernel-ffi/**"
+      - "crates/chio-conformance/**"
+      - "packages/sdk/chio-cpp/**"
+      - "packages/sdk/chio-cpp-kernel/**"
+      - "packages/sdk/chio-guard-cpp/**"
+      - "scripts/check-chio-cpp*.sh"
+      - "scripts/check-sdk-release.sh"
+      - "tests/abi/**"
+      - "tests/bindings/**"
+      - "tests/conformance/**"
+
+jobs:
+  cmake:
+    name: CMake package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Install cbindgen
+        run: cargo install cbindgen --locked
+      - name: Full Unix SDK smoke
+        if: runner.os != 'Windows'
+        env:
+          CHIO_CPP_REQUIRE_CBINDGEN: "1"
+        run: ./scripts/check-chio-cpp.sh
+      - name: Windows CMake smoke
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo test -p chio-bindings-ffi
+          cargo build -p chio-bindings-ffi
+          mkdir -p target
+          cbindgen crates/chio-bindings-ffi -o target/chio_ffi.generated.h
+          diff -u crates/chio-bindings-ffi/include/chio/chio_ffi.h target/chio_ffi.generated.h
+          cmake -S packages/sdk/chio-cpp -B target/chio-cpp-win \
+            -DCHIO_CPP_BUILD_TESTS=ON \
+            -DCHIO_CPP_BUILD_EXAMPLES=ON \
+            -DCHIO_CPP_ENABLE_CURL=OFF
+          cmake --build target/chio-cpp-win --config Debug
+          ctest --test-dir target/chio-cpp-win -C Debug --output-on-failure
+          cmake --install target/chio-cpp-win --config Debug --prefix target/chio-cpp-win/install
+
+  conformance:
+    name: Live C++ conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libcurl4-openssl-dev python3
+      - name: Run live C++ waves
+        run: |
+          cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture
+
+  hardening:
+    name: Sanitizers and leaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential clang cmake valgrind
+      - name: ASAN and UBSAN
+        env:
+          CC: clang
+          CXX: clang++
+          CFLAGS: "-fsanitize=address,undefined -fno-omit-frame-pointer"
+          CXXFLAGS: "-fsanitize=address,undefined -fno-omit-frame-pointer"
+          LDFLAGS: "-fsanitize=address,undefined"
+        run: |
+          cmake -S packages/sdk/chio-cpp -B target/chio-cpp-asan \
+            -DCHIO_CPP_BUILD_TESTS=ON \
+            -DCHIO_CPP_BUILD_EXAMPLES=OFF \
+            -DCHIO_CPP_ENABLE_CURL=OFF
+          cmake --build target/chio-cpp-asan
+          ctest --test-dir target/chio-cpp-asan --output-on-failure
+      - name: Valgrind
+        run: |
+          cmake -S packages/sdk/chio-cpp -B target/chio-cpp-valgrind \
+            -DCHIO_CPP_BUILD_TESTS=ON \
+            -DCHIO_CPP_BUILD_EXAMPLES=OFF \
+            -DCHIO_CPP_ENABLE_CURL=OFF
+          cmake --build target/chio-cpp-valgrind
+          valgrind --leak-check=full --error-exitcode=1 target/chio-cpp-valgrind/chio_cpp_tests
+
+  packaging:
+    name: Conan and vcpkg
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake curl git pkg-config python3 python3-pip zip unzip tar
+          cargo install cbindgen --locked
+          python3 -m pip install --user conan
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ runner.temp }}/vcpkg"
+          "${{ runner.temp }}/vcpkg/bootstrap-vcpkg.sh"
+          echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
+          echo "${{ runner.temp }}/vcpkg" >> "$GITHUB_PATH"
+      - name: Release package smoke
+        env:
+          CHIO_CPP_REQUIRE_CBINDGEN: "1"
+          CHIO_CPP_REQUIRE_PACKAGERS: "1"
+        run: ./scripts/check-chio-cpp-release.sh
+
+  guard-and-kernel:
+    name: Guard and kernel packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build guard native smoke
+        run: ./packages/sdk/chio-guard-cpp/scripts/check-native.sh
+      - name: Build kernel package
+        run: |
+          cmake -S packages/sdk/chio-cpp-kernel -B target/chio-cpp-kernel \
+            -DCHIO_CPP_KERNEL_BUILD_TESTS=ON \
+            -DCHIO_CPP_KERNEL_BUILD_EXAMPLES=ON
+          cmake --build target/chio-cpp-kernel
+          ctest --test-dir target/chio-cpp-kernel --output-on-failure
+      - name: Build kernel package with Rust FFI backend
+        run: ./packages/sdk/chio-cpp-kernel/scripts/check-with-ffi.sh

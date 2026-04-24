@@ -36,14 +36,13 @@ set(CHIO_CPP_RUST_LIB
 )
 
 if(CHIO_CPP_BUILD_RUST_FFI)
-  add_custom_command(
-    OUTPUT "${CHIO_CPP_RUST_LIB}"
+  add_custom_target(chio_bindings_ffi_build
     COMMAND cargo build -p chio-bindings-ffi ${CHIO_CPP_RUST_PROFILE_ARG}
+    BYPRODUCTS "${CHIO_CPP_RUST_LIB}"
     WORKING_DIRECTORY "${CHIO_CPP_REPO_ROOT}"
     COMMENT "Building Rust chio-bindings-ffi"
     VERBATIM
   )
-  add_custom_target(chio_bindings_ffi_build DEPENDS "${CHIO_CPP_RUST_LIB}")
 endif()
 
 add_library(chio_bindings_ffi STATIC IMPORTED GLOBAL)
@@ -55,8 +54,10 @@ if(CHIO_CPP_BUILD_RUST_FFI)
 endif()
 
 add_library(chio_cpp
+  src/auth.cpp
   src/client.cpp
   src/dpop.cpp
+  src/features.cpp
   src/http_substrate.cpp
   src/invariants.cpp
   src/receipt_query.cpp
@@ -101,6 +102,9 @@ if(CHIO_CPP_BUILD_EXAMPLES)
 endif()
 
 if(CHIO_CPP_BUILD_CONFORMANCE_PEER)
+  if(NOT CHIO_CPP_ENABLE_CURL)
+    message(FATAL_ERROR "CHIO_CPP_BUILD_CONFORMANCE_PEER requires CHIO_CPP_ENABLE_CURL=ON")
+  endif()
   add_executable(chio_cpp_conformance_peer
     ../../../tests/conformance/peers/cpp/client.cpp
   )

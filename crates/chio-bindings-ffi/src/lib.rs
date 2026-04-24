@@ -11,6 +11,7 @@ use std::ptr;
 
 use chio_binding_helpers::{Error, ErrorCode};
 
+pub const CHIO_FFI_ABI_VERSION: u32 = 1;
 pub const CHIO_FFI_NO_MAX_DELEGATION_DEPTH: u32 = u32::MAX;
 
 const STATUS_OK: i32 = 0;
@@ -163,6 +164,32 @@ fn read_bytes(ptr: *const u8, len: usize, name: &str) -> Result<Vec<u8>, ChioFfi
 
 fn json<T: serde::Serialize>(value: &T) -> Result<String, Error> {
     serde_json::to_string(value).map_err(Into::into)
+}
+
+#[no_mangle]
+pub extern "C" fn chio_ffi_abi_version() -> u32 {
+    CHIO_FFI_ABI_VERSION
+}
+
+#[no_mangle]
+pub extern "C" fn chio_ffi_build_info() -> ChioFfiResult {
+    #[derive(serde::Serialize)]
+    struct BuildInfo<'a> {
+        crate_name: &'a str,
+        crate_version: &'a str,
+        abi_version: u32,
+        target: String,
+        features: Vec<&'a str>,
+    }
+
+    let info = BuildInfo {
+        crate_name: env!("CARGO_PKG_NAME"),
+        crate_version: env!("CARGO_PKG_VERSION"),
+        abi_version: CHIO_FFI_ABI_VERSION,
+        target: format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS),
+        features: Vec::new(),
+    };
+    run_ffi(|| json(&info))
 }
 
 #[no_mangle]
@@ -323,10 +350,13 @@ pub extern "C" fn chio_verify_manifest_json(input_json: *const c_char) -> ChioFf
 #[cfg(test)]
 mod tests {
     use super::{
-        chio_buffer_free, chio_canonicalize_json, chio_sha256_hex_utf8,
-        chio_sign_utf8_message_ed25519, ChioFfiBuffer, STATUS_OK,
+        chio_buffer_free, chio_canonicalize_json, chio_ffi_abi_version, chio_ffi_build_info,
+        chio_sha256_hex_bytes, chio_sha256_hex_utf8, chio_sign_utf8_message_ed25519,
+        chio_verify_utf8_message_ed25519, ChioFfiBuffer, STATUS_ERROR, STATUS_NULL_ARGUMENT,
+        STATUS_OK,
     };
     use std::ffi::CString;
+    use std::os::raw::c_char;
 
     fn result_to_string(buffer: ChioFfiBuffer) -> String {
         let bytes = if buffer.len == 0 {
@@ -336,12 +366,22 @@ mod tests {
             unsafe { std::slice::from_raw_parts(buffer.ptr, buffer.len).to_vec() }
         };
         chio_buffer_free(buffer);
-        String::from_utf8(bytes).expect("ffi output must be utf8")
+        match String::from_utf8(bytes) {
+            Ok(value) => value,
+            Err(error) => panic!("ffi output must be utf8: {error}"),
+        }
+    }
+
+    fn c_string(value: &str) -> CString {
+        match CString::new(value) {
+            Ok(value) => value,
+            Err(error) => panic!("test input contained interior nul: {error}"),
+        }
     }
 
     #[test]
     fn canonicalize_roundtrips_over_c_abi() {
-        let input = CString::new(r#"{"z":1,"a":2}"#).expect("CString");
+        let input = c_string(r#"{"z":1,"a":2}"#);
         let result = chio_canonicalize_json(input.as_ptr());
         assert_eq!(result.status, STATUS_OK);
         assert_eq!(result_to_string(result.data), r#"{"a":2,"z":1}"#);
@@ -349,7 +389,7 @@ mod tests {
 
     #[test]
     fn hashing_roundtrips_over_c_abi() {
-        let input = CString::new("hello").expect("CString");
+        let input = c_string("hello");
         let result = chio_sha256_hex_utf8(input.as_ptr());
         assert_eq!(result.status, STATUS_OK);
         assert_eq!(
@@ -360,12 +400,130 @@ mod tests {
 
     #[test]
     fn signing_roundtrips_over_c_abi() {
-        let input = CString::new("hello chio").expect("CString");
-        let seed = CString::new("09".repeat(32)).expect("CString");
+        let input = c_string("hello chio");
+        let seed = c_string(&"09".repeat(32));
         let result = chio_sign_utf8_message_ed25519(input.as_ptr(), seed.as_ptr());
         assert_eq!(result.status, STATUS_OK);
         let output = result_to_string(result.data);
         assert!(output.contains("public_key_hex"));
         assert!(output.contains("signature_hex"));
+    }
+
+    #[test]
+    fn abi_version_is_stable_one() {
+        assert_eq!(chio_ffi_abi_version(), 1);
+    }
+
+    #[test]
+    fn build_info_reports_version_target_and_features() {
+        let result = chio_ffi_build_info();
+        assert_eq!(result.status, STATUS_OK);
+        let output = result_to_string(result.data);
+        let parsed: serde_json::Value = match serde_json::from_str(&output) {
+            Ok(value) => value,
+            Err(error) => panic!("build info must be valid json: {error}; output={output}"),
+        };
+
+        assert_eq!(parsed["crate_name"], "chio-bindings-ffi");
+        assert_eq!(parsed["crate_version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(parsed["abi_version"], 1);
+        assert!(parsed["target"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty()));
+        assert!(parsed["features"].as_array().is_some());
+    }
+
+    #[test]
+    fn null_string_argument_returns_null_argument_status() {
+        let result = chio_canonicalize_json(std::ptr::null());
+        assert_eq!(result.status, STATUS_NULL_ARGUMENT);
+        assert!(result_to_string(result.data).contains("input_json must not be null"));
+    }
+
+    #[test]
+    fn null_bytes_with_nonzero_len_returns_null_argument_status() {
+        let result = chio_sha256_hex_bytes(std::ptr::null(), 1);
+        assert_eq!(result.status, STATUS_NULL_ARGUMENT);
+        assert!(result_to_string(result.data).contains("input pointer must not be null"));
+    }
+
+    #[test]
+    fn null_bytes_with_zero_len_hashes_empty_buffer() {
+        let result = chio_sha256_hex_bytes(std::ptr::null(), 0);
+        assert_eq!(result.status, STATUS_OK);
+        assert_eq!(
+            result_to_string(result.data),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn invalid_utf8_argument_returns_error_status() {
+        let input = [0xff_u8, 0x00_u8];
+        let result = chio_sha256_hex_utf8(input.as_ptr().cast::<c_char>());
+        assert_eq!(result.status, STATUS_ERROR);
+        assert!(result_to_string(result.data).contains("input_utf8 must be valid UTF-8"));
+    }
+
+    #[test]
+    fn malformed_json_returns_error_status() {
+        let input = c_string(r#"{"unterminated": true"#);
+        let result = chio_canonicalize_json(input.as_ptr());
+        assert_eq!(result.status, STATUS_ERROR);
+        assert_ne!(result.error_code, 0);
+        assert!(!result_to_string(result.data).is_empty());
+    }
+
+    #[test]
+    fn malformed_hex_returns_error_status() {
+        let input = c_string("hello");
+        let public_key = c_string("not-hex");
+        let signature = c_string("also-not-hex");
+        let result = chio_verify_utf8_message_ed25519(
+            input.as_ptr(),
+            public_key.as_ptr(),
+            signature.as_ptr(),
+        );
+        assert_eq!(result.status, STATUS_ERROR);
+        assert_ne!(result.error_code, 0);
+        assert!(!result_to_string(result.data).is_empty());
+    }
+
+    #[test]
+    fn freeing_empty_and_null_buffers_is_noop() {
+        chio_buffer_free(ChioFfiBuffer {
+            ptr: std::ptr::null_mut(),
+            len: 0,
+        });
+        chio_buffer_free(ChioFfiBuffer {
+            ptr: std::ptr::null_mut(),
+            len: 16,
+        });
+    }
+
+    #[test]
+    fn abi_symbol_snapshot_lists_exported_functions() {
+        let snapshot = include_str!("../../../tests/abi/chio-bindings-ffi.symbols");
+        let expected = [
+            "chio_buffer_free",
+            "chio_canonicalize_json",
+            "chio_ffi_abi_version",
+            "chio_ffi_build_info",
+            "chio_sha256_hex_bytes",
+            "chio_sha256_hex_utf8",
+            "chio_sign_json_ed25519",
+            "chio_sign_utf8_message_ed25519",
+            "chio_verify_capability_json",
+            "chio_verify_json_signature_ed25519",
+            "chio_verify_manifest_json",
+            "chio_verify_receipt_json",
+            "chio_verify_utf8_message_ed25519",
+        ];
+
+        let actual: Vec<&str> = snapshot
+            .lines()
+            .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))
+            .collect();
+        assert_eq!(actual, expected);
     }
 }

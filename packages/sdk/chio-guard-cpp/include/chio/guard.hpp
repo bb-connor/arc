@@ -1,24 +1,33 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace chio::guard {
 
-struct Verdict {
-  enum class Kind {
-    Allow,
-    Deny,
-  };
+enum class VerdictKind {
+  Allow,
+  Deny,
+};
 
-  Kind kind = Kind::Deny;
+struct Verdict {
+  VerdictKind kind = VerdictKind::Deny;
   std::string reason;
 
-  static Verdict allow() { return Verdict{Kind::Allow, {}}; }
-  static Verdict deny(std::string message) { return Verdict{Kind::Deny, std::move(message)}; }
+  static Verdict allow() { return Verdict{VerdictKind::Allow, {}}; }
+
+  static Verdict deny(std::string message) {
+    return Verdict{VerdictKind::Deny, std::move(message)};
+  }
+
+  [[nodiscard]] bool allowed() const { return kind == VerdictKind::Allow; }
+
+  [[nodiscard]] bool denied() const { return kind == VerdictKind::Deny; }
 };
 
 struct GuardRequest {
@@ -34,10 +43,45 @@ struct GuardRequest {
   std::optional<std::uint32_t> matched_grant_index;
 };
 
+using GuardFn = std::function<Verdict(const GuardRequest&)>;
+
 class Guard {
  public:
   virtual ~Guard() = default;
   virtual Verdict evaluate(const GuardRequest& request) = 0;
 };
+
+class FunctionGuard final : public Guard {
+ public:
+  explicit FunctionGuard(GuardFn fn) : fn_(std::move(fn)) {}
+
+  Verdict evaluate(const GuardRequest& request) override {
+    if (!fn_) {
+      return Verdict::deny("guard function not configured");
+    }
+    return fn_(request);
+  }
+
+ private:
+  GuardFn fn_;
+};
+
+[[nodiscard]] inline Verdict evaluate_guard(Guard& guard, const GuardRequest& request) {
+  return guard.evaluate(request);
+}
+
+[[nodiscard]] inline bool path_contains_parent_reference(std::string_view path) {
+  if (path == "..") {
+    return true;
+  }
+  if (path.find("../") != std::string_view::npos) {
+    return true;
+  }
+  if (path.find("/..") != std::string_view::npos) {
+    return true;
+  }
+  return path.find("\\..") != std::string_view::npos ||
+         path.find("..\\") != std::string_view::npos;
+}
 
 }  // namespace chio::guard

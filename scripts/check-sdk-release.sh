@@ -44,6 +44,7 @@ trap cleanup EXIT
 case "${lang}" in
   cpp)
     sdk_dir="${repo_root}/packages/sdk/chio-cpp"
+    require_cpp_packagers="${CHIO_CPP_REQUIRE_PACKAGERS:-${CI:-}}"
 
     "${repo_root}/scripts/check-chio-cpp.sh"
 
@@ -52,6 +53,9 @@ case "${lang}" in
         cd "${sdk_dir}"
         conan create . --build=missing
       )
+    elif [[ -n "${require_cpp_packagers}" && "${require_cpp_packagers}" != "0" ]]; then
+      echo "Conan package smoke is required but conan is not on PATH" >&2
+      exit 1
     else
       echo "skipping Conan package smoke because conan is not on PATH"
     fi
@@ -65,6 +69,9 @@ case "${lang}" in
 
     if [[ -n "${vcpkg_cmd}" ]]; then
       "${vcpkg_cmd}" install --x-manifest-root="${sdk_dir}" --dry-run
+    elif [[ -n "${require_cpp_packagers}" && "${require_cpp_packagers}" != "0" ]]; then
+      echo "vcpkg manifest build is required but vcpkg is not on PATH" >&2
+      exit 1
     else
       python3 - "${sdk_dir}/vcpkg.json" <<'PY'
 import json

@@ -1,10 +1,8 @@
 #include "chio/chio.hpp"
 
 #include <algorithm>
-#include <array>
 #include <chrono>
-#include <cstdio>
-#include <cstdlib>
+#include <cctype>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -15,10 +13,9 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
-
-#include <unistd.h>
 
 namespace {
 
@@ -26,6 +23,8 @@ struct Args {
   std::string base_url;
   std::string auth_mode = "static-bearer";
   std::string auth_token;
+  std::string admin_token;
+  std::string auth_scope = "mcp:invoke";
   std::string scenarios_dir;
   std::string results_output;
   std::string artifacts_dir;
@@ -34,6 +33,13 @@ struct Args {
 struct Scenario {
   std::string id;
   std::string category;
+};
+
+struct AuthContext {
+  std::string mode;
+  std::string access_token;
+  chio::OAuthMetadata protected_resource_metadata;
+  chio::OAuthMetadata authorization_server_metadata;
 };
 
 struct Result {
@@ -78,6 +84,20 @@ std::string json_escape(const std::string& input) {
 
 std::string quote(const std::string& input) {
   return "\"" + json_escape(input) + "\"";
+}
+
+std::string url_encode(const std::string& input) {
+  std::ostringstream escaped;
+  escaped.fill('0');
+  escaped << std::hex;
+  for (unsigned char c : input) {
+    if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      escaped << c;
+    } else {
+      escaped << '%' << std::uppercase << std::setw(2) << int(c) << std::nouppercase;
+    }
+  }
+  return escaped.str();
 }
 
 std::string read_file(const std::filesystem::path& path) {
@@ -161,6 +181,8 @@ Args parse_args(int argc, char** argv) {
       {"--base-url", &args.base_url},
       {"--auth-mode", &args.auth_mode},
       {"--auth-token", &args.auth_token},
+      {"--admin-token", &args.admin_token},
+      {"--auth-scope", &args.auth_scope},
       {"--scenarios-dir", &args.scenarios_dir},
       {"--results-output", &args.results_output},
       {"--artifacts-dir", &args.artifacts_dir},
@@ -217,111 +239,309 @@ bool contains(const std::string& value, const std::string& needle) {
   return value.find(needle) != std::string::npos;
 }
 
-std::string shell_quote(const std::string& value) {
-  std::string out = "'";
-  for (char c : value) {
-    if (c == '\'') {
-      out += "'\\''";
-    } else {
-      out.push_back(c);
-    }
+std::string error_text(const chio::Error& error) {
+  if (error.response_body_snippet.empty()) {
+    return error.message;
   }
-  out += "'";
-  return out;
+  return error.message + " body: " + error.response_body_snippet;
 }
 
-std::string trim_header_value(std::string value) {
-  while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) {
+bool contains_value(const std::vector<std::string>& values, const std::string& expected) {
+  return std::find(values.begin(), values.end(), expected) != values.end();
+}
+
+std::string trim_slashes(std::string value) {
+  while (!value.empty() && value.front() == '/') {
     value.erase(value.begin());
   }
-  while (!value.empty() && (value.back() == '\r' || value.back() == '\n')) {
+  while (!value.empty() && value.back() == '/') {
     value.pop_back();
   }
   return value;
 }
 
-std::map<std::string, std::string> parse_headers(const std::string& header_blob) {
-  std::map<std::string, std::string> headers;
-  std::istringstream input(header_blob);
-  std::string line;
-  while (std::getline(input, line)) {
-    const auto colon = line.find(':');
-    if (colon == std::string::npos) {
-      continue;
-    }
-    headers[line.substr(0, colon)] = trim_header_value(line.substr(colon + 1));
+std::string authorization_server_metadata_url(const std::string& base_url,
+                                              const std::string& issuer) {
+  auto path_start = issuer.find("://");
+  if (path_start != std::string::npos) {
+    path_start = issuer.find('/', path_start + 3);
   }
-  return headers;
+  std::string issuer_path =
+      path_start == std::string::npos ? std::string() : issuer.substr(path_start);
+  issuer_path = trim_slashes(std::move(issuer_path));
+  std::string base = base_url;
+  while (!base.empty() && base.back() == '/') {
+    base.pop_back();
+  }
+  if (issuer_path.empty()) {
+    return base + "/.well-known/oauth-authorization-server";
+  }
+  return base + "/.well-known/oauth-authorization-server/" + issuer_path;
 }
 
-class CommandCurlTransport final : public chio::HttpTransport {
- public:
-  chio::Result<chio::HttpResponse> send(const chio::HttpRequest& request) override {
-    const auto body_path = write_temp_body(request.body);
-    std::string command =
-        "curl --silent --show-error --include --write-out '\\nCHIO_HTTP_STATUS:%{http_code}\\n'";
-    command += " --request " + shell_quote(request.method);
-    command += " --url " + shell_quote(request.url);
-    for (const auto& header : request.headers) {
-      command += " --header " + shell_quote(header.first + ": " + header.second);
+std::string header_value(const std::map<std::string, std::string>& headers,
+                         std::string name) {
+  std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+  for (const auto& header : headers) {
+    auto key = header.first;
+    std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    if (key == name) {
+      return header.second;
     }
-    if (!request.body.empty()) {
-      command += " --data-binary @" + shell_quote(body_path.string());
-    }
-
-    std::array<char, 4096> buffer{};
-    std::string output;
-    FILE* pipe = popen(command.c_str(), "r");
-    if (pipe == nullptr) {
-      std::filesystem::remove(body_path);
-      return chio::Result<chio::HttpResponse>::failure(
-          chio::Error{chio::ErrorCode::Transport, "failed to spawn curl"});
-    }
-    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
-      output += buffer.data();
-    }
-    const int rc = pclose(pipe);
-    std::filesystem::remove(body_path);
-    if (rc != 0) {
-      return chio::Result<chio::HttpResponse>::failure(
-          chio::Error{chio::ErrorCode::Transport, "curl exited unsuccessfully"});
-    }
-
-    const std::string marker = "\nCHIO_HTTP_STATUS:";
-    const auto marker_pos = output.rfind(marker);
-    if (marker_pos == std::string::npos) {
-      return chio::Result<chio::HttpResponse>::failure(
-          chio::Error{chio::ErrorCode::Transport, "curl output did not include HTTP status"});
-    }
-    const auto status_text = output.substr(marker_pos + marker.size(), 3);
-    const int status = std::atoi(status_text.c_str());
-    const auto response_blob = output.substr(0, marker_pos);
-
-    auto split = response_blob.rfind("\r\n\r\n");
-    auto delimiter_size = std::string("\r\n\r\n").size();
-    if (split == std::string::npos) {
-      split = response_blob.rfind("\n\n");
-      delimiter_size = std::string("\n\n").size();
-    }
-    if (split == std::string::npos) {
-      return chio::Result<chio::HttpResponse>::success(
-          chio::HttpResponse{status, {}, response_blob});
-    }
-
-    auto headers = parse_headers(response_blob.substr(0, split));
-    auto body = response_blob.substr(split + delimiter_size);
-    return chio::Result<chio::HttpResponse>::success(
-        chio::HttpResponse{status, std::move(headers), std::move(body)});
   }
+  return {};
+}
+
+std::string query_value(const std::string& url, const std::string& key) {
+  const auto query_start = url.find('?');
+  if (query_start == std::string::npos) {
+    return {};
+  }
+  const std::string needle = key + "=";
+  auto pos = url.find(needle, query_start + 1);
+  if (pos == std::string::npos) {
+    return {};
+  }
+  pos += needle.size();
+  const auto end = url.find('&', pos);
+  return url.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+}
+
+std::string conformance_client_capabilities_json() {
+  return "{"
+         "\"sampling\":{\"includeContext\":true,\"tools\":{}},"
+         "\"elicitation\":{\"form\":{},\"url\":{}},"
+         "\"roots\":{\"listChanged\":true}"
+         "}";
+}
+
+chio::NestedCallbackRouter conformance_nested_router() {
+  chio::NestedCallbackRouter router;
+  router
+      .on_sampling([](const chio::JsonMessage& message) {
+        return chio::Result<std::string>::success(
+            chio::NestedCallbackRouter::sampling_text_result(
+                message, "sampled by conformance peer", "chio-conformance-cpp-model"));
+      })
+      .on_elicitation([](const chio::JsonMessage& message) {
+        if (contains(message.raw_json, "\"mode\":\"url\"")) {
+          return chio::Result<std::string>::success(
+              chio::NestedCallbackRouter::elicitation_accept_result(message));
+        }
+        return chio::Result<std::string>::success(
+            chio::NestedCallbackRouter::elicitation_accept_result(
+                message, "{\"answer\":\"elicited by conformance peer\"}"));
+      })
+      .on_roots([](const chio::JsonMessage& message) {
+        return chio::Result<std::string>::success(
+            chio::NestedCallbackRouter::roots_list_result(
+                message,
+                "[{\"uri\":\"file:///workspace/conformance-root\",\"name\":\"conformance-root\"}]"));
+      });
+  return router;
+}
+
+class ReceiveGuard {
+ public:
+  ReceiveGuard(chio::Session& session, chio::MessageHandler handler)
+      : cancellation_(std::make_shared<chio::CancellationToken>()),
+        thread_(session.start_receive_loop(std::move(handler), cancellation_)) {}
+
+  ~ReceiveGuard() {
+    cancellation_->cancel();
+    if (thread_.joinable()) {
+      thread_.join();
+    }
+  }
+
+  ReceiveGuard(const ReceiveGuard&) = delete;
+  ReceiveGuard& operator=(const ReceiveGuard&) = delete;
 
  private:
-  static std::filesystem::path write_temp_body(const std::string& body) {
-    auto path = std::filesystem::temp_directory_path() /
-                ("chio-cpp-peer-body-" + std::to_string(getpid()) + ".json");
-    write_file(path, body);
-    return path;
-  }
+  std::shared_ptr<chio::CancellationToken> cancellation_;
+  std::thread thread_;
 };
+
+std::string form_encode(const std::map<std::string, std::string>& fields) {
+  std::string out;
+  bool first = true;
+  for (const auto& field : fields) {
+    if (!first) {
+      out += "&";
+    }
+    first = false;
+    out += url_encode(field.first);
+    out += "=";
+    out += url_encode(field.second);
+  }
+  return out;
+}
+
+chio::Result<chio::Session> initialize_with_token(const Args& args,
+                                                  chio::HttpTransportPtr transport,
+                                                  const std::string& token) {
+  auto built_client = chio::ClientBuilder()
+                          .base_url(args.base_url)
+                          .bearer_token(token)
+                          .transport(std::move(transport))
+                          .timeout(std::chrono::milliseconds(10000))
+                          .client_info("chio-conformance-cpp", "0.1.0")
+                          .client_capabilities_json(conformance_client_capabilities_json())
+                          .initialize_message_handler([](chio::Session& session,
+                                                         const chio::JsonMessage& message) {
+                            return conformance_nested_router().bind(session)(message);
+                          })
+                          .build();
+  if (!built_client) {
+    return chio::Result<chio::Session>::failure(built_client.error());
+  }
+  return built_client.value().initialize();
+}
+
+chio::Result<std::string> perform_authorization_code_flow(
+    const Args& args,
+    chio::HttpTransportPtr transport,
+    const chio::OAuthMetadata& authorization_server_metadata) {
+  const std::string verifier =
+      "chio-conformance-cpp-verifier-abcdefghijklmnopqrstuvwxyz0123456789";
+  auto pkce = chio::PkceChallenge::from_verifier(verifier);
+  if (!pkce) {
+    return chio::Result<std::string>::failure(pkce.error());
+  }
+  const std::string base =
+      args.base_url.empty() || args.base_url.back() != '/'
+          ? args.base_url
+          : args.base_url.substr(0, args.base_url.size() - 1);
+  const std::string resource = base + "/mcp";
+  const std::string redirect_uri = "http://localhost:7777/callback";
+  const std::string client_id = "https://client.example/app";
+  const std::string state = "chio-cpp-state";
+  const std::string authorization_endpoint =
+      authorization_server_metadata.authorization_endpoint.empty()
+          ? base + "/oauth/authorize"
+          : authorization_server_metadata.authorization_endpoint;
+  const std::string token_endpoint =
+      authorization_server_metadata.token_endpoint.empty()
+          ? base + "/oauth/token"
+          : authorization_server_metadata.token_endpoint;
+
+  const auto authorize_query = form_encode({
+      {"client_id", client_id},
+      {"code_challenge", pkce.value().challenge},
+      {"code_challenge_method", "S256"},
+      {"redirect_uri", redirect_uri},
+      {"resource", resource},
+      {"response_type", "code"},
+      {"scope", args.auth_scope},
+      {"state", state},
+  });
+  chio::HttpRequest authorize_request{
+      "GET",
+      authorization_endpoint + "?" + authorize_query,
+      {{"Accept", "text/html, application/json"}},
+      "",
+  };
+  auto authorize_response = transport->send(authorize_request);
+  if (!authorize_response) {
+    return chio::Result<std::string>::failure(authorize_response.error());
+  }
+  if (authorize_response.value().status != 200 ||
+      !contains(authorize_response.value().body, "Approve")) {
+    return chio::Result<std::string>::failure(
+        chio::Error{chio::ErrorCode::Protocol,
+                    "authorization endpoint did not return an approval page",
+                    "cpp-peer::perform_authorization_code_flow"});
+  }
+
+  chio::HttpRequest approval_request{
+      "POST",
+      authorization_endpoint,
+      {{"Content-Type", "application/x-www-form-urlencoded"}},
+      form_encode({
+          {"client_id", client_id},
+          {"code_challenge", pkce.value().challenge},
+          {"code_challenge_method", "S256"},
+          {"decision", "approve"},
+          {"redirect_uri", redirect_uri},
+          {"resource", resource},
+          {"response_type", "code"},
+          {"scope", args.auth_scope},
+          {"state", state},
+      }),
+  };
+  auto approval_response = transport->send(approval_request);
+  if (!approval_response) {
+    return chio::Result<std::string>::failure(approval_response.error());
+  }
+  const auto location = header_value(approval_response.value().headers, "location");
+  const auto code = query_value(location, "code");
+  if (approval_response.value().status < 300 || approval_response.value().status >= 400 ||
+      code.empty()) {
+    return chio::Result<std::string>::failure(
+        chio::Error{chio::ErrorCode::Protocol,
+                    "authorization approval did not redirect with a code",
+                    "cpp-peer::perform_authorization_code_flow"});
+  }
+
+  chio::TokenExchangeRequest token_request;
+  token_request.token_endpoint = token_endpoint;
+  token_request.grant_type = "authorization_code";
+  token_request.code = code;
+  token_request.redirect_uri = redirect_uri;
+  token_request.client_id = client_id;
+  token_request.code_verifier = verifier;
+  token_request.resource = resource;
+  chio::OAuthMetadataClient oauth(args.base_url, transport);
+  auto token_response = oauth.exchange_token(token_request);
+  if (!token_response) {
+    return token_response;
+  }
+  const auto token = extract_string_field(token_response.value(), "access_token");
+  if (token.empty()) {
+    return chio::Result<std::string>::failure(
+        chio::Error{chio::ErrorCode::Protocol,
+                    "authorization code exchange did not return an access token",
+                    "cpp-peer::perform_authorization_code_flow"});
+  }
+  return chio::Result<std::string>::success(token);
+}
+
+chio::Result<AuthContext> resolve_auth(const Args& args, chio::HttpTransportPtr transport) {
+  if (args.auth_mode != "oauth-local") {
+    return chio::Result<AuthContext>::success(
+        AuthContext{"static-bearer", args.auth_token, {}, {}});
+  }
+
+  chio::OAuthMetadataClient oauth(args.base_url, transport);
+  auto protected_resource = oauth.discover_protected_resource();
+  if (!protected_resource) {
+    return chio::Result<AuthContext>::failure(protected_resource.error());
+  }
+  if (protected_resource.value().authorization_servers.empty()) {
+    return chio::Result<AuthContext>::failure(
+        chio::Error{chio::ErrorCode::Protocol,
+                    "protected resource metadata did not advertise an authorization server",
+                    "cpp-peer::resolve_auth"});
+  }
+  auto authorization_server = oauth.discover_authorization_server(
+      authorization_server_metadata_url(args.base_url,
+                                        protected_resource.value().authorization_servers[0]));
+  if (!authorization_server) {
+    return chio::Result<AuthContext>::failure(authorization_server.error());
+  }
+  auto access_token =
+      perform_authorization_code_flow(args, transport, authorization_server.value());
+  if (!access_token) {
+    return chio::Result<AuthContext>::failure(access_token.error());
+  }
+  return chio::Result<AuthContext>::success(
+      AuthContext{"oauth-local", access_token.value(), protected_resource.value(),
+                  authorization_server.value()});
+}
 
 std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point started) {
   return static_cast<std::uint64_t>(
@@ -330,7 +550,11 @@ std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point started) {
           .count());
 }
 
-Result run_scenario(const Scenario& scenario, chio::Session& session) {
+Result run_scenario(const Scenario& scenario,
+                    const Args& args,
+                    const AuthContext& auth_context,
+                    chio::Session& session,
+                    chio::HttpTransportPtr transport) {
   const auto started = std::chrono::steady_clock::now();
 
   if (scenario.id == "initialize") {
@@ -345,7 +569,7 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
     return fail(scenario,
                 elapsed_ms(started),
                 "tools_list_contains_echo_text",
-                response ? response.value() : response.error().message);
+                response ? response.value() : error_text(response.error()));
   }
 
   if (scenario.id == "tools-call-simple-text") {
@@ -356,7 +580,7 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
     return fail(scenario,
                 elapsed_ms(started),
                 "tool_result_matches_input_text",
-                response ? response.value() : response.error().message);
+                response ? response.value() : error_text(response.error()));
   }
 
   if (scenario.id == "resources-list") {
@@ -367,7 +591,7 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
     return fail(scenario,
                 elapsed_ms(started),
                 "resources_list_contains_fixture_uri",
-                response ? response.value() : response.error().message);
+                response ? response.value() : error_text(response.error()));
   }
 
   if (scenario.id == "prompts-list") {
@@ -378,7 +602,114 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
     return fail(scenario,
                 elapsed_ms(started),
                 "prompts_list_contains_fixture_prompt",
-                response ? response.value() : response.error().message);
+                response ? response.value() : error_text(response.error()));
+  }
+
+  if (scenario.id == "auth-unauthorized-challenge") {
+    chio::HttpRequest request{
+        "POST",
+        args.base_url + "/mcp",
+        {{"Accept", "application/json, text/event-stream"},
+         {"Content-Type", "application/json"}},
+        "{\"jsonrpc\":\"2.0\",\"id\":20,\"method\":\"initialize\",\"params\":{"
+        "\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},"
+        "\"clientInfo\":{\"name\":\"chio-conformance-cpp-unauthorized\","
+        "\"version\":\"0.1.0\"}}}",
+    };
+    auto response = transport->send(request);
+    if (response && response.value().status == 401 &&
+        contains(header_value(response.value().headers, "www-authenticate"),
+                 "resource_metadata=")) {
+      return pass(scenario,
+                  elapsed_ms(started),
+                  "unauthorized_initialize_returns_resource_metadata_challenge");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "unauthorized_initialize_returns_resource_metadata_challenge",
+                response ? response.value().body : error_text(response.error()));
+  }
+
+  if (scenario.id == "auth-protected-resource-metadata") {
+    if (!auth_context.protected_resource_metadata.authorization_servers.empty() &&
+        contains_value(auth_context.protected_resource_metadata.scopes_supported,
+                       args.auth_scope)) {
+      return pass(scenario,
+                  elapsed_ms(started),
+                  "protected_resource_metadata_advertises_auth_server_and_scope");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "protected_resource_metadata_advertises_auth_server_and_scope",
+                "protected resource metadata did not advertise expected server and scope");
+  }
+
+  if (scenario.id == "auth-authorization-server-metadata") {
+    if (contains_value(auth_context.authorization_server_metadata.grant_types_supported,
+                       "authorization_code") &&
+        contains_value(auth_context.authorization_server_metadata.grant_types_supported,
+                       "urn:ietf:params:oauth:grant-type:token-exchange") &&
+        !auth_context.authorization_server_metadata.authorization_endpoint.empty() &&
+        !auth_context.authorization_server_metadata.token_endpoint.empty()) {
+      return pass(scenario,
+                  elapsed_ms(started),
+                  "authorization_server_metadata_advertises_expected_grants");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "authorization_server_metadata_advertises_expected_grants",
+                "authorization server metadata did not advertise expected grants");
+  }
+
+  if (scenario.id == "auth-code-initialize") {
+    auto initialized = initialize_with_token(args, transport, auth_context.access_token);
+    if (!initialized) {
+      return fail(scenario,
+                  elapsed_ms(started),
+                  "authorization_code_access_token_initializes_session",
+                  error_text(initialized.error()));
+    }
+    auto extra_session = initialized.move_value();
+    (void)extra_session.close();
+    return pass(scenario,
+                elapsed_ms(started),
+                "authorization_code_access_token_initializes_session");
+  }
+
+  if (scenario.id == "auth-token-exchange-initialize") {
+    std::string base = args.base_url;
+    while (!base.empty() && base.back() == '/') {
+      base.pop_back();
+    }
+    chio::TokenExchangeRequest token_request;
+    token_request.token_endpoint = auth_context.authorization_server_metadata.token_endpoint;
+    token_request.grant_type = "urn:ietf:params:oauth:grant-type:token-exchange";
+    token_request.subject_token = auth_context.access_token;
+    token_request.subject_token_type =
+        "urn:ietf:params:oauth:token-type:access_token";
+    token_request.resource = base + "/mcp";
+    token_request.scopes = {args.auth_scope};
+    chio::OAuthMetadataClient oauth(args.base_url, transport);
+    auto exchanged = oauth.exchange_token(token_request);
+    if (!exchanged) {
+      return fail(scenario,
+                  elapsed_ms(started),
+                  "token_exchange_access_token_initializes_session",
+                  error_text(exchanged.error()));
+    }
+    const auto exchanged_token = extract_string_field(exchanged.value(), "access_token");
+    auto initialized = initialize_with_token(args, transport, exchanged_token);
+    if (!initialized) {
+      return fail(scenario,
+                  elapsed_ms(started),
+                  "token_exchange_access_token_initializes_session",
+                  error_text(initialized.error()));
+    }
+    auto extra_session = initialized.move_value();
+    (void)extra_session.close();
+    return pass(scenario,
+                elapsed_ms(started),
+                "token_exchange_access_token_initializes_session");
   }
 
   if (scenario.id == "tasks-call-get-result") {
@@ -389,7 +720,7 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
       return fail(scenario,
                   elapsed_ms(started),
                   "task_created",
-                  create ? create.value() : create.error().message);
+                  create ? create.value() : error_text(create.error()));
     }
     const auto task_id = extract_string_field(create.value(), "taskId");
     auto result = session.get_task_result(task_id);
@@ -401,7 +732,7 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
     return fail(scenario,
                 elapsed_ms(started),
                 "tasks_result_returns_related_terminal_payload",
-                result ? result.value() : result.error().message);
+                result ? result.value() : error_text(result.error()));
   }
 
   if (scenario.id == "tasks-cancel") {
@@ -412,7 +743,7 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
       return fail(scenario,
                   elapsed_ms(started),
                   "task_created",
-                  create ? create.value() : create.error().message);
+                  create ? create.value() : error_text(create.error()));
     }
     const auto task_id = extract_string_field(create.value(), "taskId");
     auto cancel = session.cancel_task(task_id);
@@ -422,32 +753,145 @@ Result run_scenario(const Scenario& scenario, chio::Session& session) {
     return fail(scenario,
                 elapsed_ms(started),
                 "tasks_cancel_marks_cancelled",
-                cancel ? cancel.value() : cancel.error().message);
+                cancel ? cancel.value() : error_text(cancel.error()));
   }
 
   if (scenario.id == "catalog-list-changed-notifications") {
+    bool saw_resource = false;
+    bool saw_tool = false;
+    bool saw_prompt = false;
     auto response = session.call_tool(
         "emit_fixture_notifications",
-        "{\"message\":\"hello from cpp notification peer\",\"uri\":\"fixture://docs/alpha\"}");
-    if (response && contains(response.value(), "notifications/resources/list_changed") &&
-        contains(response.value(), "notifications/tools/list_changed")) {
+        "{\"count\":3,\"message\":\"hello from cpp notification peer\",\"uri\":\"fixture://docs/alpha\"}",
+        [&](const chio::JsonMessage& message) {
+          saw_resource = saw_resource || message.method == "notifications/resources/list_changed";
+          saw_tool = saw_tool || message.method == "notifications/tools/list_changed";
+          saw_prompt = saw_prompt || message.method == "notifications/prompts/list_changed";
+          return chio::Result<void>::success();
+        });
+    if (response &&
+        ((saw_resource && saw_tool && saw_prompt) ||
+         (contains(response.value(), "notifications/resources/list_changed") &&
+          contains(response.value(), "notifications/tools/list_changed")))) {
       return pass(scenario, elapsed_ms(started), "catalog_notifications_forwarded");
     }
     return fail(scenario,
                 elapsed_ms(started),
                 "catalog_notifications_forwarded",
-                response ? response.value() : response.error().message);
+                response ? response.value() : error_text(response.error()));
   }
 
   if (scenario.id == "resources-subscribe-updated-notification") {
-    return unsupported(scenario,
-                       elapsed_ms(started),
-                       "C++ streaming subscription helpers are not implemented yet");
+    const std::string uri = "fixture://docs/alpha";
+    bool saw_update = false;
+    auto subscribed = session.subscribe_resource(uri);
+    if (!subscribed) {
+      return fail(scenario,
+                  elapsed_ms(started),
+                  "resources_subscribe_succeeds",
+                  error_text(subscribed.error()));
+    }
+    auto response = session.call_tool(
+        "emit_fixture_notifications",
+        "{\"count\":2,\"uri\":\"fixture://docs/alpha\"}",
+        [&](const chio::JsonMessage& message) {
+          saw_update = saw_update ||
+                       (message.method == "notifications/resources/updated" &&
+                        contains(message.raw_json, uri));
+          return chio::Result<void>::success();
+        });
+    if (response && (saw_update || contains(response.value(), "notifications/resources/updated"))) {
+      return pass(scenario, elapsed_ms(started), "subscribed_resource_update_is_forwarded");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "subscribed_resource_update_is_forwarded",
+                response ? response.value() : error_text(response.error()));
+  }
+
+  if (scenario.id == "nested-sampling-create-message") {
+    auto router = conformance_nested_router();
+    bool saw_sampling = false;
+    auto response = session.call_tool(
+        "sampled_echo",
+        "{\"message\":\"wave5 sampling request\"}",
+        [&](const chio::JsonMessage& message) {
+          saw_sampling = saw_sampling || message.method == "sampling/createMessage";
+          return router.bind(session)(message);
+        });
+    if (response && saw_sampling && contains(response.value(), "sampled by conformance peer")) {
+      return pass(scenario, elapsed_ms(started), "nested_sampling_request_roundtrips");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "nested_sampling_request_roundtrips",
+                response ? response.value() : error_text(response.error()));
+  }
+
+  if (scenario.id == "nested-elicitation-form-create") {
+    auto router = conformance_nested_router();
+    bool saw_elicitation = false;
+    auto response = session.call_tool(
+        "elicited_echo",
+        "{\"message\":\"wave5 form elicitation request\"}",
+        [&](const chio::JsonMessage& message) {
+          saw_elicitation = saw_elicitation || message.method == "elicitation/create";
+          return router.bind(session)(message);
+        });
+    if (response && saw_elicitation &&
+        contains(response.value(), "elicited by conformance peer")) {
+      return pass(scenario, elapsed_ms(started), "nested_form_elicitation_roundtrips");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "nested_form_elicitation_roundtrips",
+                response ? response.value() : error_text(response.error()));
+  }
+
+  if (scenario.id == "nested-elicitation-url-create") {
+    auto router = conformance_nested_router();
+    bool saw_elicitation = false;
+    auto response = session.call_tool(
+        "url_elicited_echo",
+        "{\"message\":\"wave5 url elicitation request\"}",
+        [&](const chio::JsonMessage& message) {
+          saw_elicitation = saw_elicitation || message.method == "elicitation/create";
+          return router.bind(session)(message);
+        });
+    if (response && saw_elicitation && contains(response.value(), "elicitationId")) {
+      return pass(scenario,
+                  elapsed_ms(started),
+                  "nested_url_elicitation_roundtrips_and_completes");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "nested_url_elicitation_roundtrips_and_completes",
+                response ? response.value() : error_text(response.error()));
+  }
+
+  if (scenario.id == "nested-roots-list") {
+    auto router = conformance_nested_router();
+    bool saw_roots = false;
+    auto response = session.call_tool(
+        "roots_echo",
+        "{\"message\":\"wave5 roots request\"}",
+        [&](const chio::JsonMessage& message) {
+          saw_roots = saw_roots || message.method == "roots/list";
+          return router.bind(session)(message);
+        });
+    if (response && saw_roots &&
+        contains(response.value(), "file:///workspace/conformance-root")) {
+      return pass(scenario, elapsed_ms(started), "nested_roots_list_roundtrips");
+    }
+    return fail(scenario,
+                elapsed_ms(started),
+                "nested_roots_list_roundtrips",
+                response ? response.value() : error_text(response.error()));
   }
 
   return unsupported(scenario,
                      elapsed_ms(started),
-                     "C++ peer does not yet implement OAuth discovery or nested callbacks");
+                     "unsupported scenario id " + scenario.id);
 }
 
 std::string result_to_json(const Result& result, const std::string& transcript_path) {
@@ -490,25 +934,41 @@ int main(int argc, char** argv) {
     write_file(transcript_path, "{\"peer\":\"cpp\",\"event\":\"started\"}\n");
 
     std::vector<Result> results;
-    if (args.auth_mode != "static-bearer") {
+    auto transport = std::make_shared<chio::CurlHttpTransport>();
+    auto auth_context = resolve_auth(args, transport);
+    if (!auth_context) {
       for (const auto& scenario : scenarios) {
-        results.push_back(
-            unsupported(scenario, 0, "C++ peer currently supports static bearer only"));
+        results.push_back(fail(scenario, 0, "auth_resolved", error_text(auth_context.error())));
       }
     } else {
-      auto transport = std::make_shared<CommandCurlTransport>();
-      auto client = chio::Client::with_static_bearer(args.base_url, args.auth_token, transport);
+      auto built_client = chio::ClientBuilder()
+                              .base_url(args.base_url)
+                              .bearer_token(auth_context.value().access_token)
+                              .transport(transport)
+                              .timeout(std::chrono::milliseconds(10000))
+                              .client_info("chio-conformance-cpp", "0.1.0")
+                              .client_capabilities_json(conformance_client_capabilities_json())
+                              .initialize_message_handler([](chio::Session& session,
+                                                             const chio::JsonMessage& message) {
+                                return conformance_nested_router().bind(session)(message);
+                              })
+                              .build();
+      if (!built_client) {
+        throw std::runtime_error(error_text(built_client.error()));
+      }
+      auto client = built_client.move_value();
       std::cerr << "cpp peer: initializing session\n";
       auto initialized = client.initialize();
       if (!initialized) {
         for (const auto& scenario : scenarios) {
           results.push_back(
-              fail(scenario, 0, "session_initialized", initialized.error().message));
+              fail(scenario, 0, "session_initialized", error_text(initialized.error())));
         }
       } else {
         auto session = initialized.move_value();
         for (const auto& scenario : scenarios) {
-          results.push_back(run_scenario(scenario, session));
+          results.push_back(
+              run_scenario(scenario, args, auth_context.value(), session, transport));
         }
         (void)session.close();
       }

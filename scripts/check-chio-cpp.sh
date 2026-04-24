@@ -30,10 +30,14 @@ fi
 cargo test -p chio-bindings-ffi
 cargo build -p chio-bindings-ffi
 
+require_cbindgen="${CHIO_CPP_REQUIRE_CBINDGEN:-${CI:-}}"
 if command -v cbindgen >/dev/null 2>&1; then
   generated_header="${smoke_dir}/chio_ffi.h"
   cbindgen crates/chio-bindings-ffi -o "${generated_header}"
   diff -u crates/chio-bindings-ffi/include/chio/chio_ffi.h "${generated_header}"
+elif [[ -n "${require_cbindgen}" && "${require_cbindgen}" != "0" ]]; then
+  echo "cbindgen is required for chio_ffi.h freshness but is not on PATH" >&2
+  exit 1
 else
   echo "skipping chio_ffi.h freshness check because cbindgen is not on PATH"
 fi
@@ -69,6 +73,16 @@ cc -I "${repo_root}/crates/chio-bindings-ffi/include" \
   "${smoke_dir}/smoke.c" "${ffi_lib}" "${extra_link[@]}" \
   -o "${smoke_dir}/smoke"
 "${smoke_dir}/smoke"
+
+nm -g "${ffi_lib}" 2>/dev/null |
+  awk '$2 == "T" {print $3}' |
+  sed 's/^_//' |
+  grep -E '^chio_' |
+  sort -u > "${smoke_dir}/actual.symbols"
+grep -v '^#' tests/abi/chio-bindings-ffi.symbols |
+  sed '/^[[:space:]]*$/d' |
+  sort -u > "${smoke_dir}/expected.symbols"
+diff -u "${smoke_dir}/expected.symbols" "${smoke_dir}/actual.symbols"
 
 cmake -S packages/sdk/chio-cpp -B "${build_dir}" \
   -DCHIO_CPP_BUILD_TESTS=ON \

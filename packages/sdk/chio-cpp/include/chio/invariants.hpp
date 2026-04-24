@@ -9,6 +9,9 @@
 
 namespace chio::invariants {
 
+std::uint32_t ffi_abi_version();
+Result<std::string> ffi_build_info();
+
 Result<std::string> canonicalize_json(std::string_view input_json);
 Result<std::string> sha256_hex_utf8(std::string_view input_utf8);
 Result<std::string> sha256_hex_bytes(const std::vector<std::uint8_t>& input);

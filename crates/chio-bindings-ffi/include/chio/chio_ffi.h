@@ -39,6 +39,7 @@ extern "C" {
 #define CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED 21
 #define CHIO_FFI_ERROR_INTERNAL 255
 
+#define CHIO_FFI_ABI_VERSION 1
 #define CHIO_FFI_NO_MAX_DELEGATION_DEPTH UINT32_MAX
 
 typedef struct ChioFfiBuffer {
@@ -54,6 +55,8 @@ typedef struct ChioFfiResult {
 
 void chio_buffer_free(ChioFfiBuffer buffer);
 
+uint32_t chio_ffi_abi_version(void);
+ChioFfiResult chio_ffi_build_info(void);
 ChioFfiResult chio_canonicalize_json(const char *input_json);
 ChioFfiResult chio_sha256_hex_utf8(const char *input_utf8);
 ChioFfiResult chio_sha256_hex_bytes(const uint8_t *input, size_t input_len);

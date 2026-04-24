@@ -131,4 +131,29 @@ Result<std::string> Evaluator::health() const {
   return Result<std::string>::success(response.value().body);
 }
 
+Middleware::Middleware(Evaluator evaluator) : evaluator_(std::move(evaluator)) {}
+
+EvaluateVerdict Middleware::evaluate_fail_closed(const ChioHttpRequest& request) const {
+  auto response = evaluator_.evaluate(request);
+  if (!response) {
+    return EvaluateVerdict{"deny", response.error().message, {}, {}};
+  }
+  EvaluateVerdict verdict;
+  verdict.raw_json = response.value();
+  auto parsed = detail::parse_json(response.value());
+  if (parsed) {
+    verdict.verdict = parsed->string_field("verdict");
+    verdict.reason = parsed->string_field("reason");
+    const auto* receipt = parsed->get("receipt");
+    if (receipt != nullptr) {
+      verdict.receipt_json = receipt->dump();
+    }
+  }
+  if (verdict.verdict.empty()) {
+    verdict.verdict = "deny";
+    verdict.reason = "missing verdict";
+  }
+  return verdict;
+}
+
 }  // namespace chio::http

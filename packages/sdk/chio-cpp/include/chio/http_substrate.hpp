@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "chio/models.hpp"
 #include "chio/result.hpp"
 #include "chio/transport.hpp"
 
@@ -56,6 +57,16 @@ class Evaluator {
   std::string sidecar_url_;
   HttpTransportPtr transport_;
   std::uint32_t timeout_ms_;
+};
+
+class Middleware {
+ public:
+  explicit Middleware(Evaluator evaluator);
+
+  EvaluateVerdict evaluate_fail_closed(const ChioHttpRequest& request) const;
+
+ private:
+  Evaluator evaluator_;
 };
 
 }  // namespace chio::http

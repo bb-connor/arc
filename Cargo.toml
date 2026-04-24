@@ -83,6 +83,7 @@ members = [
     # SDK support
     "crates/chio-binding-helpers",
     "crates/chio-bindings-ffi",
+    "crates/chio-cpp-kernel-ffi",
     "crates/chio-conformance",
     #
     # Examples
