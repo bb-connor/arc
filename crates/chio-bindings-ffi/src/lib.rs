@@ -14,13 +14,34 @@ use chio_binding_helpers::{Error, ErrorCode};
 pub const CHIO_FFI_ABI_VERSION: u32 = 1;
 pub const CHIO_FFI_NO_MAX_DELEGATION_DEPTH: u32 = u32::MAX;
 
-const STATUS_OK: i32 = 0;
-const STATUS_ERROR: i32 = 1;
-const STATUS_PANIC: i32 = 2;
-const STATUS_NULL_ARGUMENT: i32 = 3;
+pub const CHIO_FFI_STATUS_OK: i32 = 0;
+pub const CHIO_FFI_STATUS_ERROR: i32 = 1;
+pub const CHIO_FFI_STATUS_PANIC: i32 = 2;
+pub const CHIO_FFI_STATUS_NULL_ARGUMENT: i32 = 3;
 
-const ERROR_NONE: i32 = 0;
-const ERROR_INTERNAL: i32 = 255;
+pub const CHIO_FFI_ERROR_NONE: i32 = 0;
+pub const CHIO_FFI_ERROR_INVALID_PUBLIC_KEY: i32 = 1;
+pub const CHIO_FFI_ERROR_INVALID_HEX: i32 = 2;
+pub const CHIO_FFI_ERROR_INVALID_SIGNATURE: i32 = 3;
+pub const CHIO_FFI_ERROR_JSON: i32 = 4;
+pub const CHIO_FFI_ERROR_CANONICAL_JSON: i32 = 5;
+pub const CHIO_FFI_ERROR_CAPABILITY_EXPIRED: i32 = 6;
+pub const CHIO_FFI_ERROR_CAPABILITY_NOT_YET_VALID: i32 = 7;
+pub const CHIO_FFI_ERROR_CAPABILITY_REVOKED: i32 = 8;
+pub const CHIO_FFI_ERROR_DELEGATION_CHAIN_BROKEN: i32 = 9;
+pub const CHIO_FFI_ERROR_ATTENUATION_VIOLATION: i32 = 10;
+pub const CHIO_FFI_ERROR_SCOPE_MISMATCH: i32 = 11;
+pub const CHIO_FFI_ERROR_SIGNATURE_VERIFICATION_FAILED: i32 = 12;
+pub const CHIO_FFI_ERROR_DELEGATION_DEPTH_EXCEEDED: i32 = 13;
+pub const CHIO_FFI_ERROR_INVALID_HASH_LENGTH: i32 = 14;
+pub const CHIO_FFI_ERROR_MERKLE_PROOF_FAILED: i32 = 15;
+pub const CHIO_FFI_ERROR_EMPTY_TREE: i32 = 16;
+pub const CHIO_FFI_ERROR_INVALID_PROOF_INDEX: i32 = 17;
+pub const CHIO_FFI_ERROR_EMPTY_MANIFEST: i32 = 18;
+pub const CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME: i32 = 19;
+pub const CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA: i32 = 20;
+pub const CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED: i32 = 21;
+pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
 pub struct ChioFfiBuffer {
@@ -73,8 +94,8 @@ pub extern "C" fn chio_buffer_free(buffer: ChioFfiBuffer) {
 
 fn ok_string(value: String) -> ChioFfiResult {
     ChioFfiResult {
-        status: STATUS_OK,
-        error_code: ERROR_NONE,
+        status: CHIO_FFI_STATUS_OK,
+        error_code: CHIO_FFI_ERROR_NONE,
         data: ChioFfiBuffer::from_string(value),
     }
 }
@@ -89,27 +110,27 @@ fn err_string(status: i32, error_code: i32, message: String) -> ChioFfiResult {
 
 fn helper_error_code(error: &Error) -> i32 {
     match error.code() {
-        ErrorCode::InvalidPublicKey => 1,
-        ErrorCode::InvalidHex => 2,
-        ErrorCode::InvalidSignature => 3,
-        ErrorCode::Json => 4,
-        ErrorCode::CanonicalJson => 5,
-        ErrorCode::CapabilityExpired => 6,
-        ErrorCode::CapabilityNotYetValid => 7,
-        ErrorCode::CapabilityRevoked => 8,
-        ErrorCode::DelegationChainBroken => 9,
-        ErrorCode::AttenuationViolation => 10,
-        ErrorCode::ScopeMismatch => 11,
-        ErrorCode::SignatureVerificationFailed => 12,
-        ErrorCode::DelegationDepthExceeded => 13,
-        ErrorCode::InvalidHashLength => 14,
-        ErrorCode::MerkleProofFailed => 15,
-        ErrorCode::EmptyTree => 16,
-        ErrorCode::InvalidProofIndex => 17,
-        ErrorCode::EmptyManifest => 18,
-        ErrorCode::DuplicateToolName => 19,
-        ErrorCode::UnsupportedSchema => 20,
-        ErrorCode::ManifestVerificationFailed => 21,
+        ErrorCode::InvalidPublicKey => CHIO_FFI_ERROR_INVALID_PUBLIC_KEY,
+        ErrorCode::InvalidHex => CHIO_FFI_ERROR_INVALID_HEX,
+        ErrorCode::InvalidSignature => CHIO_FFI_ERROR_INVALID_SIGNATURE,
+        ErrorCode::Json => CHIO_FFI_ERROR_JSON,
+        ErrorCode::CanonicalJson => CHIO_FFI_ERROR_CANONICAL_JSON,
+        ErrorCode::CapabilityExpired => CHIO_FFI_ERROR_CAPABILITY_EXPIRED,
+        ErrorCode::CapabilityNotYetValid => CHIO_FFI_ERROR_CAPABILITY_NOT_YET_VALID,
+        ErrorCode::CapabilityRevoked => CHIO_FFI_ERROR_CAPABILITY_REVOKED,
+        ErrorCode::DelegationChainBroken => CHIO_FFI_ERROR_DELEGATION_CHAIN_BROKEN,
+        ErrorCode::AttenuationViolation => CHIO_FFI_ERROR_ATTENUATION_VIOLATION,
+        ErrorCode::ScopeMismatch => CHIO_FFI_ERROR_SCOPE_MISMATCH,
+        ErrorCode::SignatureVerificationFailed => CHIO_FFI_ERROR_SIGNATURE_VERIFICATION_FAILED,
+        ErrorCode::DelegationDepthExceeded => CHIO_FFI_ERROR_DELEGATION_DEPTH_EXCEEDED,
+        ErrorCode::InvalidHashLength => CHIO_FFI_ERROR_INVALID_HASH_LENGTH,
+        ErrorCode::MerkleProofFailed => CHIO_FFI_ERROR_MERKLE_PROOF_FAILED,
+        ErrorCode::EmptyTree => CHIO_FFI_ERROR_EMPTY_TREE,
+        ErrorCode::InvalidProofIndex => CHIO_FFI_ERROR_INVALID_PROOF_INDEX,
+        ErrorCode::EmptyManifest => CHIO_FFI_ERROR_EMPTY_MANIFEST,
+        ErrorCode::DuplicateToolName => CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME,
+        ErrorCode::UnsupportedSchema => CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA,
+        ErrorCode::ManifestVerificationFailed => CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED,
     }
 }
 
@@ -119,10 +140,14 @@ where
 {
     match catch_unwind(AssertUnwindSafe(f)) {
         Ok(Ok(value)) => ok_string(value),
-        Ok(Err(error)) => err_string(STATUS_ERROR, helper_error_code(&error), error.to_string()),
+        Ok(Err(error)) => err_string(
+            CHIO_FFI_STATUS_ERROR,
+            helper_error_code(&error),
+            error.to_string(),
+        ),
         Err(_) => err_string(
-            STATUS_PANIC,
-            ERROR_INTERNAL,
+            CHIO_FFI_STATUS_PANIC,
+            CHIO_FFI_ERROR_INTERNAL,
             "panic while executing Chio FFI helper".to_string(),
         ),
     }
@@ -131,8 +156,8 @@ where
 fn read_c_str(ptr: *const c_char, name: &str) -> Result<&str, ChioFfiResult> {
     if ptr.is_null() {
         return Err(err_string(
-            STATUS_NULL_ARGUMENT,
-            ERROR_INTERNAL,
+            CHIO_FFI_STATUS_NULL_ARGUMENT,
+            CHIO_FFI_ERROR_INTERNAL,
             format!("{name} must not be null"),
         ));
     }
@@ -140,8 +165,8 @@ fn read_c_str(ptr: *const c_char, name: &str) -> Result<&str, ChioFfiResult> {
     let raw = unsafe { CStr::from_ptr(ptr) };
     raw.to_str().map_err(|error| {
         err_string(
-            STATUS_ERROR,
-            ERROR_INTERNAL,
+            CHIO_FFI_STATUS_ERROR,
+            CHIO_FFI_ERROR_INTERNAL,
             format!("{name} must be valid UTF-8: {error}"),
         )
     })
@@ -150,8 +175,8 @@ fn read_c_str(ptr: *const c_char, name: &str) -> Result<&str, ChioFfiResult> {
 fn read_bytes(ptr: *const u8, len: usize, name: &str) -> Result<Vec<u8>, ChioFfiResult> {
     if ptr.is_null() && len != 0 {
         return Err(err_string(
-            STATUS_NULL_ARGUMENT,
-            ERROR_INTERNAL,
+            CHIO_FFI_STATUS_NULL_ARGUMENT,
+            CHIO_FFI_ERROR_INTERNAL,
             format!("{name} pointer must not be null when length is non-zero"),
         ));
     }
@@ -352,8 +377,8 @@ mod tests {
     use super::{
         chio_buffer_free, chio_canonicalize_json, chio_ffi_abi_version, chio_ffi_build_info,
         chio_sha256_hex_bytes, chio_sha256_hex_utf8, chio_sign_utf8_message_ed25519,
-        chio_verify_utf8_message_ed25519, ChioFfiBuffer, STATUS_ERROR, STATUS_NULL_ARGUMENT,
-        STATUS_OK,
+        chio_verify_utf8_message_ed25519, ChioFfiBuffer, CHIO_FFI_STATUS_ERROR,
+        CHIO_FFI_STATUS_NULL_ARGUMENT, CHIO_FFI_STATUS_OK,
     };
     use std::ffi::CString;
     use std::os::raw::c_char;
@@ -383,7 +408,7 @@ mod tests {
     fn canonicalize_roundtrips_over_c_abi() {
         let input = c_string(r#"{"z":1,"a":2}"#);
         let result = chio_canonicalize_json(input.as_ptr());
-        assert_eq!(result.status, STATUS_OK);
+        assert_eq!(result.status, CHIO_FFI_STATUS_OK);
         assert_eq!(result_to_string(result.data), r#"{"a":2,"z":1}"#);
     }
 
@@ -391,7 +416,7 @@ mod tests {
     fn hashing_roundtrips_over_c_abi() {
         let input = c_string("hello");
         let result = chio_sha256_hex_utf8(input.as_ptr());
-        assert_eq!(result.status, STATUS_OK);
+        assert_eq!(result.status, CHIO_FFI_STATUS_OK);
         assert_eq!(
             result_to_string(result.data),
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
@@ -403,7 +428,7 @@ mod tests {
         let input = c_string("hello chio");
         let seed = c_string(&"09".repeat(32));
         let result = chio_sign_utf8_message_ed25519(input.as_ptr(), seed.as_ptr());
-        assert_eq!(result.status, STATUS_OK);
+        assert_eq!(result.status, CHIO_FFI_STATUS_OK);
         let output = result_to_string(result.data);
         assert!(output.contains("public_key_hex"));
         assert!(output.contains("signature_hex"));
@@ -417,7 +442,7 @@ mod tests {
     #[test]
     fn build_info_reports_version_target_and_features() {
         let result = chio_ffi_build_info();
-        assert_eq!(result.status, STATUS_OK);
+        assert_eq!(result.status, CHIO_FFI_STATUS_OK);
         let output = result_to_string(result.data);
         let parsed: serde_json::Value = match serde_json::from_str(&output) {
             Ok(value) => value,
@@ -436,21 +461,21 @@ mod tests {
     #[test]
     fn null_string_argument_returns_null_argument_status() {
         let result = chio_canonicalize_json(std::ptr::null());
-        assert_eq!(result.status, STATUS_NULL_ARGUMENT);
+        assert_eq!(result.status, CHIO_FFI_STATUS_NULL_ARGUMENT);
         assert!(result_to_string(result.data).contains("input_json must not be null"));
     }
 
     #[test]
     fn null_bytes_with_nonzero_len_returns_null_argument_status() {
         let result = chio_sha256_hex_bytes(std::ptr::null(), 1);
-        assert_eq!(result.status, STATUS_NULL_ARGUMENT);
+        assert_eq!(result.status, CHIO_FFI_STATUS_NULL_ARGUMENT);
         assert!(result_to_string(result.data).contains("input pointer must not be null"));
     }
 
     #[test]
     fn null_bytes_with_zero_len_hashes_empty_buffer() {
         let result = chio_sha256_hex_bytes(std::ptr::null(), 0);
-        assert_eq!(result.status, STATUS_OK);
+        assert_eq!(result.status, CHIO_FFI_STATUS_OK);
         assert_eq!(
             result_to_string(result.data),
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -461,7 +486,7 @@ mod tests {
     fn invalid_utf8_argument_returns_error_status() {
         let input = [0xff_u8, 0x00_u8];
         let result = chio_sha256_hex_utf8(input.as_ptr().cast::<c_char>());
-        assert_eq!(result.status, STATUS_ERROR);
+        assert_eq!(result.status, CHIO_FFI_STATUS_ERROR);
         assert!(result_to_string(result.data).contains("input_utf8 must be valid UTF-8"));
     }
 
@@ -469,7 +494,7 @@ mod tests {
     fn malformed_json_returns_error_status() {
         let input = c_string(r#"{"unterminated": true"#);
         let result = chio_canonicalize_json(input.as_ptr());
-        assert_eq!(result.status, STATUS_ERROR);
+        assert_eq!(result.status, CHIO_FFI_STATUS_ERROR);
         assert_ne!(result.error_code, 0);
         assert!(!result_to_string(result.data).is_empty());
     }
@@ -484,7 +509,7 @@ mod tests {
             public_key.as_ptr(),
             signature.as_ptr(),
         );
-        assert_eq!(result.status, STATUS_ERROR);
+        assert_eq!(result.status, CHIO_FFI_STATUS_ERROR);
         assert_ne!(result.error_code, 0);
         assert!(!result_to_string(result.data).is_empty());
     }

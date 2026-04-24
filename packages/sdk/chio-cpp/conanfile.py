@@ -14,8 +14,8 @@ class ChioCppConan(ConanFile):
     url = "https://github.com/backbay-labs/chio"
     description = "C++17 SDK for Chio hosted MCP and security invariants"
     settings = "os", "compiler", "build_type", "arch"
-    options = {"with_curl": [True, False]}
-    default_options = {"with_curl": False}
+    options = {"shared": [True, False], "with_curl": [True, False]}
+    default_options = {"shared": False, "with_curl": False}
 
     def export_sources(self):
         package_dir = Path(self.recipe_folder)
@@ -35,6 +35,13 @@ class ChioCppConan(ConanFile):
             src=repo_root / "crates",
             dst=Path(self.export_sources_folder) / "crates",
         )
+        for workspace_dir in ["examples", "formal", "tests"]:
+            copy(
+                self,
+                "*",
+                src=repo_root / workspace_dir,
+                dst=Path(self.export_sources_folder) / workspace_dir,
+            )
         copy(self, "Cargo.toml", src=repo_root, dst=self.export_sources_folder)
         copy(self, "Cargo.lock", src=repo_root, dst=self.export_sources_folder)
 
@@ -48,6 +55,7 @@ class ChioCppConan(ConanFile):
         toolchain.variables["CHIO_CPP_BUILD_TESTS"] = False
         toolchain.variables["CHIO_CPP_BUILD_EXAMPLES"] = False
         toolchain.variables["CHIO_CPP_ENABLE_CURL"] = self.options.with_curl
+        toolchain.variables["BUILD_SHARED_LIBS"] = self.options.shared
         toolchain.generate()
 
     def build(self):
