@@ -14,6 +14,7 @@ class TokenProvider {
  public:
   virtual ~TokenProvider() = default;
   virtual Result<std::string> access_token() = 0;
+  virtual std::string cache_key() const { return {}; }
 };
 
 using TokenProviderPtr = std::shared_ptr<TokenProvider>;
@@ -22,6 +23,7 @@ class StaticBearerTokenProvider final : public TokenProvider {
  public:
   explicit StaticBearerTokenProvider(std::string token);
   Result<std::string> access_token() override;
+  std::string cache_key() const override;
 
  private:
   std::string token_;

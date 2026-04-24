@@ -68,6 +68,11 @@ inline std::string quote(std::string_view input) {
   return "\"" + escape_json(input) + "\"";
 }
 
+inline bool is_hex_digit(char c) {
+  const auto ch = static_cast<unsigned char>(c);
+  return std::isdigit(ch) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
 inline std::string json_string_map(const std::map<std::string, std::string>& values) {
   std::string out = "{";
   bool first = true;
@@ -127,6 +132,11 @@ inline std::string extract_json_string_field(const std::string& json, std::strin
         case 'u':
           if (i + 4 >= json.size()) {
             return {};
+          }
+          for (std::size_t offset = 1; offset <= 4; ++offset) {
+            if (!is_hex_digit(json[i + offset])) {
+              return {};
+            }
           }
           out += "\\u";
           out.append(json.substr(i + 1, 4));
@@ -403,6 +413,11 @@ class JsonParser {
           if (pos_ + 4 > input_.size()) {
             return std::nullopt;
           }
+          for (std::size_t offset = 0; offset < 4; ++offset) {
+            if (!is_hex_digit(input_[pos_ + offset])) {
+              return std::nullopt;
+            }
+          }
           // Keep non-ASCII escapes in escaped form for this lightweight
           // private parser. Canonical byte-sensitive work stays in Rust FFI.
           out += "\\u";
@@ -429,12 +444,19 @@ class JsonParser {
     if (input_[pos_] == '-') {
       ++pos_;
     }
-    const auto integer_start = pos_;
-    while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
-      ++pos_;
-    }
-    if (pos_ == integer_start) {
+    if (pos_ >= input_.size() || !std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
       return std::nullopt;
+    }
+    if (input_[pos_] == '0') {
+      ++pos_;
+      if (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+        return std::nullopt;
+      }
+    } else {
+      while (pos_ < input_.size() &&
+             std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+        ++pos_;
+      }
     }
     if (pos_ < input_.size() && input_[pos_] == '.') {
       ++pos_;

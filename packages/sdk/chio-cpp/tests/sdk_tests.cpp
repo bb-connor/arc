@@ -125,6 +125,11 @@ void test_private_json_helpers_are_strict() {
   require(!chio::detail::parse_json("{\"n\":-}"), "expected bare minus to fail");
   require(!chio::detail::parse_json("{\"n\":1.}"), "expected missing fraction to fail");
   require(!chio::detail::parse_json("{\"n\":1e}"), "expected missing exponent to fail");
+  require(!chio::detail::parse_json("{\"n\":01}"), "expected leading zero to fail");
+  require(!chio::detail::parse_json("{\"s\":\"\\uZZZZ\"}"),
+          "expected non-hex unicode escape to fail");
+  require(chio::detail::extract_json_string_field("{\"s\":\"\\uZZZZ\"}", "s").empty(),
+          "expected non-hex unicode extraction to fail");
 }
 
 class FixedClock final : public chio::Clock {
@@ -377,6 +382,52 @@ void test_feature_helpers_and_middleware() {
   request.path = "/";
   const auto verdict = middleware.evaluate_fail_closed(request);
   require_eq(verdict.verdict, "deny", "fail closed verdict");
+
+  auto pool_transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200, {{"MCP-Session-Id", "sess-a"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+      {200, {{"MCP-Session-Id", "sess-b"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+      {200, {{"MCP-Session-Id", "sess-c"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+  });
+  auto client_a = chio::ClientBuilder()
+                      .base_url("http://127.0.0.1:8080/")
+                      .bearer_token("token")
+                      .transport(pool_transport)
+                      .client_capabilities_json("{\"roots\":{\"listChanged\":true}}")
+                      .build();
+  auto client_b = chio::ClientBuilder()
+                      .base_url("http://127.0.0.1:8080/")
+                      .bearer_token("token")
+                      .transport(pool_transport)
+                      .client_capabilities_json("{\"sampling\":{}}")
+                      .build();
+  auto client_c = chio::ClientBuilder()
+                      .base_url("http://127.0.0.1:8080/")
+                      .token_provider(std::make_shared<chio::StaticBearerTokenProvider>("token-c"))
+                      .transport(pool_transport)
+                      .client_capabilities_json("{\"roots\":{\"listChanged\":true}}")
+                      .build();
+  require(client_a.ok(), client_a.error().message);
+  require(client_b.ok(), client_b.error().message);
+  require(client_c.ok(), client_c.error().message);
+  chio::SessionPool pool;
+  auto session_a = pool.get_or_initialize(client_a.value());
+  auto session_b = pool.get_or_initialize(client_b.value());
+  auto session_c = pool.get_or_initialize(client_c.value());
+  require(session_a.ok(), session_a.error().message);
+  require(session_b.ok(), session_b.error().message);
+  require(session_c.ok(), session_c.error().message);
+  require_eq(session_a.value()->session_id(), "sess-a", "pooled session a");
+  require_eq(session_b.value()->session_id(), "sess-b", "pooled session b");
+  require_eq(session_c.value()->session_id(), "sess-c", "pooled session c");
+  require(pool_transport->requests.size() == 6, "expected separate session pool initializations");
+  require_contains(pool_transport->requests[0].body, "\"roots\"", "pool capabilities a");
+  require_contains(pool_transport->requests[2].body, "\"sampling\"", "pool capabilities b");
+  require_eq(pool_transport->requests[4].headers["Authorization"],
+             "Bearer token-c",
+             "pool token provider auth");
 }
 
 void test_http_substrate_evaluator() {

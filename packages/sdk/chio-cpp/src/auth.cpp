@@ -64,7 +64,7 @@ std::string base64url_encode(const std::vector<std::uint8_t>& bytes) {
   static constexpr char alphabet[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   std::string out;
-  int val = 0;
+  std::uint32_t val = 0;
   int valb = -6;
   for (std::uint8_t byte : bytes) {
     val = (val << 8) + byte;
@@ -147,6 +147,10 @@ Result<std::string> StaticBearerTokenProvider::access_token() {
               "StaticBearerTokenProvider::access_token"});
   }
   return Result<std::string>::success(token_);
+}
+
+std::string StaticBearerTokenProvider::cache_key() const {
+  return "static-bearer:" + token_;
 }
 
 Result<PkceChallenge> PkceChallenge::from_verifier(std::string verifier) {
