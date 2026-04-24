@@ -10,6 +10,7 @@
 
 #include "../src/json.hpp"
 #include "../src/curl_sse.hpp"
+#include "../src/transport_util.hpp"
 
 namespace {
 
@@ -52,6 +53,21 @@ class StreamingFakeTransport final : public chio::HttpTransport {
   }
 
   std::vector<chio::HttpRequest> requests;
+};
+
+class FailingTransport final : public chio::HttpTransport {
+ public:
+  explicit FailingTransport(chio::Error error) : error_(std::move(error)) {}
+
+  chio::Result<chio::HttpResponse> send(const chio::HttpRequest&) override {
+    ++calls;
+    return chio::Result<chio::HttpResponse>::failure(error_);
+  }
+
+  int calls = 0;
+
+ private:
+  chio::Error error_;
 };
 
 void require(bool condition, const std::string& message) {
@@ -163,7 +179,31 @@ void test_curl_sse_helpers_abort_after_terminal_message() {
   const auto json_returned =
       chio::detail::write_curl_body(&json[0], 1, json.size(), &non_streaming);
   require(json_returned == json.size(), "expected non-streaming body to keep reading");
-  require(non_streaming.complete, "expected non-streaming terminal body to be complete");
+  require(!non_streaming.complete, "expected non-streaming body to avoid repeated full parses");
+}
+
+void test_transport_policy_respects_retryable_flag() {
+  chio::RetryPolicy policy;
+  policy.max_attempts = 3;
+  policy.initial_backoff = std::chrono::milliseconds(0);
+  policy.max_backoff = std::chrono::milliseconds(0);
+
+  chio::HttpRequest request{"POST", "http://127.0.0.1/mcp", {}, "{}"};
+  auto hard = std::make_shared<FailingTransport>(
+      chio::Error{chio::ErrorCode::Transport, "hard failure", "", {}, {}, {}, {}, false});
+  auto hard_result = chio::detail::send_with_policy(
+      hard, request, policy, {}, "test_transport_policy_respects_retryable_flag");
+  require(!hard_result.ok(), "expected hard transport failure");
+  require(hard->calls == 1, "expected non-retryable error to stop after one attempt");
+  require(!hard_result.error().retryable, "expected non-retryable flag to be preserved");
+
+  auto transient = std::make_shared<FailingTransport>(
+      chio::Error{chio::ErrorCode::Transport, "transient failure", "", {}, {}, {}, {}, true});
+  auto transient_result = chio::detail::send_with_policy(
+      transient, request, policy, {}, "test_transport_policy_respects_retryable_flag");
+  require(!transient_result.ok(), "expected retryable transport failure");
+  require(transient->calls == 3, "expected retryable error to use all attempts");
+  require(transient_result.error().retryable, "expected retryable flag to be preserved");
 }
 
 class FixedClock final : public chio::Clock {
@@ -261,6 +301,32 @@ void test_client_session_with_fake_transport() {
   require_eq(transport->requests[2].headers["MCP-Session-Id"], "sess-1", "session header");
 }
 
+void test_typed_list_helpers_reject_jsonrpc_errors() {
+  const chio::HttpResponse error_response{
+      200, {}, "{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32603,\"message\":\"denied\"}}"};
+  auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      error_response,
+      error_response,
+      error_response,
+      error_response,
+  });
+  chio::Session session("http://127.0.0.1:8080",
+                        "token",
+                        "sess-errors",
+                        "2025-11-25",
+                        transport);
+
+  auto tools = session.list_tools_typed();
+  require(!tools.ok(), "expected tools/list JSON-RPC error to fail");
+  require_contains(tools.error().message, "denied", "tools/list error");
+  auto resources = session.list_resources_typed();
+  require(!resources.ok(), "expected resources/list JSON-RPC error to fail");
+  auto prompts = session.list_prompts_typed();
+  require(!prompts.ok(), "expected prompts/list JSON-RPC error to fail");
+  auto tasks = session.list_tasks_typed();
+  require(!tasks.ok(), "expected tasks/list JSON-RPC error to fail");
+}
+
 void test_session_refreshes_token_provider_for_requests() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-refresh"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
@@ -300,6 +366,20 @@ void test_session_refreshes_token_provider_for_requests() {
   require_eq(transport->requests[3].headers["Authorization"],
              "Bearer close-token",
              "close token");
+}
+
+void test_start_receive_loop_returns_setup_errors() {
+  auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{});
+  chio::Session session("http://127.0.0.1:8080",
+                        "",
+                        "sess-receive",
+                        "2025-11-25",
+                        transport);
+  auto started = session.start_receive_loop([](const chio::JsonMessage&) {
+    return chio::Result<void>::success();
+  }, std::make_shared<chio::CancellationToken>());
+  require(!started.ok(), "expected receive loop setup failure");
+  require_contains(started.error().message, "bearer token is empty", "receive loop setup error");
 }
 
 void test_initialize_nested_message_handler() {
@@ -573,9 +653,12 @@ int main() {
     test_invariants_from_shared_vectors();
     test_private_json_helpers_are_strict();
     test_curl_sse_helpers_abort_after_terminal_message();
+    test_transport_policy_respects_retryable_flag();
     test_dpop_proof();
     test_client_session_with_fake_transport();
+    test_typed_list_helpers_reject_jsonrpc_errors();
     test_session_refreshes_token_provider_for_requests();
+    test_start_receive_loop_returns_setup_errors();
     test_initialize_nested_message_handler();
     test_builder_retry_trace_typed_models_and_streaming();
     test_auth_metadata_and_pkce();

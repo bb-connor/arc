@@ -100,8 +100,8 @@ class Session {
   Result<HttpResponse> close() const;
 
   void on_message(MessageHandler handler);
-  std::thread start_receive_loop(MessageHandler handler,
-                                 std::shared_ptr<CancellationToken> cancellation) const;
+  Result<std::thread> start_receive_loop(MessageHandler handler,
+                                         std::shared_ptr<CancellationToken> cancellation) const;
 
   const std::string& session_id() const { return session_id_; }
   const std::string& protocol_version() const { return protocol_version_; }

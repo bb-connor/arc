@@ -96,9 +96,6 @@ inline std::size_t write_curl_body(char* ptr,
   const std::size_t len = size * nmemb;
   capture->body.append(ptr, len);
   scan_sse_events(*capture);
-  if (!capture->complete && is_terminal_message(capture->body, capture->id_json)) {
-    capture->complete = true;
-  }
   if (capture->callback_failed || (capture->complete && capture->stream_message)) {
     return 0;
   }

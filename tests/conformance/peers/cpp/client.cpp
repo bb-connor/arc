@@ -348,8 +348,13 @@ chio::NestedCallbackRouter conformance_nested_router() {
 class ReceiveGuard {
  public:
   ReceiveGuard(chio::Session& session, chio::MessageHandler handler)
-      : cancellation_(std::make_shared<chio::CancellationToken>()),
-        thread_(session.start_receive_loop(std::move(handler), cancellation_)) {}
+      : cancellation_(std::make_shared<chio::CancellationToken>()) {
+    auto started = session.start_receive_loop(std::move(handler), cancellation_);
+    if (!started) {
+      throw std::runtime_error("failed to start receive loop: " + started.error().message);
+    }
+    thread_ = started.move_value();
+  }
 
   ~ReceiveGuard() {
     cancellation_->cancel();

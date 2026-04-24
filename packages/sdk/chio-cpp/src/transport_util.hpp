@@ -65,11 +65,10 @@ inline Result<HttpResponse> send_with_policy(HttpTransportPtr transport,
     } else {
       last_error = response.error();
       last_error.operation = operation;
-      last_error.retryable = true;
       if (trace_sink) {
         trace_sink->record(TraceEvent{operation, request, {}, last_error});
       }
-      if (attempt == policy.max_attempts) {
+      if (!last_error.retryable || attempt == policy.max_attempts) {
         return Result<HttpResponse>::failure(last_error);
       }
     }

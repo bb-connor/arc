@@ -171,6 +171,25 @@ Error parse_error(std::string operation, const std::string& raw_json) {
                detail::body_snippet(raw_json)};
 }
 
+Result<void> reject_jsonrpc_error(const detail::JsonValue& root,
+                                  std::string operation,
+                                  const std::string& raw_json) {
+  const auto* error = root.get("error");
+  if (error == nullptr) {
+    return Result<void>::success();
+  }
+  std::string message = "JSON-RPC error response";
+  if (error->is_object()) {
+    const auto error_message = error->string_field("message");
+    if (!error_message.empty()) {
+      message += ": " + error_message;
+    }
+  }
+  return Result<void>::failure(
+      Error{ErrorCode::Protocol, std::move(message), std::move(operation), {},
+            detail::body_snippet(raw_json), {}, {}, false});
+}
+
 }  // namespace
 
 NestedCallbackRouter& NestedCallbackRouter::on_sampling(SamplingHandler handler) {
@@ -505,6 +524,10 @@ Result<TypedResponse<std::vector<Tool>>> Session::list_tools_typed() const {
     return Result<TypedResponse<std::vector<Tool>>>::failure(
         parse_error("Session::list_tools_typed", raw.value().raw_json));
   }
+  auto error = reject_jsonrpc_error(*parsed, "Session::list_tools_typed", raw.value().raw_json);
+  if (!error) {
+    return Result<TypedResponse<std::vector<Tool>>>::failure(error.error());
+  }
   return Result<TypedResponse<std::vector<Tool>>>::success(
       TypedResponse<std::vector<Tool>>{parse_tools(*parsed), raw.value().raw_json,
                                        std::move(raw.value().response)});
@@ -540,6 +563,11 @@ Result<TypedResponse<std::vector<Resource>>> Session::list_resources_typed() con
     return Result<TypedResponse<std::vector<Resource>>>::failure(
         parse_error("Session::list_resources_typed", raw.value().raw_json));
   }
+  auto error =
+      reject_jsonrpc_error(*parsed, "Session::list_resources_typed", raw.value().raw_json);
+  if (!error) {
+    return Result<TypedResponse<std::vector<Resource>>>::failure(error.error());
+  }
   return Result<TypedResponse<std::vector<Resource>>>::success(
       TypedResponse<std::vector<Resource>>{parse_resources(*parsed), raw.value().raw_json,
                                            std::move(raw.value().response)});
@@ -573,6 +601,10 @@ Result<TypedResponse<std::vector<Prompt>>> Session::list_prompts_typed() const {
     return Result<TypedResponse<std::vector<Prompt>>>::failure(
         parse_error("Session::list_prompts_typed", raw.value().raw_json));
   }
+  auto error = reject_jsonrpc_error(*parsed, "Session::list_prompts_typed", raw.value().raw_json);
+  if (!error) {
+    return Result<TypedResponse<std::vector<Prompt>>>::failure(error.error());
+  }
   return Result<TypedResponse<std::vector<Prompt>>>::success(
       TypedResponse<std::vector<Prompt>>{parse_prompts(*parsed), raw.value().raw_json,
                                          std::move(raw.value().response)});
@@ -598,6 +630,10 @@ Result<TypedResponse<std::vector<Task>>> Session::list_tasks_typed() const {
   if (!parsed) {
     return Result<TypedResponse<std::vector<Task>>>::failure(
         parse_error("Session::list_tasks_typed", raw.value().raw_json));
+  }
+  auto error = reject_jsonrpc_error(*parsed, "Session::list_tasks_typed", raw.value().raw_json);
+  if (!error) {
+    return Result<TypedResponse<std::vector<Task>>>::failure(error.error());
   }
   return Result<TypedResponse<std::vector<Task>>>::success(
       TypedResponse<std::vector<Task>>{parse_tasks(*parsed), raw.value().raw_json,
@@ -643,7 +679,7 @@ void Session::on_message(MessageHandler handler) {
   message_handler_ = std::move(handler);
 }
 
-std::thread Session::start_receive_loop(
+Result<std::thread> Session::start_receive_loop(
     MessageHandler handler,
     std::shared_ptr<CancellationToken> cancellation) const {
   auto transport = transport_;
@@ -651,7 +687,7 @@ std::thread Session::start_receive_loop(
   auto trace_sink = trace_sink_;
   auto request_result = make_get_stream(std::move(cancellation));
   if (!request_result) {
-    return std::thread([]() {});
+    return Result<std::thread>::failure(request_result.error());
   }
   auto request = request_result.move_value();
   request.stream_message = [handler = std::move(handler)](const std::string& raw_json) {
@@ -663,10 +699,11 @@ std::thread Session::start_receive_loop(
     }
     return deliver_message(*parsed, handler, {});
   };
-  return std::thread([transport, retry_policy, trace_sink, request = std::move(request)]() mutable {
-    (void)detail::send_with_policy(transport, std::move(request), retry_policy, trace_sink,
-                                   "Session::start_receive_loop");
-  });
+  return Result<std::thread>::success(
+      std::thread([transport, retry_policy, trace_sink, request = std::move(request)]() mutable {
+        (void)detail::send_with_policy(transport, std::move(request), retry_policy, trace_sink,
+                                       "Session::start_receive_loop");
+      }));
 }
 
 SessionInfo Session::info() const {
