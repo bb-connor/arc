@@ -65,7 +65,8 @@ class ChioCppConan(ConanFile):
 
     def build(self):
         cargo = "cargo build -p chio-bindings-ffi"
-        if str(self.settings.build_type) == "Release":
+        build_type = str(self.settings.build_type or "")
+        if build_type and build_type != "Debug":
             cargo += " --release"
         with chdir(self, self.source_folder):
             self.run(cargo)
