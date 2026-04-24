@@ -198,6 +198,7 @@ internal class ChioFlinkEvaluator<IN>(
             subtaskIndex = subtaskIndex,
             attemptNumber = attemptNumber,
             receiptBytes = receiptBytes,
+            acked = true,
         )
     }
 

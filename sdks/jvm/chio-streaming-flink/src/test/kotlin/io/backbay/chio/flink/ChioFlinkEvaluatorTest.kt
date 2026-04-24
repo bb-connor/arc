@@ -45,6 +45,7 @@ class ChioFlinkEvaluatorTest {
         evaluator.bind(FakeRuntimeContext())
         val outcome = evaluator.evaluate(mapOf("topic" to "t"))
         assertTrue(outcome.allowed)
+        assertTrue(outcome.acked, "allow path must report acked=true for parity with Python")
         assertNull(outcome.receiptBytes)
         assertNull(outcome.dlqBytes)
         assertNull(outcome.dlqRecord)
