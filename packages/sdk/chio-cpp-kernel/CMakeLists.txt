@@ -36,6 +36,13 @@ if(CHIO_CPP_KERNEL_ENABLE_FFI)
   target_compile_definitions(chio_cpp_kernel PRIVATE CHIO_CPP_KERNEL_ENABLE_FFI=1)
   target_include_directories(chio_cpp_kernel PRIVATE "${CHIO_CPP_KERNEL_FFI_INCLUDE_DIR}")
   target_link_libraries(chio_cpp_kernel PRIVATE "${CHIO_CPP_KERNEL_FFI_LIBRARY}")
+  if(APPLE)
+    target_link_libraries(chio_cpp_kernel PUBLIC "-framework Security" "-framework CoreFoundation")
+  elseif(UNIX)
+    target_link_libraries(chio_cpp_kernel PUBLIC dl pthread m)
+  elseif(WIN32)
+    target_link_libraries(chio_cpp_kernel PUBLIC ws2_32 bcrypt userenv advapi32 ntdll)
+  endif()
   get_filename_component(CHIO_CPP_KERNEL_FFI_LIBRARY_DIR "${CHIO_CPP_KERNEL_FFI_LIBRARY}" DIRECTORY)
   set_target_properties(chio_cpp_kernel PROPERTIES
     BUILD_RPATH "${CHIO_CPP_KERNEL_FFI_LIBRARY_DIR}"
