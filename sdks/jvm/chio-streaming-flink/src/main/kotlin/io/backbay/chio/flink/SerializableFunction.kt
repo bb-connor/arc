@@ -1,7 +1,7 @@
 /**
  * Serializable function one-arg shape. Flink serialises operator
  * closures; plain java.util.function.Function is not Serializable.
- * Same rationale as client_factory in flink.py:189-197.
+ * Same rationale as Python's client_factory pattern.
  */
 package io.backbay.chio.flink
 

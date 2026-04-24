@@ -203,8 +203,7 @@ async def test_allow_handler_error_naks_by_default() -> None:
 
 @pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
 async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
-    # Wave 1 replaced `except BaseException` with `except Exception` so
-    # shutdown signals must surface out of dispatch unchanged.
+    # Shutdown signals must surface out of dispatch unchanged.
     mw, _js = _middleware(chio_client=allow_all())
     msg = FakeNatsMsg(subject="tasks.research")
 

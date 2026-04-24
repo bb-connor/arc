@@ -1,6 +1,5 @@
 /**
- * SHA-256 hex helpers. Mirrors sha256Hex previously in ChioIdentityExtractor
- * and chio_streaming.core.hash_body (core.py:183-187).
+ * SHA-256 hex helpers. Mirrors chio_streaming.core.hash_body.
  */
 package io.backbay.chio.sdk
 
@@ -24,10 +23,7 @@ object Hashing {
         return sb.toString()
     }
 
-    /**
-     * Hex SHA-256 or null if input is null/empty. Mirrors
-     * chio_streaming.core.hash_body (core.py:183-187).
-     */
+    /** Hex SHA-256 or null for null/empty input. */
     @JvmStatic
     fun hashBody(input: ByteArray?): String? {
         if (input == null || input.isEmpty()) {

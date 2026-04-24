@@ -197,8 +197,7 @@ async def test_allow_handler_error_negative_acks() -> None:
 
 @pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
 async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
-    # Wave 1 replaced `except BaseException` with `except Exception` so
-    # shutdown signals must surface out of dispatch unchanged.
+    # Shutdown signals must surface out of dispatch unchanged.
     mw, consumer, receipt_prod, dlq_prod = _middleware(chio_client=allow_all())
     msg = FakePulsarMessage(topic="persistent://public/default/orders")
 

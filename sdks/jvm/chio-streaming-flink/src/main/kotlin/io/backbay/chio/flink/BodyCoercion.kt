@@ -1,6 +1,6 @@
 /**
- * Canonical body bytes helper used by the default parameters extractor.
- * Mirrors _canonical_body_bytes in chio_streaming/flink.py:327-343.
+ * Canonical body bytes for the default parameters extractor. Mirrors
+ * the Python _canonical_body_bytes.
  */
 package io.backbay.chio.flink
 
@@ -10,16 +10,14 @@ import java.nio.charset.StandardCharsets
 
 internal object BodyCoercion {
     /**
-     * Encoding rules (match flink.py:329-343):
+     * Encoding rules (matching the Python equivalent):
      * 1. ByteArray / ByteBuffer passthrough.
      * 2. String encodes as UTF-8.
      * 3. Map canonical JSON via CanonicalJson.writeBytes.
      * 4. Fallback: element.toString().toByteArray(UTF_8).
      *
-     * Null matches Python's fallthrough via ``str(None).encode("utf-8")``
-     * which produces the four-byte payload "None". Kotlin's
-     * ``null.toString()`` would NPE, so null is short-circuited to the
-     * same payload explicitly.
+     * Null short-circuits to "None" bytes to match Python's
+     * ``str(None).encode("utf-8")``; Kotlin's ``null.toString()`` would NPE.
      */
     @JvmStatic
     fun canonicalBodyBytes(element: Any?): ByteArray =

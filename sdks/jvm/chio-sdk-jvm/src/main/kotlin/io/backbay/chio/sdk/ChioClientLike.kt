@@ -1,7 +1,7 @@
 /**
  * The sidecar surface the Flink operator calls. ChioClient implements
- * this; test doubles can too without spinning up an HttpServer.
- * Mirrors chio_streaming.core.ChioClientLike Protocol (core.py:28-39).
+ * this; test doubles can too without an HttpServer. Mirrors the Python
+ * chio_streaming.core.ChioClientLike Protocol.
  */
 package io.backbay.chio.sdk
 

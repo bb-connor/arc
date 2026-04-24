@@ -1,6 +1,6 @@
 /**
  * Canonical envelope emitted to the receipt side output. Mirrors
- * build_envelope + ReceiptEnvelope in chio_streaming/receipt.py:57-149.
+ * chio_streaming.receipt.build_envelope and ReceiptEnvelope.
  */
 package io.backbay.chio.sdk
 
@@ -51,10 +51,7 @@ data class ReceiptEnvelope(
         /** Header carrying the verdict ("allow" / "deny"). */
         const val VERDICT_HEADER: String = "X-Chio-Verdict"
 
-        /**
-         * Serialise [receipt] into a broker-friendly envelope. Mirrors
-         * chio_streaming.receipt.build_envelope (receipt.py:83-149).
-         */
+        /** Serialise [receipt] into a broker-friendly envelope. */
         @JvmOverloads
         @JvmStatic
         fun build(

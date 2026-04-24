@@ -1,9 +1,8 @@
 /**
  * Typed blocking HTTP client for the Chio sidecar.
  *
- * Mirrors chio_sdk.client.ChioClient (client.py:66-364). Only blocking
- * methods in v1; async pair lands in v1.1 when the Flink async operator
- * is rewired through the SDK layer.
+ * Mirrors chio_sdk.client.ChioClient. Blocking only in v1; the async
+ * pair lands when the Flink async operator is rewired through the SDK.
  */
 package io.backbay.chio.sdk
 
@@ -41,35 +40,23 @@ class ChioClient
                 .connectTimeout(timeout)
                 .build()
 
-        // ObjectMapper for response parsing; tolerant to unknown fields.
+        // Response-side parser tolerates unknown fields. Request side uses
+        // CanonicalJson where byte-identical output matters (parameter_hash).
         private val parser: ObjectMapper =
             jacksonObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-
-        // Canonical mapper is used on the request side whenever we need
-        // byte-identical output (evaluate_tool_call parameter_hash, etc.).
 
         // --------------------------------------------------------------
         // Lifecycle
         // --------------------------------------------------------------
 
         /**
-         * Forward-compat no-op on JDK 17.
-         *
-         * java.net.http.HttpClient does not expose a close() method on JDK
-         * 17; the instance is reclaimed by GC when unreferenced. This
-         * method exists to satisfy AutoCloseable so callers can
-         * use-resource it and to mirror Python's async client.close()
-         * shape.
-         *
-         * JDK 21+ adds HttpClient.close(). If the toolchain is bumped in
-         * the future, this shim should be replaced with a real
-         * http.close() call so HTTP/2 connections are released
-         * deterministically rather than on GC.
+         * No-op on JDK 17: java.net.http.HttpClient has no close() until
+         * JDK 21. Present so callers can use-resource the client and to
+         * mirror Python's async client.close() shape. Replace with
+         * http.close() when the toolchain bumps to JDK 21+.
          */
-        override fun close() {
-            // Intentionally empty on JDK 17.
-        }
+        override fun close() {}
 
         // --------------------------------------------------------------
         // Health
@@ -93,7 +80,7 @@ class ChioClient
         // Tool evaluation
         // --------------------------------------------------------------
 
-        /** POST /v1/evaluate. Mirrors evaluate_tool_call (client.py:224-247). */
+        /** POST /v1/evaluate. Mirrors evaluate_tool_call. */
         override fun evaluateToolCall(
             capabilityId: String,
             toolServer: String,
@@ -114,7 +101,7 @@ class ChioClient
             return parser.treeToValue(node, ChioReceipt::class.java)
         }
 
-        /** POST /chio/evaluate. Mirrors evaluate_http_request (client.py:249-294). */
+        /** POST /chio/evaluate. Mirrors evaluate_http_request. */
         @JvmOverloads
         fun evaluateHttpRequest(
             request: ChioHttpRequest,
@@ -170,13 +157,13 @@ class ChioClient
         // Receipt verification
         // --------------------------------------------------------------
 
-        /** POST /v1/receipts/verify. Mirrors verify_receipt (client.py:182-191). */
+        /** POST /v1/receipts/verify. Mirrors verify_receipt. */
         fun verifyReceipt(receipt: ChioReceipt): Boolean {
             val node = postJson(SidecarPaths.VERIFY_RECEIPT, receipt)
             return node.path("valid").asBoolean(false)
         }
 
-        /** POST /chio/verify. Mirrors verify_http_receipt (client.py:193-199). */
+        /** POST /chio/verify. Mirrors verify_http_receipt. */
         fun verifyHttpReceipt(receipt: HttpReceipt): Boolean {
             val node = postJson(SidecarPaths.VERIFY_HTTP_RECEIPT, receipt)
             return node.path("valid").asBoolean(false)
@@ -187,9 +174,8 @@ class ChioClient
         fun verifyReceipt(receipt: HttpReceipt): Boolean = verifyHttpReceipt(receipt)
 
         /**
-         * Pure client-side Merkle chain walk. Mirrors
-         * verify_receipt_chain (client.py:201-218). Byte-identical
-         * hashes (canonical JSON via CanonicalJson).
+         * Pure client-side Merkle chain walk. Mirrors verify_receipt_chain;
+         * byte-identical hashes via CanonicalJson.
          */
         fun verifyReceiptChain(receipts: List<ChioReceipt>): Boolean {
             if (receipts.size < 2) {
@@ -226,7 +212,7 @@ class ChioClient
         // --------------------------------------------------------------
 
         companion object {
-            /** Mirrors chio_sdk.client.ChioClient.collect_evidence (client.py:300-308). */
+            /** Mirrors chio_sdk.client.ChioClient.collect_evidence. */
             @JvmStatic
             fun collectEvidence(receipts: List<ChioReceipt>): List<GuardEvidence> {
                 val out = ArrayList<GuardEvidence>()

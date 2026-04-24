@@ -262,7 +262,6 @@ def test_normalise_headers_list_str_key_bytes_value() -> None:
 
 
 def test_normalise_headers_list_bytes_key_bytes_value() -> None:
-    # This is the Wave 1 bug #7 regression: bytes keys in list form.
     out = normalise_headers([(b"trace", b"abc"), (b"span", b"x")])
     assert out == {"trace": "abc", "span": "x"}
 

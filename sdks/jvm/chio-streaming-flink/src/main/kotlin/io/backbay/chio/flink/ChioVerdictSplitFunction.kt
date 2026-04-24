@@ -1,7 +1,7 @@
 /**
  * ProcessFunction that fans out EvaluationResult from
  * ChioAsyncEvaluateFunction to main / receipt / DLQ side outputs.
- * Mirrors ChioVerdictSplitFunction in chio_streaming/flink.py:707-732.
+ * Mirrors the Python ChioVerdictSplitFunction.
  *
  * Runtime cost is negligible when chained to the async operator (same
  * task thread, no serialisation).

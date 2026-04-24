@@ -1,9 +1,7 @@
 /**
- * Shared sync/async core for the Chio Flink operators. Mirrors
- * _ChioFlinkEvaluator in chio_streaming/flink.py:410-589.
- *
- * Not part of the public API; marked internal. One instance per
- * operator subtask; bound by the operator's open().
+ * Shared sync/async core for the Chio Flink operators. Mirrors the
+ * Python _ChioFlinkEvaluator. One instance per operator subtask;
+ * bound by the operator's open(). Not part of the public API.
  */
 package io.backbay.chio.flink
 
@@ -42,10 +40,9 @@ internal class ChioFlinkEvaluator<IN>(
         attemptNumber = runCatching<Int> { runtimeContext.taskInfo.attemptNumber }.getOrNull()
         metrics =
             runCatching<MetricGroup> {
-                // Register flat on the operator's metric group to match
-                // chio_streaming.flink._register_metrics (flink.py:369-379),
-                // which registers without a subgroup. Keeps cross-platform
-                // dashboards / alert rules interchangeable.
+                // Flat on the operator's metric group, matching the Python
+                // _register_metrics layout so cross-platform dashboards and
+                // alert rules stay interchangeable.
                 val group = runtimeContext.metricGroup
                 MetricGroup(
                     evaluationsTotal = group.counter("evaluations_total"),
@@ -131,9 +128,9 @@ internal class ChioFlinkEvaluator<IN>(
             // so Flink restarts the task and the source rewinds.
             metrics?.sidecarErrorsTotal?.inc()
             if (config.onSidecarError != SidecarErrorBehaviour.DENY) {
-                // Decorate with failure_context parity from Python
-                // (flink.py:523-527): topic + request_id follow the error
-                // into the task-restart logs / async completeExceptionally.
+                // failure_context parity with Python: topic + request_id
+                // follow the error into task-restart logs / async
+                // completeExceptionally.
                 throw ChioStreamingError(
                     "Chio sidecar evaluation failed: ${err.message}",
                     topic = subject.ifEmpty { null },
@@ -219,7 +216,6 @@ internal class ChioFlinkEvaluator<IN>(
     }
 
     private fun newRequestId(prefix: String): String {
-        // Mirrors core.py:228-230: "{prefix}-{uuid.uuid4().hex}".
         val hex = UUID.randomUUID().toString().replace("-", "")
         return "$prefix-$hex"
     }

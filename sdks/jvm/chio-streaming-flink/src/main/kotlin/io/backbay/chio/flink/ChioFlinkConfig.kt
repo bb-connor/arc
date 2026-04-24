@@ -1,7 +1,6 @@
 /**
- * Immutable Chio Flink operator configuration. Mirrors the
- * @dataclass ChioFlinkConfig plus __post_init__ validation in
- * chio_streaming/flink.py:142-258.
+ * Immutable Chio Flink operator configuration. Mirrors the Python
+ * ChioFlinkConfig dataclass and its __post_init__ validation.
  *
  * Factories (not instances) of ChioClient and DlqRouter are required
  * because Flink serialises operator closures across the JobManager ->

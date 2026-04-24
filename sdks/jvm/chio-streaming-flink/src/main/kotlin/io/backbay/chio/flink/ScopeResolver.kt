@@ -1,9 +1,7 @@
 /**
  * Resolve the Chio tool_name for a subject. Mirrors
- * chio_streaming.core.resolve_scope (core.py:163-180).
- *
- * Explicit map hit wins over the default prefix fallback. Empty
- * subject throws ChioValidationError.
+ * chio_streaming.core.resolve_scope. Explicit map hit wins over the
+ * default prefix fallback; empty subject throws ChioValidationError.
  */
 package io.backbay.chio.flink
 

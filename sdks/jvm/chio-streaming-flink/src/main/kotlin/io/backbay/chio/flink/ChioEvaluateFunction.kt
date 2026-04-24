@@ -1,11 +1,11 @@
 /**
- * Synchronous Chio ProcessFunction. Mirrors ChioEvaluateFunction in
- * chio_streaming/flink.py:592-641.
+ * Synchronous Chio ProcessFunction. Mirrors the Python
+ * ChioEvaluateFunction.
  *
- * Latency floor equals the sidecar RTT times the per-element cost; no
+ * Latency floor equals sidecar RTT times the per-element cost; no
  * pipelining. Use only when the sidecar is co-located and RTT is sub-ms,
- * or when the source is low-throughput. Prefer
- * ChioAsyncEvaluateFunction + ChioVerdictSplitFunction everywhere else.
+ * or the source is low-throughput. Prefer ChioAsyncEvaluateFunction +
+ * ChioVerdictSplitFunction otherwise.
  *
  * Emits:
  * - value to main on allow;
@@ -37,7 +37,6 @@ class ChioEvaluateFunction<IN>(
         val ev = ChioFlinkEvaluator(config)
         ev.bind(runtimeContext)
         evaluator = ev
-        // Build tags once per operator instance; allocation cost is off the hot path.
         receiptTag = ChioOutputTags.receiptTag()
         dlqTag = ChioOutputTags.dlqTag()
     }

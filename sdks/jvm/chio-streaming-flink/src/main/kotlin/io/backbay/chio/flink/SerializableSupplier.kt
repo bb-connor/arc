@@ -3,7 +3,7 @@
  * across the JobManager -> TaskManager boundary; plain
  * java.util.function.Supplier is not Serializable. Factories (not
  * instances) are the safe shape for ChioClient / DlqRouter, mirroring
- * Python's client_factory / dlq_router_factory pattern (flink.py:189-197).
+ * Python's client_factory / dlq_router_factory pattern.
  */
 package io.backbay.chio.flink
 

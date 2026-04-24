@@ -1,7 +1,6 @@
 /**
- * Full evaluation outcome produced by the sync operator (and shared
- * core). Mirrors FlinkProcessingOutcome in
- * chio_streaming/flink.py:261-295.
+ * Full evaluation outcome produced by the sync operator and the shared
+ * core. Mirrors the Python FlinkProcessingOutcome.
  */
 package io.backbay.chio.flink
 

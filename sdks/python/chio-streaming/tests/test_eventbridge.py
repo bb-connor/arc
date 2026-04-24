@@ -149,8 +149,7 @@ async def test_deny_outcome_reports_acked_true() -> None:
 
 @pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
 async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
-    # Wave 1 replaced `except BaseException` with `except Exception` so
-    # shutdown signals must surface out of evaluate() unchanged.
+    # Shutdown signals must surface out of evaluate() unchanged.
     h, ec = _handler(chio_client=allow_all())
 
     def handler(_evt: Any, _r: Any) -> None:

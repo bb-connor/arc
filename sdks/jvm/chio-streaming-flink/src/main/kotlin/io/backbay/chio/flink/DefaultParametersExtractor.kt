@@ -1,7 +1,7 @@
 /**
  * Default parameters extractor returning
- * {request_id, subject, body_length, body_hash}.
- * Mirrors _default_parameters_extractor in chio_streaming/flink.py:346-358.
+ * {request_id, subject, body_length, body_hash}. Mirrors the Python
+ * _default_parameters_extractor.
  */
 package io.backbay.chio.flink
 

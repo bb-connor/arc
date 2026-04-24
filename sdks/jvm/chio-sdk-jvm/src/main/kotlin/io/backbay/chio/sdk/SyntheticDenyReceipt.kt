@@ -1,8 +1,6 @@
 /**
- * Synthetic deny receipt builder used when the sidecar is unreachable
- * and the operator is configured to fail-closed with a synthesised
- * receipt. Mirrors chio_streaming.core.synthesize_deny_receipt
- * (core.py:119-160).
+ * Synthetic deny receipt builder for the fail-closed path when the
+ * sidecar is unreachable. Mirrors chio_streaming.core.synthesize_deny_receipt.
  *
  * Invariants:
  * - Reason is prefixed "[unsigned] " unless already prefixed (idempotent).

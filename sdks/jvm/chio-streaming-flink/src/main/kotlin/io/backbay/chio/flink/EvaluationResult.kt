@@ -1,6 +1,6 @@
 /**
- * Per-element record the async operator emits. Mirrors
- * EvaluationResult in chio_streaming/flink.py:298-324.
+ * Per-element record the async operator emits. Mirrors the Python
+ * EvaluationResult.
  *
  * The async operator yields exactly one EvaluationResult per input,
  * which the downstream ChioVerdictSplitFunction fans out to main /

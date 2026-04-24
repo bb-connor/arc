@@ -11,11 +11,9 @@ Routing precedence (highest wins):
 3. ``ChioStreamingConfigError`` if neither is configured and the router
    is asked to route.
 
-The payload returned by :meth:`DLQRouter.build_envelope` is intended
-for immediate publication via the same transactional producer that
-commits the consumer offset, so denial and commit remain atomic (see
-:class:`chio_streaming.middleware.ChioConsumerMiddleware` for the
-transaction semantics).
+The payload returned by :meth:`DLQRouter.build_envelope` is meant for
+immediate publication via the same transactional producer that commits
+the consumer offset, so denial and commit remain atomic.
 """
 
 from __future__ import annotations
@@ -72,9 +70,8 @@ class DLQRouter:
         Mapping from source topic -> DLQ topic. Checked before
         ``default_topic``.
     include_original_value:
-        When ``True`` (the default), the original event value (bytes) is
-        base64-free-embedded as a UTF-8 string when possible, or as a
-        hex-encoded string otherwise. This is useful for redrive.
+        When ``True`` (the default), the original event bytes are
+        embedded as a UTF-8 string when decodable, otherwise as hex.
     """
 
     def __init__(

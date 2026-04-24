@@ -1,6 +1,6 @@
 /**
  * Sidecar failure behaviour for Chio Flink operators. Mirrors the
- * Python Literal["raise", "deny"] (flink.py:72).
+ * Python Literal["raise", "deny"].
  *
  * RAISE: propagate sidecar unavailability so Flink restarts the task
  *        and the source rewinds.

@@ -1,8 +1,7 @@
 /**
  * Canonical JSON serialization for byte-identical output with the
  * Python SDK and Rust kernel. Mirrors chio_sdk.client._canonical_json
- * (client.py:38-48) and chio_streaming.receipt.canonical_json
- * (receipt.py:47-54).
+ * and chio_streaming.receipt.canonical_json.
  *
  * Guarantees:
  * - Map keys sorted alphabetically (code-point order).
