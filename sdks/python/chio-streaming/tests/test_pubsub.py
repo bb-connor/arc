@@ -620,4 +620,35 @@ async def test_request_id_is_deterministic_on_redelivery() -> None:
         FakePubSubMessage(message_id="mid-stable-42", attributes={"subject": "t"}),
         handler,
     )
-    assert first.request_id == second.request_id == "chio-pubsub-mid-stable-42"
+    expected = "chio-pubsub-projects/p/subscriptions/agent-tasks-mid-stable-42"
+    assert first.request_id == second.request_id == expected
+
+
+async def test_request_id_namespaced_by_subscription() -> None:
+    # Pub/Sub message_id is unique per topic, not globally; two
+    # subscriptions feeding a shared receipt stream could see the same
+    # message_id from sibling topics. Namespacing by subscription path
+    # keeps those distinct.
+    mw_a, _ = _middleware(
+        chio_client=allow_all(),
+        config=_cfg(subscription="projects/p/subscriptions/sub-a"),
+    )
+    mw_b, _ = _middleware(
+        chio_client=allow_all(),
+        config=_cfg(subscription="projects/p/subscriptions/sub-b"),
+    )
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    out_a = await mw_a.dispatch(
+        FakePubSubMessage(message_id="shared-id", attributes={"subject": "t"}),
+        handler,
+    )
+    out_b = await mw_b.dispatch(
+        FakePubSubMessage(message_id="shared-id", attributes={"subject": "t"}),
+        handler,
+    )
+    assert out_a.request_id != out_b.request_id
+    assert "sub-a" in out_a.request_id
+    assert "sub-b" in out_b.request_id

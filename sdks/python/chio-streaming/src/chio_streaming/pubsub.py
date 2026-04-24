@@ -229,16 +229,18 @@ class ChioPubSubMiddleware:
     ) -> PubSubProcessingOutcome:
         # Derive request_id from the broker's message identity so a
         # redelivery after a failed ack produces a byte-identical
-        # receipt. A fresh UUID per attempt would force downstream
-        # dedupe-by-request-id to double-count, and sidecar evaluation
-        # (which hashes request_id) would produce diverging signatures.
-        # Fall back to a UUID only for the defensive case where
-        # message_id is empty (should not happen with the official client).
-        request_id = (
-            f"chio-pubsub-{message.message_id}"
-            if message.message_id
-            else new_request_id("chio-pubsub")
-        )
+        # receipt. message_id is only unique per topic, so namespace
+        # with the subscription path; otherwise a shared receipt/DLQ
+        # stream consuming from multiple subscriptions could collapse
+        # genuinely distinct events. Fall back to a UUID only for the
+        # defensive case where message_id is empty (should not happen
+        # with the official client).
+        if message.message_id:
+            request_id = (
+                f"chio-pubsub-{self._config.subscription}-{message.message_id}"
+            )
+        else:
+            request_id = new_request_id("chio-pubsub")
         subject = self._subject_for(message)
         tool_name = resolve_scope(scope_map=self._config.scope_map, subject=subject)
         parameters = self._parameters_for(
