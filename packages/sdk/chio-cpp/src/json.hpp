@@ -29,6 +29,7 @@ inline std::string lower(std::string value) {
 
 inline std::string escape_json(std::string_view input) {
   std::ostringstream out;
+  constexpr char kHexDigits[] = "0123456789abcdef";
   for (unsigned char c : input) {
     switch (c) {
       case '"':
@@ -54,8 +55,7 @@ inline std::string escape_json(std::string_view input) {
         break;
       default:
         if (c < 0x20) {
-          out << "\\u" << std::hex << std::setw(4) << std::setfill('0')
-              << static_cast<int>(c);
+          out << "\\u00" << kHexDigits[(c >> 4U) & 0x0FU] << kHexDigits[c & 0x0FU];
         } else {
           out << static_cast<char>(c);
         }

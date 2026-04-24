@@ -561,18 +561,14 @@ Result<std::string> Session::request_streaming(std::string method,
               {},
               detail::retryable_status(http.status)});
   }
-  auto response = Result<TypedResponse<std::string>>::success(
-      TypedResponse<std::string>{http.body, http.body, std::move(http)});
-  if (!response) {
-    return Result<std::string>::failure(response.error());
-  }
+  auto response_body = std::move(http.body);
   if (!*saw_stream_message) {
-    auto dispatched = dispatch_messages(response.value().value, std::move(handler));
+    auto dispatched = dispatch_messages(response_body, std::move(handler));
     if (!dispatched) {
       return Result<std::string>::failure(dispatched.error());
     }
   }
-  return Result<std::string>::success(std::move(response.value().value));
+  return Result<std::string>::success(std::move(response_body));
 }
 
 Result<std::string> Session::notification(std::string method, std::string params_json) const {
@@ -758,6 +754,10 @@ Result<std::thread> Session::start_receive_loop(
   auto transport = transport_;
   auto retry_policy = retry_policy_;
   auto trace_sink = trace_sink_;
+  if (!transport) {
+    return Result<std::thread>::failure(
+        Error{ErrorCode::Transport, "missing HTTP transport", "Session::start_receive_loop"});
+  }
   auto request_result = make_get_stream(std::move(cancellation));
   if (!request_result) {
     return Result<std::thread>::failure(request_result.error());

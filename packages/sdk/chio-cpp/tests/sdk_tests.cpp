@@ -152,6 +152,13 @@ void test_private_json_helpers_are_strict() {
   require(chio::detail::extract_json_string_field(
               std::string("{\"s\":\"line\nbreak\"}"), "s").empty(),
           "expected raw control extraction to fail");
+
+  std::string escaped_control;
+  escaped_control.push_back('\x01');
+  escaped_control += "42";
+  require_eq(chio::detail::escape_json(escaped_control),
+             "\\u000142",
+             "control character json escaping");
 }
 
 void test_curl_sse_helpers_abort_after_terminal_message() {
@@ -406,6 +413,22 @@ void test_session_refreshes_token_provider_for_requests() {
 }
 
 void test_start_receive_loop_returns_setup_errors() {
+  chio::Session missing_transport("http://127.0.0.1:8080",
+                                  "token",
+                                  "sess-receive",
+                                  "2025-11-25",
+                                  nullptr);
+  auto missing_started = missing_transport.start_receive_loop([](const chio::JsonMessage&) {
+    return chio::Result<void>::success();
+  }, std::make_shared<chio::CancellationToken>());
+  require(!missing_started.ok(), "expected receive loop transport setup failure");
+  require_contains(missing_started.error().message,
+                   "missing HTTP transport",
+                   "receive loop transport setup error");
+  require_eq(missing_started.error().operation,
+             "Session::start_receive_loop",
+             "receive loop transport operation");
+
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{});
   chio::Session session("http://127.0.0.1:8080",
                         "",
