@@ -525,3 +525,38 @@ broker is required. See `tests/test_middleware.py`
 (Kafka), `tests/test_nats.py`, `tests/test_pulsar.py`,
 `tests/test_eventbridge.py`, `tests/test_pubsub.py`, and
 `tests/test_redis_streams.py`.
+
+## Integration testing
+
+Live-broker integration tests live under `tests/integration/` and are
+gated by the `CHIO_INTEGRATION=1` environment variable so a normal
+`uv run pytest` invocation never touches a real broker (the suite is
+skipped, not failed, when the gate is off).
+
+The integration stack ships as `infra/streaming-compose.yml` at the
+repo root and currently includes Redis (port `16379`) and NATS with
+JetStream enabled (port `14222`). The ports are deliberately offset
+from the broker defaults so the stack can coexist with a workspace-wide
+Redis on `6379`.
+
+The Makefile target brings the stack up, runs the suite, and tears it
+down (even on failure):
+
+```bash
+make test-integration
+```
+
+To iterate against a long-running stack:
+
+```bash
+make infra-up
+CHIO_INTEGRATION=1 \
+  CHIO_TEST_REDIS_URL=redis://localhost:16379/0 \
+  CHIO_TEST_NATS_URL=nats://localhost:14222 \
+  uv run pytest tests/integration -v
+make infra-down
+```
+
+The fixtures in `tests/integration/conftest.py` probe each broker on
+startup and emit a clean skip (rather than a connection-error
+backtrace) when the broker is unreachable.
