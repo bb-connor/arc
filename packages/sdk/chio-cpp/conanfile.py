@@ -77,3 +77,7 @@ class ChioCppConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "ChioCpp")
         self.cpp_info.set_property("cmake_target_name", "ChioCpp::chio_cpp")
         self.cpp_info.libs = ["chio_cpp", "chio_bindings_ffi"]
+        if str(self.settings.os) == "Macos":
+            self.cpp_info.frameworks = ["Security", "CoreFoundation"]
+        elif str(self.settings.os) in ["Linux", "FreeBSD"]:
+            self.cpp_info.system_libs = ["dl", "pthread", "m"]
