@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from conan import ConanFile
@@ -17,23 +18,7 @@ class ChioCppConan(ConanFile):
     options = {"shared": [True, False], "with_curl": [True, False]}
     default_options = {"shared": False, "with_curl": False}
 
-    _rust_workspace_members = [
-        "chio-appraisal",
-        "chio-autonomy",
-        "chio-binding-helpers",
-        "chio-bindings-ffi",
-        "chio-core",
-        "chio-core-types",
-        "chio-credit",
-        "chio-federation",
-        "chio-governance",
-        "chio-listing",
-        "chio-manifest",
-        "chio-market",
-        "chio-open-market",
-        "chio-underwriting",
-        "chio-web3",
-    ]
+    _rust_workspace_roots = ["chio-bindings-ffi"]
 
     @staticmethod
     def _extract_manifest_section(manifest, header):
@@ -41,15 +26,52 @@ class ChioCppConan(ConanFile):
         start = manifest.find(start_marker)
         if start == -1:
             raise ValueError(f"missing {header} in workspace Cargo.toml")
-        next_section = manifest.find("\n[", start + len(start_marker))
-        if next_section == -1:
-            return manifest[start:].strip()
-        return manifest[start:next_section].strip()
+        section_name = header.strip("[]")
+        lines = manifest[start:].splitlines()
+        out = []
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if index > 0 and stripped.startswith("[") and stripped.endswith("]"):
+                current = stripped.strip("[]")
+                if current != section_name and not current.startswith(f"{section_name}."):
+                    break
+            out.append(line)
+        return "\n".join(out).strip()
+
+    @staticmethod
+    def _path_dependency_crates(crate_manifest, repo_root):
+        text = crate_manifest.read_text()
+        crates_dir = (repo_root / "crates").resolve()
+        crate_names = []
+        for dependency_path in re.findall(r'path\s*=\s*"(\.\./[^"]+)"', text):
+            dependency_dir = (crate_manifest.parent / dependency_path).resolve()
+            if dependency_dir.parent == crates_dir:
+                crate_names.append(dependency_dir.name)
+        return crate_names
+
+    def _rust_workspace_members(self, repo_root):
+        members = set()
+        pending = list(self._rust_workspace_roots)
+        while pending:
+            crate = pending.pop()
+            if crate in members:
+                continue
+            crate_manifest = repo_root / "crates" / crate / "Cargo.toml"
+            if not crate_manifest.exists():
+                raise ValueError(f"missing Cargo.toml for Rust crate {crate}")
+            members.add(crate)
+            pending.extend(
+                dependency
+                for dependency in self._path_dependency_crates(crate_manifest, repo_root)
+                if dependency not in members
+            )
+        return sorted(members)
 
     def _trimmed_workspace_manifest(self, repo_root):
         root_manifest = (repo_root / "Cargo.toml").read_text()
+        workspace_members = self._rust_workspace_members(repo_root)
         members = "\n".join(
-            f'    "crates/{crate}",' for crate in self._rust_workspace_members
+            f'    "crates/{crate}",' for crate in workspace_members
         )
         copied_sections = "\n\n".join(
             self._extract_manifest_section(root_manifest, header)
@@ -71,6 +93,7 @@ class ChioCppConan(ConanFile):
     def export_sources(self):
         package_dir = Path(self.recipe_folder)
         repo_root = package_dir.parents[2]
+        workspace_members = self._rust_workspace_members(repo_root)
         for pattern in [
             "CMakeLists.txt",
             "cmake/*",
@@ -80,7 +103,7 @@ class ChioCppConan(ConanFile):
             "examples/*",
         ]:
             copy(self, pattern, src=package_dir, dst=self.export_sources_folder)
-        for crate in self._rust_workspace_members:
+        for crate in workspace_members:
             copy(
                 self,
                 "*",

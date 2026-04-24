@@ -294,14 +294,17 @@ std::string trim_slashes(std::string value) {
 
 std::string authorization_server_metadata_url(const std::string& base_url,
                                               const std::string& issuer) {
-  auto path_start = issuer.find("://");
-  if (path_start != std::string::npos) {
-    path_start = issuer.find('/', path_start + 3);
+  std::string metadata_base = base_url;
+  std::string issuer_path = issuer;
+  const auto scheme = issuer.find("://");
+  if (scheme != std::string::npos) {
+    const auto origin_end = issuer.find('/', scheme + 3);
+    metadata_base = origin_end == std::string::npos ? issuer : issuer.substr(0, origin_end);
+    issuer_path =
+        origin_end == std::string::npos ? std::string() : issuer.substr(origin_end);
   }
-  std::string issuer_path =
-      path_start == std::string::npos ? std::string() : issuer.substr(path_start);
   issuer_path = trim_slashes(std::move(issuer_path));
-  std::string base = base_url;
+  std::string base = std::move(metadata_base);
   while (!base.empty() && base.back() == '/') {
     base.pop_back();
   }

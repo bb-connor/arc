@@ -409,10 +409,12 @@ fn run_peer(
 
 fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> {
     let build_dir = repo_root.join("target/chio-cpp-conformance");
-    let executable = build_dir.join(format!(
-        "chio_cpp_conformance_peer{}",
-        std::env::consts::EXE_SUFFIX
-    ));
+    let build_config = "Debug";
+    let executable_name = format!("chio_cpp_conformance_peer{}", std::env::consts::EXE_SUFFIX);
+    let executable_candidates = [
+        build_dir.join(&executable_name),
+        build_dir.join(build_config).join(&executable_name),
+    ];
     let source_dir = repo_root.join("packages/sdk/chio-cpp");
     let configure_status = Command::new("cmake")
         .current_dir(repo_root)
@@ -424,6 +426,7 @@ fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> 
         .arg("-DCHIO_CPP_BUILD_EXAMPLES=OFF")
         .arg("-DCHIO_CPP_ENABLE_CURL=ON")
         .arg("-DCHIO_CPP_BUILD_CONFORMANCE_PEER=ON")
+        .arg("-DCMAKE_BUILD_TYPE=Debug")
         .status()
         .map_err(|source| RunnerError::Spawn {
             command: "cmake configure chio_cpp_conformance_peer".to_string(),
@@ -443,6 +446,8 @@ fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> 
         .arg(&build_dir)
         .arg("--target")
         .arg("chio_cpp_conformance_peer")
+        .arg("--config")
+        .arg(build_config)
         .status()
         .map_err(|source| RunnerError::Spawn {
             command: "cmake --build chio_cpp_conformance_peer".to_string(),
@@ -456,15 +461,16 @@ fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> 
         });
     }
 
-    if executable.exists() {
-        Ok(executable)
-    } else {
-        Err(RunnerError::ProcessFailed {
-            command: "cmake --build chio_cpp_conformance_peer".to_string(),
-            status: 1,
-            log_path: "<stderr>".to_string(),
-        })
+    for executable in executable_candidates {
+        if executable.exists() {
+            return Ok(executable);
+        }
     }
+    Err(RunnerError::ProcessFailed {
+        command: "cmake --build chio_cpp_conformance_peer".to_string(),
+        status: 1,
+        log_path: "<stderr>".to_string(),
+    })
 }
 
 fn reserve_listen_addr() -> Result<SocketAddr, RunnerError> {
