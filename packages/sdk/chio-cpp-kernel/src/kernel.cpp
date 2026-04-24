@@ -4,6 +4,8 @@
 #include <sstream>
 #include <utility>
 
+#include "json_field.hpp"
+
 #ifdef CHIO_CPP_KERNEL_ENABLE_FFI
 #include "chio/chio_kernel_ffi.h"
 #endif
@@ -74,63 +76,6 @@ std::string code_name(int code) {
   }
 }
 
-std::optional<std::string> json_string_field(const std::string& json,
-                                             const std::string& key) {
-  const std::string needle = "\"" + key + "\":";
-  std::size_t pos = json.find(needle);
-  if (pos == std::string::npos) {
-    return std::nullopt;
-  }
-  pos += needle.size();
-  while (pos < json.size() &&
-         (json[pos] == ' ' || json[pos] == '\n' || json[pos] == '\r' ||
-          json[pos] == '\t')) {
-    ++pos;
-  }
-  if (pos >= json.size() || json[pos] != '"') {
-    return std::nullopt;
-  }
-  ++pos;
-  std::string out;
-  while (pos < json.size()) {
-    char c = json[pos++];
-    if (c == '"') {
-      return out;
-    }
-    if (c == '\\' && pos < json.size()) {
-      char escaped = json[pos++];
-      switch (escaped) {
-        case '"':
-        case '\\':
-        case '/':
-          out.push_back(escaped);
-          break;
-        case 'b':
-          out.push_back('\b');
-          break;
-        case 'f':
-          out.push_back('\f');
-          break;
-        case 'n':
-          out.push_back('\n');
-          break;
-        case 'r':
-          out.push_back('\r');
-          break;
-        case 't':
-          out.push_back('\t');
-          break;
-        default:
-          out.push_back('\\');
-          out.push_back(escaped);
-          break;
-      }
-    } else {
-      out.push_back(c);
-    }
-  }
-  return std::nullopt;
-}
 #endif
 
 std::string result_json(const EvaluateResult& result) {
@@ -207,8 +152,8 @@ EvaluateResult from_ffi_result(const ChioKernelFfiResult& ffi_result) {
     EvaluateResult result;
     result.ok = true;
     result.result_json = body;
-    result.verdict = json_string_field(body, "verdict").value_or("deny");
-    result.reason = json_string_field(body, "reason").value_or("");
+    result.verdict = detail::json_string_field(body, "verdict").value_or("deny");
+    result.reason = detail::json_string_field(body, "reason").value_or("");
     return result;
   }
 

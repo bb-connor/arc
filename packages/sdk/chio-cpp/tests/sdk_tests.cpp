@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../src/json.hpp"
+#include "../src/curl_sse.hpp"
 
 namespace {
 
@@ -135,6 +136,34 @@ void test_private_json_helpers_are_strict() {
   require(chio::detail::extract_json_string_field(
               std::string("{\"s\":\"line\nbreak\"}"), "s").empty(),
           "expected raw control extraction to fail");
+}
+
+void test_curl_sse_helpers_abort_after_terminal_message() {
+  chio::detail::CurlBodyCapture capture;
+  capture.id_json = "7";
+  int delivered_count = 0;
+  capture.stream_message = [&delivered_count](const std::string& payload) {
+    ++delivered_count;
+    require_contains(payload, "\"id\":7", "terminal payload");
+    return chio::Result<void>::success();
+  };
+
+  std::string terminal =
+      "data: {\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"ok\":true}}\n\n";
+  const auto returned =
+      chio::detail::write_curl_body(&terminal[0], 1, terminal.size(), &capture);
+  require(returned == 0, "expected curl write callback to abort after terminal SSE");
+  require(capture.complete, "expected terminal SSE to mark capture complete");
+  require(!capture.callback_failed, "expected terminal SSE not to be a callback failure");
+  require(delivered_count == 1, "expected terminal SSE to be delivered once");
+
+  chio::detail::CurlBodyCapture non_streaming;
+  non_streaming.id_json = "7";
+  std::string json = "{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{}}\n";
+  const auto json_returned =
+      chio::detail::write_curl_body(&json[0], 1, json.size(), &non_streaming);
+  require(json_returned == json.size(), "expected non-streaming body to keep reading");
+  require(non_streaming.complete, "expected non-streaming terminal body to be complete");
 }
 
 class FixedClock final : public chio::Clock {
@@ -543,6 +572,7 @@ int main() {
   try {
     test_invariants_from_shared_vectors();
     test_private_json_helpers_are_strict();
+    test_curl_sse_helpers_abort_after_terminal_message();
     test_dpop_proof();
     test_client_session_with_fake_transport();
     test_session_refreshes_token_provider_for_requests();

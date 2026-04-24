@@ -3,6 +3,8 @@
 #include <cassert>
 #include <string>
 
+#include "../src/json_field.hpp"
+
 int main() {
   chio::kernel::Kernel kernel;
 
@@ -17,6 +19,17 @@ int main() {
     assert(result.error_code == "invalid_argument");
     assert(result.result_json.find("\"ok\":false") != std::string::npos);
     assert(result.result_json.find("\"verdict\":\"deny\"") != std::string::npos);
+  }
+
+  {
+    auto escaped = chio::kernel::detail::json_string_field(
+        "{\"reason\":\"line\\nslash\\\\tab\\tunicode\\u0041\"}", "reason");
+    assert(escaped.has_value());
+    assert(*escaped == "line\nslash\\tab\tunicode\\u0041");
+    assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\uZZZZ\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\q\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field(
+        std::string("{\"reason\":\"line\nbreak\"}"), "reason"));
   }
 
   {
