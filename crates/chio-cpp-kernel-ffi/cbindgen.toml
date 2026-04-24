@@ -2,6 +2,7 @@ language = "C"
 pragma_once = true
 include_guard = "CHIO_CPP_KERNEL_FFI_H"
 style = "both"
+cpp_compat = true
 usize_is_size_t = true
 documentation = true
 header = """

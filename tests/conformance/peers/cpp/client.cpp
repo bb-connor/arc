@@ -100,6 +100,38 @@ std::string url_encode(const std::string& input) {
   return escaped.str();
 }
 
+int hex_value(char c) {
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+  if (c >= 'A' && c <= 'F') {
+    return c - 'A' + 10;
+  }
+  return -1;
+}
+
+std::string url_decode(const std::string& input) {
+  std::string decoded;
+  decoded.reserve(input.size());
+  for (std::size_t i = 0; i < input.size(); ++i) {
+    const char c = input[i];
+    if (c == '%' && i + 2 < input.size()) {
+      const int high = hex_value(input[i + 1]);
+      const int low = hex_value(input[i + 2]);
+      if (high >= 0 && low >= 0) {
+        decoded.push_back(static_cast<char>((high << 4) | low));
+        i += 2;
+        continue;
+      }
+    }
+    decoded.push_back(c == '+' ? ' ' : c);
+  }
+  return decoded;
+}
+
 std::string read_file(const std::filesystem::path& path) {
   std::ifstream input(path);
   if (!input) {
@@ -483,7 +515,7 @@ chio::Result<std::string> perform_authorization_code_flow(
     return chio::Result<std::string>::failure(approval_response.error());
   }
   const auto location = header_value(approval_response.value().headers, "location");
-  const auto code = query_value(location, "code");
+  const auto code = url_decode(query_value(location, "code"));
   if (approval_response.value().status < 300 || approval_response.value().status >= 400 ||
       code.empty()) {
     return chio::Result<std::string>::failure(

@@ -1,5 +1,11 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+
+if(@CHIO_CPP_ENABLE_CURL@)
+  find_dependency(CURL)
+endif()
+
 if(NOT TARGET chio_bindings_ffi)
   add_library(chio_bindings_ffi STATIC IMPORTED)
   set_target_properties(chio_bindings_ffi PROPERTIES

@@ -1,6 +1,3 @@
-#ifndef CHIO_CPP_KERNEL_FFI_H
-#define CHIO_CPP_KERNEL_FFI_H
-
 /*
  * Chio C++ kernel FFI ABI.
  *
@@ -9,8 +6,15 @@
  * explicit Rust-owned buffer release.
  */
 
+
+#ifndef CHIO_CPP_KERNEL_FFI_H
+#define CHIO_CPP_KERNEL_FFI_H
+
+#pragma once
+
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -42,7 +46,7 @@
 
 typedef struct ChioKernelFfiBuffer {
   uint8_t *ptr;
-  uintptr_t len;
+  size_t len;
 } ChioKernelFfiBuffer;
 
 typedef struct ChioKernelFfiResult {
@@ -74,7 +78,7 @@ struct ChioKernelFfiResult chio_kernel_verify_passport_json(const char *envelope
                                                             int64_t now_secs);
 
 #ifdef __cplusplus
-} // extern "C"
-#endif // __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
-#endif /* CHIO_CPP_KERNEL_FFI_H */
+#endif  /* CHIO_CPP_KERNEL_FFI_H */
