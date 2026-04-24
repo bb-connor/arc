@@ -1,0 +1,18 @@
+{
+  "dispatch_id": "dispatch-ioa-web3-001",
+  "execution_receipt_id": "receipt-ioa-web3-001",
+  "fulfillment_id": "fulfillment-e9cb54abe045",
+  "mainnet_blocked": true,
+  "order_id": "ioa-web3-order-001",
+  "quote_id": "quote-8d8a2b665e02",
+  "quoted_amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "schema": "chio.example.ioa-web3.reconciliation.v1",
+  "settled_amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "status": "reconciled"
+}

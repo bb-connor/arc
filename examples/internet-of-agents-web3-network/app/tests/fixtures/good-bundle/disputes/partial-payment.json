@@ -1,0 +1,13 @@
+{
+  "amount": {
+    "currency": "USDC",
+    "units": 140000
+  },
+  "capability_id": "cap-ioa-web3-settlement",
+  "order_id": "ioa-web3-order-001",
+  "receipt": {
+    "decision": "allow",
+    "id": "rcpt-partial-payment-ioa-web3-order-001"
+  },
+  "schema": "chio.example.ioa-web3.partial-payment.v1"
+}

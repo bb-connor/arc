@@ -1,0 +1,25 @@
+{
+  "checks": [
+    {
+      "id": "passport-presentation",
+      "outcome": "pass"
+    },
+    {
+      "id": "runtime-attestation",
+      "outcome": "pass"
+    },
+    {
+      "id": "delegation-depth",
+      "outcome": "pass"
+    },
+    {
+      "id": "obligation-inheritance",
+      "outcome": "pass"
+    }
+  ],
+  "evaluationId": "admission-cipherworks-specialist-001",
+  "policyId": "proofworks-cipherworks-two-hop-specialist-review",
+  "schema": "chio.federation.open-admission-evaluation.v1",
+  "subject": "did:web:cipherworks.example:agent:specialist-reviewer",
+  "verdict": "pass"
+}

@@ -1,0 +1,38 @@
+{
+  "capability_id": "cap-ioa-web3-cipherworks-specialist",
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "provider_cannot_move_funds"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "delegator": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b",
+      "signature": "1d4ce8553e50887651035bb9aa408dd9084c49471aa6b01c9b8ce795f745c19712235713815a8f3ca21ed906550b04df74a0b1109c917b8c792be4be9690f006",
+      "timestamp": 1776995579
+    },
+    {
+      "attenuations": [
+        {
+          "kind": "specialist_review_only"
+        },
+        {
+          "kind": "no_payment_authority"
+        },
+        {
+          "kind": "inherits_mainnet_block"
+        }
+      ],
+      "capability_id": "cap-ioa-web3-provider",
+      "delegatee": "50570882ff97adecaac9c848ebd7078f96103c0c2041b0d9cf2a3890ce24f685",
+      "delegator": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "signature": "6760cc485bf3379fa13a3664ecf199d52a66414da911eec59a973a22f70ea6ffc46d4c092c8232431ad7afcbf1470eda80680428eca2df359cb06221e4d4980e",
+      "timestamp": 1776995580
+    }
+  ],
+  "delegation_depth": 2,
+  "issuer": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "subject": "50570882ff97adecaac9c848ebd7078f96103c0c2041b0d9cf2a3890ce24f685"
+}

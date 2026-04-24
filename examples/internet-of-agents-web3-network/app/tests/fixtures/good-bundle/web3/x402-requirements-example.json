@@ -1,0 +1,17 @@
+{
+  "accepted_tokens": [
+    "USDC",
+    "EURC"
+  ],
+  "amount_minor_units": 150,
+  "capability_id": "dispatch-web3-1",
+  "chain_id": "eip155:8453",
+  "currency": "USD",
+  "dispatch_id": "dispatch-web3-1",
+  "facilitator_url": "https://facilitator.example/x402",
+  "governed_authorization_required": true,
+  "pay_to": "0x2222222222222222222222222222222222222222",
+  "resource": "https://tool.example/v1/run",
+  "settlement_mode": "prepaid_authorization",
+  "version": "x402"
+}

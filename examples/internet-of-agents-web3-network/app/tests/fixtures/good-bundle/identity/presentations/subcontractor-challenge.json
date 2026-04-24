@@ -1,0 +1,12 @@
+{
+  "challengeId": "challenge-meridian-cipherworks-001",
+  "holder": "did:web:cipherworks.example:agent:specialist-reviewer",
+  "nonce": "0332bb8a33366b7470d335352df01f01838693113e0d3cdb4f55971e5586544e",
+  "requestedClaims": [
+    "holderPublicKey",
+    "workloadIdentity",
+    "trustTier"
+  ],
+  "schema": "chio.passport.challenge.v1",
+  "verifier": "Meridian Federation Verifier"
+}

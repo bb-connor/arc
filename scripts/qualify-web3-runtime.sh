@@ -23,6 +23,7 @@ run() {
   "$@" 2>&1 | tee -a "${log_path}"
 }
 
+run pnpm --dir contracts install --frozen-lockfile
 run cargo fmt --all --check
 run env CARGO_TARGET_DIR=target/chio-cli-web3-evidence CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   cargo test -p chio-cli web3_evidence -- --test-threads=1

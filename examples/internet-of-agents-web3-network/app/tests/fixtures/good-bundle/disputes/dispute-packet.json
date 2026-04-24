@@ -1,0 +1,10 @@
+{
+  "dispute_id": "dispute-ioa-web3-order-001",
+  "order_id": "ioa-web3-order-001",
+  "partial_payment": "disputes/partial-payment.json",
+  "refund": "disputes/refund.json",
+  "remediation": "disputes/remediation-packet.json",
+  "schema": "chio.example.ioa-web3.dispute-packet.v1",
+  "status": "resolved",
+  "weak_deliverable": "disputes/weak-deliverable.json"
+}

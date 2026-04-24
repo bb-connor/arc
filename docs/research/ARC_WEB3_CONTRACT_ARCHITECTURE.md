@@ -720,7 +720,7 @@ The following addresses are canonical for ARC's primary deployment on Base (Chai
 
 | Feed | Address |
 |------|---------|
-| L2 Sequencer Uptime | `0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3` |
+| L2 Sequencer Uptime | `0xBCF85224fc0756B9Fa45aA7892530B47e10b6433` |
 
 **EAS (Ethereum Attestation Service) on Base:**
 
@@ -746,7 +746,7 @@ rpc_endpoint = "https://mainnet.base.org"
 
 [price_oracle.chainlink]
 chain_id = 8453  # Base Mainnet
-sequencer_uptime_feed = "0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3"
+sequencer_uptime_feed = "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433"
 feeds = [
     { pair = "ETH/USD", address = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70", heartbeat = 1200, deviation_bps = 15 },
     { pair = "USDC/USD", address = "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", heartbeat = 86400, deviation_bps = 10 },
@@ -1004,7 +1004,7 @@ eth_usd = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70"
 btc_usd = "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F"
 usdc_usd = "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B"
 link_usd = "0x17CAb8FE31cA45e4684Ea7bCB9D30Ba03e38BF2C"
-sequencer_uptime = "0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3"
+sequencer_uptime = "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433"
 
 [arc_web3.solana]
 chain = "solana-mainnet"

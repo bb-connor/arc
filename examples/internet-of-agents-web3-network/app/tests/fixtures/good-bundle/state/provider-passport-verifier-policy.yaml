@@ -1,0 +1,5 @@
+issuerAllowlist:
+  - "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+minCompositeScore: 0.6142
+minReceiptCount: 4
+minLineageRecords: 1

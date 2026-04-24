@@ -1,0 +1,22 @@
+{
+  "claims": {
+    "example": "internet-of-agents-web3-network",
+    "localRealism": true,
+    "mainnetBlocked": true,
+    "organization": "ProofWorks Provider"
+  },
+  "evidence_sha256": "1a096a85c07d9bba171c4c1bcac6e072d49d351081bf20a4f7446d122fd523c0",
+  "expires_at": 1776999180,
+  "issued_at": 1776995580,
+  "runtime_identity": "spiffe://ioa-web3.local/provider/proofworks-agent-auditor",
+  "schema": "chio.runtime-attestation.enterprise-verifier.json.v1",
+  "tier": "attested",
+  "verifier": "https://attest.ioa-web3.local",
+  "workload_identity": {
+    "credentialKind": "uri",
+    "path": "/provider/proofworks-agent-auditor",
+    "scheme": "spiffe",
+    "trustDomain": "ioa-web3.local",
+    "uri": "spiffe://ioa-web3.local/provider/proofworks-agent-auditor"
+  }
+}

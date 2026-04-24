@@ -1,0 +1,30 @@
+{
+  "accepted": true,
+  "commandResult": {
+    "capabilityLineage": 1,
+    "command": [
+      "/Users/connor/.codex/worktrees/673b/arc/target/debug/chio",
+      "--format",
+      "json",
+      "--control-url",
+      "http://127.0.0.1:62121",
+      "--control-token",
+      "demo-token",
+      "evidence",
+      "import",
+      "--input",
+      "target/web3-example-qualification/internet-of-agents-web3-network/federation/evidence-export-package"
+    ],
+    "exportedAt": 1776995580,
+    "importedAt": 1776995580,
+    "issuer": "ProofWorks Provider",
+    "manifestHash": "64c8e802bdf50deb60daea0fba94171aac3af35989253844732aa548fe2dc6b1",
+    "partner": "Meridian Federation Verifier",
+    "requireProofs": false,
+    "shareId": "share-3270208fac1d3bdefa89027b6fc06575d52ab1a38963d0233f170ecd8576dba5",
+    "signerPublicKey": "08a1fcd8e07344ab0c22599bf57daa75c956660e888a27fb134c78e089b031cd",
+    "toolReceipts": 5
+  },
+  "schema": "chio.federation.evidence-import.v1",
+  "source": "chio-trust-control"
+}

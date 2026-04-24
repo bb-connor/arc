@@ -1,0 +1,38 @@
+{
+  "jobs": [
+    {
+      "decision": "allow",
+      "job_id": "history-job-001",
+      "receipt_id": "rcpt-history-job-001",
+      "timestamp": 1775181179
+    },
+    {
+      "decision": "allow",
+      "job_id": "history-job-002",
+      "receipt_id": "rcpt-history-job-002",
+      "timestamp": 1775785979
+    },
+    {
+      "decision": "allow",
+      "job_id": "history-job-003",
+      "receipt_id": "rcpt-history-job-003",
+      "timestamp": 1776131579
+    },
+    {
+      "decision": "allow",
+      "job_id": "history-job-004",
+      "receipt_id": "rcpt-history-job-004",
+      "timestamp": 1776563579
+    },
+    {
+      "decision": "allow",
+      "job_id": "history-job-005",
+      "receipt_id": "rcpt-history-job-005",
+      "timestamp": 1776822779
+    }
+  ],
+  "receiptDb": "target/web3-example-qualification/internet-of-agents-web3-network/state/provider-receipts.sqlite3",
+  "schema": "chio.example.ioa-web3.historical-reputation-ledger.v1",
+  "source": "seeded-chio-receipt-db",
+  "subjectPublicKey": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+}

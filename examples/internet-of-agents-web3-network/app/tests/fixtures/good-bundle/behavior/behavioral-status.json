@@ -1,0 +1,83 @@
+{
+  "baseline": {
+    "limits": {
+      "mcpEvidenceReadsPerOrder": 3,
+      "quoteRequestsPerOrder": 3,
+      "settlementPacketsPerOrder": 2
+    },
+    "note": "Baseline is emitted from Chio behavioral-feed artifacts, not HushSpec runtime deny wiring.",
+    "observed": {
+      "mcpEvidenceReads": 1,
+      "quoteRequests": 3,
+      "settlementPackets": 2
+    },
+    "profile": "web3-procurement-normal",
+    "schema": "chio.example.ioa-web3.behavioral-baseline.v1",
+    "verdict": "pass",
+    "workloadTrustDomain": "ioa-web3.local"
+  },
+  "feed": {
+    "body": {
+      "decisions": {
+        "allowCount": 0,
+        "cancelledCount": 0,
+        "denyCount": 0,
+        "incompleteCount": 0
+      },
+      "filters": {
+        "receiptLimit": 100
+      },
+      "generatedAt": 1776995581,
+      "governedActions": {
+        "approvalReceipts": 0,
+        "approvedReceipts": 0,
+        "commerceReceipts": 0,
+        "governedReceipts": 0,
+        "maxAmountReceipts": 0
+      },
+      "meteredBilling": {
+        "actionableReceipts": 0,
+        "evidenceAttachedReceipts": 0,
+        "financialMismatchReceipts": 0,
+        "meteredReceipts": 0,
+        "missingEvidenceReceipts": 0,
+        "overMaxBilledUnitsReceipts": 0,
+        "overQuotedCostReceipts": 0,
+        "overQuotedUnitsReceipts": 0,
+        "reconciledReceipts": 0
+      },
+      "privacy": {
+        "childReceiptScope": "full_query_window",
+        "directEvidenceExportSupported": true,
+        "exportQuery": {},
+        "matchingReceipts": 0,
+        "proofsComplete": true,
+        "returnedReceipts": 0
+      },
+      "receipts": [],
+      "schema": "chio.behavioral-feed.v1",
+      "settlements": {
+        "actionableReceipts": 0,
+        "failedReceipts": 0,
+        "notApplicableReceipts": 0,
+        "pendingReceipts": 0,
+        "reconciledReceipts": 0,
+        "settledReceipts": 0
+      },
+      "sharedEvidence": {
+        "distinctRemoteSubjects": 0,
+        "matchingLocalReceipts": 0,
+        "matchingReferences": 0,
+        "matchingShares": 0,
+        "proofRequiredShares": 0,
+        "remoteLineageRecords": 0,
+        "remoteToolReceipts": 0,
+        "truncated": false
+      }
+    },
+    "signature": "1b5f82fd1495c1aba46bb29396e3937e9a01b08f182475b7bc4ccd263041f58c19da1eeba66d883177c80e7fd6fffe3e252a17398f53b77534c07a6d8c5d3e05",
+    "signerKey": "fc7afde8300a7d3ad77055ced5c48e3673af91148df162227122958c88f76711"
+  },
+  "schema": "chio.example.ioa-web3.behavioral-status.v1",
+  "verdict": "pass"
+}

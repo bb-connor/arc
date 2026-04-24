@@ -51,8 +51,9 @@ fn repo_root() -> PathBuf {
 
 fn runtime_devnet_prereqs_available() -> bool {
     let repo_root = repo_root();
-    if !repo_root.join("contracts/node_modules/ethers").exists()
-        || !repo_root.join("contracts/node_modules/ganache").exists()
+    let contracts_dir = repo_root.join("contracts");
+    if !contracts_dir.join("node_modules/ethers").exists()
+        || !contracts_dir.join("node_modules/ganache").exists()
     {
         return false;
     }
@@ -62,7 +63,7 @@ fn runtime_devnet_prereqs_available() -> bool {
             .arg("--input-type=module")
             .arg("-e")
             .arg("await import('ethers'); await import('ganache');")
-            .current_dir(&repo_root)
+            .current_dir(&contracts_dir)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status(),

@@ -1,0 +1,15 @@
+{
+  "attempt": "submit passport with mismatched holder signature",
+  "boundary": "federation",
+  "control": "forged_passport",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "a24f19acc11fa7cf159a53cab58bf72ee24b911dce1fc4ec8561fc2fc7454457",
+    "id": "denial-forged_passport",
+    "kind": "adversarial",
+    "reason": "holder signature did not verify",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.adversarial-denial.v1"
+}

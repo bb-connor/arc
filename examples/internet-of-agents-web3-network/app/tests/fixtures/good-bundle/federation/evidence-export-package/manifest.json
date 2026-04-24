@@ -1,0 +1,108 @@
+{
+  "schema": "chio.evidence_export_manifest.v1",
+  "exportedAt": 1776995580,
+  "query": {
+    "capabilityId": "cap-ioa-web3-provider"
+  },
+  "counts": {
+    "toolReceipts": 5,
+    "childReceipts": 0,
+    "checkpoints": 0,
+    "capabilityLineage": 1,
+    "inclusionProofs": 0,
+    "uncheckpointedReceipts": 5
+  },
+  "proofCoverage": {
+    "checkpointedReceipts": 0,
+    "uncheckpointedReceipts": 5
+  },
+  "childReceiptScope": "omitted_no_join_path",
+  "claimBoundary": {
+    "schema": "chio.evidence_transparency_claims.v1",
+    "publicationState": "transparency_preview",
+    "audit": {
+      "checkpointLogs": [],
+      "signedCheckpoints": 0,
+      "checkpointPublications": 0,
+      "checkpointWitnesses": 0,
+      "checkpointConsistencyProofs": 0,
+      "inclusionProofs": 0,
+      "capabilityLineageRecords": 1
+    }
+  },
+  "files": [
+    {
+      "path": "query.json",
+      "sha256": "72f8909529db21c636a60a3c2fbde440ea56201efe87b9cc945a6e15efb54e69",
+      "bytes": 45
+    },
+    {
+      "path": "receipts.ndjson",
+      "sha256": "ed0f7eabacc9598913474582a0a2121c0145be018bba1a94372538e36bb0f0d1",
+      "bytes": 5300
+    },
+    {
+      "path": "child-receipts.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "checkpoints.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "checkpoint-publications.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "checkpoint-witnesses.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "checkpoint-consistency-proofs.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "checkpoint-equivocations.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "capability-lineage.ndjson",
+      "sha256": "3082344fc9126160c1ace62a8411eec9382a4a88036f9cf1d216d7d13e84f9d7",
+      "bytes": 791
+    },
+    {
+      "path": "inclusion-proofs.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "retention.json",
+      "sha256": "a7b554e4cc3666b63b902981f8e54b2f9bbbcf1288c5311f28aa3ddeb74cd29f",
+      "bytes": 75
+    },
+    {
+      "path": "README.txt",
+      "sha256": "2b677d2b043ccde9a499527d178ecc86b3067b9c5f0dc25eea2b9bca108caed4",
+      "bytes": 921
+    },
+    {
+      "path": "federation-policy.json",
+      "sha256": "dad731faf9b9f5b42db42ea4255b576157867ebc7f7dfb8d953859d7712d55e4",
+      "bytes": 583
+    }
+  ],
+  "federationPolicy": {
+    "issuer": "ProofWorks Provider",
+    "partner": "Meridian Federation Verifier",
+    "signerPublicKey": "08a1fcd8e07344ab0c22599bf57daa75c956660e888a27fb134c78e089b031cd",
+    "createdAt": 1776995580,
+    "expiresAt": 1777081980,
+    "requireProofs": false
+  }
+}

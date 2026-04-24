@@ -1,0 +1,9 @@
+{
+  "capability_id": "cap-ioa-web3-settlement",
+  "decision": "settle_with_chio_web3_evidence",
+  "dispatch_id": "dispatch-ioa-web3-001",
+  "final_release_tx_hash": "0x103d0a1d052fdf6f7a4c247599dc9a6f52f3b7dba0e705622749dc35369b306e",
+  "receipt_id": "receipt-ioa-web3-001",
+  "selected_rail": "base-sepolia-usdc",
+  "timeout_refund_tx_hash": "0xf15085e4eedc4a14b7af53c1db205e9d0817fa0eca6b51b0886ca89b5e2cd57d"
+}

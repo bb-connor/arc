@@ -1,0 +1,23 @@
+{
+  "claims": {
+    "acceptedDelegator": "ProofWorks Provider",
+    "claimedReputationScore": 0.88,
+    "service": "specialist-evidence-leaf-review"
+  },
+  "holderPublicKey": "50570882ff97adecaac9c848ebd7078f96103c0c2041b0d9cf2a3890ce24f685",
+  "issuedAt": 1776995580,
+  "organization": "CipherWorks Review Lab",
+  "passportId": "passport-cipherworks-specialist-reviewer",
+  "schema": "chio.agent-passport.v1",
+  "signature": "9beecad2e7f3e9d313f9cfe3c7bb142926ea9dd304e4a6094786fc849df964deec8300c7789451c32e9e7019952b39160711788deece82a20538c4a9d7e80a00",
+  "subject": "did:web:cipherworks.example:agent:specialist-reviewer",
+  "trustTier": "verified_specialist",
+  "validUntil": 1777081980,
+  "workloadIdentity": {
+    "credentialKind": "uri",
+    "path": "/subcontractor/cipherworks-specialist-reviewer",
+    "scheme": "spiffe",
+    "trustDomain": "ioa-web3.local",
+    "uri": "spiffe://ioa-web3.local/subcontractor/cipherworks-specialist-reviewer"
+  }
+}

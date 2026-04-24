@@ -1,0 +1,95 @@
+{
+  "bids": [
+    {
+      "bid_id": "bid-proofworks-agent-auditors-ioa-web3-order-001",
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "base-sepolia-transaction-map",
+        "settlement-dispatch-readiness-note"
+      ],
+      "expires_at": 1776996479,
+      "issued_at": 1776995579,
+      "order_id": "ioa-web3-order-001",
+      "price_minor_units": 200000,
+      "provider_id": "proofworks-agent-auditors",
+      "requirements": [
+        "passing e2e qualification",
+        "passing promotion qualification",
+        "passing ops incident audit",
+        "passing Base Sepolia smoke"
+      ],
+      "risk": {
+        "expected_outcome": "deliver",
+        "profile": "trusted"
+      },
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "trust": {
+        "claimed_reputation_score": 0.91,
+        "federation_status": "eligible",
+        "passport_status": "valid",
+        "runtime_tier": "attested"
+      }
+    },
+    {
+      "bid_id": "bid-discount-zk-reviewers-ioa-web3-order-001",
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "transaction-map-summary"
+      ],
+      "expires_at": 1776996479,
+      "issued_at": 1776995579,
+      "order_id": "ioa-web3-order-001",
+      "price_minor_units": 120000,
+      "provider_id": "discount-zk-reviewers",
+      "requirements": [
+        "passing e2e qualification",
+        "self-attested prior work"
+      ],
+      "risk": {
+        "expected_outcome": "reject-for-reputation",
+        "profile": "cheap-low-reputation"
+      },
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "trust": {
+        "claimed_reputation_score": 0.86,
+        "federation_status": "eligible",
+        "passport_status": "valid",
+        "runtime_tier": "attested"
+      }
+    },
+    {
+      "bid_id": "bid-overbudget-shadow-settlers-ioa-web3-order-001",
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "inflated-settlement-invoice"
+      ],
+      "expires_at": 1776996479,
+      "issued_at": 1776995579,
+      "order_id": "ioa-web3-order-001",
+      "price_minor_units": 450000,
+      "provider_id": "overbudget-shadow-settlers",
+      "requirements": [
+        "direct wallet settlement",
+        "off-policy mainnet route"
+      ],
+      "risk": {
+        "expected_outcome": "reject-for-budget-federation",
+        "profile": "malicious-over-budget"
+      },
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "trust": {
+        "claimed_reputation_score": 0.78,
+        "federation_status": "ineligible",
+        "passport_status": "forged",
+        "runtime_tier": "unverified"
+      }
+    }
+  ],
+  "issued_at": 1776995579,
+  "order_id": "ioa-web3-order-001",
+  "rfq_id": "rfq-ioa-web3-order-001",
+  "schema": "chio.example.ioa-web3.rfq-response.v1"
+}

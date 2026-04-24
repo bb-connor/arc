@@ -1,0 +1,45 @@
+{
+  "events": [
+    {
+      "actor": "treasury-agent",
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "event": "issued root web3 budget"
+    },
+    {
+      "actor": "procurement-agent",
+      "event": "selected provider through Chio RFQ routing",
+      "selected_provider_id": "proofworks-agent-auditors"
+    },
+    {
+      "actor": "procurement-agent",
+      "event": "satisfied x402 payment proof and accepted provider quote",
+      "quote_id": "quote-8d8a2b665e02"
+    },
+    {
+      "actor": "provider-agent",
+      "event": "delivered validation review package",
+      "fulfillment_id": "fulfillment-e9cb54abe045"
+    },
+    {
+      "actor": "subcontractor-agent",
+      "capability_id": "cap-ioa-web3-cipherworks-specialist",
+      "event": "completed specialist proof-leaf review"
+    },
+    {
+      "actor": "settlement-agent",
+      "dispatch_id": "dispatch-ioa-web3-001",
+      "event": "assembled web3 settlement dispatch"
+    },
+    {
+      "actor": "settlement-agent",
+      "event": "resolved secondary dispute branch",
+      "status": "resolved"
+    },
+    {
+      "actor": "auditor-agent",
+      "event": "verified bundle against web3 validation ladder",
+      "validation_index": "web3/validation-index.json"
+    }
+  ],
+  "schema": "chio.example.ioa-web3.timeline.v1"
+}

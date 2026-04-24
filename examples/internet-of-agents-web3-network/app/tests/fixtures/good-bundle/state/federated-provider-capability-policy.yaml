@@ -1,0 +1,9 @@
+kernel:
+  max_capability_ttl: 3600
+capabilities:
+  default:
+    tools:
+      - server: "provider-review"
+        tool: "issue_review_attestation"
+        operations: [invoke]
+        ttl: 300

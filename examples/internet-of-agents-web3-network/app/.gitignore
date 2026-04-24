@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+.env.local
+.env*.local
+public/bundle
+*.log
+.DS_Store
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+tsconfig.tsbuildinfo

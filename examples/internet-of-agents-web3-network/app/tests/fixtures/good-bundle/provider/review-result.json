@@ -1,0 +1,30 @@
+{
+  "attestation": {
+    "attestationId": "attestation-proofworks-web3-review-001",
+    "mainnetBlocked": true,
+    "orderId": "ioa-web3-order-001",
+    "provider": "proofworks-agent-auditors",
+    "schema": "chio.example.ioa-web3.provider-review-attestation.v1",
+    "scope": "web3-settlement-proof-review",
+    "signature": "b2453372d6a93a236d1fae72f51ddf665adbcccc2cb8efedef155a0a7946b48a",
+    "validationIndexDigest": "65d7950bed408355a7c2f7e4e0d65a8733bc054809d8fd4004b6ec9ccb7b43dd",
+    "verdict": "pass"
+  },
+  "inspection": {
+    "capabilityRefsPresent": true,
+    "orderId": "ioa-web3-order-001",
+    "paymentProtocolHint": "x402",
+    "provider": "proofworks-agent-auditors",
+    "schema": "chio.example.ioa-web3.provider-review.service-order-inspection.v1",
+    "verdict": "pass"
+  },
+  "reputation": {
+    "computedScore": 0.6241880341880343,
+    "minimumScore": 0.6,
+    "schema": "chio.example.ioa-web3.provider-review.reputation-evaluation.v1",
+    "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+    "verdict": "pass"
+  },
+  "schema": "chio.example.ioa-web3.provider-review-result.v1",
+  "verdict": "pass"
+}

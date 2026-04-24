@@ -1,0 +1,70 @@
+{
+  "ranked_providers": [
+    {
+      "admitted": true,
+      "bid_id": "bid-proofworks-agent-auditors-ioa-web3-order-001",
+      "provider_id": "proofworks-agent-auditors",
+      "reasons": [],
+      "score": 76.8
+    },
+    {
+      "admitted": false,
+      "bid_id": "bid-discount-zk-reviewers-ioa-web3-order-001",
+      "provider_id": "discount-zk-reviewers",
+      "reasons": [
+        "reputation_below_threshold",
+        "passport_claim_drift",
+        "federation_admission_failed"
+      ],
+      "score": 60.8
+    },
+    {
+      "admitted": false,
+      "bid_id": "bid-overbudget-shadow-settlers-ioa-web3-order-001",
+      "provider_id": "overbudget-shadow-settlers",
+      "reasons": [
+        "budget_exceeds_policy",
+        "reputation_below_threshold",
+        "passport_claim_drift",
+        "federation_admission_failed"
+      ],
+      "score": -11.0
+    }
+  ],
+  "receipt": {
+    "decision": "allow",
+    "digest": "67e83fad51a43abc0ad70b462cc82e11e70f9e0f243ffb28c746623872f39ca2",
+    "id": "rcpt-rfq-selection-ioa-web3-order-001"
+  },
+  "rejected_providers": [
+    {
+      "admitted": false,
+      "bid_id": "bid-discount-zk-reviewers-ioa-web3-order-001",
+      "provider_id": "discount-zk-reviewers",
+      "reasons": [
+        "reputation_below_threshold",
+        "passport_claim_drift",
+        "federation_admission_failed"
+      ],
+      "score": 60.8
+    },
+    {
+      "admitted": false,
+      "bid_id": "bid-overbudget-shadow-settlers-ioa-web3-order-001",
+      "provider_id": "overbudget-shadow-settlers",
+      "reasons": [
+        "budget_exceeds_policy",
+        "reputation_below_threshold",
+        "passport_claim_drift",
+        "federation_admission_failed"
+      ],
+      "score": -11.0
+    }
+  ],
+  "rfq_id": "rfq-ioa-web3-order-001",
+  "routing_authority": "Chio policy over passport, reputation, budget, runtime tier, and federation admission",
+  "schema": "chio.example.ioa-web3.provider-selection.v1",
+  "selected_bid_id": "bid-proofworks-agent-auditors-ioa-web3-order-001",
+  "selected_provider_id": "proofworks-agent-auditors",
+  "status": "pass"
+}

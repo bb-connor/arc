@@ -1,0 +1,17 @@
+{
+  "limits": {
+    "mcpEvidenceReadsPerOrder": 3,
+    "quoteRequestsPerOrder": 3,
+    "settlementPacketsPerOrder": 2
+  },
+  "note": "Baseline is emitted from Chio behavioral-feed artifacts, not HushSpec runtime deny wiring.",
+  "observed": {
+    "mcpEvidenceReads": 1,
+    "quoteRequests": 3,
+    "settlementPackets": 2
+  },
+  "profile": "web3-procurement-normal",
+  "schema": "chio.example.ioa-web3.behavioral-baseline.v1",
+  "verdict": "pass",
+  "workloadTrustDomain": "ioa-web3.local"
+}

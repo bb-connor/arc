@@ -1,0 +1,6 @@
+{
+  "boundary": "budget",
+  "expectedReceiptCount": 2,
+  "schema": "chio.example.ioa-web3.boundary-receipts.v1",
+  "status": "present"
+}

@@ -1,0 +1,6 @@
+{
+  "boundary": "subcontractor-review-mcp",
+  "expectedReceiptCount": 1,
+  "schema": "chio.example.ioa-web3.boundary-receipts.v1",
+  "status": "present"
+}

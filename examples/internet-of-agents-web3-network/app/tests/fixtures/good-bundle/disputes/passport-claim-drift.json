@@ -1,0 +1,8 @@
+{
+  "claimed_score": 0.91,
+  "drift": 0.038,
+  "post_dispute_score": 0.872,
+  "provider_id": "proofworks-agent-auditors",
+  "schema": "chio.example.ioa-web3.passport-claim-drift.v1",
+  "verdict": "monitor"
+}

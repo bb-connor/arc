@@ -1,0 +1,8 @@
+{
+  "partial_payment_units": 140000,
+  "passport_drift_verdict": "monitor",
+  "refund_units": 60000,
+  "reputation_after": 0.872,
+  "schema": "chio.example.ioa-web3.dispute-summary.v1",
+  "status": "resolved"
+}

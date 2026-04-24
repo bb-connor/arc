@@ -22,6 +22,7 @@
   ],
   "deployment_manifests": [
     "contracts/deployments/base-mainnet.template.json",
+    "contracts/deployments/base-sepolia.template.json",
     "contracts/deployments/arbitrum-one.template.json",
     "contracts/deployments/local-devnet.json"
   ],
@@ -30,8 +31,18 @@
     "contracts/reports/CHIO_WEB3_CONTRACT_GAS_AND_STORAGE.md",
     "contracts/reports/CHIO_WEB3_CONTRACT_SECURITY_REVIEW.md"
   ],
+  "operator_tooling": [
+    "contracts/scripts/deploy-base-sepolia-dependencies.mjs",
+    "contracts/scripts/refresh-base-sepolia-mock-feeds.mjs",
+    "contracts/scripts/smoke-base-sepolia.mjs",
+    "contracts/scripts/prepare-reviewed-manifest.mjs",
+    "contracts/scripts/promote-deployment.mjs",
+    "docs/standards/CHIO_WEB3_OPERATOR_ENVIRONMENT.example"
+  ],
   "notes": [
     "The local-devnet qualification path validates the dual-sign settlement lane via static-call plus gas estimate because Ganache on Node 25 hangs while mining that exact path; the Merkle-proof lane is executed end to end on-chain.",
-    "Base remains the primary deployment target and Arbitrum remains the bounded secondary target."
+    "Base remains the primary deployment target and Arbitrum remains the bounded secondary target.",
+    "Base Sepolia is the public testnet rehearsal template for operator-reviewed rollout before Base mainnet promotion.",
+    "Base Sepolia smoke evidence must pass with transaction hashes before a mainnet approval artifact is prepared."
   ]
 }

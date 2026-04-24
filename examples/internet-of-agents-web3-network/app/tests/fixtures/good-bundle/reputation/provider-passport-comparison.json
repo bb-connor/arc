@@ -1,0 +1,235 @@
+{
+  "commandResult": {
+    "command": [
+      "/Users/connor/.codex/worktrees/673b/arc/target/debug/chio",
+      "--format",
+      "json",
+      "--receipt-db",
+      "target/web3-example-qualification/internet-of-agents-web3-network/state/provider-receipts.sqlite3",
+      "--budget-db",
+      "target/web3-example-qualification/internet-of-agents-web3-network/state/provider-budgets.sqlite3",
+      "reputation",
+      "compare",
+      "--subject-public-key",
+      "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "--passport",
+      "target/web3-example-qualification/internet-of-agents-web3-network/identity/passports/proofworks-provider-passport.json"
+    ],
+    "comparedAt": 1776995580,
+    "credentialDrifts": [
+      {
+        "attestationUntil": 1776995579,
+        "expirationDate": "2026-05-24T01:52:59Z",
+        "index": 0,
+        "issuanceDate": "2026-04-24T01:52:59Z",
+        "issuer": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66",
+        "lineageRecords": 1,
+        "metrics": {
+          "boundaryPressure": {
+            "local": 0.0,
+            "localMinusPortable": 0.0,
+            "portable": 0.0
+          },
+          "compositeScore": {
+            "local": 0.6241880341880343,
+            "localMinusPortable": 0.0,
+            "portable": 0.6241880341880343
+          },
+          "delegationHygiene": {},
+          "historyDepth": {
+            "local": 0.30722222222222223,
+            "localMinusPortable": 0.0,
+            "portable": 0.30722222222222223
+          },
+          "incidentCorrelation": {},
+          "leastPrivilege": {
+            "local": 0.16666666666666666,
+            "localMinusPortable": 0.0,
+            "portable": 0.16666666666666666
+          },
+          "reliability": {
+            "local": 1.0,
+            "localMinusPortable": 0.0,
+            "portable": 1.0
+          },
+          "resourceStewardship": {},
+          "specialization": {
+            "local": 0.0,
+            "localMinusPortable": 0.0,
+            "portable": 0.0
+          }
+        },
+        "receiptCount": 5
+      }
+    ],
+    "importedTrust": {
+      "acceptedCount": 0,
+      "policy": {
+        "attenuationFactor": 0.5,
+        "maxSignalAgeDays": 30,
+        "requireProofs": true,
+        "requireSignerIdentity": true,
+        "requiredTrustMode": "bilateral_evidence_share"
+      },
+      "signalCount": 0
+    },
+    "local": {
+      "effectiveScore": 0.6241880341880343,
+      "probationary": true,
+      "probationaryMinDays": 30,
+      "probationaryReceiptCount": 1000,
+      "probationaryStatus": {
+        "belowDayTarget": true,
+        "belowReceiptTarget": true
+      },
+      "scorecard": {
+        "boundary_pressure": {
+          "deny_ratio": {
+            "state": "known",
+            "value": 0.0
+          },
+          "policies_observed": 1,
+          "receipts_observed": 5
+        },
+        "composite_score": {
+          "state": "known",
+          "value": 0.6241880341880343
+        },
+        "computed_at": 1776995580,
+        "delegation_hygiene": {
+          "budget_reduction_rate": {
+            "state": "unknown"
+          },
+          "delegations_observed": 0,
+          "scope_reduction_rate": {
+            "state": "unknown"
+          },
+          "score": {
+            "state": "unknown"
+          },
+          "ttl_reduction_rate": {
+            "state": "unknown"
+          }
+        },
+        "effective_weight_sum": 0.6499999999999999,
+        "history_depth": {
+          "active_days": 5,
+          "activity_ratio": {
+            "state": "known",
+            "value": 0.25
+          },
+          "first_seen": 1775181179,
+          "last_seen": 1776822779,
+          "receipt_count": 5,
+          "score": {
+            "state": "known",
+            "value": 0.30722222222222223
+          },
+          "span_days": 20
+        },
+        "incident_correlation": {
+          "incidents_observed": null,
+          "score": {
+            "state": "unknown"
+          }
+        },
+        "least_privilege": {
+          "capabilities_observed": 1,
+          "score": {
+            "state": "known",
+            "value": 0.16666666666666666
+          }
+        },
+        "reliability": {
+          "cancellation_rate": {
+            "state": "known",
+            "value": 0.0
+          },
+          "completion_rate": {
+            "state": "known",
+            "value": 1.0
+          },
+          "incompletion_rate": {
+            "state": "known",
+            "value": 0.0
+          },
+          "receipts_observed": 5,
+          "score": {
+            "state": "known",
+            "value": 1.0
+          }
+        },
+        "resource_stewardship": {
+          "average_utilization": {
+            "state": "unknown"
+          },
+          "capped_grants_observed": 0,
+          "fit_score": {
+            "state": "unknown"
+          }
+        },
+        "specialization": {
+          "distinct_tools": 1,
+          "score": {
+            "state": "known",
+            "value": 0.0
+          }
+        },
+        "subject_key": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+      },
+      "scoring": {
+        "diversity_cap": 1.0,
+        "history_day_target": 30,
+        "history_receipt_target": 1000,
+        "incident_penalty": 0.2,
+        "target_utilization": 0.75,
+        "temporal_decay_half_life_days": 30,
+        "weights": {
+          "boundary_pressure": 0.2,
+          "delegation_hygiene": 0.15,
+          "history_depth": 0.1,
+          "incident_correlation": 0.1,
+          "least_privilege": 0.15,
+          "reliability": 0.15,
+          "resource_stewardship": 0.1,
+          "tool_diversity": 0.05
+        }
+      },
+      "scoringSource": "default",
+      "subjectKey": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+    },
+    "passportSubject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+    "passportVerification": {
+      "credentialCount": 1,
+      "issuer": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66",
+      "issuerCount": 1,
+      "issuers": [
+        "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+      ],
+      "merkleRootCount": 0,
+      "passportId": "d67d9c2948cc49b90868966ae1061b8016f46db05671663d0f358cff5d31c8c6",
+      "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "validUntil": "2026-05-24T01:52:59Z",
+      "verifiedAt": 1776995580
+    },
+    "sharedEvidence": {
+      "references": [],
+      "summary": {
+        "distinctRemoteSubjects": 0,
+        "matchingLocalReceipts": 0,
+        "matchingReferences": 0,
+        "matchingShares": 0,
+        "proofRequiredShares": 0,
+        "remoteLineageRecords": 0,
+        "remoteToolReceipts": 0,
+        "truncated": false
+      }
+    },
+    "subjectKey": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+    "subjectMatches": true
+  },
+  "schema": "chio.reputation.passport-comparison.v1",
+  "source": "chio-cli",
+  "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "subjectMatches": true
+}

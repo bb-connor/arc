@@ -1,0 +1,36 @@
+{
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "read_only"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "104edee1b00d20f3be38c7ba48b2ff05972e6d77d587d7715429a0fe1dcfefaa",
+      "delegator": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+      "signature": "7580c430eb059d327a917dd173f73e78d3844bba1a9759d2bb5dc3a96f5941bec9266c485034b4d8b1c1eb4405a2f3febf0dc62c14f1f8ca33c0100147e88e04",
+      "timestamp": 1776995579
+    }
+  ],
+  "expires_at": 1776997379,
+  "id": "cap-ioa-web3-auditor",
+  "issued_at": 1776995579,
+  "issuer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "web3-evidence",
+        "tool_name": "verify_bundle"
+      }
+    ],
+    "prompt_grants": [],
+    "resource_grants": []
+  },
+  "signature": "edd15c362cdc5c35337bfa8e2a9b3ef240cc4fdd948302cd2341406dfd541a207e7236b2eb5038a8f1b8823a55699e60ef37013e0fea835a94b2d4261e6f8c0d",
+  "subject": "104edee1b00d20f3be38c7ba48b2ff05972e6d77d587d7715429a0fe1dcfefaa"
+}

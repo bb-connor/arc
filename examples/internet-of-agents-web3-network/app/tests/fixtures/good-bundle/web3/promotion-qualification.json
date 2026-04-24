@@ -1,0 +1,42 @@
+{
+  "checks": [
+    {
+      "id": "promotion.reproducible_rollout",
+      "note": "Two fresh local-devnet promotion runs produced identical CREATE2-planned and deployed contract addresses.",
+      "outcome": "pass"
+    },
+    {
+      "id": "promotion.base_builder_code_attribution",
+      "note": "A local promotion run with --base-builder-code appended an ERC-8021 suffix to CREATE2 factory calls without changing CREATE2 outcomes.",
+      "outcome": "pass"
+    },
+    {
+      "id": "promotion.resume_existing_create2",
+      "note": "A resumed promotion skips already deployed CREATE2 addresses and continues through post-deployment configuration.",
+      "outcome": "pass"
+    },
+    {
+      "id": "promotion.approval_gate",
+      "note": "Tampered approval manifest hashes fail closed before deployment.",
+      "outcome": "pass"
+    },
+    {
+      "id": "promotion.rollback_on_failure",
+      "note": "Duplicate-salt deployment failure triggered explicit local snapshot rollback.",
+      "outcome": "pass"
+    }
+  ],
+  "evidence": {
+    "negative_approval_report": "target/web3-promotion-qualification/negative-approval/promotion-report.json",
+    "negative_rollback_plan": "target/web3-promotion-qualification/negative-rollback/rollback-plan.json",
+    "negative_rollback_report": "target/web3-promotion-qualification/negative-rollback/promotion-report.json",
+    "resume_existing_report": "target/web3-promotion-qualification/resume-existing/promotion-report.json",
+    "success_runs": [
+      "target/web3-promotion-qualification/run-a/promotion-report.json",
+      "target/web3-promotion-qualification/run-b/promotion-report.json"
+    ]
+  },
+  "generated_at": "2026-04-24T01:52:56.104Z",
+  "manifest": "contracts/deployments/local-devnet.reviewed.json",
+  "report_id": "chio.web3-deployment-promotion-qualification.local-devnet.v1"
+}

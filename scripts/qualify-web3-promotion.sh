@@ -23,12 +23,15 @@ run() {
   "$@" 2>&1 | tee -a "${log_path}"
 }
 
+run pnpm --dir contracts install --frozen-lockfile
 run pnpm --dir contracts compile
+run pnpm --dir contracts qualify:review-prep --output-dir "${output_root}/review-prep"
 run node contracts/scripts/qualify-promotion.mjs --output-dir "${output_root}"
 run jq empty \
   docs/standards/CHIO_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json \
   docs/standards/CHIO_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json \
   docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json \
+  "${output_root}/review-prep/qualification.json" \
   "${output_root}/promotion-qualification.json"
 
 printf 'web3 promotion qualification complete; log written to %s\n' "${log_path}" | tee -a "${log_path}"

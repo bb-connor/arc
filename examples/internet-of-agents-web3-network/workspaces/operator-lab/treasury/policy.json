@@ -1,0 +1,14 @@
+{
+  "policy_id": "atlas-treasury-web3-agent-policy",
+  "max_single_order_minor_units": 300000,
+  "currency": "USDC",
+  "allowed_chains": [
+    "eip155:84532"
+  ],
+  "allowed_rails": [
+    "chio-web3-escrow"
+  ],
+  "requires_separate_settlement_agent": true,
+  "requires_offline_auditor_review": true,
+  "mainnet_blocked": true
+}

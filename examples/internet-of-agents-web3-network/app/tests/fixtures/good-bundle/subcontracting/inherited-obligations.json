@@ -1,0 +1,12 @@
+{
+  "obligations": [
+    "mainnet-disabled",
+    "read-only-evidence-review",
+    "no-payment-authority",
+    "attach-receipt-to-provider-review"
+  ],
+  "parentCapabilityId": "cap-ioa-web3-provider",
+  "schema": "chio.example.ioa-web3.inherited-obligations.v1",
+  "status": "inherited",
+  "subcontractorCapabilityId": "cap-ioa-web3-cipherworks-specialist"
+}

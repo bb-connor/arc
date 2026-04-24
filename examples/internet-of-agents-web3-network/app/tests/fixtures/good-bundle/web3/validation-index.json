@@ -1,0 +1,109 @@
+{
+  "base_sepolia_live_smoke": {
+    "actor": "0x00CeF2E5a0EeCe44a2A2416AA49cd5756f8De6a3",
+    "chain_id": "eip155:84532",
+    "contracts": {
+      "chio.bond-vault": "0x0EcDDd3C6Ff32aBb841729F4909375A63FEd333E",
+      "chio.escrow": "0x1BEa33b952f4730c42B256FF9bE55fD0016C14f7",
+      "chio.identity-registry": "0xf4125e32aA47FD3D4b1d9Dc21C9a5A97D88d19c8",
+      "chio.price-resolver": "0xE277aC0a028a976c69874cD95C329c91aba17B91",
+      "chio.root-registry": "0x575CBE92c5141fC68837229b33ced589C178B6b7"
+    },
+    "deployment_id": "chio.web3-reviewed-rollout.base-sepolia.v1",
+    "included": true,
+    "path": "target/web3-live-rollout/base-sepolia/base-sepolia-smoke.json",
+    "sha256": "28caed8571ff8eb2d0cabc500a113e1d8dff5c47ceb67e936aa2252d840b0c5d",
+    "status": "pass",
+    "transaction_ids": [
+      "feed.sequencer_uptime_feed.refresh",
+      "feed.eth_usd_feed.refresh",
+      "feed.btc_usd_feed.refresh",
+      "feed.usdc_usd_feed.refresh",
+      "feed.link_usd_feed.refresh",
+      "identity.operator_registration",
+      "identity.entity_registration",
+      "anchor.partial_root_publish",
+      "anchor.final_root_publish",
+      "settlement.usdc_approval",
+      "settlement.primary_escrow_create",
+      "settlement.partial_release",
+      "settlement.final_release",
+      "settlement.refund_escrow_create",
+      "settlement.timeout_refund"
+    ],
+    "tx_count": 15
+  },
+  "generated_at": 1776995579,
+  "required_local_validations": {
+    "e2e": {
+      "claims": [
+        "fx-backed settlement requires and carries chio-link oracle evidence",
+        "dual-sign settlement executes on chain and projects finalized receipt truth",
+        "timeout refund, canonical drift, bond impairment, and bond expiry remain explicit recovery surfaces",
+        "the same evidence family stages cleanly into the hosted web3 release bundle"
+      ],
+      "path": "target/web3-e2e-qualification/partner-qualification.json",
+      "sha256": "9d8deef3b8e48ab85a19ec449b8648f8847361567f9136f56e1d8ed56fc62e2d",
+      "status": "pass"
+    },
+    "ops": {
+      "assertions": [
+        {
+          "component": "chio-link",
+          "details": "runtime report reflects pair pause and disabled standby chain after explicit operator actions",
+          "result": "pass"
+        },
+        {
+          "component": "chio-anchor",
+          "details": "recovery-only mode denies new publication while preserving confirmation actions",
+          "result": "pass"
+        },
+        {
+          "component": "chio-settle",
+          "details": "refund-only mode blocks dispatch and retains explicit reorg recovery records",
+          "result": "pass"
+        }
+      ],
+      "path": "target/web3-ops-qualification/incident-audit.json",
+      "sha256": "686fcb253ae6f6995e3deba055002acc9bb4604c6ef74e736cde04c956ac47d9"
+    },
+    "promotion": {
+      "checks": [
+        {
+          "id": "promotion.reproducible_rollout",
+          "note": "Two fresh local-devnet promotion runs produced identical CREATE2-planned and deployed contract addresses.",
+          "outcome": "pass"
+        },
+        {
+          "id": "promotion.base_builder_code_attribution",
+          "note": "A local promotion run with --base-builder-code appended an ERC-8021 suffix to CREATE2 factory calls without changing CREATE2 outcomes.",
+          "outcome": "pass"
+        },
+        {
+          "id": "promotion.resume_existing_create2",
+          "note": "A resumed promotion skips already deployed CREATE2 addresses and continues through post-deployment configuration.",
+          "outcome": "pass"
+        },
+        {
+          "id": "promotion.approval_gate",
+          "note": "Tampered approval manifest hashes fail closed before deployment.",
+          "outcome": "pass"
+        },
+        {
+          "id": "promotion.rollback_on_failure",
+          "note": "Duplicate-salt deployment failure triggered explicit local snapshot rollback.",
+          "outcome": "pass"
+        }
+      ],
+      "path": "target/web3-promotion-qualification/promotion-qualification.json",
+      "sha256": "e14cae62b3a8aab773a2201b50a4704aaa3b2b0232c50a897f9c26208271b3be"
+    },
+    "x402": {
+      "path": "docs/standards/CHIO_X402_REQUIREMENTS_EXAMPLE.json",
+      "settlement_mode": "prepaid_authorization",
+      "sha256": "52b67c5f4d1a9160b158e40d476d0efca6801c803cbab4b453e55738377338da",
+      "version": "x402"
+    }
+  },
+  "schema": "chio.example.ioa-web3.validation-index.v1"
+}

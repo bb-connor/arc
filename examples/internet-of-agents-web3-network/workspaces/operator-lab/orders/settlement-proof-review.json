@@ -1,0 +1,26 @@
+{
+  "order_id": "ioa-web3-order-001",
+  "buyer_id": "atlas-treasury-desk",
+  "provider_id": "proofworks-agent-auditors",
+  "service_family": "settlement-proof-review",
+  "requested_scope": "base-sepolia-usdc-dress-rehearsal",
+  "target": "chio://web3/base-sepolia/promotion",
+  "required_evidence": [
+    "web3-e2e-qualification",
+    "promotion-qualification",
+    "ops-control-audit",
+    "base-sepolia-smoke"
+  ],
+  "max_budget_minor_units": 300000,
+  "currency": "USDC",
+  "settlement_preference": {
+    "payment_protocol_hint": "x402",
+    "settlement_rail": "chio-web3-escrow",
+    "chain_id": "eip155:84532",
+    "token": "USDC"
+  },
+  "delivery_window": {
+    "not_before": "2026-04-23T00:00:00Z",
+    "not_after": "2026-04-30T00:00:00Z"
+  }
+}

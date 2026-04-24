@@ -1,0 +1,8 @@
+{
+  "after": 0.872,
+  "before": 0.904,
+  "capability_id": "cap-ioa-web3-provider",
+  "provider_id": "proofworks-agent-auditors",
+  "reason": "secondary evidence appendix was late and missing one proof leaf",
+  "schema": "chio.example.ioa-web3.reputation-downgrade.v1"
+}

@@ -1,0 +1,23 @@
+hushspec: "0.1.0"
+name: internet-of-agents-web3-settlement-desk
+description: Settlement desk sidecar policy model for Chio API protection.
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - assemble_packet
+      - assemble_dispute_packet
+    require_runtime_assurance_tier: attested
+    require_workload_identity:
+      scheme: spiffe
+      trust_domain: ioa-web3.local
+      path_prefixes:
+        - /operator
+      credential_kinds:
+        - uri
+  velocity:
+    enabled: true
+    max_invocations_per_window: 4
+    max_requests_per_agent: 2
+    window_secs: 60

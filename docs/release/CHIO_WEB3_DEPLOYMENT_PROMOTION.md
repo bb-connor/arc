@@ -26,6 +26,7 @@ For local rehearsal those inputs are:
 For operator rollout the reviewed manifest is derived from one shipped template:
 
 - `contracts/deployments/base-mainnet.template.json`
+- `contracts/deployments/base-sepolia.template.json`
 - `contracts/deployments/arbitrum-one.template.json`
 
 The approval artifact must bind:
@@ -67,6 +68,7 @@ Run:
 
 Required evidence:
 
+- `target/web3-promotion-qualification/review-prep/qualification.json`
 - `target/web3-promotion-qualification/promotion-qualification.json`
 - `target/web3-promotion-qualification/run-a/promotion-report.json`
 - `target/web3-promotion-qualification/run-a/rollback-plan.json`
@@ -79,6 +81,9 @@ Required evidence:
 
 This lane proves three invariants:
 
+- every shipped public-chain template can be materialized into a reviewed
+  manifest plus pending-review approval scaffold with no unresolved
+  operator-supplied placeholders
 - the same reviewed manifest produces identical CREATE2-planned and deployed
   addresses across fresh local devnets
 - tampered approval artifacts fail closed before deployment begins
@@ -122,14 +127,113 @@ node contracts/scripts/promote-deployment.mjs \
   --price-admin-key "$CHIO_BASE_PRICE_ADMIN_KEY"
 ```
 
+Public testnet rehearsal command shape:
+
+```bash
+pnpm --dir contracts deploy:base-sepolia-deps \
+  --rpc-url "$CHIO_BASE_SEPOLIA_RPC_URL" \
+  --deployer-key "$CHIO_BASE_SEPOLIA_DEPLOYER_KEY" \
+  --role-address "$CHIO_BASE_SEPOLIA_WALLET" \
+  --base-builder-code "$CHIO_BASE_BUILDER_CODE" \
+  --output-dir target/web3-live-rollout/base-sepolia/dependencies
+
+node contracts/scripts/prepare-reviewed-manifest.mjs \
+  --template contracts/deployments/base-sepolia.template.json \
+  --values-file target/web3-live-rollout/base-sepolia/dependencies/base-sepolia.review-inputs.json \
+  --environment base-sepolia \
+  --output contracts/deployments/base-sepolia.reviewed.json \
+  --approval-output approvals/base-sepolia.approval.json
+
+pnpm --dir contracts refresh:base-sepolia-feeds \
+  --dependencies target/web3-live-rollout/base-sepolia/dependencies/dependencies.json \
+  --output target/web3-live-rollout/base-sepolia/dependencies/feed-refresh.json
+
+node contracts/scripts/promote-deployment.mjs \
+  --manifest contracts/deployments/base-sepolia.reviewed.json \
+  --approval approvals/base-sepolia.approval.json \
+  --output-dir target/web3-live-rollout/base-sepolia \
+  --rpc-url "$CHIO_BASE_SEPOLIA_RPC_URL" \
+  --deployer-key "$CHIO_BASE_SEPOLIA_DEPLOYER_KEY" \
+  --registry-admin-key "$CHIO_BASE_SEPOLIA_REGISTRY_ADMIN_KEY" \
+  --operator-key "$CHIO_BASE_SEPOLIA_OPERATOR_KEY" \
+  --price-admin-key "$CHIO_BASE_SEPOLIA_PRICE_ADMIN_KEY" \
+  --base-builder-code "$CHIO_BASE_BUILDER_CODE"
+
+pnpm --dir contracts smoke:base-sepolia \
+  --deployment target/web3-live-rollout/base-sepolia/promotion/deployment.json \
+  --dependencies target/web3-live-rollout/base-sepolia/dependencies/dependencies.json \
+  --output target/web3-live-rollout/base-sepolia/base-sepolia-smoke.json
+```
+
+The dependency step is for public testnet rehearsal only. It deploys a Base
+Sepolia CREATE2 factory plus mock Chainlink-compatible aggregators and emits
+`base-sepolia.review-inputs.json`. Mainnet promotion must replace those mock
+feed placeholders with reviewed live Chainlink feed addresses. Refresh the
+testnet mock feed timestamps before delayed readback or any rehearsal that waits
+longer than the configured heartbeat windows.
+
+The Base Sepolia smoke reads the promoted deployment record, then executes the
+minimum public-chain transaction path: operator/entity setup, mock feed refresh,
+price readback, USDC approval, proof-root publication, escrow create, partial
+proof release, final proof release, and timeout refund. It must finish with
+`status: pass` and preserve transaction hashes under
+`target/web3-live-rollout/base-sepolia/base-sepolia-smoke.json`.
+
+For a one-wallet pilot, the review-inputs file can set only `role_address`;
+`prepare-reviewed-manifest.mjs` will use it as registry admin, price admin,
+operator, and delegate. Production promotion should split those roles before
+mainnet approval.
+
 Prepare one reviewed chain manifest from one shipped template:
 
 - `contracts/deployments/base-mainnet.template.json`
+- `contracts/deployments/base-sepolia.template.json`
 - `contracts/deployments/arbitrum-one.template.json`
+
+Review-prep helper:
+
+```bash
+node contracts/scripts/prepare-reviewed-manifest.mjs \
+  --template contracts/deployments/base-sepolia.template.json \
+  --values-file approvals/base-sepolia.review-inputs.json \
+  --environment base-sepolia \
+  --output contracts/deployments/base-sepolia.reviewed.json \
+  --approval-output approvals/base-sepolia.approval.json
+```
+
+The generated approval scaffold is not rollout-ready by itself. It is emitted
+with `status: pending-review`, binds the exact reviewed manifest hash, and
+gives the operator one file to complete after review instead of hand-assembling
+the shape from examples.
+
+Coinbase/CDP local setup:
+
+```bash
+npm install -g @coinbase/cdp-cli
+codex mcp add cdp -- cdp mcp
+codex mcp add payments-mcp -- node "$HOME/.payments-mcp/bundle.js"
+
+cdp env live --key-file /private/path/cdp-api-key.json
+cdp env live --wallet-secret-file /private/path/cdp_wallet_secret.txt
+cdp env
+```
+
+`CHIO_COINBASE_CLIENT_API_KEY` is a Base Node/RPC client key. It can form
+`CHIO_BASE_SEPOLIA_RPC_URL` as
+`https://api.developer.coinbase.com/rpc/v1/base-sepolia/${CHIO_COINBASE_CLIENT_API_KEY}`.
+CDP server-wallet writes still require a Secret API Key JSON plus Wallet Secret
+configured through `cdp env`.
 
 Required review points:
 
 - registry-admin, price-admin, and operator addresses are filled explicitly
+- testnet and mainnet feed addresses plus heartbeat_seconds are reviewed
+  intentionally against current Chainlink inventory before approval
+- Base Sepolia smoke evidence is attached for the promoted deployment before
+  any mainnet approval proceeds
+- Base Builder Code attribution is present on CREATE2 factory calls when
+  `--base-builder-code` is set; strict ABI registry and oracle configuration
+  calls remain unsuffixed
 - settlement token address matches the intended jurisdiction and custody model
 - CREATE2 salts remain unchanged from the shipped package unless a new version
   is cut intentionally

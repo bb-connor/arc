@@ -1,0 +1,18 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - issue_specialist_review
+
+capabilities:
+  default:
+    tools:
+      - server: subcontractor-review
+        tool: issue_specialist_review
+        operations: [invoke]
+        ttl: 900

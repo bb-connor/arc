@@ -1,0 +1,8 @@
+{
+  "all_events_have_receipts": true,
+  "schema": "chio.example.ioa-web3.observability-status.v1",
+  "siem_event_count": 9,
+  "span_count": 9,
+  "status": "correlated",
+  "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+}

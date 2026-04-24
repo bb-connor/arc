@@ -1,0 +1,30 @@
+{
+  "provider_id": "overbudget-shadow-settlers",
+  "display_name": "Overbudget Shadow Settlers",
+  "trust": {
+    "claimed_reputation_score": 0.78,
+    "runtime_tier": "unverified",
+    "passport_status": "forged",
+    "federation_status": "ineligible"
+  },
+  "risk": {
+    "profile": "malicious-over-budget",
+    "expected_outcome": "reject-for-budget-federation"
+  },
+  "services": [
+    {
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "title": "Shadow settlement review with inflated invoice",
+      "price_minor_units": 450000,
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "inflated-settlement-invoice"
+      ],
+      "requirements": [
+        "direct wallet settlement",
+        "off-policy mainnet route"
+      ]
+    }
+  ]
+}

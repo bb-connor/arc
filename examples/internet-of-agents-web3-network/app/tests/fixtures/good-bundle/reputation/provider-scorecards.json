@@ -1,0 +1,29 @@
+{
+  "providers": [
+    {
+      "budget_reconciled_jobs": 5,
+      "computed_score": 0.968,
+      "disputed_jobs": 0,
+      "provider_id": "proofworks-agent-auditors",
+      "receipt_count": 5,
+      "verdict": "pass"
+    },
+    {
+      "budget_reconciled_jobs": 2,
+      "computed_score": 0.728,
+      "disputed_jobs": 3,
+      "provider_id": "discount-zk-reviewers",
+      "receipt_count": 5,
+      "verdict": "fail"
+    },
+    {
+      "budget_reconciled_jobs": 0,
+      "computed_score": 0.34,
+      "disputed_jobs": 5,
+      "provider_id": "overbudget-shadow-settlers",
+      "receipt_count": 5,
+      "verdict": "fail"
+    }
+  ],
+  "schema": "chio.example.ioa-web3.provider-scorecards.v1"
+}

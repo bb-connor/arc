@@ -1,0 +1,28 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - list_validation_artifacts
+      - summarize_base_sepolia_smoke
+      - build_cutover_readiness
+
+capabilities:
+  default:
+    tools:
+      - server: web3-evidence
+        tool: list_validation_artifacts
+        operations: [invoke]
+        ttl: 900
+      - server: web3-evidence
+        tool: summarize_base_sepolia_smoke
+        operations: [invoke]
+        ttl: 900
+      - server: web3-evidence
+        tool: build_cutover_readiness
+        operations: [invoke]
+        ttl: 900

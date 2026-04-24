@@ -1,0 +1,78 @@
+{
+  "schema": "chio.example.ioa-web3.trace-map.v1",
+  "spans": [
+    {
+      "boundary": "trust-control",
+      "description": "capability issuance and lineage",
+      "receipt_count": 11,
+      "receipt_id": "rcpt-trust-control-ioa-web3-order-001",
+      "span_id": "4c2a1e36c8a5a4f8",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "market-api-sidecar",
+      "description": "RFQ, payment requirements, payment proof, fulfillment",
+      "receipt_count": 5,
+      "receipt_id": "rcpt-market-api-sidecar-ioa-web3-order-001",
+      "span_id": "9999d69134160752",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "provider-review-mcp",
+      "description": "provider review attestation",
+      "receipt_count": 3,
+      "receipt_id": "rcpt-provider-review-mcp-ioa-web3-order-001",
+      "span_id": "479b1f539d847450",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "subcontractor-review-mcp",
+      "description": "specialist subcontractor review",
+      "receipt_count": 1,
+      "receipt_id": "rcpt-subcontractor-review-mcp-ioa-web3-order-001",
+      "span_id": "0a6a9e64bb3c62aa",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "settlement-api-sidecar",
+      "description": "settlement packet assembly",
+      "receipt_count": 2,
+      "receipt_id": "rcpt-settlement-api-sidecar-ioa-web3-order-001",
+      "span_id": "ad40b686e7d86646",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "web3-evidence-mcp",
+      "description": "read-only validation evidence",
+      "receipt_count": 1,
+      "receipt_id": "rcpt-web3-evidence-mcp-ioa-web3-order-001",
+      "span_id": "1ced05556cf1d2e4",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "budget",
+      "description": "budget authorization and reconciliation",
+      "receipt_count": 2,
+      "receipt_id": "rcpt-budget-ioa-web3-order-001",
+      "span_id": "fe08742c66f0aa46",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "approval",
+      "description": "signed human approval fixture",
+      "receipt_count": 1,
+      "receipt_id": "rcpt-approval-ioa-web3-order-001",
+      "span_id": "32f7ced508fd05b8",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "rail-selection",
+      "description": "cross-rail policy routing",
+      "receipt_count": 1,
+      "receipt_id": "rcpt-rail-selection-ioa-web3-order-001",
+      "span_id": "25546392a5840f0f",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    }
+  ],
+  "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+}

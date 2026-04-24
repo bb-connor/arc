@@ -1,0 +1,215 @@
+{
+  "actor": "0x00CeF2E5a0EeCe44a2A2416AA49cd5756f8De6a3",
+  "balances": {
+    "final_eth": "0.000501780367923355",
+    "final_usdc": "1.0",
+    "initial_eth": "0.000510901467389665",
+    "initial_usdc": "1.0"
+  },
+  "chain_id": "eip155:84532",
+  "checks": [
+    {
+      "id": "oracle.mock_feeds_refreshed",
+      "note": "Refreshed 5 mock Chainlink-compatible feeds before readback.",
+      "outcome": "pass"
+    },
+    {
+      "id": "oracle.price_readback",
+      "note": "Price resolver returned fresh ETH, BTC, USDC, and LINK prices.",
+      "outcome": "pass"
+    },
+    {
+      "id": "identity.operator_registered",
+      "note": "Smoke signer is registered as the active Chio operator.",
+      "outcome": "pass"
+    },
+    {
+      "id": "identity.entity_registration",
+      "note": "Operator registered a unique entity binding and read it back.",
+      "outcome": "pass"
+    },
+    {
+      "id": "anchor.root_publication",
+      "note": "Operator published fresh partial and final roots for proof-backed releases.",
+      "outcome": "pass"
+    },
+    {
+      "id": "settlement.partial_and_final_release",
+      "note": "USDC escrow was created, partially released by proof, then fully released by proof.",
+      "outcome": "pass"
+    },
+    {
+      "id": "settlement.timeout_refund",
+      "note": "Short-deadline USDC escrow was refunded after Base Sepolia block time passed the deadline.",
+      "outcome": "pass"
+    }
+  ],
+  "contracts": {
+    "chio.bond-vault": "0x0EcDDd3C6Ff32aBb841729F4909375A63FEd333E",
+    "chio.escrow": "0x1BEa33b952f4730c42B256FF9bE55fD0016C14f7",
+    "chio.identity-registry": "0xf4125e32aA47FD3D4b1d9Dc21C9a5A97D88d19c8",
+    "chio.price-resolver": "0xE277aC0a028a976c69874cD95C329c91aba17B91",
+    "chio.root-registry": "0x575CBE92c5141fC68837229b33ced589C178B6b7"
+  },
+  "deployment_id": "chio.web3-reviewed-rollout.base-sepolia.v1",
+  "deployment_path": "target/web3-live-rollout/base-sepolia/promotion/deployment.json",
+  "escrows": {
+    "primary": {
+      "deposited": "200000",
+      "escrow_id": "0x31c72993827dee0a1f97f3e7571e30ecb7c407ee7f8bbc9c7a4a010d57f4882b",
+      "refunded": false,
+      "released": "200000"
+    },
+    "refund": {
+      "deposited": "100000",
+      "escrow_id": "0xb553b968f76e9c6d71622bd16340c12f542737880f637364f568b820a1a947ac",
+      "refunded": true,
+      "released": "0"
+    }
+  },
+  "generated_at": "2026-04-23T21:02:21.557Z",
+  "prices": {
+    "BTC/USD": {
+      "decimals": 8,
+      "price": "6500000000000",
+      "updated_at": "1776978080"
+    },
+    "ETH/USD": {
+      "decimals": 8,
+      "price": "300000000000",
+      "updated_at": "1776978078"
+    },
+    "LINK/USD": {
+      "decimals": 8,
+      "price": "1500000000",
+      "updated_at": "1776978088"
+    },
+    "USDC/USD": {
+      "decimals": 8,
+      "price": "100000000",
+      "updated_at": "1776978084"
+    }
+  },
+  "report_id": "chio.web3-base-sepolia-smoke.v1",
+  "status": "pass",
+  "transactions": [
+    {
+      "address": "0x04BBD5A5B1528051Db010b1B944D381E42f20342",
+      "answer": "0",
+      "block_number": 40604895,
+      "gas_used": "44188",
+      "id": "feed.sequencer_uptime_feed.refresh",
+      "tx_hash": "0x1493797c4cc421bdd9e2e7d487cee906e57d7dba198e702f3cab6ddfe0f31a27"
+    },
+    {
+      "address": "0xAF31E96f5d7c6417A948448c060e7fd99579707E",
+      "answer": "300000000000",
+      "block_number": 40604895,
+      "gas_used": "44236",
+      "id": "feed.eth_usd_feed.refresh",
+      "tx_hash": "0x57f418fc566149bb91803f9efd6cdf3235ca9c2deb8b74ff07e097768a30bb43"
+    },
+    {
+      "address": "0xE1137532f59A32D34bAB54914d7eF0F077d1935A",
+      "answer": "6500000000000",
+      "block_number": 40604896,
+      "gas_used": "44248",
+      "id": "feed.btc_usd_feed.refresh",
+      "tx_hash": "0x00baa411e89761303f42bfe72ab931b687511ce0bf8cd95f1a5741a050f08aa8"
+    },
+    {
+      "address": "0x22bE5b5DaFbfa46BdF513819C9a8B47b1D3AF400",
+      "answer": "100000000",
+      "block_number": 40604898,
+      "gas_used": "44224",
+      "id": "feed.usdc_usd_feed.refresh",
+      "tx_hash": "0x8b5ef181a58e7856827afa680b303d282d0e2626936deaab3200dbf1192a389f"
+    },
+    {
+      "address": "0x646D185528cfA57BECB2264836fb363aa11153f1",
+      "answer": "1500000000",
+      "block_number": 40604900,
+      "gas_used": "44224",
+      "id": "feed.link_usd_feed.refresh",
+      "tx_hash": "0xd1c4b9b476ffa33f828f0448e8f607d128ca2918e335c26577b63aa3e14624b1"
+    },
+    {
+      "id": "identity.operator_registration",
+      "source": "deployment.configuration_transactions.operator_registration",
+      "status": "already_registered",
+      "tx_hash": "0x8c0ba067c951ef64d653fe2b364d9c1250a07095f34c231939f6979d0ea4fbe7"
+    },
+    {
+      "block_number": 40604903,
+      "entity_id": "0x7eec7ddcb00f8a49ff8e9be83d7919fdeb20e83edab3630bff22b9eb863d7216",
+      "gas_used": "97806",
+      "id": "identity.entity_registration",
+      "tx_hash": "0xa4fe68bce61e5d37c309383becc9a65470ae7e175b1aefa719444ad4678e665f"
+    },
+    {
+      "block_number": 40604905,
+      "checkpoint_seq": "3",
+      "gas_used": "155338",
+      "id": "anchor.partial_root_publish",
+      "root": "0xac27a9a26fc4d101525e48dfbf7ef5a50d4a6766623874881d980d79c023131e",
+      "tx_hash": "0x8b61b372369431cc46e18d2df252ef3772356f81e76f0fdc70a2604060330bec"
+    },
+    {
+      "block_number": 40604908,
+      "checkpoint_seq": "4",
+      "gas_used": "155338",
+      "id": "anchor.final_root_publish",
+      "root": "0xc4a0f13170b8720d3936cbb7f2747f8361db4f24fecc4c20e2af5c53b302162c",
+      "tx_hash": "0x7a74e8d44fccbb147f16fffb2aff3e2146b2b0e4b2e74cf2fcd854322cba1d25"
+    },
+    {
+      "amount": "300000",
+      "block_number": 40604910,
+      "gas_used": "55437",
+      "id": "settlement.usdc_approval",
+      "spender": "0x1BEa33b952f4730c42B256FF9bE55fD0016C14f7",
+      "tx_hash": "0x22c1a04c05009ad8048898a5c58331afff32772db4486dee5714a1c64d1ff60c"
+    },
+    {
+      "amount": "200000",
+      "block_number": 40604913,
+      "escrow_id": "0x31c72993827dee0a1f97f3e7571e30ecb7c407ee7f8bbc9c7a4a010d57f4882b",
+      "gas_used": "294630",
+      "id": "settlement.primary_escrow_create",
+      "tx_hash": "0x80f2cc9ff48bdab12635391bc3faa9b2ef2dd91ba4206dd2f31f094c2a61c462"
+    },
+    {
+      "amount": "75000",
+      "block_number": 40604915,
+      "escrow_id": "0x31c72993827dee0a1f97f3e7571e30ecb7c407ee7f8bbc9c7a4a010d57f4882b",
+      "gas_used": "97260",
+      "id": "settlement.partial_release",
+      "tx_hash": "0xba5d49ba1338f6c80b923daaa5fc70994095ee728cee85ad700a51cd31cc4909"
+    },
+    {
+      "amount": "125000",
+      "block_number": 40604917,
+      "escrow_id": "0x31c72993827dee0a1f97f3e7571e30ecb7c407ee7f8bbc9c7a4a010d57f4882b",
+      "gas_used": "74648",
+      "id": "settlement.final_release",
+      "tx_hash": "0x103d0a1d052fdf6f7a4c247599dc9a6f52f3b7dba0e705622749dc35369b306e"
+    },
+    {
+      "amount": "100000",
+      "block_number": 40604920,
+      "deadline": "1776978134",
+      "escrow_id": "0xb553b968f76e9c6d71622bd16340c12f542737880f637364f568b820a1a947ac",
+      "gas_used": "289830",
+      "id": "settlement.refund_escrow_create",
+      "tx_hash": "0xd88e2a059e6c8a6a7757457accbc1913f58330c6863f83c9932f8a68c8d83f95"
+    },
+    {
+      "amount": "100000",
+      "block_number": 40604925,
+      "escrow_id": "0xb553b968f76e9c6d71622bd16340c12f542737880f637364f568b820a1a947ac",
+      "gas_used": "78230",
+      "id": "settlement.timeout_refund",
+      "tx_hash": "0xf15085e4eedc4a14b7af53c1db205e9d0817fa0eca6b51b0886ca89b5e2cd57d"
+    }
+  ]
+}

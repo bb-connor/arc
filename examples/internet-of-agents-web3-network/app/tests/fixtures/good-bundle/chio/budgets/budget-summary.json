@@ -1,0 +1,8 @@
+{
+  "authorizationStatus": "authorized",
+  "authorizedExposureUnits": 200000,
+  "realizedSpendUnits": 200000,
+  "reconciliationStatus": "reconciled",
+  "schema": "chio.example.ioa-web3.budget-summary.v1",
+  "source": "chio-trust-control"
+}

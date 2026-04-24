@@ -1,0 +1,8 @@
+{
+  "denial": "identity/runtime-degradation/capability-denial.json",
+  "quarantine": "identity/runtime-degradation/provider-quarantine.json",
+  "readmission": "identity/runtime-degradation/readmission.json",
+  "reattestation": "identity/runtime-degradation/reattestation.json",
+  "schema": "chio.example.ioa-web3.runtime-degradation-summary.v1",
+  "status": "quarantined_then_reattested"
+}

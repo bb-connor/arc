@@ -1,0 +1,8 @@
+{
+  "base_sepolia_live_smoke_included": true,
+  "capability_id": "cap-ioa-web3-auditor",
+  "cutover_readiness": "evidence/cutover-readiness.json",
+  "decision": "accept_bundle",
+  "reconciliation": "financial/settlement-reconciliation.json",
+  "validation_index": "web3/validation-index.json"
+}

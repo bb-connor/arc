@@ -1,0 +1,11 @@
+{
+  "digest": "6de716ad3f9f06f455495573451de88028c7427003330e3d7480f004e929e7ac",
+  "dispute_id": "dispute-ioa-web3-order-001",
+  "receipt_ids": [
+    "rcpt-partial-payment-ioa-web3-order-001",
+    "rcpt-refund-ioa-web3-order-001",
+    "rcpt-dispute-resolution-ioa-web3-order-001"
+  ],
+  "schema": "chio.example.ioa-web3.dispute-audit.v1",
+  "status": "resolved"
+}

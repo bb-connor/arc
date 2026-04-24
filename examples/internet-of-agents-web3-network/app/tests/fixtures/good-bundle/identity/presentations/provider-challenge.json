@@ -1,0 +1,20 @@
+{
+  "schema": "chio.agent-passport-presentation-challenge.v1",
+  "verifier": "http://127.0.0.1:62121",
+  "challengeId": "31d14b539a79494a0ee830abf15eda2951e96b8256a55d101e1aadcf3fc601a0",
+  "nonce": "8dc01e807fe791827dd0ae45ad7fce88e7d8ff0e54377f26332a4c1fa6155147",
+  "issuedAt": "2026-04-24T01:52:59Z",
+  "expiresAt": "2026-04-24T01:57:59Z",
+  "policy": {
+    "issuerAllowlist": [
+      "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+    ],
+    "minCompositeScore": 0.6142,
+    "minReceiptCount": 4,
+    "minLineageRecords": 1,
+    "requireCheckpointCoverage": false,
+    "requireReceiptLogUrls": false,
+    "requireEnterpriseIdentityProvenance": false,
+    "requireActiveLifecycle": false
+  }
+}

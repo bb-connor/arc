@@ -1,0 +1,13 @@
+{
+  "attestationId": "attestation-cipherworks-specialist-001",
+  "capabilityId": "cap-ioa-web3-cipherworks-specialist",
+  "delegatedBy": "proofworks-agent-auditors",
+  "mainnetBlocked": true,
+  "orderId": "ioa-web3-order-001",
+  "provider": "CipherWorks Review Lab",
+  "schema": "chio.example.ioa-web3.subcontractor-review-attestation.v1",
+  "scope": "base-sepolia-settlement-proof-leaf",
+  "signature": "b1987d703266722c065ab04074ed43a4591237a8bc894a008e5b382dcd6be194",
+  "validationIndexDigest": "65d7950bed408355a7c2f7e4e0d65a8733bc054809d8fd4004b6ec9ccb7b43dd",
+  "verdict": "pass"
+}

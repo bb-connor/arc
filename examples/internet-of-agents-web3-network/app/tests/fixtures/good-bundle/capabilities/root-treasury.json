@@ -1,0 +1,172 @@
+{
+  "expires_at": 1776999178,
+  "id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+  "issued_at": 1776995578,
+  "issuer": "fc7afde8300a7d3ad77055ced5c48e3673af91148df162227122958c88f76711",
+  "scope": {
+    "grants": [
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "request_rfq"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "request_quote"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "request_payment_requirements"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "submit_payment_proof"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "accept_fulfillment"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "request_rfq"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "request_quote"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "request_payment_requirements"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "submit_payment_proof"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "accept_fulfillment"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "assemble_packet"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "assemble_dispute_packet"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "web3-evidence",
+        "tool_name": "build_cutover_readiness"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "provider-review",
+        "tool_name": "issue_review_attestation"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "subcontractor-review",
+        "tool_name": "issue_specialist_review"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "chio-settle",
+        "tool_name": "create_escrow"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "chio-settle",
+        "tool_name": "release_escrow"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "chio-settle",
+        "tool_name": "refund_escrow"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "chio-anchor",
+        "tool_name": "publish_root"
+      },
+      {
+        "operations": [
+          "invoke",
+          "delegate"
+        ],
+        "server_id": "chio-link",
+        "tool_name": "read_price"
+      }
+    ]
+  },
+  "signature": "32cce6ece999ddd8784cb48f9e397489528ec1c072bf41918aa2e75716432f6a02ac077e3c9c0b332dd4dee6346b57b0d9c6bab6396577a0671aec068017db0c",
+  "subject": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c"
+}

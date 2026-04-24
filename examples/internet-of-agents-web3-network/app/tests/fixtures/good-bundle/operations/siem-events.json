@@ -1,0 +1,104 @@
+{
+  "events": [
+    {
+      "boundary": "trust-control",
+      "event_id": "siem-1-trust-control",
+      "message": "capability issuance and lineage",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-trust-control-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "4c2a1e36c8a5a4f8",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "market-api-sidecar",
+      "event_id": "siem-2-market-api-sidecar",
+      "message": "RFQ, payment requirements, payment proof, fulfillment",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-market-api-sidecar-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "9999d69134160752",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "provider-review-mcp",
+      "event_id": "siem-3-provider-review-mcp",
+      "message": "provider review attestation",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-provider-review-mcp-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "479b1f539d847450",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "subcontractor-review-mcp",
+      "event_id": "siem-4-subcontractor-review-mcp",
+      "message": "specialist subcontractor review",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-subcontractor-review-mcp-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "0a6a9e64bb3c62aa",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "settlement-api-sidecar",
+      "event_id": "siem-5-settlement-api-sidecar",
+      "message": "settlement packet assembly",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-settlement-api-sidecar-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "ad40b686e7d86646",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "web3-evidence-mcp",
+      "event_id": "siem-6-web3-evidence-mcp",
+      "message": "read-only validation evidence",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-web3-evidence-mcp-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "1ced05556cf1d2e4",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "budget",
+      "event_id": "siem-7-budget",
+      "message": "budget authorization and reconciliation",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-budget-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "fe08742c66f0aa46",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "approval",
+      "event_id": "siem-8-approval",
+      "message": "signed human approval fixture",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-approval-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "32f7ced508fd05b8",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    },
+    {
+      "boundary": "rail-selection",
+      "event_id": "siem-9-rail-selection",
+      "message": "cross-rail policy routing",
+      "observed_at": 1776995581,
+      "receipt_id": "rcpt-rail-selection-ioa-web3-order-001",
+      "schema": "chio.siem.event.v1",
+      "severity": "info",
+      "span_id": "25546392a5840f0f",
+      "trace_id": "eca669b1d5de687f01cecb6143f20b3b"
+    }
+  ],
+  "schema": "chio.example.ioa-web3.siem-events.v1"
+}

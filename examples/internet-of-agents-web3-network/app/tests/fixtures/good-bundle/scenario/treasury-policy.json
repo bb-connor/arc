@@ -1,0 +1,14 @@
+{
+  "allowed_chains": [
+    "eip155:84532"
+  ],
+  "allowed_rails": [
+    "chio-web3-escrow"
+  ],
+  "currency": "USDC",
+  "mainnet_blocked": true,
+  "max_single_order_minor_units": 300000,
+  "policy_id": "atlas-treasury-web3-agent-policy",
+  "requires_offline_auditor_review": true,
+  "requires_separate_settlement_agent": true
+}

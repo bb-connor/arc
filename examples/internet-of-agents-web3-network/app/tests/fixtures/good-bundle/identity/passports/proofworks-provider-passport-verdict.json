@@ -1,0 +1,28 @@
+{
+  "commandResult": {
+    "command": [
+      "/Users/connor/.codex/worktrees/673b/arc/target/debug/chio",
+      "--format",
+      "json",
+      "passport",
+      "verify",
+      "--input",
+      "target/web3-example-qualification/internet-of-agents-web3-network/identity/passports/proofworks-provider-passport.json"
+    ],
+    "credentialCount": 1,
+    "issuer": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66",
+    "issuerCount": 1,
+    "issuers": [
+      "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+    ],
+    "merkleRootCount": 0,
+    "passportId": "d67d9c2948cc49b90868966ae1061b8016f46db05671663d0f358cff5d31c8c6",
+    "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+    "validUntil": "2026-05-24T01:52:59Z",
+    "verifiedAt": 1776995579
+  },
+  "passportId": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "schema": "chio.example.ioa-web3.passport-verdict.v1",
+  "source": "chio-cli",
+  "verdict": "pass"
+}

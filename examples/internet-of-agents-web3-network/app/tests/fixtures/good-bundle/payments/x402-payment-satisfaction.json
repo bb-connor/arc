@@ -1,0 +1,16 @@
+{
+  "accepted_at": 1776995579,
+  "capability_id": "cap-ioa-web3-procurement",
+  "order_id": "ioa-web3-order-001",
+  "payment_satisfaction_id": "x402-satisfied-quote-8d8a2b665e02",
+  "proof_id": "x402-proof-ioa-web3-order-001",
+  "quote_id": "quote-8d8a2b665e02",
+  "receipt": {
+    "decision": "allow",
+    "digest": "1bedc4551baa1da95a610cc25be5ac9439f71fed3375069d1c4d04c9a30caa70",
+    "id": "rcpt-x402-payment-proof-ioa-web3-order-001"
+  },
+  "schema": "x402.payment-satisfaction.local.v1",
+  "source_of_truth": "chio-budget-and-receipts",
+  "status": "satisfied"
+}

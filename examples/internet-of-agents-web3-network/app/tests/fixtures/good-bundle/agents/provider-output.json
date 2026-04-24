@@ -1,0 +1,7 @@
+{
+  "capability_id": "cap-ioa-web3-provider",
+  "decision": "fulfill_order",
+  "fulfillment_id": "fulfillment-e9cb54abe045",
+  "fulfillment_receipt": "rcpt-ioa-web3-001",
+  "subcontractor_capability_id": "cap-ioa-web3-cipherworks-specialist"
+}

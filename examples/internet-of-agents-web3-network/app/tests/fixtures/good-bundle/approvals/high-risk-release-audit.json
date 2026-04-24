@@ -1,0 +1,8 @@
+{
+  "challenge": "approvals/high-risk-release-challenge.json",
+  "decision": "approvals/high-risk-release-decision.json",
+  "non_interactive": true,
+  "receipt": "approvals/high-risk-release-receipt.json",
+  "schema": "chio.example.ioa-web3.approval-audit.v1",
+  "status": "signed"
+}
