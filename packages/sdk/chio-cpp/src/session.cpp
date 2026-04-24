@@ -1,8 +1,10 @@
 #include "chio/session.hpp"
 
 #include <memory>
+#include <optional>
 #include <utility>
 
+#include "json_rpc.hpp"
 #include "json.hpp"
 #include "sse.hpp"
 #include "transport_util.hpp"
@@ -187,6 +189,58 @@ Result<void> reject_jsonrpc_error(const detail::JsonValue& root,
   return Result<void>::failure(
       Error{ErrorCode::Protocol, std::move(message), std::move(operation), {},
             detail::body_snippet(raw_json), {}, {}, false});
+}
+
+Result<std::string> normalize_response_body(const std::string& body,
+                                            const std::string& expected_id_json,
+                                            std::string operation,
+                                            bool require_terminal) {
+  auto parsed = detail::parse_json(body);
+  if (parsed) {
+    if (!require_terminal ||
+        detail::is_jsonrpc_terminal_response(*parsed, expected_id_json)) {
+      return Result<std::string>::success(body);
+    }
+    return Result<std::string>::failure(
+        Error{ErrorCode::Protocol,
+              "MCP response did not include matching JSON-RPC terminal response",
+              std::move(operation),
+              {},
+              detail::body_snippet(body)});
+  }
+
+  if (expected_id_json.empty()) {
+    return Result<std::string>::success(body);
+  }
+
+  std::optional<std::string> terminal_response;
+  auto events = detail::for_each_sse_event(body, [&](const std::string& payload) {
+    auto event = detail::parse_json(payload);
+    if (!event) {
+      return Result<void>::failure(
+          Error{ErrorCode::Json,
+                "failed to parse JSON stream event",
+                operation,
+                {},
+                detail::body_snippet(payload)});
+    }
+    if (detail::is_jsonrpc_terminal_response(*event, expected_id_json)) {
+      terminal_response = payload;
+    }
+    return Result<void>::success();
+  });
+  if (!events) {
+    return Result<std::string>::failure(events.error());
+  }
+  if (terminal_response) {
+    return Result<std::string>::success(std::move(*terminal_response));
+  }
+  return Result<std::string>::failure(
+      Error{ErrorCode::Protocol,
+            "MCP response did not include matching JSON-RPC terminal response",
+            std::move(operation),
+            {},
+            detail::body_snippet(body)});
 }
 
 }  // namespace
@@ -465,6 +519,7 @@ Result<TypedResponse<std::string>> Session::send_envelope_response(std::string b
     return Result<TypedResponse<std::string>>::failure(
         Error{ErrorCode::Transport, "missing HTTP transport", "Session::send_envelope"});
   }
+  const auto expected_id_json = detail::request_id_json(body_json);
   auto request_result = make_post(std::move(body_json));
   if (!request_result) {
     return Result<TypedResponse<std::string>>::failure(request_result.error());
@@ -500,9 +555,14 @@ Result<TypedResponse<std::string>> Session::send_envelope_response(std::string b
               {},
               detail::retryable_status(http.status)});
   }
-  const auto raw = http.body;
+  auto normalized = normalize_response_body(http.body, expected_id_json,
+                                            "Session::send_envelope", false);
+  if (!normalized) {
+    return Result<TypedResponse<std::string>>::failure(normalized.error());
+  }
+  auto raw = normalized.move_value();
   if (message_handler_ && !*stream_dispatched) {
-    auto dispatched = dispatch_messages(raw, {});
+    auto dispatched = dispatch_messages(http.body, {});
     if (!dispatched) {
       return Result<TypedResponse<std::string>>::failure(dispatched.error());
     }
@@ -523,6 +583,7 @@ Result<std::string> Session::request_streaming(std::string method,
                                                std::string params_json,
                                                MessageHandler handler) const {
   const auto id = next_id();
+  const auto id_json = std::to_string(id);
   std::string body = "{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
                      ",\"method\":" + detail::quote(method) + ",\"params\":" +
                      params_json + "}";
@@ -561,13 +622,18 @@ Result<std::string> Session::request_streaming(std::string method,
               detail::retryable_status(http.status)});
   }
   auto response_body = std::move(http.body);
+  auto terminal_response = normalize_response_body(response_body, id_json,
+                                                   "Session::request_streaming", true);
+  if (!terminal_response) {
+    return Result<std::string>::failure(terminal_response.error());
+  }
   if (!*saw_stream_message) {
     auto dispatched = dispatch_messages(response_body, std::move(handler));
     if (!dispatched) {
       return Result<std::string>::failure(dispatched.error());
     }
   }
-  return Result<std::string>::success(std::move(response_body));
+  return Result<std::string>::success(terminal_response.move_value());
 }
 
 Result<std::string> Session::notification(std::string method, std::string params_json) const {

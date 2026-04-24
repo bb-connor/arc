@@ -20,13 +20,13 @@ cargo build -p chio-cpp-kernel-ffi
 
 case "$(uname -s)" in
   Darwin)
-    ffi_lib="${repo_root}/target/debug/libchio_cpp_kernel_ffi.dylib"
+    ffi_lib="${repo_root}/target/debug/libchio_cpp_kernel_ffi.a"
     ;;
   Linux)
-    ffi_lib="${repo_root}/target/debug/libchio_cpp_kernel_ffi.so"
+    ffi_lib="${repo_root}/target/debug/libchio_cpp_kernel_ffi.a"
     ;;
   MINGW*|MSYS*|CYGWIN*)
-    ffi_lib="${repo_root}/target/debug/chio_cpp_kernel_ffi.dll"
+    ffi_lib="${repo_root}/target/debug/chio_cpp_kernel_ffi.lib"
     ;;
   *)
     ffi_lib="${repo_root}/target/debug/libchio_cpp_kernel_ffi.a"

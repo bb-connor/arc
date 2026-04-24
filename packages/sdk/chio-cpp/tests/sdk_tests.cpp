@@ -40,8 +40,34 @@ class StreamingFakeTransport final : public chio::HttpTransport {
  public:
   chio::Result<chio::HttpResponse> send(const chio::HttpRequest& request) override {
     requests.push_back(request);
+    const auto id_json = chio::detail::request_id_json(request.body);
     const std::string payload =
         "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}";
+    const std::string terminal =
+        "{\"jsonrpc\":\"2.0\",\"id\":" + id_json + ",\"result\":{\"ok\":true}}";
+    if (request.stream_message) {
+      auto delivered = request.stream_message(payload);
+      if (!delivered) {
+        return chio::Result<chio::HttpResponse>::failure(delivered.error());
+      }
+      delivered = request.stream_message(terminal);
+      if (!delivered) {
+        return chio::Result<chio::HttpResponse>::failure(delivered.error());
+      }
+    }
+    return chio::Result<chio::HttpResponse>::success(
+        chio::HttpResponse{200, {}, "data: " + payload + "\n\ndata: " + terminal + "\n\n"});
+  }
+
+  std::vector<chio::HttpRequest> requests;
+};
+
+class IncompleteStreamingFakeTransport final : public chio::HttpTransport {
+ public:
+  chio::Result<chio::HttpResponse> send(const chio::HttpRequest& request) override {
+    requests.push_back(request);
+    const std::string payload =
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\"}";
     if (request.stream_message) {
       auto delivered = request.stream_message(payload);
       if (!delivered) {
@@ -677,8 +703,8 @@ void test_builder_retry_trace_typed_models_and_streaming() {
       {500, {}, "{\"error\":\"busy\"}"},
       {200, {{"MCP-Session-Id", "sess-2"}}, initialize_ok_response_json()},
       {202, {}, "{}"},
-      {200, {}, "{\"result\":{\"tools\":[{\"name\":\"echo_text\",\"description\":\"Echo\",\"inputSchema\":{\"type\":\"object\"}}]}}"},
-      {200, {}, "data: {\"jsonrpc\":\"2.0\",\ndata: \"method\":\"notifications/tools/list_changed\"}\n\n"},
+      {200, {}, "data: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"echo_text\",\"description\":\"Echo\",\"inputSchema\":{\"type\":\"object\"}}]}}\n\n"},
+      {200, {}, "data: {\"jsonrpc\":\"2.0\",\ndata: \"method\":\"notifications/tools/list_changed\"}\n\ndata: {\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"ok\":true}}\n\n"},
   });
   auto traces = std::make_shared<chio::test::RecordingTraceSink>();
   chio::RetryPolicy retry;
@@ -741,6 +767,26 @@ void test_builder_retry_trace_typed_models_and_streaming() {
       });
   require(streamed_once.ok(), streamed_once.error().message);
   require(delivered_count == 1, "streaming backend must not dispatch duplicate messages");
+
+  auto incomplete_stream_transport = std::make_shared<IncompleteStreamingFakeTransport>();
+  chio::Session incomplete_stream_session("http://127.0.0.1:8080",
+                                          "token",
+                                          "sess-incomplete-stream",
+                                          "2025-11-25",
+                                          incomplete_stream_transport);
+  bool saw_incomplete_progress = false;
+  auto incomplete_stream = incomplete_stream_session.request_streaming(
+      "tools/list",
+      "{}",
+      [&](const chio::JsonMessage& message) {
+        saw_incomplete_progress = message.method == "notifications/progress";
+        return chio::Result<void>::success();
+      });
+  require(!incomplete_stream.ok(), "expected streaming response without terminal to fail");
+  require(saw_incomplete_progress, "expected incomplete stream notification to be delivered");
+  require_contains(incomplete_stream.error().message,
+                   "terminal response",
+                   "incomplete stream error");
 }
 
 void test_auth_metadata_and_pkce() {
