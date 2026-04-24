@@ -157,5 +157,7 @@ tempfile = "3"
             self.cpp_info.frameworks = ["Security", "CoreFoundation"]
         elif str(self.settings.os) in ["Linux", "FreeBSD"]:
             self.cpp_info.system_libs = ["dl", "pthread", "m"]
+        elif str(self.settings.os) == "Windows":
+            self.cpp_info.system_libs = ["ws2_32", "bcrypt", "userenv", "advapi32", "ntdll"]
         if self.options.with_curl:
             self.cpp_info.requires = ["libcurl::libcurl"]

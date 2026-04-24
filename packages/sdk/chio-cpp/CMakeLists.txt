@@ -104,6 +104,8 @@ if(APPLE)
   target_link_libraries(chio_cpp PUBLIC "-framework Security" "-framework CoreFoundation")
 elseif(UNIX)
   target_link_libraries(chio_cpp PUBLIC dl pthread m)
+elseif(WIN32)
+  target_link_libraries(chio_cpp PUBLIC ws2_32 bcrypt userenv advapi32 ntdll)
 endif()
 
 if(CHIO_CPP_ENABLE_CURL)

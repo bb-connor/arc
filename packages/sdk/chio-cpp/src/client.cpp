@@ -1,11 +1,53 @@
 #include "chio/client.hpp"
 
+#include <optional>
 #include <utility>
 
 #include "json.hpp"
+#include "sse.hpp"
 #include "transport_util.hpp"
 
 namespace chio {
+namespace {
+
+Result<detail::JsonValue> parse_initialize_response_json(const std::string& body,
+                                                         int status) {
+  auto parsed = detail::parse_json(body);
+  if (parsed) {
+    return Result<detail::JsonValue>::success(std::move(*parsed));
+  }
+
+  std::optional<detail::JsonValue> terminal_message;
+  auto events = detail::for_each_sse_event(body, [&](const std::string& payload) {
+    auto event_json = detail::parse_json(payload);
+    if (!event_json) {
+      return Result<void>::failure(
+          Error{ErrorCode::Json,
+                "failed to parse initialize SSE event",
+                "Client::initialize",
+                status,
+                detail::body_snippet(payload)});
+    }
+    if (event_json->get("result") != nullptr || event_json->get("error") != nullptr) {
+      terminal_message = std::move(*event_json);
+    }
+    return Result<void>::success();
+  });
+  if (!events) {
+    return Result<detail::JsonValue>::failure(events.error());
+  }
+  if (terminal_message) {
+    return Result<detail::JsonValue>::success(std::move(*terminal_message));
+  }
+  return Result<detail::JsonValue>::failure(
+      Error{ErrorCode::Json,
+            "failed to parse initialize response body",
+            "Client::initialize",
+            status,
+            detail::body_snippet(body)});
+}
+
+}  // namespace
 
 Client::Client(ClientOptions options, HttpTransportPtr transport, TraceSinkPtr trace_sink)
     : options_(std::move(options)),
@@ -78,15 +120,34 @@ Result<Session> Client::initialize() const {
         Error{ErrorCode::Protocol, "initialize response did not include MCP-Session-Id"});
   }
   std::string protocol;
-  auto parsed = detail::parse_json(response.value().body);
-  if (parsed) {
-    protocol = detail::json_string_at(*parsed, {"result", "protocolVersion"});
-    if (protocol.empty()) {
-      protocol = detail::json_string_at(*parsed, {"protocolVersion"});
-    }
+  auto parsed = parse_initialize_response_json(response.value().body, response.value().status);
+  if (!parsed) {
+    return Result<Session>::failure(parsed.error());
   }
+  const auto* rpc_error = parsed.value().get("error");
+  if (rpc_error != nullptr) {
+    std::string message = "initialize returned JSON-RPC error";
+    if (rpc_error->is_object()) {
+      const auto error_message = rpc_error->string_field("message");
+      if (!error_message.empty()) {
+        message += ": " + error_message;
+      }
+    }
+    return Result<Session>::failure(
+        Error{ErrorCode::Protocol,
+              std::move(message),
+              "Client::initialize",
+              response.value().status,
+              detail::body_snippet(response.value().body)});
+  }
+  protocol = detail::json_string_at(parsed.value(), {"result", "protocolVersion"});
   if (protocol.empty()) {
-    protocol = options_.protocol_version;
+    return Result<Session>::failure(
+        Error{ErrorCode::Protocol,
+              "initialize response missing result.protocolVersion",
+              "Client::initialize",
+              response.value().status,
+              detail::body_snippet(response.value().body)});
   }
 
   Session session(options_.base_url, bearer_token, session_header->second, protocol,
