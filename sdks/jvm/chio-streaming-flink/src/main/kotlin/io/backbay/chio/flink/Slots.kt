@@ -1,9 +1,7 @@
 /**
- * Bounded semaphore + in-flight gauge. Mirrors
- * chio_streaming.core.Slots (core.py:233-268).
- *
- * JVM uses java.util.concurrent.Semaphore directly; there is no
- * asyncio loop-binding concern.
+ * Bounded semaphore + in-flight gauge. Mirrors chio_streaming.core.Slots.
+ * Uses java.util.concurrent.Semaphore directly; no asyncio loop-binding
+ * concern on the JVM.
  */
 package io.backbay.chio.flink
 
@@ -63,10 +61,14 @@ class Slots(
 
     fun release() {
         // Match Python's "extra releases are ignored so drain paths stay simple" semantic.
+        // The check + decrement must be atomic; otherwise two concurrent extra releases
+        // can both observe >0, both decrement, and both release the semaphore, growing
+        // permits past `limit`.
         val inFlightCounter = inFlightRef ?: return
-        if (inFlightCounter.get() <= 0) return
-        inFlightCounter.decrementAndGet()
-        semRef?.release()
+        val prev = inFlightCounter.getAndUpdate { if (it > 0) it - 1 else it }
+        if (prev > 0) {
+            semRef?.release()
+        }
     }
 
     companion object {

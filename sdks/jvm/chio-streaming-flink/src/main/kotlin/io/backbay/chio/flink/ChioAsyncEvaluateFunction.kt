@@ -1,8 +1,8 @@
 /**
  * Asynchronous Chio evaluator. Wraps the blocking ChioClient on an
  * executor sized to config.maxInFlight, completing exactly one
- * EvaluationResult per input element. Mirrors
- * ChioAsyncEvaluateFunction in chio_streaming/flink.py:644-704.
+ * EvaluationResult per input element. Mirrors the Python
+ * ChioAsyncEvaluateFunction.
  *
  * Flink's AsyncFunction has no Context, so side outputs are NOT
  * available from this operator. Chain a ChioVerdictSplitFunction
@@ -17,6 +17,7 @@ import org.apache.flink.streaming.api.functions.async.RichAsyncFunction
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class ChioAsyncEvaluateFunction<IN>(
@@ -44,7 +45,13 @@ class ChioAsyncEvaluateFunction<IN>(
 
     override fun close() {
         try {
-            executor?.shutdownNow()
+            // Drain in-flight workers before closing the underlying client; on JDK 21+
+            // ChioClient.close() actually shuts down the HTTP client and would race
+            // with workers still inside evaluateToolCall(). Bounded wait keeps Flink
+            // teardown from hanging if a worker is genuinely wedged.
+            executor?.shutdownNow()?.also {
+                executor?.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            }
         } finally {
             evaluator?.shutdown()
             evaluator = null
@@ -104,5 +111,6 @@ class ChioAsyncEvaluateFunction<IN>(
 
     companion object {
         private const val serialVersionUID: Long = 1L
+        private const val SHUTDOWN_TIMEOUT_SECONDS: Long = 10
     }
 }
