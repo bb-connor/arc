@@ -36,6 +36,14 @@ int main() {
     assert(*real == "real");
     assert(!chio::kernel::detail::json_string_field(
         "{\"message\":\"\\\"reason\\\":\\\"fake\\\"\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field(
+        "{\"ignored\":tru e,\"reason\":\"wrong\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field(
+        "{\"ignored\":@#$,\"reason\":\"wrong\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field(
+        "{\"ignored\":{\"bad\":tru e},\"reason\":\"wrong\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field(
+        "{\"ignored\":[true false],\"reason\":\"wrong\"}", "reason"));
   }
 
   {

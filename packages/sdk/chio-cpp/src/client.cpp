@@ -77,11 +77,12 @@ Result<Session> Client::initialize() const {
     return Result<Session>::failure(
         Error{ErrorCode::Protocol, "initialize response did not include MCP-Session-Id"});
   }
-  std::string protocol = detail::extract_json_string_field(response.value().body, "protocolVersion");
-  if (protocol.empty()) {
-    auto parsed = detail::parse_json(response.value().body);
-    if (parsed) {
-      protocol = detail::json_string_at(*parsed, {"result", "protocolVersion"});
+  std::string protocol;
+  auto parsed = detail::parse_json(response.value().body);
+  if (parsed) {
+    protocol = detail::json_string_at(*parsed, {"result", "protocolVersion"});
+    if (protocol.empty()) {
+      protocol = detail::json_string_at(*parsed, {"protocolVersion"});
     }
   }
   if (protocol.empty()) {

@@ -31,13 +31,21 @@ std::string capability_id_from_json(const std::string& capability_json) {
   return detail::extract_json_string_field(capability_json, "capability_id");
 }
 
-std::string session_pool_key(const ClientOptions& options) {
+std::string session_pool_key(const ClientOptions& options,
+                             const HttpTransport* transport,
+                             const TraceSink* trace_sink) {
   std::ostringstream key;
   key << "base=" << options.base_url << "\n"
       << "protocol=" << options.protocol_version << "\n"
       << "client_name=" << options.client_name << "\n"
       << "client_version=" << options.client_version << "\n"
-      << "capabilities=" << options.client_capabilities_json << "\n";
+      << "capabilities=" << options.client_capabilities_json << "\n"
+      << "transport@" << transport << "\n"
+      << "trace_sink@" << trace_sink << "\n"
+      << "timeout_ms=" << options.timeout.count() << "\n"
+      << "retry_attempts=" << options.retry_policy.max_attempts << "\n"
+      << "retry_initial_ms=" << options.retry_policy.initial_backoff.count() << "\n"
+      << "retry_max_ms=" << options.retry_policy.max_backoff.count() << "\n";
   if (options.token_provider) {
     auto provider_key = options.token_provider->cache_key();
     if (provider_key.empty()) {
@@ -219,8 +227,9 @@ Result<TypedResponse<std::string>> ToolClient::call_typed(
 }
 
 Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& client) {
-  const auto& options = client.options();
-  const auto key = session_pool_key(options);
+  const auto key = session_pool_key(client.options_,
+                                    client.transport_.get(),
+                                    client.trace_sink_.get());
   std::shared_ptr<std::mutex> initialization_lock;
   {
     std::lock_guard<std::mutex> lock(mu_);

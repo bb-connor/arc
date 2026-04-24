@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace chio {
 namespace kernel {
@@ -85,6 +86,67 @@ inline std::optional<std::string> parse_json_string_token(const std::string& jso
   return std::nullopt;
 }
 
+inline bool consume_json_literal(const std::string& json,
+                                 std::size_t& pos,
+                                 std::string_view literal) {
+  if (pos + literal.size() > json.size()) {
+    return false;
+  }
+  if (json.compare(pos, literal.size(), literal) != 0) {
+    return false;
+  }
+  pos += literal.size();
+  return true;
+}
+
+inline bool skip_json_number(const std::string& json, std::size_t& pos) {
+  const auto start = pos;
+  if (pos < json.size() && json[pos] == '-') {
+    ++pos;
+  }
+  if (pos >= json.size() || json[pos] < '0' || json[pos] > '9') {
+    pos = start;
+    return false;
+  }
+  if (json[pos] == '0') {
+    ++pos;
+    if (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+      pos = start;
+      return false;
+    }
+  } else {
+    while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+      ++pos;
+    }
+  }
+  if (pos < json.size() && json[pos] == '.') {
+    ++pos;
+    const auto fraction_start = pos;
+    while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+      ++pos;
+    }
+    if (pos == fraction_start) {
+      pos = start;
+      return false;
+    }
+  }
+  if (pos < json.size() && (json[pos] == 'e' || json[pos] == 'E')) {
+    ++pos;
+    if (pos < json.size() && (json[pos] == '+' || json[pos] == '-')) {
+      ++pos;
+    }
+    const auto exponent_start = pos;
+    while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+      ++pos;
+    }
+    if (pos == exponent_start) {
+      pos = start;
+      return false;
+    }
+  }
+  return pos > start;
+}
+
 inline bool skip_json_value(const std::string& json, std::size_t& pos) {
   skip_json_ws(json, pos);
   if (pos >= json.size()) {
@@ -93,36 +155,76 @@ inline bool skip_json_value(const std::string& json, std::size_t& pos) {
   if (json[pos] == '"') {
     return parse_json_string_token(json, pos).has_value();
   }
-  if (json[pos] == '{' || json[pos] == '[') {
-    std::string stack;
-    stack.push_back(json[pos] == '{' ? '}' : ']');
+  if (json[pos] == '{') {
     ++pos;
-    while (pos < json.size() && !stack.empty()) {
-      if (json[pos] == '"') {
-        if (!parse_json_string_token(json, pos)) {
-          return false;
-        }
-        continue;
+    skip_json_ws(json, pos);
+    if (pos < json.size() && json[pos] == '}') {
+      ++pos;
+      return true;
+    }
+    while (pos < json.size()) {
+      if (!parse_json_string_token(json, pos)) {
+        return false;
       }
-      if (json[pos] == '{') {
-        stack.push_back('}');
-      } else if (json[pos] == '[') {
-        stack.push_back(']');
-      } else if (json[pos] == '}' || json[pos] == ']') {
-        if (json[pos] != stack.back()) {
-          return false;
-        }
-        stack.pop_back();
+      skip_json_ws(json, pos);
+      if (pos >= json.size() || json[pos] != ':') {
+        return false;
       }
       ++pos;
+      if (!skip_json_value(json, pos)) {
+        return false;
+      }
+      skip_json_ws(json, pos);
+      if (pos < json.size() && json[pos] == ',') {
+        ++pos;
+        skip_json_ws(json, pos);
+        continue;
+      }
+      if (pos < json.size() && json[pos] == '}') {
+        ++pos;
+        return true;
+      }
+      return false;
     }
-    return stack.empty();
+    return false;
   }
-  while (pos < json.size() && json[pos] != ',' && json[pos] != '}' &&
-         json[pos] != ']') {
+  if (json[pos] == '[') {
     ++pos;
+    skip_json_ws(json, pos);
+    if (pos < json.size() && json[pos] == ']') {
+      ++pos;
+      return true;
+    }
+    while (pos < json.size()) {
+      if (!skip_json_value(json, pos)) {
+        return false;
+      }
+      skip_json_ws(json, pos);
+      if (pos < json.size() && json[pos] == ',') {
+        ++pos;
+        continue;
+      }
+      if (pos < json.size() && json[pos] == ']') {
+        ++pos;
+        return true;
+      }
+      return false;
+    }
+    return false;
   }
-  return true;
+  if (json[pos] == 't') {
+    return consume_json_literal(json, pos, "true");
+  }
+  if (json[pos] == 'f') {
+    return consume_json_literal(json, pos, "false");
+  }
+  if (json[pos] == 'n') {
+    return consume_json_literal(json, pos, "null");
+  }
+  if (json[pos] == '-' || (json[pos] >= '0' && json[pos] <= '9')) {
+    return skip_json_number(json, pos);
+  }
+  return false;
 }
 
 inline std::optional<std::string> json_string_field(const std::string& json,

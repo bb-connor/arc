@@ -14,6 +14,8 @@ namespace chio {
 
 using InitializeMessageHandler = std::function<Result<void>(Session&, const JsonMessage&)>;
 
+class SessionPool;
+
 struct ClientOptions {
   std::string base_url;
   std::string bearer_token;
@@ -39,6 +41,8 @@ class Client {
   const ClientOptions& options() const { return options_; }
 
  private:
+  friend class SessionPool;
+
   ClientOptions options_;
   HttpTransportPtr transport_;
   TraceSinkPtr trace_sink_;

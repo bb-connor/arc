@@ -356,7 +356,8 @@ void test_dpop_proof() {
 
 void test_client_session_with_fake_transport() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
-      {200, {{"MCP-Session-Id", "sess-1"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {200, {{"MCP-Session-Id", "sess-1"}},
+       "{\"metadata\":{\"protocolVersion\":\"wrong\"},\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
       {202, {}, "{}"},
       {200, {}, "{\"tools\":[]}"},
       {200, {}, "{\"result\":\"closed\"}"},
@@ -367,6 +368,7 @@ void test_client_session_with_fake_transport() {
   require(initialized.ok(), initialized.error().message);
   auto session = initialized.move_value();
   require_eq(session.session_id(), "sess-1", "session id");
+  require_eq(session.protocol_version(), "2025-11-25", "parsed initialize protocol");
 
   auto tools = session.list_tools();
   require(tools.ok(), tools.error().message);
@@ -384,6 +386,9 @@ void test_client_session_with_fake_transport() {
                    "initialized notification body");
   require_contains(transport->requests[2].body, "\"method\":\"tools/list\"", "tools body");
   require_eq(transport->requests[2].headers["MCP-Session-Id"], "sess-1", "session header");
+  require_eq(transport->requests[2].headers["MCP-Protocol-Version"],
+             "2025-11-25",
+             "session protocol header");
 }
 
 void test_typed_list_helpers_reject_jsonrpc_errors() {
@@ -738,6 +743,98 @@ void test_feature_helpers_and_middleware() {
   require_eq(pool_transport->requests[4].headers["Authorization"],
              "Bearer token-c",
              "pool token provider auth");
+
+  pool.clear();
+  auto transport_a = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200, {{"MCP-Session-Id", "sess-transport-a"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+  });
+  auto transport_b = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200, {{"MCP-Session-Id", "sess-transport-b"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+  });
+  auto client_transport_a = chio::ClientBuilder()
+                                .base_url("http://127.0.0.1:8080/")
+                                .bearer_token("token")
+                                .transport(transport_a)
+                                .build();
+  auto client_transport_b = chio::ClientBuilder()
+                                .base_url("http://127.0.0.1:8080/")
+                                .bearer_token("token")
+                                .transport(transport_b)
+                                .build();
+  require(client_transport_a.ok(), client_transport_a.error().message);
+  require(client_transport_b.ok(), client_transport_b.error().message);
+  auto session_transport_a = pool.get_or_initialize(client_transport_a.value());
+  auto session_transport_b = pool.get_or_initialize(client_transport_b.value());
+  require(session_transport_a.ok(), session_transport_a.error().message);
+  require(session_transport_b.ok(), session_transport_b.error().message);
+  require_eq(session_transport_a.value()->session_id(),
+             "sess-transport-a",
+             "transport keyed session a");
+  require_eq(session_transport_b.value()->session_id(),
+             "sess-transport-b",
+             "transport keyed session b");
+  require(transport_a->requests.size() == 2, "expected transport a initialization");
+  require(transport_b->requests.size() == 2, "expected transport b initialization");
+
+  pool.clear();
+  auto policy_transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200, {{"MCP-Session-Id", "sess-policy-a"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+      {200, {{"MCP-Session-Id", "sess-policy-b"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+      {200, {{"MCP-Session-Id", "sess-timeout-a"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+      {200, {{"MCP-Session-Id", "sess-timeout-b"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+  });
+  chio::RetryPolicy one_attempt;
+  one_attempt.max_attempts = 1;
+  chio::RetryPolicy two_attempts;
+  two_attempts.max_attempts = 2;
+  auto client_policy_a = chio::ClientBuilder()
+                             .base_url("http://127.0.0.1:8080/")
+                             .bearer_token("token")
+                             .transport(policy_transport)
+                             .retry_policy(one_attempt)
+                             .build();
+  auto client_policy_b = chio::ClientBuilder()
+                             .base_url("http://127.0.0.1:8080/")
+                             .bearer_token("token")
+                             .transport(policy_transport)
+                             .retry_policy(two_attempts)
+                             .build();
+  auto client_timeout_a = chio::ClientBuilder()
+                              .base_url("http://127.0.0.1:8080/")
+                              .bearer_token("token")
+                              .transport(policy_transport)
+                              .timeout(std::chrono::milliseconds(1000))
+                              .build();
+  auto client_timeout_b = chio::ClientBuilder()
+                              .base_url("http://127.0.0.1:8080/")
+                              .bearer_token("token")
+                              .transport(policy_transport)
+                              .timeout(std::chrono::milliseconds(2000))
+                              .build();
+  require(client_policy_a.ok(), client_policy_a.error().message);
+  require(client_policy_b.ok(), client_policy_b.error().message);
+  require(client_timeout_a.ok(), client_timeout_a.error().message);
+  require(client_timeout_b.ok(), client_timeout_b.error().message);
+  auto session_policy_a = pool.get_or_initialize(client_policy_a.value());
+  auto session_policy_b = pool.get_or_initialize(client_policy_b.value());
+  auto session_timeout_a = pool.get_or_initialize(client_timeout_a.value());
+  auto session_timeout_b = pool.get_or_initialize(client_timeout_b.value());
+  require(session_policy_a.ok(), session_policy_a.error().message);
+  require(session_policy_b.ok(), session_policy_b.error().message);
+  require(session_timeout_a.ok(), session_timeout_a.error().message);
+  require(session_timeout_b.ok(), session_timeout_b.error().message);
+  require_eq(session_policy_a.value()->session_id(), "sess-policy-a", "policy session a");
+  require_eq(session_policy_b.value()->session_id(), "sess-policy-b", "policy session b");
+  require_eq(session_timeout_a.value()->session_id(), "sess-timeout-a", "timeout session a");
+  require_eq(session_timeout_b.value()->session_id(), "sess-timeout-b", "timeout session b");
+  require(policy_transport->requests.size() == 8,
+          "expected retry policy and timeout keyed initializations");
 }
 
 void test_http_substrate_evaluator() {
