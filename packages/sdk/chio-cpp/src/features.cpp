@@ -193,6 +193,7 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
   const auto& options = client.options();
   const auto key = options.base_url + "\n" + options.bearer_token + "\n" +
                    options.protocol_version;
+  std::shared_ptr<std::mutex> initialization_lock;
   {
     std::lock_guard<std::mutex> lock(mu_);
     auto found = sessions_.find(key);
@@ -202,21 +203,43 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
         return Result<std::shared_ptr<Session>>::success(existing);
       }
     }
+    auto& pending_lock = initialization_locks_[key];
+    if (!pending_lock) {
+      pending_lock = std::make_shared<std::mutex>();
+    }
+    initialization_lock = pending_lock;
+  }
+
+  std::lock_guard<std::mutex> key_lock(*initialization_lock);
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    auto found = sessions_.find(key);
+    if (found != sessions_.end()) {
+      auto existing = found->second.lock();
+      if (existing) {
+        initialization_locks_.erase(key);
+        return Result<std::shared_ptr<Session>>::success(existing);
+      }
+    }
   }
 
   auto initialized = client.initialize();
   if (!initialized) {
+    std::lock_guard<std::mutex> lock(mu_);
+    initialization_locks_.erase(key);
     return Result<std::shared_ptr<Session>>::failure(initialized.error());
   }
   auto session = std::make_shared<Session>(initialized.move_value());
   std::lock_guard<std::mutex> lock(mu_);
   sessions_[key] = session;
+  initialization_locks_.erase(key);
   return Result<std::shared_ptr<Session>>::success(std::move(session));
 }
 
 void SessionPool::clear() {
   std::lock_guard<std::mutex> lock(mu_);
   sessions_.clear();
+  initialization_locks_.clear();
 }
 
 }  // namespace chio

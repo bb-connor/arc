@@ -400,7 +400,9 @@ Result<std::string> Session::request_streaming(std::string method,
                      ",\"method\":" + detail::quote(method) + ",\"params\":" +
                      params_json + "}";
   auto request = make_post(std::move(body), true);
-  request.stream_message = [this, handler](const std::string& raw_json) {
+  auto saw_stream_message = std::make_shared<bool>(false);
+  request.stream_message = [this, handler, saw_stream_message](const std::string& raw_json) {
+    *saw_stream_message = true;
     auto parsed = detail::parse_json(raw_json);
     if (!parsed) {
       return Result<void>::failure(
@@ -432,9 +434,11 @@ Result<std::string> Session::request_streaming(std::string method,
   if (!response) {
     return Result<std::string>::failure(response.error());
   }
-  auto dispatched = dispatch_messages(response.value().value, std::move(handler));
-  if (!dispatched) {
-    return Result<std::string>::failure(dispatched.error());
+  if (!*saw_stream_message) {
+    auto dispatched = dispatch_messages(response.value().value, std::move(handler));
+    if (!dispatched) {
+      return Result<std::string>::failure(dispatched.error());
+    }
   }
   return Result<std::string>::success(std::move(response.value().value));
 }

@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "../src/json.hpp"
+
 namespace {
 
 class FakeTransport final : public chio::HttpTransport {
@@ -30,6 +32,25 @@ class FakeTransport final : public chio::HttpTransport {
 
  private:
   std::vector<chio::HttpResponse> responses_;
+};
+
+class StreamingFakeTransport final : public chio::HttpTransport {
+ public:
+  chio::Result<chio::HttpResponse> send(const chio::HttpRequest& request) override {
+    requests.push_back(request);
+    const std::string payload =
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}";
+    if (request.stream_message) {
+      auto delivered = request.stream_message(payload);
+      if (!delivered) {
+        return chio::Result<chio::HttpResponse>::failure(delivered.error());
+      }
+    }
+    return chio::Result<chio::HttpResponse>::success(
+        chio::HttpResponse{200, {}, "data: " + payload + "\n\n"});
+  }
+
+  std::vector<chio::HttpRequest> requests;
 };
 
 void require(bool condition, const std::string& message) {
@@ -92,6 +113,18 @@ void test_invariants_from_shared_vectors() {
       "4b134ccad3c684ef462bf085ea2e87c416557980e01da869703d18016f3811a0f0310f38075e2019480f8c1abc06c7d823ef1776eb95687785e5eacdbe57250c");
   require(verified.ok(), verified.error().message);
   require(verified.value(), "expected vector signature to verify");
+}
+
+void test_private_json_helpers_are_strict() {
+  const auto extracted = chio::detail::extract_json_string_field(
+      "{\"value\":\"line\\nslash\\\\tab\\tquote\\\"\"}", "value");
+  require_eq(extracted,
+             std::string("line\nslash\\tab\tquote\""),
+             "json string escape extraction");
+
+  require(!chio::detail::parse_json("{\"n\":-}"), "expected bare minus to fail");
+  require(!chio::detail::parse_json("{\"n\":1.}"), "expected missing fraction to fail");
+  require(!chio::detail::parse_json("{\"n\":1e}"), "expected missing exponent to fail");
 }
 
 class FixedClock final : public chio::Clock {
@@ -252,6 +285,25 @@ void test_builder_retry_trace_typed_models_and_streaming() {
       });
   require(streamed.ok(), streamed.error().message);
   require(saw_notification, "expected streaming notification handler");
+
+  auto streaming_transport = std::make_shared<StreamingFakeTransport>();
+  chio::Session streaming_session("http://127.0.0.1:8080",
+                                  "token",
+                                  "sess-stream",
+                                  "2025-11-25",
+                                  streaming_transport);
+  int delivered_count = 0;
+  auto streamed_once = streaming_session.request_streaming(
+      "tools/list",
+      "{}",
+      [&](const chio::JsonMessage& message) {
+        if (message.method == "notifications/tools/list_changed") {
+          ++delivered_count;
+        }
+        return chio::Result<void>::success();
+      });
+  require(streamed_once.ok(), streamed_once.error().message);
+  require(delivered_count == 1, "streaming backend must not dispatch duplicate messages");
 }
 
 void test_auth_metadata_and_pkce() {
@@ -330,6 +382,7 @@ void test_feature_helpers_and_middleware() {
 void test_http_substrate_evaluator() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {}, "{\"verdict\":\"allow\",\"receipt\":{\"id\":\"r1\"}}"},
+      {200, {}, "{\"metadata\":{\"valid\":true},\"valid\":false}"},
       {200, {}, "{\"valid\":true}"},
       {503, {}, "{\"status\":\"degraded\"}"},
   });
@@ -354,6 +407,10 @@ void test_http_substrate_evaluator() {
   require_contains(transport->requests[0].body, "\"body_hash\":", "evaluate request");
   require_contains(transport->requests[0].body, "\"caller\":", "evaluate request");
 
+  const auto false_verified = evaluator.verify_receipt("{\"receipt\":{\"id\":\"r1\"}}");
+  require(false_verified.ok(), false_verified.error().message);
+  require(!false_verified.value(), "expected top-level valid=false to fail");
+
   const auto verified = evaluator.verify_receipt("{\"receipt\":{\"id\":\"r1\"}}");
   require(verified.ok(), verified.error().message);
   require(verified.value(), "expected receipt verification to succeed");
@@ -368,6 +425,7 @@ void test_http_substrate_evaluator() {
 int main() {
   try {
     test_invariants_from_shared_vectors();
+    test_private_json_helpers_are_strict();
     test_dpop_proof();
     test_client_session_with_fake_transport();
     test_initialize_nested_message_handler();

@@ -233,13 +233,6 @@ bool Kernel::ffi_enabled() {
 }
 
 EvaluateResult Kernel::evaluate(const EvaluateRequest& request) const {
-  if (!options_.fail_closed) {
-    return failure(
-        "unsupported_options",
-        "chio-cpp-kernel only supports fail-closed evaluation",
-        "in-process kernel FFI is not linked in this package skeleton");
-  }
-
   if (request.request_json.empty()) {
     return failure(
         "invalid_argument",

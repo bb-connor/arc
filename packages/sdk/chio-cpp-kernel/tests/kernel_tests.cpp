@@ -8,7 +8,6 @@ int main() {
 
   assert(std::string(chio::kernel::Kernel::version()) == "0.1.0");
   assert(kernel.options().kernel_id == "chio-cpp-kernel");
-  assert(kernel.options().fail_closed);
 
   {
     chio::kernel::EvaluateRequest request;
@@ -36,22 +35,6 @@ int main() {
       assert(first.error_code == "unsupported");
     }
     assert(first.result_json == second.result_json);
-  }
-
-  {
-    chio::kernel::KernelOptions options;
-    options.fail_closed = false;
-    chio::kernel::Kernel open_kernel(options);
-
-    chio::kernel::EvaluateRequest request;
-    request.request_json = "{\"request_id\":\"req-1\"}";
-    request.capability_json = "{\"id\":\"cap-1\"}";
-    request.trusted_issuers_hex.push_back("00");
-
-    auto result = open_kernel.evaluate(request);
-    assert(!result.ok);
-    assert(result.verdict == "deny");
-    assert(result.error_code == "unsupported_options");
   }
 
   return 0;

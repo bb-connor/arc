@@ -11,7 +11,6 @@ struct KernelOptions {
   std::string kernel_id = "chio-cpp-kernel";
   std::string policy_json;
   std::uint64_t default_now_secs = 0;
-  bool fail_closed = true;
 };
 
 struct EvaluateRequest {

@@ -106,7 +106,17 @@ Result<bool> Evaluator::verify_receipt(std::string receipt_json) const {
         Error{ErrorCode::Protocol, "sidecar verify returned HTTP " +
                                       std::to_string(response.value().status)});
   }
-  return Result<bool>::success(response.value().body.find("\"valid\":true") != std::string::npos);
+  auto parsed = detail::parse_json(response.value().body);
+  if (!parsed || !parsed->is_object()) {
+    return Result<bool>::failure(
+        Error{ErrorCode::Json, "sidecar verify returned malformed JSON"});
+  }
+  const auto* valid = parsed->get("valid");
+  if (valid == nullptr || !valid->is_bool()) {
+    return Result<bool>::failure(
+        Error{ErrorCode::Json, "sidecar verify response missing boolean valid field"});
+  }
+  return Result<bool>::success(valid->as_bool());
 }
 
 Result<std::string> Evaluator::health() const {

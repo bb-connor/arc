@@ -103,7 +103,38 @@ inline std::string extract_json_string_field(const std::string& json, std::strin
   for (std::size_t i = pos + 1; i < json.size(); ++i) {
     char c = json[i];
     if (escaped) {
-      out.push_back(c);
+      switch (c) {
+        case '"':
+        case '\\':
+        case '/':
+          out.push_back(c);
+          break;
+        case 'b':
+          out.push_back('\b');
+          break;
+        case 'f':
+          out.push_back('\f');
+          break;
+        case 'n':
+          out.push_back('\n');
+          break;
+        case 'r':
+          out.push_back('\r');
+          break;
+        case 't':
+          out.push_back('\t');
+          break;
+        case 'u':
+          if (i + 4 >= json.size()) {
+            return {};
+          }
+          out += "\\u";
+          out.append(json.substr(i + 1, 4));
+          i += 4;
+          break;
+        default:
+          return {};
+      }
       escaped = false;
       continue;
     }
@@ -189,8 +220,10 @@ class JsonValue {
   bool is_object() const { return kind_ == Kind::Object; }
   bool is_array() const { return kind_ == Kind::Array; }
   bool is_string() const { return kind_ == Kind::String; }
+  bool is_bool() const { return kind_ == Kind::Bool; }
 
   const std::string& as_string() const { return string_; }
+  bool as_bool() const { return bool_; }
   const std::vector<JsonValue>& as_array() const { return array_; }
   const std::map<std::string, JsonValue>& as_object() const { return object_; }
 
@@ -396,13 +429,21 @@ class JsonParser {
     if (input_[pos_] == '-') {
       ++pos_;
     }
+    const auto integer_start = pos_;
     while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
       ++pos_;
     }
+    if (pos_ == integer_start) {
+      return std::nullopt;
+    }
     if (pos_ < input_.size() && input_[pos_] == '.') {
       ++pos_;
+      const auto fraction_start = pos_;
       while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
         ++pos_;
+      }
+      if (pos_ == fraction_start) {
+        return std::nullopt;
       }
     }
     if (pos_ < input_.size() && (input_[pos_] == 'e' || input_[pos_] == 'E')) {
@@ -410,8 +451,12 @@ class JsonParser {
       if (pos_ < input_.size() && (input_[pos_] == '+' || input_[pos_] == '-')) {
         ++pos_;
       }
+      const auto exponent_start = pos_;
       while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
         ++pos_;
+      }
+      if (pos_ == exponent_start) {
+        return std::nullopt;
       }
     }
     return JsonValue::number(std::string(input_.substr(start, pos_ - start)));
