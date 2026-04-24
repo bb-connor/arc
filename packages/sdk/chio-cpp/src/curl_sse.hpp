@@ -39,6 +39,7 @@ inline std::string request_id_json(const std::string& body) {
 
 struct CurlBodyCapture {
   std::string body;
+  std::string scan_buffer;
   std::string id_json;
   std::size_t scan_pos = 0;
   bool complete = false;
@@ -52,20 +53,20 @@ inline void compact_processed_sse(CurlBodyCapture& capture) {
   if (capture.scan_pos < kSseCompactThreshold) {
     return;
   }
-  capture.body.erase(0, capture.scan_pos);
+  capture.scan_buffer.erase(0, capture.scan_pos);
   capture.scan_pos = 0;
 }
 
 inline void scan_sse_events(CurlBodyCapture& capture) {
   while (true) {
     const auto line_start = capture.scan_pos;
-    const auto line_end = capture.body.find('\n', line_start);
+    const auto line_end = capture.scan_buffer.find('\n', line_start);
     if (line_end == std::string::npos) {
       compact_processed_sse(capture);
       return;
     }
     capture.scan_pos = line_end + 1;
-    std::string_view line(capture.body.data() + line_start, line_end - line_start);
+    std::string_view line(capture.scan_buffer.data() + line_start, line_end - line_start);
     if (is_sse_blank_line(line)) {
       auto delivered = flush_sse_event(capture.pending_event, [&](const std::string& payload) {
         if (capture.stream_message) {
@@ -105,6 +106,7 @@ inline std::size_t write_curl_body(char* ptr,
   auto* capture = static_cast<CurlBodyCapture*>(userdata);
   const std::size_t len = size * nmemb;
   capture->body.append(ptr, len);
+  capture->scan_buffer.append(ptr, len);
   scan_sse_events(*capture);
   if (capture->callback_failed || (capture->complete && capture->stream_message)) {
     return 0;

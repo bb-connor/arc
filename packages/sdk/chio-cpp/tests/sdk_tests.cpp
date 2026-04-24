@@ -249,8 +249,22 @@ void test_curl_sse_helpers_abort_after_terminal_message() {
     require(event_returned == event.size(), "expected long stream to continue");
   }
   require(long_stream_count == 300, "expected every long stream event to dispatch");
-  require(long_stream.body.size() < chio::detail::kSseCompactThreshold + 1024,
+  require(long_stream.scan_buffer.size() < chio::detail::kSseCompactThreshold + 1024,
           "expected processed SSE bytes to be compacted");
+  require(long_stream.body.size() > chio::detail::kSseCompactThreshold,
+          "expected compacted SSE response body to stay intact");
+
+  chio::detail::CurlBodyCapture large_text;
+  std::string full_text;
+  for (int i = 0; i < 300; ++i) {
+    full_text += "{\"line\":" + std::to_string(i) + "}\n";
+  }
+  const auto large_returned =
+      chio::detail::write_curl_body(&full_text[0], 1, full_text.size(), &large_text);
+  require(large_returned == full_text.size(), "expected large text response to keep reading");
+  require_eq(large_text.body, full_text, "large text response body");
+  require(large_text.scan_buffer.size() < chio::detail::kSseCompactThreshold + 1024,
+          "expected large text scan buffer to compact independently");
 }
 
 void test_transport_policy_respects_retryable_flag() {

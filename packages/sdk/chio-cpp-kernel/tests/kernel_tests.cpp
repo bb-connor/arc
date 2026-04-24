@@ -30,6 +30,12 @@ int main() {
     assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\q\"}", "reason"));
     assert(!chio::kernel::detail::json_string_field(
         std::string("{\"reason\":\"line\nbreak\"}"), "reason"));
+    auto real = chio::kernel::detail::json_string_field(
+        "{\"message\":\"\\\"reason\\\":\\\"fake\\\"\",\"reason\":\"real\"}", "reason");
+    assert(real.has_value());
+    assert(*real == "real");
+    assert(!chio::kernel::detail::json_string_field(
+        "{\"message\":\"\\\"reason\\\":\\\"fake\\\"\"}", "reason"));
   }
 
   {

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <sstream>
 
 #include "curl_sse.hpp"
@@ -137,7 +138,7 @@ Result<HttpResponse> CurlHttpTransport::send(const HttpRequest& request) {
         Error{ErrorCode::Transport,
               cancelled ? "request cancelled" : curl_easy_strerror(code),
               "CurlHttpTransport::send",
-              {},
+              status > 0 ? std::optional<int>(static_cast<int>(status)) : std::nullopt,
               snippet,
               {},
               {},
