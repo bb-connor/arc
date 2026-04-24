@@ -236,7 +236,13 @@ async function verifyEagerHashes(
         // JSON is a precondition for eager artifacts; skip caching if parse fails.
       }
       if (!matchesManifestHash(expected, hex)) {
+        // Eager artifacts are foundational (summary, topology). A hash
+        // mismatch here is a fail-closed event: surface it via the
+        // mismatch callback AND propagate as a load failure so the
+        // provider transitions to status="error" instead of rendering
+        // tampered data with a flipped verdict badge.
         onMismatch(path);
+        ok = false;
       }
     } catch (err) {
       console.error(`eager fetch ${path} threw`, err);
