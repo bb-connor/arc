@@ -211,7 +211,8 @@ MessageHandler NestedCallbackRouter::bind(Session& session) const {
   auto sampling = sampling_handler_;
   auto elicitation = elicitation_handler_;
   auto roots = roots_handler_;
-  return [&session, sampling, elicitation, roots](const JsonMessage& message) {
+  auto send_envelope = session.envelope_sender();
+  return [send_envelope, sampling, elicitation, roots](const JsonMessage& message) {
     Result<std::string> response = Result<std::string>::failure(
         Error{ErrorCode::Protocol, "no nested callback handler matched",
               "NestedCallbackRouter::bind"});
@@ -227,7 +228,7 @@ MessageHandler NestedCallbackRouter::bind(Session& session) const {
     if (!response) {
       return Result<void>::failure(response.error());
     }
-    auto sent = session.send_envelope(response.value());
+    auto sent = send_envelope(response.value());
     if (!sent) {
       return Result<void>::failure(sent.error());
     }
@@ -331,6 +332,78 @@ Result<std::string> Session::bearer_token_for_request(std::string operation) con
         Error{ErrorCode::Protocol, "bearer token is empty", std::move(operation)});
   }
   return Result<std::string>::success(bearer_token_);
+}
+
+std::function<Result<std::string>(std::string)> Session::envelope_sender() const {
+  auto base_url = base_url_;
+  auto bearer_token = bearer_token_;
+  auto token_provider = token_provider_;
+  auto session_id = session_id_;
+  auto protocol_version = protocol_version_;
+  auto transport = transport_;
+  auto retry_policy = retry_policy_;
+  auto trace_sink = trace_sink_;
+  auto timeout = timeout_;
+  return [base_url = std::move(base_url),
+          bearer_token = std::move(bearer_token),
+          token_provider = std::move(token_provider),
+          session_id = std::move(session_id),
+          protocol_version = std::move(protocol_version),
+          transport = std::move(transport),
+          retry_policy,
+          trace_sink = std::move(trace_sink),
+          timeout](std::string body_json) -> Result<std::string> {
+    if (!transport) {
+      return Result<std::string>::failure(
+          Error{ErrorCode::Transport, "missing HTTP transport", "NestedCallbackRouter::bind"});
+    }
+    std::string token;
+    if (token_provider) {
+      auto provider_token = token_provider->access_token();
+      if (!provider_token) {
+        return Result<std::string>::failure(provider_token.error());
+      }
+      token = provider_token.value();
+    } else {
+      token = bearer_token;
+    }
+    if (token.empty()) {
+      return Result<std::string>::failure(
+          Error{ErrorCode::Protocol, "bearer token is empty", "NestedCallbackRouter::bind"});
+    }
+
+    HttpRequest request{
+        "POST",
+        base_url + "/mcp",
+        {
+            {"Authorization", "Bearer " + token},
+            {"Accept", "application/json, text/event-stream"},
+            {"Content-Type", "application/json"},
+            {"MCP-Session-Id", session_id},
+            {"MCP-Protocol-Version", protocol_version},
+        },
+        std::move(body_json),
+        timeout,
+    };
+    auto response = detail::send_with_policy(transport, std::move(request), retry_policy,
+                                             trace_sink, "NestedCallbackRouter::bind");
+    if (!response) {
+      return Result<std::string>::failure(response.error());
+    }
+    auto http = response.move_value();
+    if (http.status < 200 || http.status >= 300) {
+      return Result<std::string>::failure(
+          Error{ErrorCode::Protocol,
+                "nested callback response returned HTTP " + std::to_string(http.status),
+                "NestedCallbackRouter::bind",
+                http.status,
+                detail::body_snippet(http.body),
+                {},
+                {},
+                detail::retryable_status(http.status)});
+    }
+    return Result<std::string>::success(std::move(http.body));
+  };
 }
 
 Result<HttpRequest> Session::make_post(std::string body_json, bool stream_response) const {

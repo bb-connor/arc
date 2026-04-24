@@ -180,6 +180,43 @@ void test_curl_sse_helpers_abort_after_terminal_message() {
       chio::detail::write_curl_body(&json[0], 1, json.size(), &non_streaming);
   require(json_returned == json.size(), "expected non-streaming body to keep reading");
   require(!non_streaming.complete, "expected non-streaming body to avoid repeated full parses");
+
+  chio::detail::CurlBodyCapture anchored;
+  int anchored_count = 0;
+  anchored.stream_message = [&anchored_count](const std::string& payload) {
+    ++anchored_count;
+    require_contains(payload, "notifications/tools/list_changed", "anchored SSE payload");
+    return chio::Result<void>::success();
+  };
+  std::string metadata = "event: metadata: not-a-data-field\n";
+  const auto metadata_returned =
+      chio::detail::write_curl_body(&metadata[0], 1, metadata.size(), &anchored);
+  require(metadata_returned == metadata.size(), "expected metadata line to keep reading");
+  require(anchored_count == 0, "expected non-data SSE field not to dispatch");
+  std::string notification =
+      "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n\n";
+  const auto notification_returned =
+      chio::detail::write_curl_body(&notification[0], 1, notification.size(), &anchored);
+  require(notification_returned == notification.size(), "expected notification stream to continue");
+  require(anchored_count == 1, "expected line-start data field to dispatch once");
+
+  chio::detail::CurlBodyCapture long_stream;
+  int long_stream_count = 0;
+  long_stream.stream_message = [&long_stream_count](const std::string&) {
+    ++long_stream_count;
+    return chio::Result<void>::success();
+  };
+  for (int i = 0; i < 300; ++i) {
+    std::string event =
+        "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"i\":" +
+        std::to_string(i) + "}}\n\n";
+    const auto event_returned =
+        chio::detail::write_curl_body(&event[0], 1, event.size(), &long_stream);
+    require(event_returned == event.size(), "expected long stream to continue");
+  }
+  require(long_stream_count == 300, "expected every long stream event to dispatch");
+  require(long_stream.body.size() < chio::detail::kSseCompactThreshold + 1024,
+          "expected processed SSE bytes to be compacted");
 }
 
 void test_transport_policy_respects_retryable_flag() {
@@ -380,6 +417,40 @@ void test_start_receive_loop_returns_setup_errors() {
   }, std::make_shared<chio::CancellationToken>());
   require(!started.ok(), "expected receive loop setup failure");
   require_contains(started.error().message, "bearer token is empty", "receive loop setup error");
+}
+
+void test_nested_router_bind_captures_stable_sender() {
+  auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {202, {}, "{\"ok\":true}"},
+  });
+
+  chio::MessageHandler handler;
+  {
+    chio::Session session("http://127.0.0.1:8080",
+                          "token",
+                          "sess-bound-router",
+                          "2025-11-25",
+                          transport);
+    chio::NestedCallbackRouter router;
+    router.on_roots([](const chio::JsonMessage& message) {
+      return chio::Result<std::string>::success(
+          chio::NestedCallbackRouter::roots_list_result(
+              message, "[{\"uri\":\"file:///tmp\",\"name\":\"tmp\"}]"));
+    });
+    handler = router.bind(session);
+  }
+
+  chio::JsonMessage message;
+  message.method = "roots/list";
+  message.id = "edge-client-2";
+  message.id_json = "\"edge-client-2\"";
+  const auto handled = handler(message);
+  require(handled.ok(), handled.error().message);
+  require(transport->requests.size() == 1, "expected bound router callback response");
+  require_contains(transport->requests[0].body, "\"id\":\"edge-client-2\"", "bound callback id");
+  require_contains(transport->requests[0].headers["MCP-Session-Id"],
+                   "sess-bound-router",
+                   "bound callback session id");
 }
 
 void test_initialize_nested_message_handler() {
@@ -659,6 +730,7 @@ int main() {
     test_typed_list_helpers_reject_jsonrpc_errors();
     test_session_refreshes_token_provider_for_requests();
     test_start_receive_loop_returns_setup_errors();
+    test_nested_router_bind_captures_stable_sender();
     test_initialize_nested_message_handler();
     test_builder_retry_trace_typed_models_and_streaming();
     test_auth_metadata_and_pkce();

@@ -53,6 +53,8 @@ class NestedCallbackRouter {
 };
 
 class Session {
+  friend class NestedCallbackRouter;
+
  public:
   Session(std::string base_url,
           std::string bearer_token,
@@ -113,6 +115,7 @@ class Session {
   std::int64_t next_id() const;
   Result<void> dispatch_messages(const std::string& body, MessageHandler handler) const;
   Result<std::string> bearer_token_for_request(std::string operation) const;
+  std::function<Result<std::string>(std::string)> envelope_sender() const;
 
   std::string base_url_;
   std::string bearer_token_;

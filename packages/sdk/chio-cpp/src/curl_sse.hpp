@@ -10,6 +10,8 @@
 namespace chio {
 namespace detail {
 
+constexpr std::size_t kSseCompactThreshold = 4096;
+
 inline std::string trim_event_payload(std::string value) {
   while (!value.empty() &&
          (value.front() == ' ' || value.front() == '\t' || value.front() == '\r')) {
@@ -56,20 +58,31 @@ struct CurlBodyCapture {
   std::function<Result<void>(const std::string&)> stream_message;
 };
 
+inline void compact_processed_sse(CurlBodyCapture& capture) {
+  if (capture.scan_pos < kSseCompactThreshold) {
+    return;
+  }
+  capture.body.erase(0, capture.scan_pos);
+  capture.scan_pos = 0;
+}
+
 inline void scan_sse_events(CurlBodyCapture& capture) {
   while (true) {
-    const auto line_start = capture.body.find("data:", capture.scan_pos);
-    if (line_start == std::string::npos) {
-      return;
-    }
+    const auto line_start = capture.scan_pos;
     const auto line_end = capture.body.find('\n', line_start);
     if (line_end == std::string::npos) {
+      compact_processed_sse(capture);
       return;
     }
     capture.scan_pos = line_end + 1;
+    if (capture.body.compare(line_start, 5, "data:") != 0) {
+      compact_processed_sse(capture);
+      continue;
+    }
     auto payload = trim_event_payload(
         capture.body.substr(line_start + 5, line_end - (line_start + 5)));
     if (payload.empty() || payload == "[DONE]") {
+      compact_processed_sse(capture);
       continue;
     }
     if (capture.stream_message) {
@@ -85,6 +98,7 @@ inline void scan_sse_events(CurlBodyCapture& capture) {
       capture.complete = true;
       return;
     }
+    compact_processed_sse(capture);
   }
 }
 

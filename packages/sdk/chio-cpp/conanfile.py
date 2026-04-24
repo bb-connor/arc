@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from conan import ConanFile
-from conan.tools.files import copy
+from conan.tools.files import chdir, copy
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 
@@ -54,11 +54,17 @@ class ChioCppConan(ConanFile):
         toolchain = CMakeToolchain(self)
         toolchain.variables["CHIO_CPP_BUILD_TESTS"] = False
         toolchain.variables["CHIO_CPP_BUILD_EXAMPLES"] = False
+        toolchain.variables["CHIO_CPP_BUILD_RUST_FFI"] = False
         toolchain.variables["CHIO_CPP_ENABLE_CURL"] = self.options.with_curl
         toolchain.variables["BUILD_SHARED_LIBS"] = self.options.shared
         toolchain.generate()
 
     def build(self):
+        cargo = "cargo build -p chio-bindings-ffi"
+        if str(self.settings.build_type) == "Release":
+            cargo += " --release"
+        with chdir(self, self.source_folder):
+            self.run(cargo)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
