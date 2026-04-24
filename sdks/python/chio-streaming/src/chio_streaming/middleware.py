@@ -311,8 +311,18 @@ class ChioConsumerMiddleware:
         message: KafkaMessageLike,
         handler: MessageHandler,
     ) -> ProcessingOutcome:
-        request_id = _new_request_id("chio-kafka")
         topic = message.topic() or ""
+        # Derive request_id from (topic, partition, offset) so non-transactional
+        # consumers that redeliver between produce and commit still collide on
+        # the same request_id, honouring the README dedupe contract. In
+        # transactional=True mode the EOS commit prevents redelivery so this
+        # is a belt-and-braces guarantee.
+        partition = message.partition()
+        offset = message.offset()
+        if partition is not None and offset is not None:
+            request_id = f"chio-kafka-{topic}-{partition}-{offset}"
+        else:
+            request_id = _new_request_id("chio-kafka")
         tool_name = resolve_scope(scope_map=self._config.scope_map, subject=topic)
         parameters = self._parameters_for(message, request_id=request_id)
 

@@ -294,6 +294,10 @@ async def test_allow_path_runs_handler_publishes_receipt_and_commits() -> None:
     assert outcome.committed is True
     assert outcome.handler_error is None
     assert handled == [("orders", 7)]
+    # request_id is derived from (topic, partition, offset) so non-transactional
+    # consumers that redeliver between produce and commit still collide on
+    # the same id for downstream dedupe.
+    assert outcome.request_id == "chio-kafka-orders-0-7"
     # Allow path publishes a receipt envelope to the receipt topic.
     assert len(producer.produced) == 1
     produced = producer.produced[0]
@@ -349,7 +353,6 @@ async def test_allow_path_handler_error_aborts_transaction() -> None:
 
 @pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
 async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
-    # Wave 1 replaced `except BaseException` with `except Exception`;
     # SystemExit / KeyboardInterrupt / CancelledError must propagate so
     # operators can shut the consumer down cleanly.
     chio = allow_all()
