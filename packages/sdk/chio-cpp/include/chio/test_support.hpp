@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <mutex>
 #include <utility>
 #include <vector>
@@ -21,7 +22,7 @@ class FakeTransport final : public HttpTransport {
 
   Result<HttpResponse> send(const HttpRequest& request) override {
     std::lock_guard<std::mutex> lock(mu_);
-    requests.push_back(request);
+    requests_.push_back(request);
     if (responses_.empty()) {
       return Result<HttpResponse>::failure(
           Error{ErrorCode::Transport, "no fake response queued", "FakeTransport::send"});
@@ -32,10 +33,24 @@ class FakeTransport final : public HttpTransport {
     return Result<HttpResponse>::success(std::move(response));
   }
 
-  std::vector<HttpRequest> requests;
+  std::vector<HttpRequest> requests_snapshot() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    return requests_;
+  }
+
+  std::size_t request_count() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    return requests_.size();
+  }
+
+  void clear_requests() {
+    std::lock_guard<std::mutex> lock(mu_);
+    requests_.clear();
+  }
 
  private:
-  std::mutex mu_;
+  mutable std::mutex mu_;
+  std::vector<HttpRequest> requests_;
   std::vector<HttpResponse> responses_;
 };
 
@@ -51,13 +66,27 @@ class RecordingTraceSink final : public TraceSink {
  public:
   void record(const TraceEvent& event) override {
     std::lock_guard<std::mutex> lock(mu_);
-    events.push_back(event);
+    events_.push_back(event);
   }
 
-  std::vector<TraceEvent> events;
+  std::vector<TraceEvent> events_snapshot() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    return events_;
+  }
+
+  std::size_t event_count() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    return events_.size();
+  }
+
+  void clear_events() {
+    std::lock_guard<std::mutex> lock(mu_);
+    events_.clear();
+  }
 
  private:
-  std::mutex mu_;
+  mutable std::mutex mu_;
+  std::vector<TraceEvent> events_;
 };
 
 }  // namespace chio::test

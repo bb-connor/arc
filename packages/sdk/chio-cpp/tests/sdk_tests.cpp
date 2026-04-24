@@ -392,7 +392,7 @@ void test_client_session_with_fake_transport() {
        "{\"jsonrpc\":\"2.0\",\"id\":1,\"metadata\":{\"protocolVersion\":\"wrong\"},"
        "\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
       {202, {}, "{}"},
-      {200, {}, "{\"tools\":[]}"},
+      {200, {}, "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[]}}"},
       {200, {}, "{\"result\":\"closed\"}"},
   });
 
@@ -405,7 +405,7 @@ void test_client_session_with_fake_transport() {
 
   auto tools = session.list_tools();
   require(tools.ok(), tools.error().message);
-  require_eq(tools.value(), "{\"tools\":[]}", "list tools body");
+  require_contains(tools.value(), "\"tools\":[]", "list tools body");
 
   auto closed = session.close();
   require(closed.ok(), closed.error().message);
@@ -533,13 +533,23 @@ void test_initialize_handles_sse_and_rejects_invalid_handshakes() {
 }
 
 void test_typed_list_helpers_reject_jsonrpc_errors() {
-  const chio::HttpResponse error_response{
-      200, {}, "{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32603,\"message\":\"denied\"}}"};
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
-      error_response,
-      error_response,
-      error_response,
-      error_response,
+      {200,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32603,"
+       "\"message\":\"denied\"}}"},
+      {200,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"id\":3,\"error\":{\"code\":-32603,"
+       "\"message\":\"denied\"}}"},
+      {200,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"id\":4,\"error\":{\"code\":-32603,"
+       "\"message\":\"denied\"}}"},
+      {200,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"id\":5,\"error\":{\"code\":-32603,"
+       "\"message\":\"denied\"}}"},
   });
   chio::Session session("http://127.0.0.1:8080",
                         "token",
@@ -556,6 +566,21 @@ void test_typed_list_helpers_reject_jsonrpc_errors() {
   require(!prompts.ok(), "expected prompts/list JSON-RPC error to fail");
   auto tasks = session.list_tasks_typed();
   require(!tasks.ok(), "expected tasks/list JSON-RPC error to fail");
+
+  auto wrong_id_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200, {}, "{\"jsonrpc\":\"2.0\",\"id\":99,\"result\":{\"tools\":[]}}"},
+      });
+  chio::Session wrong_id_session("http://127.0.0.1:8080",
+                                 "token",
+                                 "sess-wrong-response-id",
+                                 "2025-11-25",
+                                 wrong_id_transport);
+  auto wrong_id_tools = wrong_id_session.list_tools_typed();
+  require(!wrong_id_tools.ok(), "expected mismatched tools/list response id to fail");
+  require_contains(wrong_id_tools.error().message,
+                   "terminal response",
+                   "mismatched tools/list response id error");
 }
 
 void test_session_refreshes_token_provider_for_requests() {
@@ -563,7 +588,7 @@ void test_session_refreshes_token_provider_for_requests() {
       {200, {{"MCP-Session-Id", "sess-refresh"}},
        initialize_ok_response_json()},
       {202, {}, "{}"},
-      {200, {}, "{\"tools\":[]}"},
+      {200, {}, "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[]}}"},
       {200, {}, "{\"result\":\"closed\"}"},
   });
 
@@ -730,7 +755,7 @@ void test_builder_retry_trace_typed_models_and_streaming() {
   require_eq(transport->requests[1].headers["Authorization"],
              "Bearer token",
              "token provider header");
-  require(traces->events.size() >= 2, "expected trace events for retry");
+  require(traces->event_count() >= 2, "expected trace events for retry");
 
   auto tools = session.list_tools_typed();
   require(tools.ok(), tools.error().message);
@@ -787,6 +812,56 @@ void test_builder_retry_trace_typed_models_and_streaming() {
   require_contains(incomplete_stream.error().message,
                    "terminal response",
                    "incomplete stream error");
+
+  auto buffered_incomplete_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200,
+           {},
+           "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\"}\n\n"},
+      });
+  chio::Session buffered_incomplete_session("http://127.0.0.1:8080",
+                                            "token",
+                                            "sess-buffered-incomplete-stream",
+                                            "2025-11-25",
+                                            buffered_incomplete_transport);
+  bool saw_buffered_progress = false;
+  auto buffered_incomplete = buffered_incomplete_session.request_streaming(
+      "tools/list",
+      "{}",
+      [&](const chio::JsonMessage& message) {
+        saw_buffered_progress = message.method == "notifications/progress";
+        return chio::Result<void>::success();
+      });
+  require(!buffered_incomplete.ok(), "expected buffered stream without terminal to fail");
+  require(saw_buffered_progress, "expected buffered stream notification to be delivered");
+  require_contains(buffered_incomplete.error().message,
+                   "terminal response",
+                   "buffered incomplete stream error");
+
+  auto tool_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200,
+           {{"X-Test", "metadata"}},
+           "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[]}}"},
+      });
+  chio::Session tool_session("http://127.0.0.1:8080",
+                             "token",
+                             "sess-tool-client",
+                             "2025-11-25",
+                             tool_transport);
+  chio::ToolClient tool(tool_session, "echo");
+  auto typed_call = tool.call_typed("{}");
+  require(typed_call.ok(), typed_call.error().message);
+  require(typed_call.value().response.status == 200,
+          "expected ToolClient typed response status");
+  require_eq(typed_call.value().response.headers["X-Test"],
+             "metadata",
+             "expected ToolClient typed response header");
+  require_contains(typed_call.value().raw_json, "\"content\":[]", "typed tool call raw json");
+  require_contains(tool_transport->requests[0].body,
+                   "\"method\":\"tools/call\"",
+                   "typed tool call request method");
+  require_contains(tool_transport->requests[0].body, "\"name\":\"echo\"", "typed tool name");
 }
 
 void test_auth_metadata_and_pkce() {

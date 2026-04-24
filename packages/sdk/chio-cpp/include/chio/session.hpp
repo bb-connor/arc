@@ -28,6 +28,7 @@ using ElicitationHandler = std::function<Result<std::string>(const JsonMessage&)
 using RootsHandler = std::function<Result<std::string>(const JsonMessage&)>;
 
 class Session;
+class ToolClient;
 
 class NestedCallbackRouter {
  public:
@@ -54,6 +55,7 @@ class NestedCallbackRouter {
 
 class Session {
   friend class NestedCallbackRouter;
+  friend class ToolClient;
 
  public:
   Session(std::string base_url,

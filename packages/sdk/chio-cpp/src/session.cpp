@@ -191,13 +191,25 @@ Result<void> reject_jsonrpc_error(const detail::JsonValue& root,
             detail::body_snippet(raw_json), {}, {}, false});
 }
 
+std::string request_terminal_id_json(const std::string& body_json) {
+  auto parsed = detail::parse_json(body_json);
+  if (!parsed || !parsed->is_object() || parsed->get("method") == nullptr) {
+    return {};
+  }
+  const auto* id = parsed->get("id");
+  return id == nullptr ? std::string() : id->dump();
+}
+
 Result<std::string> normalize_response_body(const std::string& body,
                                             const std::string& expected_id_json,
                                             std::string operation,
                                             bool require_terminal) {
   auto parsed = detail::parse_json(body);
   if (parsed) {
-    if (!require_terminal ||
+    if (expected_id_json.empty() && !require_terminal) {
+      return Result<std::string>::success(body);
+    }
+    if (!expected_id_json.empty() &&
         detail::is_jsonrpc_terminal_response(*parsed, expected_id_json)) {
       return Result<std::string>::success(body);
     }
@@ -519,7 +531,7 @@ Result<TypedResponse<std::string>> Session::send_envelope_response(std::string b
     return Result<TypedResponse<std::string>>::failure(
         Error{ErrorCode::Transport, "missing HTTP transport", "Session::send_envelope"});
   }
-  const auto expected_id_json = detail::request_id_json(body_json);
+  const auto expected_id_json = request_terminal_id_json(body_json);
   auto request_result = make_post(std::move(body_json));
   if (!request_result) {
     return Result<TypedResponse<std::string>>::failure(request_result.error());
@@ -622,16 +634,16 @@ Result<std::string> Session::request_streaming(std::string method,
               detail::retryable_status(http.status)});
   }
   auto response_body = std::move(http.body);
-  auto terminal_response = normalize_response_body(response_body, id_json,
-                                                   "Session::request_streaming", true);
-  if (!terminal_response) {
-    return Result<std::string>::failure(terminal_response.error());
-  }
   if (!*saw_stream_message) {
     auto dispatched = dispatch_messages(response_body, std::move(handler));
     if (!dispatched) {
       return Result<std::string>::failure(dispatched.error());
     }
+  }
+  auto terminal_response = normalize_response_body(response_body, id_json,
+                                                   "Session::request_streaming", true);
+  if (!terminal_response) {
+    return Result<std::string>::failure(terminal_response.error());
   }
   return Result<std::string>::success(terminal_response.move_value());
 }

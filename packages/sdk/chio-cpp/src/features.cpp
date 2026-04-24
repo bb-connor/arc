@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <sstream>
+#include <string>
 #include <utility>
 
 #include "chio/client.hpp"
@@ -215,15 +216,15 @@ Result<std::string> ToolClient::call_json(std::string arguments_json) const {
 
 Result<TypedResponse<std::string>> ToolClient::call_typed(
     std::string arguments_json) const {
-  const auto id = "tools/call";
-  auto raw = session_->request(id,
-                               "{\"name\":" + detail::quote(name_) +
-                                   ",\"arguments\":" + arguments_json + "}");
+  const auto id = session_->next_id();
+  auto raw = session_->send_envelope_response(
+      "{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
+      ",\"method\":\"tools/call\",\"params\":{\"name\":" + detail::quote(name_) +
+      ",\"arguments\":" + arguments_json + "}}");
   if (!raw) {
     return Result<TypedResponse<std::string>>::failure(raw.error());
   }
-  return Result<TypedResponse<std::string>>::success(
-      TypedResponse<std::string>{raw.value(), raw.value(), HttpResponse{}});
+  return Result<TypedResponse<std::string>>::success(raw.move_value());
 }
 
 Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& client) {
