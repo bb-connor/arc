@@ -127,7 +127,7 @@ class SessionPool {
  private:
   std::mutex mu_;
   std::map<std::string, std::weak_ptr<Session>> sessions_;
-  std::map<std::string, std::shared_ptr<std::mutex>> initialization_locks_;
+  std::map<std::string, std::weak_ptr<std::mutex>> initialization_locks_;
 };
 
 }  // namespace chio

@@ -48,6 +48,10 @@ class ChioCppConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
+    def requirements(self):
+        if self.options.with_curl:
+            self.requires("libcurl/8.15.0")
+
     def generate(self):
         deps = CMakeDeps(self)
         deps.generate()
@@ -81,3 +85,5 @@ class ChioCppConan(ConanFile):
             self.cpp_info.frameworks = ["Security", "CoreFoundation"]
         elif str(self.settings.os) in ["Linux", "FreeBSD"]:
             self.cpp_info.system_libs = ["dl", "pthread", "m"]
+        if self.options.with_curl:
+            self.cpp_info.requires = ["libcurl::libcurl"]

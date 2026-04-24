@@ -23,22 +23,37 @@ if(NOT EXISTS "${CHIO_CPP_REPO_ROOT}/Cargo.toml")
 endif()
 set(CHIO_CPP_FFI_INCLUDE_DIR "${CHIO_CPP_REPO_ROOT}/crates/chio-bindings-ffi/include")
 
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(CHIO_CPP_RUST_PROFILE_ARG "--release")
-  set(CHIO_CPP_RUST_PROFILE_DIR "release")
-else()
-  set(CHIO_CPP_RUST_PROFILE_ARG "")
-  set(CHIO_CPP_RUST_PROFILE_DIR "debug")
-endif()
-
-set(CHIO_CPP_RUST_LIB
-  "${CHIO_CPP_REPO_ROOT}/target/${CHIO_CPP_RUST_PROFILE_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
+set(CHIO_CPP_RUST_DEBUG_LIB
+  "${CHIO_CPP_REPO_ROOT}/target/debug/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
+set(CHIO_CPP_RUST_RELEASE_LIB
+  "${CHIO_CPP_REPO_ROOT}/target/release/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
+)
+
+if(CMAKE_CONFIGURATION_TYPES)
+  set(CHIO_CPP_RUST_PROFILE_ARG "$<$<NOT:$<CONFIG:Debug>>:--release>")
+  set(CHIO_CPP_RUST_LIB
+    "$<$<CONFIG:Debug>:${CHIO_CPP_RUST_DEBUG_LIB}>$<$<NOT:$<CONFIG:Debug>>:${CHIO_CPP_RUST_RELEASE_LIB}>"
+  )
+  set(CHIO_CPP_RUST_BYPRODUCTS
+    "${CHIO_CPP_RUST_DEBUG_LIB}"
+    "${CHIO_CPP_RUST_RELEASE_LIB}"
+  )
+else()
+  if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(CHIO_CPP_RUST_PROFILE_ARG "--release")
+    set(CHIO_CPP_RUST_LIB "${CHIO_CPP_RUST_RELEASE_LIB}")
+  else()
+    set(CHIO_CPP_RUST_PROFILE_ARG "")
+    set(CHIO_CPP_RUST_LIB "${CHIO_CPP_RUST_DEBUG_LIB}")
+  endif()
+  set(CHIO_CPP_RUST_BYPRODUCTS "${CHIO_CPP_RUST_LIB}")
+endif()
 
 if(CHIO_CPP_BUILD_RUST_FFI)
   add_custom_target(chio_bindings_ffi_build
     COMMAND cargo build -p chio-bindings-ffi ${CHIO_CPP_RUST_PROFILE_ARG}
-    BYPRODUCTS "${CHIO_CPP_RUST_LIB}"
+    BYPRODUCTS ${CHIO_CPP_RUST_BYPRODUCTS}
     WORKING_DIRECTORY "${CHIO_CPP_REPO_ROOT}"
     COMMENT "Building Rust chio-bindings-ffi"
     VERBATIM
@@ -46,9 +61,19 @@ if(CHIO_CPP_BUILD_RUST_FFI)
 endif()
 
 add_library(chio_bindings_ffi STATIC IMPORTED GLOBAL)
-set_target_properties(chio_bindings_ffi PROPERTIES
-  IMPORTED_LOCATION "${CHIO_CPP_RUST_LIB}"
-)
+if(CMAKE_CONFIGURATION_TYPES)
+  set_target_properties(chio_bindings_ffi PROPERTIES
+    IMPORTED_CONFIGURATIONS "DEBUG;RELEASE;RELWITHDEBINFO;MINSIZEREL"
+    IMPORTED_LOCATION_DEBUG "${CHIO_CPP_RUST_DEBUG_LIB}"
+    IMPORTED_LOCATION_RELEASE "${CHIO_CPP_RUST_RELEASE_LIB}"
+    IMPORTED_LOCATION_RELWITHDEBINFO "${CHIO_CPP_RUST_RELEASE_LIB}"
+    IMPORTED_LOCATION_MINSIZEREL "${CHIO_CPP_RUST_RELEASE_LIB}"
+  )
+else()
+  set_target_properties(chio_bindings_ffi PROPERTIES
+    IMPORTED_LOCATION "${CHIO_CPP_RUST_LIB}"
+  )
+endif()
 if(CHIO_CPP_BUILD_RUST_FFI)
   add_dependencies(chio_bindings_ffi chio_bindings_ffi_build)
 endif()

@@ -51,6 +51,26 @@ std::string session_pool_key(const ClientOptions& options) {
   return key.str();
 }
 
+void prune_session_pool_locked(
+    std::map<std::string, std::weak_ptr<Session>>& sessions,
+    std::map<std::string, std::weak_ptr<std::mutex>>& initialization_locks) {
+  for (auto it = sessions.begin(); it != sessions.end();) {
+    if (it->second.expired()) {
+      it = sessions.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = initialization_locks.begin(); it != initialization_locks.end();) {
+    if (it->second.expired() && sessions.find(it->first) == sessions.end()) {
+      it = initialization_locks.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 }  // namespace
 
 std::uint64_t SystemClock::now_unix_secs() const {
@@ -204,6 +224,7 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
   std::shared_ptr<std::mutex> initialization_lock;
   {
     std::lock_guard<std::mutex> lock(mu_);
+    prune_session_pool_locked(sessions_, initialization_locks_);
     auto found = sessions_.find(key);
     if (found != sessions_.end()) {
       auto existing = found->second.lock();
@@ -211,9 +232,11 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
         return Result<std::shared_ptr<Session>>::success(existing);
       }
     }
-    auto& pending_lock = initialization_locks_[key];
+    auto& pending_lock_ref = initialization_locks_[key];
+    auto pending_lock = pending_lock_ref.lock();
     if (!pending_lock) {
       pending_lock = std::make_shared<std::mutex>();
+      pending_lock_ref = pending_lock;
     }
     initialization_lock = pending_lock;
   }
@@ -236,6 +259,7 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
   }
   auto session = std::make_shared<Session>(initialized.move_value());
   std::lock_guard<std::mutex> lock(mu_);
+  prune_session_pool_locked(sessions_, initialization_locks_);
   sessions_[key] = session;
   return Result<std::shared_ptr<Session>>::success(std::move(session));
 }
