@@ -23,8 +23,11 @@ def write_dispute_workflow(
         "severity": "medium",
         "detected_at": now_epoch(),
     }
-    partial_payment_units = int(quote_response["price_minor_units"] * 0.7)
-    refund_units = quote_response["price_minor_units"] - partial_payment_units
+    # Stay in integer arithmetic: split 70/30 of the minor-unit price as
+    # exact integer math so large prices never round through a float.
+    price_minor_units = quote_response["price_minor_units"]
+    partial_payment_units = (price_minor_units * 7) // 10
+    refund_units = price_minor_units - partial_payment_units
     partial_payment = {
         "schema": "chio.example.ioa-web3.partial-payment.v1",
         "order_id": order_id,
