@@ -1,25 +1,14 @@
 #include "chio/dpop.hpp"
 
 #include <chrono>
-#include <iomanip>
-#include <random>
 #include <sstream>
 
 #include "chio/invariants.hpp"
 #include "json.hpp"
+#include "random.hpp"
 
 namespace chio {
 namespace {
-
-std::string random_nonce() {
-  std::random_device rng;
-  std::ostringstream out;
-  for (int i = 0; i < 16; ++i) {
-    auto byte = static_cast<unsigned int>(rng() & 0xffU);
-    out << std::hex << std::setw(2) << std::setfill('0') << byte;
-  }
-  return out.str();
-}
 
 std::uint64_t now_unix_secs() {
   const auto now = std::chrono::system_clock::now().time_since_epoch();
@@ -54,7 +43,7 @@ Result<DpopProof> sign_dpop_proof(const DpopSignParams& params) {
         Error{ErrorCode::Protocol, "failed to derive DPoP agent public key"});
   }
 
-  const auto nonce = params.nonce.empty() ? random_nonce() : params.nonce;
+  const auto nonce = params.nonce.empty() ? detail::random_hex(16) : params.nonce;
   const auto issued_at = params.issued_at == 0 ? now_unix_secs() : params.issued_at;
 
   std::ostringstream body;

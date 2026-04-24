@@ -1,11 +1,10 @@
 #include "chio/session.hpp"
 
-#include <cctype>
 #include <memory>
-#include <sstream>
 #include <utility>
 
 #include "json.hpp"
+#include "sse.hpp"
 #include "transport_util.hpp"
 
 namespace chio {
@@ -803,19 +802,7 @@ Result<void> Session::dispatch_messages(const std::string& body,
     return Result<void>::success();
   }
 
-  std::istringstream stream(body);
-  std::string line;
-  while (std::getline(stream, line)) {
-    if (line.rfind("data:", 0) != 0) {
-      continue;
-    }
-    auto payload = line.substr(5);
-    while (!payload.empty() && std::isspace(static_cast<unsigned char>(payload.front()))) {
-      payload.erase(payload.begin());
-    }
-    if (payload.empty() || payload == "[DONE]") {
-      continue;
-    }
+  return detail::for_each_sse_event(body, [&](const std::string& payload) {
     auto event = detail::parse_json(payload);
     if (!event) {
       return Result<void>::failure(
@@ -826,8 +813,8 @@ Result<void> Session::dispatch_messages(const std::string& body,
     if (!delivered) {
       return delivered;
     }
-  }
-  return Result<void>::success();
+    return Result<void>::success();
+  });
 }
 
 }  // namespace chio

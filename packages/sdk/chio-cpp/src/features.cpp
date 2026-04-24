@@ -1,27 +1,16 @@
 #include "chio/features.hpp"
 
 #include <chrono>
-#include <iomanip>
-#include <random>
 #include <sstream>
 #include <utility>
 
 #include "chio/client.hpp"
 #include "chio/invariants.hpp"
 #include "json.hpp"
+#include "random.hpp"
 
 namespace chio {
 namespace {
-
-std::string random_hex(std::size_t bytes) {
-  std::random_device rng;
-  std::ostringstream out;
-  for (std::size_t i = 0; i < bytes; ++i) {
-    out << std::hex << std::setw(2) << std::setfill('0')
-        << static_cast<unsigned int>(rng() & 0xffU);
-  }
-  return out.str();
-}
 
 std::string capability_id_from_json(const std::string& capability_json) {
   auto parsed = detail::parse_json(capability_json);
@@ -71,7 +60,7 @@ std::uint64_t SystemClock::now_unix_secs() const {
 }
 
 Result<std::string> RandomNonceGenerator::generate_nonce() {
-  return Result<std::string>::success(random_hex(16));
+  return Result<std::string>::success(detail::random_hex(16));
 }
 
 StaticSeedKeyProvider::StaticSeedKeyProvider(std::string seed_hex)

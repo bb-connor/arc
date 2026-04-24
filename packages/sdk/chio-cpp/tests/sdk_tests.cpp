@@ -207,6 +207,33 @@ void test_curl_sse_helpers_abort_after_terminal_message() {
   require(notification_returned == notification.size(), "expected notification stream to continue");
   require(anchored_count == 1, "expected line-start data field to dispatch once");
 
+  chio::detail::CurlBodyCapture multiline;
+  int multiline_count = 0;
+  multiline.stream_message = [&multiline_count](const std::string& payload) {
+    ++multiline_count;
+    require_contains(payload, "\"method\"", "multiline SSE payload");
+    auto parsed = chio::detail::parse_json(payload);
+    require(parsed.has_value(), "expected multiline SSE payload to parse");
+    return chio::Result<void>::success();
+  };
+  std::string partial_multiline =
+      "data: {\"jsonrpc\":\"2.0\",\n"
+      "data: \"method\":\"notifications/tools/list_changed\"}\n";
+  const auto partial_multiline_returned =
+      chio::detail::write_curl_body(&partial_multiline[0], 1, partial_multiline.size(), &multiline);
+  require(partial_multiline_returned == partial_multiline.size(),
+          "expected incomplete multiline event to keep reading");
+  require(multiline_count == 0, "expected multiline SSE to wait for event delimiter");
+  std::string multiline_delimiter = "\n";
+  const auto multiline_delimiter_returned =
+      chio::detail::write_curl_body(&multiline_delimiter[0],
+                                    1,
+                                    multiline_delimiter.size(),
+                                    &multiline);
+  require(multiline_delimiter_returned == multiline_delimiter.size(),
+          "expected multiline event delimiter to keep reading");
+  require(multiline_count == 1, "expected multiline SSE event to dispatch once");
+
   chio::detail::CurlBodyCapture long_stream;
   int long_stream_count = 0;
   long_stream.stream_message = [&long_stream_count](const std::string&) {
@@ -515,7 +542,7 @@ void test_builder_retry_trace_typed_models_and_streaming() {
       {200, {{"MCP-Session-Id", "sess-2"}}, "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
       {202, {}, "{}"},
       {200, {}, "{\"result\":{\"tools\":[{\"name\":\"echo_text\",\"description\":\"Echo\",\"inputSchema\":{\"type\":\"object\"}}]}}"},
-      {200, {}, "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n\n"},
+      {200, {}, "data: {\"jsonrpc\":\"2.0\",\ndata: \"method\":\"notifications/tools/list_changed\"}\n\n"},
   });
   auto traces = std::make_shared<chio::test::RecordingTraceSink>();
   chio::RetryPolicy retry;

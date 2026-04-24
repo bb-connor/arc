@@ -6,23 +6,12 @@
 
 #include "chio/result.hpp"
 #include "json.hpp"
+#include "sse.hpp"
 
 namespace chio {
 namespace detail {
 
 constexpr std::size_t kSseCompactThreshold = 4096;
-
-inline std::string trim_event_payload(std::string value) {
-  while (!value.empty() &&
-         (value.front() == ' ' || value.front() == '\t' || value.front() == '\r')) {
-    value.erase(value.begin());
-  }
-  while (!value.empty() &&
-         (value.back() == ' ' || value.back() == '\t' || value.back() == '\r')) {
-    value.pop_back();
-  }
-  return value;
-}
 
 inline bool is_terminal_message(const std::string& payload, const std::string& id_json) {
   if (id_json.empty()) {
@@ -54,6 +43,7 @@ struct CurlBodyCapture {
   std::size_t scan_pos = 0;
   bool complete = false;
   bool callback_failed = false;
+  SseEventData pending_event;
   Error callback_error;
   std::function<Result<void>(const std::string&)> stream_message;
 };
@@ -75,28 +65,34 @@ inline void scan_sse_events(CurlBodyCapture& capture) {
       return;
     }
     capture.scan_pos = line_end + 1;
-    if (capture.body.compare(line_start, 5, "data:") != 0) {
-      compact_processed_sse(capture);
-      continue;
-    }
-    auto payload = trim_event_payload(
-        capture.body.substr(line_start + 5, line_end - (line_start + 5)));
-    if (payload.empty() || payload == "[DONE]") {
-      compact_processed_sse(capture);
-      continue;
-    }
-    if (capture.stream_message) {
-      auto delivered = capture.stream_message(payload);
+    std::string_view line(capture.body.data() + line_start, line_end - line_start);
+    if (is_sse_blank_line(line)) {
+      auto delivered = flush_sse_event(capture.pending_event, [&](const std::string& payload) {
+        if (capture.stream_message) {
+          auto handled = capture.stream_message(payload);
+          if (!handled) {
+            return handled;
+          }
+        }
+        if (is_terminal_message(payload, capture.id_json)) {
+          capture.complete = true;
+        }
+        return Result<void>::success();
+      });
       if (!delivered) {
         capture.callback_failed = true;
         capture.callback_error = delivered.error();
         capture.complete = true;
         return;
       }
+      if (capture.complete) {
+        return;
+      }
+      compact_processed_sse(capture);
+      continue;
     }
-    if (is_terminal_message(payload, capture.id_json)) {
-      capture.complete = true;
-      return;
+    if (line.rfind("data:", 0) == 0) {
+      append_sse_data_line(capture.pending_event, line);
     }
     compact_processed_sse(capture);
   }
