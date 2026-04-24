@@ -5,6 +5,7 @@
 #include <curl/curl.h>
 
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <sstream>
 
@@ -168,6 +169,12 @@ Result<HttpResponse> CurlHttpTransport::send(const HttpRequest& request) {
     curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT_MS,
                      static_cast<long>(request.timeout.count()));
   }
+  if (request.body.size() > static_cast<std::size_t>(std::numeric_limits<long>::max())) {
+    return Result<HttpResponse>::failure(
+        Error{ErrorCode::Transport, "request body is too large for curl POSTFIELDSIZE",
+              "CurlHttpTransport::send"});
+  }
+  const auto body_size = static_cast<long>(request.body.size());
 
   ProgressContext progress{request.cancellation};
   if (request.cancellation) {
@@ -179,12 +186,12 @@ Result<HttpResponse> CurlHttpTransport::send(const HttpRequest& request) {
   if (request.method == "POST") {
     curl_easy_setopt(curl.get(), CURLOPT_POST, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, request.body.c_str());
-    curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, request.body.size());
+    curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, body_size);
   } else if (request.method != "GET") {
     curl_easy_setopt(curl.get(), CURLOPT_CUSTOMREQUEST, request.method.c_str());
     if (!request.body.empty()) {
       curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, request.body.c_str());
-      curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, request.body.size());
+      curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, body_size);
     }
   }
 

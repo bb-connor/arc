@@ -252,9 +252,11 @@ Session::Session(std::string base_url,
                  HttpTransportPtr transport,
                  RetryPolicy retry_policy,
                  TraceSinkPtr trace_sink,
-                 std::chrono::milliseconds timeout)
+                 std::chrono::milliseconds timeout,
+                 TokenProviderPtr token_provider)
     : base_url_(detail::trim_right_slash(std::move(base_url))),
       bearer_token_(std::move(bearer_token)),
+      token_provider_(std::move(token_provider)),
       session_id_(std::move(session_id)),
       protocol_version_(std::move(protocol_version)),
       transport_(std::move(transport)),
@@ -265,6 +267,7 @@ Session::Session(std::string base_url,
 Session::Session(Session&& other) noexcept
     : base_url_(std::move(other.base_url_)),
       bearer_token_(std::move(other.bearer_token_)),
+      token_provider_(std::move(other.token_provider_)),
       session_id_(std::move(other.session_id_)),
       protocol_version_(std::move(other.protocol_version_)),
       transport_(std::move(other.transport_)),
@@ -280,6 +283,7 @@ Session& Session::operator=(Session&& other) noexcept {
   }
   base_url_ = std::move(other.base_url_);
   bearer_token_ = std::move(other.bearer_token_);
+  token_provider_ = std::move(other.token_provider_);
   session_id_ = std::move(other.session_id_);
   protocol_version_ = std::move(other.protocol_version_);
   transport_ = std::move(other.transport_);
@@ -291,13 +295,36 @@ Session& Session::operator=(Session&& other) noexcept {
   return *this;
 }
 
-HttpRequest Session::make_post(std::string body_json, bool stream_response) const {
+Result<std::string> Session::bearer_token_for_request(std::string operation) const {
+  if (token_provider_) {
+    auto token = token_provider_->access_token();
+    if (!token) {
+      return Result<std::string>::failure(token.error());
+    }
+    if (token.value().empty()) {
+      return Result<std::string>::failure(
+          Error{ErrorCode::Protocol, "bearer token is empty", std::move(operation)});
+    }
+    return Result<std::string>::success(token.value());
+  }
+  if (bearer_token_.empty()) {
+    return Result<std::string>::failure(
+        Error{ErrorCode::Protocol, "bearer token is empty", std::move(operation)});
+  }
+  return Result<std::string>::success(bearer_token_);
+}
+
+Result<HttpRequest> Session::make_post(std::string body_json, bool stream_response) const {
   (void)stream_response;
-  return HttpRequest{
+  auto bearer_token = bearer_token_for_request("Session::make_post");
+  if (!bearer_token) {
+    return Result<HttpRequest>::failure(bearer_token.error());
+  }
+  return Result<HttpRequest>::success(HttpRequest{
       "POST",
       base_url_ + "/mcp",
       {
-          {"Authorization", "Bearer " + bearer_token_},
+          {"Authorization", "Bearer " + bearer_token.value()},
           {"Accept", "application/json, text/event-stream"},
           {"Content-Type", "application/json"},
           {"MCP-Session-Id", session_id_},
@@ -305,15 +332,20 @@ HttpRequest Session::make_post(std::string body_json, bool stream_response) cons
       },
       std::move(body_json),
       timeout_,
-  };
+  });
 }
 
-HttpRequest Session::make_get_stream(std::shared_ptr<CancellationToken> cancellation) const {
-  return HttpRequest{
+Result<HttpRequest> Session::make_get_stream(
+    std::shared_ptr<CancellationToken> cancellation) const {
+  auto bearer_token = bearer_token_for_request("Session::make_get_stream");
+  if (!bearer_token) {
+    return Result<HttpRequest>::failure(bearer_token.error());
+  }
+  return Result<HttpRequest>::success(HttpRequest{
       "GET",
       base_url_ + "/mcp",
       {
-          {"Authorization", "Bearer " + bearer_token_},
+          {"Authorization", "Bearer " + bearer_token.value()},
           {"Accept", "text/event-stream"},
           {"MCP-Session-Id", session_id_},
           {"MCP-Protocol-Version", protocol_version_},
@@ -322,7 +354,7 @@ HttpRequest Session::make_get_stream(std::shared_ptr<CancellationToken> cancella
       std::chrono::milliseconds(0),
       1,
       std::move(cancellation),
-  };
+  });
 }
 
 std::int64_t Session::next_id() const {
@@ -342,7 +374,11 @@ Result<TypedResponse<std::string>> Session::send_envelope_response(std::string b
     return Result<TypedResponse<std::string>>::failure(
         Error{ErrorCode::Transport, "missing HTTP transport", "Session::send_envelope"});
   }
-  auto request = make_post(std::move(body_json));
+  auto request_result = make_post(std::move(body_json));
+  if (!request_result) {
+    return Result<TypedResponse<std::string>>::failure(request_result.error());
+  }
+  auto request = request_result.move_value();
   auto stream_dispatched = std::make_shared<bool>(false);
   if (message_handler_) {
     request.stream_message = [this, stream_dispatched](const std::string& raw_json) {
@@ -399,7 +435,11 @@ Result<std::string> Session::request_streaming(std::string method,
   std::string body = "{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(id) +
                      ",\"method\":" + detail::quote(method) + ",\"params\":" +
                      params_json + "}";
-  auto request = make_post(std::move(body), true);
+  auto request_result = make_post(std::move(body), true);
+  if (!request_result) {
+    return Result<std::string>::failure(request_result.error());
+  }
+  auto request = request_result.move_value();
   auto saw_stream_message = std::make_shared<bool>(false);
   request.stream_message = [this, handler, saw_stream_message](const std::string& raw_json) {
     *saw_stream_message = true;
@@ -581,11 +621,15 @@ Result<HttpResponse> Session::close() const {
     return Result<HttpResponse>::failure(
         Error{ErrorCode::Transport, "missing HTTP transport", "Session::close"});
   }
+  auto bearer_token = bearer_token_for_request("Session::close");
+  if (!bearer_token) {
+    return Result<HttpResponse>::failure(bearer_token.error());
+  }
   HttpRequest request{
       "DELETE",
       base_url_ + "/mcp",
       {
-          {"Authorization", "Bearer " + bearer_token_},
+          {"Authorization", "Bearer " + bearer_token.value()},
           {"MCP-Session-Id", session_id_},
       },
       "",
@@ -605,7 +649,11 @@ std::thread Session::start_receive_loop(
   auto transport = transport_;
   auto retry_policy = retry_policy_;
   auto trace_sink = trace_sink_;
-  auto request = make_get_stream(std::move(cancellation));
+  auto request_result = make_get_stream(std::move(cancellation));
+  if (!request_result) {
+    return std::thread([]() {});
+  }
+  auto request = request_result.move_value();
   request.stream_message = [handler = std::move(handler)](const std::string& raw_json) {
     auto parsed = detail::parse_json(raw_json);
     if (!parsed) {

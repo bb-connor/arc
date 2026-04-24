@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "chio/auth.hpp"
 #include "chio/models.hpp"
 #include "chio/result.hpp"
 #include "chio/transport.hpp"
@@ -60,7 +61,8 @@ class Session {
           HttpTransportPtr transport,
           RetryPolicy retry_policy = {},
           TraceSinkPtr trace_sink = {},
-          std::chrono::milliseconds timeout = std::chrono::milliseconds(30000));
+          std::chrono::milliseconds timeout = std::chrono::milliseconds(30000),
+          TokenProviderPtr token_provider = {});
 
   Session(Session&& other) noexcept;
   Session& operator=(Session&& other) noexcept;
@@ -106,13 +108,15 @@ class Session {
   SessionInfo info() const;
 
  private:
-  HttpRequest make_post(std::string body_json, bool stream_response = false) const;
-  HttpRequest make_get_stream(std::shared_ptr<CancellationToken> cancellation) const;
+  Result<HttpRequest> make_post(std::string body_json, bool stream_response = false) const;
+  Result<HttpRequest> make_get_stream(std::shared_ptr<CancellationToken> cancellation) const;
   std::int64_t next_id() const;
   Result<void> dispatch_messages(const std::string& body, MessageHandler handler) const;
+  Result<std::string> bearer_token_for_request(std::string operation) const;
 
   std::string base_url_;
   std::string bearer_token_;
+  TokenProviderPtr token_provider_;
   std::string session_id_;
   std::string protocol_version_;
   HttpTransportPtr transport_;

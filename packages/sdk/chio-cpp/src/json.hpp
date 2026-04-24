@@ -155,6 +155,9 @@ inline std::string extract_json_string_field(const std::string& json, std::strin
     if (c == '"') {
       return out;
     }
+    if (static_cast<unsigned char>(c) < 0x20) {
+      return {};
+    }
     out.push_back(c);
   }
   return {};
@@ -381,6 +384,9 @@ class JsonParser {
         return out;
       }
       if (c != '\\') {
+        if (static_cast<unsigned char>(c) < 0x20) {
+          return std::nullopt;
+        }
         out.push_back(c);
         continue;
       }

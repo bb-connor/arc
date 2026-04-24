@@ -236,7 +236,6 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
     if (found != sessions_.end()) {
       auto existing = found->second.lock();
       if (existing) {
-        initialization_locks_.erase(key);
         return Result<std::shared_ptr<Session>>::success(existing);
       }
     }
@@ -244,14 +243,11 @@ Result<std::shared_ptr<Session>> SessionPool::get_or_initialize(const Client& cl
 
   auto initialized = client.initialize();
   if (!initialized) {
-    std::lock_guard<std::mutex> lock(mu_);
-    initialization_locks_.erase(key);
     return Result<std::shared_ptr<Session>>::failure(initialized.error());
   }
   auto session = std::make_shared<Session>(initialized.move_value());
   std::lock_guard<std::mutex> lock(mu_);
   sessions_[key] = session;
-  initialization_locks_.erase(key);
   return Result<std::shared_ptr<Session>>::success(std::move(session));
 }
 

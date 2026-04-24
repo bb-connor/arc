@@ -89,7 +89,8 @@ Result<Session> Client::initialize() const {
   }
 
   Session session(options_.base_url, bearer_token, session_header->second, protocol,
-                  transport_, options_.retry_policy, trace_sink_, options_.timeout);
+                  transport_, options_.retry_policy, trace_sink_, options_.timeout,
+                  options_.token_provider);
   if (options_.initialize_message_handler) {
     session.on_message([handler = options_.initialize_message_handler, &session](
                            const JsonMessage& message) {

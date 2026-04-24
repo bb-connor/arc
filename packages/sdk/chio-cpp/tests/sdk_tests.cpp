@@ -130,6 +130,11 @@ void test_private_json_helpers_are_strict() {
           "expected non-hex unicode escape to fail");
   require(chio::detail::extract_json_string_field("{\"s\":\"\\uZZZZ\"}", "s").empty(),
           "expected non-hex unicode extraction to fail");
+  require(!chio::detail::parse_json(std::string("{\"s\":\"line\nbreak\"}")),
+          "expected raw control character to fail");
+  require(chio::detail::extract_json_string_field(
+              std::string("{\"s\":\"line\nbreak\"}"), "s").empty(),
+          "expected raw control extraction to fail");
 }
 
 class FixedClock final : public chio::Clock {
@@ -142,6 +147,26 @@ class FixedNonceGenerator final : public chio::NonceGenerator {
   chio::Result<std::string> generate_nonce() override {
     return chio::Result<std::string>::success("fixed-nonce");
   }
+};
+
+class RotatingTokenProvider final : public chio::TokenProvider {
+ public:
+  explicit RotatingTokenProvider(std::vector<std::string> tokens)
+      : tokens_(std::move(tokens)) {}
+
+  chio::Result<std::string> access_token() override {
+    if (next_ >= tokens_.size()) {
+      return chio::Result<std::string>::failure(
+          chio::Error{chio::ErrorCode::Protocol, "no token queued"});
+    }
+    return chio::Result<std::string>::success(tokens_[next_++]);
+  }
+
+  std::string cache_key() const override { return "rotating-test"; }
+
+ private:
+  std::vector<std::string> tokens_;
+  std::size_t next_ = 0;
 };
 
 void test_dpop_proof() {
@@ -205,6 +230,47 @@ void test_client_session_with_fake_transport() {
                    "initialized notification body");
   require_contains(transport->requests[2].body, "\"method\":\"tools/list\"", "tools body");
   require_eq(transport->requests[2].headers["MCP-Session-Id"], "sess-1", "session header");
+}
+
+void test_session_refreshes_token_provider_for_requests() {
+  auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200, {{"MCP-Session-Id", "sess-refresh"}}, "{\"protocolVersion\":\"2025-11-25\"}"},
+      {202, {}, "{}"},
+      {200, {}, "{\"tools\":[]}"},
+      {200, {}, "{\"result\":\"closed\"}"},
+  });
+
+  auto client = chio::ClientBuilder()
+                    .base_url("http://127.0.0.1:8080/")
+                    .token_provider(std::make_shared<RotatingTokenProvider>(
+                        std::vector<std::string>{"init-token",
+                                                 "notify-token",
+                                                 "tools-token",
+                                                 "close-token"}))
+                    .transport(transport)
+                    .build();
+  require(client.ok(), client.error().message);
+  auto initialized = client.value().initialize();
+  require(initialized.ok(), initialized.error().message);
+  auto session = initialized.move_value();
+  auto tools = session.list_tools();
+  require(tools.ok(), tools.error().message);
+  auto closed = session.close();
+  require(closed.ok(), closed.error().message);
+
+  require(transport->requests.size() == 4, "expected refresh transport requests");
+  require_eq(transport->requests[0].headers["Authorization"],
+             "Bearer init-token",
+             "initialize token");
+  require_eq(transport->requests[1].headers["Authorization"],
+             "Bearer notify-token",
+             "initialized notification token");
+  require_eq(transport->requests[2].headers["Authorization"],
+             "Bearer tools-token",
+             "session request token");
+  require_eq(transport->requests[3].headers["Authorization"],
+             "Bearer close-token",
+             "close token");
 }
 
 void test_initialize_nested_message_handler() {
@@ -479,6 +545,7 @@ int main() {
     test_private_json_helpers_are_strict();
     test_dpop_proof();
     test_client_session_with_fake_transport();
+    test_session_refreshes_token_provider_for_requests();
     test_initialize_nested_message_handler();
     test_builder_retry_trace_typed_models_and_streaming();
     test_auth_metadata_and_pkce();
