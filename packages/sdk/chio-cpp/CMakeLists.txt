@@ -31,7 +31,10 @@ set(CHIO_CPP_RUST_RELEASE_LIB
 )
 
 if(CMAKE_CONFIGURATION_TYPES)
-  set(CHIO_CPP_RUST_PROFILE_ARG "$<$<NOT:$<CONFIG:Debug>>:--release>")
+  set(CHIO_CPP_RUST_BUILD_COMMAND
+    COMMAND cargo build -p chio-bindings-ffi
+    COMMAND cargo build -p chio-bindings-ffi --release
+  )
   set(CHIO_CPP_RUST_LIB
     "$<$<CONFIG:Debug>:${CHIO_CPP_RUST_DEBUG_LIB}>$<$<NOT:$<CONFIG:Debug>>:${CHIO_CPP_RUST_RELEASE_LIB}>"
   )
@@ -48,11 +51,20 @@ else()
     set(CHIO_CPP_RUST_LIB "${CHIO_CPP_RUST_RELEASE_LIB}")
   endif()
   set(CHIO_CPP_RUST_BYPRODUCTS "${CHIO_CPP_RUST_LIB}")
+  if(CHIO_CPP_RUST_PROFILE_ARG)
+    set(CHIO_CPP_RUST_BUILD_COMMAND
+      COMMAND cargo build -p chio-bindings-ffi ${CHIO_CPP_RUST_PROFILE_ARG}
+    )
+  else()
+    set(CHIO_CPP_RUST_BUILD_COMMAND
+      COMMAND cargo build -p chio-bindings-ffi
+    )
+  endif()
 endif()
 
 if(CHIO_CPP_BUILD_RUST_FFI)
   add_custom_target(chio_bindings_ffi_build
-    COMMAND cargo build -p chio-bindings-ffi ${CHIO_CPP_RUST_PROFILE_ARG}
+    ${CHIO_CPP_RUST_BUILD_COMMAND}
     BYPRODUCTS ${CHIO_CPP_RUST_BYPRODUCTS}
     WORKING_DIRECTORY "${CHIO_CPP_REPO_ROOT}"
     COMMENT "Building Rust chio-bindings-ffi"
@@ -147,7 +159,18 @@ install(TARGETS chio_cpp
   RUNTIME DESTINATION bin
   INCLUDES DESTINATION include
 )
-install(FILES "${CHIO_CPP_RUST_LIB}" DESTINATION lib)
+if(CMAKE_CONFIGURATION_TYPES)
+  install(FILES "${CHIO_CPP_RUST_DEBUG_LIB}"
+    DESTINATION lib
+    CONFIGURATIONS Debug
+  )
+  install(FILES "${CHIO_CPP_RUST_RELEASE_LIB}"
+    DESTINATION lib
+    CONFIGURATIONS Release RelWithDebInfo MinSizeRel
+  )
+else()
+  install(FILES "${CHIO_CPP_RUST_LIB}" DESTINATION lib)
+endif()
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY "${CHIO_CPP_FFI_INCLUDE_DIR}/" DESTINATION include)
 

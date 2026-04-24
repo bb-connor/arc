@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "json.hpp"
+#include "json_rpc.hpp"
 #include "sse.hpp"
 #include "transport_util.hpp"
 
@@ -11,13 +12,23 @@ namespace chio {
 namespace {
 
 Result<detail::JsonValue> parse_initialize_response_json(const std::string& body,
+                                                         const std::string& expected_id_json,
                                                          int status) {
   auto parsed = detail::parse_json(body);
   if (parsed) {
+    if (!detail::is_jsonrpc_terminal_response(*parsed, expected_id_json)) {
+      return Result<detail::JsonValue>::failure(
+          Error{ErrorCode::Protocol,
+                "initialize response did not match JSON-RPC request id",
+                "Client::initialize",
+                status,
+                detail::body_snippet(body)});
+    }
     return Result<detail::JsonValue>::success(std::move(*parsed));
   }
 
   std::optional<detail::JsonValue> terminal_message;
+  bool saw_mismatched_terminal = false;
   auto events = detail::for_each_sse_event(body, [&](const std::string& payload) {
     auto event_json = detail::parse_json(payload);
     if (!event_json) {
@@ -28,8 +39,10 @@ Result<detail::JsonValue> parse_initialize_response_json(const std::string& body
                 status,
                 detail::body_snippet(payload)});
     }
-    if (event_json->get("result") != nullptr || event_json->get("error") != nullptr) {
+    if (detail::is_jsonrpc_terminal_response(*event_json, expected_id_json)) {
       terminal_message = std::move(*event_json);
+    } else if (event_json->get("result") != nullptr || event_json->get("error") != nullptr) {
+      saw_mismatched_terminal = true;
     }
     return Result<void>::success();
   });
@@ -38,6 +51,14 @@ Result<detail::JsonValue> parse_initialize_response_json(const std::string& body
   }
   if (terminal_message) {
     return Result<detail::JsonValue>::success(std::move(*terminal_message));
+  }
+  if (saw_mismatched_terminal) {
+    return Result<detail::JsonValue>::failure(
+        Error{ErrorCode::Protocol,
+              "initialize response did not match JSON-RPC request id",
+              "Client::initialize",
+              status,
+              detail::body_snippet(body)});
   }
   return Result<detail::JsonValue>::failure(
       Error{ErrorCode::Json,
@@ -120,7 +141,8 @@ Result<Session> Client::initialize() const {
         Error{ErrorCode::Protocol, "initialize response did not include MCP-Session-Id"});
   }
   std::string protocol;
-  auto parsed = parse_initialize_response_json(response.value().body, response.value().status);
+  auto parsed = parse_initialize_response_json(
+      response.value().body, detail::request_id_json(body), response.value().status);
   if (!parsed) {
     return Result<Session>::failure(parsed.error());
   }

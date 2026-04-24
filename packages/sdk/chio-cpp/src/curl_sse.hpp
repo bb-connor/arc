@@ -6,6 +6,7 @@
 
 #include "chio/result.hpp"
 #include "json.hpp"
+#include "json_rpc.hpp"
 #include "sse.hpp"
 
 namespace chio {
@@ -14,27 +15,7 @@ namespace detail {
 constexpr std::size_t kSseCompactThreshold = 4096;
 
 inline bool is_terminal_message(const std::string& payload, const std::string& id_json) {
-  if (id_json.empty()) {
-    return false;
-  }
-  auto parsed = detail::parse_json(payload);
-  if (!parsed || !parsed->is_object()) {
-    return false;
-  }
-  const auto* id = parsed->get("id");
-  if (id == nullptr || id->dump() != id_json) {
-    return false;
-  }
-  return parsed->get("result") != nullptr || parsed->get("error") != nullptr;
-}
-
-inline std::string request_id_json(const std::string& body) {
-  auto parsed = detail::parse_json(body);
-  if (!parsed || !parsed->is_object()) {
-    return {};
-  }
-  const auto* id = parsed->get("id");
-  return id == nullptr ? std::string() : id->dump();
+  return is_jsonrpc_terminal_response(payload, id_json);
 }
 
 struct CurlBodyCapture {

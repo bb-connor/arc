@@ -29,7 +29,7 @@ class DemoTransport final : public chio::HttpTransport {
 int main() {
   auto transport = std::make_shared<DemoTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "demo-session"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
       {202, {}, "{}"},
       {200, {}, "{\"tools\":[{\"name\":\"hello\"}]}"},
   });

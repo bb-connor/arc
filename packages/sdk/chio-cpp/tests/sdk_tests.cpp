@@ -92,6 +92,12 @@ void require_contains(const std::string& haystack,
   }
 }
 
+std::string initialize_ok_response_json(const std::string& protocol = "2025-11-25",
+                                        const std::string& id_json = "1") {
+  return "{\"jsonrpc\":\"2.0\",\"id\":" + id_json +
+         ",\"result\":{\"protocolVersion\":\"" + protocol + "\"}}";
+}
+
 std::string read_file(const std::string& relative_path) {
   const std::string path = std::string(CHIO_CPP_REPO_ROOT) + "/" + relative_path;
   std::ifstream input(path);
@@ -357,7 +363,8 @@ void test_dpop_proof() {
 void test_client_session_with_fake_transport() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-1"}},
-       "{\"metadata\":{\"protocolVersion\":\"wrong\"},\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       "{\"jsonrpc\":\"2.0\",\"id\":1,\"metadata\":{\"protocolVersion\":\"wrong\"},"
+       "\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
       {202, {}, "{}"},
       {200, {}, "{\"tools\":[]}"},
       {200, {}, "{\"result\":\"closed\"}"},
@@ -412,7 +419,8 @@ void test_initialize_handles_sse_and_rejects_invalid_handshakes() {
 
   auto missing_protocol_transport = std::make_shared<FakeTransport>(
       std::vector<chio::HttpResponse>{
-          {200, {{"MCP-Session-Id", "sess-missing"}}, "{\"result\":{}}"},
+          {200, {{"MCP-Session-Id", "sess-missing"}},
+           "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}"},
       });
   auto missing_protocol_client = chio::Client::with_static_bearer(
       "http://127.0.0.1:8080/", "token", missing_protocol_transport);
@@ -423,6 +431,51 @@ void test_initialize_handles_sse_and_rejects_invalid_handshakes() {
                    "missing protocol error");
   require(missing_protocol_transport->requests.size() == 1,
           "missing protocol must not send initialized notification");
+
+  auto missing_envelope_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200, {{"MCP-Session-Id", "sess-envelope"}},
+           "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+      });
+  auto missing_envelope_client = chio::Client::with_static_bearer(
+      "http://127.0.0.1:8080/", "token", missing_envelope_transport);
+  auto missing_envelope = missing_envelope_client.initialize();
+  require(!missing_envelope.ok(), "expected missing JSON-RPC envelope to fail");
+  require_contains(missing_envelope.error().message,
+                   "JSON-RPC request id",
+                   "missing JSON-RPC envelope error");
+  require(missing_envelope_transport->requests.size() == 1,
+          "missing envelope must not send initialized notification");
+
+  auto wrong_id_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200, {{"MCP-Session-Id", "sess-wrong-id"}},
+           initialize_ok_response_json("2025-11-25", "2")},
+      });
+  auto wrong_id_client = chio::Client::with_static_bearer(
+      "http://127.0.0.1:8080/", "token", wrong_id_transport);
+  auto wrong_id = wrong_id_client.initialize();
+  require(!wrong_id.ok(), "expected mismatched JSON-RPC id to fail");
+  require_contains(wrong_id.error().message, "JSON-RPC request id", "wrong id error");
+  require(wrong_id_transport->requests.size() == 1,
+          "wrong id must not send initialized notification");
+
+  auto wrong_sse_id_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200,
+           {{"MCP-Session-Id", "sess-wrong-sse-id"}},
+           "data: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"protocolVersion\":"
+           "\"2025-11-25\"}}\n\n"},
+      });
+  auto wrong_sse_id_client = chio::Client::with_static_bearer(
+      "http://127.0.0.1:8080/", "token", wrong_sse_id_transport);
+  auto wrong_sse_id = wrong_sse_id_client.initialize();
+  require(!wrong_sse_id.ok(), "expected mismatched SSE JSON-RPC id to fail");
+  require_contains(wrong_sse_id.error().message,
+                   "JSON-RPC request id",
+                   "wrong SSE id error");
+  require(wrong_sse_id_transport->requests.size() == 1,
+          "wrong SSE id must not send initialized notification");
 
   auto rpc_error_transport = std::make_shared<FakeTransport>(
       std::vector<chio::HttpResponse>{
@@ -482,7 +535,7 @@ void test_typed_list_helpers_reject_jsonrpc_errors() {
 void test_session_refreshes_token_provider_for_requests() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-refresh"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
       {200, {}, "{\"tools\":[]}"},
       {200, {}, "{\"result\":\"closed\"}"},
@@ -588,7 +641,7 @@ void test_nested_router_bind_captures_stable_sender() {
 void test_initialize_nested_message_handler() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-nested"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {200, {}, "data: {\"jsonrpc\":\"2.0\",\"id\":\"edge-client-1\",\"method\":\"roots/list\",\"params\":{}}\n\n"},
       {202, {}, "{}"},
   });
@@ -622,7 +675,7 @@ void test_initialize_nested_message_handler() {
 void test_builder_retry_trace_typed_models_and_streaming() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {500, {}, "{\"error\":\"busy\"}"},
-      {200, {{"MCP-Session-Id", "sess-2"}}, "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+      {200, {{"MCP-Session-Id", "sess-2"}}, initialize_ok_response_json()},
       {202, {}, "{}"},
       {200, {}, "{\"result\":{\"tools\":[{\"name\":\"echo_text\",\"description\":\"Echo\",\"inputSchema\":{\"type\":\"object\"}}]}}"},
       {200, {}, "data: {\"jsonrpc\":\"2.0\",\ndata: \"method\":\"notifications/tools/list_changed\"}\n\n"},
@@ -763,11 +816,11 @@ void test_feature_helpers_and_middleware() {
   require_eq(verdict.verdict, "deny", "fail closed verdict");
 
   auto pool_transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
-      {200, {{"MCP-Session-Id", "sess-a"}}, "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+      {200, {{"MCP-Session-Id", "sess-a"}}, initialize_ok_response_json()},
       {202, {}, "{}"},
-      {200, {{"MCP-Session-Id", "sess-b"}}, "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+      {200, {{"MCP-Session-Id", "sess-b"}}, initialize_ok_response_json()},
       {202, {}, "{}"},
-      {200, {{"MCP-Session-Id", "sess-c"}}, "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+      {200, {{"MCP-Session-Id", "sess-c"}}, initialize_ok_response_json()},
       {202, {}, "{}"},
   });
   auto client_a = chio::ClientBuilder()
@@ -811,12 +864,12 @@ void test_feature_helpers_and_middleware() {
   pool.clear();
   auto transport_a = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-transport-a"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
   });
   auto transport_b = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-transport-b"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
   });
   auto client_transport_a = chio::ClientBuilder()
@@ -847,16 +900,16 @@ void test_feature_helpers_and_middleware() {
   pool.clear();
   auto policy_transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-policy-a"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
       {200, {{"MCP-Session-Id", "sess-policy-b"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
       {200, {{"MCP-Session-Id", "sess-timeout-a"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
       {200, {{"MCP-Session-Id", "sess-timeout-b"}},
-       "{\"result\":{\"protocolVersion\":\"2025-11-25\"}}"},
+       initialize_ok_response_json()},
       {202, {}, "{}"},
   });
   chio::RetryPolicy one_attempt;
