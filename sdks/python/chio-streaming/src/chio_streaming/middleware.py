@@ -490,7 +490,22 @@ class ChioConsumerMiddleware:
     def _commit_transaction(self, message: KafkaMessageLike) -> None:
         """Send offsets and commit the transaction (or commit directly)."""
         if not self._config.transactional:
-            self._producer.flush(self._config.produce_timeout)
+            # confluent-kafka's flush() returns the number of messages still
+            # in the queue when the timeout elapses; committing the source
+            # offset before the receipt/DLQ envelope is durably delivered
+            # would silently lose the audit record. Raise so the caller's
+            # try/except keeps the source offset uncommitted and Kafka
+            # redelivers on the next poll.
+            still_queued = self._producer.flush(self._config.produce_timeout)
+            if still_queued:
+                raise ChioStreamingError(
+                    "Kafka flush left "
+                    f"{still_queued} envelope(s) undelivered before non-"
+                    "transactional offset commit; refusing to ack source",
+                    topic=message.topic(),
+                    partition=message.partition(),
+                    offset=message.offset(),
+                )
             self._consumer.commit(message=message, asynchronous=False)
             return
 

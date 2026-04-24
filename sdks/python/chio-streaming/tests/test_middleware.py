@@ -123,12 +123,14 @@ class FakeProducer:
         *,
         fail_on_commit: bool = False,
         fail_on_produce_topics: set[str] | None = None,
+        flush_undelivered: int = 0,
     ) -> None:
         self.produced: list[dict[str, Any]] = []
         self.committed_offsets: list[Any] = []
         self.transactions_begun = 0
         self.transactions_committed = 0
         self.transactions_aborted = 0
+        self._flush_undelivered = flush_undelivered
         # Raw call count (every abort_transaction invocation), separate
         # from transactions_aborted which only increments when the fake
         # was in a transaction. confluent-kafka raises on an abort call
@@ -210,7 +212,7 @@ class FakeProducer:
             self.produced.append(record)
 
     def flush(self, timeout: float = 10.0) -> int:
-        return 0
+        return self._flush_undelivered
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +568,33 @@ async def test_non_transactional_commit_uses_consumer_commit() -> None:
     assert producer.transactions_committed == 0
     # Consumer commit was invoked directly.
     assert consumer.commits == [("orders", 0, 5)]
+
+
+async def test_non_transactional_undelivered_flush_does_not_commit_offset() -> None:
+    # confluent-kafka's flush() can return a non-zero count when the
+    # broker stalls; committing the source offset in that case would
+    # silently drop the receipt envelope and break auditability.
+    chio = allow_all()
+    cfg = _cfg(transactional=False, consumer_group_id=None)
+    producer = FakeProducer(flush_undelivered=1)
+    mw, consumer, _producer = _build_middleware(
+        chio_client=chio,
+        config=cfg,
+        producer=producer,
+    )
+    consumer.enqueue(_fake_message(offset=9))
+
+    async def handler(_msg: Any, _r: Any) -> None:
+        return None
+
+    outcome = await mw.poll_and_process(handler)
+    assert outcome is not None
+    # acked=False because the source offset must not advance when the
+    # receipt envelope did not durably land.
+    assert outcome.committed is False
+    assert consumer.commits == []
+    assert isinstance(outcome.handler_error, ChioStreamingError)
+    assert "undelivered" in str(outcome.handler_error)
 
 
 # ---------------------------------------------------------------------------
