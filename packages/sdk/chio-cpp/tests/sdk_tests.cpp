@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "../src/auth_encoding.hpp"
 #include "../src/json.hpp"
 #include "../src/curl_sse.hpp"
 #include "../src/transport_util.hpp"
@@ -873,6 +874,20 @@ void test_builder_retry_trace_typed_models_and_streaming() {
 }
 
 void test_auth_metadata_and_pkce() {
+  require_eq(chio::detail::base64url_encode({}), "", "base64url empty");
+  require_eq(chio::detail::base64url_encode({'f'}), "Zg", "base64url one byte");
+  require_eq(chio::detail::base64url_encode({'f', 'o'}), "Zm8", "base64url two bytes");
+  require_eq(chio::detail::base64url_encode({'f', 'o', 'o'}), "Zm9v", "base64url three bytes");
+  require_eq(chio::detail::base64url_encode({'f', 'o', 'o', 'b'}),
+             "Zm9vYg",
+             "base64url four bytes");
+  require_eq(chio::detail::base64url_encode({'f', 'o', 'o', 'b', 'a'}),
+             "Zm9vYmE",
+             "base64url five bytes");
+  require_eq(chio::detail::base64url_encode({'f', 'o', 'o', 'b', 'a', 'r'}),
+             "Zm9vYmFy",
+             "base64url six bytes");
+
   const std::string verifier =
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abc";
   auto pkce = chio::PkceChallenge::from_verifier(verifier);

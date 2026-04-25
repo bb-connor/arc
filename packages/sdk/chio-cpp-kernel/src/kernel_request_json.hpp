@@ -2,51 +2,16 @@
 
 #include "chio/kernel.hpp"
 
+#include <cstddef>
 #include <optional>
 #include <sstream>
 #include <string>
 
+#include "../../chio-cpp/src/json.hpp"
+
 namespace chio {
 namespace kernel {
 namespace detail {
-
-inline std::string escape_json(const std::string& input) {
-  std::ostringstream out;
-  for (unsigned char c : input) {
-    switch (c) {
-      case '"':
-        out << "\\\"";
-        break;
-      case '\\':
-        out << "\\\\";
-        break;
-      case '\b':
-        out << "\\b";
-        break;
-      case '\f':
-        out << "\\f";
-        break;
-      case '\n':
-        out << "\\n";
-        break;
-      case '\r':
-        out << "\\r";
-        break;
-      case '\t':
-        out << "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          static const char* digits = "0123456789abcdef";
-          out << "\\u00" << digits[(c >> 4) & 0x0f] << digits[c & 0x0f];
-        } else {
-          out << static_cast<char>(c);
-        }
-        break;
-    }
-  }
-  return out.str();
-}
 
 inline std::optional<std::uint64_t> effective_now_secs(
     const KernelOptions& options,
@@ -69,7 +34,7 @@ inline std::string build_kernel_request_json(const KernelOptions& options,
     if (i != 0) {
       out << ",";
     }
-    out << "\"" << escape_json(request.trusted_issuers_hex[i]) << "\"";
+    out << "\"" << chio::detail::escape_json(request.trusted_issuers_hex[i]) << "\"";
   }
   out << "]";
   out << ",\"request\":" << request.request_json;

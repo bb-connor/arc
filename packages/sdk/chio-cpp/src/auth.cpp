@@ -1,7 +1,6 @@
 #include "chio/auth.hpp"
 
 #include <algorithm>
-#include <cstdint>
 #include <cstdlib>
 #include <iomanip>
 #include <random>
@@ -10,6 +9,7 @@
 #include <utility>
 
 #include "auth_cache.hpp"
+#include "auth_encoding.hpp"
 #include "chio/invariants.hpp"
 #include "json.hpp"
 #include "transport_util.hpp"
@@ -60,26 +60,6 @@ Result<std::vector<std::uint8_t>> hex_to_bytes(const std::string& hex) {
     out.push_back(static_cast<std::uint8_t>(value));
   }
   return Result<std::vector<std::uint8_t>>::success(std::move(out));
-}
-
-std::string base64url_encode(const std::vector<std::uint8_t>& bytes) {
-  static constexpr char alphabet[] =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  std::string out;
-  std::uint32_t val = 0;
-  int valb = -6;
-  for (std::uint8_t byte : bytes) {
-    val = (val << 8) + byte;
-    valb += 8;
-    while (valb >= 0) {
-      out.push_back(alphabet[(val >> valb) & 0x3f]);
-      valb -= 6;
-    }
-  }
-  if (valb > -6) {
-    out.push_back(alphabet[((val << 8) >> (valb + 8)) & 0x3f]);
-  }
-  return out;
 }
 
 OAuthMetadata parse_metadata(const std::string& raw_json) {
@@ -174,7 +154,7 @@ Result<PkceChallenge> PkceChallenge::from_verifier(std::string verifier) {
     return Result<PkceChallenge>::failure(bytes.error());
   }
   return Result<PkceChallenge>::success(
-      PkceChallenge{std::move(verifier), base64url_encode(bytes.value()), "S256"});
+      PkceChallenge{std::move(verifier), detail::base64url_encode(bytes.value()), "S256"});
 }
 
 Result<PkceChallenge> PkceChallenge::generate() {

@@ -44,10 +44,10 @@ std::string result_json(const EvaluateResult& result) {
   std::ostringstream out;
   out << "{";
   out << "\"ok\":" << (result.ok ? "true" : "false");
-  out << ",\"verdict\":\"" << detail::escape_json(result.verdict) << "\"";
-  out << ",\"reason\":\"" << detail::escape_json(result.reason) << "\"";
-  out << ",\"error_code\":\"" << detail::escape_json(result.error_code) << "\"";
-  out << ",\"error_message\":\"" << detail::escape_json(result.error_message) << "\"";
+  out << ",\"verdict\":\"" << chio::detail::escape_json(result.verdict) << "\"";
+  out << ",\"reason\":\"" << chio::detail::escape_json(result.reason) << "\"";
+  out << ",\"error_code\":\"" << chio::detail::escape_json(result.error_code) << "\"";
+  out << ",\"error_message\":\"" << chio::detail::escape_json(result.error_message) << "\"";
   out << "}";
   return out.str();
 }
