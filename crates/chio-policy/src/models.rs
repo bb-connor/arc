@@ -189,8 +189,13 @@ fn leading_whitespace_len(input: &str) -> usize {
 }
 
 fn block_scalar_parent_indent_start(line: &str) -> Option<usize> {
-    if line.trim_start().starts_with('#') {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with('#') {
         return None;
+    }
+
+    if sequence_block_scalar_start(trimmed) {
+        return Some(leading_whitespace_len(line));
     }
 
     let colon_index = line.rfind(':')?;
@@ -202,6 +207,21 @@ fn block_scalar_parent_indent_start(line: &str) -> Option<usize> {
     }
 
     Some(leading_whitespace_len(line))
+}
+
+fn sequence_block_scalar_start(trimmed_line: &str) -> bool {
+    let Some(rest) = trimmed_line.strip_prefix('-') else {
+        return false;
+    };
+    let Some(separator) = rest.chars().next() else {
+        return false;
+    };
+    if !separator.is_ascii_whitespace() {
+        return false;
+    }
+
+    let after_dash = rest.trim_start();
+    after_dash.starts_with('|') || after_dash.starts_with('>')
 }
 
 fn double_quoted_value_start(line: &str) -> Option<usize> {
@@ -1121,6 +1141,36 @@ mod tests {
     }
 
     #[test]
+    fn parse_allows_sequence_block_scalar_with_unpaired_double_quote() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: sequence-block-pattern\n",
+            "rules:\n",
+            "  shell_commands:\n",
+            "    forbidden_patterns:\n",
+            "      - |\n",
+            "        \"quoted regex text\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("sequence block scalar quotes should parse: {err}"),
+        };
+        let rules = match spec.rules {
+            Some(rules) => rules,
+            None => panic!("rules should parse"),
+        };
+        let shell_commands = match rules.shell_commands {
+            Some(shell_commands) => shell_commands,
+            None => panic!("shell command rules should parse"),
+        };
+        assert_eq!(
+            shell_commands.forbidden_patterns,
+            vec!["\"quoted regex text\n".to_string()]
+        );
+    }
+
+    #[test]
     fn parse_allows_comment_line_with_unpaired_double_quote() {
         let input = concat!(
             "# note: \"comment-only quote\n",
@@ -1139,6 +1189,9 @@ mod tests {
     #[test]
     fn block_scalar_detection_uses_last_colon() {
         assert!(block_scalar_parent_indent_start("description: |").is_some());
+        assert!(block_scalar_parent_indent_start("  - |").is_some());
+        assert!(block_scalar_parent_indent_start("  - >").is_some());
+        assert!(block_scalar_parent_indent_start("  - not-block").is_none());
         assert!(block_scalar_parent_indent_start("# note: |").is_none());
         assert!(block_scalar_parent_indent_start("description: nested: |").is_none());
     }
