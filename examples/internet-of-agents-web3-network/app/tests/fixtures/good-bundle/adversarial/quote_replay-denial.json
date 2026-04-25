@@ -1,0 +1,15 @@
+{
+  "attempt": "reuse expired quote id with fresh fulfillment",
+  "boundary": "market-api-sidecar",
+  "control": "quote_replay",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "aebdd06f3b8fc5a41db763bac76cbabcf485557734c8be72ecec8e6ec857ac67",
+    "id": "denial-quote_replay",
+    "kind": "adversarial",
+    "reason": "quote nonce already consumed",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.adversarial-denial.v1"
+}

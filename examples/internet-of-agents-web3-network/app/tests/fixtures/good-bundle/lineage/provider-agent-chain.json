@@ -1,0 +1,20 @@
+{
+  "capability_id": "cap-ioa-web3-provider",
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "provider_cannot_move_funds"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "delegator": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b",
+      "signature": "1d4ce8553e50887651035bb9aa408dd9084c49471aa6b01c9b8ce795f745c19712235713815a8f3ca21ed906550b04df74a0b1109c917b8c792be4be9690f006",
+      "timestamp": 1776995579
+    }
+  ],
+  "delegation_depth": 1,
+  "issuer": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b",
+  "subject": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+}

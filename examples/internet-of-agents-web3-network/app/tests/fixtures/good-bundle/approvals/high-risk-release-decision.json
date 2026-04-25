@@ -1,0 +1,15 @@
+{
+  "approved_amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "challenge_id": "approval-challenge-ioa-web3-order-001",
+  "decision": "approve",
+  "decision_id": "approval-decision-ioa-web3-order-001",
+  "order_id": "ioa-web3-order-001",
+  "schema": "chio.example.ioa-web3.approval-decision.v1",
+  "signature": "8de4da1af2455713f5564c4ce5943abd7b98385931ebe6ff2c55d386575bd3671c3a181f9d2139e58f1506fe89bab20125ed76f35052d2dd68e1eb89a531ca03",
+  "signed_at": 1776995579,
+  "signed_fixture": true,
+  "signer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c"
+}

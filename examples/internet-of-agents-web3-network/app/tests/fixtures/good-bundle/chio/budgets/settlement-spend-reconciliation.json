@@ -1,0 +1,18 @@
+{
+  "capabilityId": "cap-ioa-web3-settlement",
+  "exposedCostUnits": 200000,
+  "grantIndex": 0,
+  "holdId": "budget-hold:ioa-web3-order-001:cap-ioa-web3-settlement:0",
+  "realizedSpendUnits": 200000,
+  "schema": "chio.example.ioa-web3.budget-reconciliation.v1",
+  "source": "chio-trust-control",
+  "status": "reconciled",
+  "trustControlResponse": {
+    "capabilityId": "cap-ioa-web3-settlement",
+    "grantIndex": 0,
+    "invocationCount": 1,
+    "releasedExposureUnits": 0,
+    "totalExposureCharged": 0,
+    "totalRealizedSpend": 200000
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "capability_id": "cap-ioa-web3-procurement",
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "remove_settlement_authority"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b",
+      "delegator": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+      "signature": "471cd358dad4b481c97bbb7d8b7590183275972b9293ddb5ec1cda0ef77e0ed5c1a86594c46f2638efcc5edaa3430007db77375d4247a1165a81ed7d0b90aa0b",
+      "timestamp": 1776995579
+    }
+  ],
+  "delegation_depth": 1,
+  "issuer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+  "subject": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b"
+}

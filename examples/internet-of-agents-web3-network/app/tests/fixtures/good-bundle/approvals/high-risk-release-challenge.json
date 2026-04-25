@@ -1,0 +1,16 @@
+{
+  "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+  "challenge_id": "approval-challenge-ioa-web3-order-001",
+  "issued_at": 1776995579,
+  "order_id": "ioa-web3-order-001",
+  "required_before": "budget-exposure-or-final-release",
+  "risk": {
+    "amount": {
+      "currency": "USDC",
+      "units": 200000
+    },
+    "category": "high-risk-web3-settlement",
+    "mainnet_blocked": true
+  },
+  "schema": "chio.example.ioa-web3.approval-challenge.v1"
+}

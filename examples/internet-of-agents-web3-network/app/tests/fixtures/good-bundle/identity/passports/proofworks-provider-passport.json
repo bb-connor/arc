@@ -1,0 +1,146 @@
+{
+  "schema": "chio.agent-passport.v1",
+  "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "credentials": [
+    {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://chio.dev/credentials/v1"
+      ],
+      "type": [
+        "VerifiableCredential",
+        "ChioReputationAttestation"
+      ],
+      "issuer": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66",
+      "issuanceDate": "2026-04-24T01:52:59Z",
+      "expirationDate": "2026-05-24T01:52:59Z",
+      "credentialSubject": {
+        "id": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+        "metrics": {
+          "subject_key": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+          "computed_at": 1776995579,
+          "boundary_pressure": {
+            "deny_ratio": {
+              "state": "known",
+              "value": 0.0
+            },
+            "policies_observed": 1,
+            "receipts_observed": 5
+          },
+          "resource_stewardship": {
+            "average_utilization": {
+              "state": "unknown"
+            },
+            "fit_score": {
+              "state": "unknown"
+            },
+            "capped_grants_observed": 0
+          },
+          "least_privilege": {
+            "score": {
+              "state": "known",
+              "value": 0.16666666666666666
+            },
+            "capabilities_observed": 1
+          },
+          "history_depth": {
+            "score": {
+              "state": "known",
+              "value": 0.30722222222222223
+            },
+            "receipt_count": 5,
+            "active_days": 5,
+            "first_seen": 1775181179,
+            "last_seen": 1776822779,
+            "span_days": 20,
+            "activity_ratio": {
+              "state": "known",
+              "value": 0.25
+            }
+          },
+          "specialization": {
+            "score": {
+              "state": "known",
+              "value": 0.0
+            },
+            "distinct_tools": 1
+          },
+          "delegation_hygiene": {
+            "score": {
+              "state": "unknown"
+            },
+            "delegations_observed": 0,
+            "scope_reduction_rate": {
+              "state": "unknown"
+            },
+            "ttl_reduction_rate": {
+              "state": "unknown"
+            },
+            "budget_reduction_rate": {
+              "state": "unknown"
+            }
+          },
+          "reliability": {
+            "score": {
+              "state": "known",
+              "value": 1.0
+            },
+            "completion_rate": {
+              "state": "known",
+              "value": 1.0
+            },
+            "cancellation_rate": {
+              "state": "known",
+              "value": 0.0
+            },
+            "incompletion_rate": {
+              "state": "known",
+              "value": 0.0
+            },
+            "receipts_observed": 5
+          },
+          "incident_correlation": {
+            "score": {
+              "state": "unknown"
+            },
+            "incidents_observed": null
+          },
+          "composite_score": {
+            "state": "known",
+            "value": 0.6241880341880343
+          },
+          "effective_weight_sum": 0.6499999999999999
+        }
+      },
+      "evidence": {
+        "query": {
+          "until": 1776995579
+        },
+        "receiptCount": 5,
+        "receiptIds": [
+          "rcpt-history-job-001",
+          "rcpt-history-job-002",
+          "rcpt-history-job-003",
+          "rcpt-history-job-004",
+          "rcpt-history-job-005"
+        ],
+        "checkpointRoots": [],
+        "receiptLogUrls": [
+          "https://trust.proofworks.local/receipts"
+        ],
+        "lineageRecords": 1,
+        "uncheckpointedReceipts": 5
+      },
+      "proof": {
+        "type": "Ed25519Signature2020",
+        "created": "2026-04-24T01:52:59Z",
+        "proofPurpose": "assertionMethod",
+        "verificationMethod": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66#key-1",
+        "proofValue": "b21469ea2aa5bb5212fb89828003498ba658b70717e771d63a7350209d75d311d515fdd4684879c9325b8e28e77d853198221792561bcf61eca93c8841e0d904"
+      }
+    }
+  ],
+  "merkleRoots": [],
+  "issuedAt": "2026-04-24T01:52:59Z",
+  "validUntil": "2026-05-24T01:52:59Z"
+}

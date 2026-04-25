@@ -1,0 +1,29 @@
+{
+  "boundaries": {
+    "approval": 1,
+    "budget": 2,
+    "market-api-sidecar": 5,
+    "provider-review-mcp": 3,
+    "rail-selection": 1,
+    "settlement-api-sidecar": 2,
+    "subcontractor-review-mcp": 1,
+    "trust-control": 11,
+    "web3-evidence-mcp": 1
+  },
+  "operatorTrustControl": {
+    "backend": "sqlite",
+    "configured": true,
+    "count": 0,
+    "filters": {
+      "capabilityId": null,
+      "decision": null,
+      "toolName": null,
+      "toolServer": null
+    },
+    "kind": "tool",
+    "receipts": []
+  },
+  "receiptCompleteness": "pass",
+  "schema": "chio.example.ioa-web3.receipt-summary.v1",
+  "totalExpectedReceipts": 27
+}

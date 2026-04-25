@@ -1,0 +1,19 @@
+{
+  "attempt": {
+    "maxRequestsPerSession": 3,
+    "requestsInWindow": 4,
+    "windowSeconds": 60
+  },
+  "boundary": "policy:velocity",
+  "control": "velocity-burst",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "ed27b13b1a9a953db3c8b3b2e160165b2d4bc9fc55be4e06bee4da975970cd52",
+    "id": "denial-velocity-burst",
+    "kind": "velocity",
+    "reason": "session exceeded configured velocity limit",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.guardrail-denial.v1"
+}

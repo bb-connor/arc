@@ -1,0 +1,115 @@
+{
+  "beneficiary_address": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "bond_vault_contract": "0x0EcDDd3C6Ff32aBb841729F4909375A63FEd333E",
+  "capital_instruction": {
+    "body": {
+      "action": "transfer_funds",
+      "amount": {
+        "currency": "USDC",
+        "units": 200000
+      },
+      "authorityChain": [
+        {
+          "approvedAt": 1776995581,
+          "expiresAt": 1776999178,
+          "note": "root budget holder approved bounded web3 settlement",
+          "principalId": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+          "role": "operator_treasury"
+        },
+        {
+          "approvedAt": 1776995581,
+          "expiresAt": 1776997379,
+          "note": "delegated only Base Sepolia USDC settlement authority",
+          "principalId": "afd315eaf6104447b73e47655f37bb6f643d60e8452192e7b6eed5eb1dee0be4",
+          "role": "settlement_agent"
+        }
+      ],
+      "completionFlowRowId": "economic-completion-flow:rcpt-ioa-web3-001",
+      "counterpartyId": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "counterpartyRole": "agent_counterparty",
+      "description": "settle one internet-of-agents service order over Chio web3 escrow evidence",
+      "evidenceRefs": [
+        {
+          "kind": "base_sepolia_smoke",
+          "locator": "web3/base-sepolia-smoke.json",
+          "observedAt": 1776995581,
+          "referenceId": "target/web3-live-rollout/base-sepolia/base-sepolia-smoke.json"
+        }
+      ],
+      "executionWindow": {
+        "notAfter": 1776997379,
+        "notBefore": 1776995581
+      },
+      "governedReceiptId": "rcpt-ioa-web3-001",
+      "instructionId": "cei-ioa-web3-001",
+      "intendedState": "pending_execution",
+      "issuedAt": 1776995581,
+      "ownerRole": "operator_treasury",
+      "query": {
+        "agentSubject": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+        "bondLimit": 1,
+        "facilityLimit": 1,
+        "lossEventLimit": 5,
+        "receiptLimit": 50
+      },
+      "rail": {
+        "custodyProviderId": "operator-test-wallet",
+        "destinationAccountRef": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+        "jurisdiction": "US",
+        "kind": "web3",
+        "railId": "base-sepolia-usdc",
+        "sourceAccountRef": "wallet:base-sepolia-smoke"
+      },
+      "reconciledState": "observed",
+      "schema": "chio.credit.capital-instruction.v1",
+      "sourceId": "capital-source:internet-of-agents-web3",
+      "sourceKind": "facility_commitment",
+      "subjectKey": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+      "supportBoundary": {
+        "automaticDispatchSupported": true,
+        "capitalBookAuthoritative": true,
+        "custodyNeutralInstructionSupported": false,
+        "externalExecutionAuthoritative": true
+      }
+    },
+    "signature": "e26a8f7f48e508c862e6cf078596d08d7b599c15a0ad814057a445c1f09858f2c12db52ab40854f73ed14c62c601425f461afbb2a706cd0a8a496341c966df02",
+    "signerKey": "afd315eaf6104447b73e47655f37bb6f643d60e8452192e7b6eed5eb1dee0be4"
+  },
+  "chain_id": "eip155:84532",
+  "contract_package_id": "chio.official-web3-contracts",
+  "denied_rails": [
+    {
+      "decision": "deny",
+      "kind": "solana-memo",
+      "rail_id": "solana-memo-proof",
+      "reason": "alternate proof path only; no live Solana signer or settlement escrow in this smoke"
+    },
+    {
+      "decision": "deny",
+      "kind": "web3",
+      "rail_id": "local-devnet-usdc",
+      "reason": "higher-fidelity Base Sepolia smoke is available"
+    }
+  ],
+  "dispatch_id": "dispatch-ioa-web3-001",
+  "escrow_contract": "0x1BEa33b952f4730c42B256FF9bE55fD0016C14f7",
+  "escrow_id": "0x31c72993827dee0a1f97f3e7571e30ecb7c407ee7f8bbc9c7a4a010d57f4882b",
+  "issued_at": 1776995581,
+  "note": "Example binds recursive agent delegation to the validated Base-first Chio web3 stack.",
+  "rail_selection_id": "base-sepolia-usdc",
+  "schema": "chio.web3-settlement-dispatch.v1",
+  "settlement_amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "settlement_packet_id": "settlement-packet-ioa-web3-order-001",
+  "settlement_path": "merkle_proof",
+  "support_boundary": {
+    "anchor_proof_required": true,
+    "custody_boundary_explicit": true,
+    "oracle_evidence_required_for_fx": true,
+    "real_dispatch_supported": true,
+    "reversal_supported": true
+  },
+  "trust_profile_id": "chio.official-web3-stack"
+}

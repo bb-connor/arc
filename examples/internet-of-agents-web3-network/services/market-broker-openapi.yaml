@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: ProofWorks Market Broker
+  version: 0.1.0
+paths:
+  /rfqs:
+    post:
+      operationId: requestRfq
+      summary: Request bids from all candidate providers.
+      x-chio-tool-name: request_rfq
+      x-chio-side-effects: false
+      x-chio-approval-required: false
+      x-chio-cost-units: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: RFQ bid response.
+          content:
+            application/json:
+              schema:
+                type: object
+  /quotes:
+    post:
+      operationId: requestQuote
+      summary: Request a provider quote.
+      x-chio-tool-name: request_quote
+      x-chio-side-effects: false
+      x-chio-approval-required: false
+      x-chio-cost-units: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Quote response.
+          content:
+            application/json:
+              schema:
+                type: object
+  /payment-requirements:
+    post:
+      operationId: requestPaymentRequirements
+      summary: Return x402-style payment requirements.
+      x-chio-tool-name: request_payment_requirements
+      x-chio-side-effects: false
+      x-chio-approval-required: false
+      x-chio-cost-units: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: x402 payment requirements.
+          content:
+            application/json:
+              schema:
+                type: object
+  /payment-proofs:
+    post:
+      operationId: submitPaymentProof
+      summary: Accept a Chio-mediated x402 payment proof.
+      x-chio-tool-name: submit_payment_proof
+      x-chio-side-effects: true
+      x-chio-approval-required: true
+      x-chio-cost-units: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: x402 payment satisfaction.
+          content:
+            application/json:
+              schema:
+                type: object
+  /fulfillments:
+    post:
+      operationId: acceptFulfillment
+      summary: Accept a provider fulfillment package.
+      x-chio-tool-name: accept_fulfillment
+      x-chio-side-effects: true
+      x-chio-approval-required: true
+      x-chio-cost-units: 125000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Fulfillment package.
+          content:
+            application/json:
+              schema:
+                type: object

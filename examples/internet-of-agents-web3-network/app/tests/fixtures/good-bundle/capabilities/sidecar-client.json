@@ -1,0 +1,61 @@
+{
+  "expires_at": 1776997379,
+  "id": "cap-019dbd30-b48e-7883-9007-e234267815ce",
+  "issued_at": 1776995579,
+  "issuer": "fc7afde8300a7d3ad77055ced5c48e3673af91148df162227122958c88f76711",
+  "scope": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "request_rfq"
+      },
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "request_quote"
+      },
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "request_payment_requirements"
+      },
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "submit_payment_proof"
+      },
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "accept_fulfillment"
+      },
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "assemble_packet"
+      },
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "http-sidecar-client",
+        "tool_name": "assemble_dispute_packet"
+      }
+    ]
+  },
+  "signature": "86ba7bf464ab6d85e7b56cd3f841a988b909e5e02617d622273b8dd4917d0cff391d4f1468e6f2b4ab8781e1fb1e77c66efe6936e22a6b865f6616fcad217a04",
+  "subject": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b"
+}

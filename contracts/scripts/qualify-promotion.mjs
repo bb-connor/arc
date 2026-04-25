@@ -84,6 +84,13 @@ function duplicateContractManifest(manifest) {
   return copy;
 }
 
+function missingArtifactManifest(manifest) {
+  const copy = structuredClone(manifest);
+  copy.contracts[0].artifact = "contracts/artifacts/DoesNotExist.json";
+  copy.manifest_id = `${manifest.manifest_id}.missing-artifact-test`;
+  return copy;
+}
+
 async function main() {
   const outputDirIndex = process.argv.indexOf("--output-dir");
   const outputRoot =
@@ -103,22 +110,29 @@ async function main() {
     ensureDir(runDir);
     const approvalPath = path.join(runDir, "approval.json");
     writeJson(approvalPath, buildApproval({ manifestPath, manifest, manifestHash }));
-    runNode(
-      [
-        path.join("contracts", "scripts", "promote-deployment.mjs"),
-        "--manifest",
-        repoRelative(manifestPath),
-        "--approval",
-        repoRelative(approvalPath),
-        "--output-dir",
-        repoRelative(runDir),
-        "--local-devnet",
-        "--rollback-on-failure"
-      ],
-      true
-    );
+    const promotionArgs = [
+      path.join("contracts", "scripts", "promote-deployment.mjs"),
+      "--manifest",
+      repoRelative(manifestPath),
+      "--approval",
+      repoRelative(approvalPath),
+      "--output-dir",
+      repoRelative(runDir),
+      "--local-devnet",
+      "--rollback-on-failure"
+    ];
+    if (label === "run-a") {
+      promotionArgs.push("--base-builder-code", "bc_localtest");
+    }
+    runNode(promotionArgs, true);
     successRuns.push(readJson(path.join(runDir, "promotion-report.json")));
   }
+
+  assert.equal(
+    successRuns[0].attribution?.erc8021_marker,
+    "0x80218021802180218021802180218021",
+    "builder-code promotion run should record ERC-8021 attribution"
+  );
 
   assert.deepEqual(
     successRuns[0].planned_contract_addresses,
@@ -153,17 +167,17 @@ async function main() {
   const badApprovalReport = readJson(path.join(badApprovalDir, "promotion-report.json"));
   assert.equal(badApprovalReport.status, "failed");
 
-  const rollbackFailureDir = path.join(outputRoot, "negative-rollback");
-  ensureDir(rollbackFailureDir);
-  const badManifestPath = path.join(rollbackFailureDir, "duplicate-salt.reviewed.json");
+  const resumeDir = path.join(outputRoot, "resume-existing");
+  ensureDir(resumeDir);
+  const duplicateManifestPath = path.join(resumeDir, "duplicate-salt.reviewed.json");
   const duplicateManifest = duplicateContractManifest(manifest);
-  writeJson(badManifestPath, duplicateManifest);
-  const duplicateManifestHash = sha256File(badManifestPath);
-  const duplicateApprovalPath = path.join(rollbackFailureDir, "approval.json");
+  writeJson(duplicateManifestPath, duplicateManifest);
+  const duplicateManifestHash = sha256File(duplicateManifestPath);
+  const duplicateApprovalPath = path.join(resumeDir, "approval.json");
   writeJson(
     duplicateApprovalPath,
     buildApproval({
-      manifestPath: badManifestPath,
+      manifestPath: duplicateManifestPath,
       manifest: duplicateManifest,
       manifestHash: duplicateManifestHash
     })
@@ -172,9 +186,45 @@ async function main() {
     [
       path.join("contracts", "scripts", "promote-deployment.mjs"),
       "--manifest",
-      repoRelative(badManifestPath),
+      repoRelative(duplicateManifestPath),
       "--approval",
       repoRelative(duplicateApprovalPath),
+      "--output-dir",
+      repoRelative(resumeDir),
+      "--local-devnet",
+      "--rollback-on-failure"
+    ],
+    true
+  );
+  const resumeDeployment = readJson(path.join(resumeDir, "deployment.json"));
+  assert.equal(
+    resumeDeployment.deployment_transactions["chio.identity-registry"].status,
+    "already_deployed",
+    "duplicate-salt resume should skip an already deployed CREATE2 address"
+  );
+
+  const rollbackFailureDir = path.join(outputRoot, "negative-rollback");
+  ensureDir(rollbackFailureDir);
+  const badManifestPath = path.join(rollbackFailureDir, "missing-artifact.reviewed.json");
+  const badManifest = missingArtifactManifest(manifest);
+  writeJson(badManifestPath, badManifest);
+  const badManifestHash = sha256File(badManifestPath);
+  const rollbackApprovalPath = path.join(rollbackFailureDir, "approval.json");
+  writeJson(
+    rollbackApprovalPath,
+    buildApproval({
+      manifestPath: badManifestPath,
+      manifest: badManifest,
+      manifestHash: badManifestHash
+    })
+  );
+  runNode(
+    [
+      path.join("contracts", "scripts", "promote-deployment.mjs"),
+      "--manifest",
+      repoRelative(badManifestPath),
+      "--approval",
+      repoRelative(rollbackApprovalPath),
       "--output-dir",
       repoRelative(rollbackFailureDir),
       "--local-devnet",
@@ -196,6 +246,16 @@ async function main() {
         note: "Two fresh local-devnet promotion runs produced identical CREATE2-planned and deployed contract addresses."
       },
       {
+        id: "promotion.base_builder_code_attribution",
+        outcome: "pass",
+        note: "A local promotion run with --base-builder-code appended an ERC-8021 suffix to CREATE2 factory calls without changing CREATE2 outcomes."
+      },
+      {
+        id: "promotion.resume_existing_create2",
+        outcome: "pass",
+        note: "A resumed promotion skips already deployed CREATE2 addresses and continues through post-deployment configuration."
+      },
+      {
         id: "promotion.approval_gate",
         outcome: "pass",
         note: "Tampered approval manifest hashes fail closed before deployment."
@@ -209,6 +269,7 @@ async function main() {
     evidence: {
       success_runs: successRuns.map((_, index) => repoRelative(path.join(outputRoot, index === 0 ? "run-a" : "run-b", "promotion-report.json"))),
       negative_approval_report: repoRelative(path.join(badApprovalDir, "promotion-report.json")),
+      resume_existing_report: repoRelative(path.join(resumeDir, "promotion-report.json")),
       negative_rollback_report: repoRelative(path.join(rollbackFailureDir, "promotion-report.json")),
       negative_rollback_plan: repoRelative(path.join(rollbackFailureDir, "rollback-plan.json"))
     }

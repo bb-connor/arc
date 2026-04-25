@@ -1,0 +1,9 @@
+{
+  "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+  "decision": "delegate_bounded_web3_budget",
+  "max_budget": {
+    "currency": "USDC",
+    "units": 300000
+  },
+  "order_id": "ioa-web3-order-001"
+}

@@ -1,0 +1,20 @@
+{
+  "capability_id": "cap-ioa-web3-auditor",
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "read_only"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "104edee1b00d20f3be38c7ba48b2ff05972e6d77d587d7715429a0fe1dcfefaa",
+      "delegator": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+      "signature": "7580c430eb059d327a917dd173f73e78d3844bba1a9759d2bb5dc3a96f5941bec9266c485034b4d8b1c1eb4405a2f3febf0dc62c14f1f8ca33c0100147e88e04",
+      "timestamp": 1776995579
+    }
+  ],
+  "delegation_depth": 1,
+  "issuer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+  "subject": "104edee1b00d20f3be38c7ba48b2ff05972e6d77d587d7715429a0fe1dcfefaa"
+}

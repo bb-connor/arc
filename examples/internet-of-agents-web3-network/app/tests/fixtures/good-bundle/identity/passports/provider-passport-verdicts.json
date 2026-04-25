@@ -1,0 +1,62 @@
+{
+  "providers": [
+    {
+      "checks": [
+        {
+          "id": "signature",
+          "outcome": "pass"
+        },
+        {
+          "id": "claim-drift",
+          "outcome": "pass"
+        },
+        {
+          "id": "runtime-tier",
+          "outcome": "pass"
+        }
+      ],
+      "passport_id": "passport-proofworks-agent-auditors",
+      "provider_id": "proofworks-agent-auditors",
+      "verdict": "pass"
+    },
+    {
+      "checks": [
+        {
+          "id": "signature",
+          "outcome": "pass"
+        },
+        {
+          "id": "claim-drift",
+          "outcome": "fail"
+        },
+        {
+          "id": "runtime-tier",
+          "outcome": "pass"
+        }
+      ],
+      "passport_id": "passport-discount-zk-reviewers",
+      "provider_id": "discount-zk-reviewers",
+      "verdict": "fail"
+    },
+    {
+      "checks": [
+        {
+          "id": "signature",
+          "outcome": "pass"
+        },
+        {
+          "id": "claim-drift",
+          "outcome": "fail"
+        },
+        {
+          "id": "runtime-tier",
+          "outcome": "fail"
+        }
+      ],
+      "passport_id": "passport-overbudget-shadow-settlers",
+      "provider_id": "overbudget-shadow-settlers",
+      "verdict": "fail"
+    }
+  ],
+  "schema": "chio.example.ioa-web3.provider-passport-verdicts.v1"
+}

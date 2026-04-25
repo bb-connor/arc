@@ -24,6 +24,7 @@ See [`docs/guides/WEB_BACKEND_QUICKSTART.md`](../docs/guides/WEB_BACKEND_QUICKST
 
 - [`agent-commerce-network/`](./agent-commerce-network/): buyer/provider/reviewer topology with approvals, budgets, settlement, federation, and live receipt capture
 - [`internet-of-agents-incident-network/`](./internet-of-agents-incident-network/): recursive cross-org incident-response network with a live happy path for OpenAI SDK orchestration, MCP tools, ACP provider jobs, and offline review
+- [`internet-of-agents-web3-network/`](./internet-of-agents-web3-network/): four-org Chio-mediated agent-commerce web3 topology with RFQ routing, subcontracted review, trust-control, API sidecars, MCP edges, passports, reputation, federation, budgets, x402-style payment proof, guardrails, and optional Base Sepolia evidence
 - [`hello-tool/`](./hello-tool/): minimal Rust-native tool example
 - [`docker/`](./docker/): local containerized smoke path
 - [`anthropic-sdk/`](./anthropic-sdk/), [`openai-compatible/`](./openai-compatible/), [`langchain/`](./langchain/): ecosystem-specific slices
@@ -124,4 +125,6 @@ The `hello-*` examples are the small, surface-specific teaching layer.
 
 The `agent-commerce-network` example is the “how these surfaces combine in the real world” layer.
 
-The `internet-of-agents-incident-network` example is the “how recursive delegation, OpenAI SDK orchestration, MCP, ACP, and cross-org authority all compose together” layer.
+The `internet-of-agents-incident-network` example is the "how recursive delegation, OpenAI SDK orchestration, MCP, ACP, and cross-org authority all compose together" layer.
+
+The `internet-of-agents-web3-network` example is the "how Chio-mediated cross-org agent commerce binds to the official Chio web3 validation ladder" layer.

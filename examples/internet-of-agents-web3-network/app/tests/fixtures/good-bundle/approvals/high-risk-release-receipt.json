@@ -1,0 +1,8 @@
+{
+  "challenge_id": "approval-challenge-ioa-web3-order-001",
+  "decision": "allow",
+  "decision_id": "approval-decision-ioa-web3-order-001",
+  "receipt_id": "rcpt-approval-ioa-web3-order-001",
+  "schema": "chio.example.ioa-web3.approval-receipt.v1",
+  "signature_digest": "422364bd6c10949469b5676d7df046a351dbc8c8853c0c4900cea80f2c5a800a"
+}

@@ -1,0 +1,73 @@
+{
+  "artifact_dir": "target/web3-example-qualification/internet-of-agents-web3-network",
+  "summary": {
+    "schema": "chio.example.ioa-web3.summary.v1",
+    "example": "internet-of-agents-web3-network",
+    "order_id": "ioa-web3-order-001",
+    "agent_count": 6,
+    "capability_count": 7,
+    "chio_mediated": true,
+    "mediation_status": "pass",
+    "receipt_counts_by_boundary": {
+      "trust-control": 11,
+      "market-api-sidecar": 5,
+      "settlement-api-sidecar": 2,
+      "web3-evidence-mcp": 1,
+      "provider-review-mcp": 3,
+      "subcontractor-review-mcp": 1,
+      "budget": 2,
+      "approval": 1,
+      "rail-selection": 1
+    },
+    "capability_lineage_depth": 2,
+    "budget_exposure": "authorized",
+    "budget_reconciliation": "reconciled",
+    "passport_verdict": "pass",
+    "federation_verdict": "pass",
+    "reputation_verdict": "pass",
+    "behavioral_baseline_status": "pass",
+    "guardrail_denial_status": {
+      "invalid_spiffe": "denied",
+      "velocity": "denied",
+      "overspend": "denied"
+    },
+    "provider_review_verdict": "pass",
+    "rfq_selection_status": "pass",
+    "selected_provider_id": "proofworks-agent-auditors",
+    "rejected_provider_count": 2,
+    "subcontract_lineage_depth": 2,
+    "subcontractor_review_verdict": "pass",
+    "dispute_status": "resolved",
+    "approval_status": "signed",
+    "x402_payment_status": "satisfied",
+    "rail_selection_status": "pass",
+    "selected_rail": "base-sepolia-usdc",
+    "runtime_degradation_status": "quarantined_then_reattested",
+    "observability_status": "correlated",
+    "historical_reputation_status": "pass",
+    "adversarial_denial_status": {
+      "prompt_injection": "denied",
+      "invoice_tampering": "denied",
+      "quote_replay": "denied",
+      "expired_capability": "denied",
+      "unauthorized_settlement_route": "denied",
+      "forged_passport": "denied"
+    },
+    "settlement_status": "settled",
+    "reconciliation_status": "reconciled",
+    "base_sepolia_live_smoke_included": true,
+    "base_sepolia_smoke_status": "pass",
+    "base_sepolia_attachment_status": "attached",
+    "web3_local_e2e_status": "pass",
+    "promotion_checks": 5,
+    "ops_assertions": 3,
+    "mainnet_blocked": true,
+    "service_topology": {
+      "market_broker": "chio-api-protect",
+      "settlement_desk": "chio-api-protect",
+      "evidence_tool": "chio-mcp-serve-http",
+      "provider_review": "chio-mcp-serve-http",
+      "subcontractor_review": "chio-mcp-serve-http"
+    }
+  }
+}

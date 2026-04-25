@@ -1,0 +1,92 @@
+{
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "limit_to_base_sepolia_usdc"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "afd315eaf6104447b73e47655f37bb6f643d60e8452192e7b6eed5eb1dee0be4",
+      "delegator": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+      "signature": "332cb95710c0ab42ce28636b1fc034bfdfb18e4828cfddfd795e2247d1f148515fbdc7d1d2e88de344aa78b0f0a65d4e6599b1f77083aaea012df15d0cc77600",
+      "timestamp": 1776995579
+    }
+  ],
+  "expires_at": 1776997379,
+  "id": "cap-ioa-web3-settlement",
+  "issued_at": 1776995579,
+  "issuer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [],
+        "maxCostPerInvocation": {
+          "currency": "USDC",
+          "units": 300000
+        },
+        "maxTotalCost": {
+          "currency": "USDC",
+          "units": 300000
+        },
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "chio-settle",
+        "tool_name": "create_escrow"
+      },
+      {
+        "constraints": [],
+        "maxCostPerInvocation": {
+          "currency": "USDC",
+          "units": 200000
+        },
+        "maxTotalCost": {
+          "currency": "USDC",
+          "units": 200000
+        },
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "chio-settle",
+        "tool_name": "release_escrow"
+      },
+      {
+        "constraints": [],
+        "maxCostPerInvocation": {
+          "currency": "USDC",
+          "units": 100000
+        },
+        "maxTotalCost": {
+          "currency": "USDC",
+          "units": 100000
+        },
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "chio-settle",
+        "tool_name": "refund_escrow"
+      },
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "chio-anchor",
+        "tool_name": "publish_root"
+      },
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "chio-link",
+        "tool_name": "read_price"
+      }
+    ],
+    "prompt_grants": [],
+    "resource_grants": []
+  },
+  "signature": "f6ae620b31a8dd43a2b1a63638da3aafb74aeaf779e5efd1d2cbc5205e982f7b66fe718850c336165fba712e66b91776e2144e374d9f2f5c885d89407065d70e",
+  "subject": "afd315eaf6104447b73e47655f37bb6f643d60e8452192e7b6eed5eb1dee0be4"
+}

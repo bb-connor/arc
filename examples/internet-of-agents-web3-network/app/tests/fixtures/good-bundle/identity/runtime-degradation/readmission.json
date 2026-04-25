@@ -1,0 +1,20 @@
+{
+  "checks": [
+    {
+      "id": "runtime-tier",
+      "outcome": "pass"
+    },
+    {
+      "id": "spiffe-trust-domain",
+      "outcome": "pass"
+    },
+    {
+      "id": "capability-issuance",
+      "outcome": "pass"
+    }
+  ],
+  "provider": "ProofWorks Provider",
+  "reattestationDigest": "2d40a7db8b2ebe2e693d438a795ee0743d45786cd4b9c45da4fb3ddcddd8390c",
+  "schema": "chio.example.ioa-web3.provider-readmission.v1",
+  "status": "readmitted"
+}

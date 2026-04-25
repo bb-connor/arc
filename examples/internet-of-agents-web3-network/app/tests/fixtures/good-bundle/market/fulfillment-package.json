@@ -1,0 +1,15 @@
+{
+  "accepted_by": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "capability_id": "cap-ioa-web3-provider",
+  "delivered_at": 1776995579,
+  "evidence_refs": [
+    "web3/validation-index.json",
+    "contracts/web3-settlement-dispatch.json",
+    "contracts/web3-settlement-receipt.json"
+  ],
+  "fulfillment_id": "fulfillment-e9cb54abe045",
+  "order_id": "ioa-web3-order-001",
+  "provider_id": "proofworks-agent-auditors",
+  "quote_id": "quote-8d8a2b665e02",
+  "status": "delivered"
+}

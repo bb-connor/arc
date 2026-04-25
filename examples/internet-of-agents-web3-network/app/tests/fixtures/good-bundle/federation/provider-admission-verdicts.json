@@ -1,0 +1,28 @@
+{
+  "providers": [
+    {
+      "provider_id": "proofworks-agent-auditors",
+      "reasons": [],
+      "verdict": "pass"
+    },
+    {
+      "provider_id": "discount-zk-reviewers",
+      "reasons": [
+        "reputation_below_threshold",
+        "passport_claim_drift"
+      ],
+      "verdict": "fail"
+    },
+    {
+      "provider_id": "overbudget-shadow-settlers",
+      "reasons": [
+        "runtime_tier_below_attested",
+        "reputation_below_threshold",
+        "passport_claim_drift",
+        "budget_exceeds_policy"
+      ],
+      "verdict": "fail"
+    }
+  ],
+  "schema": "chio.example.ioa-web3.provider-federation-verdicts.v1"
+}

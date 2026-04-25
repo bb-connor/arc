@@ -1,0 +1,33 @@
+{
+  "actor": "procurement-agent",
+  "attestation": {
+    "claims": {
+      "example": "internet-of-agents-web3-network",
+      "localRealism": true,
+      "mainnetBlocked": true,
+      "organization": "Atlas Operator"
+    },
+    "evidence_sha256": "fb4f3de79243fe653fc0ab5e1f125edbadceaf81131b44d000d43b916a0fdb20",
+    "expires_at": 1776999178,
+    "issued_at": 1776995578,
+    "runtime_identity": "spiffe://ioa-web3.local/operator/procurement-agent",
+    "schema": "chio.runtime-attestation.enterprise-verifier.json.v1",
+    "tier": "attested",
+    "verifier": "https://attest.ioa-web3.local",
+    "workload_identity": {
+      "credentialKind": "uri",
+      "path": "/operator/procurement-agent",
+      "scheme": "spiffe",
+      "trustDomain": "ioa-web3.local",
+      "uri": "spiffe://ioa-web3.local/operator/procurement-agent"
+    }
+  },
+  "organization": "Atlas Operator",
+  "requirements": {
+    "minimum_tier": "attested",
+    "scheme": "spiffe",
+    "trust_domain": "ioa-web3.local"
+  },
+  "schema": "chio.example.ioa-web3.runtime-appraisal.v1",
+  "verdict": "pass"
+}

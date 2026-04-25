@@ -1,0 +1,16 @@
+{
+  "body": {
+    "schema": "chio.federation-policy.v1",
+    "issuer": "ProofWorks Provider",
+    "partner": "Meridian Federation Verifier",
+    "signerPublicKey": "08a1fcd8e07344ab0c22599bf57daa75c956660e888a27fb134c78e089b031cd",
+    "createdAt": 1776995580,
+    "expiresAt": 1777081980,
+    "query": {
+      "capabilityId": "cap-ioa-web3-provider"
+    },
+    "requireProofs": false,
+    "purpose": "ioa-web3-provider-admission"
+  },
+  "signature": "21bf10b85010aac2e68d3c21dacf628eb3027dcc23bc9b29acd982210e79381388219e833c8055c12e2214f709ff706baac928c00d3bfc068b6307e6e496000b"
+}

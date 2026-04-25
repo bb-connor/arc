@@ -8,7 +8,12 @@
   "scripts": {
     "compile": "node ./scripts/compile.mjs",
     "qualify:devnet": "node ./scripts/qualify-devnet.mjs",
+    "qualify:review-prep": "node ./scripts/qualify-review-prep.mjs",
     "qualify:promotion": "node ./scripts/qualify-promotion.mjs",
+    "prepare:reviewed": "node ./scripts/prepare-reviewed-manifest.mjs",
+    "deploy:base-sepolia-deps": "node ./scripts/deploy-base-sepolia-dependencies.mjs",
+    "refresh:base-sepolia-feeds": "node ./scripts/refresh-base-sepolia-mock-feeds.mjs",
+    "smoke:base-sepolia": "node ./scripts/smoke-base-sepolia.mjs",
     "promote:reviewed": "node ./scripts/promote-deployment.mjs",
     "devnet:smoke": "pnpm compile && pnpm qualify:devnet"
   },

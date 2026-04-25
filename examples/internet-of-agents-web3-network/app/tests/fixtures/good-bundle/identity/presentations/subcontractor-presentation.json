@@ -1,0 +1,19 @@
+{
+  "challengeId": "challenge-meridian-cipherworks-001",
+  "claims": {
+    "holderPublicKey": "50570882ff97adecaac9c848ebd7078f96103c0c2041b0d9cf2a3890ce24f685",
+    "trustTier": "verified_specialist",
+    "workloadIdentity": {
+      "credentialKind": "uri",
+      "path": "/subcontractor/cipherworks-specialist-reviewer",
+      "scheme": "spiffe",
+      "trustDomain": "ioa-web3.local",
+      "uri": "spiffe://ioa-web3.local/subcontractor/cipherworks-specialist-reviewer"
+    }
+  },
+  "holder": "did:web:cipherworks.example:agent:specialist-reviewer",
+  "holderSignature": "298622ba9b0197d1eb54560316432da03d2480327b7f3c888f0581627405823404ed0cf0433071f973f100d4a7f1970137ab06fa7789ce2fce4e9cee03c01605",
+  "passportDigest": "da01e2ae4e8aabe05fa42e1f24e8515e52e8e12348268bd0bd918651194eab2c",
+  "presentationId": "presentation-cipherworks-meridian-001",
+  "schema": "chio.passport.presentation.v1"
+}

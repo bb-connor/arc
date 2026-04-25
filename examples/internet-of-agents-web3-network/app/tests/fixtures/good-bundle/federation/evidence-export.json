@@ -1,0 +1,129 @@
+{
+  "commandResult": {
+    "command": [
+      "/Users/connor/.codex/worktrees/673b/arc/target/debug/chio",
+      "--format",
+      "json",
+      "--receipt-db",
+      "target/web3-example-qualification/internet-of-agents-web3-network/state/provider-receipts.sqlite3",
+      "evidence",
+      "export",
+      "--output",
+      "target/web3-example-qualification/internet-of-agents-web3-network/federation/evidence-export-package",
+      "--federation-policy",
+      "target/web3-example-qualification/internet-of-agents-web3-network/federation/bilateral-evidence-policy.json"
+    ],
+    "stdout": ""
+  },
+  "manifest": {
+    "childReceiptScope": "omitted_no_join_path",
+    "claimBoundary": {
+      "audit": {
+        "capabilityLineageRecords": 1,
+        "checkpointConsistencyProofs": 0,
+        "checkpointLogs": [],
+        "checkpointPublications": 0,
+        "checkpointWitnesses": 0,
+        "inclusionProofs": 0,
+        "signedCheckpoints": 0
+      },
+      "publicationState": "transparency_preview",
+      "schema": "chio.evidence_transparency_claims.v1"
+    },
+    "counts": {
+      "capabilityLineage": 1,
+      "checkpoints": 0,
+      "childReceipts": 0,
+      "inclusionProofs": 0,
+      "toolReceipts": 5,
+      "uncheckpointedReceipts": 5
+    },
+    "exportedAt": 1776995580,
+    "federationPolicy": {
+      "createdAt": 1776995580,
+      "expiresAt": 1777081980,
+      "issuer": "ProofWorks Provider",
+      "partner": "Meridian Federation Verifier",
+      "requireProofs": false,
+      "signerPublicKey": "08a1fcd8e07344ab0c22599bf57daa75c956660e888a27fb134c78e089b031cd"
+    },
+    "files": [
+      {
+        "bytes": 45,
+        "path": "query.json",
+        "sha256": "72f8909529db21c636a60a3c2fbde440ea56201efe87b9cc945a6e15efb54e69"
+      },
+      {
+        "bytes": 5300,
+        "path": "receipts.ndjson",
+        "sha256": "ed0f7eabacc9598913474582a0a2121c0145be018bba1a94372538e36bb0f0d1"
+      },
+      {
+        "bytes": 0,
+        "path": "child-receipts.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 0,
+        "path": "checkpoints.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 0,
+        "path": "checkpoint-publications.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 0,
+        "path": "checkpoint-witnesses.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 0,
+        "path": "checkpoint-consistency-proofs.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 0,
+        "path": "checkpoint-equivocations.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 791,
+        "path": "capability-lineage.ndjson",
+        "sha256": "3082344fc9126160c1ace62a8411eec9382a4a88036f9cf1d216d7d13e84f9d7"
+      },
+      {
+        "bytes": 0,
+        "path": "inclusion-proofs.ndjson",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 75,
+        "path": "retention.json",
+        "sha256": "a7b554e4cc3666b63b902981f8e54b2f9bbbcf1288c5311f28aa3ddeb74cd29f"
+      },
+      {
+        "bytes": 921,
+        "path": "README.txt",
+        "sha256": "2b677d2b043ccde9a499527d178ecc86b3067b9c5f0dc25eea2b9bca108caed4"
+      },
+      {
+        "bytes": 583,
+        "path": "federation-policy.json",
+        "sha256": "dad731faf9b9f5b42db42ea4255b576157867ebc7f7dfb8d953859d7712d55e4"
+      }
+    ],
+    "proofCoverage": {
+      "checkpointedReceipts": 0,
+      "uncheckpointedReceipts": 5
+    },
+    "query": {
+      "capabilityId": "cap-ioa-web3-provider"
+    },
+    "schema": "chio.evidence_export_manifest.v1"
+  },
+  "package": "federation/evidence-export-package",
+  "schema": "chio.federation.evidence-export.v1",
+  "source": "chio-cli"
+}

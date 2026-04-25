@@ -1,0 +1,33 @@
+{
+  "actor": "treasury-agent",
+  "attestation": {
+    "claims": {
+      "example": "internet-of-agents-web3-network",
+      "localRealism": true,
+      "mainnetBlocked": true,
+      "organization": "Atlas Operator"
+    },
+    "evidence_sha256": "c05f61d162887cdf2b55b8484803b994e3943afbc2399d963bd1830c61c80130",
+    "expires_at": 1776999178,
+    "issued_at": 1776995578,
+    "runtime_identity": "spiffe://ioa-web3.local/operator/treasury-agent",
+    "schema": "chio.runtime-attestation.enterprise-verifier.json.v1",
+    "tier": "attested",
+    "verifier": "https://attest.ioa-web3.local",
+    "workload_identity": {
+      "credentialKind": "uri",
+      "path": "/operator/treasury-agent",
+      "scheme": "spiffe",
+      "trustDomain": "ioa-web3.local",
+      "uri": "spiffe://ioa-web3.local/operator/treasury-agent"
+    }
+  },
+  "organization": "Atlas Operator",
+  "requirements": {
+    "minimum_tier": "attested",
+    "scheme": "spiffe",
+    "trust_domain": "ioa-web3.local"
+  },
+  "schema": "chio.example.ioa-web3.runtime-appraisal.v1",
+  "verdict": "pass"
+}

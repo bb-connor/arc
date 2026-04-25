@@ -1,0 +1,30 @@
+{
+  "provider_id": "discount-zk-reviewers",
+  "display_name": "Discount ZK Reviewers",
+  "trust": {
+    "claimed_reputation_score": 0.86,
+    "runtime_tier": "attested",
+    "passport_status": "valid",
+    "federation_status": "eligible"
+  },
+  "risk": {
+    "profile": "cheap-low-reputation",
+    "expected_outcome": "reject-for-reputation"
+  },
+  "services": [
+    {
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "title": "Low-cost Base Sepolia settlement proof review",
+      "price_minor_units": 120000,
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "transaction-map-summary"
+      ],
+      "requirements": [
+        "passing e2e qualification",
+        "self-attested prior work"
+      ]
+    }
+  ]
+}

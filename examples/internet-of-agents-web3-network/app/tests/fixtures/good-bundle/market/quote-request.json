@@ -1,0 +1,10 @@
+{
+  "buyer_id": "atlas-treasury-desk",
+  "capability_id": "cap-ioa-web3-procurement",
+  "currency": "USDC",
+  "max_budget_minor_units": 300000,
+  "order_id": "ioa-web3-order-001",
+  "provider_id": "proofworks-agent-auditors",
+  "quote_request_id": "quote-request-ioa-web3-order-001",
+  "requested_scope": "base-sepolia-usdc-dress-rehearsal"
+}

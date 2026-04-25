@@ -1,0 +1,13 @@
+{
+  "amount": {
+    "currency": "USDC",
+    "units": 60000
+  },
+  "capability_id": "cap-ioa-web3-settlement",
+  "order_id": "ioa-web3-order-001",
+  "receipt": {
+    "decision": "allow",
+    "id": "rcpt-refund-ioa-web3-order-001"
+  },
+  "schema": "chio.example.ioa-web3.refund.v1"
+}

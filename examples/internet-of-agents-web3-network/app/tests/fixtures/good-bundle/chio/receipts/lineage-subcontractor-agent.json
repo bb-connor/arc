@@ -1,0 +1,11 @@
+{
+  "capabilityId": "cap-ioa-web3-cipherworks-specialist",
+  "lineageDepth": 2,
+  "parentCapabilityId": "cap-ioa-web3-provider",
+  "receipt": {
+    "decision": "allow",
+    "digest": "08674f6332fca469a2a6422d2ed33b402d9d1eeba2235843a1c756c15d421a6c",
+    "id": "rcpt-lineage-subcontractor-agent"
+  },
+  "stored": true
+}

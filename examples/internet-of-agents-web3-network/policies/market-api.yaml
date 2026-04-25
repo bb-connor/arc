@@ -1,0 +1,26 @@
+hushspec: "0.1.0"
+name: internet-of-agents-web3-market-api
+description: Market broker sidecar policy model for Chio API protection.
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - request_rfq
+      - request_quote
+      - request_payment_requirements
+      - submit_payment_proof
+      - accept_fulfillment
+    require_runtime_assurance_tier: attested
+    require_workload_identity:
+      scheme: spiffe
+      trust_domain: ioa-web3.local
+      path_prefixes:
+        - /operator
+      credential_kinds:
+        - uri
+  velocity:
+    enabled: true
+    max_invocations_per_window: 8
+    max_requests_per_agent: 4
+    window_secs: 60

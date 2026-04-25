@@ -1,0 +1,91 @@
+{
+  "capability": {
+    "expires_at": 1776995880,
+    "id": "cap-019dbd30-ba5c-74d3-bcd4-aa684089e70c",
+    "issued_at": 1776995580,
+    "issuer": "08a1fcd8e07344ab0c22599bf57daa75c956660e888a27fb134c78e089b031cd",
+    "scope": {
+      "grants": [
+        {
+          "operations": [
+            "invoke"
+          ],
+          "server_id": "provider-review",
+          "tool_name": "issue_review_attestation"
+        }
+      ]
+    },
+    "signature": "921223f83c9d55584cfa46309d33904525cc3d673b02d7ff679d26b9ff74b22b07960c5f293b483ca351bd086f3756c75227e66f69d0aeeb9346e93cf18f8e02",
+    "subject": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+  },
+  "parentCapabilityId": "cap-ioa-web3-provider",
+  "schema": "chio.federated-provider-capability.v1",
+  "source": "chio-trust-control",
+  "subject": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "verification": {
+    "accepted": true,
+    "challengeExpiresAt": "2026-04-24T01:57:59Z",
+    "challengeId": "31d14b539a79494a0ee830abf15eda2951e96b8256a55d101e1aadcf3fc601a0",
+    "credentialCount": 1,
+    "nonce": "8dc01e807fe791827dd0ae45ad7fce88e7d8ff0e54377f26332a4c1fa6155147",
+    "passportId": "d67d9c2948cc49b90868966ae1061b8016f46db05671663d0f358cff5d31c8c6",
+    "policyEvaluated": true,
+    "policyEvaluation": {
+      "accepted": true,
+      "credentialResults": [
+        {
+          "accepted": true,
+          "attestationUntil": 1776995579,
+          "boundaryPressure": 0.0,
+          "compositeScore": 0.6241880341880343,
+          "enterpriseIdentityPresent": false,
+          "expirationDate": "2026-05-24T01:52:59Z",
+          "index": 0,
+          "issuanceDate": "2026-04-24T01:52:59Z",
+          "issuer": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66",
+          "leastPrivilege": 0.16666666666666666,
+          "lineageRecords": 1,
+          "receiptCount": 5,
+          "reliability": 1.0,
+          "uncheckpointedReceipts": 5
+        }
+      ],
+      "matchedCredentialIndexes": [
+        0
+      ],
+      "matchedIssuers": [
+        "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+      ],
+      "policy": {
+        "issuerAllowlist": [
+          "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+        ],
+        "minCompositeScore": 0.6142,
+        "minLineageRecords": 1,
+        "minReceiptCount": 4,
+        "requireActiveLifecycle": false,
+        "requireCheckpointCoverage": false,
+        "requireEnterpriseIdentityProvenance": false,
+        "requireReceiptLogUrls": false
+      },
+      "verification": {
+        "credentialCount": 1,
+        "issuer": "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66",
+        "issuerCount": 1,
+        "issuers": [
+          "did:chio:2f4ea6948f4c70eb9a8cbbfacc88944a238fc3c1410221403e0833ac00f4ea66"
+        ],
+        "merkleRootCount": 0,
+        "passportId": "d67d9c2948cc49b90868966ae1061b8016f46db05671663d0f358cff5d31c8c6",
+        "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+        "validUntil": "2026-05-24T01:52:59Z",
+        "verifiedAt": 1776995580
+      }
+    },
+    "policySource": "embedded",
+    "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+    "validUntil": "2026-05-24T01:52:59Z",
+    "verifiedAt": 1776995580,
+    "verifier": "http://127.0.0.1:62121"
+  }
+}

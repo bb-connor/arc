@@ -1,0 +1,10 @@
+{
+  "remediation_id": "remediation-ioa-web3-order-001",
+  "required_actions": [
+    "attach missing proof leaf",
+    "publish amended provider review receipt",
+    "accept partial refund"
+  ],
+  "schema": "chio.example.ioa-web3.remediation-packet.v1",
+  "status": "completed"
+}

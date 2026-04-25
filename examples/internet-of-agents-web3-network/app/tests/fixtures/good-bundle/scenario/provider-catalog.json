@@ -1,0 +1,117 @@
+{
+  "providers": [
+    {
+      "display_name": "ProofWorks Agent Auditors",
+      "provider_id": "proofworks-agent-auditors",
+      "risk": {
+        "expected_outcome": "deliver",
+        "profile": "trusted"
+      },
+      "services": [
+        {
+          "currency": "USDC",
+          "deliverables": [
+            "validation-index-review",
+            "base-sepolia-transaction-map",
+            "settlement-dispatch-readiness-note"
+          ],
+          "price_minor_units": 200000,
+          "requirements": [
+            "passing e2e qualification",
+            "passing promotion qualification",
+            "passing ops incident audit",
+            "passing Base Sepolia smoke"
+          ],
+          "service_id": "base-sepolia-usdc-dress-rehearsal",
+          "title": "Base Sepolia USDC settlement proof review"
+        }
+      ],
+      "trust": {
+        "claimed_reputation_score": 0.91,
+        "federation_status": "eligible",
+        "passport_status": "valid",
+        "runtime_tier": "attested"
+      }
+    },
+    {
+      "display_name": "Discount ZK Reviewers",
+      "provider_id": "discount-zk-reviewers",
+      "risk": {
+        "expected_outcome": "reject-for-reputation",
+        "profile": "cheap-low-reputation"
+      },
+      "services": [
+        {
+          "currency": "USDC",
+          "deliverables": [
+            "validation-index-review",
+            "transaction-map-summary"
+          ],
+          "price_minor_units": 120000,
+          "requirements": [
+            "passing e2e qualification",
+            "self-attested prior work"
+          ],
+          "service_id": "base-sepolia-usdc-dress-rehearsal",
+          "title": "Low-cost Base Sepolia settlement proof review"
+        }
+      ],
+      "trust": {
+        "claimed_reputation_score": 0.86,
+        "federation_status": "eligible",
+        "passport_status": "valid",
+        "runtime_tier": "attested"
+      }
+    },
+    {
+      "display_name": "Overbudget Shadow Settlers",
+      "provider_id": "overbudget-shadow-settlers",
+      "risk": {
+        "expected_outcome": "reject-for-budget-federation",
+        "profile": "malicious-over-budget"
+      },
+      "services": [
+        {
+          "currency": "USDC",
+          "deliverables": [
+            "validation-index-review",
+            "inflated-settlement-invoice"
+          ],
+          "price_minor_units": 450000,
+          "requirements": [
+            "direct wallet settlement",
+            "off-policy mainnet route"
+          ],
+          "service_id": "base-sepolia-usdc-dress-rehearsal",
+          "title": "Shadow settlement review with inflated invoice"
+        }
+      ],
+      "trust": {
+        "claimed_reputation_score": 0.78,
+        "federation_status": "ineligible",
+        "passport_status": "forged",
+        "runtime_tier": "unverified"
+      }
+    }
+  ],
+  "schema": "chio.example.ioa-web3.provider-catalog.v1",
+  "services": [
+    {
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "base-sepolia-transaction-map",
+        "settlement-dispatch-readiness-note"
+      ],
+      "price_minor_units": 200000,
+      "requirements": [
+        "passing e2e qualification",
+        "passing promotion qualification",
+        "passing ops incident audit",
+        "passing Base Sepolia smoke"
+      ],
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "title": "Base Sepolia USDC settlement proof review"
+    }
+  ]
+}

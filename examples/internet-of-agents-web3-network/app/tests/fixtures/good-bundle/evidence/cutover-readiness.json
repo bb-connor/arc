@@ -1,0 +1,6 @@
+{
+  "base_sepolia_smoke_passed": true,
+  "local_evidence_present": true,
+  "mainnet_blocked": true,
+  "next_gate": "review live Chainlink mainnet feeds and split signer roles before approval"
+}

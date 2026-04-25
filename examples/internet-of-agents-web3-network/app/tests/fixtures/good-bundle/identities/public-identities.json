@@ -1,0 +1,32 @@
+{
+  "auditor-agent": {
+    "identity_scheme": "ed25519",
+    "name": "auditor-agent",
+    "public_key": "104edee1b00d20f3be38c7ba48b2ff05972e6d77d587d7715429a0fe1dcfefaa"
+  },
+  "procurement-agent": {
+    "identity_scheme": "ed25519",
+    "name": "procurement-agent",
+    "public_key": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b"
+  },
+  "provider-agent": {
+    "identity_scheme": "ed25519",
+    "name": "provider-agent",
+    "public_key": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+  },
+  "settlement-agent": {
+    "identity_scheme": "ed25519",
+    "name": "settlement-agent",
+    "public_key": "afd315eaf6104447b73e47655f37bb6f643d60e8452192e7b6eed5eb1dee0be4"
+  },
+  "subcontractor-agent": {
+    "identity_scheme": "ed25519",
+    "name": "subcontractor-agent",
+    "public_key": "50570882ff97adecaac9c848ebd7078f96103c0c2041b0d9cf2a3890ce24f685"
+  },
+  "treasury-agent": {
+    "identity_scheme": "ed25519",
+    "name": "treasury-agent",
+    "public_key": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c"
+  }
+}

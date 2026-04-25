@@ -1,0 +1,7 @@
+{
+  "capability_id": "cap-ioa-web3-cipherworks-specialist",
+  "order_id": "ioa-web3-order-001",
+  "requested_check": "base-sepolia-settlement-proof-leaf",
+  "schema": "chio.example.ioa-web3.subcontractor-review-request.v1",
+  "validation_index_ref": "web3/validation-index.json"
+}

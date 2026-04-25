@@ -1,0 +1,12 @@
+{
+  "controls": {
+    "expired_capability": "denied",
+    "forged_passport": "denied",
+    "invoice_tampering": "denied",
+    "prompt_injection": "denied",
+    "quote_replay": "denied",
+    "unauthorized_settlement_route": "denied"
+  },
+  "schema": "chio.example.ioa-web3.adversarial-summary.v1",
+  "status": "pass"
+}

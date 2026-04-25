@@ -44,6 +44,9 @@ copy_if_exists \
   "target/web3-promotion-qualification/qualification.log" \
   "${dest_root}/logs/promotion-qualification.log"
 copy_if_exists \
+  "target/web3-example-qualification/qualification.log" \
+  "${dest_root}/logs/example-qualification.log"
+copy_if_exists \
   "contracts/deployments/local-devnet.json" \
   "${dest_root}/contracts/deployments/local-devnet.json"
 copy_if_exists \
@@ -52,6 +55,9 @@ copy_if_exists \
 copy_if_exists \
   "contracts/deployments/base-mainnet.template.json" \
   "${dest_root}/contracts/deployments/base-mainnet.template.json"
+copy_if_exists \
+  "contracts/deployments/base-sepolia.template.json" \
+  "${dest_root}/contracts/deployments/base-sepolia.template.json"
 copy_if_exists \
   "contracts/deployments/arbitrum-one.template.json" \
   "${dest_root}/contracts/deployments/arbitrum-one.template.json"
@@ -70,6 +76,9 @@ copy_if_exists \
 copy_if_exists \
   "docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md" \
   "${dest_root}/docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md"
+copy_if_exists \
+  "docs/release/CHIO_WEB3_MAINNET_CUTOVER_CHECKLIST.md" \
+  "${dest_root}/docs/release/CHIO_WEB3_MAINNET_CUTOVER_CHECKLIST.md"
 copy_if_exists \
   "docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md" \
   "${dest_root}/docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md"
@@ -95,8 +104,14 @@ copy_if_exists \
   "docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json" \
   "${dest_root}/docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json"
 copy_if_exists \
+  "docs/standards/CHIO_WEB3_OPERATOR_ENVIRONMENT.example" \
+  "${dest_root}/docs/standards/CHIO_WEB3_OPERATOR_ENVIRONMENT.example"
+copy_if_exists \
   "docs/standards/CHIO_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json" \
   "${dest_root}/docs/standards/CHIO_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json"
+copy_if_exists \
+  "target/web3-promotion-qualification/review-prep/qualification.json" \
+  "${dest_root}/promotion/review-prep/qualification.json"
 copy_if_exists \
   "target/web3-promotion-qualification/promotion-qualification.json" \
   "${dest_root}/promotion/promotion-qualification.json"
@@ -172,6 +187,139 @@ copy_if_exists \
 copy_if_exists \
   "target/web3-promotion-qualification/negative-rollback/rollback-plan.json" \
   "${dest_root}/promotion/negative-rollback/rollback-plan.json"
+copy_if_exists \
+  "target/web3-live-rollout/base-sepolia/promotion/deployment.json" \
+  "${dest_root}/live/base-sepolia/promotion/deployment.json"
+copy_if_exists \
+  "target/web3-live-rollout/base-sepolia/promotion/promotion-report.json" \
+  "${dest_root}/live/base-sepolia/promotion/promotion-report.json"
+copy_if_exists \
+  "target/web3-live-rollout/base-sepolia/base-sepolia-smoke.json" \
+  "${dest_root}/live/base-sepolia/base-sepolia-smoke.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/review-result.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/review-result.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/summary.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/summary.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/web3/validation-index.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/web3/validation-index.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/evidence/cutover-readiness.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/evidence/cutover-readiness.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/contracts/settlement-packet.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/contracts/settlement-packet.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/contracts/web3-settlement-dispatch.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/contracts/web3-settlement-dispatch.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/contracts/web3-settlement-receipt.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/contracts/web3-settlement-receipt.json"
+copy_if_exists \
+  "target/web3-example-qualification/internet-of-agents-web3-network/bundle-manifest.json" \
+  "${dest_root}/examples/internet-of-agents-web3-network/bundle-manifest.json"
+
+example_root="target/web3-example-qualification/internet-of-agents-web3-network"
+example_dest="${dest_root}/examples/internet-of-agents-web3-network"
+for artifact in \
+  "chio/topology.json" \
+  "chio/receipts/receipt-summary.json" \
+  "chio/receipts/trust-control.json" \
+  "chio/receipts/market-api-sidecar.json" \
+  "chio/receipts/settlement-api-sidecar.json" \
+  "chio/receipts/provider-review-mcp.json" \
+  "chio/receipts/subcontractor-review-mcp.json" \
+  "chio/receipts/web3-evidence-mcp.json" \
+  "chio/receipts/budget.json" \
+  "chio/receipts/approval.json" \
+  "chio/receipts/rail-selection.json" \
+  "chio/budgets/budget-summary.json" \
+  "chio/budgets/quote-exposure-authorization.json" \
+  "chio/budgets/settlement-spend-reconciliation.json" \
+  "identity/passports/proofworks-provider-passport.json" \
+  "identity/passports/proofworks-provider-passport-provenance.json" \
+  "identity/passports/proofworks-provider-passport-verdict.json" \
+  "identity/passports/provider-passport-verdicts.json" \
+  "identity/passports/cipherworks-subcontractor-passport.json" \
+  "identity/presentations/provider-challenge.json" \
+  "identity/presentations/provider-presentation.json" \
+  "identity/presentations/provider-presentation-verdict.json" \
+  "identity/presentations/subcontractor-challenge.json" \
+  "identity/presentations/subcontractor-presentation.json" \
+  "identity/runtime-appraisals/treasury-agent.json" \
+  "identity/runtime-appraisals/procurement-agent.json" \
+  "identity/runtime-appraisals/provider-agent.json" \
+  "identity/runtime-appraisals/subcontractor-agent.json" \
+  "identity/runtime-appraisals/settlement-agent.json" \
+  "identity/runtime-appraisals/auditor-agent.json" \
+  "identity/runtime-degradation/capability-denial.json" \
+  "identity/runtime-degradation/provider-quarantine.json" \
+  "identity/runtime-degradation/reattestation.json" \
+  "identity/runtime-degradation/readmission.json" \
+  "identity/runtime-degradation/summary.json" \
+  "federation/bilateral-evidence-policy.json" \
+  "federation/evidence-export.json" \
+  "federation/evidence-export-package/manifest.json" \
+  "federation/evidence-import.json" \
+  "federation/federated-delegation-policy.json" \
+  "federation/open-admission-evaluation.json" \
+  "federation/federated-provider-capability.json" \
+  "federation/provider-admission-verdicts.json" \
+  "federation/subcontractor-admission.json" \
+  "reputation/history-ledger.json" \
+  "reputation/provider-scorecards.json" \
+  "reputation/passport-drift-report.json" \
+  "reputation/provider-local-report.json" \
+  "reputation/provider-passport-comparison.json" \
+  "reputation/provider-reputation-verdict.json" \
+  "behavior/behavioral-feed.json" \
+  "behavior/baseline.json" \
+  "behavior/behavioral-status.json" \
+  "guardrails/invalid-spiffe-denial.json" \
+  "guardrails/overspend-denial.json" \
+  "guardrails/velocity-burst-denial.json" \
+  "adversarial/prompt_injection-denial.json" \
+  "adversarial/invoice_tampering-denial.json" \
+  "adversarial/quote_replay-denial.json" \
+  "adversarial/expired_capability-denial.json" \
+  "adversarial/unauthorized_settlement_route-denial.json" \
+  "adversarial/forged_passport-denial.json" \
+  "adversarial/summary.json" \
+  "approvals/high-risk-release-challenge.json" \
+  "approvals/high-risk-release-decision.json" \
+  "approvals/high-risk-release-receipt.json" \
+  "approvals/high-risk-release-audit.json" \
+  "payments/x402-payment-required.json" \
+  "payments/chio-payment-proof.json" \
+  "payments/x402-payment-satisfaction.json" \
+  "subcontracting/delegated-capability.json" \
+  "subcontracting/inherited-obligations.json" \
+  "subcontracting/review-request.json" \
+  "subcontracting/review-attestation.json" \
+  "settlement/rail-selection.json" \
+  "disputes/weak-deliverable.json" \
+  "disputes/partial-payment.json" \
+  "disputes/refund.json" \
+  "disputes/reputation-downgrade.json" \
+  "disputes/passport-claim-drift.json" \
+  "disputes/remediation-packet.json" \
+  "disputes/dispute-packet.json" \
+  "disputes/dispute-audit.json" \
+  "disputes/dispute-summary.json" \
+  "operations/trace-map.json" \
+  "operations/siem-events.json" \
+  "operations/observability-status.json" \
+  "operations/operations-timeline.json" \
+  "market/rfq-request.json" \
+  "market/provider-bids.json" \
+  "market/provider-selection.json" \
+  "provider/review-result.json" \
+  "provider/review-attestation.json" \
+  "provider/reputation-evaluation.json"; do
+  copy_if_exists "${example_root}/${artifact}" "${example_dest}/${artifact}"
+done
 
 python3 - <<'PY' "${dest_root}/artifact-manifest.json" "${present_list}" "${missing_list}"
 from __future__ import annotations

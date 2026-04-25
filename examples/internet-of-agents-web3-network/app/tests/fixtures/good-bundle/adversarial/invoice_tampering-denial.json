@@ -1,0 +1,15 @@
+{
+  "attempt": "mutate invoice amount after quote acceptance",
+  "boundary": "settlement-api-sidecar",
+  "control": "invoice_tampering",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "37454bf81589bf2c4215337b490fd59620b039eae1864a42654e4bc8739d0742",
+    "id": "denial-invoice_tampering",
+    "kind": "adversarial",
+    "reason": "settlement packet amount does not match Chio quote receipt",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.adversarial-denial.v1"
+}

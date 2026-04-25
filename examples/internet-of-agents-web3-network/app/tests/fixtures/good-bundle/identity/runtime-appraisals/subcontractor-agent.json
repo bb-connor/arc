@@ -1,0 +1,33 @@
+{
+  "actor": "subcontractor-agent",
+  "attestation": {
+    "claims": {
+      "example": "internet-of-agents-web3-network",
+      "localRealism": true,
+      "mainnetBlocked": true,
+      "organization": "CipherWorks Review Lab"
+    },
+    "evidence_sha256": "33443b895633a7a5164f5892a323728f584fedfc1ef8003051a4f4259432a318",
+    "expires_at": 1776999178,
+    "issued_at": 1776995578,
+    "runtime_identity": "spiffe://ioa-web3.local/subcontractor/cipherworks-specialist-reviewer",
+    "schema": "chio.runtime-attestation.enterprise-verifier.json.v1",
+    "tier": "attested",
+    "verifier": "https://attest.ioa-web3.local",
+    "workload_identity": {
+      "credentialKind": "uri",
+      "path": "/subcontractor/cipherworks-specialist-reviewer",
+      "scheme": "spiffe",
+      "trustDomain": "ioa-web3.local",
+      "uri": "spiffe://ioa-web3.local/subcontractor/cipherworks-specialist-reviewer"
+    }
+  },
+  "organization": "CipherWorks Review Lab",
+  "requirements": {
+    "minimum_tier": "attested",
+    "scheme": "spiffe",
+    "trust_domain": "ioa-web3.local"
+  },
+  "schema": "chio.example.ioa-web3.runtime-appraisal.v1",
+  "verdict": "pass"
+}

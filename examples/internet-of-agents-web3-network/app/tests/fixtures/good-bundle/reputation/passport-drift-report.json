@@ -1,0 +1,27 @@
+{
+  "providers": [
+    {
+      "computed_score": 0.968,
+      "drift": -0.058,
+      "passport_claimed_score": 0.91,
+      "provider_id": "proofworks-agent-auditors",
+      "verdict": "pass"
+    },
+    {
+      "computed_score": 0.728,
+      "drift": 0.132,
+      "passport_claimed_score": 0.86,
+      "provider_id": "discount-zk-reviewers",
+      "verdict": "fail"
+    },
+    {
+      "computed_score": 0.34,
+      "drift": 0.44,
+      "passport_claimed_score": 0.78,
+      "provider_id": "overbudget-shadow-settlers",
+      "verdict": "fail"
+    }
+  ],
+  "schema": "chio.example.ioa-web3.passport-drift-report.v1",
+  "status": "pass"
+}

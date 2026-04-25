@@ -1,0 +1,9 @@
+{
+  "deliverable_id": "weak-secondary-review-ioa-web3-order-001",
+  "detected_at": 1776995581,
+  "issue": "secondary evidence appendix was late and missing one proof leaf",
+  "order_id": "ioa-web3-order-001",
+  "provider_id": "proofworks-agent-auditors",
+  "schema": "chio.example.ioa-web3.weak-deliverable.v1",
+  "severity": "medium"
+}

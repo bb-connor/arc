@@ -1,0 +1,25 @@
+# Chio Web3 Operator Environment Example
+
+# Copy these exports into a private shell or a gitignored `.env.local`.
+# Do not commit real API keys, wallet secrets, or private keys.
+
+# Base attribution and RPC.
+export CHIO_BASE_SEPOLIA_WALLET="0x<base-sepolia-wallet-address>"
+export CHIO_BASE_SEPOLIA_ROLE_ADDRESS="$CHIO_BASE_SEPOLIA_WALLET"
+export CHIO_BASE_BUILDER_CODE="bc_<builder-code>"
+export CHIO_COINBASE_CLIENT_API_KEY="<coinbase-client-api-key>"
+export CHIO_BASE_SEPOLIA_RPC_URL="https://api.developer.coinbase.com/rpc/v1/base-sepolia/${CHIO_COINBASE_CLIENT_API_KEY}"
+
+# Deployment signer. Use a testnet-only key and do not paste it into chat.
+export CHIO_BASE_SEPOLIA_DEPLOYER_KEY="0x<base-sepolia-private-key>"
+export CHIO_BASE_SEPOLIA_REGISTRY_ADMIN_KEY="$CHIO_BASE_SEPOLIA_DEPLOYER_KEY"
+export CHIO_BASE_SEPOLIA_OPERATOR_KEY="$CHIO_BASE_SEPOLIA_DEPLOYER_KEY"
+export CHIO_BASE_SEPOLIA_PRICE_ADMIN_KEY="$CHIO_BASE_SEPOLIA_DEPLOYER_KEY"
+
+# CDP CLI server-wallet credentials are configured in the CDP CLI, not in repo files.
+# The Client API Key above is only a Node/RPC key. CDP server-wallet writes require
+# a downloaded Secret API Key JSON and a downloaded Wallet Secret file.
+#
+# cdp env live --key-file /private/path/cdp-api-key.json
+# cdp env live --wallet-secret-file /private/path/cdp_wallet_secret.txt
+# cdp env

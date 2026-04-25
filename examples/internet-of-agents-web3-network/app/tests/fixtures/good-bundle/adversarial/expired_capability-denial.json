@@ -1,0 +1,15 @@
+{
+  "attempt": "invoke provider review after delegated capability expiry",
+  "boundary": "chio-trust-control",
+  "control": "expired_capability",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "7894dc159935f017ff5d432e94425e4b39340d1f6cda6e27b7d2adc8d8b967f2",
+    "id": "denial-expired_capability",
+    "kind": "adversarial",
+    "reason": "capability expired",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.adversarial-denial.v1"
+}

@@ -1,0 +1,27 @@
+{
+  "currency": "USDC",
+  "deliverables": [
+    "validation-index-review",
+    "base-sepolia-transaction-map",
+    "settlement-dispatch-readiness-note"
+  ],
+  "expires_at": 1776996479,
+  "issued_at": 1776995579,
+  "order_id": "ioa-web3-order-001",
+  "price_minor_units": 200000,
+  "provider_id": "proofworks-agent-auditors",
+  "quote_id": "quote-8d8a2b665e02",
+  "requirements": [
+    "passing e2e qualification",
+    "passing promotion qualification",
+    "passing ops incident audit",
+    "passing Base Sepolia smoke"
+  ],
+  "service_id": "base-sepolia-usdc-dress-rehearsal",
+  "trust": {
+    "claimed_reputation_score": 0.91,
+    "federation_status": "eligible",
+    "passport_status": "valid",
+    "runtime_tier": "attested"
+  }
+}

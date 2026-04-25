@@ -1,0 +1,8 @@
+{
+  "capabilityRefsPresent": true,
+  "orderId": "ioa-web3-order-001",
+  "paymentProtocolHint": "x402",
+  "provider": "proofworks-agent-auditors",
+  "schema": "chio.example.ioa-web3.provider-review.service-order-inspection.v1",
+  "verdict": "pass"
+}

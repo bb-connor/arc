@@ -1,0 +1,20 @@
+{
+  "boundary": "chio-trust-control:/v1/budgets/authorize-exposure",
+  "control": "overspend",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "id": "denial-overspend-ioa-web3-order-001",
+    "kind": "budget",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "response": {
+    "allowed": false,
+    "capabilityId": "cap-ioa-web3-settlement",
+    "grantIndex": 0,
+    "invocationCount": 1,
+    "totalExposureCharged": 0,
+    "totalRealizedSpend": 200000
+  },
+  "schema": "chio.example.ioa-web3.guardrail-denial.v1"
+}

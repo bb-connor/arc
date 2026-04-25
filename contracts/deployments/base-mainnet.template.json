@@ -11,27 +11,27 @@
     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
   },
   "oracle_configuration": {
-    "sequencer_uptime_feed": "0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3",
+    "sequencer_uptime_feed": "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433",
     "feeds": [
       {
         "pair": "ETH/USD",
         "address": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
-        "heartbeat_seconds": 1200
+        "heartbeat_seconds": 300
       },
       {
         "pair": "BTC/USD",
         "address": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
-        "heartbeat_seconds": 1200
+        "heartbeat_seconds": 180
       },
       {
         "pair": "USDC/USD",
         "address": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
-        "heartbeat_seconds": 86400
+        "heartbeat_seconds": 68400
       },
       {
         "pair": "LINK/USD",
-        "address": "0x17CAb8FE31cA45e4684Ea7bCB9D30Ba03e38BF2C",
-        "heartbeat_seconds": 1200
+        "address": "0x17CAb8FE31E32f08326e5E27412894e49B0f9D65",
+        "heartbeat_seconds": 86400
       }
     ]
   },
@@ -80,7 +80,7 @@
       "source": "contracts/src/ChioPriceResolver.sol",
       "constructor_args": [
         "<price_admin_address>",
-        "0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3"
+        "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433"
       ],
       "create2_salt": "chio.price-resolver.base.v0.1.0"
     }

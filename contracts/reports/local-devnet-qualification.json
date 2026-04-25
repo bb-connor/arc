@@ -1,19 +1,19 @@
 {
   "report_id": "chio.web3-contract-qualification.local-devnet.v1",
-  "generated_at": "2026-04-02T19:32:47.006Z",
+  "generated_at": "2026-04-24T01:52:19.168Z",
   "chain_id": "eip155:31337",
   "gas_estimates": {
-    "register_operator": "74658",
+    "register_operator": "74670",
     "register_delegate": "74559",
-    "publish_root_operator": "172426",
-    "publish_root_delegate": "157650",
+    "publish_root_operator": "172438",
+    "publish_root_delegate": "157662",
     "register_feed": "123625",
     "price_read": "60173",
-    "create_escrow": "284004",
+    "create_escrow": "284016",
     "merkle_partial_release": "103764",
     "dual_sign_release": "76277",
     "lock_bond": "278775",
-    "bond_release": "83629"
+    "bond_release": "83641"
   },
   "checks": [
     {

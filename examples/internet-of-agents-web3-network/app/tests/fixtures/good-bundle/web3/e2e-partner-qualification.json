@@ -1,0 +1,29 @@
+{
+  "chainId": "eip155:31337",
+  "claims": [
+    "fx-backed settlement requires and carries chio-link oracle evidence",
+    "dual-sign settlement executes on chain and projects finalized receipt truth",
+    "timeout refund, canonical drift, bond impairment, and bond expiry remain explicit recovery surfaces",
+    "the same evidence family stages cleanly into the hosted web3 release bundle"
+  ],
+  "generatedAt": 1776995549,
+  "hostedArtifacts": [
+    "target/release-qualification/web3-runtime/e2e/partner-qualification.json",
+    "target/release-qualification/web3-runtime/e2e/scenarios/fx-dual-sign-settlement.json",
+    "target/release-qualification/web3-runtime/e2e/scenarios/timeout-refund-recovery.json",
+    "target/release-qualification/web3-runtime/e2e/scenarios/reorg-recovery.json",
+    "target/release-qualification/web3-runtime/e2e/scenarios/bond-impair-recovery.json",
+    "target/release-qualification/web3-runtime/e2e/scenarios/bond-expiry-recovery.json"
+  ],
+  "localArtifacts": [
+    "target/web3-e2e-qualification/partner-qualification.json",
+    "target/web3-e2e-qualification/scenarios/fx-dual-sign-settlement.json",
+    "target/web3-e2e-qualification/scenarios/timeout-refund-recovery.json",
+    "target/web3-e2e-qualification/scenarios/reorg-recovery.json",
+    "target/web3-e2e-qualification/scenarios/bond-impair-recovery.json",
+    "target/web3-e2e-qualification/scenarios/bond-expiry-recovery.json"
+  ],
+  "network": "Ganache Runtime Devnet",
+  "schema": "chio.web3-e2e-qualification.v1",
+  "status": "pass"
+}

@@ -1,0 +1,8 @@
+{
+  "computedScore": 0.6241880341880343,
+  "minimumScore": 0.6,
+  "schema": "chio.example.ioa-web3.reputation-verdict.v1",
+  "source": "chio-cli",
+  "subject": "did:chio:bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "verdict": "pass"
+}

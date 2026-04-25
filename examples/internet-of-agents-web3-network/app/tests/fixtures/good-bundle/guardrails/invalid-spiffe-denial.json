@@ -1,0 +1,19 @@
+{
+  "attemptedWorkloadIdentity": {
+    "path": "/operator/procurement-agent",
+    "scheme": "spiffe",
+    "trustDomain": "evil.example"
+  },
+  "boundary": "policy:require_workload_identity",
+  "control": "invalid-spiffe-identity",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "89c48a5752abe301f4e9f0e51a4e8133885c9e305f8a7c1f0a7354f0b2e137f8",
+    "id": "denial-invalid-spiffe-identity",
+    "kind": "policy",
+    "reason": "trust domain is not ioa-web3.local",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.guardrail-denial.v1"
+}

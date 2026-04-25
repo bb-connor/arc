@@ -1,0 +1,89 @@
+{
+  "approval_id": "chio.web3-deployment-approval.base-sepolia.v1",
+  "approval_sha256": "b7775976beb963156fa7450ae9d57f07182339a73105d2669e2ce5c47f94468d",
+  "attribution": {
+    "data_suffix_sha256": "0x2d77fdd0e0e859b004a06028ca8ee729747758186be8a8f08f0e68b899f165f9",
+    "erc8021_marker": "0x80218021802180218021802180218021"
+  },
+  "chain_id": "eip155:84532",
+  "configuration_transactions": {
+    "delegate_registration": {
+      "status": "already_registered",
+      "tx_hash": null
+    },
+    "feed_registrations": [
+      {
+        "feed_address": "0xAF31E96f5d7c6417A948448c060e7fd99579707E",
+        "pair": "ETH/USD",
+        "tx_hash": "0x9ea384fd77771eb84a7fc3cd522c7b3bfb6c099d785cdb7c217f4e3d2a5e19e2"
+      },
+      {
+        "feed_address": "0xE1137532f59A32D34bAB54914d7eF0F077d1935A",
+        "pair": "BTC/USD",
+        "tx_hash": "0x11d30b908173c567f7237a419f62ba71973baba5bb17d053a801ed4306af1d5e"
+      },
+      {
+        "feed_address": "0x22bE5b5DaFbfa46BdF513819C9a8B47b1D3AF400",
+        "pair": "USDC/USD",
+        "tx_hash": "0x38b3ce417c1165b6da3e0f5db2250a232ea8e626447467eba2e749b78c1dea1a"
+      },
+      {
+        "feed_address": "0x646D185528cfA57BECB2264836fb363aa11153f1",
+        "pair": "LINK/USD",
+        "tx_hash": "0x1125b4b7c349931fa3c63625a4dafa12a35334a9b9c14c6c24b6f35a3ebe28bf"
+      }
+    ],
+    "operator_registration": {
+      "status": "submitted",
+      "tx_hash": "0x8c0ba067c951ef64d653fe2b364d9c1250a07095f34c231939f6979d0ea4fbe7"
+    }
+  },
+  "create2_factory_address": "0x4Ab90B23dbC0Ea1D25E378EECaC86B6ad47bfcb1",
+  "deployed_contract_addresses": {
+    "chio.bond-vault": "0x0EcDDd3C6Ff32aBb841729F4909375A63FEd333E",
+    "chio.escrow": "0x1BEa33b952f4730c42B256FF9bE55fD0016C14f7",
+    "chio.identity-registry": "0xf4125e32aA47FD3D4b1d9Dc21C9a5A97D88d19c8",
+    "chio.price-resolver": "0xE277aC0a028a976c69874cD95C329c91aba17B91",
+    "chio.root-registry": "0x575CBE92c5141fC68837229b33ced589C178B6b7"
+  },
+  "deployment_id": "chio.web3-reviewed-rollout.base-sepolia.v1",
+  "deployment_transactions": {
+    "chio.bond-vault": {
+      "gas_used": "1236736",
+      "tx_hash": "0x33d3eb406614c62be6763f83488132503f1affb7ee567f9a536f57ca50c70c45"
+    },
+    "chio.escrow": {
+      "gas_used": "1308155",
+      "tx_hash": "0x1c515b6e5e911f1790a40165d7a2148feac1238fac240f7d63d06073faef02bd"
+    },
+    "chio.identity-registry": {
+      "gas_used": "631705",
+      "tx_hash": "0xc74df479fef218c68514f3b0c9a87e0ca4e709149d4c6683a816eb398e53b6c5"
+    },
+    "chio.price-resolver": {
+      "gas_used": "613301",
+      "tx_hash": "0xfdb93d7f6def3ca6fb9ef5fa02407d945f28e0770785d5f64d7a638a8f3254e1"
+    },
+    "chio.root-registry": {
+      "gas_used": "1312948",
+      "tx_hash": "0x5e986871c389d2513098c9ad7e638b499ac7e96d1d2834c3c90cb37eb17225c6"
+    }
+  },
+  "environment": "base-sepolia",
+  "generated_at": "2026-04-23T20:32:50.511Z",
+  "local_dependencies": {},
+  "manifest_id": "chio.web3-deployment.base-sepolia.reviewed.v1",
+  "manifest_sha256": "4562e317a70c84a17a90f2699746a377342b78f0a2b297b1f8482214bc95da00",
+  "planned_contract_addresses": {
+    "chio.bond-vault": "0x0EcDDd3C6Ff32aBb841729F4909375A63FEd333E",
+    "chio.escrow": "0x1BEa33b952f4730c42B256FF9bE55fD0016C14f7",
+    "chio.identity-registry": "0xf4125e32aA47FD3D4b1d9Dc21C9a5A97D88d19c8",
+    "chio.price-resolver": "0xE277aC0a028a976c69874cD95C329c91aba17B91",
+    "chio.root-registry": "0x575CBE92c5141fC68837229b33ced589C178B6b7"
+  },
+  "rpc_url": "https://sepolia.base.org",
+  "settlement_token": {
+    "address": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "symbol": "USDC"
+  }
+}

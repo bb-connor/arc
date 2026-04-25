@@ -1,0 +1,12 @@
+{
+  "capability_id": "cap-ioa-web3-procurement",
+  "decision": "select_provider_and_satisfy_x402",
+  "order_id": "ioa-web3-order-001",
+  "payment_status": "satisfied",
+  "quote": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "quote_id": "quote-8d8a2b665e02",
+  "selected_provider_id": "proofworks-agent-auditors"
+}

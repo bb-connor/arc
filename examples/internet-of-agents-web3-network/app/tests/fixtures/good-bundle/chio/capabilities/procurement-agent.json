@@ -1,0 +1,68 @@
+{
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "kind": "remove_settlement_authority"
+        }
+      ],
+      "capability_id": "cap-019dbd30-b376-7b92-ba54-d00aec973369",
+      "delegatee": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b",
+      "delegator": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+      "signature": "471cd358dad4b481c97bbb7d8b7590183275972b9293ddb5ec1cda0ef77e0ed5c1a86594c46f2638efcc5edaa3430007db77375d4247a1165a81ed7d0b90aa0b",
+      "timestamp": 1776995579
+    }
+  ],
+  "expires_at": 1776997379,
+  "id": "cap-ioa-web3-procurement",
+  "issued_at": 1776995579,
+  "issuer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "request_rfq"
+      },
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "request_quote"
+      },
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "request_payment_requirements"
+      },
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "submit_payment_proof"
+      },
+      {
+        "constraints": [],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "agent-market",
+        "tool_name": "accept_fulfillment"
+      }
+    ],
+    "prompt_grants": [],
+    "resource_grants": []
+  },
+  "signature": "ea1e3d45bc038febe5a1be6102c41e2c7e1cca9efb0a6847f983f9f1ca1317098ba1f5d2a0dda0cbef71e9a67adb92e795fcc1234e343d15a77e400601fef904",
+  "subject": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b"
+}

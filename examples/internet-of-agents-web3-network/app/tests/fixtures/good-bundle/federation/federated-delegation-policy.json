@@ -1,0 +1,25 @@
+{
+  "body": {
+    "schema": "chio.federated-delegation-policy.v1",
+    "issuer": "Meridian Federation Verifier",
+    "partner": "ProofWorks Provider",
+    "verifier": "http://127.0.0.1:62121",
+    "signerPublicKey": "08a1fcd8e07344ab0c22599bf57daa75c956660e888a27fb134c78e089b031cd",
+    "createdAt": 1776995580,
+    "expiresAt": 1777081980,
+    "ttlSeconds": 900,
+    "scope": {
+      "grants": [
+        {
+          "server_id": "provider-review",
+          "tool_name": "issue_review_attestation",
+          "operations": [
+            "invoke"
+          ]
+        }
+      ]
+    },
+    "purpose": "ioa-web3-provider-federated-issue"
+  },
+  "signature": "88641d00ba071a765472b68b75c9a3bacb153e3dde58e7a5c553e5d8bc16fe7f9b741c153c2a3adf440f3f4586cb7d7749d046321306e5455f755930077e4f06"
+}

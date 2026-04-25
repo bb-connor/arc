@@ -1,0 +1,18 @@
+{
+  "amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "approval_decision_id": "approval-decision-ioa-web3-order-001",
+  "capability_id": "cap-ioa-web3-settlement",
+  "order_id": "ioa-web3-order-001",
+  "proof_id": "x402-proof-ioa-web3-order-001",
+  "quote_id": "quote-8d8a2b665e02",
+  "receipt": {
+    "decision": "allow",
+    "digest": "1bedc4551baa1da95a610cc25be5ac9439f71fed3375069d1c4d04c9a30caa70",
+    "id": "rcpt-x402-payment-proof-ioa-web3-order-001"
+  },
+  "schema": "chio.example.ioa-web3.x402-payment-proof.v1",
+  "source_of_truth": "chio-budget-and-receipts"
+}

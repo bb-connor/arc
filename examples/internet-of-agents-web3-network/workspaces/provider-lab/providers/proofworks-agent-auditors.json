@@ -1,0 +1,33 @@
+{
+  "provider_id": "proofworks-agent-auditors",
+  "display_name": "ProofWorks Agent Auditors",
+  "trust": {
+    "claimed_reputation_score": 0.91,
+    "runtime_tier": "attested",
+    "passport_status": "valid",
+    "federation_status": "eligible"
+  },
+  "risk": {
+    "profile": "trusted",
+    "expected_outcome": "deliver"
+  },
+  "services": [
+    {
+      "service_id": "base-sepolia-usdc-dress-rehearsal",
+      "title": "Base Sepolia USDC settlement proof review",
+      "price_minor_units": 200000,
+      "currency": "USDC",
+      "deliverables": [
+        "validation-index-review",
+        "base-sepolia-transaction-map",
+        "settlement-dispatch-readiness-note"
+      ],
+      "requirements": [
+        "passing e2e qualification",
+        "passing promotion qualification",
+        "passing ops incident audit",
+        "passing Base Sepolia smoke"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "attempt": "force mainnet or Solana settlement route",
+  "boundary": "rail-selection",
+  "control": "unauthorized_settlement_route",
+  "denied": true,
+  "receipt": {
+    "decision": "deny",
+    "digest": "1d9dd7a09bc5a008526f5237eb4b30e2769f5855b590d3977efd5ab2860d8f4b",
+    "id": "denial-unauthorized_settlement_route",
+    "kind": "adversarial",
+    "reason": "route outside approved rail policy",
+    "schema": "chio.example.ioa-web3.denial-receipt.v1"
+  },
+  "schema": "chio.example.ioa-web3.adversarial-denial.v1"
+}

@@ -1,0 +1,7 @@
+{
+  "denialReceiptId": "denial-runtime-degradation-proofworks",
+  "provider": "ProofWorks Provider",
+  "reason": "runtime attestation expired and workload identity trust domain mismatch",
+  "schema": "chio.example.ioa-web3.provider-quarantine.v1",
+  "status": "quarantined"
+}

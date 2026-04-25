@@ -48,6 +48,7 @@ Meaning:
 | On-chain Ed25519 verification | absent | accepted non-goal; identity binding remains registry-backed and explicit |
 | Sanctions or blacklist screening | absent | operator obligation outside the shipped local runtime lane |
 | Live CREATE2 deployment runner | present | closed through `contracts/scripts/promote-deployment.mjs`, `./scripts/qualify-web3-promotion.sh`, and explicit approval/rollback artifacts |
+| Base Sepolia dependency bootstrap | present | closed for public testnet rehearsal through `contracts/scripts/deploy-base-sepolia-dependencies.mjs`, `contracts/scripts/refresh-base-sepolia-mock-feeds.mjs`, and `contracts/scripts/smoke-base-sepolia.mjs`; mainnet still requires reviewed live Chainlink feed addresses |
 | Proxy upgrade path | absent | accepted by design; replacement deployments remain the remediation path |
 
 ## Measured Budgets
@@ -92,14 +93,22 @@ when:
 6. Failed promotion emits an explicit rollback plan, and local rehearsal proves
    snapshot rollback can execute fail closed.
 7. The operator has reviewed `contracts/deployments/base-mainnet.template.json`
-   or `contracts/deployments/arbitrum-one.template.json` and filled the
-   placeholder addresses intentionally.
-8. Web3-enabled runtime policy uses local durable receipt persistence with
+   or `contracts/deployments/base-sepolia.template.json` or
+   `contracts/deployments/arbitrum-one.template.json` and filled the
+   placeholder addresses intentionally through the repo-shipped review-prep
+   helper or an equivalent manifest-generation path.
+   Base Sepolia may use the dependency bootstrap helper's mock feed report only
+   as public testnet evidence; mainnet approvals must use live Chainlink feeds.
+   Public testnet mock feeds must be refreshed before delayed readback.
+8. Base Sepolia promotion has a passing smoke report at
+   `target/web3-live-rollout/base-sepolia/base-sepolia-smoke.json` before any
+   mainnet approval is prepared.
+9. Web3-enabled runtime policy uses local durable receipt persistence with
    checkpoint issuance enabled; append-only remote receipt mirrors do not
    satisfy the promotion gate for Merkle or Solana evidence lanes.
-9. The web3 operations and settlement/anchor/oracle runbooks are updated
+10. The web3 operations and settlement/anchor/oracle runbooks are updated
    together with the candidate docs.
-10. The measured gas table stays within the deployment policy budgets.
+11. The measured gas table stays within the deployment policy budgets.
 
 Promotion from template review to actual public deployment is still blocked
 until:
@@ -121,6 +130,12 @@ until:
 - `./scripts/qualify-web3-e2e.sh`
 - `./scripts/qualify-web3-ops-controls.sh`
 - `./scripts/qualify-web3-promotion.sh`
+- `contracts/scripts/prepare-reviewed-manifest.mjs`
+- `contracts/scripts/deploy-base-sepolia-dependencies.mjs`
+- `contracts/scripts/refresh-base-sepolia-mock-feeds.mjs`
+- `contracts/scripts/smoke-base-sepolia.mjs`
+- `examples/internet-of-agents-web3-network/smoke.sh`
+- `scripts/qualify-web3-examples.sh`
 - `.github/workflows/release-qualification.yml`
 - `./scripts/stage-web3-release-artifacts.sh`
 - `target/web3-e2e-qualification/partner-qualification.json`
@@ -131,6 +146,7 @@ until:
 - `target/web3-ops-qualification/runtime-reports/chio-anchor-runtime-report.json`
 - `target/web3-ops-qualification/runtime-reports/chio-settle-runtime-report.json`
 - `contracts/deployments/local-devnet.reviewed.json`
+- `contracts/deployments/base-sepolia.template.json`
 - `contracts/reports/local-devnet-qualification.json`
 - `contracts/reports/CHIO_WEB3_CONTRACT_SECURITY_REVIEW.md`
 - `contracts/reports/CHIO_WEB3_CONTRACT_GAS_AND_STORAGE.md`
@@ -138,5 +154,7 @@ until:
 - `docs/standards/CHIO_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json`
 - `docs/standards/CHIO_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json`
 - `docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json`
+- `docs/standards/CHIO_WEB3_OPERATOR_ENVIRONMENT.example`
 - `docs/standards/CHIO_WEB3_OPERATIONS_PROFILE.md`
 - `docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md`
+- `target/web3-promotion-qualification/review-prep/qualification.json`

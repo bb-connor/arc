@@ -1,0 +1,34 @@
+{
+  "attempt": "issue capability with expired attestation and bad SPIFFE trust domain",
+  "attestation": {
+    "claims": {
+      "example": "internet-of-agents-web3-network",
+      "localRealism": true,
+      "mainnetBlocked": true,
+      "organization": "ProofWorks Provider"
+    },
+    "evidence_sha256": "1a096a85c07d9bba171c4c1bcac6e072d49d351081bf20a4f7446d122fd523c0",
+    "expires_at": 1776988379,
+    "issued_at": 1776988380,
+    "runtime_identity": "spiffe://ioa-web3.local/provider/proofworks-agent-auditor",
+    "schema": "chio.runtime-attestation.enterprise-verifier.json.v1",
+    "tier": "attested",
+    "verifier": "https://attest.ioa-web3.local",
+    "workload_identity": {
+      "credentialKind": "uri",
+      "path": "/provider/proofworks-agent-auditor",
+      "scheme": "spiffe",
+      "trustDomain": "evil.example",
+      "uri": "spiffe://evil.example/provider/proofworks-agent-auditor"
+    }
+  },
+  "denied": true,
+  "provider": "ProofWorks Provider",
+  "receipt": {
+    "decision": "deny",
+    "id": "denial-runtime-degradation-proofworks",
+    "reason": "runtime attestation expired and workload identity trust domain mismatch"
+  },
+  "schema": "chio.example.ioa-web3.runtime-degradation-denial.v1",
+  "subject": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a"
+}

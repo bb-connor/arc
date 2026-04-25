@@ -1,0 +1,46 @@
+{
+  "amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "assembled_at": 1776995581,
+  "chain_id": "eip155:84532",
+  "evidence": {
+    "base_sepolia_tx_count": 15,
+    "mainnet_blocked": true,
+    "validation_index": "web3/validation-index.json"
+  },
+  "fulfillment_id": "fulfillment-e9cb54abe045",
+  "order_id": "ioa-web3-order-001",
+  "packet_id": "settlement-packet-ioa-web3-order-001",
+  "quote_id": "quote-8d8a2b665e02",
+  "rail_selection": {
+    "denied_rails": [
+      {
+        "decision": "deny",
+        "kind": "solana-memo",
+        "rail_id": "solana-memo-proof",
+        "reason": "alternate proof path only; no live Solana signer or settlement escrow in this smoke"
+      },
+      {
+        "decision": "deny",
+        "kind": "web3",
+        "rail_id": "local-devnet-usdc",
+        "reason": "higher-fidelity Base Sepolia smoke is available"
+      }
+    ],
+    "evaluated_at": 1776995581,
+    "mainnet_blocked": true,
+    "order_id": "ioa-web3-order-001",
+    "schema": "chio.example.ioa-web3.rail-selection.v1",
+    "selected_rail": {
+      "chain_id": "eip155:84532",
+      "external_execution_authoritative": true,
+      "kind": "web3",
+      "rail_id": "base-sepolia-usdc",
+      "reason": "Base Sepolia smoke evidence is attached and passing"
+    },
+    "status": "pass"
+  },
+  "status": "ready"
+}

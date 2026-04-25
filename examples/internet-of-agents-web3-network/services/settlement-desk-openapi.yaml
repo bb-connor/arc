@@ -1,0 +1,47 @@
+openapi: 3.1.0
+info:
+  title: Atlas Settlement Desk
+  version: 0.1.0
+paths:
+  /settlement-packets:
+    post:
+      operationId: assembleSettlementPacket
+      summary: Assemble a Chio web3 settlement packet.
+      x-chio-tool-name: assemble_packet
+      x-chio-side-effects: true
+      x-chio-approval-required: true
+      x-chio-cost-units: 125000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Settlement packet.
+          content:
+            application/json:
+              schema:
+                type: object
+  /dispute-packets:
+    post:
+      operationId: assembleDisputePacket
+      summary: Assemble a dispute and remediation settlement packet.
+      x-chio-tool-name: assemble_dispute_packet
+      x-chio-side-effects: true
+      x-chio-approval-required: true
+      x-chio-cost-units: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Dispute packet.
+          content:
+            application/json:
+              schema:
+                type: object

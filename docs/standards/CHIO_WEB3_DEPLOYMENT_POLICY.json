@@ -5,6 +5,7 @@
     "local-devnet",
     "runtime-devnet",
     "base-mainnet-template",
+    "base-sepolia-template",
     "arbitrum-one-template"
   ],
   "gasBudgets": {
@@ -30,15 +31,25 @@
   "requiredEvidence": [
     "./scripts/qualify-web3-runtime.sh",
     "./scripts/qualify-web3-promotion.sh",
+    "contracts/scripts/deploy-base-sepolia-dependencies.mjs",
+    "contracts/scripts/refresh-base-sepolia-mock-feeds.mjs",
+    "contracts/scripts/smoke-base-sepolia.mjs",
+    "contracts/scripts/prepare-reviewed-manifest.mjs",
+    "examples/internet-of-agents-web3-network/smoke.sh",
+    "scripts/qualify-web3-examples.sh",
     "contracts/reports/local-devnet-qualification.json",
     "contracts/deployments/local-devnet.reviewed.json",
+    "contracts/deployments/base-sepolia.template.json",
     "contracts/reports/CHIO_WEB3_CONTRACT_SECURITY_REVIEW.md",
     "contracts/reports/CHIO_WEB3_CONTRACT_GAS_AND_STORAGE.md",
     "docs/standards/CHIO_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json",
     "docs/standards/CHIO_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json",
     "docs/standards/CHIO_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json",
+    "docs/standards/CHIO_WEB3_OPERATOR_ENVIRONMENT.example",
+    "docs/release/CHIO_WEB3_MAINNET_CUTOVER_CHECKLIST.md",
     "docs/release/CHIO_WEB3_OPERATIONS_RUNBOOK.md",
     "docs/release/CHIO_WEB3_READINESS_AUDIT.md",
+    "target/web3-promotion-qualification/review-prep/qualification.json",
     "target/web3-promotion-qualification/promotion-qualification.json"
   ],
   "promotionGates": [
@@ -47,6 +58,11 @@
     "Runtime qualification must be green on the candidate revision.",
     "Reviewed promotion manifests must bind one exact manifest hash, release id, deployment policy id, CREATE2 salt namespace, and environment-specific approval artifact before any rollout begins.",
     "Deployment manifests must remain deterministic templates with operator-filled addresses reviewed before any live promotion.",
+    "The repo-shipped review-prep helper must be able to materialize reviewed manifests and pending-review approval scaffolds for every shipped public-chain template with no unresolved operator-supplied placeholders.",
+    "Base Sepolia public-chain rehearsals may use deployed mock Chainlink-compatible feeds only when the dependency report records them as testnet-only placeholders.",
+    "Base Sepolia public-chain rehearsals that use mock Chainlink-compatible feeds must refresh feed timestamps before delayed readback or tests that depend on fresh oracle prices.",
+    "Base Sepolia promotion must have a passing smoke report with transaction hashes before any mainnet approval artifact is prepared.",
+    "Base Builder Code attribution must be enabled for Base deployment factory calls when a builder code is configured.",
     "Promotion qualification must prove reproducible CREATE2 rollout across fresh local devnets and emit explicit rollback plans on failure.",
     "External publication still requires hosted workflow observation and operator approval."
   ]

@@ -1,0 +1,6 @@
+{
+  "boundary": "trust-control",
+  "expectedReceiptCount": 11,
+  "schema": "chio.example.ioa-web3.boundary-receipts.v1",
+  "status": "present"
+}

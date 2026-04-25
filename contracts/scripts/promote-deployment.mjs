@@ -16,6 +16,7 @@ const LOCAL_RPC_URL = `http://127.0.0.1:${LOCAL_PORT}`;
 const LOCAL_CHAIN_ID = 31337;
 const USDC_UNITS = 10n ** 6n;
 const DEFAULT_EXPIRY_SECONDS = 3600;
+const ERC8021_MARKER = "80218021802180218021802180218021";
 
 const ACCOUNT_CONFIG = [
   { name: "admin", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000001" },
@@ -110,6 +111,60 @@ function splitPair(pair) {
     throw new Error(`invalid oracle pair ${pair}`);
   }
   return [base.trim(), quote.trim()];
+}
+
+function normalizeHex(label, value) {
+  if (typeof value !== "string" || !/^0x[0-9a-fA-F]*$/.test(value)) {
+    throw new Error(`${label} must be 0x-prefixed hex`);
+  }
+  if (value.length % 2 !== 0) {
+    throw new Error(`${label} must contain complete bytes`);
+  }
+  return value.toLowerCase();
+}
+
+function encodeBaseBuilderDataSuffix(rawCodes) {
+  const codes = rawCodes
+    .split(",")
+    .map((code) => code.trim())
+    .filter((code) => code.length > 0);
+  if (codes.length === 0) {
+    throw new Error("base builder code list cannot be empty");
+  }
+  for (const code of codes) {
+    if (!/^[A-Za-z0-9_:-]+$/.test(code)) {
+      throw new Error(`base builder code ${code} contains unsupported characters`);
+    }
+  }
+  const schemaText = codes.join(",");
+  const schemaBytes = ethers.toUtf8Bytes(schemaText);
+  if (schemaBytes.length > 255) {
+    throw new Error("base builder code suffix schema data must fit in one length byte");
+  }
+  const schemaData = ethers.hexlify(Uint8Array.from([...schemaBytes, schemaBytes.length])).slice(2);
+  return `0x${schemaData}00${ERC8021_MARKER}`;
+}
+
+function resolveDataSuffix(args) {
+  if (args["data-suffix"] || process.env.CHIO_BASE_DATA_SUFFIX) {
+    return normalizeHex("base data suffix", args["data-suffix"] ?? process.env.CHIO_BASE_DATA_SUFFIX);
+  }
+  const builderCode = args["base-builder-code"] ?? process.env.CHIO_BASE_BUILDER_CODE;
+  return builderCode ? encodeBaseBuilderDataSuffix(builderCode) : null;
+}
+
+function appendDataSuffix(data, dataSuffix) {
+  if (!dataSuffix) {
+    return data;
+  }
+  const normalizedData = normalizeHex("transaction data", data ?? "0x");
+  return `${normalizedData}${dataSuffix.slice(2)}`;
+}
+
+async function sendContractCall(contract, method, params, dataSuffix) {
+  const txRequest = await contract[method].populateTransaction(...params);
+  txRequest.data = appendDataSuffix(txRequest.data, dataSuffix);
+  return await contract.runner.sendTransaction(txRequest);
 }
 
 async function waitForCode(provider, address) {
@@ -301,9 +356,10 @@ async function main() {
   const outputDir = args["output-dir"] ? path.resolve(repoRoot, args["output-dir"]) : null;
   const localDevnet = Boolean(args["local-devnet"]);
   const rollbackOnFailure = Boolean(args["rollback-on-failure"]);
+  const dataSuffix = resolveDataSuffix(args);
 
   if (!manifestPath || !approvalPath || !outputDir) {
-    throw new Error("usage: node contracts/scripts/promote-deployment.mjs --manifest <path> --approval <path> --output-dir <path> [--local-devnet] [--rollback-on-failure] [--rpc-url <url>] [--deployer-key <hex>] [--registry-admin-key <hex>] [--operator-key <hex>] [--price-admin-key <hex>]");
+    throw new Error("usage: node contracts/scripts/promote-deployment.mjs --manifest <path> --approval <path> --output-dir <path> [--local-devnet] [--rollback-on-failure] [--rpc-url <url>] [--deployer-key <hex>] [--registry-admin-key <hex>] [--operator-key <hex>] [--price-admin-key <hex>] [--base-builder-code <code>] [--data-suffix <hex>]");
   }
 
   ensureDir(outputDir);
@@ -321,6 +377,12 @@ async function main() {
 
   let report = deploymentReportSkeleton({ manifest, manifestHash, approval, approvalHash, environment });
   let rollbackPlan = rollbackPlanSkeleton({ manifest, approval, environment });
+  if (dataSuffix) {
+    report.attribution = {
+      data_suffix_sha256: ethers.sha256(dataSuffix),
+      erc8021_marker: `0x${ERC8021_MARKER}`
+    };
+  }
 
   let server;
   let provider;
@@ -434,6 +496,7 @@ async function main() {
       const initCode = deployTx.data;
       const salt = toSalt(manifest.salt_namespace, contract.create2_salt);
       const plannedAddress = ethers.getCreate2Address(create2FactoryAddress, salt, ethers.keccak256(initCode));
+      const expectedDeployedBytecode = (artifact.deployedBytecode ?? "").toLowerCase();
       state.deploymentPlan.push({
         contract_id: contract.contract_id,
         artifact: contract.artifact,
@@ -443,7 +506,11 @@ async function main() {
         create2_salt: contract.create2_salt,
         create2_salt_hash: salt,
         planned_address: plannedAddress,
-        init_code: initCode
+        init_code: initCode,
+        expected_deployed_bytecode: expectedDeployedBytecode,
+        expected_deployed_bytecode_hash: expectedDeployedBytecode
+          ? ethers.keccak256(expectedDeployedBytecode.startsWith("0x") ? expectedDeployedBytecode : `0x${expectedDeployedBytecode}`)
+          : null
       });
 
       const placeholderKey = contract.contract_id.replace("chio.", "").replaceAll("-", "_");
@@ -457,7 +524,50 @@ async function main() {
 
     const deploymentTransactions = {};
     for (const plan of state.deploymentPlan) {
-      const tx = await create2Factory.deploy(plan.create2_salt_hash, plan.init_code);
+      const existingCode = await provider.getCode(plan.planned_address);
+      if (existingCode && existingCode !== "0x") {
+        // CREATE2 binds the planned_address to (factory, salt, keccak(initcode)).
+        // We just computed initcode from the reviewed artifact + reviewed
+        // constructor args, so any code that lives at planned_address must be
+        // the deterministic constructor output of our exact initcode (modulo
+        // SHA-3 collision, which is cryptographically infeasible). Stale or
+        // out-of-band code therefore cannot land at the planned address with
+        // bytecode that disagrees with the reviewed artifact.
+        //
+        // When the artifact happens to expose deployedBytecode (toolchains
+        // sometimes do, sometimes do not), we keep a defense-in-depth check
+        // that compares its hash to the on-chain runtime hash. The check is a
+        // best-effort cross-validation, not the primary safety guarantee, and
+        // a missing deployedBytecode does NOT block idempotent promotion.
+        const onChainHash = ethers.keccak256(existingCode);
+        if (
+          plan.expected_deployed_bytecode_hash &&
+          onChainHash.toLowerCase() !== plan.expected_deployed_bytecode_hash.toLowerCase()
+        ) {
+          throw new Error(
+            `address ${plan.planned_address} for ${plan.contract_id} has unexpected on-chain bytecode ` +
+              `(expected runtime hash ${plan.expected_deployed_bytecode_hash}, on-chain hash ${onChainHash}). ` +
+              `Refusing to mark as already_deployed.`
+          );
+        }
+        deploymentTransactions[plan.contract_id] = {
+          tx_hash: null,
+          gas_used: 0n,
+          status: "already_deployed",
+          on_chain_bytecode_hash: onChainHash,
+          init_code_hash: plan.init_code_hash,
+          deployed_bytecode_hash_check: plan.expected_deployed_bytecode_hash
+            ? "matched_artifact"
+            : "skipped_artifact_lacks_deployedBytecode"
+        };
+        continue;
+      }
+      const tx = await sendContractCall(
+        create2Factory,
+        "deploy",
+        [plan.create2_salt_hash, plan.init_code],
+        dataSuffix
+      );
       const receipt = await tx.wait();
       await waitForCode(provider, plan.planned_address);
       deploymentTransactions[plan.contract_id] = {
@@ -469,7 +579,7 @@ async function main() {
     report.checks.push({
       id: "deployment.create2_rollout",
       outcome: "pass",
-      note: "Reviewed manifest deployed the full bounded contract family through CREATE2 and every actual address matched the planned address."
+      note: "Reviewed manifest deployed the full bounded contract family through CREATE2 and every actual address matched the planned address. Any address with pre-existing code was verified against the artifact's runtime bytecode hash before being marked already_deployed."
     });
 
     const deployedContracts = Object.fromEntries(
@@ -498,30 +608,74 @@ async function main() {
 
     const operatorConfig = manifest.operator_configuration ?? {};
     const operatorLabel = operatorConfig.operator_ed_key_label ?? "chio-operator-ed25519-key";
-    const operatorTx = await identityRegistry.registerOperator(
-      operatorConfig.operator_address,
-      labelHash(operatorLabel),
-      operatorConfig.operator_address,
-      ethers.toUtf8Bytes("deployment-runner:operator")
-    );
-    await operatorTx.wait();
+    const expectedEdKeyHash = labelHash(operatorLabel);
+    const expectedSettlementKey = ethers.getAddress(operatorConfig.operator_address);
+    const existingOperator = await identityRegistry.getOperator(operatorConfig.operator_address);
+    let operatorTx = null;
+    if (existingOperator.active) {
+      // Active record on chain: verify the bound key material matches the
+      // reviewed manifest before treating registration as idempotent. If the
+      // edKeyHash or settlement key disagree, refuse rather than implicitly
+      // accept stale or unrelated identity bindings (which would later break
+      // root publication and other key-bound flows).
+      const onChainEdKeyHash = existingOperator.edKeyHash.toLowerCase();
+      const onChainSettlement = ethers.getAddress(existingOperator.settlementKey);
+      if (
+        onChainEdKeyHash !== expectedEdKeyHash.toLowerCase() ||
+        onChainSettlement !== expectedSettlementKey
+      ) {
+        throw new Error(
+          `operator ${operatorConfig.operator_address} is already registered with mismatched key material ` +
+            `(on-chain edKeyHash=${existingOperator.edKeyHash}, settlementKey=${onChainSettlement}; ` +
+            `manifest expects edKeyHash=${expectedEdKeyHash}, settlementKey=${expectedSettlementKey}). ` +
+            `Refusing to skip registerOperator.`
+        );
+      }
+    } else {
+      operatorTx = await sendContractCall(
+        identityRegistry,
+        "registerOperator",
+        [
+          operatorConfig.operator_address,
+          expectedEdKeyHash,
+          operatorConfig.operator_address,
+          ethers.toUtf8Bytes("deployment-runner:operator")
+        ],
+        null
+      );
+      await operatorTx.wait();
+    }
 
     const latestBlock = await provider.getBlock("latest");
     const delegateExpiry = BigInt(Number(latestBlock.timestamp) + (operatorConfig.delegate_expiry_seconds ?? DEFAULT_EXPIRY_SECONDS));
-    const delegateTx = await rootRegistry.registerDelegate(
-      operatorConfig.delegate_address,
-      delegateExpiry
+    const delegateAlreadyRegistered = await rootRegistry.isAuthorizedPublisher(
+      operatorConfig.operator_address,
+      operatorConfig.delegate_address
     );
-    await delegateTx.wait();
+    let delegateTx = null;
+    if (!delegateAlreadyRegistered) {
+      delegateTx = await sendContractCall(
+        rootRegistry,
+        "registerDelegate",
+        [operatorConfig.delegate_address, delegateExpiry],
+        null
+      );
+      await delegateTx.wait();
+    }
 
     const feedTransactions = [];
     for (const feed of manifest.oracle_configuration?.feeds ?? []) {
       const [base, quote] = splitPair(feed.pair);
-      const tx = await priceResolver.registerFeed(
-        labelHash(base),
-        labelHash(quote),
-        resolveValue(feed.address, state),
-        BigInt(feed.heartbeat_seconds ?? 3600)
+      const tx = await sendContractCall(
+        priceResolver,
+        "registerFeed",
+        [
+          labelHash(base),
+          labelHash(quote),
+          resolveValue(feed.address, state),
+          BigInt(feed.heartbeat_seconds ?? 3600)
+        ],
+        null
       );
       await tx.wait();
       feedTransactions.push({
@@ -558,10 +712,20 @@ async function main() {
       ),
       deployment_transactions: deploymentTransactions,
       configuration_transactions: {
-        operator_registration: operatorTx.hash,
-        delegate_registration: delegateTx.hash,
+        operator_registration: operatorTx
+          ? { tx_hash: operatorTx.hash, status: "submitted" }
+          : { tx_hash: null, status: "already_registered" },
+        delegate_registration: delegateTx
+          ? { tx_hash: delegateTx.hash, status: "submitted" }
+          : { tx_hash: null, status: "already_registered" },
         feed_registrations: feedTransactions
       },
+      attribution: dataSuffix
+        ? {
+            data_suffix_sha256: ethers.sha256(dataSuffix),
+            erc8021_marker: `0x${ERC8021_MARKER}`
+          }
+        : null,
       local_dependencies: localDevnet ? state.placeholders : {}
     };
 

@@ -1,0 +1,16 @@
+{
+  "amount": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "capability_id": "cap-ioa-web3-procurement",
+  "http_status": 402,
+  "issued_at": 1776995579,
+  "order_id": "ioa-web3-order-001",
+  "payment_requirement_id": "x402-required-quote-8d8a2b665e02",
+  "protocol": "x402",
+  "provider_id": "proofworks-agent-auditors",
+  "quote_id": "quote-8d8a2b665e02",
+  "schema": "x402.payment-required.local.v1",
+  "settlement_source_of_truth": "chio"
+}

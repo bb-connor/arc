@@ -1,0 +1,30 @@
+{
+  "buyer": "atlas-treasury-desk",
+  "capabilities": {
+    "auditor": "cap-ioa-web3-auditor",
+    "procurement": "cap-ioa-web3-procurement",
+    "provider": "cap-ioa-web3-provider",
+    "settlement": "cap-ioa-web3-settlement"
+  },
+  "market_refs": {
+    "fulfillment": "market/fulfillment-package.json",
+    "quote_request": "market/quote-request.json",
+    "quote_response": "market/quote-response.json"
+  },
+  "order_id": "ioa-web3-order-001",
+  "payment_requirement": {
+    "local_payment_required": "payments/x402-payment-required.json",
+    "payment_proof": "x402-proof-ioa-web3-order-001",
+    "payment_status": "satisfied",
+    "protocol_hint": "x402",
+    "requirements_reference": "web3/x402-requirements-example.json",
+    "settlement_mode": "prepaid_authorization"
+  },
+  "provider": "proofworks-agent-auditors",
+  "quote": {
+    "currency": "USDC",
+    "units": 200000
+  },
+  "schema": "chio.example.ioa-web3.service-order.v1",
+  "service": "Base Sepolia USDC settlement proof review"
+}
