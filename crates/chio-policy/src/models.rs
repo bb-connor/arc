@@ -489,26 +489,18 @@ fn double_quoted_value_start(line: &str) -> Option<usize> {
         return None;
     }
 
+    if let Some(colon_index) = structural_mapping_colon_index(line) {
+        let after_colon = &line[colon_index + 1..];
+        let value_offset = after_colon.len() - after_colon.trim_start().len();
+        let value_index = colon_index + 1 + value_offset;
+        return line[value_index..].starts_with('"').then_some(value_index);
+    }
+
     let quote_index = line.find('"')?;
     let prefix = &line[..quote_index];
     let trimmed_prefix = prefix.trim();
 
-    if trimmed_prefix.is_empty() {
-        return None;
-    }
-
-    if trimmed_prefix == "-" {
-        return Some(quote_index);
-    }
-
-    let colon_index = prefix.rfind(':')?;
-    let before_colon = &prefix[..colon_index];
-    let after_colon = &prefix[colon_index + 1..];
-    if before_colon.contains(':') || !after_colon.trim().is_empty() {
-        return None;
-    }
-
-    Some(quote_index)
+    (trimmed_prefix == "-").then_some(quote_index)
 }
 
 fn structural_mapping_colon_index(line: &str) -> Option<usize> {
@@ -1699,6 +1691,14 @@ mod tests {
         assert!(has_unclosed_double_quoted_value_scalar(
             "description: \"closed\"#\"unclosed\n"
         ));
+    }
+
+    #[test]
+    fn quote_precheck_handles_double_quoted_mapping_key() {
+        let input = concat!("hushspec: \"0.1.0\"\n", "\"name\": \"unclosed-policy\n",);
+
+        assert!(has_unclosed_double_quoted_value_scalar(input));
+        assert!(HushSpec::parse(input).is_err());
     }
 
     #[test]
