@@ -662,3 +662,34 @@ async def test_request_id_header_wins_over_jetstream_metadata() -> None:
         handler,
     )
     assert outcome.request_id == "chio-nats-publisher-set"
+
+
+class _NotJsMessageError(Exception):
+    """Mimics nats.errors.NotJSMessageError for test purposes."""
+
+
+class FakeCoreNatsMsg(FakeNatsMsg):
+    """FakeNatsMsg whose ``metadata`` property raises like real core-NATS."""
+
+    @property
+    def metadata(self) -> Any:
+        raise _NotJsMessageError("not a JetStream message")
+
+
+async def test_request_id_falls_back_when_metadata_property_raises() -> None:
+    # Real nats-py exposes Msg.metadata as a property that raises
+    # NotJSMessageError on core-NATS messages; getattr's default value is
+    # not invoked for non-AttributeError exceptions, so the helper must
+    # catch the raise and fall through to UUID instead of crashing
+    # dispatch().
+    mw, _ = _middleware(chio_client=allow_all())
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    msg = FakeCoreNatsMsg(subject="tasks.research")
+    outcome = await mw.dispatch(msg, handler)
+    assert outcome.allowed is True
+    assert outcome.request_id.startswith("chio-nats-")
+    # Not the JetStream-shaped id; UUID path was taken.
+    assert "chio-nats-js-" not in outcome.request_id

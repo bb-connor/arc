@@ -414,13 +414,25 @@ def _derive_nats_request_id(msg: NatsMsgLike) -> str:
     if msg_id:
         return f"chio-nats-{msg_id}"
     # JetStream Msg.metadata.sequence carries (stream, consumer) seqs.
-    # nats-py raises if metadata is read on a core-NATS message, so guard.
-    metadata = getattr(msg, "metadata", None)
+    # In nats-py `metadata` is a property that raises NotJSMessageError on
+    # core-NATS messages (not AttributeError), so getattr's default does not
+    # catch it. Treat any exception as "no metadata available" and fall
+    # through to the UUID path; request_id derivation is best-effort.
+    try:
+        metadata = getattr(msg, "metadata", None)
+    except Exception:
+        metadata = None
     if metadata is not None:
-        sequence = getattr(metadata, "sequence", None)
-        stream_seq = getattr(sequence, "stream", None) if sequence is not None else None
-        if stream_seq is not None:
+        try:
+            sequence = getattr(metadata, "sequence", None)
+            stream_seq = (
+                getattr(sequence, "stream", None) if sequence is not None else None
+            )
             stream_name = getattr(metadata, "stream", "") or ""
+        except Exception:
+            stream_seq = None
+            stream_name = ""
+        if stream_seq is not None:
             return f"chio-nats-js-{stream_name}-{stream_seq}"
     return new_request_id("chio-nats")
 
