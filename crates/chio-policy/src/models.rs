@@ -169,7 +169,10 @@ fn has_non_mapping_document_start(input: &str) -> bool {
         }
 
         let document_start = trimmed.strip_prefix("---").map(str::trim_start);
-        let candidate = strip_inline_comment(document_start.unwrap_or(trimmed)).trim();
+        let mut candidate = strip_inline_comment(document_start.unwrap_or(trimmed)).trim();
+        if document_start.is_some() {
+            candidate = strip_yaml_node_properties(candidate);
+        }
         if candidate.is_empty() || candidate.starts_with('#') {
             continue;
         }
@@ -238,6 +241,23 @@ fn explicit_mapping_key_start(candidate: &str) -> bool {
             Some(ch) => ch.is_whitespace(),
             None => true,
         }
+}
+
+fn strip_yaml_node_properties(mut candidate: &str) -> &str {
+    loop {
+        let trimmed = candidate.trim_start();
+        let Some(first) = trimmed.chars().next() else {
+            return trimmed;
+        };
+        if first != '&' && first != '!' {
+            return trimmed;
+        }
+        let token_end = trimmed
+            .char_indices()
+            .find_map(|(index, ch)| ch.is_whitespace().then_some(index))
+            .unwrap_or(trimmed.len());
+        candidate = &trimmed[token_end..];
+    }
 }
 
 fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
@@ -1555,6 +1575,22 @@ mod tests {
             Err(err) => panic!("document marker policy should parse: {err}"),
         };
         assert_eq!(spec.name.as_deref(), Some("document-marker-policy"));
+    }
+
+    #[test]
+    fn parse_allows_document_marker_properties_before_mapping() {
+        let input = concat!(
+            "--- &base !!map\n",
+            "hushspec: \"0.1.0\"\n",
+            "name: document-property-policy\n"
+        );
+
+        assert!(!has_non_mapping_document_start(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("document properties before mapping should parse: {err}"),
+        };
+        assert_eq!(spec.name.as_deref(), Some("document-property-policy"));
     }
 
     #[test]

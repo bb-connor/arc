@@ -257,8 +257,8 @@ jobs:
           echo "Download the fuzz-artifacts-manual-${{ github.sha }} artifact from this run."
           echo "unzip fuzz-artifacts-manual-${{ github.sha }}.zip -d /tmp/chio-fuzz-artifacts"
           echo "find /tmp/chio-fuzz-artifacts -type f -exec shasum -a 256 {} \\;"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz run ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/<artifact> -- -runs=1"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz tmin ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/<artifact>"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz run ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/${FUZZ_TARGET}/<artifact> -- -runs=1"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz tmin ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/${FUZZ_TARGET}/<artifact>"
           echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz cmin ${FUZZ_TARGET} corpus/${FUZZ_TARGET}"
 
       - name: Upload fuzz artifacts
