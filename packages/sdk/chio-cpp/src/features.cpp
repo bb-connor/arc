@@ -57,7 +57,12 @@ std::string session_pool_key(const ClientOptions& options,
       key << "token_provider=" << provider_key;
     }
   } else {
-    key << "bearer=" << detail::bearer_cache_key(options.bearer_token);
+    auto bearer_key = detail::bearer_cache_key(options.bearer_token);
+    if (bearer_key.empty()) {
+      key << "bearer_storage@" << static_cast<const void*>(&options.bearer_token);
+    } else {
+      key << "bearer=" << bearer_key;
+    }
   }
   return key.str();
 }

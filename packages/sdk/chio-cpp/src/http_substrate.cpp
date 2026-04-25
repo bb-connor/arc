@@ -1,5 +1,6 @@
 #include "chio/http_substrate.hpp"
 
+#include <chrono>
 #include <utility>
 
 #include "json.hpp"
@@ -80,6 +81,7 @@ Result<std::string> Evaluator::evaluate(const ChioHttpRequest& request,
       std::move(headers),
       request.to_json(),
   };
+  http_request.timeout = std::chrono::milliseconds(timeout_ms_);
   auto response = transport_->send(http_request);
   if (!response) {
     return Result<std::string>::failure(response.error());
@@ -102,6 +104,7 @@ Result<bool> Evaluator::verify_receipt(std::string receipt_json) const {
       {{"Content-Type", "application/json"}, {"Accept", "application/json"}},
       std::move(receipt_json),
   };
+  request.timeout = std::chrono::milliseconds(timeout_ms_);
   auto response = transport_->send(request);
   if (!response) {
     return Result<bool>::failure(response.error());
@@ -134,6 +137,7 @@ Result<std::string> Evaluator::health() const {
       {{"Accept", "application/json"}},
       "",
   };
+  request.timeout = std::chrono::milliseconds(timeout_ms_);
   auto response = transport_->send(request);
   if (!response) {
     return Result<std::string>::failure(response.error());

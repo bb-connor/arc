@@ -152,7 +152,11 @@ Result<std::string> StaticBearerTokenProvider::access_token() {
 }
 
 std::string StaticBearerTokenProvider::cache_key() const {
-  return "static-bearer:" + detail::bearer_cache_key(token_);
+  auto key = detail::bearer_cache_key(token_);
+  if (key.empty()) {
+    return {};
+  }
+  return "static-bearer:" + key;
 }
 
 Result<PkceChallenge> PkceChallenge::from_verifier(std::string verifier) {

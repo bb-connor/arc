@@ -916,6 +916,24 @@ void test_auth_metadata_and_pkce() {
           "static bearer cache key must not contain the raw token");
   require(cache_key != chio::StaticBearerTokenProvider("other-token").cache_key(),
           "static bearer cache key must distinguish token values");
+
+  const std::string embedded_null_token("secret\0tail", 11);
+  const auto embedded_null_key =
+      chio::StaticBearerTokenProvider(embedded_null_token).cache_key();
+  require_contains(embedded_null_key,
+                   "static-bearer:sha256:",
+                   "embedded null static bearer cache key");
+  require(embedded_null_key != chio::StaticBearerTokenProvider("secret").cache_key(),
+          "static bearer cache key must include bytes after embedded null");
+
+  std::string invalid_utf8_token;
+  invalid_utf8_token.push_back(static_cast<char>(0xff));
+  invalid_utf8_token.push_back('a');
+  const auto invalid_utf8_key =
+      chio::StaticBearerTokenProvider(invalid_utf8_token).cache_key();
+  require_contains(invalid_utf8_key,
+                   "static-bearer:sha256:",
+                   "invalid utf8 static bearer cache key");
 }
 
 void test_receipt_query_client() {
@@ -1128,7 +1146,7 @@ void test_http_substrate_evaluator() {
   request.body_length = 5;
   request.timestamp = 1700000000;
 
-  chio::http::Evaluator evaluator("http://127.0.0.1:9090/", transport);
+  chio::http::Evaluator evaluator("http://127.0.0.1:9090/", transport, 1234);
   const auto verdict = evaluator.evaluate(request, "cap-token-1");
   require(verdict.ok(), verdict.error().message);
   require_contains(verdict.value(), "\"verdict\":\"allow\"", "evaluate body");
@@ -1137,6 +1155,8 @@ void test_http_substrate_evaluator() {
   require_eq(transport->requests[0].headers["X-Chio-Capability"],
              "cap-token-1",
              "evaluate capability header");
+  require(transport->requests[0].timeout == std::chrono::milliseconds(1234),
+          "evaluate request should propagate configured timeout");
   require_no_header(transport->requests[0].headers, "Authorization", "evaluate headers");
   require_no_header(transport->requests[0].headers, "authorization", "evaluate headers");
   require_no_header(transport->requests[0].headers, "Cookie", "evaluate headers");
@@ -1156,10 +1176,14 @@ void test_http_substrate_evaluator() {
   const auto verified = evaluator.verify_receipt("{\"receipt\":{\"id\":\"r1\"}}");
   require(verified.ok(), verified.error().message);
   require(verified.value(), "expected receipt verification to succeed");
+  require(transport->requests[3].timeout == std::chrono::milliseconds(1234),
+          "verify request should propagate configured timeout");
 
   const auto health = evaluator.health();
   require(health.ok(), health.error().message);
   require_eq(health.value(), "{\"status\":\"degraded\"}", "health body");
+  require(transport->requests[4].timeout == std::chrono::milliseconds(1234),
+          "health request should propagate configured timeout");
 }
 
 void test_http_substrate_middleware_verdict_parsing() {

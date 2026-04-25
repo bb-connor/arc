@@ -1,29 +1,25 @@
 #pragma once
 
 #include <cstdint>
-#include <iomanip>
-#include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "chio/invariants.hpp"
 
 namespace chio::detail {
 
 inline std::string bearer_cache_key(std::string_view token) {
-  auto digest = invariants::sha256_hex_utf8(token);
-  if (digest) {
-    return "sha256:" + digest.value();
-  }
-
-  std::uint64_t fallback = 1469598103934665603ull;
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(token.size());
   for (unsigned char ch : token) {
-    fallback ^= ch;
-    fallback *= 1099511628211ull;
+    bytes.push_back(ch);
   }
-  std::ostringstream out;
-  out << "fallback-fnv1a64:" << token.size() << ":" << std::hex << fallback;
-  return out.str();
+  auto digest = invariants::sha256_hex_bytes(bytes);
+  if (!digest) {
+    return {};
+  }
+  return "sha256:" + digest.value();
 }
 
 }  // namespace chio::detail
