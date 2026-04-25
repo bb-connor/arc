@@ -592,6 +592,61 @@ void test_typed_list_helpers_reject_jsonrpc_errors() {
                    "mismatched tools/list response id error");
 }
 
+void test_untyped_session_helpers_reject_jsonrpc_errors() {
+  auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32603,"
+       "\"message\":\"request denied\"}}"},
+      {200,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"id\":3,\"error\":{\"code\":-32603,"
+       "\"message\":\"tool denied\"}}"},
+      {202,
+       {},
+       "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,"
+       "\"message\":\"notification denied\"}}"},
+  });
+  chio::Session session("http://127.0.0.1:8080",
+                        "token",
+                        "sess-untyped-errors",
+                        "2025-11-25",
+                        transport);
+
+  auto request = session.request("tools/list", "{}");
+  require(!request.ok(), "expected untyped request JSON-RPC error to fail");
+  require_contains(request.error().message, "request denied", "untyped request error");
+
+  auto tool = session.call_tool("slow", "{}");
+  require(!tool.ok(), "expected untyped call_tool JSON-RPC error to fail");
+  require_contains(tool.error().message, "tool denied", "untyped call_tool error");
+
+  auto notification = session.notification("notifications/initialized", "{}");
+  require(!notification.ok(), "expected notification JSON-RPC error to fail");
+  require_contains(notification.error().message,
+                   "notification denied",
+                   "notification error");
+
+  auto sse_transport = std::make_shared<FakeTransport>(
+      std::vector<chio::HttpResponse>{
+          {200,
+           {},
+           "data: {\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32603,"
+           "\"message\":\"stream denied\"}}\n\n"},
+      });
+  chio::Session sse_session("http://127.0.0.1:8080",
+                            "token",
+                            "sess-sse-errors",
+                            "2025-11-25",
+                            sse_transport);
+  auto streamed = sse_session.call_tool(
+      "slow",
+      "{}",
+      [](const chio::JsonMessage&) { return chio::Result<void>::success(); });
+  require(!streamed.ok(), "expected streaming JSON-RPC error to fail");
+  require_contains(streamed.error().message, "stream denied", "streaming error");
+}
+
 void test_session_refreshes_token_provider_for_requests() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-refresh"}},
@@ -1262,6 +1317,7 @@ int main() {
     test_client_session_with_fake_transport();
     test_initialize_handles_sse_and_rejects_invalid_handshakes();
     test_typed_list_helpers_reject_jsonrpc_errors();
+    test_untyped_session_helpers_reject_jsonrpc_errors();
     test_session_refreshes_token_provider_for_requests();
     test_start_receive_loop_returns_setup_errors();
     test_nested_router_bind_captures_stable_sender();

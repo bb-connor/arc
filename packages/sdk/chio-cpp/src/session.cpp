@@ -207,10 +207,18 @@ Result<std::string> normalize_response_body(const std::string& body,
   auto parsed = detail::parse_json(body);
   if (parsed) {
     if (expected_id_json.empty() && !require_terminal) {
+      auto error = reject_jsonrpc_error(*parsed, operation, body);
+      if (!error) {
+        return Result<std::string>::failure(error.error());
+      }
       return Result<std::string>::success(body);
     }
     if (!expected_id_json.empty() &&
         detail::is_jsonrpc_terminal_response(*parsed, expected_id_json)) {
+      auto error = reject_jsonrpc_error(*parsed, operation, body);
+      if (!error) {
+        return Result<std::string>::failure(error.error());
+      }
       return Result<std::string>::success(body);
     }
     return Result<std::string>::failure(
@@ -237,6 +245,10 @@ Result<std::string> normalize_response_body(const std::string& body,
                 detail::body_snippet(payload)});
     }
     if (detail::is_jsonrpc_terminal_response(*event, expected_id_json)) {
+      auto error = reject_jsonrpc_error(*event, operation, payload);
+      if (!error) {
+        return Result<void>::failure(error.error());
+      }
       terminal_response = payload;
     }
     return Result<void>::success();
