@@ -145,16 +145,25 @@ jobs:
         run: cargo +"${RUST_NIGHTLY}" metadata --manifest-path fuzz/Cargo.toml --locked --format-version 1 > /dev/null
 
       - name: Run scheduled fuzz target
+        env:
+          FUZZ_MAX_TOTAL_TIME: ${{ github.event.inputs.max_total_time }}
+          FUZZ_TARGET: ${{ matrix.fuzz_target }}
         run: |
-          max_total_time="${{ github.event.inputs.max_total_time }}"
+          max_total_time="${FUZZ_MAX_TOTAL_TIME}"
           if [ -z "${max_total_time}" ]; then
             max_total_time=120
           fi
-          mkdir -p "/tmp/chio-fuzz/${{ matrix.fuzz_target }}"
+          case "${max_total_time}" in
+            *[!0-9]*)
+              echo "max_total_time must be an integer number of seconds"
+              exit 1
+              ;;
+          esac
+          mkdir -p "/tmp/chio-fuzz/${FUZZ_TARGET}"
           cd fuzz
-          cargo +"${RUST_NIGHTLY}" fuzz run "${{ matrix.fuzz_target }}" \
-            "/tmp/chio-fuzz/${{ matrix.fuzz_target }}" \
-            "corpus/${{ matrix.fuzz_target }}" \
+          cargo +"${RUST_NIGHTLY}" fuzz run "${FUZZ_TARGET}" \
+            "/tmp/chio-fuzz/${FUZZ_TARGET}" \
+            "corpus/${FUZZ_TARGET}" \
             -- -max_total_time="${max_total_time}"
 
       - name: Enforce fuzz lockfile stability
@@ -209,13 +218,30 @@ jobs:
         run: cargo +"${RUST_NIGHTLY}" metadata --manifest-path fuzz/Cargo.toml --locked --format-version 1 > /dev/null
 
       - name: Run manual fuzz target
+        env:
+          FUZZ_MAX_TOTAL_TIME: ${{ github.event.inputs.max_total_time }}
+          FUZZ_TARGET: ${{ github.event.inputs.target }}
         run: |
-          mkdir -p "/tmp/chio-fuzz/${{ github.event.inputs.target }}"
+          case "${FUZZ_TARGET}" in
+            fuzz_canonical_json|fuzz_policy_parse_compile|fuzz_sql_parser|fuzz_merkle_checkpoint|fuzz_capability_receipt|fuzz_manifest_roundtrip|fuzz_tool_action)
+              ;;
+            *)
+              echo "Unknown fuzz target: ${FUZZ_TARGET}"
+              exit 1
+              ;;
+          esac
+          case "${FUZZ_MAX_TOTAL_TIME}" in
+            ''|*[!0-9]*)
+              echo "max_total_time must be an integer number of seconds"
+              exit 1
+              ;;
+          esac
+          mkdir -p "/tmp/chio-fuzz/${FUZZ_TARGET}"
           cd fuzz
-          cargo +"${RUST_NIGHTLY}" fuzz run "${{ github.event.inputs.target }}" \
-            "/tmp/chio-fuzz/${{ github.event.inputs.target }}" \
-            "corpus/${{ github.event.inputs.target }}" \
-            -- -max_total_time="${{ github.event.inputs.max_total_time }}"
+          cargo +"${RUST_NIGHTLY}" fuzz run "${FUZZ_TARGET}" \
+            "/tmp/chio-fuzz/${FUZZ_TARGET}" \
+            "corpus/${FUZZ_TARGET}" \
+            -- -max_total_time="${FUZZ_MAX_TOTAL_TIME}"
 
       - name: Enforce fuzz lockfile stability
         if: always()

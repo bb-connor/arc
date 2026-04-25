@@ -125,7 +125,7 @@ pub struct HushSpec {
 impl HushSpec {
     /// Parse a HushSpec document from a YAML string.
     pub fn parse(yaml: &str) -> Result<Self, serde_yml::Error> {
-        if has_unclosed_double_quoted_scalar(yaml) {
+        if has_unclosed_double_quoted_value_scalar(yaml) {
             return Err(<serde_yml::Error as serde::de::Error>::custom(
                 "YAML contains an unterminated double-quoted scalar",
             ));
@@ -145,47 +145,91 @@ impl HushSpec {
     }
 }
 
-fn has_unclosed_double_quoted_scalar(input: &str) -> bool {
-    let mut chars = input.chars().peekable();
-    let mut in_single = false;
+fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
     let mut in_double = false;
+    let mut block_scalar_parent_indent: Option<usize> = None;
 
-    while let Some(ch) = chars.next() {
-        if in_single {
-            if ch == '\'' {
-                if matches!(chars.peek(), Some(&'\'')) {
-                    let _ = chars.next();
-                } else {
-                    in_single = false;
-                }
+    for line in input.lines() {
+        let indent = leading_whitespace_len(line);
+        let trimmed = line.trim_start();
+        if let Some(parent_indent) = block_scalar_parent_indent {
+            if trimmed.is_empty() || indent > parent_indent {
+                continue;
             }
+            block_scalar_parent_indent = None;
+        }
+
+        if !in_double {
+            if let Some(parent_indent) = block_scalar_parent_indent_start(line) {
+                block_scalar_parent_indent = Some(parent_indent);
+                continue;
+            }
+        }
+
+        let scan_from = if in_double {
+            0
+        } else if let Some(start) = double_quoted_value_start(line) {
+            start + 1
+        } else {
             continue;
-        }
+        };
 
-        if in_double {
-            if ch == '\\' {
-                let _ = chars.next();
-            } else if ch == '"' {
-                in_double = false;
-            }
-            continue;
-        }
-
-        match ch {
-            '\'' => in_single = true,
-            '"' => in_double = true,
-            '#' => {
-                for comment_ch in chars.by_ref() {
-                    if comment_ch == '\n' {
-                        break;
-                    }
-                }
-            }
-            _ => {}
-        }
+        in_double = !double_quote_closes(&line[scan_from..]);
     }
 
     in_double
+}
+
+fn leading_whitespace_len(input: &str) -> usize {
+    input
+        .chars()
+        .take_while(|ch| ch.is_ascii_whitespace() && *ch != '\n')
+        .map(char::len_utf8)
+        .sum()
+}
+
+fn block_scalar_parent_indent_start(line: &str) -> Option<usize> {
+    let colon_index = line.find(':')?;
+    let before_colon = &line[..colon_index];
+    let after_colon = line[colon_index + 1..].trim_start();
+    if before_colon.contains(':') || !(after_colon.starts_with('|') || after_colon.starts_with('>'))
+    {
+        return None;
+    }
+
+    Some(leading_whitespace_len(line))
+}
+
+fn double_quoted_value_start(line: &str) -> Option<usize> {
+    let quote_index = line.find('"')?;
+    let prefix = &line[..quote_index];
+    let trimmed_prefix = prefix.trim();
+
+    if trimmed_prefix.is_empty() || trimmed_prefix == "-" {
+        return Some(quote_index);
+    }
+
+    let colon_index = prefix.rfind(':')?;
+    let before_colon = &prefix[..colon_index];
+    let after_colon = &prefix[colon_index + 1..];
+    if before_colon.contains(':') || !after_colon.trim().is_empty() {
+        return None;
+    }
+
+    Some(quote_index)
+}
+
+fn double_quote_closes(input: &str) -> bool {
+    let mut chars = input.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            let _ = chars.next();
+        } else if ch == '"' {
+            return true;
+        }
+    }
+
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -1011,5 +1055,60 @@ mod tests {
         );
 
         assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn parse_allows_plain_scalar_with_unpaired_double_quote() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: quoted-description\n",
+            "description: A valid plain scalar with a single \" character\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("plain scalar quotes should parse: {err}"),
+        };
+        assert_eq!(
+            spec.description.as_deref(),
+            Some("A valid plain scalar with a single \" character")
+        );
+    }
+
+    #[test]
+    fn parse_allows_hash_inside_double_quoted_scalar() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: quoted-description\n",
+            "description: \"A quoted scalar with # as data\"\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("quoted scalar hash should parse: {err}"),
+        };
+        assert_eq!(
+            spec.description.as_deref(),
+            Some("A quoted scalar with # as data")
+        );
+    }
+
+    #[test]
+    fn parse_allows_block_scalar_with_unpaired_double_quote() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: block-description\n",
+            "description: |\n",
+            "  A valid block scalar with a single \" character\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("block scalar quotes should parse: {err}"),
+        };
+        assert_eq!(
+            spec.description.as_deref(),
+            Some("A valid block scalar with a single \" character\n")
+        );
     }
 }

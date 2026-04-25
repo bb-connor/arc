@@ -66,7 +66,7 @@ impl ShellCommandGuard {
         }
 
         if self.enforce_forbidden_paths {
-            for p in self.extract_candidate_paths(commandline) {
+            for p in self.extract_candidate_paths(commandline, &tokens) {
                 if self.forbidden_path.is_forbidden(&p) {
                     return true;
                 }
@@ -76,8 +76,7 @@ impl ShellCommandGuard {
         false
     }
 
-    fn extract_candidate_paths(&self, commandline: &str) -> Vec<String> {
-        let tokens = shlex_split_best_effort(commandline);
+    fn extract_candidate_paths(&self, commandline: &str, tokens: &[String]) -> Vec<String> {
         if tokens.is_empty() {
             return Vec::new();
         }
@@ -155,29 +154,43 @@ impl chio_kernel::Guard for ShellCommandGuard {
 }
 
 fn is_recursive_rm_root(tokens: &[String]) -> bool {
-    let Some(command) = tokens.first() else {
-        return false;
-    };
-    if command != "rm" {
-        return false;
+    for (index, token) in tokens.iter().enumerate() {
+        if token != "rm" {
+            continue;
+        }
+
+        let args = tokens
+            .iter()
+            .skip(index + 1)
+            .take_while(|arg| !is_shell_separator(arg));
+        let mut has_recursive_flag = false;
+        let mut has_root_target = false;
+
+        for arg in args {
+            if arg == "--recursive" || is_short_rm_recursive_flag(arg) {
+                has_recursive_flag = true;
+            }
+            if arg == "/" || arg == "/*" {
+                has_root_target = true;
+            }
+        }
+
+        if has_recursive_flag && has_root_target {
+            return true;
+        }
     }
 
-    let has_recursive_flag = tokens
-        .iter()
-        .skip(1)
-        .any(|token| token == "--recursive" || is_short_rm_recursive_flag(token));
-    let has_root_target = tokens
-        .iter()
-        .skip(1)
-        .any(|token| token == "/" || token == "/*");
-
-    has_recursive_flag && has_root_target
+    false
 }
 
 fn is_short_rm_recursive_flag(token: &str) -> bool {
     token.starts_with('-')
         && !token.starts_with("--")
         && token.chars().any(|ch| ch == 'r' || ch == 'R')
+}
+
+fn is_shell_separator(token: &str) -> bool {
+    matches!(token, ";" | "|" | "||" | "&" | "&&")
 }
 
 fn shlex_split_best_effort(input: &str) -> Vec<String> {
@@ -212,6 +225,18 @@ fn shlex_split_best_effort(input: &str) -> Vec<String> {
         match c {
             '\'' => in_single = true,
             '"' => in_double = true,
+            ';' | '|' | '&' => {
+                if !cur.is_empty() {
+                    tokens.push(cur.clone());
+                    cur.clear();
+                }
+                if matches!(chars.peek(), Some(next) if *next == c && (c == '|' || c == '&')) {
+                    let _ = chars.next();
+                    tokens.push(format!("{c}{c}"));
+                } else {
+                    tokens.push(c.to_string());
+                }
+            }
             '\\' => {
                 if let Some(next) = chars.next() {
                     cur.push(next);
@@ -339,6 +364,14 @@ mod tests {
     fn blocks_quote_obfuscated_rm_rf_root() {
         let guard = ShellCommandGuard::new();
         assert!(guard.is_forbidden("rm -r'f' /"));
+    }
+
+    #[test]
+    fn blocks_prefixed_quote_obfuscated_rm_rf_root() {
+        let guard = ShellCommandGuard::new();
+        assert!(guard.is_forbidden("sudo rm -r'f' /"));
+        assert!(guard.is_forbidden("echo ok; rm -r'f' /"));
+        assert!(guard.is_forbidden("echo ok;rm -r'f' /"));
     }
 
     #[test]
