@@ -140,7 +140,7 @@ struct EvaluateRequestEnvelope {
     trusted_issuers: Vec<String>,
     request: EvaluateRequestBody,
     #[serde(default)]
-    now_secs: Option<i64>,
+    now_secs: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -249,10 +249,6 @@ fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
     }
 }
 
-fn fixed_clock_from_optional_secs(now_secs: Option<i64>) -> Option<FixedClock> {
-    now_secs.and_then(fixed_clock_from_secs)
-}
-
 fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     let parsed: EvaluateRequestEnvelope = serde_json::from_str(request_json)
         .map_err(|error| KernelFfiError::invalid_json("evaluate request", error))?;
@@ -273,7 +269,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
         arguments: parsed.request.arguments,
     };
 
-    let fixed_clock = fixed_clock_from_optional_secs(parsed.now_secs);
+    let fixed_clock = parsed.now_secs.map(FixedClock::new);
     let system_clock = SystemClock;
     let clock: &dyn Clock = match &fixed_clock {
         Some(clock) => clock,
@@ -586,7 +582,7 @@ mod tests {
         tool_name: &str,
         issued_at: u64,
         expires_at: u64,
-        now_secs: Option<i64>,
+        now_secs: Option<u64>,
     ) -> String {
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
@@ -609,12 +605,7 @@ mod tests {
     }
 
     fn evaluate_envelope(tool_name: &str) -> String {
-        evaluate_envelope_at(
-            tool_name,
-            ISSUED_AT,
-            EXPIRES_AT,
-            Some((ISSUED_AT + 1) as i64),
-        )
+        evaluate_envelope_at(tool_name, ISSUED_AT, EXPIRES_AT, Some(ISSUED_AT + 1))
     }
 
     fn passport_envelope_at(issuer: &Keypair, issued_at: u64, expires_at: u64) -> String {
@@ -638,14 +629,7 @@ mod tests {
     #[test]
     fn fixed_clock_helpers_preserve_epoch_zero_and_negative_sentinel() {
         assert_eq!(fixed_clock_from_secs(0).unwrap().now_unix_secs(), 0);
-        assert_eq!(
-            fixed_clock_from_optional_secs(Some(0))
-                .unwrap()
-                .now_unix_secs(),
-            0
-        );
         assert!(fixed_clock_from_secs(-1).is_none());
-        assert!(fixed_clock_from_optional_secs(None).is_none());
     }
 
     #[test]
@@ -659,6 +643,19 @@ mod tests {
     #[test]
     fn evaluate_honors_epoch_zero_clock() {
         let output = evaluate_json_str(&evaluate_envelope_at("echo", 0, 10, Some(0))).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(value["verdict"], "allow");
+    }
+
+    #[test]
+    fn evaluate_accepts_u64_now_secs_above_i64_max() {
+        let output = evaluate_json_str(&evaluate_envelope_at(
+            "echo",
+            0,
+            u64::MAX,
+            Some(i64::MAX as u64 + 1),
+        ))
+        .unwrap();
         let value: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(value["verdict"], "allow");
     }
