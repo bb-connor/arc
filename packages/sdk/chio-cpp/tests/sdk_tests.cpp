@@ -1189,6 +1189,8 @@ void test_http_substrate_evaluator() {
 void test_http_substrate_middleware_verdict_parsing() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {}, "{\"verdict\":\"allow\",\"reason\":\"ok\",\"receipt\":{\"id\":\"receipt-42\"},\"evidence\":[]}"},
+      {200, {}, "{\"verdict\":{\"verdict\":\"allow\"},\"receipt\":{\"id\":\"nested-allow-receipt\"},\"evidence\":[]}"},
+      {200, {}, "{\"verdict\":{\"verdict\":\"deny\",\"reason\":\"blocked by policy\",\"guard\":\"policy\"},\"receipt\":{\"id\":\"nested-deny-receipt\"},\"evidence\":[]}"},
       {200, {}, "{\"receipt\":{\"id\":\"missing-verdict-receipt\"},\"evidence\":[]}"},
       {200, {}, "{not-json"},
   });
@@ -1207,6 +1209,19 @@ void test_http_substrate_middleware_verdict_parsing() {
              "receipt-42",
              "receipt id extraction");
   require_contains(allow.receipt_json, "\"id\":\"receipt-42\"", "receipt json");
+
+  const auto nested_allow = middleware.evaluate_fail_closed(request);
+  require_eq(nested_allow.verdict, "allow", "nested allow verdict");
+  require_eq(chio::http::receipt_id_from_verdict(nested_allow),
+             "nested-allow-receipt",
+             "nested allow receipt id extraction");
+
+  const auto nested_deny = middleware.evaluate_fail_closed(request);
+  require_eq(nested_deny.verdict, "deny", "nested deny verdict");
+  require_eq(nested_deny.reason, "blocked by policy", "nested deny reason");
+  require_eq(chio::http::receipt_id_from_verdict(nested_deny),
+             "nested-deny-receipt",
+             "nested deny receipt id extraction");
 
   const auto missing = middleware.evaluate_fail_closed(request);
   require_eq(missing.verdict, "deny", "missing verdict fail closed");

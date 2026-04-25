@@ -6,6 +6,29 @@
 #include "json.hpp"
 
 namespace chio::http {
+namespace {
+
+struct ParsedSidecarVerdict {
+  std::string verdict;
+  std::string reason;
+};
+
+ParsedSidecarVerdict parse_sidecar_verdict(const detail::JsonValue& root) {
+  ParsedSidecarVerdict out;
+  const auto* verdict = root.get("verdict");
+  if (verdict != nullptr && verdict->is_object()) {
+    out.verdict = verdict->string_field("verdict");
+    out.reason = verdict->string_field("reason");
+  } else {
+    out.verdict = root.string_field("verdict");
+  }
+  if (out.reason.empty()) {
+    out.reason = root.string_field("reason");
+  }
+  return out;
+}
+
+}  // namespace
 
 std::string AuthMethod::to_json() const {
   std::string out = "{\"method\":" + detail::quote(method);
@@ -165,8 +188,9 @@ EvaluateVerdict Middleware::evaluate_fail_closed(const ChioHttpRequest& request)
     verdict.reason = "malformed evaluate response";
     return verdict;
   }
-  verdict.verdict = parsed->string_field("verdict");
-  verdict.reason = parsed->string_field("reason");
+  const auto parsed_verdict = parse_sidecar_verdict(*parsed);
+  verdict.verdict = parsed_verdict.verdict;
+  verdict.reason = parsed_verdict.reason;
   const auto* receipt = parsed->get("receipt");
   if (receipt != nullptr) {
     verdict.receipt_json = receipt->dump();

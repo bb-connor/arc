@@ -293,6 +293,26 @@ std::string receipt_id_from_response(const Json::Value& root) {
   return string_field(receipt, "id");
 }
 
+struct ParsedSidecarVerdict {
+  std::string verdict;
+  std::string reason;
+};
+
+ParsedSidecarVerdict verdict_from_response(const Json::Value& root) {
+  ParsedSidecarVerdict out;
+  const auto& verdict = root["verdict"];
+  if (verdict.isObject()) {
+    out.verdict = string_field(verdict, "verdict");
+    out.reason = string_field(verdict, "reason");
+  } else {
+    out.verdict = string_field(root, "verdict");
+  }
+  if (out.reason.empty()) {
+    out.reason = string_field(root, "reason");
+  }
+  return out;
+}
+
 std::string json_escape(std::string_view value) {
   std::string out;
   out.reserve(value.size());
@@ -457,8 +477,8 @@ void ChioMiddleware::invoke(const ::drogon::HttpRequestPtr& req,
     return;
   }
 
-  const auto verdict = string_field(root, "verdict");
-  if (verdict.empty()) {
+  const auto verdict = verdict_from_response(root);
+  if (verdict.verdict.empty()) {
     if (fail_open_without_receipt(options_)) {
       next_cb(std::move(middleware_cb));
       return;
@@ -471,8 +491,8 @@ void ChioMiddleware::invoke(const ::drogon::HttpRequestPtr& req,
 
   const auto id = receipt_id_from_response(root);
 
-  if (verdict != "allow") {
-    auto reason = string_field(root, "reason");
+  if (verdict.verdict != "allow") {
+    auto reason = verdict.reason;
     if (reason.empty()) {
       reason = "request denied";
     }
