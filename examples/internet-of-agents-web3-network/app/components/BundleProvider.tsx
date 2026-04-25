@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import type { Bundle, Manifest, Verdict } from "@/lib/types";
+import type { Bundle, Verdict } from "@/lib/types";
 import {
   BundleLoadError,
   computeBundleDigest,
@@ -66,9 +66,20 @@ export function BundleProvider({ children }: ProviderProps): JSX.Element {
     loadEagerBundle()
       .then(async (loaded) => {
         if (cancelled) return;
-        const { bundle: base } = loaded;
+        // loadEagerBundle has already verified each manifest-listed eager
+        // artifact's bytes against manifest.sha256 BEFORE returning, so the
+        // bodies in `loaded.bundle` are safe to publish. Seed the artifact
+        // body cache and the computed-hash map from the same bytes that
+        // were verified, so later fetchArtifact() calls do not re-fetch
+        // and any UI rendering uses authenticated bytes only.
+        for (const [path, body] of loaded.bodies.entries()) {
+          cacheRef.current.set(path, body);
+        }
+        for (const [path, hex] of loaded.hashes.entries()) {
+          hashesRef.current.set(path, hex);
+        }
         const initial: Bundle = {
-          ...base,
+          ...loaded.bundle,
           beats: [...BEATS],
         };
         setBundle(initial);
@@ -78,31 +89,7 @@ export function BundleProvider({ children }: ProviderProps): JSX.Element {
         } catch {
           // Digest is best-effort for display; don't fail the bundle load on it.
         }
-
-        // Verify the eager artifacts against the manifest. If any eager fetch
-        // or hash check fails, flip status to error so the banner surfaces it.
-        const eagerOk = await verifyEagerHashes(
-          initial.manifest,
-          cacheRef,
-          hashesRef,
-          (path) => {
-            setHashMismatch(true);
-            setFirstMismatchPath((prev) => prev ?? path);
-          },
-        );
-
         if (cancelled) return;
-        if (!eagerOk) {
-          setError(
-            new BundleLoadError(
-              "Eager bundle verification failed. See console for details.",
-              0,
-              "bundle-manifest.json",
-            ),
-          );
-          setStatus("error");
-          return;
-        }
         setStatus("ready");
       })
       .catch((err: unknown) => {
@@ -166,9 +153,19 @@ export function BundleProvider({ children }: ProviderProps): JSX.Element {
   }, []);
 
   const effectiveVerdict = useMemo<Verdict>(() => {
+    // The verdict is derived ONLY from authenticated state. The manifest is
+    // the trust root; every eager artifact and every lazy artifact we render
+    // is hash-checked against `manifest.sha256` before display. A FAIL here
+    // means at least one such check failed.
+    //
+    // We deliberately do NOT factor in `bundle.review.ok` because
+    // `review-result.json` is excluded from `manifest.sha256` by
+    // `artifacts.py` (it is written after the manifest is sealed), so its
+    // contents are unauthenticated and an attacker who can edit only that
+    // file could otherwise flip the verdict. `review.ok` is surfaced as
+    // advisory metadata elsewhere; it must not be load-bearing here.
     if (!bundle) return "PASS";
-    if (hashMismatch) return "FAIL";
-    return bundle.review.ok ? "PASS" : "FAIL";
+    return hashMismatch ? "FAIL" : "PASS";
   }, [bundle, hashMismatch]);
 
   const value = useMemo<BundleContextValue>(
@@ -197,59 +194,6 @@ export function BundleProvider({ children }: ProviderProps): JSX.Element {
   );
 
   return <BundleContext.Provider value={value}>{children}</BundleContext.Provider>;
-}
-
-async function verifyEagerHashes(
-  manifest: Manifest,
-  cacheRef: React.MutableRefObject<Map<string, unknown>>,
-  hashesRef: React.MutableRefObject<Map<string, string>>,
-  onMismatch: (path: string) => void,
-): Promise<boolean> {
-  // bundle-manifest.json, run-result.json, and review-result.json are
-  // excluded from `manifest.sha256` by artifacts.py (see `excluded` set), so
-  // they cannot self-verify. Every other eager artifact must be a manifest
-  // entry and must hash-match.
-  const eagerVerifiable = ["summary.json", "chio/topology.json"];
-  let ok = true;
-  for (const path of eagerVerifiable) {
-    const expected = manifest.sha256[path];
-    if (typeof expected !== "string") {
-      // Missing manifest entry for a required file is fail-closed.
-      console.error(`manifest missing sha256 entry for required eager file: ${path}`);
-      ok = false;
-      continue;
-    }
-    try {
-      const res = await fetch(`/api/bundle/${encodeBundlePath(path)}`, { cache: "no-store" });
-      if (!res.ok) {
-        console.error(`eager fetch ${path} -> HTTP ${res.status}`);
-        ok = false;
-        continue;
-      }
-      const buf = await res.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      const hex = await sha256Hex(bytes);
-      hashesRef.current.set(path, hex);
-      try {
-        cacheRef.current.set(path, JSON.parse(new TextDecoder().decode(bytes)));
-      } catch {
-        // JSON is a precondition for eager artifacts; skip caching if parse fails.
-      }
-      if (!matchesManifestHash(expected, hex)) {
-        // Eager artifacts are foundational (summary, topology). A hash
-        // mismatch here is a fail-closed event: surface it via the
-        // mismatch callback AND propagate as a load failure so the
-        // provider transitions to status="error" instead of rendering
-        // tampered data with a flipped verdict badge.
-        onMismatch(path);
-        ok = false;
-      }
-    } catch (err) {
-      console.error(`eager fetch ${path} threw`, err);
-      ok = false;
-    }
-  }
-  return ok;
 }
 
 export function useBundle(): BundleContextValue {

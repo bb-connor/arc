@@ -6,6 +6,7 @@
 // top-level error boundary renders them into a visible banner.
 
 import type { Bundle, Manifest, Summary, ReviewResult, Topology, Org } from "./types";
+import { matchesManifestHash, sha256Hex } from "./hash";
 
 export class BundleLoadError extends Error {
   readonly status: number;
@@ -154,30 +155,91 @@ function validateTopology(value: unknown): Topology {
 export interface LoadedBundle {
   bundle: Omit<Bundle, "beats">;
   /**
-   * Path -> computed-hex-hash map for the files loaded so far. Populated for
-   * the eager set; extended each time fetchArtifact(path) runs.
+   * Path -> computed-hex-hash map for the eager files. Populated on success
+   * with the hashes that were verified against the manifest.
    */
   hashes: Map<string, string>;
+  /**
+   * Path -> parsed body cache for the eager files. Lets the provider seed
+   * its artifact cache without re-fetching anything.
+   */
+  bodies: Map<string, unknown>;
+}
+
+/**
+ * Verify a fetched eager artifact's bytes against the manifest BEFORE its
+ * body is published anywhere. Closes the TOCTOU gap that would otherwise
+ * exist if we hashed via a separate second fetch.
+ *
+ * `review-result.json` is intentionally excluded from `manifest.sha256` by
+ * `artifacts.py` (the verifier writes it after the manifest is sealed), so
+ * its bytes cannot be authenticated. We still load it for advisory display
+ * but must NOT use any of its fields to drive a fail-closed decision.
+ */
+async function verifyAgainstManifest(
+  manifest: Manifest,
+  path: string,
+  bytes: Uint8Array,
+  hashes: Map<string, string>,
+): Promise<void> {
+  const expected = manifest.sha256[path];
+  if (!expected) {
+    if (path === "review-result.json") return;
+    throw new BundleLoadError(
+      `manifest missing sha256 entry for required eager file ${path}`,
+      0,
+      path,
+    );
+  }
+  const hex = await sha256Hex(bytes);
+  hashes.set(path, hex);
+  if (!matchesManifestHash(expected, hex)) {
+    throw new BundleLoadError(
+      `eager artifact ${path} hash mismatch (expected ${expected}, computed ${hex})`,
+      0,
+      path,
+    );
+  }
 }
 
 export async function loadEagerBundle(): Promise<LoadedBundle> {
   // Manifest first; everything else references it.
-  const { body: manifestRaw } = await fetchJson<unknown>("bundle-manifest.json");
-  const manifest = validateManifest(manifestRaw);
+  const manifestArt = await fetchJson<unknown>("bundle-manifest.json");
+  const manifest = validateManifest(manifestArt.body);
 
-  const [summaryRes, reviewRes, topologyRes] = await Promise.all([
+  const [summaryArt, reviewArt, topologyArt] = await Promise.all([
     fetchJson<unknown>("summary.json"),
     fetchJson<unknown>("review-result.json"),
     fetchJson<unknown>("chio/topology.json"),
   ]);
 
-  const summary = validateSummary(summaryRes.body);
-  const review = validateReview(reviewRes.body);
-  const topology = validateTopology(topologyRes.body);
+  // Verify hashes on the EXACT bytes we just fetched, before we expose any
+  // of those bodies to UI state. If a manifest-listed artifact mismatches
+  // (or is missing from the manifest entirely, except for review-result),
+  // we throw and the provider transitions to status="error".
+  const hashes = new Map<string, string>();
+  await Promise.all([
+    verifyAgainstManifest(manifest, "summary.json", summaryArt.bytes, hashes),
+    verifyAgainstManifest(manifest, "review-result.json", reviewArt.bytes, hashes),
+    verifyAgainstManifest(manifest, "chio/topology.json", topologyArt.bytes, hashes),
+  ]);
+
+  // Validate shapes only on bytes that have already passed hash verification.
+  const summary = validateSummary(summaryArt.body);
+  const review = validateReview(reviewArt.body);
+  const topology = validateTopology(topologyArt.body);
+
+  const bodies = new Map<string, unknown>([
+    ["summary.json", summary],
+    ["review-result.json", review],
+    ["chio/topology.json", topology],
+    ["bundle-manifest.json", manifest],
+  ]);
 
   return {
     bundle: { manifest, summary, review, topology },
-    hashes: new Map<string, string>(),
+    hashes,
+    bodies,
   };
 }
 
