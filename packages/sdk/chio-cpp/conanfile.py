@@ -90,6 +90,16 @@ class ChioCppConan(ConanFile):
             f"{copied_sections}\n"
         )
 
+    @staticmethod
+    def _cmake_repo_root(source_folder):
+        source_root = Path(source_folder)
+        if (source_root / "Cargo.toml").exists():
+            return source_root
+        candidate = source_root.parents[2]
+        if (candidate / "Cargo.toml").exists():
+            return candidate
+        raise ValueError("cannot find Cargo.toml for CMake CHIO_CPP_REPO_ROOT")
+
     def export_sources(self):
         package_dir = Path(self.recipe_folder)
         repo_root = package_dir.parents[2]
@@ -131,6 +141,9 @@ class ChioCppConan(ConanFile):
         toolchain.variables["CHIO_CPP_BUILD_TESTS"] = False
         toolchain.variables["CHIO_CPP_BUILD_EXAMPLES"] = False
         toolchain.variables["CHIO_CPP_BUILD_RUST_FFI"] = False
+        toolchain.variables["CHIO_CPP_REPO_ROOT"] = str(
+            self._cmake_repo_root(self.source_folder)
+        )
         toolchain.variables["CHIO_CPP_ENABLE_CURL"] = self.options.with_curl
         toolchain.variables["BUILD_SHARED_LIBS"] = self.options.shared
         toolchain.generate()

@@ -47,7 +47,7 @@ std::string lower_ascii(std::string value) {
 
 bool is_sensitive_header(const std::string& lower_name) {
   return lower_name == "authorization" || lower_name == "cookie" ||
-         lower_name == kCapabilityHeader;
+         lower_name == "x-api-key" || lower_name == kCapabilityHeader;
 }
 
 bool should_skip_path(const std::string& path, const Options& options) {
