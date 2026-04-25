@@ -173,7 +173,10 @@ fn has_non_mapping_document_start(input: &str) -> bool {
         if candidate.is_empty() || candidate.starts_with('#') {
             continue;
         }
-        if candidate.starts_with('{') || structural_mapping_colon_index(candidate).is_some() {
+        if candidate.starts_with('{')
+            || explicit_mapping_key_start(candidate)
+            || structural_mapping_colon_index(candidate).is_some()
+        {
             return false;
         }
         return true;
@@ -223,6 +226,18 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
 fn has_libyml_scalar_join_overflow_risk(input: &str) -> bool {
     has_libyml_plain_scalar_join_overflow_risk(input)
         || has_libyml_quoted_scalar_join_overflow_risk(input)
+}
+
+fn explicit_mapping_key_start(candidate: &str) -> bool {
+    let Some(rest) = candidate.strip_prefix('?') else {
+        return false;
+    };
+
+    rest.is_empty()
+        || match rest.chars().next() {
+            Some(ch) => ch.is_whitespace(),
+            None => true,
+        }
 }
 
 fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
@@ -1540,6 +1555,22 @@ mod tests {
             Err(err) => panic!("document marker policy should parse: {err}"),
         };
         assert_eq!(spec.name.as_deref(), Some("document-marker-policy"));
+    }
+
+    #[test]
+    fn parse_allows_explicit_key_mapping_start() {
+        let input = concat!(
+            "? hushspec\n",
+            ": \"0.1.0\"\n",
+            "name: explicit-key-policy\n",
+        );
+
+        assert!(!has_non_mapping_document_start(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("explicit-key mapping should parse: {err}"),
+        };
+        assert_eq!(spec.name.as_deref(), Some("explicit-key-policy"));
     }
 
     #[test]

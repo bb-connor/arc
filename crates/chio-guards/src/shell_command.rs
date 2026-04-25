@@ -304,6 +304,10 @@ fn is_shell_separator(token: &str) -> bool {
     matches!(token, ";" | "|" | "||" | "&" | "&&" | "\n" | "\r")
 }
 
+fn is_shell_separator_char(ch: char) -> bool {
+    matches!(ch, ';' | '|' | '&' | '\n' | '\r')
+}
+
 fn shlex_split_best_effort(input: &str) -> Vec<String> {
     let mut tokens: Vec<String> = Vec::new();
     let mut cur = String::new();
@@ -362,6 +366,9 @@ fn shlex_split_best_effort(input: &str) -> Vec<String> {
             }
             '\\' => {
                 if let Some(next) = chars.next() {
+                    if is_shell_separator_char(next) {
+                        cur_quoted = true;
+                    }
                     cur.push(next);
                 }
             }
@@ -531,6 +538,14 @@ mod tests {
     fn allows_quoted_separator_literals_as_shell_data() {
         let guard = ShellCommandGuard::new();
         assert!(!guard.is_forbidden("echo '|' rm -r'f' /"));
+    }
+
+    #[test]
+    fn allows_escaped_separator_literals_as_shell_data() {
+        let guard = ShellCommandGuard::new();
+        assert!(!guard.is_forbidden("echo \\| rm -r'f' /"));
+        assert!(!guard.is_forbidden("echo \\; rm -r'f' /"));
+        assert!(!guard.is_forbidden("echo \\& rm -r'f' /"));
     }
 
     #[test]
