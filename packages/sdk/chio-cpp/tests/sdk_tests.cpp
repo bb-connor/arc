@@ -889,12 +889,25 @@ void test_auth_metadata_and_pkce() {
   request.redirect_uri = "https://client.example/callback";
   request.code_verifier = pkce.value().verifier;
   request.client_id = "client-1";
-  request.scopes = {"tools.read"};
+  request.scopes = {"tools.read", "tools.write"};
   auto token = oauth.exchange_token(request);
   require(token.ok(), token.error().message);
   require_contains(token.value(), "\"access_token\":\"tok\"", "token exchange response");
   require_contains(transport->requests[1].body, "code_verifier=", "token exchange form");
-  require_contains(transport->requests[1].body, "scope=tools.read", "token exchange scope");
+  require_contains(transport->requests[1].body,
+                   "scope=tools.read+tools.write",
+                   "token exchange scope");
+  require(transport->requests[1].body.find("tools.read%20tools.write") ==
+              std::string::npos,
+          "token exchange form must encode spaces as plus");
+
+  chio::StaticBearerTokenProvider provider("secret-token");
+  const auto cache_key = provider.cache_key();
+  require_contains(cache_key, "static-bearer:sha256:", "static bearer cache key");
+  require(cache_key.find("secret-token") == std::string::npos,
+          "static bearer cache key must not contain the raw token");
+  require(cache_key != chio::StaticBearerTokenProvider("other-token").cache_key(),
+          "static bearer cache key must distinguish token values");
 }
 
 void test_receipt_query_client() {

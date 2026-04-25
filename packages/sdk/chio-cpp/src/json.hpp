@@ -186,6 +186,22 @@ inline std::string url_encode(std::string_view input) {
   return escaped.str();
 }
 
+inline std::string form_url_encode(std::string_view input) {
+  std::ostringstream escaped;
+  escaped.fill('0');
+  escaped << std::hex;
+  for (unsigned char c : input) {
+    if (c == ' ') {
+      escaped << '+';
+    } else if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      escaped << c;
+    } else {
+      escaped << '%' << std::uppercase << std::setw(2) << int(c) << std::nouppercase;
+    }
+  }
+  return escaped.str();
+}
+
 class JsonValue {
  public:
   enum class Kind {

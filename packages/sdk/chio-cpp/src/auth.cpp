@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <random>
 #include <sstream>
+#include <string_view>
 #include <utility>
 
 #include "chio/invariants.hpp"
@@ -130,9 +131,17 @@ void add_form_field(std::string& body,
     body += "&";
   }
   first = false;
-  body += detail::url_encode(key);
+  body += detail::form_url_encode(key);
   body += "=";
-  body += detail::url_encode(value);
+  body += detail::form_url_encode(value);
+}
+
+std::string bearer_cache_key(std::string_view token) {
+  auto digest = invariants::sha256_hex_utf8(token);
+  if (!digest) {
+    return "sha256-error";
+  }
+  return "sha256:" + digest.value();
 }
 
 }  // namespace
@@ -150,7 +159,7 @@ Result<std::string> StaticBearerTokenProvider::access_token() {
 }
 
 std::string StaticBearerTokenProvider::cache_key() const {
-  return "static-bearer:" + token_;
+  return "static-bearer:" + bearer_cache_key(token_);
 }
 
 Result<PkceChallenge> PkceChallenge::from_verifier(std::string verifier) {
