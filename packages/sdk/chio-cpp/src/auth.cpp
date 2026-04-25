@@ -9,6 +9,7 @@
 #include <string_view>
 #include <utility>
 
+#include "auth_cache.hpp"
 #include "chio/invariants.hpp"
 #include "json.hpp"
 #include "transport_util.hpp"
@@ -136,14 +137,6 @@ void add_form_field(std::string& body,
   body += detail::form_url_encode(value);
 }
 
-std::string bearer_cache_key(std::string_view token) {
-  auto digest = invariants::sha256_hex_utf8(token);
-  if (!digest) {
-    return "sha256-error";
-  }
-  return "sha256:" + digest.value();
-}
-
 }  // namespace
 
 StaticBearerTokenProvider::StaticBearerTokenProvider(std::string token)
@@ -159,7 +152,7 @@ Result<std::string> StaticBearerTokenProvider::access_token() {
 }
 
 std::string StaticBearerTokenProvider::cache_key() const {
-  return "static-bearer:" + bearer_cache_key(token_);
+  return "static-bearer:" + detail::bearer_cache_key(token_);
 }
 
 Result<PkceChallenge> PkceChallenge::from_verifier(std::string verifier) {

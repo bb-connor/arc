@@ -6,6 +6,7 @@
 #include <string_view>
 #include <utility>
 
+#include "auth_cache.hpp"
 #include "chio/client.hpp"
 #include "chio/invariants.hpp"
 #include "json.hpp"
@@ -33,14 +34,6 @@ std::string capability_id_from_json(const std::string& capability_json) {
   return detail::extract_json_string_field(capability_json, "capability_id");
 }
 
-std::string bearer_cache_key(std::string_view token) {
-  auto digest = invariants::sha256_hex_utf8(token);
-  if (!digest) {
-    return "sha256-error";
-  }
-  return "sha256:" + digest.value();
-}
-
 std::string session_pool_key(const ClientOptions& options,
                              const HttpTransport* transport,
                              const TraceSink* trace_sink) {
@@ -64,7 +57,7 @@ std::string session_pool_key(const ClientOptions& options,
       key << "token_provider=" << provider_key;
     }
   } else {
-    key << "bearer=" << bearer_cache_key(options.bearer_token);
+    key << "bearer=" << detail::bearer_cache_key(options.bearer_token);
   }
   return key.str();
 }
