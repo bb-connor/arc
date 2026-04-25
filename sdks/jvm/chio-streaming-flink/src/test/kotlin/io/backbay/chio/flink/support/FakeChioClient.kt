@@ -8,6 +8,8 @@ import io.backbay.chio.sdk.Hashing
 import io.backbay.chio.sdk.ToolCallAction
 import io.backbay.chio.sdk.errors.ChioError
 import java.io.Serializable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -34,6 +36,11 @@ class FakeChioClient(
         data class Throw(
             val error: ChioError,
         ) : Behaviour()
+
+        /** Allow only after the supplied gate counts down (used to test orderly shutdown). */
+        data class AllowAfterGate(
+            val gate: CountDownLatch,
+        ) : Behaviour()
     }
 
     @Transient
@@ -59,6 +66,12 @@ class FakeChioClient(
             is Behaviour.Allow -> buildAllow(capabilityId, toolServer, toolName, parameters)
             is Behaviour.Deny -> buildDeny(capabilityId, toolServer, toolName, parameters, b)
             is Behaviour.Throw -> throw b.error
+            is Behaviour.AllowAfterGate -> {
+                if (!b.gate.await(GATE_WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    throw IllegalStateException("FakeChioClient gate timed out")
+                }
+                buildAllow(capabilityId, toolServer, toolName, parameters)
+            }
         }
     }
 
@@ -114,5 +127,6 @@ class FakeChioClient(
     companion object {
         const val DEFAULT_RECEIPT_ID: String = "fake-receipt"
         private const val serialVersionUID: Long = 1L
+        private const val GATE_WAIT_SECONDS: Long = 5
     }
 }

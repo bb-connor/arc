@@ -45,12 +45,19 @@ class ChioAsyncEvaluateFunction<IN>(
 
     override fun close() {
         try {
-            // Drain in-flight workers before closing the underlying client; on JDK 21+
-            // ChioClient.close() actually shuts down the HTTP client and would race
-            // with workers still inside evaluateToolCall(). Bounded wait keeps Flink
-            // teardown from hanging if a worker is genuinely wedged.
-            executor?.shutdownNow()?.also {
-                executor?.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            // Orderly drain first: shutdown() lets queued tasks finish so their
+            // ResultFutures get a complete()/completeExceptionally() before the
+            // operator detaches; shutdownNow() drops queued tasks and orphans
+            // those futures, breaking AsyncDataStream's checkpoint barriers
+            // during rebalance/stop. Escalate to shutdownNow() only if the
+            // bounded wait elapses with workers still active.
+            val exec = executor
+            if (exec != null) {
+                exec.shutdown()
+                if (!exec.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    exec.shutdownNow()
+                    exec.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                }
             }
         } finally {
             evaluator?.shutdown()

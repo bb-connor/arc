@@ -54,6 +54,55 @@ class ChioAsyncEvaluateFunctionTest {
     }
 
     @Test
+    fun closeDrainsQueuedTasksBeforeShuttingDown() {
+        // close() must let the queued task complete its ResultFuture; an
+        // immediate shutdownNow() would interrupt the worker and orphan the
+        // future, breaking AsyncDataStream's checkpoint barriers on
+        // rebalance/stop.
+        val gate = CountDownLatch(1)
+        val client =
+            FakeChioClient(
+                behaviour = FakeChioClient.Behaviour.AllowAfterGate(gate),
+            )
+        val fn = ChioAsyncEvaluateFunction(configFor(client))
+        setRuntimeContext(fn, FakeRuntimeContext())
+        fn.open(EmptyOpenContext())
+
+        val done = CountDownLatch(1)
+        val received = AtomicReference<List<EvaluationResult<Map<String, Any?>>>?>()
+        val err = AtomicReference<Throwable?>()
+        fn.asyncInvoke(
+            mapOf("topic" to "t"),
+            CollectingFuture(
+                onComplete = {
+                    received.set(it)
+                    done.countDown()
+                },
+                onException = {
+                    err.set(it)
+                    done.countDown()
+                },
+            ),
+        )
+
+        // Trigger close() concurrently with the in-flight task and let it
+        // proceed; orderly shutdown must wait for the worker to call
+        // complete() before tearing down.
+        val closer =
+            Thread {
+                Thread.sleep(50)
+                gate.countDown()
+            }
+        closer.start()
+        fn.close()
+        closer.join()
+
+        assertTrue(done.await(5, TimeUnit.SECONDS), "ResultFuture must be completed before close returns")
+        assertNotNull(received.get(), "task should have been allowed to finish, not interrupted: err=${err.get()}")
+        assertEquals(1, received.get()!!.size)
+    }
+
+    @Test
     fun asyncRaiseSidecarErrorReachesCompleteExceptionally() {
         val client =
             FakeChioClient(
