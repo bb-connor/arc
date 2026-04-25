@@ -105,11 +105,13 @@ cc -I "${repo_root}/crates/chio-bindings-ffi/include" \
   -o "${smoke_dir}/smoke"
 "${smoke_dir}/smoke"
 
-nm -g "${ffi_lib}" 2>/dev/null |
+{
+  nm -g "${ffi_lib}" 2>/dev/null || true
+} |
   awk '$2 == "T" {print $3}' |
   sed 's/^_//' |
   grep -E '^chio_' |
-  sort -u > "${smoke_dir}/actual.symbols"
+  sort -u > "${smoke_dir}/actual.symbols" || true
 grep -v '^#' tests/abi/chio-bindings-ffi.symbols |
   sed '/^[[:space:]]*$/d' |
   sort -u > "${smoke_dir}/expected.symbols"
