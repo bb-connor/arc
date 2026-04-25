@@ -971,8 +971,8 @@ func buildNestedCallbackRouter(transcript *[]map[string]any) *nested.Router {
 func conformanceClientCapabilities() map[string]any {
 	return map[string]any{
 		"sampling": map[string]any{
-			"includeContext": true,
-			"tools":          map[string]any{},
+			"context": map[string]any{},
+			"tools":   map[string]any{},
 		},
 		"elicitation": map[string]any{
 			"form": map[string]any{},

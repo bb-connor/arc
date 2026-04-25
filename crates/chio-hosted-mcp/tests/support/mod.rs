@@ -167,7 +167,7 @@ impl TestServer {
                     "protocolVersion": "2025-11-25",
                     "capabilities": {
                         "sampling": {
-                            "includeContext": true,
+                            "context": {},
                             "tools": {}
                         }
                     },

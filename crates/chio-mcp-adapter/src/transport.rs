@@ -674,11 +674,14 @@ impl StdioMcpTransport {
                 };
 
                 if response.get("method").is_some() && response.get("id").is_some() {
+                    let method = response
+                        .get("method")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or("unknown");
                     let Some(bridge) = nested_flow_bridge.as_deref_mut() else {
-                        let method = response
-                            .get("method")
-                            .and_then(serde_json::Value::as_str)
-                            .unwrap_or("unknown");
+                        if respond_to_upstream_roots_without_bridge(&mut inner.writer, &response)? {
+                            continue;
+                        }
                         return Err(AdapterError::NestedFlowDenied(format!(
                             "upstream server requested {method} without an active nested-flow bridge"
                         )));
@@ -985,8 +988,8 @@ fn proxy_client_capabilities() -> serde_json::Value {
             "listChanged": true,
         },
         "sampling": {
-            "includeContext": true,
-            "tools": true,
+            "context": {},
+            "tools": {},
         },
         "elicitation": {
             "form": {},
@@ -1005,6 +1008,22 @@ fn proxy_client_capabilities() -> serde_json::Value {
             }
         }
     })
+}
+
+fn respond_to_upstream_roots_without_bridge(
+    writer: &mut impl Write,
+    message: &serde_json::Value,
+) -> Result<bool, AdapterError> {
+    if message.get("method").and_then(serde_json::Value::as_str) != Some("roots/list") {
+        return Ok(false);
+    }
+
+    let id = message
+        .get("id")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    send_line(writer, &json_rpc_result(id, json!({ "roots": [] })))?;
+    Ok(true)
 }
 
 fn respond_to_upstream_nested_flow(
@@ -1507,6 +1526,27 @@ mod tests {
         );
     }
 
+    #[test]
+    fn proxy_client_capabilities_use_object_valued_mcp_capabilities() {
+        let capabilities = proxy_client_capabilities();
+
+        assert_eq!(capabilities["roots"]["listChanged"], true);
+        assert_eq!(capabilities["sampling"]["context"], json!({}));
+        assert_eq!(capabilities["sampling"]["tools"], json!({}));
+        assert!(capabilities["sampling"].get("includeContext").is_none());
+        assert_eq!(capabilities["elicitation"]["form"], json!({}));
+        assert_eq!(capabilities["elicitation"]["url"], json!({}));
+        assert_eq!(capabilities["tasks"]["list"], json!({}));
+        assert_eq!(
+            capabilities["tasks"]["requests"]["sampling"]["createMessage"],
+            json!({})
+        );
+        assert_eq!(
+            capabilities["tasks"]["requests"]["elicitation"]["create"],
+            json!({})
+        );
+    }
+
     /// Full round-trip test using a mock MCP server script.
     ///
     /// The "server" is a small shell pipeline that reads JSON-RPC requests
@@ -1547,6 +1587,18 @@ for line in sys.stdin:
 
     # Handle tools/list
     if msg.get("method") == "tools/list":
+        respond({
+            "jsonrpc": "2.0",
+            "id": "startup-roots",
+            "method": "roots/list",
+            "params": {}
+        })
+        while True:
+            nested = json.loads(sys.stdin.readline())
+            if nested.get("id") != "startup-roots" or nested.get("method"):
+                continue
+            assert nested["result"]["roots"] == []
+            break
         respond({
             "jsonrpc": "2.0",
             "id": msg["id"],

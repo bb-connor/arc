@@ -2827,7 +2827,7 @@ fn mcp_serve_proxies_wrapped_sampling_and_roots_requests() {
                 "capabilities": {
                     "roots": {"listChanged": true},
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -2991,7 +2991,7 @@ fn mcp_serve_supports_task_augmented_wrapped_sampling_requests() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -3354,7 +3354,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -3466,7 +3466,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -3968,7 +3968,7 @@ fn mcp_serve_tags_nested_task_messages_with_related_task_metadata() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -4114,7 +4114,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -4265,7 +4265,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },
@@ -4413,7 +4413,7 @@ fn mcp_serve_progresses_wrapped_sampling_tasks_while_upstream_keeps_talking() {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {
                     "sampling": {
-                        "includeContext": true,
+                        "context": {},
                         "tools": {}
                     }
                 },

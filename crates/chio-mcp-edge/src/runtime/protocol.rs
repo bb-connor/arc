@@ -777,9 +777,11 @@ pub(super) fn parse_peer_capabilities(params: &Value) -> PeerCapabilities {
             .unwrap_or(false),
         supports_sampling: sampling.is_some(),
         sampling_context: sampling
-            .and_then(|value| value.get("includeContext"))
-            .is_some(),
-        sampling_tools: sampling.and_then(|value| value.get("tools")).is_some(),
+            .and_then(|value| value.get("context"))
+            .is_some_and(Value::is_object),
+        sampling_tools: sampling
+            .and_then(|value| value.get("tools"))
+            .is_some_and(Value::is_object),
         supports_elicitation: elicitation.is_some(),
         elicitation_form,
         elicitation_url,

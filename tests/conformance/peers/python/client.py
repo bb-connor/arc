@@ -60,7 +60,7 @@ CONFORMANCE_ROOTS = [
 ]
 CONFORMANCE_CLIENT_CAPABILITIES = {
     "sampling": {
-        "includeContext": True,
+        "context": {},
         "tools": {},
     },
     "elicitation": {

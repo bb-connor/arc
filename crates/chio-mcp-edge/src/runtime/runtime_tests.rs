@@ -1191,6 +1191,35 @@ fn parse_peer_capabilities_treats_empty_elicitation_as_form_support() {
 }
 
 #[test]
+fn parse_peer_capabilities_honors_object_valued_sampling_subcapabilities() {
+    let capabilities = parse_peer_capabilities(&json!({
+        "capabilities": {
+            "sampling": {
+                "context": {},
+                "tools": {}
+            }
+        }
+    }));
+
+    assert!(capabilities.supports_sampling);
+    assert!(capabilities.sampling_context);
+    assert!(capabilities.sampling_tools);
+
+    let malformed = parse_peer_capabilities(&json!({
+        "capabilities": {
+            "sampling": {
+                "includeContext": true,
+                "tools": true
+            }
+        }
+    }));
+
+    assert!(malformed.supports_sampling);
+    assert!(!malformed.sampling_context);
+    assert!(!malformed.sampling_tools);
+}
+
+#[test]
 fn parse_peer_capabilities_tracks_resource_subscription_support_when_present() {
     let capabilities = parse_peer_capabilities(&json!({
         "capabilities": {
@@ -2809,7 +2838,7 @@ fn create_message_roundtrips_through_client_with_child_lineage() {
         "params": {
             "capabilities": {
                 "sampling": {
-                    "includeContext": true
+                    "context": {}
                 }
             }
         }
@@ -2903,9 +2932,7 @@ fn create_message_denies_tool_use_when_not_negotiated() {
         "method": "initialize",
         "params": {
             "capabilities": {
-                "sampling": {
-                    "includeContext": true
-                }
+                "sampling": {}
             }
         }
     }));
