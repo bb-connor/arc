@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <iomanip>
 #include <map>
@@ -73,6 +74,64 @@ inline bool is_hex_digit(char c) {
   return std::isdigit(ch) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
+inline std::optional<std::uint32_t> hex_value(char c) {
+  if (c >= '0' && c <= '9') {
+    return static_cast<std::uint32_t>(c - '0');
+  }
+  if (c >= 'a' && c <= 'f') {
+    return static_cast<std::uint32_t>(10 + c - 'a');
+  }
+  if (c >= 'A' && c <= 'F') {
+    return static_cast<std::uint32_t>(10 + c - 'A');
+  }
+  return std::nullopt;
+}
+
+inline std::optional<std::uint32_t> parse_hex_code_unit(std::string_view input,
+                                                        std::size_t pos) {
+  if (pos + 4 > input.size()) {
+    return std::nullopt;
+  }
+  std::uint32_t value = 0;
+  for (std::size_t i = 0; i < 4; ++i) {
+    auto digit = hex_value(input[pos + i]);
+    if (!digit.has_value()) {
+      return std::nullopt;
+    }
+    value = (value << 4U) | *digit;
+  }
+  return value;
+}
+
+inline bool append_utf8(std::uint32_t code_point, std::string& out) {
+  if (code_point <= 0x7FU) {
+    out.push_back(static_cast<char>(code_point));
+    return true;
+  }
+  if (code_point <= 0x7FFU) {
+    out.push_back(static_cast<char>(0xC0U | (code_point >> 6U)));
+    out.push_back(static_cast<char>(0x80U | (code_point & 0x3FU)));
+    return true;
+  }
+  if (code_point >= 0xD800U && code_point <= 0xDFFFU) {
+    return false;
+  }
+  if (code_point <= 0xFFFFU) {
+    out.push_back(static_cast<char>(0xE0U | (code_point >> 12U)));
+    out.push_back(static_cast<char>(0x80U | ((code_point >> 6U) & 0x3FU)));
+    out.push_back(static_cast<char>(0x80U | (code_point & 0x3FU)));
+    return true;
+  }
+  if (code_point <= 0x10FFFFU) {
+    out.push_back(static_cast<char>(0xF0U | (code_point >> 18U)));
+    out.push_back(static_cast<char>(0x80U | ((code_point >> 12U) & 0x3FU)));
+    out.push_back(static_cast<char>(0x80U | ((code_point >> 6U) & 0x3FU)));
+    out.push_back(static_cast<char>(0x80U | (code_point & 0x3FU)));
+    return true;
+  }
+  return false;
+}
+
 inline std::string json_string_map(const std::map<std::string, std::string>& values) {
   std::string out = "{";
   bool first = true;
@@ -87,80 +146,6 @@ inline std::string json_string_map(const std::map<std::string, std::string>& val
   }
   out += "}";
   return out;
-}
-
-inline std::string extract_json_string_field(const std::string& json, std::string_view field) {
-  const std::string needle = "\"" + std::string(field) + "\"";
-  auto pos = json.find(needle);
-  if (pos == std::string::npos) {
-    return {};
-  }
-  pos = json.find(':', pos + needle.size());
-  if (pos == std::string::npos) {
-    return {};
-  }
-  pos = json.find('"', pos + 1);
-  if (pos == std::string::npos) {
-    return {};
-  }
-  std::string out;
-  bool escaped = false;
-  for (std::size_t i = pos + 1; i < json.size(); ++i) {
-    char c = json[i];
-    if (escaped) {
-      switch (c) {
-        case '"':
-        case '\\':
-        case '/':
-          out.push_back(c);
-          break;
-        case 'b':
-          out.push_back('\b');
-          break;
-        case 'f':
-          out.push_back('\f');
-          break;
-        case 'n':
-          out.push_back('\n');
-          break;
-        case 'r':
-          out.push_back('\r');
-          break;
-        case 't':
-          out.push_back('\t');
-          break;
-        case 'u':
-          if (i + 4 >= json.size()) {
-            return {};
-          }
-          for (std::size_t offset = 1; offset <= 4; ++offset) {
-            if (!is_hex_digit(json[i + offset])) {
-              return {};
-            }
-          }
-          out += "\\u";
-          out.append(json.substr(i + 1, 4));
-          i += 4;
-          break;
-        default:
-          return {};
-      }
-      escaped = false;
-      continue;
-    }
-    if (c == '\\') {
-      escaped = true;
-      continue;
-    }
-    if (c == '"') {
-      return out;
-    }
-    if (static_cast<unsigned char>(c) < 0x20) {
-      return {};
-    }
-    out.push_back(c);
-  }
-  return {};
 }
 
 inline std::map<std::string, std::string> lower_headers(
@@ -431,21 +416,34 @@ class JsonParser {
         case 't':
           out.push_back('\t');
           break;
-        case 'u':
-          if (pos_ + 4 > input_.size()) {
+        case 'u': {
+          auto code_unit = parse_hex_code_unit(input_, pos_);
+          if (!code_unit.has_value()) {
             return std::nullopt;
           }
-          for (std::size_t offset = 0; offset < 4; ++offset) {
-            if (!is_hex_digit(input_[pos_ + offset])) {
+          pos_ += 4;
+          std::uint32_t code_point = *code_unit;
+          if (code_point >= 0xD800U && code_point <= 0xDBFFU) {
+            if (pos_ + 6 > input_.size() || input_[pos_] != '\\' ||
+                input_[pos_ + 1] != 'u') {
               return std::nullopt;
             }
+            pos_ += 2;
+            auto low = parse_hex_code_unit(input_, pos_);
+            if (!low.has_value() || *low < 0xDC00U || *low > 0xDFFFU) {
+              return std::nullopt;
+            }
+            pos_ += 4;
+            code_point = 0x10000U + ((code_point - 0xD800U) << 10U) +
+                         (*low - 0xDC00U);
+          } else if (code_point >= 0xDC00U && code_point <= 0xDFFFU) {
+            return std::nullopt;
           }
-          // Keep non-ASCII escapes in escaped form for this lightweight
-          // private parser. Canonical byte-sensitive work stays in Rust FFI.
-          out += "\\u";
-          out.append(input_.substr(pos_, 4));
-          pos_ += 4;
+          if (!append_utf8(code_point, out)) {
+            return std::nullopt;
+          }
           break;
+        }
         default:
           return std::nullopt;
       }
@@ -564,6 +562,14 @@ class JsonParser {
 
 inline std::optional<JsonValue> parse_json(std::string_view input) {
   return JsonParser(input).parse();
+}
+
+inline std::string extract_json_string_field(const std::string& json, std::string_view field) {
+  auto parsed = parse_json(json);
+  if (!parsed || !parsed->is_object()) {
+    return {};
+  }
+  return parsed->string_field(field);
 }
 
 inline const JsonValue* json_path(const JsonValue& root,

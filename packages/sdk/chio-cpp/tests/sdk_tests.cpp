@@ -179,6 +179,22 @@ void test_private_json_helpers_are_strict() {
   require_eq(extracted,
              std::string("line\nslash\\tab\tquote\""),
              "json string escape extraction");
+  const auto unicode_extracted = chio::detail::extract_json_string_field(
+      "{\"value\":\"\\u0041\\u000Aface \\uD83D\\uDE00\"}", "value");
+  require_eq(unicode_extracted,
+             std::string("A\nface \xF0\x9F\x98\x80"),
+             "json unicode escape extraction");
+  const auto escaped_key_extracted = chio::detail::extract_json_string_field(
+      "{\"\\u0069d\":\"cap-1\"}", "id");
+  require_eq(escaped_key_extracted, "cap-1", "json escaped key extraction");
+  require_eq(chio::detail::extract_json_string_field(
+                 "{\"a\":\"id\",\"b\":\"wrong\"}", "id"),
+             "",
+             "json field extractor ignores string values");
+  auto unicode_parsed = chio::detail::parse_json("{\"id\":\"\\u0041\"}");
+  require(unicode_parsed.has_value(), "expected unicode escaped json to parse");
+  require_eq(unicode_parsed->string_field("id"), "A", "unicode parsed value");
+  require_eq(unicode_parsed->dump(), "{\"id\":\"A\"}", "unicode json dump");
 
   require(!chio::detail::parse_json("{\"n\":-}"), "expected bare minus to fail");
   require(!chio::detail::parse_json("{\"n\":1.}"), "expected missing fraction to fail");
@@ -186,6 +202,10 @@ void test_private_json_helpers_are_strict() {
   require(!chio::detail::parse_json("{\"n\":01}"), "expected leading zero to fail");
   require(!chio::detail::parse_json("{\"s\":\"\\uZZZZ\"}"),
           "expected non-hex unicode escape to fail");
+  require(!chio::detail::parse_json("{\"s\":\"\\uD83D\"}"),
+          "expected lone high surrogate to fail");
+  require(!chio::detail::parse_json("{\"s\":\"\\uDE00\"}"),
+          "expected lone low surrogate to fail");
   require(chio::detail::extract_json_string_field("{\"s\":\"\\uZZZZ\"}", "s").empty(),
           "expected non-hex unicode extraction to fail");
   require(!chio::detail::parse_json(std::string("{\"s\":\"line\nbreak\"}")),
