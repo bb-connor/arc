@@ -1,0 +1,3 @@
+# JAR cache for Flink integration tests. Staged by `make flink-jars`
+# (or `make test-integration-flink`); not source.
+.test-jars/

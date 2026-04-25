@@ -560,3 +560,69 @@ make infra-down
 The fixtures in `tests/integration/conftest.py` probe each broker on
 startup and emit a clean skip (rather than a connection-error
 backtrace) when the broker is unreachable.
+
+### Flink + Kafka path
+
+A second integration stack covers the Flink operators and the Kafka
+middleware against real brokers. It ships as
+`infra/streaming-flink-compose.yml` and brings up:
+
+- **Redpanda** (Kafka-API compatible) on port `19092` (host) /
+  `9092` (in-cluster).
+- **Apache Flink** JobManager + TaskManager on port `18081` (web UI).
+  The dockerised Flink is a UI / manual exploration target only --
+  the `test_flink_kafka_integration.py` test runs PyFlink in-process
+  via `LocalStreamEnvironment` so the Python operator code does not
+  need to be shipped into a JobManager container with a matching
+  Python version.
+
+Prerequisites:
+
+```bash
+# pyflink + confluent-kafka extras
+uv sync --extra kafka --extra flink
+```
+
+PyFlink (via apache-beam) needs `setuptools<81` (which still ships
+`pkg_resources`) plus `--no-build-isolation` for the Beam wheel.
+If `uv sync` fails with `ModuleNotFoundError: No module named 'pkg_resources'`,
+install Beam manually first:
+
+```bash
+uv pip install 'setuptools<81'
+uv pip install --no-build-isolation 'apache-beam==2.61.0'
+uv pip install 'apache-flink>=2.2.0,<3'
+```
+
+JDK 17 is required (Flink 2.2 does not start cleanly on JDK 20+).
+Set `JAVA_HOME` accordingly, e.g.:
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17
+```
+
+The Flink test also needs the `flink-sql-connector-kafka` JAR
+(`KafkaSource` is wired into PyFlink's wheel; the Kafka connector
+classes are not). The Makefile target stages it under
+`sdks/python/chio-streaming/.test-jars/` on first invocation:
+
+```bash
+make test-integration-flink   # brings up Redpanda + Flink, runs tests, tears down
+```
+
+The umbrella runs both integration suites against their respective
+stacks (each leg cleans up before the next):
+
+```bash
+make test-integration-all
+```
+
+For long-running iteration:
+
+```bash
+make infra-flink-up
+CHIO_INTEGRATION=1 \
+  CHIO_TEST_KAFKA_BOOTSTRAP=localhost:19092 \
+  uv run pytest tests/integration/test_kafka_middleware_integration.py tests/integration/test_flink_kafka_integration.py -v
+make infra-flink-down
+```
