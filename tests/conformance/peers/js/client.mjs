@@ -31,7 +31,7 @@ const CONFORMANCE_ROOTS = [
 ];
 const CONFORMANCE_CLIENT_CAPABILITIES = {
   sampling: {
-    includeContext: true,
+    context: {},
     tools: {}
   },
   elicitation: {
