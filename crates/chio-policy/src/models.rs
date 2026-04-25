@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 const MAX_QUOTED_SCALAR_WHITESPACE_RUN: usize = 64;
 const MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN: usize = 5;
+const MAX_PLAIN_SCALAR_VALUE_WHITESPACE_RUN: usize = 64;
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -283,7 +284,7 @@ fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
             if plain_scalar_text_has_join_overflow_risk(&line[..colon_index]) {
                 return true;
             }
-            if plain_scalar_text_has_join_overflow_risk(strip_inline_comment(
+            if plain_scalar_value_has_join_overflow_risk(strip_inline_comment(
                 &line[colon_index + 1..],
             )) {
                 return true;
@@ -297,6 +298,20 @@ fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
 }
 
 fn plain_scalar_text_has_join_overflow_risk(input: &str) -> bool {
+    plain_scalar_text_has_join_overflow_risk_with_limit(
+        input,
+        MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN + 1,
+    )
+}
+
+fn plain_scalar_value_has_join_overflow_risk(input: &str) -> bool {
+    plain_scalar_text_has_join_overflow_risk_with_limit(
+        input,
+        MAX_PLAIN_SCALAR_VALUE_WHITESPACE_RUN + 1,
+    )
+}
+
+fn plain_scalar_text_has_join_overflow_risk_with_limit(input: &str, minimum_run: usize) -> bool {
     let trimmed = input.trim();
     if trimmed.is_empty()
         || trimmed.starts_with('"')
@@ -308,7 +323,7 @@ fn plain_scalar_text_has_join_overflow_risk(input: &str) -> bool {
         return false;
     }
 
-    has_ascii_whitespace_run(trimmed, MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN + 1)
+    has_ascii_whitespace_run(trimmed, minimum_run)
 }
 
 fn has_ascii_whitespace_run(input: &str, minimum_run: usize) -> bool {
@@ -1541,7 +1556,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_plain_mapping_value_join_before_libyml() {
-        let spaces = " ".repeat(MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN + 1);
+        let spaces = " ".repeat(MAX_PLAIN_SCALAR_VALUE_WHITESPACE_RUN + 1);
         let input = format!(
             "hushspec: \"0.1.0\"\nname: value-overflow\nrules:\n  shell_commands:\n    enabled: t{spaces}rue\n"
         );
@@ -1549,6 +1564,22 @@ mod tests {
         assert!(!has_non_mapping_document_start(&input));
         assert!(has_libyml_scalar_join_overflow_risk(&input));
         assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
+    fn parse_allows_plain_mapping_value_with_normal_spacing() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: spaced-description\n",
+            "description: hello      world\n",
+        );
+
+        assert!(!has_libyml_scalar_join_overflow_risk(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("plain spaced value should parse: {err}"),
+        };
+        assert_eq!(spec.description.as_deref(), Some("hello      world"));
     }
 
     #[test]

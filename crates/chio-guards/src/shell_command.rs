@@ -262,6 +262,14 @@ fn sudo_option_takes_value(token: &str) -> bool {
             | "--close-from"
             | "-D"
             | "--chdir"
+            | "-r"
+            | "--role"
+            | "-t"
+            | "--type"
+            | "-R"
+            | "--chroot"
+            | "-T"
+            | "--command-timeout"
     )
 }
 
@@ -512,6 +520,11 @@ mod tests {
         let guard = ShellCommandGuard::new();
         assert!(guard.is_forbidden("sudo rm -r'f' /"));
         assert!(guard.is_forbidden("sudo -n rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -T 5 rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo --command-timeout 5 rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -r sysadm_r rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -t sysadm_t rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -R /mnt/root rm -r'f' /"));
         assert!(guard.is_forbidden("env FOO=bar rm -r'f' /"));
         assert!(guard.is_forbidden("env -i rm -r'f' /"));
         assert!(guard.is_forbidden("env --ignore-environment rm -r'f' /"));
