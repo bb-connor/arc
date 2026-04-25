@@ -170,9 +170,7 @@ fn has_non_mapping_document_start(input: &str) -> bool {
 
         let document_start = trimmed.strip_prefix("---").map(str::trim_start);
         let mut candidate = strip_inline_comment(document_start.unwrap_or(trimmed)).trim();
-        if document_start.is_some() {
-            candidate = strip_yaml_node_properties(candidate);
-        }
+        candidate = strip_yaml_node_properties(candidate);
         if candidate.is_empty() || candidate.starts_with('#') {
             continue;
         }
@@ -1583,6 +1581,22 @@ mod tests {
             Err(err) => panic!("document properties before mapping should parse: {err}"),
         };
         assert_eq!(spec.name.as_deref(), Some("document-property-policy"));
+    }
+
+    #[test]
+    fn parse_allows_root_properties_before_mapping() {
+        let input = concat!(
+            "&base !!map\n",
+            "hushspec: \"0.1.0\"\n",
+            "name: root-property-policy\n"
+        );
+
+        assert!(!has_non_mapping_document_start(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("root properties before mapping should parse: {err}"),
+        };
+        assert_eq!(spec.name.as_deref(), Some("root-property-policy"));
     }
 
     #[test]
