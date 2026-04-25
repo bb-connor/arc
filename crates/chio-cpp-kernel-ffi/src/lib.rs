@@ -241,6 +241,18 @@ fn public_key_from_hex(value: &str, context: &str) -> Result<PublicKey, KernelFf
     PublicKey::from_hex(value).map_err(|error| KernelFfiError::invalid_hex(context, error))
 }
 
+fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
+    if now_secs < 0 {
+        None
+    } else {
+        Some(FixedClock::new(now_secs as u64))
+    }
+}
+
+fn fixed_clock_from_optional_secs(now_secs: Option<i64>) -> Option<FixedClock> {
+    now_secs.and_then(fixed_clock_from_secs)
+}
+
 fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     let parsed: EvaluateRequestEnvelope = serde_json::from_str(request_json)
         .map_err(|error| KernelFfiError::invalid_json("evaluate request", error))?;
@@ -261,10 +273,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
         arguments: parsed.request.arguments,
     };
 
-    let fixed_clock = match parsed.now_secs {
-        Some(secs) if secs > 0 => Some(FixedClock::new(secs as u64)),
-        _ => None,
-    };
+    let fixed_clock = fixed_clock_from_optional_secs(parsed.now_secs);
     let system_clock = SystemClock;
     let clock: &dyn Clock = match &fixed_clock {
         Some(clock) => clock,
@@ -375,11 +384,7 @@ fn verify_passport_json_str(
     now_secs: i64,
 ) -> Result<String, KernelFfiError> {
     let issuer = public_key_from_hex(issuer_pub_hex, "authority public key")?;
-    let fixed_clock = if now_secs > 0 {
-        Some(FixedClock::new(now_secs as u64))
-    } else {
-        None
-    };
+    let fixed_clock = fixed_clock_from_secs(now_secs);
     let system_clock = SystemClock;
     let clock: &dyn Clock = match &fixed_clock {
         Some(clock) => clock,
@@ -528,13 +533,22 @@ pub extern "C" fn chio_kernel_verify_passport_json(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_core_types::canonical_json_bytes;
     use chio_core_types::capability::{CapabilityTokenBody, ChioScope, Operation, ToolGrant};
+    use chio_kernel_core::passport_verify::{
+        PortablePassportBody, PortablePassportEnvelope, PORTABLE_PASSPORT_SCHEMA,
+    };
     use serde_json::json;
 
     const ISSUED_AT: u64 = 1_700_000_000;
     const EXPIRES_AT: u64 = 1_700_100_000;
 
-    fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    fn make_capability_at(
+        subject: &Keypair,
+        issuer: &Keypair,
+        issued_at: u64,
+        expires_at: u64,
+    ) -> CapabilityToken {
         let scope = ChioScope {
             grants: vec![ToolGrant {
                 server_id: "srv-a".to_string(),
@@ -554,18 +568,23 @@ mod tests {
             issuer: issuer.public_key(),
             subject: subject.public_key(),
             scope,
-            issued_at: ISSUED_AT,
-            expires_at: EXPIRES_AT,
+            issued_at,
+            expires_at,
             delegation_chain: vec![],
         };
         CapabilityToken::sign(body, issuer).unwrap()
     }
 
-    fn evaluate_envelope(tool_name: &str) -> String {
+    fn evaluate_envelope_at(
+        tool_name: &str,
+        issued_at: u64,
+        expires_at: u64,
+        now_secs: Option<i64>,
+    ) -> String {
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
-        let capability = make_capability(&subject, &issuer);
-        json!({
+        let capability = make_capability_at(&subject, &issuer, issued_at, expires_at);
+        let mut envelope = json!({
             "capability": capability,
             "trusted_issuers": [issuer.public_key().to_hex()],
             "request": {
@@ -574,10 +593,52 @@ mod tests {
                 "server_id": "srv-a",
                 "agent_id": subject.public_key().to_hex(),
                 "arguments": {"msg": "hello"}
-            },
-            "now_secs": ISSUED_AT + 1
-        })
-        .to_string()
+            }
+        });
+        if let Some(now_secs) = now_secs {
+            envelope["now_secs"] = json!(now_secs);
+        }
+        envelope.to_string()
+    }
+
+    fn evaluate_envelope(tool_name: &str) -> String {
+        evaluate_envelope_at(
+            tool_name,
+            ISSUED_AT,
+            EXPIRES_AT,
+            Some((ISSUED_AT + 1) as i64),
+        )
+    }
+
+    fn passport_envelope_at(issuer: &Keypair, issued_at: u64, expires_at: u64) -> String {
+        let payload = json!({
+            "schema": "chio.agent-passport.v1",
+            "subject": "did:chio:agent-epoch",
+            "trustTier": "epoch",
+        });
+        let body = PortablePassportBody {
+            schema: PORTABLE_PASSPORT_SCHEMA.to_string(),
+            subject: "did:chio:agent-epoch".to_string(),
+            issuer: issuer.public_key(),
+            issued_at,
+            expires_at,
+            payload_canonical_bytes: canonical_json_bytes(&payload).unwrap(),
+        };
+        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        serde_json::to_string(&PortablePassportEnvelope { body, signature }).unwrap()
+    }
+
+    #[test]
+    fn fixed_clock_helpers_preserve_epoch_zero_and_negative_sentinel() {
+        assert_eq!(fixed_clock_from_secs(0).unwrap().now_unix_secs(), 0);
+        assert_eq!(
+            fixed_clock_from_optional_secs(Some(0))
+                .unwrap()
+                .now_unix_secs(),
+            0
+        );
+        assert!(fixed_clock_from_secs(-1).is_none());
+        assert!(fixed_clock_from_optional_secs(None).is_none());
     }
 
     #[test]
@@ -586,6 +647,25 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(value["verdict"], "allow");
         assert_eq!(value["matched_grant_index"], 0);
+    }
+
+    #[test]
+    fn evaluate_honors_epoch_zero_clock() {
+        let output = evaluate_json_str(&evaluate_envelope_at("echo", 0, 10, Some(0))).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(value["verdict"], "allow");
+    }
+
+    #[test]
+    fn verify_passport_honors_epoch_zero_clock() {
+        let issuer = Keypair::generate();
+        let envelope = passport_envelope_at(&issuer, 0, 10);
+
+        let output = verify_passport_json_str(&envelope, &issuer.public_key().to_hex(), 0).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(value["evaluated_at"], 0);
+        assert_eq!(value["issued_at"], 0);
+        assert_eq!(value["expires_at"], 10);
     }
 
     #[test]
