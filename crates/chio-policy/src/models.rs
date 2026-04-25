@@ -289,14 +289,30 @@ fn has_ascii_whitespace_run(input: &str, minimum_run: usize) -> bool {
 }
 
 fn has_libyml_quoted_scalar_join_overflow_risk(input: &str) -> bool {
+    let mut block_scalar_parent_indent: Option<usize> = None;
     let mut in_single = false;
     let mut in_double = false;
     let mut escaped = false;
     let mut whitespace_run = 0usize;
 
     for line in input.lines() {
-        if !in_single && !in_double && line.trim_start().starts_with('#') {
-            continue;
+        if !in_single && !in_double {
+            let indent = leading_whitespace_len(line);
+            let trimmed = line.trim_start();
+            if let Some(parent_indent) = block_scalar_parent_indent {
+                if trimmed.is_empty() || indent > parent_indent {
+                    continue;
+                }
+                block_scalar_parent_indent = None;
+            }
+
+            if trimmed.starts_with('#') {
+                continue;
+            }
+            if let Some(parent_indent) = block_scalar_parent_indent_start(line) {
+                block_scalar_parent_indent = Some(parent_indent);
+                continue;
+            }
         }
 
         let mut chars = line.char_indices().peekable();
@@ -1492,6 +1508,22 @@ mod tests {
             Err(err) => panic!("document marker policy should parse: {err}"),
         };
         assert_eq!(spec.name.as_deref(), Some("document-marker-policy"));
+    }
+
+    #[test]
+    fn parse_allows_block_scalar_with_quoted_long_spaces() {
+        let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\nname: block-scalar-description\ndescription: |\n  \"prefix{spaces}suffix\"\n"
+        );
+
+        assert!(!has_libyml_scalar_join_overflow_risk(&input));
+        let spec = match HushSpec::parse(&input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("block scalar with quoted content should parse: {err}"),
+        };
+        let expected = format!("\"prefix{spaces}suffix\"\n");
+        assert_eq!(spec.description.as_deref(), Some(expected.as_str()));
     }
 
     #[test]

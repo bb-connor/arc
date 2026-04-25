@@ -159,10 +159,7 @@ fn is_recursive_rm_root(tokens: &[String]) -> bool {
             continue;
         };
 
-        let args = segment
-            .iter()
-            .skip(index + 1)
-            .take_while(|arg| !is_shell_separator(arg));
+        let args = segment.iter().skip(index + 1);
         let mut has_recursive_flag = false;
         let mut has_root_target = false;
 
@@ -298,6 +295,7 @@ fn shlex_split_best_effort(input: &str) -> Vec<String> {
     let mut chars = input.chars().peekable();
     let mut in_single = false;
     let mut in_double = false;
+    let mut cur_quoted = false;
 
     while let Some(c) = chars.next() {
         if in_single {
@@ -322,13 +320,16 @@ fn shlex_split_best_effort(input: &str) -> Vec<String> {
         }
 
         match c {
-            '\'' => in_single = true,
-            '"' => in_double = true,
+            '\'' => {
+                cur_quoted = true;
+                in_single = true;
+            }
+            '"' => {
+                cur_quoted = true;
+                in_double = true;
+            }
             '\n' | '\r' | ';' | '|' | '&' => {
-                if !cur.is_empty() {
-                    tokens.push(cur.clone());
-                    cur.clear();
-                }
+                push_shlex_token(&mut tokens, &mut cur, &mut cur_quoted);
                 if c == '\r' && matches!(chars.peek(), Some('\n')) {
                     let _ = chars.next();
                     tokens.push("\n".to_string());
@@ -350,20 +351,31 @@ fn shlex_split_best_effort(input: &str) -> Vec<String> {
                 }
             }
             c if c.is_whitespace() => {
-                if !cur.is_empty() {
-                    tokens.push(cur.clone());
-                    cur.clear();
-                }
+                push_shlex_token(&mut tokens, &mut cur, &mut cur_quoted);
             }
             _ => cur.push(c),
         }
     }
 
-    if !cur.is_empty() {
-        tokens.push(cur);
-    }
+    push_shlex_token(&mut tokens, &mut cur, &mut cur_quoted);
 
     tokens
+}
+
+fn push_shlex_token(tokens: &mut Vec<String>, cur: &mut String, cur_quoted: &mut bool) {
+    if cur.is_empty() {
+        *cur_quoted = false;
+        return;
+    }
+
+    let token = if *cur_quoted && is_shell_separator(cur.as_str()) {
+        format!("'{cur}'")
+    } else {
+        cur.clone()
+    };
+    tokens.push(token);
+    cur.clear();
+    *cur_quoted = false;
 }
 
 fn is_redirection_op(t: &str) -> bool {
@@ -496,6 +508,18 @@ mod tests {
     fn allows_rm_text_as_shell_data() {
         let guard = ShellCommandGuard::new();
         assert!(!guard.is_forbidden("echo rm -r'f' /"));
+    }
+
+    #[test]
+    fn allows_quoted_separator_literals_as_shell_data() {
+        let guard = ShellCommandGuard::new();
+        assert!(!guard.is_forbidden("echo '|' rm -r'f' /"));
+    }
+
+    #[test]
+    fn blocks_rm_root_after_real_separator() {
+        let guard = ShellCommandGuard::new();
+        assert!(guard.is_forbidden("echo ok | rm -r'f' /"));
     }
 
     #[test]
