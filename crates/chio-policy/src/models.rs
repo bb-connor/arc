@@ -467,8 +467,7 @@ fn quote_starts_yaml_scalar(line: &str, quote_index: usize) -> bool {
         return true;
     };
 
-    matches!(previous, ':' | '[' | '{' | ',')
-        || (previous == '-' && before_quote.trim_start() == "-")
+    matches!(previous, ':' | '[' | '{' | ',') || sequence_item_scalar_prefix(before_quote)
 }
 
 fn leading_whitespace_len(input: &str) -> usize {
@@ -527,9 +526,33 @@ fn double_quoted_value_start(line: &str) -> Option<usize> {
 
     let quote_index = line.find('"')?;
     let prefix = &line[..quote_index];
-    let trimmed_prefix = prefix.trim();
 
-    (trimmed_prefix == "-").then_some(quote_index)
+    sequence_item_scalar_prefix(prefix).then_some(quote_index)
+}
+
+fn sequence_item_scalar_prefix(prefix: &str) -> bool {
+    let mut rest = prefix.trim_start();
+
+    loop {
+        let Some(after_dash) = rest.strip_prefix('-') else {
+            return false;
+        };
+
+        let Some(separator) = after_dash.chars().next() else {
+            return true;
+        };
+        if !separator.is_ascii_whitespace() {
+            return false;
+        }
+
+        rest = after_dash.trim_start();
+        if rest.is_empty() {
+            return true;
+        }
+        if !rest.starts_with('-') {
+            return false;
+        }
+    }
 }
 
 fn structural_mapping_colon_index(line: &str) -> Option<usize> {
@@ -1747,6 +1770,35 @@ mod tests {
             "hushspec: \"0.1.0\"\n\
              description: 'has \" inside'\n\
              name: \"bad{spaces}name\"\n"
+        );
+
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
+    fn unclosed_double_quote_precheck_detects_nested_sequence_items() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: nested-sequence-quote\n",
+            "metadata:\n",
+            "  tags:\n",
+            "    - - \"unclosed\n",
+        );
+
+        assert!(has_unclosed_double_quoted_value_scalar(input));
+        assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn quoted_whitespace_overflow_rejected_in_nested_sequence_item() {
+        let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\n\
+             name: nested-sequence-quote\n\
+             metadata:\n\
+               tags:\n\
+                 - - \"prefix{spaces}suffix\"\n"
         );
 
         assert!(has_libyml_scalar_join_overflow_risk(&input));
