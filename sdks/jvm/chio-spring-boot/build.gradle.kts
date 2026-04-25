@@ -1,34 +1,30 @@
 plugins {
-    kotlin("jvm") version "2.3.0"
-    kotlin("plugin.spring") version "2.3.0"
-    id("org.springframework.boot") version "3.2.2" apply false
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.springBoot) apply false
+    `java-library`
 }
-
-group = "io.backbay.chio"
-version = "0.1.0"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
-}
-
-repositories {
-    mavenCentral()
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 dependencies {
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.2.2"))
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    api(project(":chio-sdk-jvm"))
+    implementation(platform(libs.springBoot.bom))
+    implementation(libs.springBoot.starter.web)
+    implementation(libs.kotlin.reflect)
 
-    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.2.2"))
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation(platform(libs.springBoot.bom))
+    testImplementation(libs.springBoot.starter.test)
+    testImplementation(libs.kotlin.test.junit5)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
         freeCompilerArgs.add("-Xjsr305=strict")
+        freeCompilerArgs.add("-Xannotation-default-target=param-property")
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }

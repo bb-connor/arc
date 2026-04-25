@@ -24,6 +24,7 @@ from chio_streaming import (
     build_middleware,
 )
 from chio_streaming.errors import ChioStreamingConfigError, ChioStreamingError
+from chio_streaming.receipt import build_envelope
 
 # ---------------------------------------------------------------------------
 # In-process Kafka fakes
@@ -99,9 +100,7 @@ class FakeConsumer:
     ) -> None:
         if message is None:
             return
-        self.commits.append(
-            (message.topic(), message.partition(), message.offset())
-        )
+        self.commits.append((message.topic(), message.partition(), message.offset()))
 
     def consumer_group_metadata(self) -> Any:
         return f"group-meta:{self._group_id}"
@@ -119,15 +118,28 @@ class FakeProducer:
     confluent-kafka provides.
     """
 
-    def __init__(self, *, fail_on_commit: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_on_commit: bool = False,
+        fail_on_produce_topics: set[str] | None = None,
+        flush_undelivered: int = 0,
+    ) -> None:
         self.produced: list[dict[str, Any]] = []
         self.committed_offsets: list[Any] = []
         self.transactions_begun = 0
         self.transactions_committed = 0
         self.transactions_aborted = 0
+        self._flush_undelivered = flush_undelivered
+        # Raw call count (every abort_transaction invocation), separate
+        # from transactions_aborted which only increments when the fake
+        # was in a transaction. confluent-kafka raises on an abort call
+        # outside a tx; tracking raw calls surfaces double-abort bugs.
+        self.abort_transaction_calls = 0
         self._in_tx = False
         self._buffer: list[dict[str, Any]] = []
         self._fail_on_commit = fail_on_commit
+        self._fail_on_produce_topics = fail_on_produce_topics or set()
 
     # Transactional producer API -----------------------------------------
 
@@ -168,6 +180,7 @@ class FakeProducer:
         self.transactions_committed += 1
 
     def abort_transaction(self, timeout: float = 10.0) -> None:
+        self.abort_transaction_calls += 1
         if not self._in_tx:
             return
         self._buffer = []
@@ -185,6 +198,8 @@ class FakeProducer:
         key: bytes | None = None,
         headers: list[tuple[str, bytes]] | None = None,
     ) -> None:
+        if topic in self._fail_on_produce_topics:
+            raise RuntimeError(f"produce failed for topic={topic}")
         record = {
             "topic": topic,
             "value": value,
@@ -197,7 +212,7 @@ class FakeProducer:
             self.produced.append(record)
 
     def flush(self, timeout: float = 10.0) -> int:
-        return 0
+        return self._flush_undelivered
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +296,10 @@ async def test_allow_path_runs_handler_publishes_receipt_and_commits() -> None:
     assert outcome.committed is True
     assert outcome.handler_error is None
     assert handled == [("orders", 7)]
+    # request_id is derived from (topic, partition, offset) so non-transactional
+    # consumers that redeliver between produce and commit still collide on
+    # the same id for downstream dedupe.
+    assert outcome.request_id == "chio-kafka-orders-0-7"
     # Allow path publishes a receipt envelope to the receipt topic.
     assert len(producer.produced) == 1
     produced = producer.produced[0]
@@ -329,6 +348,41 @@ async def test_allow_path_handler_error_aborts_transaction() -> None:
     assert isinstance(outcome.handler_error, RuntimeError)
     # Nothing made it through the transaction.
     assert producer.produced == []
+    assert producer.transactions_begun == 1
+    assert producer.transactions_committed == 0
+    assert producer.transactions_aborted == 1
+
+
+@pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
+async def test_handler_shutdown_signals_propagate(shutdown_exc: type) -> None:
+    # SystemExit / KeyboardInterrupt / CancelledError must propagate so
+    # operators can shut the consumer down cleanly.
+    chio = allow_all()
+    mw, consumer, _producer = _build_middleware(chio_client=chio)
+    consumer.enqueue(_fake_message(offset=77))
+
+    def handler(_msg: Any, _receipt: Any) -> None:
+        raise shutdown_exc()
+
+    with pytest.raises(shutdown_exc):
+        await mw.poll_and_process(handler)
+
+
+@pytest.mark.parametrize("shutdown_exc", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
+async def test_handler_shutdown_signal_aborts_open_transaction(shutdown_exc: type) -> None:
+    # BaseException subclasses bypass the `except Exception` catch in
+    # _handle_allow; the transaction must still be aborted in a finally
+    # or the producer stays fenced on the next begin_transaction.
+    chio = allow_all()
+    mw, consumer, producer = _build_middleware(chio_client=chio)
+    consumer.enqueue(_fake_message(offset=91))
+
+    def handler(_msg: Any, _receipt: Any) -> None:
+        raise shutdown_exc()
+
+    with pytest.raises(shutdown_exc):
+        await mw.poll_and_process(handler)
+
     assert producer.transactions_begun == 1
     assert producer.transactions_committed == 0
     assert producer.transactions_aborted == 1
@@ -431,9 +485,7 @@ async def test_transaction_failure_rolls_back_offset_and_produce() -> None:
 
 async def test_sidecar_error_raises_and_does_not_commit() -> None:
     class FailingChio:
-        async def evaluate_tool_call(
-            self, **_kwargs: Any
-        ) -> Any:  # pragma: no cover - raise path
+        async def evaluate_tool_call(self, **_kwargs: Any) -> Any:  # pragma: no cover - raise path
             from chio_sdk.errors import ChioConnectionError
 
             raise ChioConnectionError("sidecar unreachable")
@@ -451,6 +503,37 @@ async def test_sidecar_error_raises_and_does_not_commit() -> None:
     assert producer.transactions_begun == 0
     assert producer.produced == []
     assert consumer.commits == []
+
+
+async def test_sidecar_error_can_fail_closed() -> None:
+    class FailingChio:
+        async def evaluate_tool_call(self, **_kwargs: Any) -> Any:
+            from chio_sdk.errors import ChioConnectionError
+
+            raise ChioConnectionError("sidecar unreachable")
+
+    # on_sidecar_error="deny" is only supported in non-transactional mode,
+    # so the config must disable transactions for this path.
+    cfg = _cfg(
+        transactional=False,
+        receipt_topic=None,
+        consumer_group_id=None,
+        on_sidecar_error="deny",
+    )
+    mw, consumer, producer = _build_middleware(chio_client=FailingChio(), config=cfg)
+    consumer.enqueue(_fake_message(offset=12))
+
+    async def handler(_msg: Any, _receipt: Any) -> None:  # pragma: no cover
+        pytest.fail("handler should not run on synthesised deny")
+
+    outcome = await mw.poll_and_process(handler)
+    assert outcome is not None
+    assert outcome.allowed is False
+    assert outcome.receipt.decision.guard == "chio-streaming-sidecar"
+    # DLQ publish + consumer commit happened.
+    assert len(producer.produced) == 1
+    assert producer.produced[0]["topic"] == "chio-dlq"
+    assert consumer.commits == [("orders", 0, 12)]
 
 
 # ---------------------------------------------------------------------------
@@ -485,6 +568,33 @@ async def test_non_transactional_commit_uses_consumer_commit() -> None:
     assert producer.transactions_committed == 0
     # Consumer commit was invoked directly.
     assert consumer.commits == [("orders", 0, 5)]
+
+
+async def test_non_transactional_undelivered_flush_does_not_commit_offset() -> None:
+    # confluent-kafka's flush() can return a non-zero count when the
+    # broker stalls; committing the source offset in that case would
+    # silently drop the receipt envelope and break auditability.
+    chio = allow_all()
+    cfg = _cfg(transactional=False, consumer_group_id=None)
+    producer = FakeProducer(flush_undelivered=1)
+    mw, consumer, _producer = _build_middleware(
+        chio_client=chio,
+        config=cfg,
+        producer=producer,
+    )
+    consumer.enqueue(_fake_message(offset=9))
+
+    async def handler(_msg: Any, _r: Any) -> None:
+        return None
+
+    outcome = await mw.poll_and_process(handler)
+    assert outcome is not None
+    # acked=False because the source offset must not advance when the
+    # receipt envelope did not durably land.
+    assert outcome.committed is False
+    assert consumer.commits == []
+    assert isinstance(outcome.handler_error, ChioStreamingError)
+    assert "undelivered" in str(outcome.handler_error)
 
 
 # ---------------------------------------------------------------------------
@@ -557,6 +667,20 @@ def test_config_requires_consumer_group_when_transactional() -> None:
         )
 
 
+def test_config_rejects_fail_closed_with_transactional() -> None:
+    # on_sidecar_error="deny" requires non-transactional mode because the
+    # transactional commit path cannot safely synthesise a deny receipt.
+    with pytest.raises(ChioStreamingConfigError):
+        ChioConsumerConfig(
+            capability_id="c",
+            tool_server="kafka",
+            transactional=True,
+            receipt_topic="r",
+            consumer_group_id="g",
+            on_sidecar_error="deny",
+        )
+
+
 def test_config_rejects_empty_capability() -> None:
     with pytest.raises(ChioStreamingConfigError):
         ChioConsumerConfig(
@@ -606,7 +730,6 @@ def test_build_middleware_with_explicit_router() -> None:
 
 
 async def test_scope_map_hit_uses_custom_tool_name() -> None:
-    # Assert the Chio client sees the mapped tool_name.
     recorded: list[str] = []
 
     def policy(tool_name: str, _scope: dict, _ctx: dict) -> MockVerdict:
@@ -688,3 +811,87 @@ def test_close_is_idempotent() -> None:
     mw.close()
     mw.close()
     assert consumer.closed is True
+
+
+# ---------------------------------------------------------------------------
+# Transactional DLQ / receipt produce failures inside the transaction
+# ---------------------------------------------------------------------------
+
+
+async def test_dlq_publish_failure_raises_and_does_not_ack() -> None:
+    # Producing to the DLQ topic raises mid-transaction -> transaction
+    # aborts, offset rolls back, caller sees the exception.
+    chio = deny_all("nope", raise_on_deny=False)
+    producer = FakeProducer(fail_on_produce_topics={"chio-dlq"})
+    mw, consumer, producer = _build_middleware(
+        chio_client=chio, producer=producer, dlq_topic="chio-dlq"
+    )
+    consumer.enqueue(_fake_message(offset=55))
+
+    async def handler(_m: Any, _r: Any) -> None:  # pragma: no cover
+        pytest.fail("handler should not run on deny")
+
+    with pytest.raises(RuntimeError, match="produce failed"):
+        await mw.poll_and_process(handler)
+
+    assert producer.produced == []
+    assert producer.committed_offsets == []
+    assert producer.transactions_aborted == 1
+    # Abort should run exactly once; the finally guard must not re-abort
+    # an already-aborted transaction (confluent-kafka raises on that).
+    assert producer.abort_transaction_calls == 1
+    assert mw.in_flight == 0
+
+
+async def test_receipt_publish_failure_aborts_transaction_and_does_not_ack() -> None:
+    # Producing to the receipt topic raises -> transaction aborts,
+    # offset does not advance. Handler error surfaces via the outcome.
+    chio = allow_all()
+    producer = FakeProducer(fail_on_produce_topics={"chio-receipts"})
+    mw, consumer, producer = _build_middleware(
+        chio_client=chio, producer=producer, dlq_topic="chio-dlq"
+    )
+    consumer.enqueue(_fake_message(offset=77))
+
+    ran: list[int] = []
+
+    async def handler(_m: Any, _r: Any) -> None:
+        ran.append(1)
+
+    outcome = await mw.poll_and_process(handler)
+    assert outcome is not None
+    assert ran == [1]
+    assert outcome.allowed is True
+    assert outcome.committed is False
+    assert isinstance(outcome.handler_error, RuntimeError)
+    assert producer.produced == []
+    assert producer.committed_offsets == []
+    assert producer.transactions_aborted == 1
+    assert mw.in_flight == 0
+
+
+# ---------------------------------------------------------------------------
+# Receipt envelope byte-exact parity
+# ---------------------------------------------------------------------------
+
+
+async def test_receipt_envelope_matches_build_envelope() -> None:
+    chio = allow_all()
+    mw, consumer, producer = _build_middleware(chio_client=chio)
+    consumer.enqueue(_fake_message(offset=3))
+
+    async def handler(_m: Any, _r: Any) -> None:
+        return None
+
+    outcome = await mw.poll_and_process(handler)
+    assert outcome is not None
+    expected = build_envelope(
+        request_id=outcome.request_id,
+        receipt=outcome.receipt,
+        source_topic="orders",
+        source_partition=0,
+        source_offset=3,
+    )
+    produced = producer.produced[0]
+    assert produced["topic"] == "chio-receipts"
+    assert produced["value"] == expected.value

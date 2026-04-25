@@ -12,6 +12,7 @@
 package io.backbay.chio
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.backbay.chio.sdk.Hashing.sha256Hex
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.FilterConfig
@@ -26,7 +27,11 @@ private fun capabilityIdFromToken(rawToken: String?): String? {
         return null
     }
     return try {
-        jacksonObjectMapper().readTree(rawToken).get("id")?.takeIf { it.isTextual }?.asText()
+        jacksonObjectMapper()
+            .readTree(rawToken)
+            .get("id")
+            ?.takeIf { it.isTextual }
+            ?.asText()
     } catch (_: Exception) {
         null
     }
@@ -58,7 +63,6 @@ data class ChioFilterConfig(
 class ChioFilter(
     private val config: ChioFilterConfig = ChioFilterConfig(),
 ) : Filter {
-
     private val client = ChioSidecarClient(config.sidecarUrl, config.timeoutSeconds)
     private val objectMapper = jacksonObjectMapper()
 
@@ -73,18 +77,23 @@ class ChioFilter(
     ) {
         val httpRequest = request as HttpServletRequest
         val httpResponse = response as HttpServletResponse
-        val cachedRequest = when (httpRequest) {
-            is CachedBodyHttpServletRequest -> httpRequest
-            else -> CachedBodyHttpServletRequest(httpRequest)
-        }
+        val cachedRequest =
+            when (httpRequest) {
+                is CachedBodyHttpServletRequest -> httpRequest
+                else -> CachedBodyHttpServletRequest(httpRequest)
+            }
 
         val method = cachedRequest.method.uppercase()
         val validMethods = setOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
         if (method !in validMethods) {
-            writeJsonError(httpResponse, 405, ChioErrorResponse(
-                error = ChioErrorCodes.EVALUATION_FAILED,
-                message = "unsupported HTTP method: $method",
-            ))
+            writeJsonError(
+                httpResponse,
+                405,
+                ChioErrorResponse(
+                    error = ChioErrorCodes.EVALUATION_FAILED,
+                    message = "unsupported HTTP method: $method",
+                ),
+            )
             return
         }
 
@@ -95,7 +104,7 @@ class ChioFilter(
         val routePattern = config.routeResolver(method, cachedRequest.requestURI)
 
         val bodyBytes = cachedRequest.cachedBody
-        val bodyHash = bodyBytes.takeIf { it.isNotEmpty() }?.let(::sha256Hex)
+        val bodyHash = bodyBytes.takeIf { it.isNotEmpty() }?.let { sha256Hex(it) }
 
         // Extract selected headers.
         val headers = mutableMapOf<String, String>()
@@ -109,19 +118,20 @@ class ChioFilter(
         val capabilityToken = extractCapabilityToken(cachedRequest)
 
         // Build Chio HTTP request.
-        val chioRequest = ChioHttpRequest(
-            requestId = UUID.randomUUID().toString(),
-            method = method,
-            routePattern = routePattern,
-            path = cachedRequest.requestURI,
-            query = cachedRequest.parameterMap.mapValues { it.value.firstOrNull() ?: "" },
-            headers = headers,
-            caller = caller,
-            bodyHash = bodyHash,
-            bodyLength = bodyBytes.size.toLong(),
-            capabilityId = capabilityIdFromToken(capabilityToken),
-            timestamp = System.currentTimeMillis() / 1000,
-        )
+        val chioRequest =
+            ChioHttpRequest(
+                requestId = UUID.randomUUID().toString(),
+                method = method,
+                routePattern = routePattern,
+                path = cachedRequest.requestURI,
+                query = cachedRequest.parameterMap.mapValues { it.value.firstOrNull() ?: "" },
+                headers = headers,
+                caller = caller,
+                bodyHash = bodyHash,
+                bodyLength = bodyBytes.size.toLong(),
+                capabilityId = capabilityIdFromToken(capabilityToken),
+                timestamp = System.currentTimeMillis() / 1000,
+            )
 
         // Evaluate against sidecar.
         val result: EvaluateResponse
@@ -136,10 +146,14 @@ class ChioFilter(
                 chain.doFilter(cachedRequest, response)
                 return
             }
-            writeJsonError(httpResponse, 502, ChioErrorResponse(
-                error = ChioErrorCodes.SIDECAR_UNREACHABLE,
-                message = "Chio sidecar error: ${e.message}",
-            ))
+            writeJsonError(
+                httpResponse,
+                502,
+                ChioErrorResponse(
+                    error = ChioErrorCodes.SIDECAR_UNREACHABLE,
+                    message = "Chio sidecar error: ${e.message}",
+                ),
+            )
             return
         } catch (e: Exception) {
             if (config.onSidecarError == "allow") {
@@ -150,10 +164,14 @@ class ChioFilter(
                 chain.doFilter(cachedRequest, response)
                 return
             }
-            writeJsonError(httpResponse, 502, ChioErrorResponse(
-                error = ChioErrorCodes.SIDECAR_UNREACHABLE,
-                message = "Chio sidecar error: ${e.message}",
-            ))
+            writeJsonError(
+                httpResponse,
+                502,
+                ChioErrorResponse(
+                    error = ChioErrorCodes.SIDECAR_UNREACHABLE,
+                    message = "Chio sidecar error: ${e.message}",
+                ),
+            )
             return
         }
 
@@ -163,12 +181,16 @@ class ChioFilter(
         // Check verdict.
         if (result.verdict.isDenied()) {
             val status = result.verdict.httpStatus ?: 403
-            writeJsonError(httpResponse, status, ChioErrorResponse(
-                error = ChioErrorCodes.ACCESS_DENIED,
-                message = result.verdict.reason ?: "denied",
-                receiptId = result.receipt.id,
-                suggestion = "provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter",
-            ))
+            writeJsonError(
+                httpResponse,
+                status,
+                ChioErrorResponse(
+                    error = ChioErrorCodes.ACCESS_DENIED,
+                    message = result.verdict.reason ?: "denied",
+                    receiptId = result.receipt.id,
+                    suggestion = "provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter",
+                ),
+            )
             return
         }
 
@@ -180,7 +202,11 @@ class ChioFilter(
         // No cleanup needed.
     }
 
-    private fun writeJsonError(response: HttpServletResponse, status: Int, body: ChioErrorResponse) {
+    private fun writeJsonError(
+        response: HttpServletResponse,
+        status: Int,
+        body: ChioErrorResponse,
+    ) {
         response.status = status
         response.contentType = "application/json"
         response.writer.write(objectMapper.writeValueAsString(body))

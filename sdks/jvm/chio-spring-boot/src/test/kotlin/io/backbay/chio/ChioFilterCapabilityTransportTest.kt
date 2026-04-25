@@ -12,14 +12,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ChioFilterCapabilityTransportTest {
-
     @Test
     fun `query capability token is forwarded to sidecar`() {
         val observedCapability = AtomicReference<String?>()
         val sidecar = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         sidecar.createContext("/chio/evaluate") { exchange ->
             observedCapability.set(exchange.requestHeaders.getFirst("X-Chio-Capability"))
-            val body = """
+            val body =
+                """
                 {
                   "verdict": {"verdict":"allow"},
                   "receipt": {
@@ -39,7 +39,7 @@ class ChioFilterCapabilityTransportTest {
                   },
                   "evidence": []
                 }
-            """.trimIndent().toByteArray()
+                """.trimIndent().toByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
             exchange.sendResponseHeaders(200, body.size.toLong())
             exchange.responseBody.use { it.write(body) }
@@ -47,16 +47,18 @@ class ChioFilterCapabilityTransportTest {
         sidecar.start()
 
         try {
-            val filter = ChioFilter(
-                ChioFilterConfig(sidecarUrl = "http://127.0.0.1:${sidecar.address.port}"),
-            )
-            val request = MockHttpServletRequest().apply {
-                method = "POST"
-                requestURI = "/echo"
-                contentType = "application/json"
-                addParameter("chio_capability", "query-token")
-                setContent("""{"hello":"world"}""".toByteArray())
-            }
+            val filter =
+                ChioFilter(
+                    ChioFilterConfig(sidecarUrl = "http://127.0.0.1:${sidecar.address.port}"),
+                )
+            val request =
+                MockHttpServletRequest().apply {
+                    method = "POST"
+                    requestURI = "/echo"
+                    contentType = "application/json"
+                    addParameter("chio_capability", "query-token")
+                    setContent("""{"hello":"world"}""".toByteArray())
+                }
             val response = MockHttpServletResponse()
             val chainCalled = AtomicBoolean(false)
             val chain = FilterChain { _, _ -> chainCalled.set(true) }
@@ -74,25 +76,28 @@ class ChioFilterCapabilityTransportTest {
     @Test
     fun `fail-open passthrough does not attach a synthetic receipt header`() {
         val observedPassthrough = AtomicReference<ChioPassthrough?>()
-        val filter = ChioFilter(
-            ChioFilterConfig(
-                sidecarUrl = "http://127.0.0.1:1",
-                timeoutSeconds = 1,
-                onSidecarError = "allow",
-            ),
-        )
-        val request = MockHttpServletRequest().apply {
-            method = "GET"
-            requestURI = "/echo"
-        }
+        val filter =
+            ChioFilter(
+                ChioFilterConfig(
+                    sidecarUrl = "http://127.0.0.1:1",
+                    timeoutSeconds = 1,
+                    onSidecarError = "allow",
+                ),
+            )
+        val request =
+            MockHttpServletRequest().apply {
+                method = "GET"
+                requestURI = "/echo"
+            }
         val response = MockHttpServletResponse()
         val chainCalled = AtomicBoolean(false)
-        val chain = FilterChain { servletRequest, _ ->
-            chainCalled.set(true)
-            observedPassthrough.set(
-                servletRequest.getAttribute(CHIO_PASSTHROUGH_ATTRIBUTE) as ChioPassthrough?,
-            )
-        }
+        val chain =
+            FilterChain { servletRequest, _ ->
+                chainCalled.set(true)
+                observedPassthrough.set(
+                    servletRequest.getAttribute(CHIO_PASSTHROUGH_ATTRIBUTE) as ChioPassthrough?,
+                )
+            }
 
         filter.doFilter(request, response, chain)
 

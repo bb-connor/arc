@@ -682,6 +682,15 @@ fn normalize_dynamic_transport_fields(value: &mut Value) {
             if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
                 *owner_session_id = json!("$session");
             }
+            // The two transports capture wall-clock timestamps independently;
+            // a tick across a second boundary between the stdio and channel
+            // runs causes assert_eq! to flake. The shape comparison is what
+            // matters, so collapse the captured instants to a sentinel.
+            for field in ["createdAt", "lastUpdatedAt"] {
+                if let Some(ts) = map.get_mut(field) {
+                    *ts = json!("$timestamp");
+                }
+            }
             for child in map.values_mut() {
                 normalize_dynamic_transport_fields(child);
             }

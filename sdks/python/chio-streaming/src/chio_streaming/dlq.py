@@ -11,11 +11,9 @@ Routing precedence (highest wins):
 3. ``ChioStreamingConfigError`` if neither is configured and the router
    is asked to route.
 
-The payload returned by :meth:`DLQRouter.build_envelope` is intended
-for immediate publication via the same transactional producer that
-commits the consumer offset, so denial and commit remain atomic (see
-:class:`chio_streaming.middleware.ChioConsumerMiddleware` for the
-transaction semantics).
+The payload returned by :meth:`DLQRouter.build_envelope` is meant for
+immediate publication via the same transactional producer that commits
+the consumer offset, so denial and commit remain atomic.
 """
 
 from __future__ import annotations
@@ -72,9 +70,8 @@ class DLQRouter:
         Mapping from source topic -> DLQ topic. Checked before
         ``default_topic``.
     include_original_value:
-        When ``True`` (the default), the original event value (bytes) is
-        base64-free-embedded as a UTF-8 string when possible, or as a
-        hex-encoded string otherwise. This is useful for redrive.
+        When ``True`` (the default), the original event bytes are
+        embedded as a UTF-8 string when decodable, otherwise as hex.
     """
 
     def __init__(
@@ -85,9 +82,7 @@ class DLQRouter:
         include_original_value: bool = True,
     ) -> None:
         if default_topic is not None and not default_topic:
-            raise ChioStreamingConfigError(
-                "default_topic must be a non-empty string or None"
-            )
+            raise ChioStreamingConfigError("default_topic must be a non-empty string or None")
         self._default_topic = default_topic
         self._topic_map: dict[str, str] = dict(topic_map or {})
         self._include_original_value = include_original_value
@@ -103,17 +98,14 @@ class DLQRouter:
         nor a default is configured.
         """
         if not source_topic:
-            raise ChioStreamingConfigError(
-                "route() requires a non-empty source_topic"
-            )
+            raise ChioStreamingConfigError("route() requires a non-empty source_topic")
         mapped = self._topic_map.get(source_topic)
         if mapped:
             return mapped
         if self._default_topic:
             return self._default_topic
         raise ChioStreamingConfigError(
-            f"no DLQ topic configured for source_topic={source_topic!r} and no "
-            "default_topic is set"
+            f"no DLQ topic configured for source_topic={source_topic!r} and no default_topic is set"
         )
 
     # ------------------------------------------------------------------
@@ -165,9 +157,7 @@ class DLQRouter:
             "receipt": receipt.model_dump(exclude_none=True),
             "source": {
                 "topic": source_topic,
-                "partition": (
-                    int(source_partition) if source_partition is not None else None
-                ),
+                "partition": (int(source_partition) if source_partition is not None else None),
                 "offset": int(source_offset) if source_offset is not None else None,
             },
         }

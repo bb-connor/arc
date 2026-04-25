@@ -1,10 +1,10 @@
 /**
- * Conformance tests for Chio JVM types.
+ * Conformance tests for Chio JVM SDK types.
  *
  * Validates that JVM types serialize to the same JSON structure as the
  * Rust kernel types (shared test vectors).
  */
-package io.backbay.chio
+package io.backbay.chio.sdk
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -14,7 +14,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ChioTypesTest {
-
     private val mapper = jacksonObjectMapper()
 
     @Test
@@ -58,10 +57,11 @@ class ChioTypesTest {
 
     @Test
     fun `caller identity bearer serialization`() {
-        val caller = CallerIdentity(
-            subject = "bearer:abc123",
-            authMethod = AuthMethod.bearer("abc123def456"),
-        )
+        val caller =
+            CallerIdentity(
+                subject = "bearer:abc123",
+                authMethod = AuthMethod.bearer("abc123def456"),
+            )
         val json = mapper.writeValueAsString(caller)
         assertTrue(json.contains("\"subject\":\"bearer:abc123\""))
         assertTrue(json.contains("\"method\":\"bearer\""))
@@ -74,15 +74,16 @@ class ChioTypesTest {
 
     @Test
     fun `chio http request serialization`() {
-        val request = ChioHttpRequest(
-            requestId = "req-001",
-            method = "GET",
-            routePattern = "/pets/{petId}",
-            path = "/pets/42",
-            query = mapOf("verbose" to "true"),
-            caller = CallerIdentity.anonymous(),
-            timestamp = 1700000000,
-        )
+        val request =
+            ChioHttpRequest(
+                requestId = "req-001",
+                method = "GET",
+                routePattern = "/pets/{petId}",
+                path = "/pets/42",
+                query = mapOf("verbose" to "true"),
+                caller = CallerIdentity.anonymous(),
+                timestamp = 1700000000,
+            )
         val json = mapper.writeValueAsString(request)
         assertTrue(json.contains("\"request_id\":\"req-001\""))
         assertTrue(json.contains("\"method\":\"GET\""))
@@ -97,21 +98,22 @@ class ChioTypesTest {
 
     @Test
     fun `http receipt serialization roundtrip`() {
-        val receipt = HttpReceipt(
-            id = "receipt-001",
-            requestId = "req-001",
-            routePattern = "/pets/{petId}",
-            method = "GET",
-            callerIdentityHash = "abc123",
-            verdict = Verdict.allow(),
-            evidence = emptyList(),
-            responseStatus = 200,
-            timestamp = 1700000000,
-            contentHash = "deadbeef",
-            policyHash = "cafebabe",
-            kernelKey = "test-key",
-            signature = "test-sig",
-        )
+        val receipt =
+            HttpReceipt(
+                id = "receipt-001",
+                requestId = "req-001",
+                routePattern = "/pets/{petId}",
+                method = "GET",
+                callerIdentityHash = "abc123",
+                verdict = Verdict.allow(),
+                evidence = emptyList(),
+                responseStatus = 200,
+                timestamp = 1700000000,
+                contentHash = "deadbeef",
+                policyHash = "cafebabe",
+                kernelKey = "test-key",
+                signature = "test-sig",
+            )
 
         val json = mapper.writeValueAsString(receipt)
         val back: HttpReceipt = mapper.readValue(json)
@@ -124,11 +126,12 @@ class ChioTypesTest {
 
     @Test
     fun `guard evidence serialization`() {
-        val evidence = GuardEvidence(
-            guardName = "CapabilityGuard",
-            verdict = true,
-            details = "capability token presented",
-        )
+        val evidence =
+            GuardEvidence(
+                guardName = "CapabilityGuard",
+                verdict = true,
+                details = "capability token presented",
+            )
         val json = mapper.writeValueAsString(evidence)
         assertTrue(json.contains("\"guard_name\":\"CapabilityGuard\""))
         assertTrue(json.contains("\"verdict\":true"))
@@ -140,13 +143,14 @@ class ChioTypesTest {
 
     @Test
     fun `sha256 hex known vector`() {
-        val hash = sha256Hex("")
+        val hash = Hashing.sha256Hex("")
         assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", hash)
     }
 
     @Test
     fun `evaluate response deserialization`() {
-        val json = """
+        val json =
+            """
             {
                 "verdict": {"verdict": "allow"},
                 "receipt": {
@@ -166,7 +170,7 @@ class ChioTypesTest {
                 },
                 "evidence": []
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val response: EvaluateResponse = mapper.readValue(json)
         assertTrue(response.verdict.isAllowed())
@@ -175,14 +179,29 @@ class ChioTypesTest {
 
     @Test
     fun `error response serialization`() {
-        val error = ChioErrorResponse(
-            error = ChioErrorCodes.ACCESS_DENIED,
-            message = "no capability",
-            receiptId = "receipt-001",
-            suggestion = "provide a valid capability token",
-        )
+        val error =
+            ChioErrorResponse(
+                error = ChioErrorCodes.ACCESS_DENIED,
+                message = "no capability",
+                receiptId = "receipt-001",
+                suggestion = "provide a valid capability token",
+            )
         val json = mapper.writeValueAsString(error)
         assertTrue(json.contains("\"error\":\"chio_access_denied\""))
         assertTrue(json.contains("\"receipt_id\":\"receipt-001\""))
+    }
+
+    @Test
+    fun `verdict toDecision maps verdicts`() {
+        assertEquals("allow", Verdict.allow().toDecision().verdict)
+        assertEquals("deny", Verdict.deny("r", "g").toDecision().verdict)
+        assertEquals(
+            "cancelled",
+            Verdict(verdict = "cancel", reason = "timeout").toDecision().verdict,
+        )
+        assertEquals(
+            "incomplete",
+            Verdict(verdict = "incomplete", reason = "partial").toDecision().verdict,
+        )
     }
 }

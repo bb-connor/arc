@@ -25,19 +25,14 @@ import org.springframework.context.annotation.Configuration
 data class ChioProperties(
     /** Base URL of the Chio sidecar kernel. */
     val sidecarUrl: String = System.getenv("CHIO_SIDECAR_URL") ?: "http://127.0.0.1:9090",
-
     /** HTTP timeout for sidecar calls in seconds. */
     val timeoutSeconds: Long = 5,
-
     /** Behavior when sidecar is unreachable: "deny" (fail-closed) or "allow" (fail-open). */
     val onSidecarError: String = "deny",
-
     /** Whether Chio protection is enabled. Defaults to true. */
     val enabled: Boolean = true,
-
     /** URL patterns to protect. Defaults to all routes. */
     val urlPatterns: List<String> = listOf("/*"),
-
     /** Filter order. Lower values run first. */
     val filterOrder: Int = 1,
 )
@@ -48,14 +43,14 @@ data class ChioProperties(
 @ConditionalOnClass(ChioFilter::class)
 @ConditionalOnProperty(prefix = "chio", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 open class ChioAutoConfiguration {
-
     @Bean
     open fun chioFilterRegistration(properties: ChioProperties): FilterRegistrationBean<ChioFilter> {
-        val config = ChioFilterConfig(
-            sidecarUrl = properties.sidecarUrl,
-            timeoutSeconds = properties.timeoutSeconds,
-            onSidecarError = properties.onSidecarError,
-        )
+        val config =
+            ChioFilterConfig(
+                sidecarUrl = properties.sidecarUrl,
+                timeoutSeconds = properties.timeoutSeconds,
+                onSidecarError = properties.onSidecarError,
+            )
 
         val filter = ChioFilter(config)
         val registration = FilterRegistrationBean(filter)
