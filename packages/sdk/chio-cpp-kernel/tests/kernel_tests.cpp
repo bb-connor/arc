@@ -27,8 +27,18 @@ int main() {
     auto escaped = chio::kernel::detail::json_string_field(
         "{\"reason\":\"line\\nslash\\\\tab\\tunicode\\u0041\"}", "reason");
     assert(escaped.has_value());
-    assert(*escaped == "line\nslash\\tab\tunicode\\u0041");
+    assert(*escaped == "line\nslash\\tab\tunicodeA");
+    auto unicode_line = chio::kernel::detail::json_string_field(
+        "{\"reason\":\"line\\u000Abreak\"}", "reason");
+    assert(unicode_line.has_value());
+    assert(*unicode_line == "line\nbreak");
+    auto surrogate_pair = chio::kernel::detail::json_string_field(
+        "{\"reason\":\"face \\uD83D\\uDE00\"}", "reason");
+    assert(surrogate_pair.has_value());
+    assert(*surrogate_pair == std::string("face \xF0\x9F\x98\x80"));
     assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\uZZZZ\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\uD83D\"}", "reason"));
+    assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\uDE00\"}", "reason"));
     assert(!chio::kernel::detail::json_string_field("{\"reason\":\"\\q\"}", "reason"));
     assert(!chio::kernel::detail::json_string_field(
         std::string("{\"reason\":\"line\nbreak\"}"), "reason"));
@@ -46,6 +56,20 @@ int main() {
         "{\"ignored\":{\"bad\":tru e},\"reason\":\"wrong\"}", "reason"));
     assert(!chio::kernel::detail::json_string_field(
         "{\"ignored\":[true false],\"reason\":\"wrong\"}", "reason"));
+
+    std::size_t number_pos = 0;
+    assert(!chio::kernel::detail::skip_json_number("-", number_pos));
+    assert(number_pos == 0);
+    assert(!chio::kernel::detail::skip_json_number("-x", number_pos));
+    assert(number_pos == 0);
+    assert(!chio::kernel::detail::skip_json_number("1.", number_pos));
+    assert(number_pos == 0);
+    assert(!chio::kernel::detail::skip_json_number("1e", number_pos));
+    assert(number_pos == 0);
+    assert(!chio::kernel::detail::skip_json_number("01", number_pos));
+    assert(number_pos == 0);
+    assert(chio::kernel::detail::skip_json_number("-12.34e+5", number_pos));
+    assert(number_pos == 9);
   }
 
   {
