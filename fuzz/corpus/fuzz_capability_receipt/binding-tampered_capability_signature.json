@@ -1,0 +1,39 @@
+{
+  "capability": {
+    "expires_at": 1710000800,
+    "id": "cap-bindings-invalid-signature",
+    "issued_at": 1710000200,
+    "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+    "scope": {
+      "grants": [
+        {
+          "constraints": [
+            {
+              "type": "path_prefix",
+              "value": "/workspace/"
+            }
+          ],
+          "max_invocations": 3,
+          "operations": [
+            "invoke",
+            "read_result"
+          ],
+          "server_id": "srv-files",
+          "tool_name": "file_write"
+        }
+      ]
+    },
+    "signature": "1af1875c9609de12e0bd4a8b39dd58dad166ada5fe3fdbd5f76c48497f1d4898991db43c22241ceb331c5ccc4151472aa7360e2be32a368239018ad2479cff02",
+    "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+  },
+  "capability_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-invalid-signature\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_write\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
+  "description": "Capability payload was modified after signing, so signature verification fails.",
+  "expected": {
+    "delegation_chain_valid": true,
+    "signature_valid": false,
+    "time_status": "valid",
+    "time_valid": true
+  },
+  "id": "tampered_capability_signature",
+  "verify_at": 1710000400
+}

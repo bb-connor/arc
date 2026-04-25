@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "database": "fuzz",
+    "query": "SELECT id FROM orders WHERE id = 1"
+  },
+  "expected_action": "database_query",
+  "tool_name": "sql"
+}

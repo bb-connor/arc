@@ -1,0 +1,47 @@
+{
+  "description": "Receipt is signed correctly but carries a bad action parameter hash.",
+  "expected": {
+    "decision": "allow",
+    "parameter_hash_valid": false,
+    "signature_valid": true
+  },
+  "id": "signed_receipt_with_invalid_parameter_hash",
+  "receipt": {
+    "action": {
+      "parameter_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "parameters": {
+        "mode": "read",
+        "path": "/workspace/docs/private.md"
+      }
+    },
+    "capability_id": "cap-bindings-001",
+    "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "details": "path allowed",
+        "guard_name": "ForbiddenPathGuard",
+        "verdict": true
+      },
+      {
+        "details": "no secrets detected",
+        "guard_name": "SecretLeakGuard",
+        "verdict": true
+      }
+    ],
+    "id": "rcpt-bindings-invalid-hash",
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "metadata": {
+      "surface": "bindings-vectors",
+      "version": 1
+    },
+    "policy_hash": "policy-bindings-v1",
+    "signature": "c043ad36f6cc2965a61f692691ac551067d3d0e8da7ff3280379e6eb1e84dcdc709358462b59d3b8801a5e78904286b2321f68dd195a8d00b6d926b2bc1b8903",
+    "timestamp": 1710000200,
+    "tool_name": "file_read",
+    "tool_server": "srv-files"
+  },
+  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/private.md\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-invalid-hash\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+}

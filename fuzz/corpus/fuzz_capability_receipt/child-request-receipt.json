@@ -1,0 +1,19 @@
+{
+  "id": "child-rcpt-fuzz-001",
+  "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "metadata": {
+    "surface": "fuzz",
+    "tenant_id": "tenant-fuzz"
+  },
+  "operation_kind": "create_message",
+  "outcome_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "parent_request_id": "req-parent-fuzz-001",
+  "policy_hash": "policy-fuzz-child",
+  "request_id": "req-child-fuzz-001",
+  "session_id": "sess-fuzz-001",
+  "signature": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "terminal_state": {
+    "state": "completed"
+  },
+  "timestamp": 1710000200
+}

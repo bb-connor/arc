@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "url": "http://169.254.169.254/latest/meta-data"
+  },
+  "expected_action": "network_egress",
+  "expected_verdict": "deny",
+  "tool_name": "http_request"
+}

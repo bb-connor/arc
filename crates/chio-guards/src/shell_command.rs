@@ -48,6 +48,11 @@ impl ShellCommandGuard {
     }
 
     pub fn is_forbidden(&self, commandline: &str) -> bool {
+        let tokens = shlex_split_best_effort(commandline);
+        if is_recursive_rm_root(&tokens) {
+            return true;
+        }
+
         let normalized: std::borrow::Cow<'_, str> = if commandline.contains("'|'") {
             std::borrow::Cow::Owned(commandline.replace("'|'", "|"))
         } else {
@@ -147,6 +152,32 @@ impl chio_kernel::Guard for ShellCommandGuard {
             Ok(Verdict::Allow)
         }
     }
+}
+
+fn is_recursive_rm_root(tokens: &[String]) -> bool {
+    let Some(command) = tokens.first() else {
+        return false;
+    };
+    if command != "rm" {
+        return false;
+    }
+
+    let has_recursive_flag = tokens
+        .iter()
+        .skip(1)
+        .any(|token| token == "--recursive" || is_short_rm_recursive_flag(token));
+    let has_root_target = tokens
+        .iter()
+        .skip(1)
+        .any(|token| token == "/" || token == "/*");
+
+    has_recursive_flag && has_root_target
+}
+
+fn is_short_rm_recursive_flag(token: &str) -> bool {
+    token.starts_with('-')
+        && !token.starts_with("--")
+        && token.chars().any(|ch| ch == 'r' || ch == 'R')
 }
 
 fn shlex_split_best_effort(input: &str) -> Vec<String> {
@@ -302,6 +333,12 @@ mod tests {
     fn blocks_rm_rf_root() {
         let guard = ShellCommandGuard::new();
         assert!(guard.is_forbidden("rm -rf /"));
+    }
+
+    #[test]
+    fn blocks_quote_obfuscated_rm_rf_root() {
+        let guard = ShellCommandGuard::new();
+        assert!(guard.is_forbidden("rm -r'f' /"));
     }
 
     #[test]

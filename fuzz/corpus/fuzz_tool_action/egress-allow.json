@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "url": "https://api.github.com/repos"
+  },
+  "expected_action": "network_egress",
+  "expected_verdict": "allow",
+  "tool_name": "http_request"
+}

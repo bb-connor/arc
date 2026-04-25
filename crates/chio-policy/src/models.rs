@@ -125,13 +125,67 @@ pub struct HushSpec {
 impl HushSpec {
     /// Parse a HushSpec document from a YAML string.
     pub fn parse(yaml: &str) -> Result<Self, serde_yml::Error> {
-        serde_yml::from_str(yaml)
+        if has_unclosed_double_quoted_scalar(yaml) {
+            return Err(<serde_yml::Error as serde::de::Error>::custom(
+                "YAML contains an unterminated double-quoted scalar",
+            ));
+        }
+
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| serde_yml::from_str(yaml)))
+            .unwrap_or_else(|_| {
+                Err(<serde_yml::Error as serde::de::Error>::custom(
+                    "YAML parser panicked while parsing policy",
+                ))
+            })
     }
 
     /// Serialize this spec to a YAML string.
     pub fn to_yaml(&self) -> Result<String, serde_yml::Error> {
         serde_yml::to_string(self)
     }
+}
+
+fn has_unclosed_double_quoted_scalar(input: &str) -> bool {
+    let mut chars = input.chars().peekable();
+    let mut in_single = false;
+    let mut in_double = false;
+
+    while let Some(ch) = chars.next() {
+        if in_single {
+            if ch == '\'' {
+                if matches!(chars.peek(), Some(&'\'')) {
+                    let _ = chars.next();
+                } else {
+                    in_single = false;
+                }
+            }
+            continue;
+        }
+
+        if in_double {
+            if ch == '\\' {
+                let _ = chars.next();
+            } else if ch == '"' {
+                in_double = false;
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' => in_single = true,
+            '"' => in_double = true,
+            '#' => {
+                for comment_ch in chars.by_ref() {
+                    if comment_ch == '\n' {
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    in_double
 }
 
 // ---------------------------------------------------------------------------
@@ -929,4 +983,33 @@ fn default_velocity_window_secs() -> u64 {
 
 fn default_burst_factor() -> f64 {
     1.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn regression_fuzz_policy_parse_compile_bbaf353() {
+        let input = concat!(
+            "hushnarrspec: \"0.",
+            "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%",
+            "scription: Allow a narro     - r      - \"**/.git/*ist_directory\n",
+        );
+
+        assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn regression_fuzz_policy_parse_compile_2c7fd63() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: block-all\n",
+            "description: Deny every tool by default.           currency: \"U\n",
+            "    enabled: true\n",
+            "    default: block\n",
+        );
+
+        assert!(HushSpec::parse(input).is_err());
+    }
 }

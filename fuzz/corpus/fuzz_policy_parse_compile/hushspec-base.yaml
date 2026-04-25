@@ -1,0 +1,11 @@
+hushspec: "0.1.0"
+name: base
+
+rules:
+  shell_commands:
+    enabled: true
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file

@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "collection": "memories",
+    "id": "fuzz"
+  },
+  "expected_action": "memory_write",
+  "tool_name": "memory_write"
+}

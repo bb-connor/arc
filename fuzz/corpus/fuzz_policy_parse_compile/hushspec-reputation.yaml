@@ -1,0 +1,136 @@
+hushspec: "0.1.0"
+name: "reputation-gated-policy"
+description: "Capability issuance ceilings backed by local Chio reputation"
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+      - safe_invoke
+
+extensions:
+  reputation:
+    scoring:
+      weights:
+        boundary_pressure: 0.20
+        resource_stewardship: 0.10
+        least_privilege: 0.15
+        history_depth: 0.10
+        tool_diversity: 0.05
+        delegation_hygiene: 0.15
+        reliability: 0.15
+        incident_correlation: 0.10
+      temporal_decay_half_life_days: 30
+      probationary_receipt_count: 1000
+      probationary_min_days: 30
+      probationary_score_ceiling: 0.60
+
+    tiers:
+      probationary:
+        score_range: [0.0, 0.40]
+        max_scope:
+          operations: [read, get]
+          max_invocations: 50
+          max_cost_per_invocation:
+            units: 100
+            currency: "USD"
+          max_total_cost:
+            units: 1000
+            currency: "USD"
+          max_delegation_depth: 0
+          ttl_seconds: 60
+          constraints_required: true
+        promotion:
+          target: standard
+          min_score: 0.40
+          min_receipts: 1000
+          min_days: 30
+          required_metrics:
+            boundary_pressure_max: 0.10
+            reliability_min: 0.80
+
+      standard:
+        score_range: [0.40, 0.65]
+        max_scope:
+          operations: [read, get, invoke]
+          max_invocations: 500
+          max_cost_per_invocation:
+            units: 500
+            currency: "USD"
+          max_total_cost:
+            units: 5000
+            currency: "USD"
+          max_delegation_depth: 1
+          ttl_seconds: 300
+          constraints_required: false
+        promotion:
+          target: trusted
+          min_score: 0.65
+          min_receipts: 10000
+          min_days: 90
+          required_metrics:
+            boundary_pressure_max: 0.05
+            reliability_min: 0.90
+            least_privilege_min: 0.70
+        demotion:
+          target: probationary
+          triggers:
+            - type: score_below
+              threshold: 0.30
+            - type: incident_reported
+            - type: deny_streak
+              count: 20
+
+      trusted:
+        score_range: [0.65, 0.85]
+        max_scope:
+          operations: [read, get, invoke, read_result]
+          max_invocations: 5000
+          max_cost_per_invocation:
+            units: 2000
+            currency: "USD"
+          max_total_cost:
+            units: 25000
+            currency: "USD"
+          max_delegation_depth: 3
+          ttl_seconds: 1800
+        promotion:
+          target: elevated
+          min_score: 0.85
+          min_receipts: 50000
+          min_days: 180
+          required_metrics:
+            boundary_pressure_max: 0.03
+            reliability_min: 0.95
+            delegation_hygiene_min: 0.80
+            least_privilege_min: 0.80
+        demotion:
+          target: standard
+          triggers:
+            - type: score_below
+              threshold: 0.55
+            - type: incident_reported
+            - type: delegation_incident
+
+      elevated:
+        score_range: [0.85, 1.0]
+        max_scope:
+          operations: [read, get, invoke, read_result, delegate, subscribe]
+          max_invocations: null
+          max_cost_per_invocation:
+            units: 5000
+            currency: "USD"
+          max_total_cost:
+            units: 100000
+            currency: "USD"
+          max_delegation_depth: 5
+          ttl_seconds: 3600
+        demotion:
+          target: trusted
+          triggers:
+            - type: score_below
+              threshold: 0.75
+            - type: incident_reported
+            - type: delegation_incident
