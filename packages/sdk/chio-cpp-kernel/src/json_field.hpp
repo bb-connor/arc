@@ -378,13 +378,17 @@ inline std::optional<std::string> json_string_field(const std::string& json,
     skip_ws(input, pos);
 
     if (*parsed_key == key) {
-      auto value = parse_json_string(input, pos);
-      if (!value.has_value()) {
-        return std::nullopt;
-      }
-      found = std::move(value);
-      skip_ws(input, pos);
-      if (pos < input.size() && input[pos] != ',' && input[pos] != '}') {
+      if (pos < input.size() && input[pos] == '"') {
+        auto value = parse_json_string(input, pos);
+        if (!value.has_value()) {
+          return std::nullopt;
+        }
+        found = std::move(value);
+        skip_ws(input, pos);
+        if (pos < input.size() && input[pos] != ',' && input[pos] != '}') {
+          return std::nullopt;
+        }
+      } else if (!skip_json_value(input, pos)) {
         return std::nullopt;
       }
     } else if (!skip_json_value(input, pos)) {

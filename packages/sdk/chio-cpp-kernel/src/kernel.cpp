@@ -89,9 +89,9 @@ EvaluateResult from_ffi_result(const ChioKernelFfiResult& ffi_result) {
   if (ffi_result.status == CHIO_KERNEL_FFI_STATUS_OK) {
     EvaluateResult result;
     result.ok = true;
-    result.result_json = body;
     result.verdict = detail::json_string_field(body, "verdict").value_or("deny");
     result.reason = detail::json_string_field(body, "reason").value_or("");
+    result.result_json = result_json(result);
     return result;
   }
 

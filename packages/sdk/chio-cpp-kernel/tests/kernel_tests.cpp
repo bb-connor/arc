@@ -56,6 +56,16 @@ int main() {
         "{\"ignored\":{\"bad\":tru e},\"reason\":\"wrong\"}", "reason"));
     assert(!chio::kernel::detail::json_string_field(
         "{\"ignored\":[true false],\"reason\":\"wrong\"}", "reason"));
+    auto after_non_string_match = chio::kernel::detail::json_string_field(
+        "{\"verdict\":123,\"reason\":\"kept\"}", "reason");
+    assert(after_non_string_match.has_value());
+    assert(*after_non_string_match == "kept");
+    auto duplicate_string_match = chio::kernel::detail::json_string_field(
+        "{\"verdict\":123,\"verdict\":\"allow\"}", "verdict");
+    assert(duplicate_string_match.has_value());
+    assert(*duplicate_string_match == "allow");
+    assert(!chio::kernel::detail::json_string_field(
+        "{\"verdict\":tru e,\"reason\":\"wrong\"}", "verdict"));
 
     std::size_t number_pos = 0;
     assert(!chio::kernel::detail::skip_json_number("-", number_pos));
