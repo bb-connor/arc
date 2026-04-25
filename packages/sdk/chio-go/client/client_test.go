@@ -12,7 +12,7 @@ import (
 	"github.com/backbay/chio/packages/sdk/chio-go/version"
 )
 
-func TestClientInitializeReturnsSessionAndWave1Helpers(t *testing.T) {
+func TestClientInitializeReturnsSessionAndMCPCoreHelpers(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/mcp" {
 			t.Fatalf("unexpected path: %s", request.URL.Path)

@@ -1592,6 +1592,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bindings-ffi"
+version = "0.1.0"
+dependencies = [
+ "chio-binding-helpers",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-cli"
 version = "0.1.0"
 dependencies = [
@@ -1769,6 +1778,17 @@ dependencies = [
  "sha2",
  "thiserror 1.0.69",
  "url",
+]
+
+[[package]]
+name = "chio-cpp-kernel-ffi"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel-core",
+ "hex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

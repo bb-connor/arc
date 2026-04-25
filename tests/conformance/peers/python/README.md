@@ -8,7 +8,7 @@ Current shipped slice:
 - machine-readable `ScenarioResult` JSON output
 - transcript emission compatible with the Rust conformance runner
 
-Current Wave 1 coverage:
+Current MCP core coverage:
 
 - initialize
 - tools/list
@@ -16,7 +16,7 @@ Current Wave 1 coverage:
 - resources/list
 - prompts/list
 
-Current Wave 2 and Wave 3 additions:
+Current task/auth/notification additions:
 
 - remote HTTP task lifecycle scenarios
 - remote HTTP auth-family scenarios using local OAuth discovery, auth-code + PKCE, token exchange, and protected-resource challenge handling
@@ -26,4 +26,4 @@ Deferred:
 
 - Python server peer
 - stdio peer mode
-- broader nested-flow families beyond the current remote HTTP slices
+- broader nested callback families beyond the current remote HTTP slices

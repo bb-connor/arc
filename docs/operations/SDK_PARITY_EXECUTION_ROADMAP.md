@@ -16,7 +16,7 @@ As of 2026-03-20, the roadmap has materially advanced beyond the original starti
 
 - `chio-ts` is package-backed across the current live conformance surface
 - `chio-py` exists as a pure Python package and backs the current live conformance peer
-- `chio-go` exists as a pure Go module with live Wave 1 through Wave 5 conformance coverage and no mandatory CGO
+- `chio-go` exists as a pure Go module with live MCP core, tasks, auth, notifications, and nested-callback conformance coverage and no mandatory CGO
 - the SDK feature matrix and repo parity script now provide checked-in parity evidence across TS, Python, and Go
 
 The remaining work after this execution pass is mostly hardening and adoption work:
@@ -34,7 +34,7 @@ At the start of this roadmap, the repo already has:
 - checked-in shared vectors under `tests/bindings/vectors/`
 - `packages/sdk/chio-ts` invariant helpers plus a low-level transport/session layer
 - the JS conformance peer importing shared transport code from `chio-ts`
-- live Wave 1 through Wave 5 JS and Python conformance green against the remote edge
+- live MCP core, tasks, auth, notifications, and nested-callback JS and Python conformance green against the remote edge
 
 The repo does not yet have:
 
@@ -47,8 +47,8 @@ The repo does not yet have:
 
 By the end of this roadmap, Chio should be able to say all of the following with checked-in evidence:
 
-- TypeScript has a package-backed remote-edge SDK that replaces the bespoke JS peer logic for current conformance waves.
-- Python has a package-backed remote-edge SDK that replaces the bespoke Python peer logic for current conformance waves.
+- TypeScript has a package-backed remote-edge SDK that replaces the bespoke JS peer logic for current conformance areas.
+- Python has a package-backed remote-edge SDK that replaces the bespoke Python peer logic for current conformance areas.
 - Go has a pure Go remote-edge SDK foundation with real conformance coverage and no mandatory CGO.
 - parity claims are backed by vectors, live conformance, and a checked-in feature matrix
 
@@ -154,9 +154,9 @@ Tasks:
 Acceptance bar:
 
 - `chio-ts` root exports more than invariants and transport
-- the JS peer uses package modules for all remote-edge behavior in current waves
+- the JS peer uses package modules for all remote-edge behavior in current conformance areas
 - `npm --prefix packages/sdk/chio-ts test` is green
-- Wave 1 through Wave 5 live conformance is green with the JS peer backed by `chio-ts`
+- MCP core, tasks, auth, notifications, and nested-callback live conformance is green with the JS peer backed by `chio-ts`
 - the README clearly marks the package as alpha and lists unsupported surfaces explicitly
 
 ## Milestone 3: Python Foundation
@@ -218,7 +218,7 @@ Tasks:
 
 Acceptance bar:
 
-- Wave 1 through Wave 5 live conformance is green with the Python peer backed by `chio-py`
+- MCP core, tasks, auth, notifications, and nested-callback live conformance is green with the Python peer backed by `chio-py`
 - Python vector tests remain green
 - the package is still pure Python
 - `chio-native` remains deferred and is not required for any current parity claim
@@ -255,7 +255,7 @@ Acceptance bar:
 
 - `CGO_ENABLED=0` build and test path works
 - Go vector tests are green
-- the Go SDK can initialize, negotiate protocol version, and execute the Wave 1 remote-edge slice
+- the Go SDK can initialize, negotiate protocol version, and execute the MCP core remote-edge slice
 - no CGO bridge exists in the critical path
 
 ## Milestone 6: Go Coverage And Parity Hardening
@@ -288,8 +288,8 @@ Tasks:
 
 Acceptance bar:
 
-- TS and Python are `package_backed` and `conformance_green` across current waves
-- Go is at minimum `package_backed` for the first remote-edge slice and `conformance_green` for its supported wave set
+- TS and Python are `package_backed` and `conformance_green` across current conformance areas
+- Go is at minimum `package_backed` for the first remote-edge slice and `conformance_green` for its supported area set
 - the matrix clearly distinguishes `supported now` from `planned next`
 - the repo has one obvious parity evidence path instead of ad hoc commands
 
@@ -305,7 +305,7 @@ Acceptance bar:
 
 - finish TS alpha API
 - route JS peer fully through `chio-ts`
-- keep all live waves green
+- keep all live conformance areas green
 
 ### Week 3
 
@@ -316,7 +316,7 @@ Acceptance bar:
 
 - finish Python alpha API
 - route Python peer through `chio-py`
-- keep all live waves green
+- keep all live conformance areas green
 
 ### Week 5
 
@@ -325,7 +325,7 @@ Acceptance bar:
 
 ### Week 6
 
-- expand Go wave coverage
+- expand Go conformance area coverage
 - harden parity matrix, CI, examples, and alpha support docs
 
 ## Risk Kill Order

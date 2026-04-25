@@ -1,0 +1,14 @@
+# Exported C ABI symbols for chio-bindings-ffi ABI version 1.
+chio_buffer_free
+chio_canonicalize_json
+chio_ffi_abi_version
+chio_ffi_build_info
+chio_sha256_hex_bytes
+chio_sha256_hex_utf8
+chio_sign_json_ed25519
+chio_sign_utf8_message_ed25519
+chio_verify_capability_json
+chio_verify_json_signature_ed25519
+chio_verify_manifest_json
+chio_verify_receipt_json
+chio_verify_utf8_message_ed25519

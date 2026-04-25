@@ -146,7 +146,7 @@ Legacy `CHIO_MCP_SESSION_*` aliases still work for one compatibility cycle.
      --authority-db /var/lib/chio/edge-authority.sqlite3 \
      --session-db /var/lib/chio/edge-sessions.sqlite3 \
      -- \
-     python3 tests/conformance/fixtures/wave1/mock_mcp_server.py
+     python3 tests/conformance/fixtures/mcp_core/mock_mcp_server.py
    ```
 
 2. Initialize one session and confirm the admin diagnostics surface:
@@ -202,11 +202,11 @@ Minimum deploy-time smoke checks:
 
 Before promoting a candidate outside the operator boundary, archive and attach:
 
-- `target/release-qualification/conformance/wave1/report.md`
-- `target/release-qualification/conformance/wave2/report.md`
-- `target/release-qualification/conformance/wave3/report.md`
-- `target/release-qualification/conformance/wave4/report.md`
-- `target/release-qualification/conformance/wave5/report.md`
+- `target/release-qualification/conformance/mcp-core/report.md`
+- `target/release-qualification/conformance/tasks/report.md`
+- `target/release-qualification/conformance/auth/report.md`
+- `target/release-qualification/conformance/notifications/report.md`
+- `target/release-qualification/conformance/nested-callbacks/report.md`
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 - [RELEASE_AUDIT.md](RELEASE_AUDIT.md)
 - [PARTNER_PROOF.md](PARTNER_PROOF.md)

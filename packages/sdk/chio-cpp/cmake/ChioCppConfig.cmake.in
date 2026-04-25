@@ -1,0 +1,18 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(@CHIO_CPP_ENABLE_CURL@)
+  find_dependency(CURL)
+endif()
+
+if(NOT TARGET chio_bindings_ffi)
+  add_library(chio_bindings_ffi STATIC IMPORTED)
+  set_target_properties(chio_bindings_ffi PROPERTIES
+    IMPORTED_LOCATION "${PACKAGE_PREFIX_DIR}/lib/@CMAKE_STATIC_LIBRARY_PREFIX@chio_bindings_ffi@CMAKE_STATIC_LIBRARY_SUFFIX@"
+    INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include"
+  )
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/ChioCppTargets.cmake")
+check_required_components(ChioCpp)

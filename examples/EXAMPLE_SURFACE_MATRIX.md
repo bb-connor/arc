@@ -25,6 +25,7 @@ Support directories such as [`_shared/`](./_shared/), [`policies/`](./policies/)
 | [`hello-chi/`](./hello-chi/) | HTTP framework | `chio-go-http` | Go `chi` integration with Chio HTTP enforcement | [`smoke.sh`](./hello-chi/smoke.sh) |
 | [`hello-spring-boot/`](./hello-spring-boot/) | HTTP framework | `chio-spring-boot` | JVM/Spring Boot Chio filter chain on safe and governed routes | [`smoke.sh`](./hello-spring-boot/smoke.sh) |
 | [`hello-dotnet/`](./hello-dotnet/) | HTTP framework | `ChioMiddleware` | ASP.NET Chio middleware for allow/deny and receipt-bearing responses | [`smoke.sh`](./hello-dotnet/smoke.sh) |
+| [`hello-drogon/`](./hello-drogon/) | HTTP framework | `packages/sdk/chio-drogon` | C++ Drogon middleware using `chio::drogon::ChioMiddleware`; local smoke skips when CMake or Drogon is unavailable | [`smoke.sh`](./hello-drogon/smoke.sh) |
 | [`hello-mcp/`](./hello-mcp/) | Protocol edge | MCP edge runtime | Authoritative MCP request handling over JSON-RPC with Chio semantics | [`smoke.sh`](./hello-mcp/smoke.sh) |
 | [`hello-a2a/`](./hello-a2a/) | Protocol edge | A2A edge runtime | Authoritative A2A send plus deferred task lifecycle through Chio | [`smoke.sh`](./hello-a2a/smoke.sh) |
 | [`hello-acp/`](./hello-acp/) | Protocol edge | ACP edge runtime | ACP invoke plus deferred stream/resume lifecycle through Chio | [`smoke.sh`](./hello-acp/smoke.sh) |

@@ -35,40 +35,40 @@ certify_seed="${output_root}/certify-release.seed"
 rm -rf "${conformance_root}" "${log_root}" "${coverage_root}"
 mkdir -p "${conformance_root}" "${log_root}" "${coverage_root}"
 
-run_wave() {
-  local wave="$1"
+run_conformance_area() {
+  local area="$1"
   local scenarios_dir="$2"
   shift 2
-  local wave_dir="${conformance_root}/${wave}"
-  local report_path="${wave_dir}/report.md"
-  local certification_path="${wave_dir}/certification.json"
-  local certification_report_path="${wave_dir}/certification-report.md"
-  local verification_path="${wave_dir}/certification-verify.json"
-  mkdir -p "${wave_dir}/results"
+  local area_dir="${conformance_root}/${area}"
+  local report_path="${area_dir}/report.md"
+  local certification_path="${area_dir}/certification.json"
+  local certification_report_path="${area_dir}/certification-report.md"
+  local verification_path="${area_dir}/certification-verify.json"
+  mkdir -p "${area_dir}/results"
   cargo run -p chio-conformance --bin chio-conformance-runner -- \
     --scenarios-dir "${scenarios_dir}" \
     "$@" \
-    --results-dir "${wave_dir}/results" \
+    --results-dir "${area_dir}/results" \
     --report-output "${report_path}"
 
   cargo run -p chio-cli --bin chio -- certify check \
     --scenarios-dir "${scenarios_dir}" \
-    --results-dir "${wave_dir}/results" \
+    --results-dir "${area_dir}/results" \
     --output "${certification_path}" \
     --report-output "${certification_report_path}" \
-    --tool-server-id "chio-conformance-${wave}" \
-    --tool-server-name "Chio Conformance ${wave}" \
+    --tool-server-id "chio-conformance-${area}" \
+    --tool-server-name "Chio Conformance ${area}" \
     --signing-seed-file "${certify_seed}"
 
   cargo run -p chio-cli --bin chio -- certify verify \
     --input "${certification_path}" >"${verification_path}"
 }
 
-run_wave wave1 tests/conformance/scenarios/wave1
-run_wave wave2 tests/conformance/scenarios/wave2
-run_wave wave3 tests/conformance/scenarios/wave3 --auth-mode oauth-local
-run_wave wave4 tests/conformance/scenarios/wave4
-run_wave wave5 tests/conformance/scenarios/wave5
+run_conformance_area mcp-core tests/conformance/scenarios/mcp_core
+run_conformance_area tasks tests/conformance/scenarios/tasks
+run_conformance_area auth tests/conformance/scenarios/auth --auth-mode oauth-local
+run_conformance_area notifications tests/conformance/scenarios/notifications
+run_conformance_area nested-callbacks tests/conformance/scenarios/nested_callbacks
 
 cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
   | tee "${log_root}/trust-cluster-repeat-run.log"

@@ -15,6 +15,7 @@ pub enum PeerTarget {
     Js,
     Python,
     Go,
+    Cpp,
 }
 
 impl PeerTarget {
@@ -23,6 +24,7 @@ impl PeerTarget {
             Self::Js => "js",
             Self::Python => "python",
             Self::Go => "go",
+            Self::Cpp => "cpp",
         }
     }
 }
@@ -101,12 +103,12 @@ pub fn default_repo_root() -> PathBuf {
 pub fn default_run_options() -> ConformanceRunOptions {
     let repo_root = default_repo_root();
     ConformanceRunOptions {
-        scenarios_dir: repo_root.join("tests/conformance/scenarios/wave1"),
-        results_dir: repo_root.join("tests/conformance/results/generated/wave1-live"),
-        report_output: repo_root.join("tests/conformance/reports/generated/wave1-live.md"),
-        policy_path: repo_root.join("tests/conformance/fixtures/wave1/policy.yaml"),
+        scenarios_dir: repo_root.join("tests/conformance/scenarios/mcp_core"),
+        results_dir: repo_root.join("tests/conformance/results/generated/mcp-core-live"),
+        report_output: repo_root.join("tests/conformance/reports/generated/mcp-core-live.md"),
+        policy_path: repo_root.join("tests/conformance/fixtures/mcp_core/policy.yaml"),
         upstream_server_script: repo_root
-            .join("tests/conformance/fixtures/wave1/mock_mcp_server.py"),
+            .join("tests/conformance/fixtures/mcp_core/mock_mcp_server.py"),
         auth_mode: ConformanceAuthMode::StaticBearer,
         auth_token: "conformance-token".to_string(),
         admin_token: "conformance-admin-token".to_string(),
@@ -238,7 +240,7 @@ fn spawn_remote_edge(
         .arg("--policy")
         .arg(&options.policy_path)
         .arg("--server-id")
-        .arg("conformance-wave1")
+        .arg("conformance-mcp-core")
         .arg("--server-name")
         .arg("Conformance Fixture")
         .arg("--server-version")
@@ -249,7 +251,7 @@ fn spawn_remote_edge(
     let public_base_url = format!("http://{listen}");
     let auth_server_seed_path = options.results_dir.join("artifacts/auth-server.seed");
     let mut command_description = format!(
-        "{} mcp serve-http --policy {} --server-id conformance-wave1 --listen {}",
+        "{} mcp serve-http --policy {} --server-id conformance-mcp-core --listen {}",
         chio_executable.display(),
         options.policy_path.display(),
         listen
@@ -352,6 +354,13 @@ fn run_peer(
                 .arg("./cmd/conformance-peer");
             command
         }
+        PeerTarget::Cpp => {
+            let executable = ensure_cpp_peer_executable(&options.repo_root)?;
+            command_description = executable.display().to_string();
+            let mut command = Command::new(executable);
+            command.current_dir(&options.repo_root);
+            command
+        }
     };
 
     let status = command
@@ -396,6 +405,72 @@ fn run_peer(
         });
     }
     Ok(())
+}
+
+fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> {
+    let build_dir = repo_root.join("target/chio-cpp-conformance");
+    let build_config = "Debug";
+    let executable_name = format!("chio_cpp_conformance_peer{}", std::env::consts::EXE_SUFFIX);
+    let executable_candidates = [
+        build_dir.join(&executable_name),
+        build_dir.join(build_config).join(&executable_name),
+    ];
+    let source_dir = repo_root.join("packages/sdk/chio-cpp");
+    let configure_status = Command::new("cmake")
+        .current_dir(repo_root)
+        .arg("-S")
+        .arg(&source_dir)
+        .arg("-B")
+        .arg(&build_dir)
+        .arg("-DCHIO_CPP_BUILD_TESTS=OFF")
+        .arg("-DCHIO_CPP_BUILD_EXAMPLES=OFF")
+        .arg("-DCHIO_CPP_ENABLE_CURL=ON")
+        .arg("-DCHIO_CPP_BUILD_CONFORMANCE_PEER=ON")
+        .arg("-DCMAKE_BUILD_TYPE=Debug")
+        .status()
+        .map_err(|source| RunnerError::Spawn {
+            command: "cmake configure chio_cpp_conformance_peer".to_string(),
+            source,
+        })?;
+    if !configure_status.success() {
+        return Err(RunnerError::ProcessFailed {
+            command: "cmake configure chio_cpp_conformance_peer".to_string(),
+            status: configure_status.code().unwrap_or(1),
+            log_path: "<stderr>".to_string(),
+        });
+    }
+
+    let build_status = Command::new("cmake")
+        .current_dir(repo_root)
+        .arg("--build")
+        .arg(&build_dir)
+        .arg("--target")
+        .arg("chio_cpp_conformance_peer")
+        .arg("--config")
+        .arg(build_config)
+        .status()
+        .map_err(|source| RunnerError::Spawn {
+            command: "cmake --build chio_cpp_conformance_peer".to_string(),
+            source,
+        })?;
+    if !build_status.success() {
+        return Err(RunnerError::ProcessFailed {
+            command: "cmake --build chio_cpp_conformance_peer".to_string(),
+            status: build_status.code().unwrap_or(1),
+            log_path: "<stderr>".to_string(),
+        });
+    }
+
+    for executable in executable_candidates {
+        if executable.exists() {
+            return Ok(executable);
+        }
+    }
+    Err(RunnerError::ProcessFailed {
+        command: "cmake --build chio_cpp_conformance_peer".to_string(),
+        status: 1,
+        log_path: "<stderr>".to_string(),
+    })
 }
 
 fn reserve_listen_addr() -> Result<SocketAddr, RunnerError> {

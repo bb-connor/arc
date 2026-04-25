@@ -1,0 +1,24 @@
+[package]
+name = "chio-cpp-kernel-ffi"
+description = "C ABI bindings for the Chio C++ offline kernel SDK"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_cpp_kernel_ffi"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+chio-core-types = { path = "../chio-core-types" }
+chio-kernel-core = { path = "../chio-kernel-core" }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

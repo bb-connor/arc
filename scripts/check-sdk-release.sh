@@ -4,7 +4,7 @@ set -euo pipefail
 # Unified Chio SDK release qualification driver.
 #
 # Usage: check-sdk-release.sh <language>
-#   language := go | py | ts
+#   language := cpp | go | py | ts
 #
 # Each branch performs the language-specific smoke build and consumer
 # verification. The three legacy per-language entrypoints
@@ -13,7 +13,7 @@ set -euo pipefail
 # invocations and release runbooks stay source-compatible.
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: $(basename "$0") <go|py|ts> [extra args]" >&2
+  echo "usage: $(basename "$0") <cpp|go|py|ts> [extra args]" >&2
   exit 2
 fi
 
@@ -23,7 +23,7 @@ shift || true
 case "${lang}" in
   -h|--help)
     cat <<'HELP'
-check-sdk-release.sh <go|py|ts>
+check-sdk-release.sh <cpp|go|py|ts>
 
 Runs the release qualification smoke for one Chio SDK. The driver handles
 shared setup (temp dir, cleanup trap, PATH probes) and delegates to a
@@ -42,6 +42,55 @@ cleanup() {
 trap cleanup EXIT
 
 case "${lang}" in
+  cpp)
+    sdk_dir="${repo_root}/packages/sdk/chio-cpp"
+    require_cpp_packagers="${CHIO_CPP_REQUIRE_PACKAGERS:-${CI:-}}"
+
+    "${repo_root}/scripts/check-chio-cpp.sh"
+
+    if command -v conan >/dev/null 2>&1; then
+      (
+        cd "${sdk_dir}"
+        if ! conan profile path default >/dev/null 2>&1; then
+          conan profile detect --force
+        fi
+        conan create . --build=missing
+      )
+    elif [[ -n "${require_cpp_packagers}" && "${require_cpp_packagers}" != "0" ]]; then
+      echo "Conan package smoke is required but conan is not on PATH" >&2
+      exit 1
+    else
+      echo "skipping Conan package smoke because conan is not on PATH"
+    fi
+
+    vcpkg_cmd=""
+    if command -v vcpkg >/dev/null 2>&1; then
+      vcpkg_cmd="$(command -v vcpkg)"
+    elif [[ -n "${VCPKG_ROOT:-}" && -x "${VCPKG_ROOT}/vcpkg" ]]; then
+      vcpkg_cmd="${VCPKG_ROOT}/vcpkg"
+    fi
+
+    if [[ -n "${vcpkg_cmd}" ]]; then
+      "${vcpkg_cmd}" install --x-manifest-root="${sdk_dir}" --dry-run
+    elif [[ -n "${require_cpp_packagers}" && "${require_cpp_packagers}" != "0" ]]; then
+      echo "vcpkg manifest build is required but vcpkg is not on PATH" >&2
+      exit 1
+    else
+      python3 - "${sdk_dir}/vcpkg.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    manifest = json.load(handle)
+if manifest.get("name") != "chio-cpp":
+    raise SystemExit("unexpected vcpkg package name")
+print("vcpkg manifest syntax verified")
+PY
+    fi
+
+    echo "chio-cpp release qualification passed"
+    ;;
+
   go)
     sdk_dir="${repo_root}/packages/sdk/chio-go"
     consumer_dir="${work_dir}/consumer"
@@ -301,7 +350,7 @@ EOF
     ;;
 
   *)
-    echo "unknown SDK language: ${lang} (expected go, py, or ts)" >&2
+    echo "unknown SDK language: ${lang} (expected cpp, go, py, or ts)" >&2
     exit 2
     ;;
 esac

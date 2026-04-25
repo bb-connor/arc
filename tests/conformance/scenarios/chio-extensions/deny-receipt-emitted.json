@@ -11,7 +11,7 @@
     "server": [],
     "client": []
   },
-  "tags": ["wave4", "trust"],
+  "tags": ["trust", "deny-receipts"],
   "expected": "pass",
   "timeoutMs": 5000,
   "notes": "Chio-specific trust assertion. This should never be counted as MCP-core compatibility."

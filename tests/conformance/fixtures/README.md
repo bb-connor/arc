@@ -7,9 +7,9 @@ This directory holds shared conformance assets such as:
 - mock transcripts
 - reusable upstream server fixtures
 
-The first executable slice is `wave1/`:
+The first executable slice is `mcp_core/`:
 
 - `mock_mcp_server.py`
   Minimal stdio MCP server used by the live remote HTTP harness.
 - `policy.yaml`
-  Chio policy that grants the wrapped Wave 1 fixture tool, resource, and prompt access.
+  Chio policy that grants the wrapped MCP core fixture tool, resource, and prompt access.

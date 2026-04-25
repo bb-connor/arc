@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(ChioCpp CONFIG)
+find_dependency(Drogon CONFIG)
+
+include("${CMAKE_CURRENT_LIST_DIR}/ChioDrogonTargets.cmake")
+
+check_required_components(ChioDrogon)

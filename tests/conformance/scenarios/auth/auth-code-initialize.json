@@ -1,0 +1,17 @@
+{
+  "id": "auth-code-initialize",
+  "title": "Initialize an MCP session with an OAuth authorization-code access token",
+  "area": "authorization",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": [],
+    "client": []
+  },
+  "tags": ["auth"],
+  "expected": "pass",
+  "timeoutMs": 10000
+}

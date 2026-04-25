@@ -1,0 +1,17 @@
+{
+  "id": "nested-elicitation-form-create",
+  "title": "Round-trip form-mode elicitation/create through the remote HTTP edge",
+  "area": "nested_callbacks",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools"],
+    "client": ["elicitation"]
+  },
+  "tags": ["nested-callbacks", "elicitation", "form"],
+  "expected": "pass",
+  "timeoutMs": 10000
+}

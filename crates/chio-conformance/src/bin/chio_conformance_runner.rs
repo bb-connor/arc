@@ -34,7 +34,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--listen" => options.listen = Some(next_string(&mut args, &flag)?.parse()?),
             "--peer" => {
                 options.peers = parse_peers(&next_string(&mut args, &flag)?).ok_or_else(|| {
-                    format!("invalid value for {flag}: expected js, python, go, or all")
+                    format!("invalid value for {flag}: expected js, python, go, cpp, or all")
                 })?;
             }
             other => return Err(format!("unexpected flag: {other}").into()),
@@ -57,10 +57,16 @@ fn print_summary(summary: &ConformanceRunSummary) {
 
 fn parse_peers(value: &str) -> Option<Vec<PeerTarget>> {
     match value {
-        "all" => Some(vec![PeerTarget::Js, PeerTarget::Python, PeerTarget::Go]),
+        "all" => Some(vec![
+            PeerTarget::Js,
+            PeerTarget::Python,
+            PeerTarget::Go,
+            PeerTarget::Cpp,
+        ]),
         "js" => Some(vec![PeerTarget::Js]),
         "python" => Some(vec![PeerTarget::Python]),
         "go" => Some(vec![PeerTarget::Go]),
+        "cpp" => Some(vec![PeerTarget::Cpp]),
         _ => None,
     }
 }

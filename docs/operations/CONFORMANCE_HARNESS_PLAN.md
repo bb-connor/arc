@@ -221,12 +221,13 @@ The Markdown report is for humans.
 
 The JSON artifact is the source of truth.
 
-Current shipped slices:
+Current shipped areas:
 
-- Wave 1: remote HTTP MCP core request/response coverage against live JS and Python peers
-- Wave 2: remote HTTP task coverage with explicit `xfail` support for known wrapped-tool gaps
-- Wave 3: remote HTTP authorization coverage against the local OAuth-capable edge
-- Wave 4: remote HTTP notification and subscription coverage against a wrapped server that emits real upstream change notifications
+- MCP core: remote HTTP request/response coverage against live JS and Python peers
+- Tasks: remote HTTP task coverage with explicit `xfail` support for known wrapped-tool gaps
+- Auth: remote HTTP authorization coverage against the local OAuth-capable edge
+- Notifications: remote HTTP notification and subscription coverage against a wrapped server that emits real upstream change notifications
+- Nested callbacks: remote HTTP sampling, elicitation, and roots callback coverage
 
 ## Scenario Taxonomy
 
@@ -259,9 +260,9 @@ Recommended top-level areas:
 
 `trust_extensions` should be clearly separated from core MCP pass/fail so the matrix does not blur standard compliance with Chio-native guarantees.
 
-## Initial Scenario Waves
+## Initial Scenario Areas
 
-## Wave 1: minimum credible matrix
+## MCP Core: minimum credible matrix
 
 Goal:
 
@@ -285,7 +286,7 @@ Peers:
 - one JS peer
 - one Python peer
 
-## Wave 2: feature-rich parity
+## Tasks And Eventing: feature-rich parity
 
 Scenarios:
 
@@ -298,7 +299,7 @@ Scenarios:
 - completion/complete
 - logging/setLevel and notifications
 
-## Wave 3: auth and remote hosting
+## Auth And Remote Hosting
 
 Scenarios:
 
@@ -310,7 +311,7 @@ Scenarios:
 - wrong audience rejection
 - session reuse / stale session behavior
 
-## Wave 4: Chio-specific trust verification
+## Trust Extensions
 
 Scenarios:
 
@@ -320,7 +321,7 @@ Scenarios:
 - shared control-plane revocation effect
 - budget enforcement visibility
 
-This wave should appear in separate report sections so it does not contaminate MCP pass-rate claims.
+This area should appear in separate report sections so it does not contaminate MCP pass-rate claims.
 
 ## Compatibility Matrix Design
 
@@ -402,7 +403,7 @@ Mitigation:
 
 Mitigation:
 
-- keep a small Wave 1 suite for PRs
+- keep a small MCP core suite for PRs
 - move heavy remote/auth scenarios to nightly
 - require deterministic fixture setup and explicit timeouts
 
@@ -417,7 +418,7 @@ Mitigation:
 ## Recommended First Deliverables
 
 1. `tests/conformance/README.md`
-2. `tests/conformance/scenarios/` with Wave 1 scenarios
+2. `tests/conformance/scenarios/` with MCP core scenarios
 3. `tests/conformance/peers/js/`
 4. `tests/conformance/peers/python/`
 5. `crates/chio-conformance` runner

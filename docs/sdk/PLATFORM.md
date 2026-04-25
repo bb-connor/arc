@@ -363,9 +363,79 @@ app.Run();
 
 ---
 
+## 5. C++ Drogon (chio-drogon)
+
+**Location:** `packages/sdk/chio-drogon/`
+
+C++17 middleware for Drogon applications. The package exports
+`ChioDrogon::chio_drogon` when CMake can find both `Drogon::Drogon` and the
+Chio C++ SDK target.
+
+### CMake Setup
+
+```cmake
+find_package(ChioDrogon CONFIG REQUIRED)
+
+target_link_libraries(app PRIVATE ChioDrogon::chio_drogon)
+```
+
+For in-repo examples, [`examples/hello-drogon/`](../../examples/hello-drogon/)
+adds `packages/sdk/chio-drogon` as a subdirectory and skips clearly when
+Drogon is not installed locally.
+
+### Minimal Example
+
+```cpp
+#include <drogon/drogon.h>
+#include "chio/drogon.hpp"
+
+int main() {
+  chio::drogon::Options options;
+  options.sidecar_url = "http://127.0.0.1:9090";
+  options.sidecar_failure_mode = chio::drogon::SidecarFailureMode::FailClosed;
+  chio::drogon::configure(options);
+
+  drogon::app().registerHandler(
+      "/hello",
+      [](const drogon::HttpRequestPtr& req,
+         std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+        Json::Value body(Json::objectValue);
+        body["message"] = "hello";
+        body["receipt_id"] = chio::drogon::receipt_id(req);
+        callback(drogon::HttpResponse::newHttpJsonResponse(body));
+      },
+      {drogon::Get, "chio::drogon::ChioMiddleware"});
+
+  drogon::app().addListener("127.0.0.1", 8080);
+  drogon::app().run();
+}
+```
+
+### What the Middleware Does
+
+1. Reads the raw Drogon request body and hashes it before handler execution
+2. Copies only configured non-sensitive headers into the Chio evaluation request
+3. Extracts a capability token from `X-Chio-Capability` or `chio_capability`
+4. Sends an `ChioHttpRequest` to `POST /chio/evaluate` on the sidecar
+5. Stores the receipt id on allowed requests for `chio::drogon::receipt_id(req)`
+6. Returns structured JSON errors on deny or sidecar failure
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `sidecar_url` | `CHIO_SIDECAR_URL`, then `http://127.0.0.1:9090` | Chio sidecar URL |
+| `timeout_ms` | `5000` | Sidecar evaluation timeout hint |
+| `sidecar_failure_mode` | `FailClosed` | `FailClosed`, `FailOpenWithoutReceipt`, or `AllowWithoutReceipt` |
+| `selected_headers` | accept, content-type, x-request-id, x-correlation-id | Header allowlist copied into Chio evaluation |
+| `skip_paths` | empty | Exact request paths that bypass Chio evaluation |
+| `route_pattern_resolver` | unset | Optional resolver for policy route patterns such as `/orders/{id}` |
+
+---
+
 ## Common Patterns
 
-All four platform SDKs share the same operational model:
+All five platform SDKs share the same operational model:
 
 1. **Sidecar communication.** Every SDK talks to the Chio Rust kernel at
    `POST /chio/evaluate` on localhost. The kernel handles capability validation,
@@ -385,7 +455,9 @@ All four platform SDKs share the same operational model:
    `req.chioPassthrough` (TypeScript Express), `chio.GetChioPassthrough(r)` (Go),
    `request.state.chio_passthrough` or `request.chio_passthrough` (Python),
    Servlet request attribute `chioPassthrough` (JVM), and
-   `HttpContext.Items["ChioPassthrough"]` (.NET).
+   `HttpContext.Items["ChioPassthrough"]` (.NET). The Drogon package exposes
+   allowed receipt ids through `chio::drogon::receipt_id(req)` and uses a
+   receiptless fail-open mode when explicitly configured.
 
 5. **Identity extraction.** Each SDK extracts caller identity from standard
    HTTP headers (Authorization, X-Api-Key, etc.) and supports custom

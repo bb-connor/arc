@@ -79,19 +79,33 @@ EOF
 ./scripts/check-bindings-parity.sh
 ./scripts/check-chio-py.sh
 ./scripts/check-chio-go.sh
+CHIO_CPP_REQUIRE_CBINDGEN="${CHIO_CPP_REQUIRE_CBINDGEN:-0}" ./scripts/check-chio-cpp.sh
+./scripts/check-chio-drogon.sh
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test auth_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture
 
 echo "Python live parity is package-backed for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"
 echo "Go live parity is conformance-green for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"
+echo "C++ parity is conformance-green for hosted MCP core, tasks, auth, notifications, and nested callbacks plus package-backed for invariant helpers, DPoP proofs, receipt queries, and HTTP substrate helpers:"
+echo "  ./scripts/check-chio-cpp.sh"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test auth_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture"
 echo "Current live evidence runs through these lanes:"
-echo "  cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave2_go_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave3_go_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave4_go_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave5_go_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave1_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave2_tasks_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave3_auth_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave4_notifications_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave5_nested_flows_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test mcp_core_go_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test tasks_go_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test auth_go_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test notifications_go_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test nested_callbacks_go_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test mcp_core_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test tasks_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test auth_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test notifications_live -- --nocapture"
+echo "  cargo test -p chio-conformance --test nested_callbacks_live -- --nocapture"

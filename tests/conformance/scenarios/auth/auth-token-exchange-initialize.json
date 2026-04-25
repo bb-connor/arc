@@ -1,0 +1,17 @@
+{
+  "id": "auth-token-exchange-initialize",
+  "title": "Initialize an MCP session with a token-exchange access token",
+  "area": "authorization",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": [],
+    "client": []
+  },
+  "tags": ["auth"],
+  "expected": "pass",
+  "timeoutMs": 10000
+}

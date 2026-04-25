@@ -1,0 +1,17 @@
+{
+  "id": "catalog-list-changed-notifications",
+  "title": "Forward resource, tool, and prompt list-changed notifications during a wrapped tool call",
+  "area": "notifications",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools", "resources", "prompts"],
+    "client": []
+  },
+  "tags": ["notifications"],
+  "expected": "pass",
+  "timeoutMs": 10000
+}

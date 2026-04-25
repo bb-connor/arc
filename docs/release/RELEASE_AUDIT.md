@@ -215,11 +215,11 @@ Primary local qualification commands:
 
 Primary release artifacts:
 
-- `target/release-qualification/conformance/wave1/report.md`
-- `target/release-qualification/conformance/wave2/report.md`
-- `target/release-qualification/conformance/wave3/report.md`
-- `target/release-qualification/conformance/wave4/report.md`
-- `target/release-qualification/conformance/wave5/report.md`
+- `target/release-qualification/conformance/mcp-core/report.md`
+- `target/release-qualification/conformance/tasks/report.md`
+- `target/release-qualification/conformance/auth/report.md`
+- `target/release-qualification/conformance/notifications/report.md`
+- `target/release-qualification/conformance/nested-callbacks/report.md`
 - `target/release-qualification/browser-kernel/report.md`
 - `target/release-qualification/browser-kernel/summary.json`
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
