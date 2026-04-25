@@ -166,10 +166,7 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
             }
         }
 
-        let scan_from = if let Some(open_indent) = open_double_quote_indent {
-            if trimmed.starts_with('#') && indent <= open_indent {
-                continue;
-            }
+        let scan_from = if open_double_quote_indent.is_some() {
             0
         } else if let Some(start) = double_quoted_value_start(line) {
             open_double_quote_indent = Some(indent);
@@ -204,11 +201,9 @@ fn block_scalar_parent_indent_start(line: &str) -> Option<usize> {
         return Some(leading_whitespace_len(line));
     }
 
-    let colon_index = line.rfind(':')?;
-    let before_colon = &line[..colon_index];
+    let colon_index = structural_mapping_colon_index(line)?;
     let after_colon = line[colon_index + 1..].trim_start();
-    if before_colon.contains(':') || !(after_colon.starts_with('|') || after_colon.starts_with('>'))
-    {
+    if !(after_colon.starts_with('|') || after_colon.starts_with('>')) {
         return None;
     }
 
@@ -255,6 +250,53 @@ fn double_quoted_value_start(line: &str) -> Option<usize> {
     }
 
     Some(quote_index)
+}
+
+fn structural_mapping_colon_index(line: &str) -> Option<usize> {
+    let mut colon_index = None;
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped = false;
+    let mut chars = line.char_indices().peekable();
+
+    while let Some((index, ch)) = chars.next() {
+        if in_single {
+            if ch == '\'' {
+                if matches!(chars.peek(), Some((_, '\''))) {
+                    let _ = chars.next();
+                } else {
+                    in_single = false;
+                }
+            }
+            continue;
+        }
+
+        if in_double {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_double = false;
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' => in_single = true,
+            '"' => in_double = true,
+            ':' => {
+                if colon_index.replace(index).is_some() {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    colon_index
 }
 
 fn double_quote_state_closes_on_line(line: &str, mut scan_from: usize) -> bool {
@@ -1181,6 +1223,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_allows_multiline_quoted_scalar_comment_content() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: multiline-quoted-description\n",
+            "description: \"first\n",
+            "# second\"\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("comment-like quoted continuation should parse: {err}"),
+        };
+        assert_eq!(spec.description.as_deref(), Some("first # second"));
+    }
+
+    #[test]
     fn quote_precheck_scans_after_closed_scalar_on_same_line() {
         let input = concat!(
             "hushspec: \"0.1.0\"\n",
@@ -1233,6 +1291,35 @@ mod tests {
     }
 
     #[test]
+    fn parse_allows_block_scalar_for_quoted_key_with_colon() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: quoted-key-block-scalar\n",
+            "extensions:\n",
+            "  runtime_assurance:\n",
+            "    trusted_verifiers:\n",
+            "      local:\n",
+            "        schema: local\n",
+            "        verifier: test\n",
+            "        effective_tier: verified\n",
+            "        required_assertions:\n",
+            "          \"a:b\": |\n",
+            "            foo: \"bar\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("quoted key block scalar should parse: {err}"),
+        };
+        let value = spec
+            .extensions
+            .and_then(|extensions| extensions.runtime_assurance)
+            .and_then(|runtime_assurance| runtime_assurance.trusted_verifiers.get("local").cloned())
+            .and_then(|verifier| verifier.required_assertions.get("a:b").cloned());
+        assert_eq!(value.as_deref(), Some("foo: \"bar\n"));
+    }
+
+    #[test]
     fn parse_allows_sequence_block_scalar_with_unpaired_double_quote() {
         let input = concat!(
             "hushspec: \"0.1.0\"\n",
@@ -1281,6 +1368,8 @@ mod tests {
     #[test]
     fn block_scalar_detection_uses_last_colon() {
         assert!(block_scalar_parent_indent_start("description: |").is_some());
+        assert!(block_scalar_parent_indent_start("\"a:b\": |").is_some());
+        assert!(block_scalar_parent_indent_start("'a:b': |").is_some());
         assert!(block_scalar_parent_indent_start("  - |").is_some());
         assert!(block_scalar_parent_indent_start("  - >").is_some());
         assert!(block_scalar_parent_indent_start("  - not-block").is_none());

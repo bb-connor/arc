@@ -202,8 +202,25 @@ fn executable_rm_index(tokens: &[String]) -> Option<usize> {
 
         if token == "env" {
             index += 1;
-            while index < tokens.len() && is_env_assignment(tokens[index].as_str()) {
-                index += 1;
+            while index < tokens.len() {
+                let env_token = tokens[index].as_str();
+                if env_token == "--" {
+                    index += 1;
+                    break;
+                }
+                if is_env_assignment(env_token) {
+                    index += 1;
+                    continue;
+                }
+                if is_env_option(env_token) {
+                    let option_takes_value = env_option_takes_value(env_token);
+                    index += 1;
+                    if option_takes_value && index < tokens.len() {
+                        index += 1;
+                    }
+                    continue;
+                }
+                break;
             }
             continue;
         }
@@ -237,6 +254,20 @@ fn sudo_option_takes_value(token: &str) -> bool {
             | "--close-from"
             | "-D"
             | "--chdir"
+    )
+}
+
+fn is_env_option(token: &str) -> bool {
+    token.starts_with('-') && token != "-" && token != "--"
+}
+
+fn env_option_takes_value(token: &str) -> bool {
+    if token.contains('=') {
+        return false;
+    }
+    matches!(
+        token,
+        "-u" | "--unset" | "-C" | "--chdir" | "-S" | "--split-string" | "--argv0"
     )
 }
 
@@ -440,6 +471,11 @@ mod tests {
         assert!(guard.is_forbidden("sudo rm -r'f' /"));
         assert!(guard.is_forbidden("sudo -n rm -r'f' /"));
         assert!(guard.is_forbidden("env FOO=bar rm -r'f' /"));
+        assert!(guard.is_forbidden("env -i rm -r'f' /"));
+        assert!(guard.is_forbidden("env --ignore-environment rm -r'f' /"));
+        assert!(guard.is_forbidden("env -u PATH rm -r'f' /"));
+        assert!(guard.is_forbidden("env FOO=bar -i rm -r'f' /"));
+        assert!(guard.is_forbidden("env -- rm -r'f' /"));
         assert!(guard.is_forbidden("command rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok; rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok;rm -r'f' /"));
