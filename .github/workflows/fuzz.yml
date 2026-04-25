@@ -172,13 +172,15 @@ jobs:
 
       - name: Print repro command
         if: failure()
+        env:
+          FUZZ_TARGET: ${{ matrix.fuzz_target }}
         run: |
-          echo "Download the fuzz-artifacts-${{ matrix.fuzz_target }}-${{ github.sha }} artifact from this run."
-          echo "unzip fuzz-artifacts-${{ matrix.fuzz_target }}-${{ github.sha }}.zip -d /tmp/chio-fuzz-artifacts"
+          echo "Download the fuzz-artifacts-${FUZZ_TARGET}-${{ github.sha }} artifact from this run."
+          echo "unzip fuzz-artifacts-${FUZZ_TARGET}-${{ github.sha }}.zip -d /tmp/chio-fuzz-artifacts"
           echo "find /tmp/chio-fuzz-artifacts -type f -exec shasum -a 256 {} \\;"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz run ${{ matrix.fuzz_target }} /tmp/chio-fuzz-artifacts/<artifact> -- -runs=1"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz tmin ${{ matrix.fuzz_target }} /tmp/chio-fuzz-artifacts/<artifact>"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz cmin ${{ matrix.fuzz_target }} corpus/${{ matrix.fuzz_target }}"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz run ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/<artifact> -- -runs=1"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz tmin ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/<artifact>"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz cmin ${FUZZ_TARGET} corpus/${FUZZ_TARGET}"
 
       - name: Upload fuzz artifacts
         if: failure()
@@ -249,19 +251,21 @@ jobs:
 
       - name: Print repro command
         if: failure()
+        env:
+          FUZZ_TARGET: ${{ github.event.inputs.target }}
         run: |
-          echo "Download the fuzz-artifacts-${{ github.event.inputs.target }}-${{ github.sha }} artifact from this run."
-          echo "unzip fuzz-artifacts-${{ github.event.inputs.target }}-${{ github.sha }}.zip -d /tmp/chio-fuzz-artifacts"
+          echo "Download the fuzz-artifacts-manual-${{ github.sha }} artifact from this run."
+          echo "unzip fuzz-artifacts-manual-${{ github.sha }}.zip -d /tmp/chio-fuzz-artifacts"
           echo "find /tmp/chio-fuzz-artifacts -type f -exec shasum -a 256 {} \\;"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz run ${{ github.event.inputs.target }} /tmp/chio-fuzz-artifacts/<artifact> -- -runs=1"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz tmin ${{ github.event.inputs.target }} /tmp/chio-fuzz-artifacts/<artifact>"
-          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz cmin ${{ github.event.inputs.target }} corpus/${{ github.event.inputs.target }}"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz run ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/<artifact> -- -runs=1"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz tmin ${FUZZ_TARGET} /tmp/chio-fuzz-artifacts/<artifact>"
+          echo "cd fuzz && cargo +${RUST_NIGHTLY} fuzz cmin ${FUZZ_TARGET} corpus/${FUZZ_TARGET}"
 
       - name: Upload fuzz artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-artifacts-${{ github.event.inputs.target }}-${{ github.sha }}
-          path: fuzz/artifacts/${{ github.event.inputs.target }}
+          name: fuzz-artifacts-manual-${{ github.sha }}
+          path: fuzz/artifacts
           if-no-files-found: ignore
           retention-days: 30

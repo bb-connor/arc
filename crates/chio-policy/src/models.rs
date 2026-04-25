@@ -11,7 +11,7 @@ use chio_core::capability::{
 };
 use serde::{Deserialize, Serialize};
 
-const MAX_DOUBLE_QUOTED_WHITESPACE_RUN: usize = 64;
+const MAX_QUOTED_SCALAR_WHITESPACE_RUN: usize = 64;
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -134,7 +134,7 @@ impl HushSpec {
         }
         if has_libyml_flow_scalar_join_overflow_risk(yaml) {
             return Err(<serde_yml::Error as serde::de::Error>::custom(
-                "YAML contains an unsupported double-quoted scalar whitespace run",
+                "YAML contains an unsupported quoted scalar whitespace run",
             ));
         }
 
@@ -191,19 +191,44 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
 }
 
 fn has_libyml_flow_scalar_join_overflow_risk(input: &str) -> bool {
+    let mut in_single = false;
     let mut in_double = false;
     let mut escaped = false;
     let mut whitespace_run = 0usize;
 
     for line in input.lines() {
-        if !in_double && line.trim_start().starts_with('#') {
+        if !in_single && !in_double && line.trim_start().starts_with('#') {
             continue;
         }
 
-        for ch in line.chars() {
+        let mut chars = line.char_indices().peekable();
+        let mut previous_is_whitespace = false;
+        while let Some((index, ch)) = chars.next() {
+            if in_single {
+                if ch == '\'' {
+                    if matches!(chars.peek(), Some((_, '\''))) {
+                        let _ = chars.next();
+                        whitespace_run = 0;
+                    } else {
+                        in_single = false;
+                        whitespace_run = 0;
+                    }
+                } else if ch.is_ascii_whitespace() {
+                    whitespace_run += 1;
+                    if whitespace_run > MAX_QUOTED_SCALAR_WHITESPACE_RUN {
+                        return true;
+                    }
+                } else {
+                    whitespace_run = 0;
+                }
+                previous_is_whitespace = false;
+                continue;
+            }
+
             if escaped {
                 escaped = false;
                 whitespace_run = 0;
+                previous_is_whitespace = false;
                 continue;
             }
 
@@ -219,23 +244,48 @@ fn has_libyml_flow_scalar_join_overflow_risk(input: &str) -> bool {
                     }
                     ch if ch.is_ascii_whitespace() => {
                         whitespace_run += 1;
-                        if whitespace_run > MAX_DOUBLE_QUOTED_WHITESPACE_RUN {
+                        if whitespace_run > MAX_QUOTED_SCALAR_WHITESPACE_RUN {
                             return true;
                         }
                     }
-                    _ => whitespace_run = 0,
+                    _ => {
+                        whitespace_run = 0;
+                    }
                 }
+                previous_is_whitespace = false;
                 continue;
             }
 
-            if ch == '"' {
+            if ch == '#' && previous_is_whitespace {
+                break;
+            }
+            if ch == '\'' && quote_starts_yaml_scalar(line, index) {
+                in_single = true;
+                whitespace_run = 0;
+                previous_is_whitespace = false;
+                continue;
+            }
+            if ch == '"' && quote_starts_yaml_scalar(line, index) {
                 in_double = true;
                 whitespace_run = 0;
+                previous_is_whitespace = false;
+                continue;
             }
+            previous_is_whitespace = ch.is_ascii_whitespace();
         }
     }
 
     false
+}
+
+fn quote_starts_yaml_scalar(line: &str, quote_index: usize) -> bool {
+    let before_quote = line[..quote_index].trim_end();
+    let Some(previous) = before_quote.chars().last() else {
+        return true;
+    };
+
+    matches!(previous, ':' | '[' | '{' | ',')
+        || (previous == '-' && before_quote.trim_start() == "-")
 }
 
 fn leading_whitespace_len(input: &str) -> usize {
@@ -342,11 +392,8 @@ fn structural_mapping_colon_index(line: &str) -> Option<usize> {
         match ch {
             '\'' => in_single = true,
             '"' => in_double = true,
-            ':' => {
-                if colon_index.replace(index).is_some() {
-                    return None;
-                }
-            }
+            ':' if colon_index.replace(index).is_some() => return None,
+            ':' => {}
             _ => {}
         }
     }
@@ -1279,7 +1326,7 @@ mod tests {
 
     #[test]
     fn regression_fuzz_policy_parse_compile_e8a595c() {
-        let spaces = " ".repeat(MAX_DOUBLE_QUOTED_WHITESPACE_RUN + 1);
+        let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
         let input = format!(
             "hushspec: \"0.{spaces}1.0\"\n\
              name: base\n\n\
@@ -1291,6 +1338,50 @@ mod tests {
                  default: block\n\
                 (allow:\n\
                    - read_file\n"
+        );
+
+        assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
+    fn parse_allows_single_quoted_scalar_with_double_quote() {
+        let spaces = " ".repeat(8);
+        let input = format!(
+            "hushspec: \"0.1.0\"\n\
+             name: single-quoted-description\n\
+             description: 'prefix \"{spaces}suffix'\n"
+        );
+
+        assert!(!has_libyml_flow_scalar_join_overflow_risk(&input));
+        let spec = match HushSpec::parse(&input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("single quoted scalar should parse: {err}"),
+        };
+        let expected = format!("prefix \"{spaces}suffix");
+        assert_eq!(spec.description.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn single_quoted_whitespace_overflow_rejected_before_libyml() {
+        let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\n\
+             name: single-quoted-description\n\
+             description: 'prefix \"{spaces}suffix'\n"
+        );
+
+        assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
+    fn overflow_precheck_resumes_after_single_quoted_scalar() {
+        let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\n\
+             description: 'has \" inside'\n\
+             name: \"bad{spaces}name\"\n"
         );
 
         assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
