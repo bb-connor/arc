@@ -1,11 +1,9 @@
 # Chio C++ Conformance Peer
 
-This peer exercises the hosted MCP surface through `packages/sdk/chio-cpp` and a
-small command-backed curl transport used only by the peer. It currently covers
-the package-backed C++ surface: session initialization, tools, resources,
-prompts, task request helpers, and catalog notification forwarding. OAuth
-discovery, streaming subscriptions, and nested callbacks are reported as
-unsupported until the C++ SDK grows those flows.
+This peer exercises the hosted MCP surface through `packages/sdk/chio-cpp` and
+the SDK `CurlHttpTransport`. It covers the package-backed C++ hosted surface:
+session initialization, tools, resources, prompts, tasks, auth discovery,
+notifications, and nested callbacks.
 
 Build:
 

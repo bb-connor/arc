@@ -12,7 +12,7 @@ long-horizon C++ SDK completion effort.
   - `./scripts/check-chio-cpp-release.sh`
   - `cargo clippy -p chio-bindings-ffi -- -D warnings`
   - `cargo clippy -p chio-conformance -- -D warnings`
-  - C++ live conformance Wave 1 and Wave 2 through `--peer cpp`
+  - C++ live conformance MCP core and tasks through `--peer cpp`
 
 ## File Ownership
 
@@ -32,7 +32,8 @@ coordinator-only.
   Rust FFI unit tests, and FFI clippy.
 - SDK: C++ unit tests, CMake build with curl on/off, install plus
   `find_package`, release script, and typed/raw API agreement tests.
-- Conformance: live C++ Waves 1-5 before matrix entries become green.
+- Conformance: live C++ MCP core, tasks, auth, notifications, and nested
+  callbacks before matrix entries become green.
 - Packaging: Linux, macOS, and Windows CMake consumer smoke; Conan
   `test_package`; vcpkg build; sanitizer job.
 - Kernel: independent `chio-cpp-kernel` package build and tests; optional
@@ -41,33 +42,33 @@ coordinator-only.
 
 ## Status Tracking
 
-- Wave 0: complete. Baseline checkpoint and ownership table are recorded here.
-- Wave 1: complete. The FFI ABI exposes version/build-info calls, generated
+- Stage 0: complete. Baseline checkpoint and ownership table are recorded here.
+- Stage 1: complete. The FFI ABI exposes version/build-info calls, generated
   header freshness, symbol snapshots, and C smoke coverage.
-- Wave 2: complete. The SDK has private JSON parsing, richer errors,
+- Stage 2: complete. The SDK has private JSON parsing, richer errors,
   typed models, typed responses, and `Result<void>` helpers.
-- Wave 3: complete. `ClientBuilder`, curl transport hardening, retry, timeout,
+- Stage 3: complete. `ClientBuilder`, curl transport hardening, retry, timeout,
   cancellation, tracing, and test transports are implemented.
-- Wave 4: complete. C++ streaming requests and notification callbacks pass live
-  Wave 4 evidence.
-- Wave 5: complete. OAuth discovery, PKCE, token exchange, token providers, and
-  live Wave 3 evidence are implemented.
-- Wave 6: complete. Receipt/capability verifiers, DPoP builder abstractions,
+- Stage 4: complete. C++ streaming requests and notification callbacks pass live
+  notifications evidence.
+- Stage 5: complete. OAuth discovery, PKCE, token exchange, token providers, and
+  live auth evidence are implemented.
+- Stage 6: complete. Receipt/capability verifiers, DPoP builder abstractions,
   `ToolClient`, `SessionPool`, and HTTP substrate middleware are present.
-- Wave 7: complete locally. CMake install/export, Conan/vcpkg metadata, release
+- Stage 7: complete locally. CMake install/export, Conan/vcpkg metadata, release
   checks, sanitizer/leak CI lanes, and OS package smoke workflow are wired.
-- Wave 8: complete. `chio-guard-cpp` has a native package, WIT/WASI scripts,
+- Stage 8: complete. `chio-guard-cpp` has a native package, WIT/WASI scripts,
   path guard example, and native smoke script.
-- Wave 9: complete. `chio-cpp-kernel` is a separate package with independent
+- Stage 9: complete. `chio-cpp-kernel` is a separate package with independent
   CMake build, tests, install/export, example, and an optional Rust-backed
   `chio-cpp-kernel-ffi` path over `chio-kernel-core`.
 
 ## Current Evidence
 
 - `./scripts/check-chio-cpp.sh`
-- `cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture`
-- `cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture`
-- `cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture`
-- `cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture`
-- `cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture`
+- `cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture`
+- `cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture`
+- `cargo test -p chio-conformance --test auth_cpp_live -- --nocapture`
+- `cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture`
+- `cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture`
 - `./packages/sdk/chio-cpp-kernel/scripts/check-with-ffi.sh`
