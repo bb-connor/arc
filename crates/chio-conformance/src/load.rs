@@ -120,7 +120,7 @@ mod tests {
               "peerRoles": ["client_to_chio_server"],
               "deploymentModes": ["wrapped_stdio"],
               "requiredCapabilities": {"server": [], "client": []},
-              "tags": ["wave1"],
+              "tags": ["mcp-core"],
               "expected": "pass"
             }"#,
         )?;

@@ -631,7 +631,7 @@ func runScenario(
 	case "nested-sampling-create-message":
 		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "sampled_echo",
-			"arguments": map[string]any{"message": "wave5 sampling request"},
+			"arguments": map[string]any{"message": "nested callback sampling request"},
 		}, "nested/sampling/tool-call", func(ctx context.Context, message map[string]any) error {
 			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/sampling")
 			return err
@@ -653,7 +653,7 @@ func runScenario(
 	case "nested-elicitation-form-create":
 		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "elicited_echo",
-			"arguments": map[string]any{"message": "wave5 form elicitation request"},
+			"arguments": map[string]any{"message": "nested callback form elicitation request"},
 		}, "nested/elicitation-form/tool-call", func(ctx context.Context, message map[string]any) error {
 			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/elicitation-form")
 			return err
@@ -676,7 +676,7 @@ func runScenario(
 	case "nested-elicitation-url-create":
 		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "url_elicited_echo",
-			"arguments": map[string]any{"message": "wave5 url elicitation request"},
+			"arguments": map[string]any{"message": "nested callback url elicitation request"},
 		}, "nested/elicitation-url/tool-call", func(ctx context.Context, message map[string]any) error {
 			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/elicitation-url")
 			return err
@@ -706,7 +706,7 @@ func runScenario(
 	case "nested-roots-list":
 		response, terminal, err := requestResultWithHandler(ctx, chioSession, "tools/call", map[string]any{
 			"name":      "roots_echo",
-			"arguments": map[string]any{"message": "wave5 roots request"},
+			"arguments": map[string]any{"message": "nested callback roots request"},
 		}, "nested/roots/tool-call", func(ctx context.Context, message map[string]any) error {
 			_, err := nestedRouter.Handle(ctx, message, chioSession, "nested/roots")
 			return err

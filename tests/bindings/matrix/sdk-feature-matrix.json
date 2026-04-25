@@ -43,7 +43,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_go_live -- --nocapture"
           ]
         },
         "cpp": {
@@ -62,28 +62,28 @@
           "status": "conformance_green",
           "evidence": [
             "npm --prefix packages/sdk/chio-ts test",
-            "cargo test -p chio-conformance --test wave1_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_live -- --nocapture"
           ]
         },
         "py": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-py.sh",
-            "cargo test -p chio-conformance --test wave1_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_live -- --nocapture"
           ]
         },
         "go": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_go_live -- --nocapture"
           ]
         },
         "cpp": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture"
           ]
         }
       }
@@ -96,28 +96,28 @@
           "status": "conformance_green",
           "evidence": [
             "npm --prefix packages/sdk/chio-ts test",
-            "cargo test -p chio-conformance --test wave1_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_live -- --nocapture"
           ]
         },
         "py": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-py.sh",
-            "cargo test -p chio-conformance --test wave1_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_live -- --nocapture"
           ]
         },
         "go": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test mcp_core_go_live -- --nocapture"
           ]
         },
         "cpp": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture"
           ]
         }
       }
@@ -130,28 +130,28 @@
           "status": "conformance_green",
           "evidence": [
             "npm --prefix packages/sdk/chio-ts test",
-            "cargo test -p chio-conformance --test wave4_notifications_live -- --nocapture"
+            "cargo test -p chio-conformance --test notifications_live -- --nocapture"
           ]
         },
         "py": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-py.sh",
-            "cargo test -p chio-conformance --test wave4_notifications_live -- --nocapture"
+            "cargo test -p chio-conformance --test notifications_live -- --nocapture"
           ]
         },
         "go": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave4_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test notifications_go_live -- --nocapture"
           ]
         },
         "cpp": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture"
           ]
         }
       }
@@ -164,28 +164,28 @@
           "status": "conformance_green",
           "evidence": [
             "npm --prefix packages/sdk/chio-ts test",
-            "cargo test -p chio-conformance --test wave2_tasks_live -- --nocapture"
+            "cargo test -p chio-conformance --test tasks_live -- --nocapture"
           ]
         },
         "py": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-py.sh",
-            "cargo test -p chio-conformance --test wave2_tasks_live -- --nocapture"
+            "cargo test -p chio-conformance --test tasks_live -- --nocapture"
           ]
         },
         "go": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave2_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test tasks_go_live -- --nocapture"
           ]
         },
         "cpp": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture"
           ]
         }
       }
@@ -198,28 +198,28 @@
           "status": "conformance_green",
           "evidence": [
             "npm --prefix packages/sdk/chio-ts test",
-            "cargo test -p chio-conformance --test wave3_auth_live -- --nocapture"
+            "cargo test -p chio-conformance --test auth_live -- --nocapture"
           ]
         },
         "py": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-py.sh",
-            "cargo test -p chio-conformance --test wave3_auth_live -- --nocapture"
+            "cargo test -p chio-conformance --test auth_live -- --nocapture"
           ]
         },
         "go": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave3_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test auth_go_live -- --nocapture"
           ]
         },
         "cpp": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test auth_cpp_live -- --nocapture"
           ]
         }
       }
@@ -232,28 +232,28 @@
           "status": "conformance_green",
           "evidence": [
             "npm --prefix packages/sdk/chio-ts test",
-            "cargo test -p chio-conformance --test wave5_nested_flows_live -- --nocapture"
+            "cargo test -p chio-conformance --test nested_callbacks_live -- --nocapture"
           ]
         },
         "py": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-py.sh",
-            "cargo test -p chio-conformance --test wave5_nested_flows_live -- --nocapture"
+            "cargo test -p chio-conformance --test nested_callbacks_live -- --nocapture"
           ]
         },
         "go": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-go.sh",
-            "cargo test -p chio-conformance --test wave5_go_live -- --nocapture"
+            "cargo test -p chio-conformance --test nested_callbacks_go_live -- --nocapture"
           ]
         },
         "cpp": {
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture"
           ]
         }
       }

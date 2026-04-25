@@ -1,0 +1,17 @@
+{
+  "id": "nested-elicitation-url-create",
+  "title": "Round-trip URL-mode elicitation/create and completion through the remote HTTP edge",
+  "area": "nested_callbacks",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools"],
+    "client": ["elicitation"]
+  },
+  "tags": ["nested-callbacks", "elicitation", "url"],
+  "expected": "pass",
+  "timeoutMs": 10000
+}

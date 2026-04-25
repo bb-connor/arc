@@ -211,11 +211,11 @@ target-chain factory, and rollout environment explicitly.
 - `CARGO_INCREMENTAL=0 cargo test -p chio-core --lib generic_listing_search_rejects_reports_with_invalid_listing_signatures -- --nocapture`
 - `CARGO_INCREMENTAL=0 cargo test -p chio-core --lib non_local_activation_authority -- --nocapture`
 - `CARGO_INCREMENTAL=0 cargo test -p chio-cli --test certify certify_adversarial_multi_operator_open_market_preserves_visibility_without_trust -- --exact --nocapture`
-- `target/release-qualification/conformance/wave1/report.md`
-- `target/release-qualification/conformance/wave2/report.md`
-- `target/release-qualification/conformance/wave3/report.md`
-- `target/release-qualification/conformance/wave4/report.md`
-- `target/release-qualification/conformance/wave5/report.md`
+- `target/release-qualification/conformance/mcp-core/report.md`
+- `target/release-qualification/conformance/tasks/report.md`
+- `target/release-qualification/conformance/auth/report.md`
+- `target/release-qualification/conformance/notifications/report.md`
+- `target/release-qualification/conformance/nested-callbacks/report.md`
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 - `target/release-qualification/web3-runtime/artifact-manifest.json`
 - [CHIO_WEB3_READINESS_AUDIT.md](CHIO_WEB3_READINESS_AUDIT.md)

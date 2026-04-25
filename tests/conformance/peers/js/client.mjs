@@ -859,7 +859,7 @@ async function runScenario(scenario, args, authContext, session, transcript) {
             params: {
               name: "sampled_echo",
               arguments: {
-                message: "wave5 sampling request"
+                message: "nested callback sampling request"
               }
             }
           },
@@ -916,7 +916,7 @@ async function runScenario(scenario, args, authContext, session, transcript) {
             params: {
               name: "elicited_echo",
               arguments: {
-                message: "wave5 form elicitation request"
+                message: "nested callback form elicitation request"
               }
             }
           },
@@ -975,7 +975,7 @@ async function runScenario(scenario, args, authContext, session, transcript) {
             params: {
               name: "url_elicited_echo",
               arguments: {
-                message: "wave5 url elicitation request"
+                message: "nested callback url elicitation request"
               }
             }
           },
@@ -1040,7 +1040,7 @@ async function runScenario(scenario, args, authContext, session, transcript) {
             params: {
               name: "roots_echo",
               arguments: {
-                message: "wave5 roots request"
+                message: "nested callback roots request"
               }
             }
           },

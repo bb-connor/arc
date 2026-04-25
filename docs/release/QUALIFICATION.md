@@ -257,13 +257,13 @@ staged.
 
 The release-qualification script writes conformance evidence under:
 
-- `target/release-qualification/conformance/wave1/`
-- `target/release-qualification/conformance/wave2/`
-- `target/release-qualification/conformance/wave3/`
-- `target/release-qualification/conformance/wave4/`
-- `target/release-qualification/conformance/wave5/`
+- `target/release-qualification/conformance/mcp-core/`
+- `target/release-qualification/conformance/tasks/`
+- `target/release-qualification/conformance/auth/`
+- `target/release-qualification/conformance/notifications/`
+- `target/release-qualification/conformance/nested-callbacks/`
 
-Each wave directory contains:
+Each conformance area directory contains:
 
 - `results/` JSON result artifacts
 - `report.md` generated Markdown summary
@@ -359,7 +359,7 @@ The current launch package also consumes the same evidence set through
 | Chio now ships one reproducible web3 qualification lane, one deployment-promotion policy with explicit gas and latency budgets, and one focused readiness audit that keep local qualification, reviewed manifests, and external publication holds distinct | `scripts/qualify-web3-runtime.sh`, `scripts/qualify-web3-promotion.sh`, `docs/standards/CHIO_WEB3_DEPLOYMENT_POLICY.json`, `docs/release/CHIO_WEB3_READINESS_AUDIT.md`, and `docs/release/CHIO_WEB3_DEPLOYMENT_PROMOTION.md` | `./scripts/qualify-web3-runtime.sh && ./scripts/qualify-web3-promotion.sh && jq empty docs/standards/CHIO_WEB3_DEPLOYMENT_POLICY.json` |
 | Chio now ships one partner-visible full-ladder web3 proof package that lets reviewers trace contracts, oracle, anchor, settlement, interop, and ops evidence end to end while keeping remaining external dependencies explicit | `docs/standards/CHIO_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json`, `docs/release/CHIO_WEB3_PARTNER_PROOF.md`, and `docs/release/CHIO_WEB3_READINESS_AUDIT.md` | `jq empty docs/standards/CHIO_WEB3_EXTERNAL_QUALIFICATION_MATRIX.json && ./scripts/qualify-web3-runtime.sh` |
 | Hosted release qualification now executes the bounded web3 runtime, end-to-end settlement, ops-control, and promotion lanes and stages stable hosted web3 evidence paths alongside the existing release corpus | `.github/workflows/release-qualification.yml`, `scripts/stage-web3-release-artifacts.sh`, `target/release-qualification/web3-runtime/`, `target/release-qualification/web3-runtime/e2e/`, and `target/release-qualification/web3-runtime/ops/` | `bash -n scripts/stage-web3-release-artifacts.sh scripts/qualify-web3-runtime.sh scripts/qualify-web3-e2e.sh scripts/qualify-web3-ops-controls.sh scripts/qualify-web3-promotion.sh && rg -n 'Hosted web3 runtime qualification|Hosted web3 promotion qualification|Stage hosted web3 qualification artifacts|retention-days' .github/workflows/release-qualification.yml` |
-| Wrapped/runtime MCP compatibility remains truthful across live peer waves | live conformance results under `target/release-qualification/conformance/` | `./scripts/qualify-release.sh` |
+| Wrapped/runtime MCP compatibility remains truthful across live peer conformance areas | live conformance results under `target/release-qualification/conformance/` | `./scripts/qualify-release.sh` |
 
 Lean proof artifacts are informative, but they are not a release gate until the
 root-imported proof surface is aligned with the shipped runtime and free of

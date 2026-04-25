@@ -818,7 +818,7 @@ def run_scenario(
                     "method": "tools/call",
                     "params": {
                         "name": "sampled_echo",
-                        "arguments": {"message": "wave5 sampling request"},
+                        "arguments": {"message": "nested callback sampling request"},
                     },
                 },
                 session.session_id,
@@ -877,7 +877,7 @@ def run_scenario(
                     "method": "tools/call",
                     "params": {
                         "name": "elicited_echo",
-                        "arguments": {"message": "wave5 form elicitation request"},
+                        "arguments": {"message": "nested callback form elicitation request"},
                     },
                 },
                 session.session_id,
@@ -935,7 +935,7 @@ def run_scenario(
                     "method": "tools/call",
                     "params": {
                         "name": "url_elicited_echo",
-                        "arguments": {"message": "wave5 url elicitation request"},
+                        "arguments": {"message": "nested callback url elicitation request"},
                     },
                 },
                 session.session_id,
@@ -1012,7 +1012,7 @@ def run_scenario(
                     "method": "tools/call",
                     "params": {
                         "name": "roots_echo",
-                        "arguments": {"message": "wave5 roots request"},
+                        "arguments": {"message": "nested callback roots request"},
                     },
                 },
                 session.session_id,

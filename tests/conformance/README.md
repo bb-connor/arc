@@ -22,7 +22,7 @@ Rules:
 - peer assets should be minimal, explicit, and easy to reproduce in CI
 - Chio-specific trust assertions should be reported separately from MCP-core compatibility
 
-The first Wave 1 scenario set lives under `scenarios/wave1/`.
+The MCP core scenario set lives under `scenarios/mcp_core/`.
 
 Generate a sample Markdown matrix from the checked-in sample result artifact with:
 
@@ -33,7 +33,7 @@ cargo run -p chio-conformance --bin chio-conformance-report -- \
   --output /tmp/chio-compatibility-matrix.md
 ```
 
-Run the live Wave 1 remote HTTP harness with real JS and Python peers:
+Run the live MCP core remote HTTP harness with real JS and Python peers:
 
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner --
@@ -41,57 +41,57 @@ cargo run -p chio-conformance --bin chio-conformance-runner --
 
 By default that command:
 
-- boots `chio mcp serve-http` against `fixtures/wave1/mock_mcp_server.py`
+- boots `chio mcp serve-http` against `fixtures/mcp_core/mock_mcp_server.py`
 - runs the JS and Python client peers against the remote edge
-- writes JSON result artifacts under `tests/conformance/results/generated/wave1-live/`
-- writes a generated report to `tests/conformance/reports/generated/wave1-live.md`
+- writes JSON result artifacts under `tests/conformance/results/generated/mcp-core-live/`
+- writes a generated report to `tests/conformance/reports/generated/mcp-core-live.md`
 
-Wave 2 task scenarios live under `scenarios/wave2/`.
-Wave 3 auth scenarios live under `scenarios/wave3/`.
-Wave 4 notification scenarios live under `scenarios/wave4/`.
-Wave 5 nested-flow scenarios live under `scenarios/wave5/`.
+Task scenarios live under `scenarios/tasks/`.
+Auth scenarios live under `scenarios/auth/`.
+Notification scenarios live under `scenarios/notifications/`.
+Nested callback scenarios live under `scenarios/nested_callbacks/`.
 The native Chio conformance lane lives under `native/`.
 
 Current live status:
 
-- Wave 1 MCP Core remote HTTP matrix is green across the JS and Python peers
-- Wave 1 MCP Core remote HTTP lane is also green for the Go peer
-- Wave 2 task creation, `tasks/get`, and `tasks/result` are green across the JS and Python peers
-- Wave 2 `tasks/cancel` is green across the JS and Python peers for the remote HTTP wrapped-tool path
-- Wave 2 task creation, `tasks/get`, `tasks/result`, and `tasks/cancel` are also green for the Go peer
-- Wave 3 remote HTTP auth/discovery is green across the JS and Python peers, including protected-resource metadata, authorization-server metadata, auth-code initialization, token-exchange initialization, and unauthenticated `WWW-Authenticate` challenges
-- Wave 3 remote HTTP auth/discovery is also green for the Go peer, including protected-resource metadata, authorization-server metadata, auth-code initialization, token-exchange initialization, and unauthenticated `WWW-Authenticate` challenges
-- Wave 4 remote HTTP notifications/subscriptions are green across the JS and Python peers, including `resources/subscribe`, forwarded `notifications/resources/updated`, and forwarded resource/tool/prompt `list_changed` notifications
-- Wave 4 remote HTTP notifications/subscriptions are also green for the Go peer
-- Wave 5 remote HTTP nested flows are green across the JS and Python peers, including `sampling/createMessage`, form-mode `elicitation/create`, URL-mode `elicitation/create` plus `notifications/elicitation/complete`, and `roots/list`
-- Wave 5 remote HTTP nested flows are also green for the Go peer, including `sampling/createMessage`, form-mode `elicitation/create`, URL-mode `elicitation/create` plus `notifications/elicitation/complete`, and `roots/list`
+- MCP core remote HTTP matrix is green across the JS and Python peers
+- MCP core remote HTTP lane is also green for the Go peer
+- Task creation, `tasks/get`, and `tasks/result` are green across the JS and Python peers
+- `tasks/cancel` is green across the JS and Python peers for the remote HTTP wrapped-tool path
+- Task creation, `tasks/get`, `tasks/result`, and `tasks/cancel` are also green for the Go peer
+- Remote HTTP auth/discovery is green across the JS and Python peers, including protected-resource metadata, authorization-server metadata, auth-code initialization, token-exchange initialization, and unauthenticated `WWW-Authenticate` challenges
+- Remote HTTP auth/discovery is also green for the Go peer, including protected-resource metadata, authorization-server metadata, auth-code initialization, token-exchange initialization, and unauthenticated `WWW-Authenticate` challenges
+- Remote HTTP notifications/subscriptions are green across the JS and Python peers, including `resources/subscribe`, forwarded `notifications/resources/updated`, and forwarded resource/tool/prompt `list_changed` notifications
+- Remote HTTP notifications/subscriptions are also green for the Go peer
+- Remote HTTP nested callbacks are green across the JS and Python peers, including `sampling/createMessage`, form-mode `elicitation/create`, URL-mode `elicitation/create` plus `notifications/elicitation/complete`, and `roots/list`
+- Remote HTTP nested callbacks are also green for the Go peer, including `sampling/createMessage`, form-mode `elicitation/create`, URL-mode `elicitation/create` plus `notifications/elicitation/complete`, and `roots/list`
 
-Generate the Wave 3 auth matrix against the local OAuth-backed edge with:
+Generate the auth matrix against the local OAuth-backed edge with:
 
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner -- \
   --auth-mode oauth-local \
-  --scenarios-dir tests/conformance/scenarios/wave3 \
-  --results-dir tests/conformance/results/generated/wave3-auth \
-  --report-output tests/conformance/reports/generated/wave3-auth.md
+  --scenarios-dir tests/conformance/scenarios/auth \
+  --results-dir tests/conformance/results/generated/auth \
+  --report-output tests/conformance/reports/generated/auth.md
 ```
 
-Generate the Wave 4 notification matrix with:
+Generate the notification matrix with:
 
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner -- \
-  --scenarios-dir tests/conformance/scenarios/wave4 \
-  --results-dir tests/conformance/results/generated/wave4-notifications \
-  --report-output tests/conformance/reports/generated/wave4-notifications.md
+  --scenarios-dir tests/conformance/scenarios/notifications \
+  --results-dir tests/conformance/results/generated/notifications \
+  --report-output tests/conformance/reports/generated/notifications.md
 ```
 
-Generate the Wave 5 nested-flow matrix with:
+Generate the nested callback matrix with:
 
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner -- \
-  --scenarios-dir tests/conformance/scenarios/wave5 \
-  --results-dir tests/conformance/results/generated/wave5-nested-flows \
-  --report-output tests/conformance/reports/generated/wave5-nested-flows.md
+  --scenarios-dir tests/conformance/scenarios/nested_callbacks \
+  --results-dir tests/conformance/results/generated/nested-callbacks \
+  --report-output tests/conformance/reports/generated/nested-callbacks.md
 ```
 
 Run the Go live lanes with:
@@ -99,18 +99,18 @@ Run the Go live lanes with:
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner -- \
   --peer go \
-  --scenarios-dir tests/conformance/scenarios/wave1 \
-  --results-dir tests/conformance/results/generated/wave1-go-live \
-  --report-output tests/conformance/reports/generated/wave1-go-live.md
+  --scenarios-dir tests/conformance/scenarios/mcp_core \
+  --results-dir tests/conformance/results/generated/mcp-core-go-live \
+  --report-output tests/conformance/reports/generated/mcp-core-go-live.md
 ```
 
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner -- \
   --peer go \
   --auth-mode oauth-local \
-  --scenarios-dir tests/conformance/scenarios/wave3 \
-  --results-dir tests/conformance/results/generated/wave3-go-live \
-  --report-output tests/conformance/reports/generated/wave3-go-live.md
+  --scenarios-dir tests/conformance/scenarios/auth \
+  --results-dir tests/conformance/results/generated/auth-go-live \
+  --report-output tests/conformance/reports/generated/auth-go-live.md
 ```
 
 Run the C++ hosted MCP lane with:
@@ -118,14 +118,14 @@ Run the C++ hosted MCP lane with:
 ```bash
 cargo run -p chio-conformance --bin chio-conformance-runner -- \
   --peer cpp \
-  --scenarios-dir tests/conformance/scenarios/wave1 \
-  --results-dir tests/conformance/results/generated/wave1-cpp-live \
-  --report-output tests/conformance/reports/generated/wave1-cpp-live.md
+  --scenarios-dir tests/conformance/scenarios/mcp_core \
+  --results-dir tests/conformance/results/generated/mcp-core-cpp-live \
+  --report-output tests/conformance/reports/generated/mcp-core-cpp-live.md
 ```
 
-The C++ peer builds `packages/sdk/chio-cpp` and uses the system `curl` command
-for live HTTP. It reports unsupported results for OAuth discovery, streaming
-subscriptions, and nested callbacks until those SDK flows are implemented.
+The C++ peer builds `packages/sdk/chio-cpp` and uses the SDK curl transport for
+live HTTP. It should remain green across MCP core, tasks, auth, notifications,
+and nested callbacks.
 
 Run the dedicated native Chio lane with:
 

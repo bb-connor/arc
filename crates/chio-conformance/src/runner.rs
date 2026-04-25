@@ -103,12 +103,12 @@ pub fn default_repo_root() -> PathBuf {
 pub fn default_run_options() -> ConformanceRunOptions {
     let repo_root = default_repo_root();
     ConformanceRunOptions {
-        scenarios_dir: repo_root.join("tests/conformance/scenarios/wave1"),
-        results_dir: repo_root.join("tests/conformance/results/generated/wave1-live"),
-        report_output: repo_root.join("tests/conformance/reports/generated/wave1-live.md"),
-        policy_path: repo_root.join("tests/conformance/fixtures/wave1/policy.yaml"),
+        scenarios_dir: repo_root.join("tests/conformance/scenarios/mcp_core"),
+        results_dir: repo_root.join("tests/conformance/results/generated/mcp-core-live"),
+        report_output: repo_root.join("tests/conformance/reports/generated/mcp-core-live.md"),
+        policy_path: repo_root.join("tests/conformance/fixtures/mcp_core/policy.yaml"),
         upstream_server_script: repo_root
-            .join("tests/conformance/fixtures/wave1/mock_mcp_server.py"),
+            .join("tests/conformance/fixtures/mcp_core/mock_mcp_server.py"),
         auth_mode: ConformanceAuthMode::StaticBearer,
         auth_token: "conformance-token".to_string(),
         admin_token: "conformance-admin-token".to_string(),
@@ -240,7 +240,7 @@ fn spawn_remote_edge(
         .arg("--policy")
         .arg(&options.policy_path)
         .arg("--server-id")
-        .arg("conformance-wave1")
+        .arg("conformance-mcp-core")
         .arg("--server-name")
         .arg("Conformance Fixture")
         .arg("--server-version")
@@ -251,7 +251,7 @@ fn spawn_remote_edge(
     let public_base_url = format!("http://{listen}");
     let auth_server_seed_path = options.results_dir.join("artifacts/auth-server.seed");
     let mut command_description = format!(
-        "{} mcp serve-http --policy {} --server-id conformance-wave1 --listen {}",
+        "{} mcp serve-http --policy {} --server-id conformance-mcp-core --listen {}",
         chio_executable.display(),
         options.policy_path.display(),
         listen

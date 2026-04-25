@@ -88,7 +88,7 @@ pub fn scenario_passed(results_json: &str, scenario_id: &str) -> bool {
 }
 
 pub fn cpp_options(
-    wave: &str,
+    scenario_area: &str,
     auth_mode: ConformanceAuthMode,
 ) -> chio_conformance::ConformanceRunOptions {
     let mut options = default_run_options();
@@ -97,9 +97,10 @@ pub fn cpp_options(
     options.auth_mode = auth_mode;
     options.scenarios_dir = options
         .repo_root
-        .join(format!("tests/conformance/scenarios/{wave}"));
-    let run_dir = unique_run_dir(&format!("chio-conformance-{wave}-cpp"));
+        .join(format!("tests/conformance/scenarios/{scenario_area}"));
+    let artifact_slug = scenario_area.replace('_', "-");
+    let run_dir = unique_run_dir(&format!("chio-conformance-{artifact_slug}-cpp"));
     options.results_dir = run_dir.join("results");
-    options.report_output = run_dir.join(format!("reports/{wave}-cpp-live.md"));
+    options.report_output = run_dir.join(format!("reports/{artifact_slug}-cpp-live.md"));
     options
 }

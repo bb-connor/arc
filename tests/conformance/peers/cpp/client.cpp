@@ -854,7 +854,7 @@ Result run_scenario(const Scenario& scenario,
     bool saw_sampling = false;
     auto response = session.call_tool(
         "sampled_echo",
-        "{\"message\":\"wave5 sampling request\"}",
+        "{\"message\":\"nested callback sampling request\"}",
         [&](const chio::JsonMessage& message) {
           saw_sampling = saw_sampling || message.method == "sampling/createMessage";
           return router.bind(session)(message);
@@ -873,7 +873,7 @@ Result run_scenario(const Scenario& scenario,
     bool saw_elicitation = false;
     auto response = session.call_tool(
         "elicited_echo",
-        "{\"message\":\"wave5 form elicitation request\"}",
+        "{\"message\":\"nested callback form elicitation request\"}",
         [&](const chio::JsonMessage& message) {
           saw_elicitation = saw_elicitation || message.method == "elicitation/create";
           return router.bind(session)(message);
@@ -893,7 +893,7 @@ Result run_scenario(const Scenario& scenario,
     bool saw_elicitation = false;
     auto response = session.call_tool(
         "url_elicited_echo",
-        "{\"message\":\"wave5 url elicitation request\"}",
+        "{\"message\":\"nested callback url elicitation request\"}",
         [&](const chio::JsonMessage& message) {
           saw_elicitation = saw_elicitation || message.method == "elicitation/create";
           return router.bind(session)(message);
@@ -914,7 +914,7 @@ Result run_scenario(const Scenario& scenario,
     bool saw_roots = false;
     auto response = session.call_tool(
         "roots_echo",
-        "{\"message\":\"wave5 roots request\"}",
+        "{\"message\":\"nested callback roots request\"}",
         [&](const chio::JsonMessage& message) {
           saw_roots = saw_roots || message.method == "roots/list";
           return router.bind(session)(message);

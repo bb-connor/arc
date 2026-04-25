@@ -1,0 +1,17 @@
+{
+  "id": "tools-list",
+  "title": "List tools through the MCP edge",
+  "area": "tools",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["stdio", "streamable-http"],
+  "peerRoles": ["client_to_chio_server", "client_to_chio_server"],
+  "deploymentModes": ["wrapped_stdio", "remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools"],
+    "client": []
+  },
+  "tags": ["mcp-core", "tools"],
+  "expected": "pass",
+  "timeoutMs": 5000
+}

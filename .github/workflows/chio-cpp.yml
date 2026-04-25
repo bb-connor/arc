@@ -95,15 +95,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libcurl4-openssl-dev python3
-      - name: Run live C++ waves
+      - name: Run live C++ conformance areas
         env:
           CHIO_CPP_LIVE_CONFORMANCE: "1"
         run: |
-          cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test auth_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture
+          cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture
 
   hardening:
     name: Sanitizers and leaks

@@ -20,7 +20,7 @@ Run against a live Chio MCP edge:
 target/chio-cpp-peer/chio_cpp_conformance_peer \
   --base-url http://127.0.0.1:8080 \
   --auth-token conformance-token \
-  --scenarios-dir tests/conformance/scenarios/wave1 \
+  --scenarios-dir tests/conformance/scenarios/mcp_core \
   --results-output tests/conformance/results/generated/cpp-remote-http.json \
   --artifacts-dir tests/conformance/results/generated/artifacts/cpp
 ```
