@@ -4,6 +4,7 @@ This is the supported order for web backends in Chio:
 
 1. start with [`examples/hello-openapi-sidecar/`](../../examples/hello-openapi-sidecar/)
 2. move to [`examples/hello-fastapi/`](../../examples/hello-fastapi/) only if you specifically want app-level Python integration
+3. use [`examples/hello-drogon/`](../../examples/hello-drogon/) when you want the C++ Drogon middleware path
 
 That ordering is intentional.
 
@@ -12,10 +13,13 @@ That ordering is intentional.
   receipt behavior before adopting a framework SDK.
 - `hello-fastapi` is second because it adds `chio-asgi` and `chio-fastapi` on top
   of the same local sidecar model.
+- `hello-drogon` is a C++ follow-on that uses
+  `packages/sdk/chio-drogon` and `chio::drogon::ChioMiddleware`. Its local
+  scripts skip clearly when CMake or Drogon is not available.
 
 ## Shared Verification Flow
 
-Use the same proof loop for both examples:
+Use the same proof loop for these examples:
 
 1. start the app-only path with `./run.sh`
 2. run `./smoke.sh` for the full trust + sidecar flow
@@ -44,6 +48,14 @@ cd examples/hello-openapi-sidecar
 
 ```bash
 cd examples/hello-fastapi
+./run.sh
+./smoke.sh
+```
+
+### Drogon follow-on
+
+```bash
+cd examples/hello-drogon
 ./run.sh
 ./smoke.sh
 ```

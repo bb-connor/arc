@@ -61,18 +61,23 @@ Evaluator::Evaluator(std::string sidecar_url, HttpTransportPtr transport, std::u
       transport_(std::move(transport)),
       timeout_ms_(timeout_ms) {}
 
-Result<std::string> Evaluator::evaluate(const ChioHttpRequest& request) const {
+Result<std::string> Evaluator::evaluate(const ChioHttpRequest& request,
+                                        const std::string& capability_token) const {
   if (!transport_) {
     return Result<std::string>::failure(Error{ErrorCode::Transport, "missing HTTP transport"});
+  }
+  std::map<std::string, std::string> headers{
+      {"Content-Type", "application/json"},
+      {"Accept", "application/json"},
+      {"X-Chio-Timeout-Ms", std::to_string(timeout_ms_)},
+  };
+  if (!capability_token.empty()) {
+    headers["X-Chio-Capability"] = capability_token;
   }
   HttpRequest http_request{
       "POST",
       sidecar_url_ + "/chio/evaluate",
-      {
-          {"Content-Type", "application/json"},
-          {"Accept", "application/json"},
-          {"X-Chio-Timeout-Ms", std::to_string(timeout_ms_)},
-      },
+      std::move(headers),
       request.to_json(),
   };
   auto response = transport_->send(http_request);
@@ -151,19 +156,49 @@ EvaluateVerdict Middleware::evaluate_fail_closed(const ChioHttpRequest& request)
   EvaluateVerdict verdict;
   verdict.raw_json = response.value();
   auto parsed = detail::parse_json(response.value());
-  if (parsed) {
-    verdict.verdict = parsed->string_field("verdict");
-    verdict.reason = parsed->string_field("reason");
-    const auto* receipt = parsed->get("receipt");
-    if (receipt != nullptr) {
-      verdict.receipt_json = receipt->dump();
-    }
+  if (!parsed || !parsed->is_object()) {
+    verdict.verdict = "deny";
+    verdict.reason = "malformed evaluate response";
+    return verdict;
+  }
+  verdict.verdict = parsed->string_field("verdict");
+  verdict.reason = parsed->string_field("reason");
+  const auto* receipt = parsed->get("receipt");
+  if (receipt != nullptr) {
+    verdict.receipt_json = receipt->dump();
   }
   if (verdict.verdict.empty()) {
     verdict.verdict = "deny";
     verdict.reason = "missing verdict";
   }
   return verdict;
+}
+
+std::string receipt_id_from_verdict(const EvaluateVerdict& verdict) {
+  const auto parse_receipt_id = [](const std::string& raw_json) {
+    auto parsed = detail::parse_json(raw_json);
+    if (!parsed || !parsed->is_object()) {
+      return std::string{};
+    }
+    return parsed->string_field("id");
+  };
+
+  if (!verdict.receipt_json.empty()) {
+    const auto receipt_id = parse_receipt_id(verdict.receipt_json);
+    if (!receipt_id.empty()) {
+      return receipt_id;
+    }
+  }
+
+  auto parsed = detail::parse_json(verdict.raw_json);
+  if (!parsed || !parsed->is_object()) {
+    return {};
+  }
+  const auto* receipt = parsed->get("receipt");
+  if (receipt == nullptr) {
+    return {};
+  }
+  return parse_receipt_id(receipt->dump());
 }
 
 }  // namespace chio::http

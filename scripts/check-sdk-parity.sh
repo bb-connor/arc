@@ -80,6 +80,7 @@ EOF
 ./scripts/check-chio-py.sh
 ./scripts/check-chio-go.sh
 CHIO_CPP_REQUIRE_CBINDGEN="${CHIO_CPP_REQUIRE_CBINDGEN:-0}" ./scripts/check-chio-cpp.sh
+./scripts/check-chio-drogon.sh
 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture
 cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture
 cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture

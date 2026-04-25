@@ -118,6 +118,14 @@ void require_contains(const std::string& haystack,
   }
 }
 
+void require_no_header(const std::map<std::string, std::string>& headers,
+                       const std::string& name,
+                       const std::string& label) {
+  if (headers.find(name) != headers.end()) {
+    throw std::runtime_error(label + ": unexpected header [" + name + "]");
+  }
+}
+
 std::string initialize_ok_response_json(const std::string& protocol = "2025-11-25",
                                         const std::string& id_json = "1") {
   return "{\"jsonrpc\":\"2.0\",\"id\":" + id_json +
@@ -1097,6 +1105,7 @@ void test_feature_helpers_and_middleware() {
 void test_http_substrate_evaluator() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {}, "{\"verdict\":\"allow\",\"receipt\":{\"id\":\"r1\"}}"},
+      {200, {}, "{\"verdict\":\"allow\",\"receipt\":{\"id\":\"r2\"}}"},
       {200, {}, "{\"metadata\":{\"valid\":true},\"valid\":false}"},
       {200, {}, "{\"valid\":true}"},
       {503, {}, "{\"status\":\"degraded\"}"},
@@ -1107,7 +1116,11 @@ void test_http_substrate_evaluator() {
   request.method = "POST";
   request.route_pattern = "/v1/items";
   request.path = "/v1/items";
-  request.headers = {{"content-type", "application/json"}};
+  request.headers = {
+      {"authorization", "Bearer inbound-secret"},
+      {"content-type", "application/json"},
+      {"cookie", "session=inbound-secret"},
+  };
   request.caller.subject = "agent-1";
   request.caller.verified = true;
   request.body_hash =
@@ -1116,11 +1129,25 @@ void test_http_substrate_evaluator() {
   request.timestamp = 1700000000;
 
   chio::http::Evaluator evaluator("http://127.0.0.1:9090/", transport);
-  const auto verdict = evaluator.evaluate(request);
+  const auto verdict = evaluator.evaluate(request, "cap-token-1");
   require(verdict.ok(), verdict.error().message);
   require_contains(verdict.value(), "\"verdict\":\"allow\"", "evaluate body");
   require_contains(transport->requests[0].body, "\"body_hash\":", "evaluate request");
   require_contains(transport->requests[0].body, "\"caller\":", "evaluate request");
+  require_eq(transport->requests[0].headers["X-Chio-Capability"],
+             "cap-token-1",
+             "evaluate capability header");
+  require_no_header(transport->requests[0].headers, "Authorization", "evaluate headers");
+  require_no_header(transport->requests[0].headers, "authorization", "evaluate headers");
+  require_no_header(transport->requests[0].headers, "Cookie", "evaluate headers");
+  require_no_header(transport->requests[0].headers, "cookie", "evaluate headers");
+  require_no_header(transport->requests[0].headers, "X-Api-Key", "evaluate headers");
+
+  const auto default_capability = evaluator.evaluate(request);
+  require(default_capability.ok(), default_capability.error().message);
+  require_no_header(transport->requests[1].headers,
+                    "X-Chio-Capability",
+                    "default evaluate headers");
 
   const auto false_verified = evaluator.verify_receipt("{\"receipt\":{\"id\":\"r1\"}}");
   require(false_verified.ok(), false_verified.error().message);
@@ -1133,6 +1160,40 @@ void test_http_substrate_evaluator() {
   const auto health = evaluator.health();
   require(health.ok(), health.error().message);
   require_eq(health.value(), "{\"status\":\"degraded\"}", "health body");
+}
+
+void test_http_substrate_middleware_verdict_parsing() {
+  auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
+      {200, {}, "{\"verdict\":\"allow\",\"reason\":\"ok\",\"receipt\":{\"id\":\"receipt-42\"},\"evidence\":[]}"},
+      {200, {}, "{\"receipt\":{\"id\":\"missing-verdict-receipt\"},\"evidence\":[]}"},
+      {200, {}, "{not-json"},
+  });
+
+  chio::http::ChioHttpRequest request;
+  request.request_id = "req-verdict";
+  request.method = "GET";
+  request.path = "/guarded";
+
+  chio::http::Middleware middleware(
+      chio::http::Evaluator("http://127.0.0.1:9090/", transport));
+
+  const auto allow = middleware.evaluate_fail_closed(request);
+  require_eq(allow.verdict, "allow", "allow verdict");
+  require_eq(chio::http::receipt_id_from_verdict(allow),
+             "receipt-42",
+             "receipt id extraction");
+  require_contains(allow.receipt_json, "\"id\":\"receipt-42\"", "receipt json");
+
+  const auto missing = middleware.evaluate_fail_closed(request);
+  require_eq(missing.verdict, "deny", "missing verdict fail closed");
+  require_eq(missing.reason, "missing verdict", "missing verdict reason");
+
+  const auto malformed = middleware.evaluate_fail_closed(request);
+  require_eq(malformed.verdict, "deny", "malformed verdict fail closed");
+  require_eq(malformed.reason, "malformed evaluate response", "malformed verdict reason");
+  require_eq(chio::http::receipt_id_from_verdict(malformed),
+             "",
+             "malformed receipt id extraction");
 }
 
 }  // namespace
@@ -1156,6 +1217,7 @@ int main() {
     test_receipt_query_client();
     test_feature_helpers_and_middleware();
     test_http_substrate_evaluator();
+    test_http_substrate_middleware_verdict_parsing();
   } catch (const std::exception& error) {
     std::cerr << "chio_cpp_tests failed: " << error.what() << "\n";
     return 1;

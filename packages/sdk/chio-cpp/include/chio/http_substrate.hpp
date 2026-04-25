@@ -49,7 +49,8 @@ class Evaluator {
  public:
   Evaluator(std::string sidecar_url, HttpTransportPtr transport, std::uint32_t timeout_ms = 5000);
 
-  Result<std::string> evaluate(const ChioHttpRequest& request) const;
+  Result<std::string> evaluate(const ChioHttpRequest& request,
+                               const std::string& capability_token = "") const;
   Result<bool> verify_receipt(std::string receipt_json) const;
   Result<std::string> health() const;
 
@@ -68,5 +69,7 @@ class Middleware {
  private:
   Evaluator evaluator_;
 };
+
+std::string receipt_id_from_verdict(const EvaluateVerdict& verdict);
 
 }  // namespace chio::http
