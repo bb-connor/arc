@@ -2,10 +2,19 @@
 kotlin = "2.3.0"
 springBoot = "3.2.2"
 flink = "2.2.0"
+# Kafka connector tracks Flink runtime; the 2.0 suffix matches Flink 2.x.
+flinkKafkaConnector = "4.0.1-2.0"
 jackson = "2.17.2"
 junit = "5.11.4"
 spotless = "7.0.2"
 ktlint = "1.5.0"
+testcontainers = "1.21.4"
+# Match the Apache Kafka client version Flink 2.2's connector compiles against.
+kafkaClients = "3.7.1"
+slf4jSimple = "2.0.13"
+# Testcontainers' commons-compress dep needs commons-codec at runtime;
+# pinning here avoids surprise version drift between TC point releases.
+commonsCodec = "1.17.1"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -22,8 +31,17 @@ springBoot-starter-test = { module = "org.springframework.boot:spring-boot-start
 flink-streaming-java = { module = "org.apache.flink:flink-streaming-java", version.ref = "flink" }
 flink-clients = { module = "org.apache.flink:flink-clients", version.ref = "flink" }
 flink-test-utils = { module = "org.apache.flink:flink-test-utils", version.ref = "flink" }
+flink-connector-base = { module = "org.apache.flink:flink-connector-base", version.ref = "flink" }
+flink-connector-kafka = { module = "org.apache.flink:flink-connector-kafka", version.ref = "flinkKafkaConnector" }
 
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+testcontainers-redpanda = { module = "org.testcontainers:redpanda", version.ref = "testcontainers" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafkaClients" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
+commons-codec = { module = "commons-codec:commons-codec", version.ref = "commonsCodec" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

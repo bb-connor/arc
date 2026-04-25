@@ -126,6 +126,23 @@ drive a full allow + deny + sidecar-error scenario through a real
 MiniCluster; they are excluded from default `check` but runnable via
 `./gradlew :chio-streaming-flink:integrationTest`.
 
+## Integration testing
+
+`./gradlew :chio-streaming-flink:integrationTest` runs the end-to-end
+Kafka suite (`ChioFlinkKafkaIntegrationTest`): a Flink MiniCluster job
+with a real `KafkaSource` -> `ChioAsyncEvaluateFunction` ->
+`ChioVerdictSplitFunction` -> two `KafkaSink`s, against a Testcontainers-
+managed Redpanda broker (image `redpandadata/redpanda:v24.2.7`,
+matching `infra/streaming-flink-compose.yml`).
+
+The task is self-contained: only a running Docker daemon is required;
+no `docker compose up` step. It is deliberately NOT wired to `check`,
+so default CI (`./gradlew check`) skips it. The suite is the JVM
+counterpart to
+`sdks/python/chio-streaming/tests/integration/test_flink_kafka_integration.py`
+and asserts the same allow + deny envelope shapes are produced
+byte-for-byte across both languages.
+
 ## Status
 
 Version `0.1.0`, pre-1.0. Flink 2.2+ required. Wire formats track

@@ -7,6 +7,8 @@ import com.sun.net.httpserver.HttpServer
 import io.backbay.chio.sdk.ChioClient
 import io.backbay.chio.sdk.DlqRouter
 import org.apache.flink.api.common.RuntimeExecutionMode
+import org.apache.flink.api.common.typeinfo.TypeHint
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.datastream.AsyncDataStream
 import org.apache.flink.streaming.api.datastream.DataStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
@@ -61,7 +63,13 @@ class MiniClusterAsyncJobIT {
                     TimeUnit.SECONDS,
                     16,
                 )
-            val split = evaluated.process(ChioVerdictSplitFunction<Map<String, Any?>>())
+            // process() needs an explicit return type; Flink's type extractor
+            // cannot recover IN from EvaluationResult<IN> through the
+            // ProcessFunction's generic signature.
+            val split =
+                evaluated
+                    .process(ChioVerdictSplitFunction<Map<String, Any?>>())
+                    .returns(TypeInformation.of(object : TypeHint<Map<String, Any?>>() {}))
 
             val main = split.executeAndCollect("main").consume()
             val dlq = split.getSideOutput(ChioOutputTags.dlqTag()).executeAndCollect("dlq").consume()
