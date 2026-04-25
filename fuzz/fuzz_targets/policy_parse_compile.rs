@@ -104,15 +104,49 @@ fn is_exact_seed(data: &[u8], seeds: &[&[u8]]) -> bool {
     seeds.contains(&data)
 }
 
-fn exercise_yaml(yaml: &str, generated_by_harness: bool) {
+#[derive(Copy, Clone, Debug)]
+enum PolicyInputKind {
+    MutatedRaw,
+    ExactSeed,
+    Structured,
+}
+
+impl PolicyInputKind {
+    fn expects_valid(self) -> bool {
+        matches!(self, Self::ExactSeed | Self::Structured)
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::MutatedRaw => "mutated raw policy",
+            Self::ExactSeed => "exact seed policy",
+            Self::Structured => "structured policy",
+        }
+    }
+}
+
+fn exercise_yaml(yaml: &str, input_kind: PolicyInputKind) {
     let _ = chio_policy::is_hushspec_format(yaml);
 
-    let Ok(spec) = chio_policy::HushSpec::parse(yaml) else {
-        return;
+    let spec = match chio_policy::HushSpec::parse(yaml) {
+        Ok(spec) => spec,
+        Err(error) if input_kind.expects_valid() => {
+            panic!("{} should parse: {error}", input_kind.label())
+        }
+        Err(_error) => return,
     };
 
     let validation = chio_policy::validate(&spec);
     let compiled = chio_policy::compile_policy(&spec);
+
+    if input_kind.expects_valid() {
+        assert!(
+            validation.is_valid(),
+            "{} should validate: {:?}",
+            input_kind.label(),
+            validation.errors
+        );
+    }
 
     if validation.is_valid() {
         assert!(
@@ -147,34 +181,32 @@ fn exercise_yaml(yaml: &str, generated_by_harness: bool) {
             assert_eq!(compiled_summary(&compiled), compiled_summary(&recompiled));
         }
     }
-
-    if generated_by_harness {
-        assert!(
-            validation.is_valid(),
-            "structured policy should validate: {:?}",
-            validation.errors
-        );
-        match chio_policy::compile_policy(&spec) {
-            Ok(_compiled) => {}
-            Err(error) => panic!("structured policy should compile: {error}"),
-        }
-    }
 }
 
 fn exercise_generated(input: PolicyInput) {
-    if input.raw_yaml.len() <= MAX_RAW_BYTES && is_exact_seed(&input.raw_yaml, POLICY_SEEDS) {
-        exercise_raw(&input.raw_yaml);
-    }
+    exercise_raw(&input.raw_yaml);
 
     let generated = structured_yaml(&input.structured);
-    exercise_yaml(&generated, true);
+    exercise_yaml(&generated, PolicyInputKind::Structured);
 }
 
 fn exercise_raw(data: &[u8]) {
-    if data.len() <= MAX_RAW_BYTES && is_exact_seed(data, POLICY_SEEDS) {
-        if let Ok(raw) = std::str::from_utf8(data) {
-            exercise_yaml(raw, false);
+    if data.len() > MAX_RAW_BYTES {
+        return;
+    }
+
+    let input_kind = if is_exact_seed(data, POLICY_SEEDS) {
+        PolicyInputKind::ExactSeed
+    } else {
+        PolicyInputKind::MutatedRaw
+    };
+
+    match std::str::from_utf8(data) {
+        Ok(raw) => exercise_yaml(raw, input_kind),
+        Err(error) if input_kind.expects_valid() => {
+            panic!("{} should be UTF-8: {error}", input_kind.label())
         }
+        Err(_error) => {}
     }
 }
 
