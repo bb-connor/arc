@@ -608,15 +608,36 @@ async function main() {
 
     const operatorConfig = manifest.operator_configuration ?? {};
     const operatorLabel = operatorConfig.operator_ed_key_label ?? "chio-operator-ed25519-key";
-    const operatorAlreadyRegistered = await identityRegistry.isOperator(operatorConfig.operator_address);
+    const expectedEdKeyHash = labelHash(operatorLabel);
+    const expectedSettlementKey = ethers.getAddress(operatorConfig.operator_address);
+    const existingOperator = await identityRegistry.getOperator(operatorConfig.operator_address);
     let operatorTx = null;
-    if (!operatorAlreadyRegistered) {
+    if (existingOperator.active) {
+      // Active record on chain: verify the bound key material matches the
+      // reviewed manifest before treating registration as idempotent. If the
+      // edKeyHash or settlement key disagree, refuse rather than implicitly
+      // accept stale or unrelated identity bindings (which would later break
+      // root publication and other key-bound flows).
+      const onChainEdKeyHash = existingOperator.edKeyHash.toLowerCase();
+      const onChainSettlement = ethers.getAddress(existingOperator.settlementKey);
+      if (
+        onChainEdKeyHash !== expectedEdKeyHash.toLowerCase() ||
+        onChainSettlement !== expectedSettlementKey
+      ) {
+        throw new Error(
+          `operator ${operatorConfig.operator_address} is already registered with mismatched key material ` +
+            `(on-chain edKeyHash=${existingOperator.edKeyHash}, settlementKey=${onChainSettlement}; ` +
+            `manifest expects edKeyHash=${expectedEdKeyHash}, settlementKey=${expectedSettlementKey}). ` +
+            `Refusing to skip registerOperator.`
+        );
+      }
+    } else {
       operatorTx = await sendContractCall(
         identityRegistry,
         "registerOperator",
         [
           operatorConfig.operator_address,
-          labelHash(operatorLabel),
+          expectedEdKeyHash,
           operatorConfig.operator_address,
           ethers.toUtf8Bytes("deployment-runner:operator")
         ],
