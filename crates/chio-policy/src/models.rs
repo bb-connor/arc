@@ -146,7 +146,7 @@ impl HushSpec {
 }
 
 fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
-    let mut in_double = false;
+    let mut open_double_quote_indent: Option<usize> = None;
     let mut block_scalar_parent_indent: Option<usize> = None;
 
     for line in input.lines() {
@@ -159,25 +159,31 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
             block_scalar_parent_indent = None;
         }
 
-        if !in_double {
+        if open_double_quote_indent.is_none() {
             if let Some(parent_indent) = block_scalar_parent_indent_start(line) {
                 block_scalar_parent_indent = Some(parent_indent);
                 continue;
             }
         }
 
-        let scan_from = if in_double {
+        let scan_from = if let Some(open_indent) = open_double_quote_indent {
+            if trimmed.starts_with('#') && indent <= open_indent {
+                continue;
+            }
             0
         } else if let Some(start) = double_quoted_value_start(line) {
+            open_double_quote_indent = Some(indent);
             start + 1
         } else {
             continue;
         };
 
-        in_double = !double_quote_closes(&line[scan_from..]);
+        if double_quote_closes(&line[scan_from..]) {
+            open_double_quote_indent = None;
+        }
     }
 
-    in_double
+    open_double_quote_indent.is_some()
 }
 
 fn leading_whitespace_len(input: &str) -> usize {
@@ -233,7 +239,11 @@ fn double_quoted_value_start(line: &str) -> Option<usize> {
     let prefix = &line[..quote_index];
     let trimmed_prefix = prefix.trim();
 
-    if trimmed_prefix.is_empty() || trimmed_prefix == "-" {
+    if trimmed_prefix.is_empty() {
+        return None;
+    }
+
+    if trimmed_prefix == "-" {
         return Some(quote_index);
     }
 
@@ -1101,6 +1111,43 @@ mod tests {
             spec.description.as_deref(),
             Some("A valid plain scalar with a single \" character")
         );
+    }
+
+    #[test]
+    fn parse_allows_plain_scalar_continuation_starting_with_quote() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: multiline-description\n",
+            "description: first line\n",
+            "  \"second line\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("plain scalar continuation quote should parse: {err}"),
+        };
+        assert_eq!(
+            spec.description.as_deref(),
+            Some("first line \"second line")
+        );
+    }
+
+    #[test]
+    fn regression_fuzz_policy_parse_compile_67a1282() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: malformed-sequence-quote\n",
+            "rules:\n",
+            "  forbidden_paths:\n",
+            "    enabled: true\n",
+            "    patterns:\n",
+            "      - \"**.g. cents). Uncomment to rate-limit invocations or spend.\n",
+            "  # human_in_loop:\n",
+            "  #   require_confirmation: [\"write_*\", \"run_command\"]\n",
+        );
+
+        assert!(has_unclosed_double_quoted_value_scalar(input));
+        assert!(HushSpec::parse(input).is_err());
     }
 
     #[test]
