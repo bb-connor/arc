@@ -496,6 +496,7 @@ async function main() {
       const initCode = deployTx.data;
       const salt = toSalt(manifest.salt_namespace, contract.create2_salt);
       const plannedAddress = ethers.getCreate2Address(create2FactoryAddress, salt, ethers.keccak256(initCode));
+      const expectedDeployedBytecode = (artifact.deployedBytecode ?? "").toLowerCase();
       state.deploymentPlan.push({
         contract_id: contract.contract_id,
         artifact: contract.artifact,
@@ -505,7 +506,11 @@ async function main() {
         create2_salt: contract.create2_salt,
         create2_salt_hash: salt,
         planned_address: plannedAddress,
-        init_code: initCode
+        init_code: initCode,
+        expected_deployed_bytecode: expectedDeployedBytecode,
+        expected_deployed_bytecode_hash: expectedDeployedBytecode
+          ? ethers.keccak256(expectedDeployedBytecode.startsWith("0x") ? expectedDeployedBytecode : `0x${expectedDeployedBytecode}`)
+          : null
       });
 
       const placeholderKey = contract.contract_id.replace("chio.", "").replaceAll("-", "_");
@@ -521,10 +526,30 @@ async function main() {
     for (const plan of state.deploymentPlan) {
       const existingCode = await provider.getCode(plan.planned_address);
       if (existingCode && existingCode !== "0x") {
+        // Fail closed if on-chain bytecode does not match the reviewed
+        // artifact. CREATE2 binds the address to (factory, salt, init_code_hash),
+        // but historical metamorphic patterns and operational mistakes (stale
+        // out-of-band deployments) could leave unexpected code at the address.
+        // Compare against the artifact's deployedBytecode hash so the reviewed
+        // manifest's safety guarantee survives an "already_deployed" path.
+        if (!plan.expected_deployed_bytecode_hash) {
+          throw new Error(
+            `cannot verify already_deployed bytecode for ${plan.contract_id}: artifact ${plan.artifact} has no deployedBytecode`
+          );
+        }
+        const onChainHash = ethers.keccak256(existingCode);
+        if (onChainHash.toLowerCase() !== plan.expected_deployed_bytecode_hash.toLowerCase()) {
+          throw new Error(
+            `address ${plan.planned_address} for ${plan.contract_id} has unexpected on-chain bytecode ` +
+              `(expected runtime hash ${plan.expected_deployed_bytecode_hash}, on-chain hash ${onChainHash}). ` +
+              `Refusing to mark as already_deployed.`
+          );
+        }
         deploymentTransactions[plan.contract_id] = {
           tx_hash: null,
           gas_used: 0n,
-          status: "already_deployed"
+          status: "already_deployed",
+          verified_deployed_bytecode_hash: onChainHash
         };
         continue;
       }
@@ -545,7 +570,7 @@ async function main() {
     report.checks.push({
       id: "deployment.create2_rollout",
       outcome: "pass",
-      note: "Reviewed manifest deployed the full bounded contract family through CREATE2 and every actual address matched the planned address."
+      note: "Reviewed manifest deployed the full bounded contract family through CREATE2 and every actual address matched the planned address. Any address with pre-existing code was verified against the artifact's runtime bytecode hash before being marked already_deployed."
     });
 
     const deployedContracts = Object.fromEntries(
