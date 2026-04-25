@@ -250,6 +250,11 @@ fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
             if plain_scalar_text_has_join_overflow_risk(&line[..colon_index]) {
                 return true;
             }
+            if plain_scalar_text_has_join_overflow_risk(strip_inline_comment(
+                &line[colon_index + 1..],
+            )) {
+                return true;
+            }
         } else if plain_scalar_text_has_join_overflow_risk(trimmed) {
             return true;
         }
@@ -472,7 +477,6 @@ fn double_quoted_value_start(line: &str) -> Option<usize> {
 }
 
 fn structural_mapping_colon_index(line: &str) -> Option<usize> {
-    let mut colon_index = None;
     let mut in_single = false;
     let mut in_double = false;
     let mut escaped = false;
@@ -506,13 +510,21 @@ fn structural_mapping_colon_index(line: &str) -> Option<usize> {
         match ch {
             '\'' => in_single = true,
             '"' => in_double = true,
-            ':' if colon_index.replace(index).is_some() => return None,
-            ':' => {}
+            ':' if yaml_mapping_separator(chars.peek().map(|(_, next)| *next)) => {
+                return Some(index);
+            }
             _ => {}
         }
     }
 
-    colon_index
+    None
+}
+
+fn yaml_mapping_separator(next: Option<char>) -> bool {
+    match next {
+        Some(ch) => ch.is_whitespace(),
+        None => true,
+    }
 }
 
 fn double_quote_state_closes_on_line(line: &str, mut scan_from: usize) -> bool {
@@ -1486,12 +1498,32 @@ mod tests {
     }
 
     #[test]
+    fn parse_rejects_plain_root_url_before_libyml() {
+        let input = "https://example.com/policy\n";
+
+        assert!(has_non_mapping_document_start(input));
+        assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
     fn parse_rejects_plain_mapping_key_join_before_libyml() {
         let input = concat!("hushspec: \"0.1.0\"\n", "description      min_days: 30\n");
 
         assert!(!has_non_mapping_document_start(input));
         assert!(has_libyml_scalar_join_overflow_risk(input));
         assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn parse_rejects_plain_mapping_value_join_before_libyml() {
+        let spaces = " ".repeat(MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\nname: value-overflow\nrules:\n  shell_commands:\n    enabled: t{spaces}rue\n"
+        );
+
+        assert!(!has_non_mapping_document_start(&input));
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
     }
 
     #[test]
@@ -1508,6 +1540,22 @@ mod tests {
             Err(err) => panic!("document marker policy should parse: {err}"),
         };
         assert_eq!(spec.name.as_deref(), Some("document-marker-policy"));
+    }
+
+    #[test]
+    fn parse_allows_first_mapping_value_with_colon() {
+        let input = concat!(
+            "description: https://example.com/a:b\n",
+            "hushspec: \"0.1.0\"\n",
+            "name: url-first-policy\n",
+        );
+
+        assert!(!has_non_mapping_document_start(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("colon-containing mapping value should parse: {err}"),
+        };
+        assert_eq!(spec.description.as_deref(), Some("https://example.com/a:b"));
     }
 
     #[test]
