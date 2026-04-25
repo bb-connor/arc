@@ -261,6 +261,7 @@ fn strip_yaml_node_properties(mut candidate: &str) -> &str {
 
 fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
     let mut block_scalar_parent_indent: Option<usize> = None;
+    let mut plain_value_parent_indent: Option<usize> = None;
 
     for line in input.lines() {
         let indent = leading_whitespace_len(line);
@@ -275,18 +276,29 @@ fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
+        if plain_value_parent_indent.is_some_and(|parent_indent| indent <= parent_indent) {
+            plain_value_parent_indent = None;
+        }
         if let Some(parent_indent) = block_scalar_parent_indent_start(line) {
             block_scalar_parent_indent = Some(parent_indent);
+            plain_value_parent_indent = None;
             continue;
         }
 
         if let Some(colon_index) = structural_mapping_colon_index(line) {
+            plain_value_parent_indent = None;
             if plain_scalar_text_has_join_overflow_risk(&line[..colon_index]) {
                 return true;
             }
-            if plain_scalar_value_has_join_overflow_risk(strip_inline_comment(
-                &line[colon_index + 1..],
-            )) {
+            let plain_value = strip_inline_comment(&line[colon_index + 1..]);
+            if plain_scalar_value_has_join_overflow_risk(plain_value) {
+                return true;
+            }
+            if plain_scalar_can_continue(plain_value) {
+                plain_value_parent_indent = Some(indent);
+            }
+        } else if plain_value_parent_indent.is_some_and(|parent_indent| indent > parent_indent) {
+            if plain_scalar_value_has_join_overflow_risk(trimmed) {
                 return true;
             }
         } else if plain_scalar_text_has_join_overflow_risk(trimmed) {
@@ -313,17 +325,21 @@ fn plain_scalar_value_has_join_overflow_risk(input: &str) -> bool {
 
 fn plain_scalar_text_has_join_overflow_risk_with_limit(input: &str, minimum_run: usize) -> bool {
     let trimmed = input.trim();
-    if trimmed.is_empty()
-        || trimmed.starts_with('"')
-        || trimmed.starts_with('\'')
-        || trimmed.starts_with('[')
-        || trimmed.starts_with('{')
-        || trimmed.starts_with('-')
-    {
+    if !plain_scalar_can_continue(trimmed) {
         return false;
     }
 
     has_ascii_whitespace_run(trimmed, minimum_run)
+}
+
+fn plain_scalar_can_continue(input: &str) -> bool {
+    let trimmed = input.trim();
+    !trimmed.is_empty()
+        && !trimmed.starts_with('"')
+        && !trimmed.starts_with('\'')
+        && !trimmed.starts_with('[')
+        && !trimmed.starts_with('{')
+        && !trimmed.starts_with('-')
 }
 
 fn has_ascii_whitespace_run(input: &str, minimum_run: usize) -> bool {
@@ -1580,6 +1596,39 @@ mod tests {
             Err(err) => panic!("plain spaced value should parse: {err}"),
         };
         assert_eq!(spec.description.as_deref(), Some("hello      world"));
+    }
+
+    #[test]
+    fn parse_allows_plain_mapping_value_continuation_with_normal_spacing() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: multiline-spaced-description\n",
+            "description: first line\n",
+            "  second      line\n",
+        );
+
+        assert!(!has_libyml_scalar_join_overflow_risk(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("plain spaced value continuation should parse: {err}"),
+        };
+        assert_eq!(
+            spec.description.as_deref(),
+            Some("first line second      line")
+        );
+    }
+
+    #[test]
+    fn parse_rejects_plain_mapping_value_continuation_join_before_libyml() {
+        let spaces = " ".repeat(MAX_PLAIN_SCALAR_VALUE_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\nname: value-overflow\n\
+             description: first line\n  second{spaces}line\n"
+        );
+
+        assert!(!has_non_mapping_document_start(&input));
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
     }
 
     #[test]
