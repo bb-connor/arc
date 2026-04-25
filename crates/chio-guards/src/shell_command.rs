@@ -289,7 +289,7 @@ fn is_short_rm_recursive_flag(token: &str) -> bool {
 }
 
 fn is_shell_separator(token: &str) -> bool {
-    matches!(token, ";" | "|" | "||" | "&" | "&&")
+    matches!(token, ";" | "|" | "||" | "&" | "&&" | "\n" | "\r")
 }
 
 fn shlex_split_best_effort(input: &str) -> Vec<String> {
@@ -324,14 +324,22 @@ fn shlex_split_best_effort(input: &str) -> Vec<String> {
         match c {
             '\'' => in_single = true,
             '"' => in_double = true,
-            ';' | '|' | '&' => {
+            '\n' | '\r' | ';' | '|' | '&' => {
                 if !cur.is_empty() {
                     tokens.push(cur.clone());
                     cur.clear();
                 }
-                if matches!(chars.peek(), Some(next) if *next == c && (c == '|' || c == '&')) {
+                if c == '\r' && matches!(chars.peek(), Some('\n')) {
+                    let _ = chars.next();
+                    tokens.push("\n".to_string());
+                } else if matches!(chars.peek(), Some(next) if *next == c && (c == '|' || c == '&'))
+                {
                     let _ = chars.next();
                     tokens.push(format!("{c}{c}"));
+                } else if c == '\r' {
+                    tokens.push("\r".to_string());
+                } else if c == '\n' {
+                    tokens.push("\n".to_string());
                 } else {
                     tokens.push(c.to_string());
                 }
@@ -479,6 +487,9 @@ mod tests {
         assert!(guard.is_forbidden("command rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok; rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok;rm -r'f' /"));
+        assert!(guard.is_forbidden("echo ok\nrm -r'f' /"));
+        assert!(guard.is_forbidden("echo ok\rrm -r'f' /"));
+        assert!(guard.is_forbidden("echo ok\r\nrm -r'f' /"));
     }
 
     #[test]

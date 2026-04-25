@@ -11,6 +11,8 @@ use chio_core::capability::{
 };
 use serde::{Deserialize, Serialize};
 
+const MAX_DOUBLE_QUOTED_WHITESPACE_RUN: usize = 64;
+
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
@@ -130,6 +132,11 @@ impl HushSpec {
                 "YAML contains an unterminated double-quoted scalar",
             ));
         }
+        if has_libyml_flow_scalar_join_overflow_risk(yaml) {
+            return Err(<serde_yml::Error as serde::de::Error>::custom(
+                "YAML contains an unsupported double-quoted scalar whitespace run",
+            ));
+        }
 
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| serde_yml::from_str(yaml)))
             .unwrap_or_else(|_| {
@@ -181,6 +188,54 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
     }
 
     open_double_quote_indent.is_some()
+}
+
+fn has_libyml_flow_scalar_join_overflow_risk(input: &str) -> bool {
+    let mut in_double = false;
+    let mut escaped = false;
+    let mut whitespace_run = 0usize;
+
+    for line in input.lines() {
+        if !in_double && line.trim_start().starts_with('#') {
+            continue;
+        }
+
+        for ch in line.chars() {
+            if escaped {
+                escaped = false;
+                whitespace_run = 0;
+                continue;
+            }
+
+            if in_double {
+                match ch {
+                    '\\' => {
+                        escaped = true;
+                        whitespace_run = 0;
+                    }
+                    '"' => {
+                        in_double = false;
+                        whitespace_run = 0;
+                    }
+                    ch if ch.is_ascii_whitespace() => {
+                        whitespace_run += 1;
+                        if whitespace_run > MAX_DOUBLE_QUOTED_WHITESPACE_RUN {
+                            return true;
+                        }
+                    }
+                    _ => whitespace_run = 0,
+                }
+                continue;
+            }
+
+            if ch == '"' {
+                in_double = true;
+                whitespace_run = 0;
+            }
+        }
+    }
+
+    false
 }
 
 fn leading_whitespace_len(input: &str) -> usize {
@@ -331,7 +386,7 @@ fn first_unescaped_double_quote(input: &str) -> Option<usize> {
 }
 
 fn strip_inline_comment(input: &str) -> &str {
-    let mut previous_is_whitespace = true;
+    let mut previous_is_whitespace = false;
     for (index, ch) in input.char_indices() {
         if ch == '#' && previous_is_whitespace {
             return &input[..index];
@@ -1223,6 +1278,26 @@ mod tests {
     }
 
     #[test]
+    fn regression_fuzz_policy_parse_compile_e8a595c() {
+        let spaces = " ".repeat(MAX_DOUBLE_QUOTED_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.{spaces}1.0\"\n\
+             name: base\n\n\
+             rules:\n\
+               shell_commands:\n\
+                 enabled: true\n\
+               tool_access:\n\
+                 enabled: true\n\
+                 default: block\n\
+                (allow:\n\
+                   - read_file\n"
+        );
+
+        assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
     fn parse_allows_multiline_quoted_scalar_comment_content() {
         let input = concat!(
             "hushspec: \"0.1.0\"\n",
@@ -1250,6 +1325,9 @@ mod tests {
         assert!(HushSpec::parse(input).is_err());
         assert!(!has_unclosed_double_quoted_value_scalar(
             "description: \"closed\" # \"comment text\n"
+        ));
+        assert!(has_unclosed_double_quoted_value_scalar(
+            "description: \"closed\"#\"unclosed\n"
         ));
     }
 
