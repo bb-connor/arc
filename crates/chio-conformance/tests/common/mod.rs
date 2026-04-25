@@ -40,6 +40,26 @@ pub fn python3_supports_chio_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
+pub fn skip_cpp_live_conformance_unless_enabled() -> bool {
+    let enabled = std::env::var("CHIO_CPP_LIVE_CONFORMANCE")
+        .map(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            !normalized.is_empty()
+                && normalized != "0"
+                && normalized != "false"
+                && normalized != "no"
+        })
+        .unwrap_or(false);
+    if enabled {
+        return false;
+    }
+
+    eprintln!(
+        "skipping C++ live conformance; set CHIO_CPP_LIVE_CONFORMANCE=1 to run the libcurl-backed peer"
+    );
+    true
+}
+
 pub fn ensure_chio_binary(repo_root: &Path) {
     let chio_binary = repo_root.join("target/debug/chio");
     if chio_binary.exists() {

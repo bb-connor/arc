@@ -48,6 +48,12 @@ std::string result_json(const EvaluateResult& result) {
   out << ",\"reason\":\"" << detail::escape_json(result.reason) << "\"";
   out << ",\"error_code\":\"" << detail::escape_json(result.error_code) << "\"";
   out << ",\"error_message\":\"" << detail::escape_json(result.error_message) << "\"";
+  if (result.matched_grant_index.has_value()) {
+    out << ",\"matched_grant_index\":" << *result.matched_grant_index;
+  }
+  if (!result.raw_result_json.empty()) {
+    out << ",\"raw_result_json\":\"" << detail::escape_json(result.raw_result_json) << "\"";
+  }
   out << "}";
   return out.str();
 }
@@ -91,6 +97,8 @@ EvaluateResult from_ffi_result(const ChioKernelFfiResult& ffi_result) {
     result.ok = true;
     result.verdict = detail::json_string_field(body, "verdict").value_or("deny");
     result.reason = detail::json_string_field(body, "reason").value_or("");
+    result.matched_grant_index = detail::json_uint_field(body, "matched_grant_index");
+    result.raw_result_json = body;
     result.result_json = result_json(result);
     return result;
   }

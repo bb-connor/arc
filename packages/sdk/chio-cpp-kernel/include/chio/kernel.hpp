@@ -27,6 +27,8 @@ struct EvaluateResult {
   std::string reason;
   std::string error_code;
   std::string error_message;
+  std::optional<std::uint64_t> matched_grant_index;
+  std::string raw_result_json;
   std::string result_json;
 };
 

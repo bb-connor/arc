@@ -67,6 +67,23 @@ int main() {
     assert(!chio::kernel::detail::json_string_field(
         "{\"verdict\":tru e,\"reason\":\"wrong\"}", "verdict"));
 
+    auto matched_grant_index = chio::kernel::detail::json_uint_field(
+        "{\"verdict\":\"allow\",\"matched_grant_index\":0}", "matched_grant_index");
+    assert(matched_grant_index.has_value());
+    assert(*matched_grant_index == 0);
+    auto later_uint_match = chio::kernel::detail::json_uint_field(
+        "{\"matched_grant_index\":\"bad\",\"matched_grant_index\":42}", "matched_grant_index");
+    assert(later_uint_match.has_value());
+    assert(*later_uint_match == 42);
+    assert(!chio::kernel::detail::json_uint_field(
+        "{\"matched_grant_index\":-1}", "matched_grant_index"));
+    assert(!chio::kernel::detail::json_uint_field(
+        "{\"matched_grant_index\":1.0}", "matched_grant_index"));
+    assert(!chio::kernel::detail::json_uint_field(
+        "{\"matched_grant_index\":01}", "matched_grant_index"));
+    assert(!chio::kernel::detail::json_uint_field(
+        "{\"matched_grant_index\":18446744073709551616}", "matched_grant_index"));
+
     std::size_t number_pos = 0;
     assert(!chio::kernel::detail::skip_json_number("-", number_pos));
     assert(number_pos == 0);

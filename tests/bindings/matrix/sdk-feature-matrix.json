@@ -83,7 +83,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
           ]
         }
       }
@@ -117,7 +117,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
           ]
         }
       }
@@ -151,7 +151,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture"
           ]
         }
       }
@@ -185,7 +185,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture"
           ]
         }
       }
@@ -219,7 +219,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture"
           ]
         }
       }
@@ -253,7 +253,7 @@
           "status": "conformance_green",
           "evidence": [
             "./scripts/check-chio-cpp.sh",
-            "cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture"
+            "CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture"
           ]
         }
       }

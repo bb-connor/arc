@@ -6,6 +6,10 @@ use chio_conformance::{run_conformance_harness, ConformanceAuthMode};
 
 #[test]
 fn wave2_tasks_harness_runs_against_live_cpp_peer() {
+    if common::skip_cpp_live_conformance_unless_enabled() {
+        return;
+    }
+
     if !common::command_available("cmake") || !common::python3_supports_chio_sdk() {
         return;
     }

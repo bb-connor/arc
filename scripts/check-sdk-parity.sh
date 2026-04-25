@@ -81,11 +81,11 @@ EOF
 ./scripts/check-chio-go.sh
 CHIO_CPP_REQUIRE_CBINDGEN="${CHIO_CPP_REQUIRE_CBINDGEN:-0}" ./scripts/check-chio-cpp.sh
 ./scripts/check-chio-drogon.sh
-cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture
-cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture
-cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture
-cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture
-cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture
 
 echo "Python live parity is package-backed for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"
@@ -93,11 +93,11 @@ echo "Go live parity is conformance-green for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"
 echo "C++ parity is conformance-green for hosted MCP waves 1-5 plus package-backed for invariant helpers, DPoP proofs, receipt queries, and HTTP substrate helpers:"
 echo "  ./scripts/check-chio-cpp.sh"
-echo "  cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture"
-echo "  cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave1_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave2_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave3_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave4_cpp_live -- --nocapture"
+echo "  CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test wave5_cpp_live -- --nocapture"
 echo "Current live evidence runs through these lanes:"
 echo "  cargo test -p chio-conformance --test wave1_go_live -- --nocapture"
 echo "  cargo test -p chio-conformance --test wave2_go_live -- --nocapture"

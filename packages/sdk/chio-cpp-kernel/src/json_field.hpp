@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -256,6 +257,41 @@ inline bool skip_json_number(std::string_view input, std::size_t& pos) {
   return pos > start;
 }
 
+inline std::optional<std::uint64_t> parse_json_uint(std::string_view input,
+                                                    std::size_t& pos) {
+  std::size_t cursor = pos;
+  if (cursor >= input.size() ||
+      !std::isdigit(static_cast<unsigned char>(input[cursor]))) {
+    return std::nullopt;
+  }
+
+  std::uint64_t value = 0;
+  if (input[cursor] == '0') {
+    ++cursor;
+    if (cursor < input.size() && std::isdigit(static_cast<unsigned char>(input[cursor]))) {
+      return std::nullopt;
+    }
+  } else {
+    while (cursor < input.size() &&
+           std::isdigit(static_cast<unsigned char>(input[cursor]))) {
+      const auto digit = static_cast<std::uint64_t>(input[cursor] - '0');
+      if (value > (std::numeric_limits<std::uint64_t>::max() - digit) / 10U) {
+        return std::nullopt;
+      }
+      value = value * 10U + digit;
+      ++cursor;
+    }
+  }
+
+  if (cursor < input.size() &&
+      (input[cursor] == '.' || input[cursor] == 'e' || input[cursor] == 'E')) {
+    return std::nullopt;
+  }
+
+  pos = cursor;
+  return value;
+}
+
 inline bool skip_json_array(std::string_view input, std::size_t& pos) {
   if (pos >= input.size() || input[pos] != '[') {
     return false;
@@ -384,6 +420,68 @@ inline std::optional<std::string> json_string_field(const std::string& json,
           return std::nullopt;
         }
         found = std::move(value);
+        skip_ws(input, pos);
+        if (pos < input.size() && input[pos] != ',' && input[pos] != '}') {
+          return std::nullopt;
+        }
+      } else if (!skip_json_value(input, pos)) {
+        return std::nullopt;
+      }
+    } else if (!skip_json_value(input, pos)) {
+      return std::nullopt;
+    }
+    skip_ws(input, pos);
+    if (pos < input.size() && input[pos] == '}') {
+      ++pos;
+      skip_ws(input, pos);
+      return pos == input.size() ? found : std::nullopt;
+    }
+    if (pos >= input.size() || input[pos] != ',') {
+      return std::nullopt;
+    }
+    ++pos;
+    skip_ws(input, pos);
+  }
+
+  return std::nullopt;
+}
+
+inline std::optional<std::uint64_t> json_uint_field(const std::string& json,
+                                                   std::string_view key) {
+  std::string_view input(json);
+  std::size_t pos = 0;
+  std::optional<std::uint64_t> found;
+  skip_ws(input, pos);
+  if (pos >= input.size() || input[pos] != '{') {
+    return std::nullopt;
+  }
+  ++pos;
+
+  skip_ws(input, pos);
+  if (pos < input.size() && input[pos] == '}') {
+    ++pos;
+    skip_ws(input, pos);
+    return pos == input.size() ? found : std::nullopt;
+  }
+
+  while (pos < input.size()) {
+    auto parsed_key = parse_json_string(input, pos);
+    if (!parsed_key.has_value()) {
+      return std::nullopt;
+    }
+    skip_ws(input, pos);
+    if (pos >= input.size() || input[pos] != ':') {
+      return std::nullopt;
+    }
+    ++pos;
+    skip_ws(input, pos);
+
+    if (*parsed_key == key) {
+      std::size_t value_pos = pos;
+      auto value = parse_json_uint(input, value_pos);
+      if (value.has_value()) {
+        found = *value;
+        pos = value_pos;
         skip_ws(input, pos);
         if (pos < input.size() && input[pos] != ',' && input[pos] != '}') {
           return std::nullopt;
