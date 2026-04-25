@@ -12,6 +12,7 @@ use chio_core::capability::{
 use serde::{Deserialize, Serialize};
 
 const MAX_QUOTED_SCALAR_WHITESPACE_RUN: usize = 64;
+const MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN: usize = 5;
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -127,14 +128,19 @@ pub struct HushSpec {
 impl HushSpec {
     /// Parse a HushSpec document from a YAML string.
     pub fn parse(yaml: &str) -> Result<Self, serde_yml::Error> {
+        if has_non_mapping_document_start(yaml) {
+            return Err(<serde_yml::Error as serde::de::Error>::custom(
+                "YAML policy must start with a mapping",
+            ));
+        }
         if has_unclosed_double_quoted_value_scalar(yaml) {
             return Err(<serde_yml::Error as serde::de::Error>::custom(
                 "YAML contains an unterminated double-quoted scalar",
             ));
         }
-        if has_libyml_flow_scalar_join_overflow_risk(yaml) {
+        if has_libyml_scalar_join_overflow_risk(yaml) {
             return Err(<serde_yml::Error as serde::de::Error>::custom(
-                "YAML contains an unsupported quoted scalar whitespace run",
+                "YAML contains an unsupported scalar whitespace run",
             ));
         }
 
@@ -150,6 +156,30 @@ impl HushSpec {
     pub fn to_yaml(&self) -> Result<String, serde_yml::Error> {
         serde_yml::to_string(self)
     }
+}
+
+fn has_non_mapping_document_start(input: &str) -> bool {
+    for line in input.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with('%') {
+            continue;
+        }
+        if trimmed == "---" || trimmed == "..." {
+            continue;
+        }
+
+        let document_start = trimmed.strip_prefix("---").map(str::trim_start);
+        let candidate = strip_inline_comment(document_start.unwrap_or(trimmed)).trim();
+        if candidate.is_empty() || candidate.starts_with('#') {
+            continue;
+        }
+        if candidate.starts_with('{') || structural_mapping_colon_index(candidate).is_some() {
+            return false;
+        }
+        return true;
+    }
+
+    false
 }
 
 fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
@@ -190,7 +220,75 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
     open_double_quote_indent.is_some()
 }
 
-fn has_libyml_flow_scalar_join_overflow_risk(input: &str) -> bool {
+fn has_libyml_scalar_join_overflow_risk(input: &str) -> bool {
+    has_libyml_plain_scalar_join_overflow_risk(input)
+        || has_libyml_quoted_scalar_join_overflow_risk(input)
+}
+
+fn has_libyml_plain_scalar_join_overflow_risk(input: &str) -> bool {
+    let mut block_scalar_parent_indent: Option<usize> = None;
+
+    for line in input.lines() {
+        let indent = leading_whitespace_len(line);
+        let trimmed = line.trim_start();
+        if let Some(parent_indent) = block_scalar_parent_indent {
+            if trimmed.is_empty() || indent > parent_indent {
+                continue;
+            }
+            block_scalar_parent_indent = None;
+        }
+
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some(parent_indent) = block_scalar_parent_indent_start(line) {
+            block_scalar_parent_indent = Some(parent_indent);
+            continue;
+        }
+
+        if let Some(colon_index) = structural_mapping_colon_index(line) {
+            if plain_scalar_text_has_join_overflow_risk(&line[..colon_index]) {
+                return true;
+            }
+        } else if plain_scalar_text_has_join_overflow_risk(trimmed) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn plain_scalar_text_has_join_overflow_risk(input: &str) -> bool {
+    let trimmed = input.trim();
+    if trimmed.is_empty()
+        || trimmed.starts_with('"')
+        || trimmed.starts_with('\'')
+        || trimmed.starts_with('[')
+        || trimmed.starts_with('{')
+        || trimmed.starts_with('-')
+    {
+        return false;
+    }
+
+    has_ascii_whitespace_run(trimmed, MAX_PLAIN_SCALAR_KEY_WHITESPACE_RUN + 1)
+}
+
+fn has_ascii_whitespace_run(input: &str, minimum_run: usize) -> bool {
+    let mut run = 0usize;
+    for ch in input.chars() {
+        if ch.is_ascii_whitespace() {
+            run += 1;
+            if run >= minimum_run {
+                return true;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    false
+}
+
+fn has_libyml_quoted_scalar_join_overflow_risk(input: &str) -> bool {
     let mut in_single = false;
     let mut in_double = false;
     let mut escaped = false;
@@ -1340,7 +1438,7 @@ mod tests {
                    - read_file\n"
         );
 
-        assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
         assert!(HushSpec::parse(&input).is_err());
     }
 
@@ -1353,13 +1451,47 @@ mod tests {
              description: 'prefix \"{spaces}suffix'\n"
         );
 
-        assert!(!has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(!has_libyml_scalar_join_overflow_risk(&input));
         let spec = match HushSpec::parse(&input) {
             Ok(spec) => spec,
             Err(err) => panic!("single quoted scalar should parse: {err}"),
         };
         let expected = format!("prefix \"{spaces}suffix");
         assert_eq!(spec.description.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn parse_rejects_plain_root_scalar_before_libyml() {
+        let input = "hushsiption      t\n";
+
+        assert!(has_non_mapping_document_start(input));
+        assert!(has_libyml_scalar_join_overflow_risk(input));
+        assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn parse_rejects_plain_mapping_key_join_before_libyml() {
+        let input = concat!("hushspec: \"0.1.0\"\n", "description      min_days: 30\n");
+
+        assert!(!has_non_mapping_document_start(input));
+        assert!(has_libyml_scalar_join_overflow_risk(input));
+        assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn parse_allows_document_marker_before_mapping() {
+        let input = concat!(
+            "--- # policy document\n",
+            "hushspec: \"0.1.0\"\n",
+            "name: document-marker-policy\n"
+        );
+
+        assert!(!has_non_mapping_document_start(input));
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("document marker policy should parse: {err}"),
+        };
+        assert_eq!(spec.name.as_deref(), Some("document-marker-policy"));
     }
 
     #[test]
@@ -1371,7 +1503,7 @@ mod tests {
              description: 'prefix \"{spaces}suffix'\n"
         );
 
-        assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
         assert!(HushSpec::parse(&input).is_err());
     }
 
@@ -1384,7 +1516,7 @@ mod tests {
              name: \"bad{spaces}name\"\n"
         );
 
-        assert!(has_libyml_flow_scalar_join_overflow_risk(&input));
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
         assert!(HushSpec::parse(&input).is_err());
     }
 
