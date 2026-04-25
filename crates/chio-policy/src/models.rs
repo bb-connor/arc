@@ -178,7 +178,7 @@ fn has_unclosed_double_quoted_value_scalar(input: &str) -> bool {
             continue;
         };
 
-        if double_quote_closes(&line[scan_from..]) {
+        if double_quote_state_closes_on_line(line, scan_from) {
             open_double_quote_indent = None;
         }
     }
@@ -257,17 +257,47 @@ fn double_quoted_value_start(line: &str) -> Option<usize> {
     Some(quote_index)
 }
 
-fn double_quote_closes(input: &str) -> bool {
-    let mut chars = input.chars();
-    while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            let _ = chars.next();
-        } else if ch == '"' {
+fn double_quote_state_closes_on_line(line: &str, mut scan_from: usize) -> bool {
+    loop {
+        let Some(close_offset) = first_unescaped_double_quote(&line[scan_from..]) else {
+            return false;
+        };
+        let after_close = scan_from + close_offset + 1;
+        let rest_before_comment = strip_inline_comment(&line[after_close..]);
+        let Some(next_quote_offset) = first_unescaped_double_quote(rest_before_comment) else {
             return true;
+        };
+        scan_from = after_close + next_quote_offset + 1;
+    }
+}
+
+fn first_unescaped_double_quote(input: &str) -> Option<usize> {
+    let mut escaped = false;
+    for (index, ch) in input.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+        } else if ch == '"' {
+            return Some(index);
         }
     }
 
-    false
+    None
+}
+
+fn strip_inline_comment(input: &str) -> &str {
+    let mut previous_is_whitespace = true;
+    for (index, ch) in input.char_indices() {
+        if ch == '#' && previous_is_whitespace {
+            return &input[..index];
+        }
+        previous_is_whitespace = ch.is_ascii_whitespace();
+    }
+
+    input
 }
 
 // ---------------------------------------------------------------------------
@@ -1148,6 +1178,21 @@ mod tests {
 
         assert!(has_unclosed_double_quoted_value_scalar(input));
         assert!(HushSpec::parse(input).is_err());
+    }
+
+    #[test]
+    fn quote_precheck_scans_after_closed_scalar_on_same_line() {
+        let input = concat!(
+            "hushspec: \"0.1.0\"\n",
+            "name: second-unclosed-quote\n",
+            "description: \"closed\" \"unclosed\n",
+        );
+
+        assert!(has_unclosed_double_quoted_value_scalar(input));
+        assert!(HushSpec::parse(input).is_err());
+        assert!(!has_unclosed_double_quoted_value_scalar(
+            "description: \"closed\" # \"comment text\n"
+        ));
     }
 
     #[test]
