@@ -222,7 +222,18 @@ fn executable_rm_index(tokens: &[String]) -> Option<usize> {
             continue;
         }
 
-        if matches!(token, "command" | "builtin") {
+        if token == "command" {
+            index += 1;
+            while index < tokens.len() && is_command_execution_option(tokens[index].as_str()) {
+                index += 1;
+            }
+            if index < tokens.len() && tokens[index] == "--" {
+                index += 1;
+            }
+            continue;
+        }
+
+        if token == "builtin" {
             index += 1;
             continue;
         }
@@ -266,6 +277,10 @@ fn env_option_takes_value(token: &str) -> bool {
         token,
         "-u" | "--unset" | "-C" | "--chdir" | "-S" | "--split-string" | "--argv0"
     )
+}
+
+fn is_command_execution_option(token: &str) -> bool {
+    token == "-p"
 }
 
 fn is_env_assignment(token: &str) -> bool {
@@ -497,6 +512,8 @@ mod tests {
         assert!(guard.is_forbidden("env FOO=bar -i rm -r'f' /"));
         assert!(guard.is_forbidden("env -- rm -r'f' /"));
         assert!(guard.is_forbidden("command rm -r'f' /"));
+        assert!(guard.is_forbidden("command -p rm -r'f' /"));
+        assert!(guard.is_forbidden("command -p -- rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok; rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok;rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok\nrm -r'f' /"));
