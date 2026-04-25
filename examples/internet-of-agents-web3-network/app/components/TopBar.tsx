@@ -48,7 +48,12 @@ export function TopBar({
   const orderId = typeof summary.order_id === "string" ? summary.order_id : "unknown";
   const agentCount = typeof summary.agent_count === "number" ? summary.agent_count : "?";
   const capCount = typeof summary.capability_count === "number" ? summary.capability_count : "?";
-  const reviewOk = review.ok === true;
+  // review.ok is advisory only: review-result.json sits outside
+  // manifest.sha256, so we surface it as a labeled non-blocking note rather
+  // than as a fail trigger. Authenticated state (manifest hash matches)
+  // drives the verdict pill above.
+  const reviewAdvisoryError =
+    review.ok === false ? (review.errors?.[0] ?? "review-result reports not ok") : null;
 
   return (
     <div className="topbar" data-testid="topbar">
@@ -95,13 +100,19 @@ export function TopBar({
           <span className="meta-k">capabilities</span>
           <span className="meta-v">{capCount}</span>
         </div>
-        {!reviewOk || firstMismatchPath ? (
+        {firstMismatchPath ? (
           <div className="meta-item" data-testid="fail-reason">
             <span className="meta-k">fail</span>
             <span className="meta-v" style={{ color: "#f43f5e" }}>
-              {firstMismatchPath
-                ? `hash-mismatch: ${firstMismatchPath}`
-                : (review.errors?.[0] ?? "review not ok")}
+              hash-mismatch: {firstMismatchPath}
+            </span>
+          </div>
+        ) : null}
+        {!firstMismatchPath && reviewAdvisoryError ? (
+          <div className="meta-item" data-testid="review-advisory">
+            <span className="meta-k">advisory</span>
+            <span className="meta-v" style={{ color: "#f59e0b" }} title="review.ok=false; review-result.json is unauthenticated and shown as a non-blocking note">
+              {reviewAdvisoryError}
             </span>
           </div>
         ) : null}
