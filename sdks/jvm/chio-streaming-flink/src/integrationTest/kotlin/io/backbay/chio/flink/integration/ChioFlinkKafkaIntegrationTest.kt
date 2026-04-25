@@ -165,6 +165,7 @@ class ChioFlinkKafkaIntegrationTest {
             assertEquals("intent-guard", dlqPayload["guard"])
             @Suppress("UNCHECKED_CAST")
             val embeddedReceipt = dlqPayload["receipt"] as Map<String, Any?>
+
             @Suppress("UNCHECKED_CAST")
             val embeddedDecision = embeddedReceipt["decision"] as Map<String, Any?>
             assertEquals("deny", embeddedDecision["verdict"])
@@ -390,7 +391,6 @@ class ChioFlinkKafkaIntegrationTest {
         }
         return out
     }
-
 }
 
 // ----------------------------------------------------------------------
@@ -436,8 +436,7 @@ class TransactionsSubjectExtractor : SerializableFunction<Map<String, Any?>, Str
  * extractor only writes request_id / subject / body_length / body_hash.)
  */
 class IntentParametersExtractor : SerializableFunction<Map<String, Any?>, Map<String, Any?>> {
-    override fun apply(input: Map<String, Any?>): Map<String, Any?> =
-        mapOf("intent" to (input["intent"]?.toString() ?: ""))
+    override fun apply(input: Map<String, Any?>): Map<String, Any?> = mapOf("intent" to (input["intent"]?.toString() ?: ""))
 
     companion object {
         private const val serialVersionUID: Long = 1L
