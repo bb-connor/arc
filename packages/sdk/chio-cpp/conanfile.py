@@ -18,7 +18,7 @@ class ChioCppConan(ConanFile):
     options = {"shared": [True, False], "with_curl": [True, False]}
     default_options = {"shared": False, "with_curl": False}
 
-    _rust_workspace_roots = ["chio-bindings-ffi"]
+    _rust_workspace_roots = ["crates/chio-bindings-ffi"]
 
     @staticmethod
     def _extract_manifest_section(manifest, header):
@@ -39,15 +39,19 @@ class ChioCppConan(ConanFile):
         return "\n".join(out).strip()
 
     @staticmethod
-    def _path_dependency_crates(crate_manifest, repo_root):
+    def _path_dependency_members(crate_manifest, repo_root):
         text = crate_manifest.read_text()
-        crates_dir = (repo_root / "crates").resolve()
-        crate_names = []
-        for dependency_path in re.findall(r'path\s*=\s*"(\.\./[^"]+)"', text):
+        repo_root = repo_root.resolve()
+        members = []
+        for dependency_path in re.findall(r'path\s*=\s*"([^"]+)"', text):
             dependency_dir = (crate_manifest.parent / dependency_path).resolve()
-            if dependency_dir.parent == crates_dir:
-                crate_names.append(dependency_dir.name)
-        return crate_names
+            if not (dependency_dir / "Cargo.toml").exists():
+                continue
+            try:
+                members.append(dependency_dir.relative_to(repo_root).as_posix())
+            except ValueError:
+                continue
+        return members
 
     def _rust_workspace_members(self, repo_root):
         members = set()
@@ -56,13 +60,13 @@ class ChioCppConan(ConanFile):
             crate = pending.pop()
             if crate in members:
                 continue
-            crate_manifest = repo_root / "crates" / crate / "Cargo.toml"
+            crate_manifest = repo_root / crate / "Cargo.toml"
             if not crate_manifest.exists():
                 raise ValueError(f"missing Cargo.toml for Rust crate {crate}")
             members.add(crate)
             pending.extend(
                 dependency
-                for dependency in self._path_dependency_crates(crate_manifest, repo_root)
+                for dependency in self._path_dependency_members(crate_manifest, repo_root)
                 if dependency not in members
             )
         return sorted(members)
@@ -71,7 +75,7 @@ class ChioCppConan(ConanFile):
         root_manifest = (repo_root / "Cargo.toml").read_text()
         workspace_members = self._rust_workspace_members(repo_root)
         members = "\n".join(
-            f'    "crates/{crate}",' for crate in workspace_members
+            f'    "{member}",' for member in workspace_members
         )
         copied_sections = "\n\n".join(
             self._extract_manifest_section(root_manifest, header)
@@ -113,12 +117,12 @@ class ChioCppConan(ConanFile):
             "examples/*",
         ]:
             copy(self, pattern, src=package_dir, dst=self.export_sources_folder)
-        for crate in workspace_members:
+        for member in workspace_members:
             copy(
                 self,
                 "*",
-                src=repo_root / "crates" / crate,
-                dst=Path(self.export_sources_folder) / "crates" / crate,
+                src=repo_root / member,
+                dst=Path(self.export_sources_folder) / member,
             )
         save(
             self,
