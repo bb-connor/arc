@@ -189,7 +189,11 @@ fn leading_whitespace_len(input: &str) -> usize {
 }
 
 fn block_scalar_parent_indent_start(line: &str) -> Option<usize> {
-    let colon_index = line.find(':')?;
+    if line.trim_start().starts_with('#') {
+        return None;
+    }
+
+    let colon_index = line.rfind(':')?;
     let before_colon = &line[..colon_index];
     let after_colon = line[colon_index + 1..].trim_start();
     if before_colon.contains(':') || !(after_colon.starts_with('|') || after_colon.starts_with('>'))
@@ -201,6 +205,10 @@ fn block_scalar_parent_indent_start(line: &str) -> Option<usize> {
 }
 
 fn double_quoted_value_start(line: &str) -> Option<usize> {
+    if line.trim_start().starts_with('#') {
+        return None;
+    }
+
     let quote_index = line.find('"')?;
     let prefix = &line[..quote_index];
     let trimmed_prefix = prefix.trim();
@@ -1110,5 +1118,28 @@ mod tests {
             spec.description.as_deref(),
             Some("A valid block scalar with a single \" character\n")
         );
+    }
+
+    #[test]
+    fn parse_allows_comment_line_with_unpaired_double_quote() {
+        let input = concat!(
+            "# note: \"comment-only quote\n",
+            "hushspec: \"0.1.0\"\n",
+            "name: comment-description\n",
+            "description: Valid policy\n",
+        );
+
+        let spec = match HushSpec::parse(input) {
+            Ok(spec) => spec,
+            Err(err) => panic!("comment-only quote should parse: {err}"),
+        };
+        assert_eq!(spec.name.as_deref(), Some("comment-description"));
+    }
+
+    #[test]
+    fn block_scalar_detection_uses_last_colon() {
+        assert!(block_scalar_parent_indent_start("description: |").is_some());
+        assert!(block_scalar_parent_indent_start("# note: |").is_none());
+        assert!(block_scalar_parent_indent_start("description: nested: |").is_none());
     }
 }

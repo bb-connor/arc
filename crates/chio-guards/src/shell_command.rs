@@ -154,12 +154,12 @@ impl chio_kernel::Guard for ShellCommandGuard {
 }
 
 fn is_recursive_rm_root(tokens: &[String]) -> bool {
-    for (index, token) in tokens.iter().enumerate() {
-        if token != "rm" {
+    for segment in tokens.split(|token| is_shell_separator(token)) {
+        let Some(index) = executable_rm_index(segment) else {
             continue;
-        }
+        };
 
-        let args = tokens
+        let args = segment
             .iter()
             .skip(index + 1)
             .take_while(|arg| !is_shell_separator(arg));
@@ -181,6 +181,74 @@ fn is_recursive_rm_root(tokens: &[String]) -> bool {
     }
 
     false
+}
+
+fn executable_rm_index(tokens: &[String]) -> Option<usize> {
+    let mut index = 0usize;
+    while index < tokens.len() {
+        let token = tokens[index].as_str();
+
+        if token == "sudo" {
+            index += 1;
+            while index < tokens.len() && is_sudo_option(tokens[index].as_str()) {
+                let option_takes_value = sudo_option_takes_value(tokens[index].as_str());
+                index += 1;
+                if option_takes_value && index < tokens.len() {
+                    index += 1;
+                }
+            }
+            continue;
+        }
+
+        if token == "env" {
+            index += 1;
+            while index < tokens.len() && is_env_assignment(tokens[index].as_str()) {
+                index += 1;
+            }
+            continue;
+        }
+
+        if matches!(token, "command" | "builtin") {
+            index += 1;
+            continue;
+        }
+
+        return (token == "rm").then_some(index);
+    }
+
+    None
+}
+
+fn is_sudo_option(token: &str) -> bool {
+    token.starts_with('-') && token != "-"
+}
+
+fn sudo_option_takes_value(token: &str) -> bool {
+    matches!(
+        token,
+        "-u" | "--user"
+            | "-g"
+            | "--group"
+            | "-h"
+            | "--host"
+            | "-p"
+            | "--prompt"
+            | "-C"
+            | "--close-from"
+            | "-D"
+            | "--chdir"
+    )
+}
+
+fn is_env_assignment(token: &str) -> bool {
+    let Some((key, _)) = token.split_once('=') else {
+        return false;
+    };
+    !key.is_empty()
+        && key
+            .chars()
+            .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        && !key.as_bytes()[0].is_ascii_digit()
 }
 
 fn is_short_rm_recursive_flag(token: &str) -> bool {
@@ -370,8 +438,17 @@ mod tests {
     fn blocks_prefixed_quote_obfuscated_rm_rf_root() {
         let guard = ShellCommandGuard::new();
         assert!(guard.is_forbidden("sudo rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -n rm -r'f' /"));
+        assert!(guard.is_forbidden("env FOO=bar rm -r'f' /"));
+        assert!(guard.is_forbidden("command rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok; rm -r'f' /"));
         assert!(guard.is_forbidden("echo ok;rm -r'f' /"));
+    }
+
+    #[test]
+    fn allows_rm_text_as_shell_data() {
+        let guard = ShellCommandGuard::new();
+        assert!(!guard.is_forbidden("echo rm -r'f' /"));
     }
 
     #[test]
