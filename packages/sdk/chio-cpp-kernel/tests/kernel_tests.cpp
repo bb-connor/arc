@@ -4,12 +4,14 @@
 #include <string>
 
 #include "../src/json_field.hpp"
+#include "../src/kernel_request_json.hpp"
 
 int main() {
   chio::kernel::Kernel kernel;
 
   assert(std::string(chio::kernel::Kernel::version()) == "0.1.0");
   assert(kernel.options().kernel_id == "chio-cpp-kernel");
+  assert(!kernel.options().default_now_secs.has_value());
 
   {
     chio::kernel::EvaluateRequest request;
@@ -44,6 +46,31 @@ int main() {
         "{\"ignored\":{\"bad\":tru e},\"reason\":\"wrong\"}", "reason"));
     assert(!chio::kernel::detail::json_string_field(
         "{\"ignored\":[true false],\"reason\":\"wrong\"}", "reason"));
+  }
+
+  {
+    chio::kernel::KernelOptions options;
+    options.default_now_secs = 77;
+    chio::kernel::EvaluateRequest request;
+    request.request_json = "{\"request_id\":\"req-epoch\",\"tool_name\":\"echo\"}";
+    request.capability_json = "{\"id\":\"cap-epoch\"}";
+    request.trusted_issuers_hex.push_back("00");
+
+    request.now_secs = 0;
+    auto explicit_epoch =
+        chio::kernel::detail::build_kernel_request_json(options, request);
+    assert(explicit_epoch.find("\"now_secs\":0") != std::string::npos);
+    assert(explicit_epoch.find("\"now_secs\":77") == std::string::npos);
+
+    request.now_secs.reset();
+    auto default_time =
+        chio::kernel::detail::build_kernel_request_json(options, request);
+    assert(default_time.find("\"now_secs\":77") != std::string::npos);
+
+    options.default_now_secs.reset();
+    auto system_time =
+        chio::kernel::detail::build_kernel_request_json(options, request);
+    assert(system_time.find("\"now_secs\"") == std::string::npos);
   }
 
   {

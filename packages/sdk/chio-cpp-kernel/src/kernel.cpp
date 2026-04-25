@@ -1,10 +1,10 @@
 #include "chio/kernel.hpp"
 
-#include <optional>
 #include <sstream>
 #include <utility>
 
 #include "json_field.hpp"
+#include "kernel_request_json.hpp"
 
 #ifdef CHIO_CPP_KERNEL_ENABLE_FFI
 #include "chio/chio_kernel_ffi.h"
@@ -13,44 +13,6 @@
 namespace chio {
 namespace kernel {
 namespace {
-
-std::string escape_json(const std::string& input) {
-  std::ostringstream out;
-  for (unsigned char c : input) {
-    switch (c) {
-      case '"':
-        out << "\\\"";
-        break;
-      case '\\':
-        out << "\\\\";
-        break;
-      case '\b':
-        out << "\\b";
-        break;
-      case '\f':
-        out << "\\f";
-        break;
-      case '\n':
-        out << "\\n";
-        break;
-      case '\r':
-        out << "\\r";
-        break;
-      case '\t':
-        out << "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          static const char* digits = "0123456789abcdef";
-          out << "\\u00" << digits[(c >> 4) & 0x0f] << digits[c & 0x0f];
-        } else {
-          out << static_cast<char>(c);
-        }
-        break;
-    }
-  }
-  return out.str();
-}
 
 #ifdef CHIO_CPP_KERNEL_ENABLE_FFI
 std::string code_name(int code) {
@@ -82,10 +44,10 @@ std::string result_json(const EvaluateResult& result) {
   std::ostringstream out;
   out << "{";
   out << "\"ok\":" << (result.ok ? "true" : "false");
-  out << ",\"verdict\":\"" << escape_json(result.verdict) << "\"";
-  out << ",\"reason\":\"" << escape_json(result.reason) << "\"";
-  out << ",\"error_code\":\"" << escape_json(result.error_code) << "\"";
-  out << ",\"error_message\":\"" << escape_json(result.error_message) << "\"";
+  out << ",\"verdict\":\"" << detail::escape_json(result.verdict) << "\"";
+  out << ",\"reason\":\"" << detail::escape_json(result.reason) << "\"";
+  out << ",\"error_code\":\"" << detail::escape_json(result.error_code) << "\"";
+  out << ",\"error_message\":\"" << detail::escape_json(result.error_message) << "\"";
   out << "}";
   return out.str();
 }
@@ -102,30 +64,6 @@ EvaluateResult failure(std::string code, std::string message, std::string reason
 }
 
 #ifdef CHIO_CPP_KERNEL_ENABLE_FFI
-std::string build_kernel_request_json(const KernelOptions& options,
-                                      const EvaluateRequest& request) {
-  const std::uint64_t now_secs =
-      request.now_secs == 0 ? options.default_now_secs : request.now_secs;
-
-  std::ostringstream out;
-  out << "{";
-  out << "\"capability\":" << request.capability_json;
-  out << ",\"trusted_issuers\":[";
-  for (std::size_t i = 0; i < request.trusted_issuers_hex.size(); ++i) {
-    if (i != 0) {
-      out << ",";
-    }
-    out << "\"" << escape_json(request.trusted_issuers_hex[i]) << "\"";
-  }
-  out << "]";
-  out << ",\"request\":" << request.request_json;
-  if (now_secs != 0) {
-    out << ",\"now_secs\":" << now_secs;
-  }
-  out << "}";
-  return out.str();
-}
-
 class KernelFfiBuffer {
  public:
   explicit KernelFfiBuffer(ChioKernelFfiBuffer buffer) : buffer_(buffer) {}
@@ -200,7 +138,7 @@ EvaluateResult Kernel::evaluate(const EvaluateRequest& request) const {
   }
 
 #ifdef CHIO_CPP_KERNEL_ENABLE_FFI
-  const std::string envelope = build_kernel_request_json(options_, request);
+  const std::string envelope = detail::build_kernel_request_json(options_, request);
   return from_ffi_result(chio_kernel_evaluate_json(envelope.c_str()));
 #else
   return failure(

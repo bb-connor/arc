@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,14 +11,14 @@ namespace kernel {
 struct KernelOptions {
   std::string kernel_id = "chio-cpp-kernel";
   std::string policy_json;
-  std::uint64_t default_now_secs = 0;
+  std::optional<std::uint64_t> default_now_secs;
 };
 
 struct EvaluateRequest {
   std::string request_json;
   std::string capability_json;
   std::vector<std::string> trusted_issuers_hex;
-  std::uint64_t now_secs = 0;
+  std::optional<std::uint64_t> now_secs;
 };
 
 struct EvaluateResult {
