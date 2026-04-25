@@ -89,7 +89,7 @@ class KernelFfiBuffer {
   ChioKernelFfiBuffer buffer_;
 };
 
-EvaluateResult from_ffi_result(const ChioKernelFfiResult& ffi_result) {
+EvaluateResult from_ffi_result(ChioKernelFfiResult ffi_result) {
   KernelFfiBuffer data(ffi_result.data);
   std::string body = data.str();
   if (ffi_result.status == CHIO_KERNEL_FFI_STATUS_OK) {
