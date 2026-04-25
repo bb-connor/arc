@@ -27,6 +27,37 @@ if ! command -v cc >/dev/null 2>&1; then
   exit 1
 fi
 
+compare_generated_header() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "chio-cpp generated-header checks require python3 on PATH" >&2
+    exit 1
+  fi
+  python3 - "$1" "$2" <<'PY'
+from pathlib import Path
+import difflib
+import sys
+
+expected_path = Path(sys.argv[1])
+actual_path = Path(sys.argv[2])
+expected = expected_path.read_bytes().replace(b"\r\n", b"\n")
+actual = actual_path.read_bytes().replace(b"\r\n", b"\n")
+if expected == actual:
+    raise SystemExit(0)
+
+expected_text = expected.decode("utf-8").splitlines(keepends=True)
+actual_text = actual.decode("utf-8").splitlines(keepends=True)
+sys.stdout.writelines(
+    difflib.unified_diff(
+        expected_text,
+        actual_text,
+        fromfile=str(expected_path),
+        tofile=str(actual_path),
+    )
+)
+raise SystemExit(1)
+PY
+}
+
 cargo test -p chio-bindings-ffi
 cargo build -p chio-bindings-ffi
 
@@ -34,7 +65,7 @@ require_cbindgen="${CHIO_CPP_REQUIRE_CBINDGEN:-${CI:-}}"
 if command -v cbindgen >/dev/null 2>&1; then
   generated_header="${smoke_dir}/chio_ffi.h"
   cbindgen crates/chio-bindings-ffi -o "${generated_header}"
-  diff -u crates/chio-bindings-ffi/include/chio/chio_ffi.h "${generated_header}"
+  compare_generated_header crates/chio-bindings-ffi/include/chio/chio_ffi.h "${generated_header}"
 elif [[ -n "${require_cbindgen}" && "${require_cbindgen}" != "0" ]]; then
   echo "cbindgen is required for chio_ffi.h freshness but is not on PATH" >&2
   exit 1

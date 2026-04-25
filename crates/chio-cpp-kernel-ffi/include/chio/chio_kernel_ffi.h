@@ -71,7 +71,8 @@ struct ChioKernelFfiResult chio_kernel_sign_receipt_json(const char *body_json,
                                                          const char *signing_seed_hex);
 
 struct ChioKernelFfiResult chio_kernel_verify_capability_json(const char *token_json,
-                                                              const char *authority_pub_hex);
+                                                              const char *authority_pub_hex,
+                                                              int64_t now_secs);
 
 struct ChioKernelFfiResult chio_kernel_verify_passport_json(const char *envelope_json,
                                                             const char *issuer_pub_hex,

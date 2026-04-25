@@ -339,14 +339,20 @@ fn sign_receipt_json_str(
 fn verify_capability_json_str(
     token_json: &str,
     authority_pub_hex: &str,
+    now_secs: i64,
 ) -> Result<String, KernelFfiError> {
     let token: CapabilityToken = serde_json::from_str(token_json)
         .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
     let authority = public_key_from_hex(authority_pub_hex, "authority public key")?;
-    let clock = SystemClock;
+    let fixed_clock = fixed_clock_from_secs(now_secs);
+    let system_clock = SystemClock;
+    let clock: &dyn Clock = match &fixed_clock {
+        Some(clock) => clock,
+        None => &system_clock,
+    };
 
     let verified =
-        core_verify_capability(&token, &[authority], &clock).map_err(|error| match error {
+        core_verify_capability(&token, &[authority], clock).map_err(|error| match error {
             CapabilityError::UntrustedIssuer => KernelFfiError::InvalidCapability(
                 "capability issuer is not in the trusted authority set".to_string(),
             ),
@@ -501,6 +507,7 @@ pub extern "C" fn chio_kernel_sign_receipt_json(
 pub extern "C" fn chio_kernel_verify_capability_json(
     token_json: *const c_char,
     authority_pub_hex: *const c_char,
+    now_secs: i64,
 ) -> ChioKernelFfiResult {
     let token_json = match read_c_str(token_json, "token_json") {
         Ok(value) => value,
@@ -510,7 +517,7 @@ pub extern "C" fn chio_kernel_verify_capability_json(
         Ok(value) => value,
         Err(result) => return result,
     };
-    run_ffi(|| verify_capability_json_str(&token_json, &authority_pub_hex))
+    run_ffi(|| verify_capability_json_str(&token_json, &authority_pub_hex, now_secs))
 }
 
 #[no_mangle]
@@ -666,6 +673,34 @@ mod tests {
         assert_eq!(value["evaluated_at"], 0);
         assert_eq!(value["issued_at"], 0);
         assert_eq!(value["expires_at"], 10);
+    }
+
+    #[test]
+    fn verify_capability_honors_epoch_zero_clock() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_capability_at(&subject, &issuer, 0, 10);
+        let token_json = serde_json::to_string(&capability).unwrap();
+
+        let output =
+            verify_capability_json_str(&token_json, &issuer.public_key().to_hex(), 0).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(value["id"], "cap-1");
+        assert_eq!(value["evaluated_at"], 0);
+        assert_eq!(value["issued_at"], 0);
+        assert_eq!(value["expires_at"], 10);
+    }
+
+    #[test]
+    fn verify_capability_uses_supplied_time_for_expiration() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_capability_at(&subject, &issuer, 0, 10);
+        let token_json = serde_json::to_string(&capability).unwrap();
+
+        let error =
+            verify_capability_json_str(&token_json, &issuer.public_key().to_hex(), 11).unwrap_err();
+        assert!(matches!(error, KernelFfiError::InvalidCapability(_)));
     }
 
     #[test]

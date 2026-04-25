@@ -51,6 +51,9 @@ case "${lang}" in
     if command -v conan >/dev/null 2>&1; then
       (
         cd "${sdk_dir}"
+        if ! conan profile path default >/dev/null 2>&1; then
+          conan profile detect --force
+        fi
         conan create . --build=missing
       )
     elif [[ -n "${require_cpp_packagers}" && "${require_cpp_packagers}" != "0" ]]; then

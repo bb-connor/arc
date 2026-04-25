@@ -7,7 +7,7 @@
 #include <sstream>
 #include <string>
 
-#include "../../chio-cpp/src/json.hpp"
+#include "json_field.hpp"
 
 namespace chio {
 namespace kernel {
@@ -34,7 +34,7 @@ inline std::string build_kernel_request_json(const KernelOptions& options,
     if (i != 0) {
       out << ",";
     }
-    out << "\"" << chio::detail::escape_json(request.trusted_issuers_hex[i]) << "\"";
+    out << "\"" << detail::escape_json(request.trusted_issuers_hex[i]) << "\"";
   }
   out << "]";
   out << ",\"request\":" << request.request_json;

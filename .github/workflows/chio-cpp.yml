@@ -59,7 +59,26 @@ jobs:
           cargo build -p chio-bindings-ffi
           mkdir -p target
           cbindgen crates/chio-bindings-ffi -o target/chio_ffi.generated.h
-          diff -u crates/chio-bindings-ffi/include/chio/chio_ffi.h target/chio_ffi.generated.h
+          python3 - crates/chio-bindings-ffi/include/chio/chio_ffi.h target/chio_ffi.generated.h <<'PY'
+          from pathlib import Path
+          import difflib
+          import sys
+
+          expected_path = Path(sys.argv[1])
+          actual_path = Path(sys.argv[2])
+          expected = expected_path.read_bytes().replace(b"\r\n", b"\n")
+          actual = actual_path.read_bytes().replace(b"\r\n", b"\n")
+          if expected != actual:
+              sys.stdout.writelines(
+                  difflib.unified_diff(
+                      expected.decode("utf-8").splitlines(keepends=True),
+                      actual.decode("utf-8").splitlines(keepends=True),
+                      fromfile=str(expected_path),
+                      tofile=str(actual_path),
+                  )
+              )
+              raise SystemExit(1)
+          PY
           cmake -S packages/sdk/chio-cpp -B target/chio-cpp-win \
             -DCHIO_CPP_BUILD_TESTS=ON \
             -DCHIO_CPP_BUILD_EXAMPLES=ON \

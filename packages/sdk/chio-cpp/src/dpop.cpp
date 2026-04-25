@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <sstream>
+#include <string_view>
 
 #include "chio/invariants.hpp"
 #include "json.hpp"
@@ -14,6 +15,18 @@ std::uint64_t now_unix_secs() {
   const auto now = std::chrono::system_clock::now().time_since_epoch();
   return static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::seconds>(now).count());
+}
+
+std::string parsed_string_field(const std::string& json, std::string_view field) {
+  auto parsed = detail::parse_json(json);
+  if (!parsed || !parsed->is_object()) {
+    return {};
+  }
+  const auto* value = parsed->get(field);
+  if (value == nullptr || !value->is_string()) {
+    return {};
+  }
+  return value->as_string();
 }
 
 }  // namespace
@@ -37,7 +50,7 @@ Result<DpopProof> sign_dpop_proof(const DpopSignParams& params) {
   if (!key_signature) {
     return Result<DpopProof>::failure(key_signature.error());
   }
-  const auto agent_key = detail::extract_json_string_field(key_signature.value(), "public_key_hex");
+  const auto agent_key = parsed_string_field(key_signature.value(), "public_key_hex");
   if (agent_key.empty()) {
     return Result<DpopProof>::failure(
         Error{ErrorCode::Protocol, "failed to derive DPoP agent public key"});
@@ -61,7 +74,7 @@ Result<DpopProof> sign_dpop_proof(const DpopSignParams& params) {
   if (!signed_body) {
     return Result<DpopProof>::failure(signed_body.error());
   }
-  const auto signature = detail::extract_json_string_field(signed_body.value(), "signature_hex");
+  const auto signature = parsed_string_field(signed_body.value(), "signature_hex");
   if (signature.empty()) {
     return Result<DpopProof>::failure(
         Error{ErrorCode::Protocol, "failed to sign DPoP proof body"});
