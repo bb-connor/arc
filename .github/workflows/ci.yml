@@ -161,8 +161,8 @@ jobs:
           fi
           rustup target add aarch64-linux-android
           sudo apt-get update
-          if ! sudo apt-get install -y chromium-driver chromium; then
-            sudo apt-get install -y chromium-driver chromium-browser
+          if ! sudo apt-get install -y chromium-driver chromium libcurl4-openssl-dev; then
+            sudo apt-get install -y chromium-driver chromium-browser libcurl4-openssl-dev
           fi
 
       - name: Workspace CI lane

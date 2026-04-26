@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "input": "ok"
+  },
+  "expected_action": "mcp_tool",
+  "expected_verdict": "allow",
+  "tool_name": "custom_tool"
+}

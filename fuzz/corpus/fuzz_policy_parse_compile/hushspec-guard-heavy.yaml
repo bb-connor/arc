@@ -1,0 +1,49 @@
+hushspec: "0.1.0"
+name: guard-heavy
+description: Exercise the currently supported HushSpec guard surface.
+
+rules:
+  forbidden_paths:
+    enabled: true
+    patterns:
+      - "**/.ssh/**"
+    exceptions:
+      - "/workspace/.ssh/known_hosts"
+  path_allowlist:
+    enabled: true
+    read:
+      - "/workspace/**"
+    write:
+      - "/workspace/**"
+    patch:
+      - "/workspace/**"
+  egress:
+    enabled: true
+    allow:
+      - "*.openai.com"
+      - "api.github.com"
+    block:
+      - "evil.com"
+  secret_patterns:
+    enabled: true
+    skip_paths:
+      - "**/fixtures/**"
+  patch_integrity:
+    enabled: true
+    max_additions: 200
+    max_deletions: 100
+    forbidden_patterns:
+      - "eval\\("
+    require_balance: true
+    max_imbalance_ratio: 3.0
+  shell_commands:
+    enabled: true
+    forbidden_patterns:
+      - "(?i)rm\\s+-rf\\s+/"
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+      - bash
+    max_args_size: 2048

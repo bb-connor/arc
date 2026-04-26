@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "command": "echo ok"
+  },
+  "expected_action": "shell_command",
+  "expected_verdict": "allow",
+  "tool_name": "bash"
+}
