@@ -83,38 +83,8 @@ impl ShellCommandGuard {
 
         let mut out: Vec<String> = Vec::new();
 
-        let mut i = 0usize;
-        while i < tokens.len() {
-            let t = tokens[i].as_str();
-
-            // Redirection operators.
-            if is_redirection_op(t) {
-                if let Some(next) = tokens.get(i + 1) {
-                    push_path_candidate(&mut out, next);
-                }
-                i += 1;
-                continue;
-            }
-            if let Some((_, rest)) = split_inline_redirection(t) {
-                if !rest.is_empty() {
-                    push_path_candidate(&mut out, rest);
-                }
-                i += 1;
-                continue;
-            }
-
-            // Flags like --output=/path
-            if let Some((_, rhs)) = t.split_once('=') {
-                if looks_like_path(rhs) {
-                    push_path_candidate(&mut out, rhs);
-                }
-            }
-
-            if looks_like_path(t) {
-                push_path_candidate(&mut out, t);
-            }
-
-            i += 1;
+        for segment in tokens.split(|token| is_shell_separator(token)) {
+            push_segment_path_candidates(&mut out, segment);
         }
 
         // Windows drive-rooted paths.
@@ -123,6 +93,42 @@ impl ShellCommandGuard {
         }
 
         out
+    }
+}
+
+fn push_segment_path_candidates(out: &mut Vec<String>, tokens: &[String]) {
+    let mut i = 0usize;
+    while i < tokens.len() {
+        let t = tokens[i].as_str();
+
+        // Redirection operators.
+        if is_redirection_op(t) {
+            if let Some(next) = tokens.get(i + 1) {
+                push_path_candidate(out, next);
+            }
+            i += 1;
+            continue;
+        }
+        if let Some((_, rest)) = split_inline_redirection(t) {
+            if !rest.is_empty() {
+                push_path_candidate(out, rest);
+            }
+            i += 1;
+            continue;
+        }
+
+        // Flags like --output=/path
+        if let Some((_, rhs)) = t.split_once('=') {
+            if looks_like_path(rhs) {
+                push_path_candidate(out, rhs);
+            }
+        }
+
+        if looks_like_path(t) {
+            push_path_candidate(out, t);
+        }
+
+        i += 1;
     }
 }
 
@@ -628,6 +634,16 @@ mod tests {
     fn blocks_forbidden_paths_via_shell() {
         let guard = ShellCommandGuard::new();
         assert!(guard.is_forbidden("cat ~/.ssh/id_rsa"));
+    }
+
+    #[test]
+    fn blocks_forbidden_paths_after_shell_separators() {
+        let guard = ShellCommandGuard::new();
+        assert!(guard.is_forbidden("echo ok; cat ~/.ssh/id_rsa"));
+        assert!(guard.is_forbidden("echo ok && cat ~/.ssh/id_rsa"));
+        assert!(guard.is_forbidden("echo ok | cat ~/.ssh/id_rsa"));
+        assert!(guard.is_forbidden("echo ok\ncat ~/.ssh/id_rsa"));
+        assert!(guard.is_forbidden("echo ok; tool --config=/home/user/.aws/credentials"));
     }
 
     #[test]

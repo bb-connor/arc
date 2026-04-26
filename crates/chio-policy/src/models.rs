@@ -458,10 +458,14 @@ fn has_libyml_quoted_scalar_join_overflow_risk(input: &str) -> bool {
             previous_is_whitespace = ch.is_ascii_whitespace();
         }
 
-        if (in_single || in_double) && !escaped && lines.peek().is_some() {
-            whitespace_run += 1;
-            if whitespace_run > MAX_QUOTED_SCALAR_WHITESPACE_RUN {
-                return true;
+        if in_single || in_double {
+            if escaped {
+                escaped = false;
+            } else if lines.peek().is_some() {
+                whitespace_run += 1;
+                if whitespace_run > MAX_QUOTED_SCALAR_WHITESPACE_RUN {
+                    return true;
+                }
             }
         }
     }
@@ -1833,6 +1837,19 @@ mod tests {
             "hushspec: \"0.1.0\"\n\
              name: folded-quoted-whitespace\n\
              description: \"prefix{left_spaces}\n{right_spaces}suffix\"\n"
+        );
+
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
+    fn quoted_whitespace_overflow_resets_escaped_line_break() {
+        let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
+        let input = format!(
+            "hushspec: \"0.1.0\"\n\
+             name: escaped-folded-quoted-whitespace\n\
+             description: \"prefix\\\n{spaces}suffix\"\n"
         );
 
         assert!(has_libyml_scalar_join_overflow_risk(&input));
