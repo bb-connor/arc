@@ -222,6 +222,58 @@ seed-promotion-to-regression-test land in M02 P4
 (`.github/workflows/fuzz_crash_triage.yml`, `scripts/promote_fuzz_seed.sh`,
 `docs/fuzzing/triage.md`).
 
+## Timing-leak detection (dudect)
+
+The `dudect` Cargo feature (M02.P2.T3) gates a set of `dudect-bencher`
+0.7-driven timing harnesses that statistically detect data-dependent
+timing leaks in the trust-boundary primitives that sit on the verdict
+hot path. The harnesses are off by default so `cargo test` stays fast
+and deterministic; they are opt-in via a per-target `--features dudect`
+build, and the standalone test binary's `main` is provided by
+`dudect_bencher::ctbench_main!`.
+
+Each harness defines two input classes (`Class::Left` and `Class::Right`)
+that should produce the same verdict but might take a different amount of
+time on a leaky implementation. The dudect runner times both classes
+many times, then runs Welch's t-test on the runtime distributions; a
+`max_t` value above the documented 4.5 threshold in two consecutive
+runs is the failure criterion.
+
+Inventory:
+
+| Crate              | Harness                                                            | Target surface                                                                     |
+|--------------------|--------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| `chio-credentials` | `crates/chio-credentials/tests/dudect/jwt_verify.rs`               | `verify_chio_passport_jwt_vc_json` parse-and-fail path                             |
+| `chio-kernel-core` | `crates/chio-kernel-core/tests/dudect/mac_eq.rs`                   | `chio_core_types::crypto::Signature` byte-equality compare (the MAC-eq surface)    |
+| `chio-kernel-core` | `crates/chio-kernel-core/tests/dudect/scope_subset.rs`             | `NormalizedScope::is_subset_of` capability-algebra subset check                    |
+
+Run locally:
+
+```bash
+cargo test -p chio-credentials --features dudect --release jwt_verify
+cargo test -p chio-kernel-core --features dudect --release mac_eq
+cargo test -p chio-kernel-core --features dudect --release scope_subset
+```
+
+The release-mode build is required: dudect's t-test is sensitive to the
+optimization level, and unoptimized builds produce noise that overwhelms
+the signal. Each harness collects ~100,000 input pairs per invocation,
+and the runner re-invokes the closure many times per pair, so a single
+local run of any one harness takes a few minutes.
+
+Pass criterion:
+
+- `max_t < 4.5` in two consecutive runs of the same harness on the same
+  target surface. A single `max_t > 4.5` is treated as advisory; a
+  reproduced failure is a regression and blocks the change set.
+- Below the 4.5 threshold the t-test cannot distinguish the two input
+  classes' runtime distributions at a level that survives multiple
+  testing correction across the ~100 t-tests dudect runs internally.
+
+CI lane: `.github/workflows/dudect.yml` (M02.P2.T4) wires these three
+harnesses into nightly + PR-time runs and applies the
+two-consecutive-runs `t < 4.5` pass rule.
+
 ## Cross-references
 
 - Source-of-truth milestone doc: [`.planning/trajectory/02-fuzzing-post-pr13.md`](../../.planning/trajectory/02-fuzzing-post-pr13.md)
