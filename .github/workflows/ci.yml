@@ -1,10 +1,33 @@
 name: CI
 
+# M09.P1.T11: required-check inventory.
+#
+# The following job names should be promoted to required status checks
+# on any branch ruleset configured for main. The actual ruleset is
+# managed out-of-band (gh api .../rulesets) and is not committed here.
+# When adding or renaming a job that should gate merges, update this
+# inventory in the same commit so the ruleset and the workflow stay in
+# lockstep.
+#
+#   required:
+#     - check                           # build, lint, test (workspace lane)
+#     - msrv                            # MSRV workspace lane
+#     - cargo-vet (supply-chain audit)
+#     - cargo-deny (supply-chain bans/advisories/licenses)
+#     - m05-freeze-guard / freeze-guard (in m05-freeze-guard.yml)
+#
+#   advisory (do not gate):
+#     - jvm-build, coverage, mutants
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
