@@ -39,17 +39,46 @@ covered_symbols = [
   "chio_core_types::crypto::PublicKey::verify_canonical",
 ]
 
-# Lane assignment (M03.P2.T5). The PR lane runs on every pull request
-# and contains the cheap concrete-fixture harnesses (`public_*` prefix)
-# plus T1's two algebraic primitives whose unwind budget is small. The
-# `nightly_only` lane holds the verify_* harnesses whose symbolic
-# search space (multi-axis u8-promoted u32/u64) is expected to exceed
-# the 6-minute PR budget. M03.P2.T6 re-measures wall-clock on the CI
-# runner and re-buckets if necessary; M03.P2.T7 wires the PR lane to
-# diff-run only on changed harnesses while preserving the full sweep
-# on `main` and nightly.
+# Lane assignment (M03.P2.T6, replacing T5's heuristic split).
+#
+# T5 bucketed the five `verify_*` algebraic harnesses on the assumption
+# that their multi-axis u8-promoted symbolic search would dominate the
+# concrete-fixture `public_*` harnesses. T6 wall-clocked each harness
+# individually with `cargo kani -p chio-kernel-core --lib --harness <h>
+# --default-unwind 8 --no-unwinding-checks` on aarch64-apple-darwin
+# (kani 0.67.0, 2026-04-26) and found the heuristic inverted: the
+# concrete-fixture harnesses dominate because `public_verify_capability`
+# and `public_evaluate` exercise the full canonical-JSON serialise plus
+# Ed25519/P-384 verify path, while the algebraic harnesses model
+# signatures with `model_sign`/`model_verify` and finish in 1-3 seconds.
+#
+# Per-harness wall-clock (local Apple M-series, hot cargo cache):
+#   public_verify_capability_rejects_untrusted_issuer_before_signature  31s
+#   public_evaluate_rejects_untrusted_issuer_before_dispatch            28s
+#   public_resolve_matching_grants_rejects_out_of_scope_request         13s
+#   public_resolve_matching_grants_preserves_wildcard_matching          13s
+#   public_sign_receipt_rejects_kernel_key_mismatch_before_signing      12s
+#   public_sign_receipt_accepts_matching_kernel_key                     11s
+#   public_normalized_scope_subset_rejects_widened_child                 5s
+#   public_normalized_scope_subset_rejects_value_widened_child           5s
+#   public_normalized_scope_subset_rejects_identity_mismatch             4s
+#   verify_revocation_predicate_idempotent                               3s
+#   verify_receipt_roundtrip                                             3s
+#   verify_budget_checked_add_no_overflow                                3s
+#   verify_scope_intersection_associative                                2s
+#   verify_delegation_chain_step                                         1s
+#   total                                                              134s
+#
+# Sum is ~2.2 min locally; even the typical 2-3x ubuntu-latest CI
+# overhead leaves the full sweep within the 6-minute PR budget. All
+# fourteen harnesses therefore land in `lanes.pr`. The `lanes.nightly_only`
+# bucket is preserved (empty) so future T6-style re-measurements can
+# move slow harnesses into it without a schema migration. The nightly
+# Kani job runs the union of `lanes.pr` and `lanes.nightly_only`, so
+# moving a harness to `nightly_only` strictly reduces PR coverage,
+# never nightly coverage.
 [lanes.pr]
-description = "Fast Kani harnesses run on every pull request"
+description = "Fast Kani harnesses run on every pull request (full sweep)"
 harnesses = [
   "public_verify_capability_rejects_untrusted_issuer_before_signature",
   "public_normalized_scope_subset_rejects_widened_child",
@@ -62,12 +91,11 @@ harnesses = [
   "public_sign_receipt_accepts_matching_kernel_key",
   "verify_scope_intersection_associative",
   "verify_revocation_predicate_idempotent",
-]
-
-[lanes.nightly_only]
-description = "Slow Kani harnesses gated to the nightly lane (re-measured by M03.P2.T6)"
-harnesses = [
   "verify_delegation_chain_step",
   "verify_receipt_roundtrip",
   "verify_budget_checked_add_no_overflow",
 ]
+
+[lanes.nightly_only]
+description = "Slow Kani harnesses gated to the nightly lane (empty after T6 wall-clock; reserved for future slow harnesses)"
+harnesses = []
