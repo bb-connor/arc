@@ -147,6 +147,46 @@ total to 20.
   fix-or-defer for `Critical`, 30d for `High`. Tracked in
   `docs/fuzzing/triage.md` once that doc lands (M02 P4).
 
+## OSS-Fuzz integration
+
+Chio is in the OSS-Fuzz application pipeline (M02.P2.T5). Integration
+files live under `infra/oss-fuzz/` and are mirrored into the upstream
+`google/oss-fuzz` repo as a follow-up PR after the in-tree files merge:
+
+- `infra/oss-fuzz/project.yaml` declares `language: rust`, the primary
+  contact (`whelan.connor11@gmail.com`), `auto_ccs`, the `address` plus
+  `undefined` sanitizer pair, the `x86_64` architecture, and the
+  `libfuzzer` engine. The backup-contact slot is held open with a
+  `TODO(M02.P2)` comment and is tracked in the M02 P2 follow-up issue.
+- `infra/oss-fuzz/Dockerfile` is based on
+  `gcr.io/oss-fuzz-base/base-builder-rust`, installs the rustls/openssl
+  build deps plus `zip` for seed-corpus packing, and clones the repo at
+  `/src/arc` (the path stays `arc` until the GitHub repo rename lands).
+- `infra/oss-fuzz/build.sh` enumerates all sixteen fuzz targets
+  (`attest_verify`, `jwt_vc_verify`, `oid4vp_presentation`,
+  `did_resolve`, `anchor_bundle_verify`, `mcp_envelope_decode`,
+  `a2a_envelope_decode`, `acp_envelope_decode`,
+  `wasm_preinstantiate_validate`, `wit_host_call_boundary`,
+  `chio_yaml_parse`, `openapi_ingest`, `receipt_log_replay`,
+  `canonical_json`, `capability_receipt`, `manifest_roundtrip`),
+  invokes `cargo +nightly fuzz build <target> --release --sanitizer
+  "$SANITIZER"` for each, copies the resulting binary into `$OUT/`,
+  and packs `fuzz/corpus/<target>/` into
+  `$OUT/<target>_seed_corpus.zip` when a corpus directory exists.
+
+The upstream PR opens against
+`https://github.com/google/oss-fuzz/tree/master/projects/chio` once
+these in-tree files merge. The OSS-Fuzz README requires the same
+three files at that path, so the in-tree copy under `infra/oss-fuzz/`
+is the source-of-truth and the upstream PR lifts the directory
+verbatim.
+
+Acceptance lag is typically 2-6 weeks. ClusterFuzzLite (in
+`.github/workflows/cflite_pr.yml` and `.github/workflows/cflite_batch.yml`)
+plus the in-tree `.github/workflows/fuzz.yml` carry continuous coverage
+through the OSS-Fuzz acceptance window and remain the documented
+permanent fallback after acceptance lands.
+
 ## Local development workflow
 
 Run a single target locally against the in-tree corpus:
