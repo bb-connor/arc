@@ -1,0 +1,42 @@
+# cargo-mutants config for chio-kernel-core (M02 P2)
+#
+# Anchored to .planning/trajectory/02-fuzzing-post-pr13.md, Phase 3,
+# "Mutation-testing approach" + "Mutation-testing CI shape (Phase 3)".
+# Decision 12: cargo-mutants pinned at 25.x; do not float.
+#
+# Trust-boundary modules in this crate:
+#   - evaluate.rs           : pure-compute verdict path (signature, time,
+#                             subject binding, scope, guard pipeline)
+#   - capability_verify.rs  : offline capability verification
+#   - scope.rs              : capability scope subset check
+#   - receipts.rs           : receipt signing / MAC equality compare
+#   - passport_verify.rs    : passport verification glue used by capability
+#   - guard.rs              : sync Guard trait + GuardContext (verdict shape)
+#   - normalized.rs         : input normalization feeding the verdict path
+#
+# Out of scope (skipped via exclude_globs): formal-methods scaffolding
+# (Aeneas / Kani harnesses), platform clock/rng adapters, fuzz entry
+# points (covered by the libFuzzer lane in M02 P1).
+
+examine_globs = [
+    "src/evaluate.rs",
+    "src/capability_verify.rs",
+    "src/scope.rs",
+    "src/receipts.rs",
+    "src/passport_verify.rs",
+    "src/guard.rs",
+    "src/normalized.rs",
+]
+
+exclude_globs = [
+    "src/**/tests.rs",
+    "src/**/test_*.rs",
+    "src/lib.rs",
+    "src/clock.rs",
+    "src/rng.rs",
+    "src/formal_aeneas.rs",
+    "src/formal_core.rs",
+    "src/kani_harnesses.rs",
+    "src/kani_public_harnesses.rs",
+    "src/fuzz.rs",
+]
