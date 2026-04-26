@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:05:46.926Z",
+  "last_checkpoint_at": "2026-04-26T03:15:00.524Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -265,14 +265,15 @@
       }
     },
     "M01.P2.T5": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 49,
+      "merged_sha": "15ed68b658aeb0219801671faff6576e4c4fcd97",
+      "branch": "wave/W1/m01/p2.t5-receipt-vectors",
+      "merged_at": "2026-04-26T03:15:00.524Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P2.T6": {
       "status": "pending",
