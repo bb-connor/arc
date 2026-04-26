@@ -30,7 +30,12 @@ cargo-fuzz = true
 
 [dependencies]
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
+chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
+# `arbitrary` is pulled in directly by libFuzzer harnesses that take
+# structured input; the `derive` feature lets per-target structs annotate
+# `#[derive(Arbitrary)]` when they need typed views on the byte stream.
+arbitrary = { version = "1", features = ["derive"] }
 
 # `unwrap_used`/`expect_used` denied so fuzz targets cannot mask panics
 # behind a hidden `.unwrap()`. Targets must use `if let Ok(_) = ...` or
@@ -42,6 +47,15 @@ expect_used = "deny"
 [[bin]]
 name = "attest_verify"
 path = "fuzz_targets/attest_verify.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P1.T1.a: Chio JWT-VC verify trust boundary.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "jwt_vc_verify"
+path = "fuzz_targets/jwt_vc_verify.rs"
 test = false
 doc = false
 bench = false
