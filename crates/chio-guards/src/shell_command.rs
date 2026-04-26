@@ -188,7 +188,11 @@ fn executable_rm_index(tokens: &[String]) -> Option<usize> {
         if token == "sudo" {
             index += 1;
             while index < tokens.len() && is_sudo_option(tokens[index].as_str()) {
-                let option_takes_value = sudo_option_takes_value(tokens[index].as_str());
+                let sudo_token = tokens[index].as_str();
+                if sudo_option_exits_without_command(sudo_token) {
+                    return None;
+                }
+                let option_takes_value = sudo_option_takes_value(sudo_token);
                 index += 1;
                 if option_takes_value && index < tokens.len() {
                     index += 1;
@@ -208,6 +212,9 @@ fn executable_rm_index(tokens: &[String]) -> Option<usize> {
                 if is_env_assignment(env_token) {
                     index += 1;
                     continue;
+                }
+                if env_option_exits_without_command(env_token) {
+                    return None;
                 }
                 if is_env_option(env_token) {
                     let option_takes_value = env_option_takes_value(env_token);
@@ -273,8 +280,27 @@ fn sudo_option_takes_value(token: &str) -> bool {
     )
 }
 
+fn sudo_option_exits_without_command(token: &str) -> bool {
+    matches!(
+        token,
+        "--help"
+            | "-V"
+            | "--version"
+            | "-v"
+            | "--validate"
+            | "-l"
+            | "--list"
+            | "-K"
+            | "--remove-timestamp"
+    )
+}
+
 fn is_env_option(token: &str) -> bool {
     token.starts_with('-') && token != "-" && token != "--"
+}
+
+fn env_option_exits_without_command(token: &str) -> bool {
+    matches!(token, "--help" | "--version")
 }
 
 fn env_option_takes_value(token: &str) -> bool {
@@ -525,6 +551,8 @@ mod tests {
         assert!(guard.is_forbidden("sudo -r sysadm_r rm -r'f' /"));
         assert!(guard.is_forbidden("sudo -t sysadm_t rm -r'f' /"));
         assert!(guard.is_forbidden("sudo -R /mnt/root rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -h localhost rm -r'f' /"));
+        assert!(guard.is_forbidden("sudo -k rm -r'f' /"));
         assert!(guard.is_forbidden("env FOO=bar rm -r'f' /"));
         assert!(guard.is_forbidden("env -i rm -r'f' /"));
         assert!(guard.is_forbidden("env --ignore-environment rm -r'f' /"));
@@ -539,6 +567,23 @@ mod tests {
         assert!(guard.is_forbidden("echo ok\nrm -r'f' /"));
         assert!(guard.is_forbidden("echo ok\rrm -r'f' /"));
         assert!(guard.is_forbidden("echo ok\r\nrm -r'f' /"));
+    }
+
+    #[test]
+    fn allows_non_executing_wrapper_modes_before_rm_text() {
+        let guard = ShellCommandGuard::new();
+        assert!(!guard.is_forbidden("sudo -V rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo --version rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo -h rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo --help rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo -v rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo --validate rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo -l rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo --list rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo -K rm -r'f' /"));
+        assert!(!guard.is_forbidden("sudo --remove-timestamp rm -r'f' /"));
+        assert!(!guard.is_forbidden("env --help rm -r'f' /"));
+        assert!(!guard.is_forbidden("env --version rm -r'f' /"));
     }
 
     #[test]

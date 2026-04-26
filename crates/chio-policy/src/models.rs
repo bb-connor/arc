@@ -364,7 +364,8 @@ fn has_libyml_quoted_scalar_join_overflow_risk(input: &str) -> bool {
     let mut escaped = false;
     let mut whitespace_run = 0usize;
 
-    for line in input.lines() {
+    let mut lines = input.lines().peekable();
+    while let Some(line) = lines.next() {
         if !in_single && !in_double {
             let indent = leading_whitespace_len(line);
             let trimmed = line.trim_start();
@@ -455,6 +456,13 @@ fn has_libyml_quoted_scalar_join_overflow_risk(input: &str) -> bool {
                 continue;
             }
             previous_is_whitespace = ch.is_ascii_whitespace();
+        }
+
+        if (in_single || in_double) && !escaped && lines.peek().is_some() {
+            whitespace_run += 1;
+            if whitespace_run > MAX_QUOTED_SCALAR_WHITESPACE_RUN {
+                return true;
+            }
         }
     }
 
@@ -638,8 +646,51 @@ fn first_unescaped_double_quote(input: &str) -> Option<usize> {
 }
 
 fn strip_inline_comment(input: &str) -> &str {
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped = false;
     let mut previous_is_whitespace = false;
-    for (index, ch) in input.char_indices() {
+    let mut chars = input.char_indices().peekable();
+
+    while let Some((index, ch)) = chars.next() {
+        if in_single {
+            if ch == '\'' {
+                if matches!(chars.peek(), Some((_, '\''))) {
+                    let _ = chars.next();
+                } else {
+                    in_single = false;
+                }
+            }
+            previous_is_whitespace = false;
+            continue;
+        }
+
+        if escaped {
+            escaped = false;
+            previous_is_whitespace = false;
+            continue;
+        }
+
+        if in_double {
+            if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_double = false;
+            }
+            previous_is_whitespace = false;
+            continue;
+        }
+
+        if ch == '\'' {
+            in_single = true;
+            previous_is_whitespace = false;
+            continue;
+        }
+        if ch == '"' {
+            in_double = true;
+            previous_is_whitespace = false;
+            continue;
+        }
         if ch == '#' && previous_is_whitespace {
             return &input[..index];
         }
@@ -1735,6 +1786,17 @@ mod tests {
     }
 
     #[test]
+    fn document_start_check_keeps_hash_inside_quoted_key() {
+        let input = "\"key # name\": value\n";
+
+        assert!(!has_non_mapping_document_start(input));
+        assert_eq!(
+            strip_inline_comment("\"key # name\": value # trailing"),
+            "\"key # name\": value "
+        );
+    }
+
+    #[test]
     fn parse_allows_block_scalar_with_quoted_long_spaces() {
         let spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN + 1);
         let input = format!(
@@ -1757,6 +1819,20 @@ mod tests {
             "hushspec: \"0.1.0\"\n\
              name: single-quoted-description\n\
              description: 'prefix \"{spaces}suffix'\n"
+        );
+
+        assert!(has_libyml_scalar_join_overflow_risk(&input));
+        assert!(HushSpec::parse(&input).is_err());
+    }
+
+    #[test]
+    fn quoted_whitespace_overflow_counts_folded_line_break() {
+        let left_spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN / 2);
+        let right_spaces = " ".repeat(MAX_QUOTED_SCALAR_WHITESPACE_RUN - left_spaces.len());
+        let input = format!(
+            "hushspec: \"0.1.0\"\n\
+             name: folded-quoted-whitespace\n\
+             description: \"prefix{left_spaces}\n{right_spaces}suffix\"\n"
         );
 
         assert!(has_libyml_scalar_join_overflow_risk(&input));
