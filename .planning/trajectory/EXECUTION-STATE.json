@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:25:04.747Z",
+  "last_checkpoint_at": "2026-04-26T03:30:40.617Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -287,14 +287,15 @@
       }
     },
     "M01.P2.T7": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 51,
+      "merged_sha": "21b971ba6d68168b7cc3f6901a05511c0e7302ea",
+      "branch": "wave/W1/m01/p2.t7-vectors-freeze",
+      "merged_at": "2026-04-26T03:30:40.617Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P2.T8": {
       "status": "pending",
