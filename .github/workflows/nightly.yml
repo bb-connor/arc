@@ -28,6 +28,10 @@ env:
   # ci.yml; the gap between the two tiers is what surfaces shrink-friendly
   # algebra-bug seams that low-case-count PR runs miss.
   PROPTEST_CASES: "4096"
+  # M03.P2.T6: pinned cargo-kani version for the nightly Kani lane.
+  # Must agree with CHIO_KANI_VERSION in ci.yml; the two values are
+  # the source of truth for kani-verifier installs in this repo.
+  CHIO_KANI_VERSION: 0.67.0
 
 concurrency:
   group: nightly-${{ github.ref }}
@@ -110,3 +114,80 @@ jobs:
             --inv=RevocationEventuallySeen \
             --config=formal/tla/MCRevocationPropagation.cfg \
             formal/tla/RevocationPropagation.tla
+
+  # M03.P2.T6: nightly Kani lane that runs the union of `lanes.pr` and
+  # `lanes.nightly_only` from formal/rust-verification/kani-public-harnesses.toml.
+  # The PR job (kani-public-pr in ci.yml) only runs `lanes.pr`; nightly
+  # runs everything so that any harness moved into `lanes.nightly_only`
+  # (currently empty after T6's wall-clock sweep) still gets daily
+  # coverage. Each harness is invoked with the same flags as the PR
+  # lane: `cargo kani -p chio-kernel-core --lib --harness <h>
+  # --default-unwind 8 --no-unwinding-checks`.
+  kani-public-nightly:
+    name: kani-public-nightly (lanes.pr + lanes.nightly_only)
+    # owner: M03
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: ${{ github.event_name == 'pull_request' && format('pr-{0}-kani-public-nightly', github.ref) || format('main-{0}-kani-public-nightly', github.sha) }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-kani
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
+        run: |
+          set -euo pipefail
+          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
+          cargo kani setup
+          cargo kani --version
+
+      - name: Run lanes.pr + lanes.nightly_only Kani harnesses
+        shell: bash
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: |
+          set -euo pipefail
+          mapfile -t HARNESSES < <(python3 - <<'PY'
+          from pathlib import Path
+          try:
+              import tomllib
+          except ModuleNotFoundError:
+              import tomli as tomllib
+          data = tomllib.loads(
+              Path("formal/rust-verification/kani-public-harnesses.toml").read_text(encoding="utf-8")
+          )
+          seen = set()
+          for lane in ("pr", "nightly_only"):
+              for h in data["lanes"][lane]["harnesses"]:
+                  if h not in seen:
+                      seen.add(h)
+                      print(h)
+          PY
+          )
+          if [[ "${#HARNESSES[@]}" -eq 0 ]]; then
+            echo "lanes.pr + lanes.nightly_only are both empty" >&2
+            exit 1
+          fi
+          for harness in "${HARNESSES[@]}"; do
+            echo "::group::cargo kani --harness ${harness}"
+            cargo kani -p chio-kernel-core --lib --harness "${harness}" \
+              --default-unwind 8 --no-unwinding-checks
+            echo "::endgroup::"
+          done
+          echo "Nightly Kani sweep passed (${#HARNESSES[@]} harnesses)"
