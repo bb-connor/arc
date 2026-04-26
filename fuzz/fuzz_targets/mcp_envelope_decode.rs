@@ -35,9 +35,20 @@
 
 #![no_main]
 
+use chio_fuzz::canonical_json::canonical_json_mutate;
 use chio_mcp_edge::fuzz::fuzz_mcp_envelope_decode;
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{fuzz_mutator, fuzz_target};
 
 fuzz_target!(|data: &[u8]| {
     fuzz_mcp_envelope_decode(data);
+});
+
+// M02.P2.T6: opt this canonical-JSON-decoding target into the
+// structure-aware mutator at `fuzz/mutators/canonical_json.rs`. The
+// fuzz_target body is unchanged from M02.P1.T3.a; only the per-iteration
+// mutation strategy switches from libFuzzer's default random-byte
+// mutator to the parse / mutate / re-canonicalize pipeline that keeps
+// inputs shape-valid past the JSON parse stage.
+fuzz_mutator!(|data: &mut [u8], size: usize, max_size: usize, seed: u32| {
+    canonical_json_mutate(data, size, max_size, seed)
 });

@@ -21,6 +21,15 @@ license = "Apache-2.0"
 [package.metadata]
 cargo-fuzz = true
 
+# M02.P2.T6: expose the structure-aware canonical-JSON mutator at
+# `fuzz/mutators/canonical_json.rs` to the four canonical-JSON-decoding
+# `[[bin]]` targets below. The library indirection lets each binary do
+# `use chio_fuzz::canonical_json::canonical_json_mutate;` instead of
+# replicating the mutator behind a `#[path = ...]` `mod` per binary.
+[lib]
+name = "chio_fuzz"
+path = "src/lib.rs"
+
 # An empty `[workspace]` stanza marks this crate as the root of its own
 # Cargo workspace. Without it, `cargo +nightly fuzz build` would attempt
 # to fold the fuzz crate into the parent workspace at `../Cargo.toml`,
@@ -34,6 +43,13 @@ chio-acp-edge = { path = "../crates/chio-acp-edge", features = ["fuzz"] }
 chio-anchor = { path = "../crates/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-config = { path = "../crates/chio-config", features = ["fuzz"] }
+# M02.P2.T6: typed canonical-JSON deserialization targets need
+# `CapabilityToken` / `ChioReceipt` (chio-core-types) and `ToolManifest`
+# (chio-manifest). No `fuzz` feature on either crate; both are pure-serde
+# Deserialize surfaces, so the fuzz harness drives `serde_json::from_slice`
+# directly.
+chio-core-types = { path = "../crates/chio-core-types" }
+chio-manifest = { path = "../crates/chio-manifest" }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
 chio-kernel-core = { path = "../crates/chio-kernel-core", features = ["fuzz"] }
@@ -46,6 +62,11 @@ libfuzzer-sys = "0.4"
 # structured input; the `derive` feature lets per-target structs annotate
 # `#[derive(Arbitrary)]` when they need typed views on the byte stream.
 arbitrary = { version = "1", features = ["derive"] }
+# M02.P2.T6: `serde_json` powers the canonical-JSON mutator parse /
+# serialize loop and the typed-deser fuzz targets. Pinned to the same
+# 1.x line consumed by chio-core-types / chio-manifest so the workspace
+# resolves a single major version.
+serde_json = "1"
 
 # `unwrap_used`/`expect_used` denied so fuzz targets cannot mask panics
 # behind a hidden `.unwrap()`. Targets must use `if let Ok(_) = ...` or
@@ -196,6 +217,49 @@ bench = false
 [[bin]]
 name = "wit_host_call_boundary"
 path = "fuzz_targets/wit_host_call_boundary.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P2.T6: structure-aware canonical-JSON mutator self-driver.
+# Wraps `chio_fuzz::canonical_json::canonical_json_mutate` in a libFuzzer
+# binary so the mutator itself gets fuzzed (parse / mutate / re-serialize
+# loop) and so cargo-fuzz can build it as a smoke check that the
+# mutator wiring compiles. Surviving inputs (no panic in the mutator) are
+# the win; the body deliberately just round-trips through `serde_json::Value`
+# so the mutator drives 100% of the work.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
+[[bin]]
+name = "canonical_json"
+path = "fuzz_targets/canonical_json.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P2.T6: typed `chio-core-types` canonical-JSON deserialization
+# target. Drives `serde_json::from_slice::<CapabilityToken>` and
+# `serde_json::from_slice::<ChioReceipt>` (the two signed canonical-JSON
+# trust-boundary types under chio-core-types) and, on parse success,
+# the receipt-side `ChioReceipt::verify_signature` path. Wired to the
+# canonical-JSON custom mutator so the fuzzer spends its budget
+# exploring the structured shape after the parse stage.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
+[[bin]]
+name = "capability_receipt"
+path = "fuzz_targets/capability_receipt.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P2.T6: `chio-manifest::ToolManifest` canonical-JSON
+# deserialization-plus-roundtrip target. Drives
+# `serde_json::from_slice::<ToolManifest>` and, on success, asserts a
+# decode -> serialize -> decode -> equal-canonical-bytes invariant.
+# Wired to the canonical-JSON custom mutator.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
+[[bin]]
+name = "manifest_roundtrip"
+path = "fuzz_targets/manifest_roundtrip.rs"
 test = false
 doc = false
 bench = false
