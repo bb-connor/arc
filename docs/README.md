@@ -69,6 +69,7 @@ Entry points and maps for the Chio protocol documentation.
 ## Fuzzing
 
 - [Continuous Fuzzing Runbook](fuzzing/continuous.md) - layered strategy (in-tree `cargo +nightly fuzz` matrix, ClusterFuzzLite bridge, OSS-Fuzz primary), GHA budget enforcement, target inventory, local-dev and triage flow
+- [Fuzz Crash Triage Runbook](fuzzing/triage.md) - severity bands (Critical, High, Medium, Low), dedupe rules (sha256 plus crash-type/target/call-site), time-to-fix SLOs (24h ack, 7d Critical, 14d High, 30d Medium), promotion to regression test, regression-deletion guard
 
 ## Protocol and architecture
 
