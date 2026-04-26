@@ -59,3 +59,12 @@ path = "fuzz_targets/jwt_vc_verify.rs"
 test = false
 doc = false
 bench = false
+
+# M02.P1.T1.b: Chio OID4VP direct_post.jwt response verify trust boundary.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "oid4vp_presentation"
+path = "fuzz_targets/oid4vp_presentation.rs"
+test = false
+doc = false
+bench = false
