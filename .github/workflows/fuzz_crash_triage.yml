@@ -1,0 +1,244 @@
+# fuzz_crash_triage.yml - Crash-to-issue automation (M02 P4 T1).
+#
+# Source of truth: .planning/trajectory/02-fuzzing-post-pr13.md, Phase 4 P4.T1
+# (Crash-triage automation section). Decision lock:
+# .planning/trajectory/decisions.yml id=continuous-fuzzing-path.
+#
+# This workflow runs after the three fuzz lanes (fuzz.yml,
+# cflite_pr.yml, cflite_batch.yml) finish. When the upstream conclusion is
+# `failure` (libFuzzer exited non-zero, i.e. a crash was found and the artifact
+# uploaded), this workflow:
+#
+#   1. Downloads the crash artifacts from the failed run via `gh run download`.
+#   2. For each crash file, runs `cargo fuzz tmin <target> <crash-input>`
+#      to minimize the reproducer.
+#   3. Computes the SHA-256 of the minimized input.
+#   4. Searches existing open issues with the `fuzz-crash` label for a
+#      substring match on the SHA-256 (dedupe). If a match is found, posts
+#      a comment on the existing issue with a link to the failed run.
+#   5. Otherwise, opens a new issue using the `fuzz_crash.yml` issue form
+#      template, populating target / sha256 / minimized input / severity.
+#   6. Posts a back-reference comment on the upstream PR (when the failed
+#      run was triggered by a `pull_request` event).
+#
+# Triage SLOs (handled by the runbook in docs/fuzzing/triage.md, M02 P4 T5):
+#   - Critical / High: 1 business day to first triage comment.
+#   - Medium: 3 business days.
+#   - Low: best-effort.
+
+name: fuzz-crash-triage
+
+on:
+  workflow_run:
+    workflows:
+      - fuzz
+      - cflite_pr
+      - cflite_batch
+    types:
+      - completed
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: fuzz-crash-triage-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+env:
+  TRIAGE_LABEL: fuzz-crash
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  triage:
+    # Only act when the upstream fuzz run actually crashed. Successful runs
+    # have nothing to triage.
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust nightly + cargo-fuzz
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache cargo-fuzz binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-bin-v1
+
+      - name: Install cargo-fuzz (if not cached)
+        run: |
+          if ! command -v cargo-fuzz >/dev/null 2>&1; then
+            cargo install cargo-fuzz --locked
+          fi
+
+      - name: Download crash artifacts from upstream run
+        id: download
+        env:
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p crash-artifacts
+          # Best-effort download; if the upstream lane uploaded nothing
+          # (e.g. cflite-only crash with sarif artifact only), exit 0 and
+          # let the post-step short-circuit cleanly.
+          if ! gh run download "${UPSTREAM_RUN_ID}" --dir crash-artifacts; then
+            echo "no-artifacts=true" >>"${GITHUB_OUTPUT}"
+            echo "Upstream run ${UPSTREAM_RUN_ID} produced no downloadable artifacts."
+            exit 0
+          fi
+          # Flatten any artifact-named subdirectories so the find loop below
+          # sees crash-* / oom-* / leak-* / timeout-* files at a uniform depth.
+          find crash-artifacts -type f \
+            \( -name 'crash-*' -o -name 'oom-*' -o -name 'leak-*' -o -name 'timeout-*' \) \
+            -print >crash-artifacts/_inventory.txt || true
+          inventory_count=$(wc -l <crash-artifacts/_inventory.txt | tr -d ' ')
+          echo "Found ${inventory_count} candidate crash files."
+          if [ "${inventory_count}" = "0" ]; then
+            echo "no-artifacts=true" >>"${GITHUB_OUTPUT}"
+          fi
+
+      - name: Minimize, dedupe, and file issues
+        if: ${{ steps.download.outputs.no-artifacts != 'true' }}
+        env:
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          UPSTREAM_RUN_NAME: ${{ github.event.workflow_run.name }}
+          UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          UPSTREAM_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          UPSTREAM_EVENT: ${{ github.event.workflow_run.event }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # The upstream lanes name their crash artifacts after the fuzz
+          # target (e.g. `crash-attest_verify`, `cflite-corpus-jwt_vc_verify`),
+          # so the parent directory of each crash file tells us which target
+          # owns it. The list of valid targets matches fuzz/fuzz_targets/.
+          known_targets=$(find fuzz/fuzz_targets -maxdepth 1 -type f -name '*.rs' -printf '%f\n' 2>/dev/null \
+            | sed 's/\.rs$//' \
+            | sort -u)
+
+          while IFS= read -r crash_path; do
+            [ -n "${crash_path}" ] || continue
+            artifact_dir=$(dirname "${crash_path}")
+            artifact_name=$(basename "${artifact_dir}")
+            target=""
+            for t in ${known_targets}; do
+              case "${artifact_name}" in
+                *"${t}"*) target="${t}"; break;;
+              esac
+            done
+            if [ -z "${target}" ]; then
+              echo "::warning::Could not infer fuzz target from artifact name '${artifact_name}'; skipping ${crash_path}"
+              continue
+            fi
+
+            echo "Minimizing ${crash_path} for target ${target}"
+            min_dir="minimized/${target}"
+            mkdir -p "${min_dir}"
+            min_path="${min_dir}/$(basename "${crash_path}").min"
+
+            # cargo fuzz tmin writes to a deterministic location under
+            # fuzz/artifacts/<target>/. Run with a 60-second per-input cap;
+            # if minimization fails we fall back to the original input so we
+            # still file an issue.
+            if ! cargo +nightly fuzz tmin "${target}" "${crash_path}" --runs 100000 -- -timeout=10 >tmin.log 2>&1; then
+              echo "::warning::cargo fuzz tmin failed for ${crash_path}; falling back to original input"
+              cp "${crash_path}" "${min_path}"
+            else
+              # tmin emits a `minimized-from-*` file in fuzz/artifacts/<target>/.
+              # Pick the most recently modified candidate via find -printf '%T@'
+              # to avoid `ls -t` (SC2012) on filenames we do not control.
+              latest=$(find "fuzz/artifacts/${target}" -maxdepth 1 -type f -name 'minimized-from-*' \
+                  -printf '%T@ %p\n' 2>/dev/null \
+                | sort -nr \
+                | head -n1 \
+                | awk '{print $2}')
+              if [ -n "${latest}" ]; then
+                cp "${latest}" "${min_path}"
+              else
+                cp "${crash_path}" "${min_path}"
+              fi
+            fi
+
+            sha256=$(shasum -a 256 "${min_path}" | awk '{print $1}')
+            b64=$(base64 <"${min_path}" | tr -d '\n')
+            echo "Crash sha256=${sha256} target=${target}"
+
+            # Dedupe: search existing open fuzz-crash issues for a substring
+            # match on the SHA-256. The issue body always includes the full
+            # hex digest under `### Minimized input SHA-256`, so a substring
+            # search on the first 16 chars is precise enough.
+            sha_prefix=$(echo "${sha256}" | cut -c1-16)
+            existing=$(gh issue list \
+              --repo "${REPO_FULL}" \
+              --state open \
+              --label "${TRIAGE_LABEL}" \
+              --search "${sha_prefix} in:body" \
+              --json number,title \
+              --jq '.[0].number' || true)
+
+            if [ -n "${existing}" ] && [ "${existing}" != "null" ]; then
+              echo "Dedupe hit: existing issue #${existing} matches sha256 prefix ${sha_prefix}"
+              dedupe_body=$(printf 'Recurrence detected by [fuzz-crash-triage](%s).\n* Upstream lane: %s\n* Head SHA: %s\n* Branch: %s\n* Target: %s\n* SHA-256: %s\n' \
+                "${UPSTREAM_RUN_URL}" "${UPSTREAM_RUN_NAME}" "${UPSTREAM_HEAD_SHA}" "${UPSTREAM_HEAD_BRANCH}" "${target}" "${sha256}")
+              gh issue comment "${existing}" --repo "${REPO_FULL}" --body "${dedupe_body}"
+              continue
+            fi
+
+            # File a new issue. We populate the body with the same field
+            # labels the issue form uses so a human editing the issue later
+            # sees a familiar shape, and so the next dedupe pass finds the
+            # SHA-256 substring in a stable location.
+            issue_title="[fuzz-crash] ${target}: ${sha_prefix}"
+            body_file=$(mktemp)
+            # shellcheck disable=SC2016 # printf format strings are deliberately single-quoted; %s args expand below.
+            {
+              printf 'Auto-filed by [fuzz-crash-triage](%s).\n\n' "${UPSTREAM_RUN_URL}"
+              printf '### Fuzz target\n%s\n\n' "${target}"
+              printf '### Minimized input SHA-256\n%s\n\n' "${sha256}"
+              printf '### Minimized input (base64)\n```\n%s\n```\n\n' "${b64}"
+              printf '### Severity\nMedium\n\n'
+              printf '### Triage notes\n* Upstream lane: %s\n* Head SHA: %s\n* Branch: %s\n* Event: %s\n\n' \
+                "${UPSTREAM_RUN_NAME}" "${UPSTREAM_HEAD_SHA}" "${UPSTREAM_HEAD_BRANCH}" "${UPSTREAM_EVENT}"
+              printf 'Reproduce locally:\n```\necho %s | base64 -d >/tmp/%s.min\ncargo +nightly fuzz run %s /tmp/%s.min\n```\n\n' \
+                "'${b64}'" "${target}" "${target}" "${target}"
+              printf 'See `docs/fuzzing/triage.md` for the triage runbook and SLOs.\n'
+            } >"${body_file}"
+            gh issue create \
+              --repo "${REPO_FULL}" \
+              --title "${issue_title}" \
+              --label "${TRIAGE_LABEL}" \
+              --label "triage" \
+              --body-file "${body_file}"
+            rm -f "${body_file}"
+          done <crash-artifacts/_inventory.txt
+
+      - name: Comment on upstream PR (if any)
+        if: ${{ steps.download.outputs.no-artifacts != 'true' && github.event.workflow_run.event == 'pull_request' }}
+        env:
+          UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          UPSTREAM_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Locate the PR whose head SHA matches the upstream run.
+          pr_number=$(gh pr list \
+            --repo "${REPO_FULL}" \
+            --state open \
+            --search "${UPSTREAM_HEAD_SHA}" \
+            --json number \
+            --jq '.[0].number' || true)
+          if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
+            gh pr comment "${pr_number}" --repo "${REPO_FULL}" --body "fuzz-crash-triage processed crashes from [this run](${UPSTREAM_RUN_URL}). Open issues with the \`fuzz-crash\` label for details."
+          fi
