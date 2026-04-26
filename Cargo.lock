@@ -2472,6 +2472,8 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "hex",
+ "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
 ]
 
