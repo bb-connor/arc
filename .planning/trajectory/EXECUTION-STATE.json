@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T00:22:28.898Z",
-  "current_wave": 0,
+  "last_checkpoint_at": "2026-04-26T00:41:28.388Z",
+  "current_wave": 1,
   "halt": {
     "halted": false,
     "reason": null,
@@ -12,18 +12,22 @@
   "milestones": {
     "M01": {
       "status": "pending",
-      "phase": null,
-      "owner_branch": null
+      "phase": "P0",
+      "owner_branch": null,
+      "scheduled_in_wave": "1a"
     },
     "M02": {
-      "status": "pending",
-      "phase": null,
-      "owner_branch": null
+      "status": "blocked",
+      "phase": "P0",
+      "owner_branch": null,
+      "scheduled_in_wave": "1b",
+      "blocked_on": "PR #13 merge"
     },
     "M03": {
       "status": "pending",
-      "phase": null,
-      "owner_branch": null
+      "phase": "P0",
+      "owner_branch": null,
+      "scheduled_in_wave": "1a"
     },
     "M04": {
       "status": "pending",
@@ -52,8 +56,9 @@
     },
     "M09": {
       "status": "pending",
-      "phase": null,
-      "owner_branch": null
+      "phase": "P0",
+      "owner_branch": null,
+      "scheduled_in_wave": "1a"
     },
     "M10": {
       "status": "pending",
@@ -61,7 +66,438 @@
       "owner_branch": null
     }
   },
-  "tickets": {},
+  "tickets": {
+    "M01.P0.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T2": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T3": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T4.a": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T4.b": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T4.c": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T5": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T6": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P1.T7": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T2": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T3": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T4": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T5": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T6": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T7": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M01.P2.T8": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M02.P0.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P0.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T2": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T3": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T4": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T5": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T6": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M03.P1.T7": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P0.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T10": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T11": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T2": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T3": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T4": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T5": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T6": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T7": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T8": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P1.T9": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P2.T1": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P2.T2": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P2.T3": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    },
+    "M09.P2.T4": {
+      "status": "pending",
+      "attempts": 0,
+      "executor_id": null,
+      "branch": null,
+      "pr_number": null,
+      "merged_at": null,
+      "diff_stats": null,
+      "divergence_checks": null
+    }
+  },
   "wave_gate_history": [],
   "pr_state_cache": {
     "13": {
@@ -95,5 +531,12 @@
       "fuzz/target-map.toml (Wave 0 deliverable; not yet committed)",
       "GitHub branch ruleset on main (configured externally; user prereq)"
     ]
+  },
+  "wave_heads": {
+    "WAVE_0_HEAD": "bad404f1985536e84cb948c7380dc325b2d94e50",
+    "WAVE_1_HEAD": null,
+    "WAVE_2_HEAD": null,
+    "WAVE_3_HEAD": null,
+    "WAVE_4_HEAD": null
   }
 }

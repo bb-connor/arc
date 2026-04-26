@@ -1,18 +1,1107 @@
 # GENERATED from per-phase files under .planning/trajectory/tickets/M{nn}/P{n}.yml
-# Do not hand-edit. Regenerate with `cargo xtask trajectory regen-manifest`
-# (Wave 0 deliverable). CI validates manifest.yml against schema.json on
-# every PR.
+# Do not hand-edit. Regenerate with `cargo xtask trajectory regen-manifest`.
+# CI validates manifest.yml against schema.json on every PR.
 #
-# Wave-0 seed state: per-phase ticket files are authored by the milestone
-# owners as part of the Wave 0 preflight PR. Until those files land, this
-# manifest is empty by design. Wave 1a CANNOT start scheduling until the
-# Wave 1a per-phase tickets (M01/P1.yml, M01/P2.yml, M03/P1.yml,
-# M09/P1.yml, M09/P2.yml plus the four Wave-opener lock-bump tickets) are
-# present and pass schema validation.
-#
-# To author the Wave 1a tickets:
-#   1. Read the milestone doc's "Phase N task breakdown (atomic)" section.
-#   2. Translate each (P{n}.T{k}) entry into a ticket per schema.json.
-#   3. Commit under .planning/trajectory/tickets/M{nn}/P{n}.yml.
-#   4. Regenerate this manifest.
-[]
+# The per-phase files under tickets/M{nn}/P{n}.yml are the source of truth.
+# This manifest is a flat, id-sorted concatenation. Empty manifest is the
+# Wave-0 seed state until the Wave 1a phase tickets are authored.
+
+- id: M01.P0.T1
+  milestone: M01
+  phase: 0
+  title: 'Wave-opener: refresh Cargo.lock for M01 spec-codegen phase'
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - Cargo.lock
+  - Cargo.toml
+  shared_paths:
+  - Cargo.lock
+  depends_on:
+  - M03.P0.T1
+  soft_deps:
+  - Third in the Wave-1 lock-bump chain; M01 P1 schema additions baseline against this.
+  gate_check:
+    cmd: cargo update --workspace --quiet && cargo metadata --locked --no-deps --format-version 1 >/dev/null && cargo build --workspace --quiet
+  worktree_branch: wave/W1/m01/p0.t1-wave-opener-lock-bump
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T1
+  milestone: M01
+  phase: 1
+  title: Audit conformance scenarios and produce spec/schemas/COVERAGE.md checklist
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - spec/schemas/COVERAGE.md
+  shared_paths: []
+  depends_on: []
+  soft_deps: []
+  gate_check:
+    cmd: test -f spec/schemas/COVERAGE.md && ! grep -q '^TBD$' spec/schemas/COVERAGE.md
+  worktree_branch: wave/W1/m01/p1.t1-schema-coverage-audit
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T2
+  milestone: M01
+  phase: 1
+  title: Land capability-token, grant, and revocation wire schemas (3 files)
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - spec/schemas/chio-wire/v1/capability/token.schema.json
+  - spec/schemas/chio-wire/v1/capability/grant.schema.json
+  - spec/schemas/chio-wire/v1/capability/revocation.schema.json
+  - spec/schemas/chio-wire/v1/capability/README.md
+  - spec/schemas/MANIFEST.sha256
+  shared_paths:
+  - spec/schemas/MANIFEST.sha256
+  depends_on:
+  - M01.P1.T1
+  soft_deps:
+  - M03 capability algebra invariants (crates/chio-core-types/src/capability*.rs)
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- trajectory regen-manifest --check && jq -e . spec/schemas/chio-wire/v1/capability/token.schema.json && jq -e . spec/schemas/chio-wire/v1/capability/grant.schema.json && jq -e . spec/schemas/chio-wire/v1/capability/revocation.schema.json
+  worktree_branch: wave/W1/m01/p1.t2-capability-schemas
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T3
+  milestone: M01
+  phase: 1
+  title: Land receipt record and inclusion-proof wire schemas (2 files)
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - spec/schemas/chio-wire/v1/receipt/record.schema.json
+  - spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
+  - spec/schemas/chio-wire/v1/receipt/README.md
+  - spec/schemas/MANIFEST.sha256
+  shared_paths:
+  - spec/schemas/MANIFEST.sha256
+  depends_on:
+  - M01.P1.T2
+  soft_deps:
+  - M04 deterministic replay consumes receipt schemas (tests/replay/goldens/**)
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- trajectory regen-manifest --check && jq -e . spec/schemas/chio-wire/v1/receipt/record.schema.json && jq -e . spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
+  worktree_branch: wave/W1/m01/p1.t3-receipt-schemas
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T4.a
+  milestone: M01
+  phase: 1
+  title: 'Land jsonrpc framing wire schemas: request, response, notification (3 files)'
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - spec/schemas/chio-wire/v1/jsonrpc/request.schema.json
+  - spec/schemas/chio-wire/v1/jsonrpc/response.schema.json
+  - spec/schemas/chio-wire/v1/jsonrpc/notification.schema.json
+  - spec/schemas/chio-wire/v1/jsonrpc/README.md
+  - spec/schemas/MANIFEST.sha256
+  shared_paths:
+  - spec/schemas/MANIFEST.sha256
+  depends_on:
+  - M01.P1.T3
+  soft_deps: []
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- trajectory regen-manifest --check && jq -e . spec/schemas/chio-wire/v1/jsonrpc/request.schema.json && jq -e . spec/schemas/chio-wire/v1/jsonrpc/response.schema.json && jq -e . spec/schemas/chio-wire/v1/jsonrpc/notification.schema.json
+  worktree_branch: wave/W1/m01/p1.t4.a-jsonrpc-framing-schemas
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T4.b
+  milestone: M01
+  phase: 1
+  title: 'Land trust-control wire schemas: lease, heartbeat, terminate, attestation (4 files)'
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - spec/schemas/chio-wire/v1/trust-control/lease.schema.json
+  - spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json
+  - spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
+  - spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
+  - spec/schemas/chio-wire/v1/trust-control/README.md
+  - spec/schemas/MANIFEST.sha256
+  shared_paths:
+  - spec/schemas/MANIFEST.sha256
+  depends_on:
+  - M01.P1.T4.a
+  soft_deps: []
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- trajectory regen-manifest --check && jq -e . spec/schemas/chio-wire/v1/trust-control/lease.schema.json && jq -e . spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json && jq -e . spec/schemas/chio-wire/v1/trust-control/terminate.schema.json && jq -e . spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
+  worktree_branch: wave/W1/m01/p1.t4.b-trust-control-schemas
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T4.c
+  milestone: M01
+  phase: 1
+  title: 'Land provenance wire schemas: stamp, context, attestation-bundle, verdict-link (4 files)'
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - spec/schemas/chio-wire/v1/provenance/stamp.schema.json
+  - spec/schemas/chio-wire/v1/provenance/context.schema.json
+  - spec/schemas/chio-wire/v1/provenance/attestation-bundle.schema.json
+  - spec/schemas/chio-wire/v1/provenance/verdict-link.schema.json
+  - spec/schemas/chio-wire/v1/provenance/README.md
+  - spec/schemas/MANIFEST.sha256
+  shared_paths:
+  - spec/schemas/MANIFEST.sha256
+  depends_on:
+  - M01.P1.T4.b
+  soft_deps:
+  - M07 tool-call fabric consumes provenance/stamp schema (crates/chio-tool-call-fabric/**)
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- trajectory regen-manifest --check && jq -e . spec/schemas/chio-wire/v1/provenance/stamp.schema.json && jq -e . spec/schemas/chio-wire/v1/provenance/context.schema.json && jq -e . spec/schemas/chio-wire/v1/provenance/attestation-bundle.schema.json && jq -e . spec/schemas/chio-wire/v1/provenance/verdict-link.schema.json
+  worktree_branch: wave/W1/m01/p1.t4.c-provenance-schemas
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T5
+  milestone: M01
+  phase: 1
+  title: Extend chio-http schemas with stream-frame, session-init, session-resume, error-envelope (4 files)
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - spec/schemas/chio-http/v1/stream-frame.schema.json
+  - spec/schemas/chio-http/v1/session-init.schema.json
+  - spec/schemas/chio-http/v1/session-resume.schema.json
+  - spec/schemas/chio-http/v1/error-envelope.schema.json
+  - spec/schemas/MANIFEST.sha256
+  shared_paths:
+  - spec/schemas/MANIFEST.sha256
+  depends_on:
+  - M01.P1.T4.c
+  soft_deps: []
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- trajectory regen-manifest --check && jq -e . spec/schemas/chio-http/v1/stream-frame.schema.json && jq -e . spec/schemas/chio-http/v1/session-init.schema.json && jq -e . spec/schemas/chio-http/v1/session-resume.schema.json && jq -e . spec/schemas/chio-http/v1/error-envelope.schema.json
+  worktree_branch: wave/W1/m01/p1.t5-chio-http-edge-schemas
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T6
+  milestone: M01
+  phase: 1
+  title: Land chio-spec-validate binary and wire as cargo xtask validate-scenarios
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - crates/chio-spec-validate/Cargo.toml
+  - crates/chio-spec-validate/src/main.rs
+  - crates/chio-spec-validate/src/lib.rs
+  - crates/chio-spec-validate/tests/scenarios.rs
+  - crates/chio-spec-validate/README.md
+  - xtask/src/main.rs
+  - Cargo.toml
+  - Cargo.lock
+  shared_paths:
+  - Cargo.toml
+  - Cargo.lock
+  depends_on:
+  - M01.P1.T5
+  soft_deps: []
+  gate_check:
+    cmd: cargo run --quiet -p xtask -- validate-scenarios && cargo test -p chio-spec-validate
+  worktree_branch: wave/W1/m01/p1.t6-spec-validate-binary
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P1.T7
+  milestone: M01
+  phase: 1
+  title: Drop out-of-band disclaimer from chio-wire README and stamp deprecation headers on hand-typed model files
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - spec/schemas/chio-wire/v1/README.md
+  - sdks/python/chio-sdk-python/src/chio_sdk/models.py
+  - sdks/typescript/packages/conformance/src/index.ts
+  - sdks/go/chio-go-http/types.go
+  shared_paths: []
+  depends_on:
+  - M01.P1.T6
+  soft_deps: []
+  gate_check:
+    cmd: grep -q 'chio-deprecation' sdks/python/chio-sdk-python/src/chio_sdk/models.py && grep -q 'chio-deprecation' sdks/typescript/packages/conformance/src/index.ts && grep -q 'chio-deprecation' sdks/go/chio-go-http/types.go && ! grep -q 'out-of-band' spec/schemas/chio-wire/v1/README.md
+  worktree_branch: wave/W1/m01/p1.t7-deprecation-headers-and-readme
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T1
+  milestone: M01
+  phase: 2
+  title: Land vectors_oracle.rs and grow canonical corpus to 20 cases
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - tests/bindings/vectors/canonical/v1.json
+  - tests/bindings/vectors/MANIFEST.sha256
+  - crates/chio-conformance/tests/vectors_oracle.rs
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on: []
+  soft_deps:
+  - M02 consumes canonical/v1.json as a libFuzzer seed corpus for canonical_roundtrip
+  - M04 consumes canonical/v1.json as the byte-freeze basis for replay fixtures
+  - M07 round-trip checks reuse canonical vectors for ProvenanceStamp wire shape
+  - M08 browser/Workers/Edge/Deno targets must produce byte-identical output to these vectors
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_oracle
+  worktree_branch: wave/W1/m01/p2.t1-vectors-oracle-canonical-20
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T2
+  milestone: M01
+  phase: 2
+  title: Grow manifest vector corpus from 5 to 20 cases
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - tests/bindings/vectors/manifest/v1.json
+  - tests/bindings/vectors/MANIFEST.sha256
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on:
+  - M01.P2.T1
+  soft_deps:
+  - M02 consumes manifest/v1.json as a fuzz seed corpus
+  - M04 reuses manifest cases as canonical-JSON freeze basis
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_oracle
+  worktree_branch: wave/W1/m01/p2.t2-manifest-corpus-20
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T3
+  milestone: M01
+  phase: 2
+  title: Grow hashing vector corpus from 3 to 20 cases
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - tests/bindings/vectors/hashing/v1.json
+  - tests/bindings/vectors/MANIFEST.sha256
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on:
+  - M01.P2.T1
+  soft_deps:
+  - M02 consumes hashing/v1.json as a fuzz seed corpus
+  - M08 browser hashing targets validate against these cases
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_oracle
+  worktree_branch: wave/W1/m01/p2.t3-hashing-corpus-20
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T4
+  milestone: M01
+  phase: 2
+  title: Grow signing vector corpus from 4 to 20 cases with signed_bytes
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - tests/bindings/vectors/signing/v1.json
+  - tests/bindings/vectors/MANIFEST.sha256
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on:
+  - M01.P2.T1
+  soft_deps:
+  - M02 consumes signing/v1.json as a libFuzzer seed corpus
+  - M04 reuses signing cases for golden receipts
+  - M07 cross-provider signed-bytes equivalence depends on this corpus
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_oracle
+  worktree_branch: wave/W1/m01/p2.t4-signing-corpus-20
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T5
+  milestone: M01
+  phase: 2
+  title: Grow receipt vector corpus from 8 to 20 cases incl. anchored proofs
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - tests/bindings/vectors/receipt/v1.json
+  - tests/bindings/vectors/MANIFEST.sha256
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on:
+  - M01.P2.T1
+  - M01.P1.T3
+  soft_deps:
+  - M04 consumes receipt vectors as the canonical-JSON freeze for tests/replay/fixtures and goldens
+  - M07 ProvenanceStamp round-trip reuses these vectors
+  - M08 browser receipt verifier validates against verify_only-tagged cases
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_oracle
+  worktree_branch: wave/W1/m01/p2.t5-receipt-corpus-20
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T6
+  milestone: M01
+  phase: 2
+  title: Grow capability vector corpus from 10 to 20 cases
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - tests/bindings/vectors/capability/v1.json
+  - tests/bindings/vectors/MANIFEST.sha256
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on:
+  - M01.P2.T1
+  - M01.P1.T2
+  soft_deps:
+  - M02 consumes capability/v1.json as a fuzz seed corpus
+  - M08 browser capability verifier validates against verify_only-tagged cases
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_oracle
+  worktree_branch: wave/W1/m01/p2.t6-capability-corpus-20
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T7
+  milestone: M01
+  phase: 2
+  title: Land cargo xtask freeze-vectors and finalize MANIFEST.sha256
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - tests/bindings/vectors/MANIFEST.sha256
+  - xtask/src/main.rs
+  shared_paths:
+  - tests/bindings/vectors/MANIFEST.sha256
+  depends_on:
+  - M01.P2.T1
+  - M01.P2.T2
+  - M01.P2.T3
+  - M01.P2.T4
+  - M01.P2.T5
+  - M01.P2.T6
+  soft_deps:
+  - M01 P5 spec-drift workflow runs freeze-vectors --check on every PR
+  - Nightly vectors-staleness.yml job invokes freeze-vectors --check
+  gate_check:
+    cmd: cargo xtask freeze-vectors --check
+  worktree_branch: wave/W1/m01/p2.t7-freeze-vectors-xtask
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M01.P2.T8
+  milestone: M01
+  phase: 2
+  title: Land vectors_schema_pair.rs asserting domain-to-schema coverage
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - crates/chio-conformance/tests/vectors_schema_pair.rs
+  shared_paths: []
+  depends_on:
+  - M01.P2.T1
+  - M01.P2.T2
+  - M01.P2.T3
+  - M01.P2.T4
+  - M01.P2.T5
+  - M01.P2.T6
+  soft_deps:
+  - M01 P5 schema-coverage CI job reuses this test
+  - M04 golden gate adds chio-spec-validate on every receipt before byte comparison
+  gate_check:
+    cmd: cargo test -p chio-conformance --test vectors_schema_pair
+  worktree_branch: wave/W1/m01/p2.t8-vectors-schema-pair
+  agent_role: spec-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M02.P0.T1
+  milestone: M02
+  phase: 0
+  title: 'Wave-opener: refresh Cargo.lock for M02 fuzzing-expansion phase'
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - Cargo.lock
+  - Cargo.toml
+  shared_paths:
+  - Cargo.lock
+  depends_on:
+  - M01.P0.T1
+  soft_deps:
+  - 'Last in the Wave-1 lock-bump chain. Scheduling gated on PR #13 merge per EXECUTION-BOARD.md section 1 row 11.'
+  gate_check:
+    cmd: cargo update --workspace --quiet && cargo metadata --locked --no-deps --format-version 1 >/dev/null && cargo build --workspace --quiet
+  worktree_branch: wave/W1/m02/p0.t1-wave-opener-lock-bump
+  agent_role: fuzz-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P0.T1
+  milestone: M03
+  phase: 0
+  title: 'Wave-opener: refresh Cargo.lock for M03 capability-algebra phase'
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - Cargo.lock
+  - Cargo.toml
+  shared_paths:
+  - Cargo.lock
+  depends_on:
+  - M09.P0.T1
+  soft_deps:
+  - Second in the Wave-1 lock-bump chain; M03 P1 proptest dev-dep enable baselines against this.
+  gate_check:
+    cmd: cargo update --workspace --quiet && cargo metadata --locked --no-deps --format-version 1 >/dev/null && cargo build --workspace --quiet
+  worktree_branch: wave/W1/m03/p0.t1-wave-opener-lock-bump
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T1
+  milestone: M03
+  phase: 1
+  title: Enable proptest dev-dep across the four algebra crates and seed regression dirs
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - crates/chio-core-types/Cargo.toml
+  - crates/chio-kernel-core/Cargo.toml
+  - crates/chio-credentials/Cargo.toml
+  - crates/chio-policy/Cargo.toml
+  - crates/chio-core-types/proptest-regressions/.gitkeep
+  - crates/chio-kernel-core/proptest-regressions/.gitkeep
+  - crates/chio-credentials/proptest-regressions/.gitkeep
+  - crates/chio-policy/proptest-regressions/.gitkeep
+  shared_paths:
+  - Cargo.lock
+  depends_on: []
+  soft_deps: []
+  gate_check:
+    cmd: cargo build -p chio-core-types -p chio-kernel-core -p chio-credentials -p chio-policy --tests
+  worktree_branch: wave/W1/m03/p1.t1-proptest-devdep
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T2
+  milestone: M03
+  phase: 1
+  title: Land five capability algebra proptest invariants in chio-core-types
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - crates/chio-core-types/tests/property_capability_algebra.rs
+  - crates/chio-core-types/Cargo.toml
+  shared_paths: []
+  depends_on:
+  - M03.P1.T1
+  soft_deps: []
+  gate_check:
+    cmd: cargo test -p chio-core-types --test property_capability_algebra
+  worktree_branch: wave/W1/m03/p1.t2-core-types-algebra-invariants
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T3
+  milestone: M03
+  phase: 1
+  title: Land five evaluate proptest invariants in chio-kernel-core
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - crates/chio-kernel-core/tests/property_evaluate.rs
+  - crates/chio-kernel-core/Cargo.toml
+  shared_paths: []
+  depends_on:
+  - M03.P1.T1
+  soft_deps: []
+  gate_check:
+    cmd: cargo test -p chio-kernel-core --test property_evaluate
+  worktree_branch: wave/W1/m03/p1.t3-kernel-core-evaluate-invariants
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T4
+  milestone: M03
+  phase: 1
+  title: Land four passport lifecycle proptest invariants in chio-credentials
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - crates/chio-credentials/tests/property_passport.rs
+  - crates/chio-credentials/Cargo.toml
+  shared_paths: []
+  depends_on:
+  - M03.P1.T1
+  soft_deps: []
+  gate_check:
+    cmd: cargo test -p chio-credentials --test property_passport
+  worktree_branch: wave/W1/m03/p1.t4-credentials-passport-invariants
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T5
+  milestone: M03
+  phase: 1
+  title: Land four merge/evaluate proptest invariants in chio-policy
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - crates/chio-policy/tests/property_evaluate.rs
+  - crates/chio-policy/Cargo.toml
+  shared_paths: []
+  depends_on:
+  - M03.P1.T1
+  soft_deps: []
+  gate_check:
+    cmd: cargo test -p chio-policy --test property_evaluate
+  worktree_branch: wave/W1/m03/p1.t5-policy-evaluate-invariants
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T6
+  milestone: M03
+  phase: 1
+  title: Tier proptest case count by lane (PR=256, nightly=4096)
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - '.github/workflows/ci.yml'
+  - '.github/workflows/nightly.yml'
+  shared_paths:
+  - '.github/workflows/ci.yml'
+  depends_on:
+  - M03.P1.T2
+  - M03.P1.T3
+  - M03.P1.T4
+  - M03.P1.T5
+  soft_deps: []
+  gate_check:
+    cmd: actionlint .github/workflows/ci.yml .github/workflows/nightly.yml || true; grep -q PROPTEST_CASES .github/workflows/ci.yml
+  worktree_branch: wave/W1/m03/p1.t6-tier-proptest-cases
+  agent_role: infra-yaml
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M03.P1.T7
+  milestone: M03
+  phase: 1
+  title: Gate proptest invariant inventory via check-proptest-coverage script
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - scripts/check-proptest-coverage.sh
+  - '.github/workflows/ci.yml'
+  shared_paths:
+  - '.github/workflows/ci.yml'
+  depends_on:
+  - M03.P1.T2
+  - M03.P1.T3
+  - M03.P1.T4
+  - M03.P1.T5
+  soft_deps: []
+  gate_check:
+    cmd: bash scripts/check-proptest-coverage.sh
+  worktree_branch: wave/W1/m03/p1.t7-proptest-coverage-gate
+  agent_role: kernel-rust
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P0.T1
+  milestone: M09
+  phase: 0
+  title: 'Wave-opener: refresh Cargo.lock for M09 supply-chain phase'
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - Cargo.lock
+  - Cargo.toml
+  shared_paths:
+  - Cargo.lock
+  depends_on: []
+  soft_deps:
+  - Lands first in the Wave-1 lock-bump chain so M09 P1 cargo-vet bootstrap baselines against a fresh resolver run.
+  gate_check:
+    cmd: cargo update --workspace --quiet && cargo metadata --locked --no-deps --format-version 1 >/dev/null && cargo build --workspace --quiet
+  worktree_branch: wave/W1/m09/p0.t1-wave-opener-lock-bump
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T1
+  milestone: M09
+  phase: 1
+  title: Bootstrap cargo-vet workspace and seed supply-chain/ skeleton
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - supply-chain/audits.toml
+  - supply-chain/config.toml
+  - supply-chain/imports.lock
+  - Cargo.toml
+  shared_paths:
+  - Cargo.lock
+  depends_on: []
+  soft_deps:
+  - M02 fuzz CI consumes cargo-vet metadata (fuzz/fuzz_targets/**)
+  gate_check:
+    cmd: cargo vet --locked
+  worktree_branch: wave/W1/m09/p1.t1-cargo-vet-bootstrap
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T10
+  milestone: M09
+  phase: 1
+  title: Document the cargo vet certify ritual in supply-chain/README.md
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - supply-chain/README.md
+  shared_paths: []
+  depends_on:
+  - M09.P1.T3
+  soft_deps: []
+  gate_check:
+    cmd: test -f supply-chain/README.md && grep -q 'cargo vet certify' supply-chain/README.md
+  worktree_branch: wave/W1/m09/p1.t10-supply-chain-readme
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T11
+  milestone: M09
+  phase: 1
+  title: Promote cargo-vet and cargo-deny lanes to required checks on main via branch ruleset
+  status: pending
+  effort_days: 0.5
+  owner_glob:
+  - '.github/workflows/ci.yml'
+  shared_paths:
+  - '.github/workflows/ci.yml'
+  depends_on:
+  - M09.P1.T8
+  - M09.P1.T9
+  soft_deps: []
+  gate_check:
+    cmd: actionlint .github/workflows/ci.yml
+  worktree_branch: wave/W1/m09/p1.t11-required-checks-promotion
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T2
+  milestone: M09
+  phase: 1
+  title: Import upstream cargo-vet audit feeds (Mozilla, Bytecode Alliance, Google, ZcashFoundation)
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - supply-chain/config.toml
+  - supply-chain/imports.lock
+  shared_paths: []
+  depends_on:
+  - M09.P1.T1
+  soft_deps: []
+  gate_check:
+    cmd: cargo vet --locked && grep -q 'imports.mozilla' supply-chain/config.toml && grep -q 'imports.bytecode-alliance' supply-chain/config.toml && grep -q 'imports.google' supply-chain/config.toml && grep -q 'imports.zcash' supply-chain/config.toml
+  worktree_branch: wave/W1/m09/p1.t2-import-upstream-feeds
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T3
+  milestone: M09
+  phase: 1
+  title: Run cargo vet suggest and certify residual unaudited crates with safe-to-deploy entries
+  status: pending
+  effort_days: 2
+  owner_glob:
+  - supply-chain/audits.toml
+  shared_paths: []
+  depends_on:
+  - M09.P1.T2
+  soft_deps: []
+  gate_check:
+    cmd: cargo vet --locked && cargo vet check
+  worktree_branch: wave/W1/m09/p1.t3-residual-audit-certifications
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T4
+  milestone: M09
+  phase: 1
+  title: Replace deny.toml wholesale with the Phase 1 verbatim hardened configuration
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - deny.toml
+  shared_paths:
+  - deny.toml
+  depends_on:
+  - M09.P1.T1
+  soft_deps: []
+  gate_check:
+    cmd: cargo deny check
+  worktree_branch: wave/W1/m09/p1.t4-deny-toml-verbatim-replacement
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T5
+  milestone: M09
+  phase: 1
+  title: Audit and document [bans.skip] allow-list entries (windows-sys, syn 1, bitflags 1)
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - deny.toml
+  shared_paths:
+  - deny.toml
+  depends_on:
+  - M09.P1.T4
+  soft_deps: []
+  gate_check:
+    cmd: cargo deny check bans
+  worktree_branch: wave/W1/m09/p1.t5-bans-skip-allowlist-audit
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T6
+  milestone: M09
+  phase: 1
+  title: Audit [advisories] ignore-list and seed RUSTSEC override entries with rationale
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - deny.toml
+  shared_paths:
+  - deny.toml
+  depends_on:
+  - M09.P1.T4
+  soft_deps: []
+  gate_check:
+    cmd: cargo deny check advisories
+  worktree_branch: wave/W1/m09/p1.t6-advisories-ignore-audit
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T7
+  milestone: M09
+  phase: 1
+  title: Audit license allow-list and pin [[licenses.exceptions]] for ring and webpki-roots
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - deny.toml
+  shared_paths:
+  - deny.toml
+  depends_on:
+  - M09.P1.T4
+  soft_deps: []
+  gate_check:
+    cmd: cargo deny check licenses
+  worktree_branch: wave/W1/m09/p1.t7-license-exceptions-audit
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T8
+  milestone: M09
+  phase: 1
+  title: Wire cargo-vet check job into .github/workflows/ci.yml supply-chain lane
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - '.github/workflows/ci.yml'
+  shared_paths:
+  - '.github/workflows/ci.yml'
+  depends_on:
+  - M09.P1.T3
+  soft_deps: []
+  gate_check:
+    cmd: actionlint .github/workflows/ci.yml
+  worktree_branch: wave/W1/m09/p1.t8-ci-cargo-vet-job
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P1.T9
+  milestone: M09
+  phase: 1
+  title: Wire cargo-deny check job into .github/workflows/ci.yml supply-chain lane
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - '.github/workflows/ci.yml'
+  shared_paths:
+  - '.github/workflows/ci.yml'
+  depends_on:
+  - M09.P1.T4
+  - M09.P1.T5
+  - M09.P1.T6
+  - M09.P1.T7
+  soft_deps: []
+  gate_check:
+    cmd: actionlint .github/workflows/ci.yml
+  worktree_branch: wave/W1/m09/p1.t9-ci-cargo-deny-job
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P2.T1
+  milestone: M09
+  phase: 2
+  title: Embed cargo-auditable dependency graph into release-binaries.yml builds
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - Cargo.toml
+  - '.github/workflows/release-binaries.yml'
+  shared_paths:
+  - Cargo.toml
+  - '.github/workflows/release-binaries.yml'
+  depends_on:
+  - M09.P1.T11
+  soft_deps:
+  - M06 (chio-wasm-guards consumes attest-verify in M09 P3, not P2)
+  gate_check:
+    cmd: cargo install cargo-auditable --locked && cargo auditable build --release -p chio-cli && cargo audit -f /dev/null
+  worktree_branch: wave/W1/m09/p2.t1-cargo-auditable
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P2.T2
+  milestone: M09
+  phase: 2
+  title: Emit CycloneDX 1.6 SBOM per release archive via pinned syft v1.18.1
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - '.github/workflows/release-binaries.yml'
+  - infra/sbom/syft.yaml
+  - docs/install/PUBLISHING.md
+  shared_paths:
+  - '.github/workflows/release-binaries.yml'
+  depends_on:
+  - M09.P1.T11
+  - M09.P2.T1
+  soft_deps: []
+  gate_check:
+    cmd: syft -o cyclonedx-json target/release/chio | jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"'
+  worktree_branch: wave/W1/m09/p2.t2-syft-cyclonedx-sbom
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P2.T3
+  milestone: M09
+  phase: 2
+  title: Land slsa.yml wiring slsa-github-generator v2.1.0 for SLSA L2 provenance
+  status: pending
+  effort_days: 1.5
+  owner_glob:
+  - '.github/workflows/slsa.yml'
+  - '.github/workflows/release-binaries.yml'
+  - docs/install/PUBLISHING.md
+  shared_paths:
+  - '.github/workflows/release-binaries.yml'
+  depends_on:
+  - M09.P1.T11
+  - M09.P2.T1
+  soft_deps:
+  - M06 (consumes attest-verify in M09 P3, not P2)
+  gate_check:
+    cmd: actionlint .github/workflows/slsa.yml
+  worktree_branch: wave/W1/m09/p2.t3-slsa-l2-provenance
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
+- id: M09.P2.T4
+  milestone: M09
+  phase: 2
+  title: Schedule quarterly TUF trust-root re-bake workflow (tuf-rebake.yml)
+  status: pending
+  effort_days: 1
+  owner_glob:
+  - '.github/workflows/tuf-rebake.yml'
+  shared_paths: []
+  depends_on:
+  - M09.P1.T11
+  soft_deps:
+  - M09.P3 (re-bake target lives inside chio-attest-verify; workflow is authored in P2 but lands its real diff against the crate once P3 merges)
+  gate_check:
+    cmd: actionlint .github/workflows/tuf-rebake.yml
+  worktree_branch: wave/W1/m09/p2.t4-quarterly-tuf-rebake
+  agent_role: supply-chain
+  review_required:
+  - '@bb-connor'
+  first_commit_sha: null
+  merged_sha: null
+  opened_ts: null
+  merged_ts: null
