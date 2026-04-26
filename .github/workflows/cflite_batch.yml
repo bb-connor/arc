@@ -1,0 +1,114 @@
+# cflite_batch.yml - Nightly ClusterFuzzLite rotation (M02-owned).
+#
+# Owned by M02. Rotates one fuzz target per night through the seven
+# baseline targets in fuzz/target-map.toml plus any future M02 P1 targets,
+# 30 minutes per run. Eighteen-day full sweep (sized for the projected
+# 18-target inventory once M02 P1 lands). Runs against the project/roadmap-04-25-2026
+# branch tip; budget-checked against the 1,800 min/30d cap before each
+# rotation step so a runaway day cannot blow the monthly free tier.
+
+name: cflite_batch
+
+on:
+  schedule:
+    # 02:17 UTC nightly; 17 minutes past the hour to land off the
+    # GitHub Actions cron-storm.
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Force a specific fuzz target (default: today's rotation)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: cflite-batch
+  cancel-in-progress: false
+
+env:
+  CHIO_FUZZ_DURATION_SECONDS: "1800"   # 30 minutes per nightly rotation
+
+jobs:
+  budget-check:
+    name: fuzz-budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yq
+        run: |
+          set -euo pipefail
+          mkdir -p "${HOME}/.local/bin"
+          curl -fsSL --retry 3 \
+            "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
+            -o "${HOME}/.local/bin/yq"
+          chmod +x "${HOME}/.local/bin/yq"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+      - name: Verify 30-day fuzz budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+  rotate:
+    name: rotate
+    needs: budget-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yq
+        run: |
+          set -euo pipefail
+          mkdir -p "${HOME}/.local/bin"
+          curl -fsSL --retry 3 \
+            "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
+            -o "${HOME}/.local/bin/yq"
+          chmod +x "${HOME}/.local/bin/yq"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Pick today's target
+        id: pick
+        env:
+          FORCED_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          mapfile -t targets < <(yq -p=toml -r '.targets | keys | .[]' \
+            fuzz/target-map.toml | sort)
+          if (( ${#targets[@]} == 0 )); then
+            echo "fuzz/target-map.toml has no targets" >&2
+            exit 1
+          fi
+          if [[ -n "${FORCED_TARGET}" ]]; then
+            picked="${FORCED_TARGET}"
+          else
+            day_index=$(( $(date -u +%s) / 86400 ))
+            picked="${targets[$(( day_index % ${#targets[@]} ))]}"
+          fi
+          printf 'picked: %s (rotation cycle: %d targets)\n' \
+            "${picked}" "${#targets[@]}"
+          {
+            echo "target=${picked}"
+            echo "cycle_size=${#targets[@]}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Run ClusterFuzzLite batch
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          language: rust
+          fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
+          mode: batch
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          report-unreproducible-crashes: true
+
+      - name: Upload crash reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cflite-batch-${{ steps.pick.outputs.target }}-${{ github.run_id }}
+          path: ./out/artifacts
+          if-no-files-found: ignore
+          retention-days: 30
