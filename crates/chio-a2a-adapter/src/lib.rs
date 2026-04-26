@@ -38,3 +38,13 @@ include!("discovery.rs");
 include!("auth.rs");
 include!("transport.rs");
 include!("tests.rs");
+// libFuzzer entry-point module for `chio-a2a-adapter` (M02.P1.T3.b).
+// Gated behind the `fuzz` Cargo feature so it only compiles into the
+// standalone `chio-fuzz` workspace at `../../fuzz`. Production builds of
+// `chio-a2a-adapter` never pull in `arbitrary`, never expose these
+// symbols, and never get recompiled with libFuzzer instrumentation. The
+// included file declares `pub mod fuzz { ... }` so the public API is
+// `chio_a2a_adapter::fuzz::fuzz_a2a_envelope_decode`, matching the
+// `chio_mcp_edge::fuzz` precedent from M02.P1.T3.a.
+#[cfg(feature = "fuzz")]
+include!("fuzz.rs");

@@ -1568,6 +1568,7 @@ dependencies = [
 name = "chio-a2a-adapter"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "base64 0.22.1",
  "chio-core-types",
  "chio-kernel",
