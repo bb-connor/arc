@@ -112,6 +112,17 @@ ignore = [
 # OSI/FSF status is no longer a config concern. Schema deviation logged in commit body.
 [licenses]
 confidence-threshold = 0.93
+# Workspace-wide allow-list. Strictly permissive: no GPL / AGPL / LGPL /
+# EUPL or other strong copyleft. MPL-2.0 is allowed because it is a
+# file-level (weak) copyleft that does not infect statically-linked
+# consumers, and the `uniffi` family (uniffi, uniffi_bindgen, uniffi_build,
+# uniffi_checksum_derive, uniffi_core, uniffi_macros, uniffi_meta,
+# uniffi_testing, uniffi_udl) all ship under MPL-2.0; pinning each as a
+# per-crate exception would push us past the ~10-entry exception cap.
+# The prior `Unicode-DFS-2016` entry was removed because the Unicode
+# consortium relicensed under `Unicode-3.0` (already allowed) and no
+# remaining crate in the lockfile ships the older identifier (cargo-deny
+# was emitting a `license-not-encountered` warning for it).
 allow = [
     "MIT",
     "Apache-2.0",
@@ -119,12 +130,20 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
     "Unicode-3.0",
     "CC0-1.0",
     "Zlib",
     "MPL-2.0",
 ]
+
+# Workspace-internal crates (notably examples/guards/{tool-gate,enriched-inspector})
+# are marked `publish = false` and intentionally omit a `license` field
+# because they are never distributed to crates.io. `ignore = true` here
+# tells cargo-deny to skip license enforcement for those private workspace
+# members. Public/published crates remain bound by the allow-list above.
+# Ref: https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html#the-private-field
+[licenses.private]
+ignore = true
 
 [[licenses.exceptions]]
 # `ring` ships under a bespoke license that is OpenSSL-derived but not
@@ -134,11 +153,23 @@ name = "ring"
 allow = ["OpenSSL", "ISC", "MIT"]
 
 [[licenses.exceptions]]
-# `webpki-roots` carries the Mozilla CA bundle under MPL-2.0 within an
-# otherwise-permissive crate; pin the exception to the crate to avoid
-# widening the workspace allow-list.
+# `webpki-roots` (both 0.26.x and 1.x are present in the lockfile) carries
+# the Mozilla CA bundle. The crate's `license` field declares
+# `CDLA-Permissive-2.0` (Linux Foundation Community Data License Agreement,
+# Permissive 2.0). It is OSI-permissive but uncommon, so we pin the
+# exception to this crate rather than widen the workspace allow-list.
+# Source: https://crates.io/crates/webpki-roots (Cargo.toml `license` field).
 name = "webpki-roots"
-allow = ["MPL-2.0"]
+allow = ["CDLA-Permissive-2.0"]
+
+[[licenses.exceptions]]
+# `webpki-root-certs` is the sibling crate to `webpki-roots` (raw DER bytes
+# instead of pre-parsed TrustAnchors). Same Mozilla bundle, same
+# `CDLA-Permissive-2.0` license, same pinning rationale. Pulled transitively
+# via reqwest -> rustls-platform-verifier in the alloy stack.
+# Source: https://crates.io/crates/webpki-root-certs (Cargo.toml `license` field).
+name = "webpki-root-certs"
+allow = ["CDLA-Permissive-2.0"]
 
 [bans]
 multiple-versions = "deny"
