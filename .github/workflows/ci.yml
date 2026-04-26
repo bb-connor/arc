@@ -277,3 +277,19 @@ jobs:
           name: coverage
           path: ${{ runner.temp }}/chio-coverage
           retention-days: 21
+
+  cargo-vet:
+    name: cargo-vet (supply-chain audit)
+    # owner: M09
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install cargo-vet
+        run: cargo install cargo-vet --locked --version "^0.10"
+      - name: cargo vet --locked
+        run: cargo vet --locked
