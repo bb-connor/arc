@@ -112,3 +112,9 @@ fn wit_host_call_boundary_smoke() {
     use chio_wasm_guards::fuzz::fuzz_wit_host_call_boundary;
     each_seed("wit_host_call_boundary", fuzz_wit_host_call_boundary);
 }
+
+#[test]
+fn chio_yaml_parse_smoke() {
+    use chio_config::fuzz::fuzz_chio_yaml_parse;
+    each_seed("chio_yaml_parse", fuzz_chio_yaml_parse);
+}
