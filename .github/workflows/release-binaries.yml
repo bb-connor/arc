@@ -1,5 +1,9 @@
 name: Release Binaries
 
+# A successful run of this workflow triggers .github/workflows/slsa.yml
+# (workflow_run), which downloads the chio-<target> archive artifacts
+# and emits a SLSA L2 provenance attestation per release (M09.P2.T3).
+
 on:
   push:
     tags:
