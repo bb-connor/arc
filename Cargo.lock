@@ -2368,6 +2368,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-spec-validate"
+version = "0.1.0"
+dependencies = [
+ "jsonschema",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-store-sqlite"
 version = "0.1.0"
 dependencies = [
@@ -8654,7 +8662,9 @@ dependencies = [
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "chio-spec-validate",
  "serde",
+ "serde_json",
  "serde_yml",
 ]
 
