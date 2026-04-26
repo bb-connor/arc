@@ -1,0 +1,62 @@
+# nightly.yml - Long-running QA jobs that the PR lane skips.
+#
+# Owned by SEQUENCER per OWNERS.toml; individual jobs are tagged with
+# `# owner: M0X` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
+# Today this file has one lane, M03's nightly proptest re-run with the
+# higher case count (PROPTEST_CASES=4096 vs the PR-tier 256). M02's
+# long-fuzz lane and M03's apalache-liveness lane will land here as
+# their owning milestones reach the tickets that schedule them.
+
+name: nightly
+
+on:
+  schedule:
+    # 04:23 UTC nightly (off the cron-storm minute, separate from
+    # cflite_batch's 02:17 UTC).
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # M03.P1.T6: nightly-tier proptest case count. Eighteen named
+  # invariants across chio-core-types, chio-kernel-core, chio-credentials,
+  # chio-policy run with this case count. The PR-tier (256) lives in
+  # ci.yml; the gap between the two tiers is what surfaces shrink-friendly
+  # algebra-bug seams that low-case-count PR runs miss.
+  PROPTEST_CASES: "4096"
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  proptest-nightly:
+    name: proptest (nightly tier)
+    # owner: M03
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Run proptest invariants (nightly case count)
+        env:
+          PROPTEST_CASES: ${{ env.PROPTEST_CASES }}
+        run: |
+          set -euo pipefail
+          cargo test \
+            -p chio-core-types --test property_capability_algebra \
+            -p chio-kernel-core --test property_evaluate \
+            -p chio-credentials --test property_passport \
+            -p chio-policy --test property_evaluate \
+            -- --nocapture

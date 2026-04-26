@@ -18,6 +18,13 @@ env:
   CHIO_AENEAS_LINUX_X86_64_SHA256: 11b4e88776655c9fd5e391bfd2824e8b52916590962fbcb392768c57b7b32ca7
   CHIO_CREUSOT_REV: a12f3ac7f688c7b93cee2c2eb60282004a2bdb30
   CHIO_KANI_VERSION: 0.67.0
+  # M03.P1.T6: PR-tier proptest case count for the eighteen named
+  # invariants (chio-core-types/property_capability_algebra,
+  # chio-kernel-core/property_evaluate, chio-credentials/property_passport,
+  # chio-policy/property_evaluate). The nightly tier (4096) lives in
+  # .github/workflows/nightly.yml; the gap surfaces algebra-bug seams
+  # that low-case-count PR runs miss.
+  PROPTEST_CASES: "256"
 
 jobs:
   jvm-build:
