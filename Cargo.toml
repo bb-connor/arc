@@ -102,6 +102,7 @@ members = [
     # Tests
     "formal/diff-tests",
     "tests/e2e",
+    "tests/replay",
     #
     # Tooling
     "xtask",

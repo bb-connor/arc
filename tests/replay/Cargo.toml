@@ -1,0 +1,23 @@
+[package]
+name = "chio-replay-gate"
+description = "Deterministic-replay corpus driver and golden infrastructure for the Chio kernel (M04 replay gate)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_replay_gate"
+path = "src/lib.rs"
+
+[[bin]]
+name = "chio-replay-gate"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
