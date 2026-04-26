@@ -27,6 +27,16 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
+    # `id-token: write` is required so `cosign sign-blob --yes` can
+    # exchange the GitHub-issued OIDC token for a short-lived Fulcio
+    # signing certificate (M09.P3.T3). `contents: read` is the workflow
+    # default and stays explicit per principle of least privilege; the
+    # per-job grant overrides the workflow-level `contents: read` only
+    # for this matrix job, leaving the `release` job's `contents: write`
+    # untouched.
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -256,6 +266,56 @@ jobs:
             [System.Text.Encoding]::ASCII
           )
 
+      # owner: M09
+      # M09.P3.T3 - Sigstore keyless cosign signing of every release
+      # archive (`.tar.gz` on linux/macOS, `.zip` on windows). Signing
+      # happens on the same runner that staged the archive, mirroring
+      # the "sign where the artifact was just produced" pattern from
+      # M09.P3.T2 (sidecar-image.yml). The OIDC token minted by
+      # `id-token: write` (declared at the job level above) is what
+      # `cosign sign-blob --yes` exchanges with Fulcio for a short-lived
+      # signing certificate; no long-lived signing key is held in repo
+      # secrets. The `.sig` and `.pem` siblings travel with the archive
+      # through `upload-artifact` and the final `softprops/action-gh-release`
+      # step so consumers can run the `cosign verify-blob` recipe in
+      # `docs/install/PUBLISHING.md` (section "Release-binaries archive
+      # signing"). The trait surface for in-tree programmatic verification
+      # is `chio_attest_verify::AttestVerifier` (M09.P3.T1).
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: v2.4.1
+
+      - name: Cosign sign-blob release archive
+        shell: bash
+        env:
+          CHIO_ARCHIVE_KIND: ${{ matrix.archive }}
+          CHIO_TARGET: ${{ matrix.target }}
+          CHIO_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          stage_dir="chio-${CHIO_VERSION}-${CHIO_TARGET}"
+          archive="dist/${stage_dir}.${CHIO_ARCHIVE_KIND}"
+          if [ ! -f "${archive}" ]; then
+            echo "::error::expected release archive missing: ${archive}" >&2
+            exit 1
+          fi
+          sig="${archive}.sig"
+          pem="${archive}.pem"
+          echo "Signing ${archive} with cosign sign-blob"
+          cosign sign-blob --yes \
+            --output-signature "${sig}" \
+            --output-certificate "${pem}" \
+            "${archive}"
+          # Fail loudly if cosign somehow returned 0 without producing
+          # the sig/cert pair; downstream upload-artifact would otherwise
+          # silently publish an unsigned archive.
+          if [ ! -s "${sig}" ] || [ ! -s "${pem}" ]; then
+            echo "::error::cosign sign-blob did not produce non-empty ${sig} and ${pem}" >&2
+            exit 1
+          fi
+          echo "Signed ${archive}; sig=${sig} pem=${pem}"
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -263,8 +323,12 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
+            dist/*.tar.gz.sig
+            dist/*.tar.gz.pem
             dist/*.zip
             dist/*.zip.sha256
+            dist/*.zip.sig
+            dist/*.zip.pem
           if-no-files-found: error
           retention-days: 7
 
@@ -326,6 +390,14 @@ jobs:
           # `fail_on_unmatched_files: true`, so missing per-archive files
           # would fail every release.
           find artifacts -type f -name "*.sha256" -exec cp {} release/ \;
+          # owner: M09
+          # M09.P3.T3 - Carry the cosign sign-blob siblings (`.sig` and
+          # `.pem`) into `release/` alongside the archives so the final
+          # `softprops/action-gh-release` step attaches them. The build
+          # job ran `cosign sign-blob` on each runner immediately after
+          # staging; without this copy the signatures would only live as
+          # GitHub Actions build artifacts and never reach consumers.
+          find artifacts -type f \( -name "*.sig" -o -name "*.pem" \) -exec cp {} release/ \;
           find release -type f -name "*.sha256" -exec perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' {} +
           # Concatenate the per-archive .sha256 files into the combined
           # SHA256SUMS for `shasum -a 256 -c`.
@@ -412,11 +484,13 @@ jobs:
             echo
             echo "### Verify"
             echo
-            echo "Every archive has a matching \`.sha256\` file, and a combined \`SHA256SUMS\` is attached to the release."
+            echo "Every archive has a matching \`.sha256\` file (combined \`SHA256SUMS\` is attached) and a Sigstore keyless signature pair (\`.sig\` + \`.pem\`) produced by \`cosign sign-blob\` (M09.P3.T3)."
             echo
             echo '```bash'
             echo "shasum -a 256 -c SHA256SUMS"
             echo '```'
+            echo
+            echo "See \`docs/install/PUBLISHING.md\` (section \"Release-binaries archive signing\") for the full \`cosign verify-blob\` recipe."
             echo
             echo "### Supported targets"
             echo
@@ -436,9 +510,17 @@ jobs:
           body_path: release/NOTES.md
           draft: false
           fail_on_unmatched_files: true
+          # `*.sig` and `*.pem` are the cosign sign-blob siblings emitted
+          # by the build job (M09.P3.T3); without them in this list the
+          # release would publish only the archives and consumers could
+          # not run the `cosign verify-blob` recipe in
+          # `docs/install/PUBLISHING.md` (section "Release-binaries
+          # archive signing").
           files: |
             release/*.tar.gz
             release/*.zip
             release/*.sha256
+            release/*.sig
+            release/*.pem
             release/SHA256SUMS
             release/chio.rb
