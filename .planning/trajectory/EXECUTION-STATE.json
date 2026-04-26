@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:13:04.644Z",
+  "last_checkpoint_at": "2026-04-26T01:27:31.507Z",
   "current_wave": "1a",
   "halt": {
-    "halted": true,
-    "reason": "operator-discretion: 8/42 wave-1a tickets merged. Pausing for batch-cadence direction.",
-    "trigger_event_id": "01KQ3NHRW4K08F1AJFE5DJHDCF",
-    "halted_at": "2026-04-26T01:13:04.644Z"
+    "halted": false,
+    "reason": null,
+    "trigger_event_id": null,
+    "halted_at": null
   },
   "milestones": {
     "M01": {
@@ -126,14 +126,19 @@
       }
     },
     "M01.P1.T3": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a348b50febb8d3566",
+      "branch": "wave/W1/m01/p1.t3-receipt-schemas",
+      "pr_number": 19,
+      "merged_at": "2026-04-26T01:27:31.507Z",
+      "merged_sha": "d605c5850c785f88daafc2986a85e82d85f49149",
+      "diff_stats": {
+        "files": 4
+      },
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P1.T4.a": {
       "status": "pending",
