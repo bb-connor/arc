@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:43:27.018Z",
+  "last_checkpoint_at": "2026-04-26T02:44:41.336Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -603,14 +603,15 @@
       }
     },
     "M09.P2.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 43,
+      "merged_sha": "c4f78025e3f5e3fddde2e329a35e4a9868f5b3ba",
+      "branch": "wave/W1/m09/p2.t1-cargo-auditable",
+      "merged_at": "2026-04-26T02:44:41.336Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P2.T2": {
       "status": "pending",
