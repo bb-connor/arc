@@ -129,6 +129,51 @@ The M02 P1 success-criteria floor is 11 new targets (7 baseline + 11 new =
 18 in the matrix exit-test count); T8 lifts the count from 11 to 12 and the
 total to 20.
 
+## ClusterFuzzLite bridge
+
+Two GitHub-Actions workflows pair libFuzzer's PR-time and nightly-cron
+coverage into the bridge that carries Chio through the OSS-Fuzz acceptance
+window and remains the documented permanent fallback after acceptance lands:
+
+- `.github/workflows/cflite_pr.yml` -- changed-target sampling per
+  `fuzz/target-map.toml`. Default per-target wall budget is 60s (1-6 targets
+  per PR after the glob match). Opt-in `fuzz: full` PR label promotes the
+  run to a full-corpus sweep across all sixteen targets at 120s each
+  (release-cut PRs and trust-boundary edits).
+- `.github/workflows/cflite_batch.yml` -- sampled nightly cron at
+  `17 2 * * *` UTC. Rotates one target per night across the sixteen-target
+  inventory (`day-of-epoch mod 16`), 30 minutes per run. The `cflite_cron`
+  workflow that the source-doc earlier described is intentionally absent;
+  the weekly-soak Tier-A plan was dropped along with Tier A, and OSS-Fuzz
+  is the post-acceptance soak path.
+
+Both workflows invoke `scripts/check-fuzz-budget.sh` before any fuzz step
+so the 1,800 GHA min/30d cap acts as a hard halt rather than a soft warning.
+
+The CFLite builder image lives under `.clusterfuzzlite/`:
+
+- `.clusterfuzzlite/Dockerfile` -- `FROM gcr.io/oss-fuzz-base/base-builder-rust`
+  with the rustls/openssl build deps plus `zip`. Mirrors the OSS-Fuzz
+  scaffold under `infra/oss-fuzz/` so the in-tree CFLite image and the
+  OSS-Fuzz image stay behaviourally identical.
+- `.clusterfuzzlite/build.sh` -- enumerates all sixteen fuzz targets and
+  runs `cargo +nightly fuzz build <target> --release --sanitizer
+  "$SANITIZER"` per target. The OSS-Fuzz copy at `infra/oss-fuzz/build.sh`
+  is the source-of-truth; any new fuzz target lands in both files in the
+  same change set.
+- `.clusterfuzzlite/project.yaml` -- declares `language: rust`, the primary
+  contact, the address+undefined sanitizer pair, the `x86_64` architecture,
+  the `libfuzzer` engine, and the `storage-repo` corpus backend
+  (`bb-connor/arc-fuzz-corpus` sibling private repo; no GCS). The
+  `report_to_oss_fuzz` flag stays `false` until OSS-Fuzz acceptance lands.
+
+Storage backend: `bb-connor/arc-fuzz-corpus` (sibling private repo). The
+repo is created out-of-band before the first `cflite_batch.yml` run; until
+it exists, ClusterFuzzLite falls back to per-run artifact storage and the
+rotation still passes its crash-search criterion. Keeping corpus storage in
+the GitHub control plane avoids new cloud-billing surfaces and keeps the
+1,800 min/30d cap legible.
+
 ## OSS-Fuzz application status
 
 - Target submission window: M02 P2.

@@ -1,0 +1,28 @@
+# ClusterFuzzLite project config for Chio (formerly ARC).
+#
+# Source-of-truth: .planning/trajectory/02-fuzzing-post-pr13.md
+# (ClusterFuzzLite implementation section, Hosting model paragraph).
+# Companion docs in docs/fuzzing/continuous.md (ClusterFuzzLite bridge
+# section).
+#
+# Storage backend: bb-connor/arc-fuzz-corpus sibling private repo
+# (no GCS). The repo is created out-of-band before the first
+# cflite_batch.yml run; until it exists, ClusterFuzzLite falls back
+# to per-run artifact storage and the rotation still passes its
+# crash-search criterion.
+language: rust
+primary_contact: "whelan.connor11@gmail.com"
+auto_ccs:
+  - "whelan.connor11@gmail.com"
+  # TODO(M02.P4): add backup contact before opening the upstream
+  # OSS-Fuzz PR. Mirrors the matching slot in
+  # infra/oss-fuzz/project.yaml so the two configs stay in lockstep.
+sanitizers:
+  - address
+  - undefined
+architectures:
+  - x86_64
+fuzzing_engines:
+  - libfuzzer
+storage-repo: "https://github.com/bb-connor/arc-fuzz-corpus"
+report_to_oss_fuzz: false

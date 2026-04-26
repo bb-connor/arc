@@ -10,6 +10,12 @@
 # week of PRs cannot burn through the public-repo 2,000 min/month free
 # tier.
 #
+# Opt-in PR label `fuzz: full` switches the run from changed-target
+# sampling to a full-corpus sweep at 120 seconds per target (release-cut
+# PRs and trust-boundary edits). The label decision is honored only if the
+# trailing-30d budget check still passes; the budget script is the hard
+# halt.
+#
 # Required check name: cflite_pr / changed-target-sampling
 # (advisory until M02 P1 lands; promoted to required at the M02 P1 wave gate)
 
@@ -23,6 +29,7 @@ on:
       - "spec/schemas/**"
       - "tests/bindings/vectors/**"
       - ".github/workflows/cflite_pr.yml"
+      - ".clusterfuzzlite/**"
       - "scripts/check-fuzz-budget.sh"
 
 permissions:
@@ -35,7 +42,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Default per-target wall budget for changed-target sampling. The
+  # `fuzz: full` PR label promotes this to 120s via a step-level override.
   CHIO_FUZZ_DURATION_SECONDS: "60"
+  CHIO_FUZZ_DURATION_SECONDS_FULL: "120"
 
 jobs:
   budget-check:
@@ -79,8 +89,31 @@ jobs:
           chmod +x "${HOME}/.local/bin/yq"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
+      - name: Detect fuzz-full label
+        id: mode
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if printf '%s' "${LABELS_JSON}" | grep -q '"fuzz: full"'; then
+            echo "fuzz: full label present; promoting to all-target sweep"
+            {
+              echo "full=true"
+              echo "fuzz_seconds=${CHIO_FUZZ_DURATION_SECONDS_FULL}"
+              echo "cflite_mode=batch"
+            } >> "${GITHUB_OUTPUT}"
+          else
+            echo "default mode: changed-target sampling at 60s per target"
+            {
+              echo "full=false"
+              echo "fuzz_seconds=${CHIO_FUZZ_DURATION_SECONDS}"
+              echo "cflite_mode=code-change"
+            } >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Compute changed targets
         id: targets
+        if: steps.mode.outputs.full == 'false'
         run: |
           set -euo pipefail
           base_sha="${{ github.event.pull_request.base.sha }}"
@@ -111,24 +144,35 @@ jobs:
             printf 'targets<<EOF\n%s\nEOF\n' "$(cat fired.txt)"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Skip if no targets fired
-        if: steps.targets.outputs.count == '0'
+      - name: Skip if no targets fired (changed-target mode)
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
         run: |
           echo "no fuzz target triggered by this diff; PR smoke is a no-op"
 
       - name: Run ClusterFuzzLite changed-target sampling
-        if: steps.targets.outputs.count != '0'
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
-          fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
+          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
           mode: code-change
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
           report-unreproducible-crashes: false
 
+      - name: "Run ClusterFuzzLite full-corpus sweep (fuzz-full label)"
+        if: steps.mode.outputs.full == 'true'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          language: rust
+          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          mode: batch
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          report-unreproducible-crashes: false
+
       - name: Upload crash reports
-        if: failure() && steps.targets.outputs.count != '0'
+        if: failure() && (steps.mode.outputs.full == 'true' || steps.targets.outputs.count != '0')
         uses: actions/upload-artifact@v4
         with:
           name: cflite-pr-crashes-${{ github.event.pull_request.number }}
