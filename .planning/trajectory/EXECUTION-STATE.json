@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:06:06.828Z",
+  "last_checkpoint_at": "2026-04-26T02:12:19.541Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -174,14 +174,16 @@
       }
     },
     "M01.P1.T4.c": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a4cf0b067fcf48ad0",
+      "branch": "wave/W1/m01/p1.t4.c-provenance-schemas",
+      "pr_number": 29,
+      "merged_at": "2026-04-26T02:12:19.541Z",
+      "merged_sha": "88ee3ee3d",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P1.T5": {
       "status": "pending",
@@ -522,14 +524,17 @@
       "divergence_checks": null
     },
     "M09.P1.T4": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ab322f7fccc683adc-then-orchestrator",
+      "branch": "wave/W1/m09/p1.t4-deny-toml-hardened",
+      "pr_number": 28,
+      "merged_at": "2026-04-26T02:12:19.541Z",
+      "merged_sha": "9a69cac33",
+      "divergence_checks": {
+        "result": "PASS-WITH-NOTES"
+      },
+      "notes": "executor stopped on schema-deviation; orchestrator landed inline fixes per autonomy table 10 row 5 (M09 owns deny.toml wholesale)"
     },
     "M09.P1.T5": {
       "status": "pending",
