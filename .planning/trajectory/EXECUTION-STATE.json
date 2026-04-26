@@ -21,15 +21,15 @@
       "p5_status": "not authored (wave 2)"
     },
     "M02": {
-      "status": "P0+P1+P2 COMPLETE (21/21 tickets merged); P3 (mutation gate flips blocking) + P4 (triage + corpus operations) still pending",
-      "phase": "P2_complete",
+      "status": "P0+P1+P2+P4 COMPLETE (30/30 tickets merged); P3 (mutation gate flip blocking) is Wave 4 work, deferred",
+      "phase": "P4_complete",
       "owner_branch": null,
       "scheduled_in_wave": "1b+2a",
       "p0_status": "merged (orchestrator-direct no-op cascade-gate baseline)",
       "p1_status": "all 14 merged (T1.a #79, T1.b #83, T1.c #87, T2 #88, T3.a #89, T3.b #90, T3.c #91, T4.a #92, T4.b #93, T5.a #95, T5.b #96, T6 #98, T7 #99, T8 #101)",
       "p2_status": "all 7 merged (T1 #102, T2 #103, T3 #105, T4 #107, T5 #106, T6 #104, T7 #108)",
-      "p3_status": "ready (mutation gate flips blocking; depends_on M02.P2.T2 satisfied)",
-      "p4_status": "ready (triage + corpus operations; concurrent with P3 per source-doc scope note)"
+      "p3_status": "Wave 4 work (mutation gate flip blocking; depends_on M02.P2.T2 satisfied but scheduled in Wave 4 per EXECUTION-BOARD section 2)",
+      "p4_status": "all 8 merged (T1 #111, T2 #110, T3 #112, T4 #115, T5 #114, T6 #113, T7 #116, T8 #117)"
     },
     "M03": {
       "status": "MILESTONE COMPLETE (P0+P1+P2+P3 all merged)",
