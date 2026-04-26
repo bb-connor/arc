@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:34:33.715Z",
+  "last_checkpoint_at": "2026-04-26T02:36:48.660Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -632,14 +632,15 @@
       "divergence_checks": null
     },
     "M09.P2.T4": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 41,
+      "merged_sha": "2cf14f7bb0b70385765f5da3db239bfce3911fd6",
+      "branch": "wave/W1/m09/p2.t4-tuf-rebake",
+      "merged_at": "2026-04-26T02:36:48.660Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     }
   },
   "wave_gate_history": [],
