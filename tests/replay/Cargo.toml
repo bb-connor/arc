@@ -25,6 +25,11 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+sha2 = { workspace = true }
+
+[[test]]
+name = "corpus_smoke"
+path = "tests/corpus_smoke.rs"
 
 [lints.clippy]
 unwrap_used = "deny"
