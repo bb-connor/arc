@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T04:55:00Z",
+  "last_checkpoint_at": "2026-04-26T05:15:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -26,14 +26,14 @@
       "blocked_on": "PR #13 merge"
     },
     "M03": {
-      "status": "in_progress",
-      "phase": "P2+P3 in flight",
+      "status": "P3 COMPLETE; P2 in flight",
+      "phase": "P2 in flight (T1-T4 merged); P3 fully merged (T1-T7)",
       "owner_branch": null,
       "scheduled_in_wave": "1a",
       "p0_status": "merged",
       "p1_status": "all 7 merged",
-      "p2_status": "T1+T2+T3 merged; T4-T7 pending",
-      "p3_status": "T1+T2+T3+T5+T7 merged; T4+T6 pending"
+      "p2_status": "T1-T4 merged; T5-T7 pending (sequential)",
+      "p3_status": "all 7 merged"
     },
     "M04": {
       "status": "pending",
@@ -801,6 +801,43 @@
       "divergence_checks": {
         "result": "PASS",
         "apalache_check": "length=4 EXITCODE: OK (3m 40s)"
+      }
+    },
+    "M03.P3.T6": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 65,
+      "merged_sha": "5e30e8dccecd7bd856b42c4f3585f279da720bb6",
+      "branch": "wave/W1/m03/p3.t6-discharge-sqlite-cross-row",
+      "merged_at": "2026-04-26T05:05:00Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
+    },
+    "M03.P3.T4": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 66,
+      "merged_sha": "937c804291efe1dc1a765f06e6ab137e56e3c2f5",
+      "branch": "wave/W1/m03/p3.t4-apalache-ci-lanes",
+      "merged_at": "2026-04-26T05:08:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "actionlint": "clean"
+      }
+    },
+    "M03.P2.T4": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 67,
+      "merged_sha": "bd81af1a21fa644fd4316ce08e3daf26f1eb3125",
+      "branch": "wave/W1/m03/p2.t4-budget-checked-add-no-overflow",
+      "merged_at": "2026-04-26T05:15:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "kani_checks": "0 of 190 failed (1 unreachable=expected); 0.48s",
+        "harness_count": "13 -> 14",
+        "mapping_md_row_added": "in same PR"
       }
     }
   },
