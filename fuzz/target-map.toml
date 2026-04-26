@@ -1,94 +1,203 @@
-# fuzz/target-map.toml - PR-#13 fuzz target inventory.
+# fuzz/target-map.toml - ClusterFuzzLite changed-target sampling map.
 #
-# Owned by M02. Lists the seven libFuzzer targets that PR #13 lands as the
-# baseline fuzzing surface. Each entry maps a target binary name to its
-# source-path triggers; the cflite_pr.yml workflow uses changed-target
-# sampling against this map to decide which targets a PR must run.
+# Owned by M02. Maps every in-tree libFuzzer binary under fuzz/fuzz_targets/
+# to the source-path globs that, when changed, must trigger that target on
+# the PR. Consumed by .github/workflows/cflite_pr.yml (PR-time changed-target
+# sampling) and .github/workflows/cflite_batch.yml (nightly rotation).
 #
-# The full M02 trajectory adds eleven more targets in P1; those entries
-# land alongside their fuzz_target! definitions, not pre-emptively here.
+# Inventory (sixteen targets total): three from the PR-#13 baseline that
+# survived target-rename reconciliation (canonical_json, capability_receipt,
+# manifest_roundtrip), one from M09 supply-chain (attest_verify), and twelve
+# from the M02 P1 expansion (jwt_vc_verify, oid4vp_presentation, did_resolve,
+# anchor_bundle_verify, mcp_envelope_decode, a2a_envelope_decode,
+# acp_envelope_decode, wasm_preinstantiate_validate, wit_host_call_boundary,
+# chio_yaml_parse, openapi_ingest, receipt_log_replay).
+#
+# This list MUST stay in lockstep with .clusterfuzzlite/build.sh and
+# infra/oss-fuzz/build.sh; any new fuzz target lands in all three files in
+# the same change set. Drift is a process bug and blocks the M02 P4 close
+# ledger.
 #
 # Schema:
 #   [targets.<name>]
 #   crate    = workspace member that owns the target
 #   path     = path to the fuzz_target! source file under fuzz/fuzz_targets
 #   triggers = source-path globs that, if changed, require this target to
-#              run on the PR
-#   seeds    = directory of seed corpora under fuzz/corpora (M01 vector
-#              graduates land here)
+#              run on the PR (used by cflite_pr.yml glob expansion)
+#   seeds    = directory of seed corpora under fuzz/corpus
 #   notes    = optional human-readable rationale
 
-[targets.canonical_json_roundtrip]
+# --- PR-#13 baseline (three surviving targets after rename) -----------------
+
+[targets.canonical_json]
 crate    = "chio-canonical-json"
-path     = "fuzz/fuzz_targets/canonical_json_roundtrip.rs"
+path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
     "crates/chio-canonical-json/**",
     "spec/schemas/canonical/**",
     "tests/bindings/vectors/canonical/**",
 ]
-seeds    = "fuzz/corpora/canonical_json_roundtrip"
+seeds    = "fuzz/corpus/canonical_json"
 notes    = "Round-trips canonical JSON; catches sort drift and float canonicalization regressions."
 
-[targets.manifest_decode]
+[targets.capability_receipt]
 crate    = "chio-core-types"
-path     = "fuzz/fuzz_targets/manifest_decode.rs"
+path     = "fuzz/fuzz_targets/capability_receipt.rs"
 triggers = [
+    "crates/chio-core-types/src/capability*.rs",
+    "crates/chio-core-types/src/receipt*.rs",
+    "spec/schemas/capability/**",
+    "spec/schemas/receipt/**",
+    "tests/bindings/vectors/capability/**",
+    "tests/bindings/vectors/receipt/**",
+]
+seeds    = "fuzz/corpus/capability_receipt"
+notes    = "Capability + receipt round-trip; intersects M03 capability algebra invariants."
+
+[targets.manifest_roundtrip]
+crate    = "chio-manifest"
+path     = "fuzz/fuzz_targets/manifest_roundtrip.rs"
+triggers = [
+    "crates/chio-manifest/**",
     "crates/chio-core-types/src/manifest*.rs",
     "spec/schemas/manifest/**",
     "tests/bindings/vectors/manifest/**",
 ]
-seeds    = "fuzz/corpora/manifest_decode"
-notes    = "Decodes wire-shape manifests; M01 P2 vector corpus seeds this."
+seeds    = "fuzz/corpus/manifest_roundtrip"
+notes    = "Tool-manifest decode plus canonicalization; downstream of M01 manifest vectors."
 
-[targets.receipt_decode]
-crate    = "chio-core-types"
-path     = "fuzz/fuzz_targets/receipt_decode.rs"
+# --- M09 supply-chain ------------------------------------------------------
+
+[targets.attest_verify]
+crate    = "chio-attest-verify"
+path     = "fuzz/fuzz_targets/attest_verify.rs"
 triggers = [
-    "crates/chio-core-types/src/receipt*.rs",
-    "spec/schemas/receipt/**",
-    "tests/bindings/vectors/receipt/**",
+    "crates/chio-attest-verify/**",
+    "spec/schemas/attestation/**",
 ]
-seeds    = "fuzz/corpora/receipt_decode"
-notes    = "Receipt envelope decode; downstream of M01 receipt vectors."
+seeds    = "fuzz/corpus/attest_verify"
+notes    = "M09.P3.T5; sigstore bundle parser + cert chain verify; trust-boundary."
 
-[targets.capability_decode]
-crate    = "chio-core-types"
-path     = "fuzz/fuzz_targets/capability_decode.rs"
-triggers = [
-    "crates/chio-core-types/src/capability*.rs",
-    "spec/schemas/capability/**",
-    "tests/bindings/vectors/capability/**",
-]
-seeds    = "fuzz/corpora/capability_decode"
-notes    = "Capability decode; intersects M03 capability algebra invariants."
+# --- M02 P1 expansion (twelve targets) -------------------------------------
 
-[targets.scope_decode]
-crate    = "chio-core-types"
-path     = "fuzz/fuzz_targets/scope_decode.rs"
-triggers = [
-    "crates/chio-core-types/src/scope*.rs",
-    "spec/schemas/scope/**",
-]
-seeds    = "fuzz/corpora/scope_decode"
-notes    = "Scope decode; M03 invariants depend on scope-shape correctness."
-
-[targets.policy_decision_decode]
-crate    = "chio-policy"
-path     = "fuzz/fuzz_targets/policy_decision_decode.rs"
-triggers = [
-    "crates/chio-policy/**",
-    "spec/schemas/policy/**",
-]
-seeds    = "fuzz/corpora/policy_decision_decode"
-notes    = "Policy decision-result decode; trust-boundary."
-
-[targets.signing_envelope_decode]
+[targets.jwt_vc_verify]
 crate    = "chio-credentials"
-path     = "fuzz/fuzz_targets/signing_envelope_decode.rs"
+path     = "fuzz/fuzz_targets/jwt_vc_verify.rs"
 triggers = [
-    "crates/chio-credentials/**",
-    "spec/schemas/signing/**",
-    "tests/bindings/vectors/signing/**",
+    "crates/chio-credentials/src/**",
+    "spec/schemas/credentials/**",
+    "tests/bindings/vectors/credentials/**",
 ]
-seeds    = "fuzz/corpora/signing_envelope_decode"
-notes    = "Signing envelope decode; trust-boundary; constant-time compare assertions live here."
+seeds    = "fuzz/corpus/jwt_vc_verify"
+notes    = "M02.P1.T1.a; JWT VC verifier; trust-boundary; constant-time compare assertions live here."
+
+[targets.oid4vp_presentation]
+crate    = "chio-credentials"
+path     = "fuzz/fuzz_targets/oid4vp_presentation.rs"
+triggers = [
+    "crates/chio-credentials/src/**",
+    "spec/schemas/oid4vp/**",
+]
+seeds    = "fuzz/corpus/oid4vp_presentation"
+notes    = "M02.P1.T1.b; OID4VP holder response decode."
+
+[targets.did_resolve]
+crate    = "chio-did"
+path     = "fuzz/fuzz_targets/did_resolve.rs"
+triggers = [
+    "crates/chio-did/**",
+    "spec/schemas/did/**",
+]
+seeds    = "fuzz/corpus/did_resolve"
+notes    = "M02.P1.T1.c; chio-did parser plus resolver."
+
+[targets.anchor_bundle_verify]
+crate    = "chio-anchor"
+path     = "fuzz/fuzz_targets/anchor_bundle_verify.rs"
+triggers = [
+    "crates/chio-anchor/**",
+    "spec/schemas/anchor/**",
+]
+seeds    = "fuzz/corpus/anchor_bundle_verify"
+notes    = "M02.P1.T2; anchor proof bundle plus checkpoint records; trust-boundary."
+
+[targets.mcp_envelope_decode]
+crate    = "chio-mcp-edge"
+path     = "fuzz/fuzz_targets/mcp_envelope_decode.rs"
+triggers = [
+    "crates/chio-mcp-edge/**",
+    "crates/chio-policy/**",
+    "spec/schemas/mcp/**",
+]
+seeds    = "fuzz/corpus/mcp_envelope_decode"
+notes    = "M02.P1.T3.a; MCP NDJSON decode plus edge dispatch; pipes into evaluator post-decode."
+
+[targets.a2a_envelope_decode]
+crate    = "chio-a2a-adapter"
+path     = "fuzz/fuzz_targets/a2a_envelope_decode.rs"
+triggers = [
+    "crates/chio-a2a-adapter/**",
+    "spec/schemas/a2a/**",
+]
+seeds    = "fuzz/corpus/a2a_envelope_decode"
+notes    = "M02.P1.T3.b; A2A SSE parse plus per-event fan-out."
+
+[targets.acp_envelope_decode]
+crate    = "chio-acp-edge"
+path     = "fuzz/fuzz_targets/acp_envelope_decode.rs"
+triggers = [
+    "crates/chio-acp-edge/**",
+    "spec/schemas/acp/**",
+]
+seeds    = "fuzz/corpus/acp_envelope_decode"
+notes    = "M02.P1.T3.c; ACP NDJSON plus handle_jsonrpc dispatch."
+
+[targets.wasm_preinstantiate_validate]
+crate    = "chio-wasm-guards"
+path     = "fuzz/fuzz_targets/wasm_preinstantiate_validate.rs"
+triggers = [
+    "crates/chio-wasm-guards/**",
+    "spec/schemas/wasm-guard/**",
+]
+seeds    = "fuzz/corpus/wasm_preinstantiate_validate"
+notes    = "M02.P1.T4.a; ComponentBackend, WasmtimeBackend, format detect; trust-boundary."
+
+[targets.wit_host_call_boundary]
+crate    = "chio-wasm-guards"
+path     = "fuzz/fuzz_targets/wit_host_call_boundary.rs"
+triggers = [
+    "crates/chio-wasm-guards/**",
+    "spec/schemas/wasm-guard/**",
+]
+seeds    = "fuzz/corpus/wit_host_call_boundary"
+notes    = "M02.P1.T4.b; GuardRequest/Verdict serde deserialization; trust-boundary."
+
+[targets.chio_yaml_parse]
+crate    = "chio-config"
+path     = "fuzz/fuzz_targets/chio_yaml_parse.rs"
+triggers = [
+    "crates/chio-config/**",
+    "spec/schemas/config/**",
+]
+seeds    = "fuzz/corpus/chio_yaml_parse"
+notes    = "M02.P1.T5.a; chio-config YAML loader."
+
+[targets.openapi_ingest]
+crate    = "chio-openapi-mcp-bridge"
+path     = "fuzz/fuzz_targets/openapi_ingest.rs"
+triggers = [
+    "crates/chio-openapi-mcp-bridge/**",
+    "spec/schemas/openapi/**",
+]
+seeds    = "fuzz/corpus/openapi_ingest"
+notes    = "M02.P1.T5.b; OpenApiMcpBridge::from_spec ingest path."
+
+[targets.receipt_log_replay]
+crate    = "chio-kernel-core"
+path     = "fuzz/fuzz_targets/receipt_log_replay.rs"
+triggers = [
+    "crates/chio-kernel-core/src/**",
+    "spec/schemas/receipt/**",
+]
+seeds    = "fuzz/corpus/receipt_log_replay"
+notes    = "M02.P1.T8; receipt log replay decode plus state-machine."

@@ -1,11 +1,16 @@
 # cflite_batch.yml - Nightly ClusterFuzzLite rotation (M02-owned).
 #
-# Owned by M02. Rotates one fuzz target per night through the seven
-# baseline targets in fuzz/target-map.toml plus any future M02 P1 targets,
-# 30 minutes per run. Eighteen-day full sweep (sized for the projected
-# 18-target inventory once M02 P1 lands). Runs against the project/roadmap-04-25-2026
-# branch tip; budget-checked against the 1,800 min/30d cap before each
-# rotation step so a runaway day cannot blow the monthly free tier.
+# Owned by M02. Rotates one fuzz target per night through the sixteen
+# in-tree targets enumerated in fuzz/target-map.toml (3 PR-#13 baseline +
+# 1 M09 supply-chain + 12 M02 P1; reconciled to disk in M02.P4.T6),
+# 30 minutes per run. Sixteen-day full sweep. Runs against the
+# project/roadmap-04-25-2026 branch tip; budget-checked against the
+# 1,800 min/30d cap before each rotation step so a runaway day cannot
+# blow the monthly free tier.
+#
+# Storage backend (corpus persistence between rotations):
+# bb-connor/arc-fuzz-corpus sibling private repo, declared in
+# .clusterfuzzlite/project.yaml `storage-repo`. No GCS.
 
 name: cflite_batch
 
