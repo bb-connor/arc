@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:51:36.962Z",
+  "last_checkpoint_at": "2026-04-26T02:58:17.626Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -243,14 +243,15 @@
       "follow_up": "chio-binding-helpers vector_fixtures test stale"
     },
     "M01.P2.T3": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 47,
+      "merged_sha": "f8b38b404d08eef547a4b6b7403cc671dbe99148",
+      "branch": "wave/W1/m01/p2.t3-hashing-vectors",
+      "merged_at": "2026-04-26T02:58:17.626Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P2.T4": {
       "status": "pending",
