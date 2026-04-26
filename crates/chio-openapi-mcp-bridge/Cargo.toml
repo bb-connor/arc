@@ -11,6 +11,14 @@ publish = false
 [lib]
 name = "chio_openapi_mcp_bridge"
 
+[features]
+default = []
+# Enables `chio_openapi_mcp_bridge::fuzz`, the libFuzzer entry-point
+# module. Off by default; turned on only by the `chio-fuzz` standalone
+# workspace at `../../fuzz`. Authored under M02.P1.T5.b; reference:
+# `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+fuzz = ["dep:arbitrary"]
+
 [dependencies]
 chio-core = { package = "chio-core-types", path = "../chio-core-types" }
 chio-kernel = { path = "../chio-kernel" }
@@ -21,6 +29,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [lints.clippy]
 unwrap_used = "deny"

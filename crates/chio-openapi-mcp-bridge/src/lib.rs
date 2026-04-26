@@ -14,6 +14,9 @@
 
 use std::collections::BTreeMap;
 
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
+
 use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
 use chio_manifest::ToolManifest;
 use chio_mcp_edge::McpToolInfo;
