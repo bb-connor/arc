@@ -128,6 +128,14 @@ rust_public_entrypoints = [
 # M09 supply-chain audit metadata; later tickets layer on upstream
 # imports (T2), per-crate certifications (T3), and CI lanes (T8/T9).
 
+[workspace.metadata.cargo-auditable]
+# M09.P2.T1: release-binaries.yml wraps every release build with
+# `cargo auditable build`, embedding the workspace dependency graph
+# (per RFC at github.com/rust-secure-code/cargo-auditable) into each
+# published binary. Downstream consumers can extract the manifest with
+# `cargo audit -f <binary>` to scan for known vulnerabilities without
+# needing the source tree, providing an attestation surface for M09.
+
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

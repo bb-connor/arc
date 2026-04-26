@@ -94,11 +94,40 @@ jobs:
         if: matrix.cross == true
         run: cargo install cross --locked --version 0.2.5
 
+      - name: Install cargo-auditable (native)
+        # cargo-auditable embeds the workspace dependency graph into the
+        # release binary so downstream consumers can later run
+        # `cargo audit -f <binary>` to read the manifest and scan for
+        # known vulnerabilities without needing the source tree. See the
+        # `[workspace.metadata.cargo-auditable]` block in Cargo.toml for
+        # the rationale tied to M09.P2.T1. Native lanes install the tool
+        # directly on the runner; the cross lane installs it inside the
+        # cross container via the pre-build hook in the next step.
+        if: matrix.cross == false
+        shell: bash
+        run: cargo install cargo-auditable --locked --version 0.7.4
+
+      - name: Configure cross to install cargo-auditable in container
+        # `cross` runs the build in a Docker image that does not bundle
+        # cargo-auditable. The Cross.toml `pre-build` hook installs the
+        # tool into the container before the build so `cross auditable
+        # build` resolves to the same v0.7.4 used on native lanes. The
+        # file is written at CI runtime and is not committed to the repo.
+        if: matrix.cross == true
+        shell: bash
+        run: |
+          cat > Cross.toml <<'EOF'
+          [build]
+          pre-build = [
+              "cargo install cargo-auditable --locked --version 0.7.4",
+          ]
+          EOF
+
       - name: Build (native)
         if: matrix.cross == false
         shell: bash
         run: |
-          cargo build --release --locked \
+          cargo auditable build --release --locked \
             --package "${CARGO_PACKAGE}" \
             --bin "${BINARY_NAME}" \
             --target "${{ matrix.target }}"
@@ -107,7 +136,7 @@ jobs:
         if: matrix.cross == true
         shell: bash
         run: |
-          cross build --release --locked \
+          cross auditable build --release --locked \
             --package "${CARGO_PACKAGE}" \
             --bin "${BINARY_NAME}" \
             --target "${{ matrix.target }}"
