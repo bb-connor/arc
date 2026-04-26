@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:45:07.549Z",
+  "last_checkpoint_at": "2026-04-26T01:48:34.915Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -158,14 +158,20 @@
       }
     },
     "M01.P1.T4.b": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a7dba83ab5832e518",
+      "branch": "wave/W1/m01/p1.t4.b-trust-control-schemas",
+      "pr_number": 26,
+      "merged_at": "2026-04-26T01:48:34.915Z",
+      "merged_sha": "19ba9362c66429da9a7dc22d7575655bf40ee292",
+      "diff_stats": {
+        "files": 6,
+        "insertions": 248
+      },
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P1.T4.c": {
       "status": "pending",
