@@ -1,0 +1,98 @@
+# mutants.yml - Advisory cargo-mutants lane (M02-owned).
+#
+# Mutation-testing posture per .planning/trajectory/decisions.yml
+# id=mutation-testing-gate-posture: advisory for one release cycle after
+# M02 P3 merges, blocking thereafter. This workflow ships in the advisory
+# state. The gate flip happens by editing releases.toml at the M02 P3+1
+# release boundary; until then the workflow's `continue-on-error: true`
+# keeps it informational on PRs and main.
+#
+# Scope today: PR-incremental sweep against origin's branch tip via
+# `--in-diff`, four crates that house the trust-boundary surface:
+#   - chio-core-types    (capability/scope/receipt/provenance)
+#   - chio-policy        (decision)
+#   - chio-credentials   (signing envelope)
+#   - chio-canonical-json (canonical encoding)
+# Wave-budget: 15-30 minutes per gate.
+
+name: mutants
+
+on:
+  pull_request:
+    paths:
+      - "crates/chio-core-types/**"
+      - "crates/chio-policy/**"
+      - "crates/chio-credentials/**"
+      - "crates/chio-canonical-json/**"
+      - ".github/workflows/mutants.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: mutants-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutate:
+    name: cargo-mutants (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true     # advisory; flip to false at M02 P3+1 release
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - chio-core-types
+          - chio-policy
+          - chio-credentials
+          - chio-canonical-json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install cargo-mutants
+        run: |
+          set -euo pipefail
+          cargo install cargo-mutants --locked --version "^25" || \
+            cargo install cargo-mutants --locked
+
+      - name: Run cargo-mutants in PR-incremental mode
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || 'project/roadmap-04-25-2026' }}
+        run: |
+          set -euo pipefail
+          # --in-diff scopes mutation generation to lines changed against
+          # the base ref; --no-shuffle keeps reproducibility across runs;
+          # --timeout caps any single mutant under sensible wall-time.
+          cargo mutants \
+            --package "${{ matrix.package }}" \
+            --in-diff "${BASE_REF}" \
+            --no-shuffle \
+            --timeout 120 \
+            --jobs 2 \
+            --output ./mutants-out/${{ matrix.package }} \
+            --json \
+            || mutants_exit=$?
+          # Always emit the report file even when zero mutants found.
+          ls -la ./mutants-out/${{ matrix.package }} || true
+          if [[ "${mutants_exit:-0}" -ne 0 ]]; then
+            echo "advisory: cargo-mutants reported survivors (exit=${mutants_exit})"
+          fi
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-mutants-${{ matrix.package }}
+          path: ./mutants-out/${{ matrix.package }}
+          if-no-files-found: ignore
+          retention-days: 14
