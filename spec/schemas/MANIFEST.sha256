@@ -31,3 +31,7 @@ ff4f655a0f0c7afda5c0674f3afde1e3961f1d58292584ed39f8bb5b96e30c8b  spec/schemas/c
 5e9fb42cd93645152075346976de75f3b1eacd03243c1c2b9d112f5876b32d69  spec/schemas/chio-wire/v1/result/incomplete.schema.json
 9b9fad84c47fc9c921647d99674ef033a44fc4b0c1679228d36f1b271545716c  spec/schemas/chio-wire/v1/result/ok.schema.json
 0f05eefed9afbfc5f46d82920deb7672876b04b23a32ab4dc59b0b5e21c6bc3b  spec/schemas/chio-wire/v1/result/stream_complete.schema.json
+0961eb28c5d889e1d3eb288dd508d5fd8f78a8d47cf3baa53a9e340086d05e06  spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
+2f16e07c90026be5670e4cbfb1db7098924f8be6a97815fe531f4822605d01d8  spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json
+5b3a500388734292e63e94d1f8dd938f58197dc8fc19ddad704597cee5c62350  spec/schemas/chio-wire/v1/trust-control/lease.schema.json
+efa89b2a0d2589ab0b6840534bb67312634c267fd5fec7d1faaa11b1f02da602  spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
