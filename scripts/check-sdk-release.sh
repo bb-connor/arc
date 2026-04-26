@@ -82,7 +82,17 @@ chio_cpp_packager_smoke() {
   fi
 
   if [[ -n "${vcpkg_cmd}" ]]; then
-    "${vcpkg_cmd}" install --x-manifest-root="${sdk_dir}" --dry-run
+    # Layer the in-tree staging overlay so SDKs whose dependencies live in
+    # our private overlay registry (e.g. chio-drogon -> chio-cpp) can
+    # resolve those deps from local port files. The same port files are
+    # later mirrored to backbay-labs/chio-vcpkg-registry by the publish
+    # workflow, so the dry-run shape matches what consumers see.
+    local overlay_ports_dir="${repo_root}/tools/vcpkg-overlay/ports"
+    local vcpkg_args=(install "--x-manifest-root=${sdk_dir}" --dry-run)
+    if [[ -d "${overlay_ports_dir}" ]]; then
+      vcpkg_args+=("--overlay-ports=${overlay_ports_dir}")
+    fi
+    "${vcpkg_cmd}" "${vcpkg_args[@]}"
   elif [[ -n "${require_packagers}" && "${require_packagers}" != "0" ]]; then
     echo "vcpkg manifest build is required but vcpkg is not on PATH" >&2
     exit 1
