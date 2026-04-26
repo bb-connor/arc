@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:39:39.103Z",
+  "last_checkpoint_at": "2026-04-26T01:40:10.123Z",
   "current_wave": "1a",
   "halt": {
-    "halted": false,
-    "reason": null,
-    "trigger_event_id": null,
-    "halted_at": null
+    "halted": true,
+    "reason": "operator-discretion: 14/42 wave-1a tickets merged. M03 P1 closed; pausing for next-batch direction.",
+    "trigger_event_id": "01KQ3Q3C8B7YH00KX403VSPFED",
+    "halted_at": "2026-04-26T01:40:10.123Z"
   },
   "milestones": {
     "M01": {
