@@ -85,6 +85,7 @@ members = [
     "crates/chio-bindings-ffi",
     "crates/chio-cpp-kernel-ffi",
     "crates/chio-conformance",
+    "crates/chio-spec-validate",
     #
     # Examples
     "examples/guards/enriched-inspector",
@@ -153,3 +154,4 @@ url = "2"
 proptest = "1.10"
 criterion = "0.5"
 tempfile = "3"
+jsonschema = { version = "0.46", default-features = false }

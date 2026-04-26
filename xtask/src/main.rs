@@ -5,12 +5,23 @@
 //! ```text
 //! cargo xtask trajectory regen-manifest
 //! cargo xtask trajectory regen-manifest --check
+//! cargo xtask validate-scenarios
 //! ```
 //!
 //! `trajectory regen-manifest` walks `.planning/trajectory/tickets/M*/P*.yml`,
 //! concatenates the per-phase ticket arrays, sorts by id, and writes the
 //! result to `.planning/trajectory/tickets/manifest.yml` with the canonical
 //! header. With `--check` it exits non-zero on drift instead of writing.
+//!
+//! `validate-scenarios` walks `tests/conformance/scenarios/**/*.json`, looks
+//! up each scenario's declared `$schema` URI (resolved against the
+//! `https://chio-protocol.dev/schemas/` prefix to a path under
+//! `spec/schemas/`), and validates the scenario via `chio-spec-validate`.
+//! Scenarios without a `$schema` field are skipped (so that legacy
+//! conformance descriptors continue to load). Prints a per-scenario
+//! `PASS|FAIL|SKIP` line and exits non-zero on any FAIL. If the scenarios
+//! directory is missing or contains no JSON files, it prints `no scenarios
+//! found` and exits 0.
 
 use std::env;
 use std::ffi::OsStr;
@@ -37,7 +48,9 @@ enum XtaskError {
     Usage(String),
     Io(String, std::io::Error),
     Yaml(String, serde_yml::Error),
+    Json(String, serde_json::Error),
     Drift(String),
+    Validation(String),
 }
 
 impl fmt::Display for XtaskError {
@@ -46,7 +59,9 @@ impl fmt::Display for XtaskError {
             Self::Usage(msg) => write!(f, "usage: {msg}"),
             Self::Io(path, err) => write!(f, "io error on {path}: {err}"),
             Self::Yaml(path, err) => write!(f, "yaml error in {path}: {err}"),
+            Self::Json(path, err) => write!(f, "json error in {path}: {err}"),
             Self::Drift(detail) => write!(f, "manifest drift: {detail}"),
+            Self::Validation(detail) => write!(f, "scenario validation failed: {detail}"),
         }
     }
 }
@@ -56,6 +71,7 @@ fn main() -> ExitCode {
     let cmd = args.next().unwrap_or_default();
     let result = match cmd.as_str() {
         "trajectory" => run_trajectory(args.collect()),
+        "validate-scenarios" => validate_scenarios(args.collect()),
         "" | "help" | "--help" | "-h" => {
             print_help();
             return ExitCode::SUCCESS;
@@ -74,6 +90,7 @@ fn main() -> ExitCode {
 fn print_help() {
     println!("xtask subcommands:");
     println!("  trajectory regen-manifest [--check]");
+    println!("  validate-scenarios");
 }
 
 fn run_trajectory(args: Vec<String>) -> Result<(), XtaskError> {
@@ -245,6 +262,114 @@ fn count_top_level_sequence_entries(path: &Path) -> Result<usize, XtaskError> {
         Value::Null => Ok(0),
         _ => Ok(0),
     }
+}
+
+const SCHEMA_URI_PREFIX: &str = "https://chio-protocol.dev/schemas/";
+
+fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
+    if let Some(arg) = args.into_iter().next() {
+        return Err(XtaskError::Usage(format!(
+            "validate-scenarios: unexpected argument: {arg}"
+        )));
+    }
+
+    let workspace_root = workspace_root()?;
+    let scenarios_dir = workspace_root.join("tests/conformance/scenarios");
+    let schemas_root = workspace_root.join("spec/schemas");
+
+    let scenarios = collect_scenario_files(&scenarios_dir)?;
+    if scenarios.is_empty() {
+        println!("no scenarios found under {}", display_path(&scenarios_dir));
+        return Ok(());
+    }
+
+    let mut failures: Vec<String> = Vec::new();
+    let mut pass_count: usize = 0;
+    let mut skip_count: usize = 0;
+    for scenario in &scenarios {
+        let raw = fs::read_to_string(scenario)
+            .map_err(|err| XtaskError::Io(display_path(scenario), err))?;
+        let value: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|err| XtaskError::Json(display_path(scenario), err))?;
+        let schema_uri = value
+            .as_object()
+            .and_then(|obj| obj.get("$schema"))
+            .and_then(|v| v.as_str());
+        let Some(uri) = schema_uri else {
+            println!("SKIP {} (no $schema field)", display_path(scenario));
+            skip_count += 1;
+            continue;
+        };
+        let Some(rel) = uri.strip_prefix(SCHEMA_URI_PREFIX) else {
+            println!(
+                "SKIP {} (unrecognized $schema URI: {})",
+                display_path(scenario),
+                uri
+            );
+            skip_count += 1;
+            continue;
+        };
+        let schema_path = schemas_root.join(rel);
+        match chio_spec_validate::validate(&schema_path, scenario) {
+            Ok(()) => {
+                println!("PASS {}", display_path(scenario));
+                pass_count += 1;
+            }
+            Err(err) => {
+                println!("FAIL {}: {err}", display_path(scenario));
+                failures.push(display_path(scenario));
+            }
+        }
+    }
+
+    println!(
+        "validate-scenarios: {} pass, {} fail, {} skip ({} scenarios inspected)",
+        pass_count,
+        failures.len(),
+        skip_count,
+        scenarios.len()
+    );
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(XtaskError::Validation(format!(
+            "{} scenarios failed: {}",
+            failures.len(),
+            failures.join(", ")
+        )))
+    }
+}
+
+fn collect_scenario_files(scenarios_dir: &Path) -> Result<Vec<PathBuf>, XtaskError> {
+    let mut out: Vec<PathBuf> = Vec::new();
+    if !scenarios_dir.exists() {
+        return Ok(out);
+    }
+    walk_json(scenarios_dir, &mut out)?;
+    out.sort();
+    Ok(out)
+}
+
+fn walk_json(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
+    let entries = fs::read_dir(dir).map_err(|err| XtaskError::Io(display_path(dir), err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| XtaskError::Io(display_path(dir), err))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| XtaskError::Io(display_path(&path), err))?;
+        if file_type.is_dir() {
+            walk_json(&path, out)?;
+        } else if file_type.is_file() {
+            if let Some(ext) = path.extension().and_then(OsStr::to_str) {
+                if ext.eq_ignore_ascii_case("json") {
+                    out.push(path);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn workspace_root() -> Result<PathBuf, XtaskError> {
