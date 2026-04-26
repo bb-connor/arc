@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T00:41:28.388Z",
+  "last_checkpoint_at": "2026-04-26T00:43:45.998Z",
   "current_wave": 1,
   "halt": {
-    "halted": false,
-    "reason": null,
-    "trigger_event_id": null,
-    "halted_at": null
+    "halted": true,
+    "reason": "operator-discretion: session_budget_review at Wave 0 -> Wave 1a transition. Not a canonical halt-and-ping trigger; user direction needed on whether to proceed in this session.",
+    "trigger_event_id": "01KQ3KW3EEAVB5G9GR54VES3HQ",
+    "halted_at": "2026-04-26T00:43:45.998Z"
   },
   "milestones": {
     "M01": {
