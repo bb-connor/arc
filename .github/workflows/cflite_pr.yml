@@ -1,0 +1,137 @@
+# cflite_pr.yml - ClusterFuzzLite PR smoke (M02-owned).
+#
+# Reference: .planning/trajectory/02-fuzzing-post-pr13.md.
+# Decision lock: .planning/trajectory/decisions.yml id=continuous-fuzzing-path.
+#
+# Default mode is changed-target sampling. We diff the PR against its
+# merge base, look up which fuzz targets each changed source-path glob in
+# fuzz/target-map.toml triggers, and run only those targets at 60 seconds
+# each. Heavy targets are bounded by the global fuzz-budget cap so a busy
+# week of PRs cannot burn through the public-repo 2,000 min/month free
+# tier.
+#
+# Required check name: cflite_pr / changed-target-sampling
+# (advisory until M02 P1 lands; promoted to required at the M02 P1 wave gate)
+
+name: cflite_pr
+
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "spec/schemas/**"
+      - "tests/bindings/vectors/**"
+      - ".github/workflows/cflite_pr.yml"
+      - "scripts/check-fuzz-budget.sh"
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
+concurrency:
+  group: cflite-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CHIO_FUZZ_DURATION_SECONDS: "60"
+
+jobs:
+  budget-check:
+    name: fuzz-budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yq + jq
+        run: |
+          set -euo pipefail
+          mkdir -p "${HOME}/.local/bin"
+          curl -fsSL --retry 3 \
+            "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
+            -o "${HOME}/.local/bin/yq"
+          chmod +x "${HOME}/.local/bin/yq"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+      - name: Verify 30-day fuzz budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+  changed-target-sampling:
+    name: changed-target-sampling
+    needs: budget-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install yq
+        run: |
+          set -euo pipefail
+          mkdir -p "${HOME}/.local/bin"
+          curl -fsSL --retry 3 \
+            "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
+            -o "${HOME}/.local/bin/yq"
+          chmod +x "${HOME}/.local/bin/yq"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Compute changed targets
+        id: targets
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          git diff --name-only "${base_sha}" "${head_sha}" > changed.txt
+          mapfile -t targets < <(yq -p=toml -r '.targets | keys | .[]' \
+            fuzz/target-map.toml)
+          fired=()
+          for tgt in "${targets[@]}"; do
+            mapfile -t triggers < <(yq -p=toml -r \
+              ".targets.${tgt}.triggers[]" fuzz/target-map.toml)
+            for trig in "${triggers[@]}"; do
+              regex="$(printf '%s' "${trig}" | sed -e 's|\.|\\.|g' \
+                -e 's|\*\*|__DSTAR__|g' -e 's|\*|[^/]*|g' \
+                -e 's|__DSTAR__|.*|g')"
+              if grep -qE "^${regex}$" changed.txt; then
+                fired+=("${tgt}")
+                break
+              fi
+            done
+          done
+          printf '%s\n' "${fired[@]}" | sort -u > fired.txt
+          fired_count="$(wc -l < fired.txt | tr -d ' ')"
+          printf 'fired targets: %s\n' "${fired_count}"
+          cat fired.txt
+          {
+            echo "count=${fired_count}"
+            printf 'targets<<EOF\n%s\nEOF\n' "$(cat fired.txt)"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Skip if no targets fired
+        if: steps.targets.outputs.count == '0'
+        run: |
+          echo "no fuzz target triggered by this diff; PR smoke is a no-op"
+
+      - name: Run ClusterFuzzLite changed-target sampling
+        if: steps.targets.outputs.count != '0'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          language: rust
+          fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
+          mode: code-change
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          report-unreproducible-crashes: false
+
+      - name: Upload crash reports
+        if: failure() && steps.targets.outputs.count != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cflite-pr-crashes-${{ github.event.pull_request.number }}
+          path: ./out/artifacts
+          if-no-files-found: ignore
+          retention-days: 14
