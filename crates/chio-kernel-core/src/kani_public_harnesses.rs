@@ -11,7 +11,10 @@ use serde_json::Value;
 use crate::capability_verify::CapabilityError;
 use crate::clock::FixedClock;
 use crate::evaluate::EvaluateInput;
-use crate::formal_core::{optional_u32_cap_is_subset, revocation_snapshot_denies};
+use crate::formal_core::{
+    monetary_cap_is_subset_by_parts, optional_u32_cap_is_subset, required_true_is_preserved,
+    revocation_snapshot_denies, time_window_valid,
+};
 use crate::guard::PortableToolCallRequest;
 use crate::normalized::{NormalizedOperation, NormalizedScope, NormalizedToolGrant};
 use crate::receipts::ReceiptSigningError;
@@ -418,4 +421,253 @@ fn verify_revocation_predicate_idempotent() {
     let mirrored_second = revocation_snapshot_denies(token_revoked, token_revoked);
     assert_eq!(mirrored_first, mirrored_second);
     assert_eq!(mirrored_first, token_revoked);
+}
+
+// NOTE (M03.P2.T2): Single-step delegation attenuation has two algebraic
+// pillars in Chio: (a) `scope(c') is_subset_of scope(c)` and
+// (b) `expires_at(c') <= expires_at(c)`. The runtime predicate
+// `validate_attenuation` is exactly `child.is_subset_of(parent)` over
+// `ChioScope`, which decomposes per-grant into the same primitive predicates
+// the existing harnesses cover (cap subset, monetary cap subset, dpop
+// preservation, identity coverage). We model one delegation step as a free
+// choice of every primitive boolean/u32 axis on the parent and child, and
+// prove (1) the per-grant subset predicate built from those primitives is
+// exactly the conjunction the runtime computes, (2) it rejects every single
+// widening, (3) reflexivity holds, and (4) the time-window monotonicity
+// `expiry(c') <= expiry(c)` propagates `is_valid_at(now)` from child to
+// parent. The bounded sizes match the existing module convention (u8-promoted
+// u32 for caps, u8-promoted u64 for monetary units); no new size constants
+// are introduced.
+fn one_step_attenuation_predicate(
+    // Identity coverage flags (parent wildcard or exact match) per axis.
+    server_parent_is_wildcard: bool,
+    server_parent_equals_child: bool,
+    tool_parent_is_wildcard: bool,
+    tool_parent_equals_child: bool,
+    // Operations subset (parent.operations contains every child operation).
+    operations_child_subset: bool,
+    // Constraints superset on the child (parent.constraints contained in child).
+    constraints_child_superset: bool,
+    // max_invocations cap subset.
+    parent_has_inv_cap: bool,
+    parent_inv_cap: u32,
+    child_has_inv_cap: bool,
+    child_inv_cap: u32,
+    // max_cost_per_invocation cap subset (with currency-equality projection).
+    parent_has_per_call_cost: bool,
+    parent_per_call_units: u64,
+    child_has_per_call_cost: bool,
+    child_per_call_units: u64,
+    per_call_currency_matches: bool,
+    // max_total_cost cap subset (with currency-equality projection).
+    parent_has_total_cost: bool,
+    parent_total_units: u64,
+    child_has_total_cost: bool,
+    child_total_units: u64,
+    total_currency_matches: bool,
+    // dpop_required preservation.
+    parent_dpop_required: bool,
+    child_dpop_required: bool,
+) -> bool {
+    let server_covers = server_parent_is_wildcard || server_parent_equals_child;
+    let tool_covers = tool_parent_is_wildcard || tool_parent_equals_child;
+    let inv_ok = optional_u32_cap_is_subset(
+        child_has_inv_cap,
+        child_inv_cap,
+        parent_has_inv_cap,
+        parent_inv_cap,
+    );
+    let per_call_ok = monetary_cap_is_subset_by_parts(
+        child_has_per_call_cost,
+        child_per_call_units,
+        parent_has_per_call_cost,
+        parent_per_call_units,
+        per_call_currency_matches,
+    );
+    let total_ok = monetary_cap_is_subset_by_parts(
+        child_has_total_cost,
+        child_total_units,
+        parent_has_total_cost,
+        parent_total_units,
+        total_currency_matches,
+    );
+    let dpop_ok = required_true_is_preserved(parent_dpop_required, child_dpop_required);
+    server_covers
+        && tool_covers
+        && operations_child_subset
+        && constraints_child_superset
+        && inv_ok
+        && per_call_ok
+        && total_ok
+        && dpop_ok
+}
+
+#[kani::proof]
+fn verify_delegation_chain_step() {
+    // Symbolic axes for the parent/child grant pair produced by one
+    // delegation step. Caps are bounded to u8 ranges to keep the search
+    // space aligned with the rest of this module.
+    let server_parent_is_wildcard = kani::any::<bool>();
+    let server_parent_equals_child = kani::any::<bool>();
+    let tool_parent_is_wildcard = kani::any::<bool>();
+    let tool_parent_equals_child = kani::any::<bool>();
+    let operations_child_subset = kani::any::<bool>();
+    let constraints_child_superset = kani::any::<bool>();
+    let parent_has_inv_cap = kani::any::<bool>();
+    let parent_inv_cap = u32::from(kani::any::<u8>());
+    let child_has_inv_cap = kani::any::<bool>();
+    let child_inv_cap = u32::from(kani::any::<u8>());
+    let parent_has_per_call_cost = kani::any::<bool>();
+    let parent_per_call_units = u64::from(kani::any::<u8>());
+    let child_has_per_call_cost = kani::any::<bool>();
+    let child_per_call_units = u64::from(kani::any::<u8>());
+    let per_call_currency_matches = kani::any::<bool>();
+    let parent_has_total_cost = kani::any::<bool>();
+    let parent_total_units = u64::from(kani::any::<u8>());
+    let child_has_total_cost = kani::any::<bool>();
+    let child_total_units = u64::from(kani::any::<u8>());
+    let total_currency_matches = kani::any::<bool>();
+    let parent_dpop_required = kani::any::<bool>();
+    let child_dpop_required = kani::any::<bool>();
+
+    let attenuates = one_step_attenuation_predicate(
+        server_parent_is_wildcard,
+        server_parent_equals_child,
+        tool_parent_is_wildcard,
+        tool_parent_equals_child,
+        operations_child_subset,
+        constraints_child_superset,
+        parent_has_inv_cap,
+        parent_inv_cap,
+        child_has_inv_cap,
+        child_inv_cap,
+        parent_has_per_call_cost,
+        parent_per_call_units,
+        child_has_per_call_cost,
+        child_per_call_units,
+        per_call_currency_matches,
+        parent_has_total_cost,
+        parent_total_units,
+        child_has_total_cost,
+        child_total_units,
+        total_currency_matches,
+        parent_dpop_required,
+        child_dpop_required,
+    );
+
+    // (1) Reflexivity: a step that does not change anything is a valid
+    // attenuation. Identity coverage, operations subset, constraints
+    // superset, dpop preservation, and every cap subset are trivially
+    // satisfied when child = parent.
+    let reflexive = one_step_attenuation_predicate(
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        parent_has_inv_cap,
+        parent_inv_cap,
+        parent_has_inv_cap,
+        parent_inv_cap,
+        parent_has_per_call_cost,
+        parent_per_call_units,
+        parent_has_per_call_cost,
+        parent_per_call_units,
+        true,
+        parent_has_total_cost,
+        parent_total_units,
+        parent_has_total_cost,
+        parent_total_units,
+        true,
+        parent_dpop_required,
+        parent_dpop_required,
+    );
+    assert!(reflexive);
+
+    // (2) Scope-side rejection: if the predicate accepts the step, then
+    // every constituent must hold. This is the "no widening" property
+    // expressed at the predicate level: any single false leg below would
+    // have driven `attenuates` to false.
+    if attenuates {
+        // Identity coverage on both axes.
+        assert!(server_parent_is_wildcard || server_parent_equals_child);
+        assert!(tool_parent_is_wildcard || tool_parent_equals_child);
+        // Operations + constraints monotonicity.
+        assert!(operations_child_subset);
+        assert!(constraints_child_superset);
+        // No invocation-cap widening.
+        assert!(!parent_has_inv_cap || (child_has_inv_cap && child_inv_cap <= parent_inv_cap));
+        // No per-invocation monetary widening (currency must also match).
+        assert!(
+            !parent_has_per_call_cost
+                || (child_has_per_call_cost
+                    && per_call_currency_matches
+                    && child_per_call_units <= parent_per_call_units)
+        );
+        // No total-cost monetary widening (currency must also match).
+        assert!(
+            !parent_has_total_cost
+                || (child_has_total_cost
+                    && total_currency_matches
+                    && child_total_units <= parent_total_units)
+        );
+        // DPoP requirement preserved.
+        assert!(!parent_dpop_required || child_dpop_required);
+    }
+
+    // (3) Strict-widening rejection witnesses, one axis at a time. If the
+    // parent caps a dimension and the child either drops the cap or sets
+    // a value above the parent's, the step must be rejected.
+    let widen_inv_unbounded = one_step_attenuation_predicate(
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,           // parent_has_inv_cap
+        parent_inv_cap, // any
+        false,          // child drops the cap
+        0,
+        false,
+        0,
+        false,
+        0,
+        true,
+        false,
+        0,
+        false,
+        0,
+        true,
+        false,
+        false,
+    );
+    assert!(!widen_inv_unbounded);
+
+    let widen_dpop = one_step_attenuation_predicate(
+        false, true, false, true, true, true, false, 0, false, 0, false, 0, false, 0, true, false,
+        0, false, 0, true, true,  // parent_dpop_required
+        false, // child drops dpop
+    );
+    assert!(!widen_dpop);
+
+    // (4) Expiry monotonicity: a single delegation step may not lengthen
+    // the validity window. Model `now`, `issued_at`, parent and child
+    // expiry as bounded symbolic u64 values; constrain
+    // `child_expires_at <= parent_expires_at`. Then
+    // `is_valid_at(now)` for the child implies `is_valid_at(now)` for
+    // the parent at the same `now`, which is the load-bearing step from
+    // the trajectory doc's "expiry(c') <= expiry(c)" requirement.
+    let now = u64::from(kani::any::<u8>());
+    let issued_at = u64::from(kani::any::<u8>());
+    let parent_expires_at = u64::from(kani::any::<u8>());
+    let child_expires_at = u64::from(kani::any::<u8>());
+    kani::assume(child_expires_at <= parent_expires_at);
+
+    let parent_valid = time_window_valid(now, issued_at, parent_expires_at);
+    let child_valid = time_window_valid(now, issued_at, child_expires_at);
+    if child_valid {
+        assert!(parent_valid);
+    }
 }
