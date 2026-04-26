@@ -24,6 +24,10 @@ f09c34b5dde4bc60a5b8db14f40a3c9e10276aae7be54584a4667046e6cd25fc  spec/schemas/c
 3c8fb35189f5148a66e89a737fb82a50b14e1e120659b1b75303ffe4bf6f4c4e  spec/schemas/chio-wire/v1/kernel/heartbeat.schema.json
 8b38e3338a2d8b11caff241af5ff05238cbc8211165dc25d896284f46504cd1e  spec/schemas/chio-wire/v1/kernel/tool_call_chunk.schema.json
 9d5a7ed377668163a3e786875cc80b21ec1d91283dbd0fd35c8f325afe5fad4c  spec/schemas/chio-wire/v1/kernel/tool_call_response.schema.json
+9e4eb09c86f239bc3f4af66d6202b7127fee7c6a17a8ded8123c73b93ad7f94e  spec/schemas/chio-wire/v1/provenance/attestation-bundle.schema.json
+bcc238d5c893251ea492044783d0f0db0670e068d3d9edc7d053a044e252df89  spec/schemas/chio-wire/v1/provenance/context.schema.json
+9b09c9158fe751dec48846861ada1022815fed0bbbab1bfad1d879e6769512e2  spec/schemas/chio-wire/v1/provenance/stamp.schema.json
+58955bd52663d4b8c87620d0f53783a2a6a8800b15b190251a5e39c21cebba6b  spec/schemas/chio-wire/v1/provenance/verdict-link.schema.json
 e0f3d154f2dbf9a51874ff90e27a0dba43a617508667e8cee8259994b64f3a7d  spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
 8a46da44dd9d2f522dee2ba5b828d9f41ef07ff40a058796d99d424973291d77  spec/schemas/chio-wire/v1/receipt/record.schema.json
 0eaea45890210fa248067a0142ebe511e9d124b4bf29300de85e3fb0cbf3c010  spec/schemas/chio-wire/v1/result/cancelled.schema.json

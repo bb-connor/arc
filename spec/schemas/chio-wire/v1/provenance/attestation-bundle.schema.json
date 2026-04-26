@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/provenance/attestation-bundle/v1",
+  "title": "Chio Provenance Attestation Bundle",
+  "description": "One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. The bundle names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class that Chio resolved across the bundle as a whole, the unix-second `assembledAt` timestamp at which the bundle was assembled, and the ordered list of normalized runtime attestation evidence statements inside `statements`. Each statement mirrors the `RuntimeAttestationEvidence` shape in `crates/chio-core-types/src/capability.rs` (lines 484-507) and is identical in structure to `chio-wire/v1/trust-control/attestation.schema.json`; this schema references that family by inlining the same required field set rather than by `$ref` until the codegen pipeline lands in M01 phase 3. NOTE: there is no live `AttestationBundle` Rust struct on this branch; the bundle is drafted from `.planning/trajectory/01-spec-codegen-conformance.md` (Cross-doc references) plus the M09 supply-chain attestation milestone, which consumes this shape in its phase 3 attestation-verify path. The dedicated Rust struct is expected to land alongside M09 P3 and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the convention used by the `GovernedCallChainContext` shape that this bundle binds to (`crates/chio-core-types/src/capability.rs` lines 952-967, `serde(rename_all = camelCase)`).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chainId",
+    "evidenceClass",
+    "assembledAt",
+    "statements"
+  ],
+  "properties": {
+    "chainId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier of the governed call chain this bundle attests. Matches the `chainId` carried by `provenance/context.schema.json`."
+    },
+    "evidenceClass": {
+      "type": "string",
+      "enum": ["asserted", "observed", "verified"],
+      "description": "Canonical evidence class Chio resolved across the bundle as a whole. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314), which uses `serde(rename_all = snake_case)`. The bundle's class is the floor across its statements: a single `asserted` statement holds the bundle to `asserted` regardless of how many `verified` statements accompany it."
+    },
+    "assembledAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) at which the bundle was assembled. Used to bound bundle freshness and to establish ordering with respect to receipts emitted from the same kernel."
+    },
+    "statements": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence`. The struct does not carry `serde(rename_all)`, so per-statement field names are snake_case.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "verifier",
+          "tier",
+          "issued_at",
+          "expires_at",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Schema or format identifier of the upstream attestation statement (for example `azure-maa-jwt`, `aws-nitro-cose-sign1`, `google-confidential-vm-jwt`)."
+          },
+          "verifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attestation verifier or relying party that accepted the evidence."
+          },
+          "tier": {
+            "type": "string",
+            "enum": ["none", "basic", "attested", "verified"],
+            "description": "Normalized assurance tier resolved from the evidence. Mirrors `RuntimeAssuranceTier` in capability.rs (lines 234-240)."
+          },
+          "issued_at": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp (seconds) when this attestation was issued."
+          },
+          "expires_at": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp (seconds) when this attestation expires. Bundle assembly fails closed when `assembledAt < issued_at` or `assembledAt >= expires_at`."
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs."
+          },
+          "runtime_identity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional runtime or workload identifier associated with the evidence."
+          }
+        }
+      }
+    },
+    "issuer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional identifier of the bundle assembler (kernel, gateway, or trust-control authority). Omitted when the bundle is locally assembled by the receiving kernel."
+    }
+  }
+}
