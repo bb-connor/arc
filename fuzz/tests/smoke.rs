@@ -97,3 +97,12 @@ fn acp_envelope_decode_smoke() {
     use chio_acp_edge::fuzz::fuzz_acp_envelope_decode;
     each_seed("acp_envelope_decode", fuzz_acp_envelope_decode);
 }
+
+#[test]
+fn wasm_preinstantiate_validate_smoke() {
+    use chio_wasm_guards::fuzz::fuzz_wasm_preinstantiate_validate;
+    each_seed(
+        "wasm_preinstantiate_validate",
+        fuzz_wasm_preinstantiate_validate,
+    );
+}

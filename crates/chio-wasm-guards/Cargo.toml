@@ -15,6 +15,14 @@ name = "chio_wasm_guards"
 default = []
 # Enable the wasmtime-based runtime backend.
 wasmtime-runtime = ["dep:wasmtime", "dep:wasmparser"]
+# Enables `chio_wasm_guards::fuzz`, the libFuzzer entry-point module.
+# Off by default; turned on only by the `chio-fuzz` standalone workspace
+# at `../../fuzz`. Pulls in `wasmtime-runtime` because the
+# preinstantiate-validate trust boundary lives in `ComponentBackend`
+# (and adjacent core-module / format-detect helpers), which only exist
+# when the wasmtime backend is compiled in. Authored under M02.P1.T4.a;
+# reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+fuzz = ["dep:arbitrary", "wasmtime-runtime"]
 
 [dependencies]
 chio-kernel = { path = "../chio-kernel" }
@@ -31,6 +39,11 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 wasmparser = { version = "0.221", optional = true }
 wasmtime = { version = "29", optional = true }
+# `arbitrary` is gated behind the `fuzz` feature so production builds stay
+# free of fuzz instrumentation. Pulled in by
+# `fuzz/fuzz_targets/wasm_preinstantiate_validate.rs` (M02.P1.T4.a) via
+# `chio-wasm-guards = { features = ["fuzz"] }`.
+arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

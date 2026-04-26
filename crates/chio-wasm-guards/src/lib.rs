@@ -57,6 +57,14 @@ pub mod runtime;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod wiring;
 
+// libFuzzer entry-point module, enabled only when the `fuzz` feature is
+// turned on by the standalone `chio-fuzz` workspace at `../../fuzz`.
+// Authored under M02.P1.T4.a; reference:
+// `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1, trust-boundary
+// fuzz target #8 (wasm_preinstantiate_validate).
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
+
 pub use abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 #[cfg(feature = "wasmtime-runtime")]
 pub use component::ComponentBackend;
