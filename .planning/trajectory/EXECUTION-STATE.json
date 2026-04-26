@@ -319,14 +319,61 @@
       }
     },
     "M02.P0.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "orchestrator-direct",
+      "branch": "wave/W1/m02/p0.t1-wave-opener-lock-bump",
       "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "merged_at": "2026-04-26T08:30:00Z",
+      "merged_sha": "3a5ac90ae1660a75ee9c094323a217b708e2e91f",
+      "diff_stats": {
+        "files": 0,
+        "insertions": 0,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "gate": "cargo update --workspace + cargo metadata --locked + cargo build --workspace -> all PASS with zero lock movement",
+        "result": "PASS"
+      },
+      "resolution": "no_op_baseline_via_cascade_gate (PR #13 merged into main; project branch absorbs PR #13 content opportunistically as M02 P1 lands)"
+    },
+    "M04.P1.T1": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a5b5da3544db54294",
+      "branch": "wave/W2/m04/p1.t1-replay-gate-skeleton",
+      "pr_number": 78,
+      "merged_sha": "6faf9bd2fd835a9fed3032b31878f65777239f56",
+      "merged_at": "2026-04-26T14:56:05Z",
+      "diff_stats": {
+        "files": 6,
+        "insertions": 155,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo build -p chio-replay-gate --tests PASS (12.71s); cargo build --workspace PASS (42.59s)",
+        "owner_glob_compliance": "all 6 files within ticket spec",
+        "preexisting_failures_noted": "xtask clippy::items-after-test-module + chio-kernel-core/tests/property_evaluate.rs fmt drift (pre-existing on tree pre-T1; logged in PR body for future cleanup ticket)"
+      },
+      "coordination_note": "M04 agent rescued M02.P1.T1.a parallel agent's working-tree mods via stash+pop while completing T1. Future parallel runs should use git worktrees per agent to avoid shared-checkout race."
+    },
+    "M02.P1.T1.a": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a1e7574effdc2ffc1",
+      "branch": "wave/W1/m02/p1.t1.a-jwt-vc-verify-target",
+      "pr_number": 79,
+      "merged_sha": "d68fff3011c24a53de07e935e62c708758cb3aff",
+      "merged_at": "2026-04-26T15:30:00Z",
+      "divergence_checks": {
+        "result": "PASS-WITH-NOTES",
+        "gates": "cargo +nightly fuzz build jwt_vc_verify PASS; cargo test smoke jwt_vc_verify_smoke PASS (0.00s, 4 seeds); cargo build --workspace PASS; clippy --workspace -D warnings PASS",
+        "deferred": "cargo +nightly fuzz run -- -runs=0 -max_total_time=1 hangs in libFuzzer/ASan init on macOS arm64 + nightly-2026-04-24; reproduces on baseline attest_verify (M09.P3.T5) so environmental, not introduced by this ticket; CI lanes (cflite_pr.yml + nightly.yml) carry the runtime gate",
+        "preexisting_fmt_drift": "crates/chio-kernel-core/tests/property_evaluate.rs + crates/chio-spec-validate/tests/scenarios.rs (out of scope; needs follow-up cleanup PR)"
+      },
+      "shared_smoke_infra_landed": "fuzz/tests/smoke.rs (NEW); T1.b through T8 will append #[test] blocks reusing each_seed/corpus_dir helpers",
+      "fuzz_feature_gate_landed": "chio-credentials --features fuzz drives verify_chio_passport_jwt_vc_json with arbitrary 1.4.2 dep"
     },
     "M03.P0.T1": {
       "status": "merged",
