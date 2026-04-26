@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:46:05.598Z",
+  "last_checkpoint_at": "2026-04-26T04:00:47Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -11,11 +11,12 @@
   },
   "milestones": {
     "M01": {
-      "status": "P1+P2 complete; remaining P3-P5 are wave-2",
-      "phase": "P2_complete",
+      "status": "P3 in progress (T1 merged; T2-T6 pending)",
+      "phase": "P3_in_progress",
       "p0_status": "merged",
       "p1_status": "all 9 merged",
-      "p2_status": "all 8 merged"
+      "p2_status": "all 8 merged",
+      "p3_status": "T1 merged"
     },
     "M02": {
       "status": "blocked",
@@ -676,6 +677,18 @@
       "merged_at": "2026-04-26T03:46:05.598Z",
       "divergence_checks": {
         "result": "PASS"
+      }
+    },
+    "M01.P3.T1": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 55,
+      "merged_sha": "da66d5ddd5a8e276d089e9d4272eab3ce79ef838",
+      "branch": "wave/W1/m01/p3.t1-rust-codegen-scaffold",
+      "merged_at": "2026-04-26T04:00:47Z",
+      "divergence_checks": {
+        "result": "PASS-WITH-NOTES",
+        "notes": "Cargo.lock delta 116 lines exceeded 25-line halt threshold; waived per ticket spec since T1 introduces the typify chain (new tooling crate). Test file under tests/ not src/ as per cargo --test resolution."
       }
     }
   },
