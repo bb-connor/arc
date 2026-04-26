@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:40:10.123Z",
+  "last_checkpoint_at": "2026-04-26T01:45:07.549Z",
   "current_wave": "1a",
   "halt": {
-    "halted": true,
-    "reason": "operator-discretion: 14/42 wave-1a tickets merged. M03 P1 closed; pausing for next-batch direction.",
-    "trigger_event_id": "01KQ3Q3C8B7YH00KX403VSPFED",
-    "halted_at": "2026-04-26T01:40:10.123Z"
+    "halted": false,
+    "reason": null,
+    "trigger_event_id": null,
+    "halted_at": null
   },
   "milestones": {
     "M01": {
@@ -455,14 +455,20 @@
       "resolution": "no_op_baseline_via_cascade_gate"
     },
     "M09.P1.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a37e4920b0e98e774",
+      "branch": "wave/W1/m09/p1.t1-cargo-vet-bootstrap",
+      "pr_number": 25,
+      "merged_at": "2026-04-26T01:45:07.549Z",
+      "merged_sha": "55e6bd3f3112fe026a8b716e8d594873f1498f35",
+      "diff_stats": {
+        "files": 4,
+        "insertions": 3237
+      },
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P1.T10": {
       "status": "pending",
