@@ -1,0 +1,146 @@
+# spec-drift.yml - Codegen drift gates for the M01 spec/codegen pipeline.
+#
+# Owned by SEQUENCER per OWNERS.toml; individual jobs are tagged with
+# `# owner: M01` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
+#
+# Phase 3 (M01.P3.T5) lands two jobs here:
+#   - codegen-no-diff: runs `make codegen-check`, which invokes
+#     `cargo xtask codegen --lang {rust,python,ts,go} --check` and fails if
+#     any committed `_generated/` bytes drift from a fresh regeneration.
+#   - header-stamp-untouched: greps every generated file for the canonical
+#     "DO NOT EDIT - regenerate via ..." header and fails if any generated
+#     file is missing it (catches a hand-edit that wiped the stamp).
+#
+# Phase 5 (M01.P5) extends this file with vectors-byte-stable,
+# schema-coverage, and cross-lang-bytes jobs per
+# .planning/trajectory/01-spec-codegen-conformance.md.
+
+name: spec-drift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spec-drift-${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || format('main-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  codegen-no-diff:
+    name: codegen-no-diff (rust+python+ts+go)
+    # owner: M01
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install uv (python codegen toolchain runner)
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install Go (go codegen toolchain)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install Node.js (ts codegen toolchain)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run codegen-check (all four lanes)
+        run: make codegen-check
+
+      - name: Assert no drift in generated files
+        run: |
+          set -euo pipefail
+          # `cargo xtask codegen --lang <lang> --check` already exits non-zero
+          # on byte drift, so reaching this step means each lane saw the
+          # committed bytes match a fresh regeneration. We additionally run
+          # `git diff --exit-code` over the four `_generated/` trees plus the
+          # checked-in Go file to catch any side-effect writes (for example,
+          # `npm ci` mutating package-lock.json).
+          git diff --exit-code \
+            crates/chio-core-types/src/_generated \
+            sdks/python/chio-sdk-python/src/chio_sdk/_generated \
+            sdks/typescript/packages/conformance/src/_generated \
+            sdks/go/chio-go-http/types.go
+
+  header-stamp-untouched:
+    name: header-stamp-untouched (do-not-edit grep gate)
+    # owner: M01
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert canonical "DO NOT EDIT" header on every generated file
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Per-language stamp tail. The canonical first-line header is
+          #   <comment-marker> DO NOT EDIT - regenerate via '<cmd>'
+          # where <cmd> ends with the language-specific xtask invocation.
+          # We grep the first 16 lines of each file (the headers are 8-12
+          # lines) for the language tail; any file missing it fails the job.
+          fail=0
+
+          check() {
+            local file="$1"
+            local needle="$2"
+            if ! head -16 "$file" | grep -qF "DO NOT EDIT - regenerate"; then
+              echo "MISSING header in $file (no 'DO NOT EDIT - regenerate' line)"
+              fail=1
+              return
+            fi
+            if ! head -16 "$file" | grep -qF "$needle"; then
+              echo "WRONG header tail in $file (expected substring '$needle')"
+              fail=1
+              return
+            fi
+            echo "OK $file"
+          }
+
+          # Rust: `crates/chio-core-types/src/_generated/**/*.rs`
+          # tail substring: `cargo xtask codegen rust`
+          while IFS= read -r f; do
+            check "$f" "cargo xtask codegen rust"
+          done < <(find crates/chio-core-types/src/_generated -type f -name '*.rs' | sort)
+
+          # Python: `sdks/python/chio-sdk-python/src/chio_sdk/_generated/**/*.py`
+          # tail substring: `cargo xtask codegen --lang python`
+          while IFS= read -r f; do
+            check "$f" "cargo xtask codegen --lang python"
+          done < <(find sdks/python/chio-sdk-python/src/chio_sdk/_generated -type f -name '*.py' | sort)
+
+          # TypeScript: `sdks/typescript/packages/conformance/src/_generated/**/*.ts`
+          # tail substring: `cargo xtask codegen --lang ts`
+          while IFS= read -r f; do
+            check "$f" "cargo xtask codegen --lang ts"
+          done < <(find sdks/typescript/packages/conformance/src/_generated -type f -name '*.ts' | sort)
+
+          # Go: single checked-in file `sdks/go/chio-go-http/types.go`
+          # tail substring: `cargo xtask codegen --lang go`
+          check "sdks/go/chio-go-http/types.go" "cargo xtask codegen --lang go"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::header-stamp-untouched: one or more generated files missing the canonical header"
+            exit 1
+          fi
+          echo "header-stamp-untouched: all generated files carry the canonical 'DO NOT EDIT - regenerate' stamp"
