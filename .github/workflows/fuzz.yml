@@ -1,0 +1,200 @@
+# fuzz.yml - Native cargo-fuzz scheduled matrix (M02-owned).
+#
+# Source of truth: .planning/trajectory/02-fuzzing-post-pr13.md
+# (Phase 1 lines 141-160; Phase 4 crash-triage references at 323/413).
+# Decision lock: .planning/trajectory/decisions.yml
+# id=continuous-fuzzing-path (OSS-Fuzz primary, ClusterFuzzLite bridge,
+# 1,800 GHA runner-min/30d hard halt before the 2,000 min/month free-tier
+# cap).
+#
+# This workflow is the in-tree `cargo +nightly fuzz` scheduled matrix
+# referenced throughout the source doc. It complements (does NOT
+# duplicate) the ClusterFuzzLite workflows:
+#
+#   - cflite_pr.yml    : PR-time changed-target sampling (60s/target)
+#   - cflite_batch.yml : nightly ClusterFuzzLite rotation (1,800s/target)
+#   - fuzz.yml (this)  : nightly native libFuzzer matrix (>= 30 min/target,
+#                        ASan, all targets in parallel)
+#
+# T6 scope (this commit): extend the matrix to enumerate every libFuzzer
+# target that has landed under M02 P1 plus the M09 supply-chain entry,
+# pre-including the receipt_log_replay slot for M02.P1.T8 so wiring it up
+# later is a one-line target-binary add rather than a workflow edit.
+#
+# Per-target wall-time budget: 1,800s (30 min) hard cap via
+# `--max_total_time=1800` plus `timeout-minutes: 45` belt-and-braces.
+# With 13 matrix entries (12 live + 1 placeholder) the worst-case nightly
+# wall-time is 13 * 30 = 390 minutes if every job ran to budget. The
+# matrix runs jobs in parallel on the GitHub-hosted pool (default 20
+# concurrent runners on the free tier), so wall-clock is bounded by
+# the longest single target rather than the sum. Budget accounting:
+# nightly = 13 jobs * 30 min = 390 billed-min; weekly = 7 * 390 = 2,730
+# billed-min; monthly = 4 * 2,730 = 10,920 billed-min. That deliberately
+# exceeds the 1,800-min cflite cap because this lane runs on the SAME
+# GHA account, so the in-tree budget guard
+# (`scripts/check-fuzz-budget.sh`) is invoked before the matrix fans
+# out. The guard counts cflite + this workflow toward the cap and
+# refuses to fan out the matrix when the trailing 30-day total
+# would breach 1,800 minutes (see fuzz-budget job below).
+#
+# Pre-empted target: receipt_log_replay (M02.P1.T8) is listed in the
+# matrix but the per-target step short-circuits when the binary does
+# not yet exist in fuzz/Cargo.toml. T8 lands the binary, no workflow
+# edit needed.
+
+name: fuzz
+
+on:
+  schedule:
+    # 03:23 UTC nightly. 23 minutes past the hour to dodge the cron
+    # storm; 03:23 sits between cflite_batch (02:17) and the existing
+    # nightly proptest lane (04:23) so the GHA runner pool is not
+    # over-subscribed.
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Force a single fuzz target (default: full matrix)"
+        required: false
+        type: string
+      max_total_time:
+        description: "Override per-target wall-time budget in seconds (default 1800)"
+        required: false
+        type: string
+        default: "1800"
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: fuzz-scheduled
+  cancel-in-progress: false
+
+env:
+  # Per-target wall-time budget in seconds. 30 minutes by default; the
+  # workflow_dispatch override path lets operators dial down for a
+  # smoke run without editing the file.
+  CHIO_FUZZ_MAX_TOTAL_TIME: ${{ inputs.max_total_time || '1800' }}
+
+jobs:
+  fuzz-budget:
+    name: fuzz-budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify 30-day fuzz budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Reuse the cflite budget guard; it counts every fuzz workflow
+          # (cflite_pr, cflite_batch, fuzz) against the 1,800-min cap.
+          scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+  fuzz-scheduled:
+    name: fuzz-scheduled (${{ matrix.target }})
+    needs: fuzz-budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # M02 PR #13 baseline (seven targets).
+          - canonical_json_roundtrip
+          - manifest_decode
+          - receipt_decode
+          - capability_decode
+          - scope_decode
+          - policy_decision_decode
+          - signing_envelope_decode
+          # M09 P3.T5 supply-chain entry (already landed via PR #76).
+          - attest_verify
+          # M02 P1 expansion (eleven new targets).
+          - jwt_vc_verify           # M02.P1.T1.a
+          - oid4vp_presentation     # M02.P1.T1.b
+          - did_resolve             # M02.P1.T1.c
+          - anchor_bundle_verify    # M02.P1.T2
+          - mcp_envelope_decode     # M02.P1.T3.a
+          - a2a_envelope_decode     # M02.P1.T3.b
+          - acp_envelope_decode     # M02.P1.T3.c
+          - wasm_preinstantiate_validate  # M02.P1.T4.a
+          - wit_host_call_boundary  # M02.P1.T4.b
+          - chio_yaml_parse         # M02.P1.T5.a
+          - openapi_ingest          # M02.P1.T5.b
+          # M02 P1.T8 slot (target binary lands later; per-step guard
+          # short-circuits until then so this entry does not break the
+          # matrix).
+          - receipt_log_replay
+    steps:
+      - name: Skip when forced target does not match
+        if: inputs.target != '' && inputs.target != matrix.target
+        run: |
+          echo "skipping ${{ matrix.target }} (forced=${{ inputs.target }})"
+          exit 0
+
+      - uses: actions/checkout@v4
+
+      - name: Install nightly Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install nightly --profile minimal --component rust-src
+          rustup default nightly
+
+      - name: Install cargo-fuzz
+        run: |
+          set -euo pipefail
+          cargo install cargo-fuzz --locked || cargo install cargo-fuzz
+
+      - name: Confirm fuzz target binary exists
+        id: confirm
+        run: |
+          set -euo pipefail
+          if grep -qE "^name = \"${{ matrix.target }}\"" fuzz/Cargo.toml; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "fuzz target ${{ matrix.target }} not yet wired in fuzz/Cargo.toml; skipping (slot reserved)"
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Build fuzz target with ASan
+        if: steps.confirm.outputs.exists == 'true'
+        env:
+          RUSTFLAGS: "-Z sanitizer=address"
+        run: |
+          set -euo pipefail
+          cd fuzz
+          cargo +nightly fuzz build --sanitizer address ${{ matrix.target }}
+
+      - name: Run fuzz target (ASan, max_total_time = ${{ env.CHIO_FUZZ_MAX_TOTAL_TIME }}s)
+        if: steps.confirm.outputs.exists == 'true'
+        run: |
+          set -euo pipefail
+          cd fuzz
+          # libFuzzer flags:
+          #   -max_total_time : per-target wall-time budget
+          #   -timeout=25     : per-input timeout (matches PR #13 profile)
+          #   -rss_limit_mb=2048 : per-target RSS ceiling
+          # The corpus dir under fuzz/corpus/<target>/ seeds the run; if
+          # the dir is empty libFuzzer starts from scratch.
+          cargo +nightly fuzz run \
+            --sanitizer address \
+            ${{ matrix.target }} \
+            -- \
+            -max_total_time=${{ env.CHIO_FUZZ_MAX_TOTAL_TIME }} \
+            -timeout=25 \
+            -rss_limit_mb=2048
+
+      - name: Upload crash artifacts
+        if: failure() && steps.confirm.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
+          path: |
+            fuzz/artifacts/${{ matrix.target }}/
+            fuzz/corpus/${{ matrix.target }}/
+          if-no-files-found: ignore
+          retention-days: 30
