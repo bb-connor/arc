@@ -161,11 +161,12 @@ impl chio_kernel::Guard for ShellCommandGuard {
 
 fn is_recursive_rm_root(tokens: &[String]) -> bool {
     for segment in tokens.split(|token| is_shell_separator(token)) {
-        let Some(index) = executable_rm_index(segment) else {
+        let expanded_segment = expand_env_split_string_options(segment);
+        let Some(index) = executable_rm_index(&expanded_segment) else {
             continue;
         };
 
-        let args = segment.iter().skip(index + 1);
+        let args = expanded_segment.iter().skip(index + 1);
         let mut has_recursive_flag = false;
         let mut has_root_target = false;
 
@@ -184,6 +185,67 @@ fn is_recursive_rm_root(tokens: &[String]) -> bool {
     }
 
     false
+}
+
+fn expand_env_split_string_options(tokens: &[String]) -> Vec<String> {
+    let mut expanded = Vec::with_capacity(tokens.len());
+    let mut index = 0usize;
+
+    while index < tokens.len() {
+        if tokens[index] != "env" {
+            expanded.push(tokens[index].clone());
+            index += 1;
+            continue;
+        }
+
+        expanded.push(tokens[index].clone());
+        index += 1;
+
+        while index < tokens.len() {
+            let env_token = tokens[index].as_str();
+            if env_token == "--" {
+                expanded.push(tokens[index].clone());
+                index += 1;
+                break;
+            }
+            if is_env_assignment(env_token) {
+                expanded.push(tokens[index].clone());
+                index += 1;
+                continue;
+            }
+            if let Some(value) = env_split_string_inline_value(env_token) {
+                expanded.extend(shlex_split_best_effort(value));
+                index += 1;
+                continue;
+            }
+            if env_option_is_split_string(env_token) {
+                if let Some(value) = tokens.get(index + 1) {
+                    expanded.extend(shlex_split_best_effort(value));
+                    index += 2;
+                } else {
+                    expanded.push(tokens[index].clone());
+                    index += 1;
+                }
+                continue;
+            }
+            if is_env_option(env_token) {
+                let option_takes_value = env_option_takes_value(env_token);
+                expanded.push(tokens[index].clone());
+                index += 1;
+                if option_takes_value && index < tokens.len() {
+                    expanded.push(tokens[index].clone());
+                    index += 1;
+                }
+                continue;
+            }
+
+            expanded.push(tokens[index].clone());
+            index += 1;
+            break;
+        }
+    }
+
+    expanded
 }
 
 fn executable_rm_index(tokens: &[String]) -> Option<usize> {
@@ -302,21 +364,29 @@ fn sudo_option_exits_without_command(token: &str) -> bool {
 }
 
 fn is_env_option(token: &str) -> bool {
-    token.starts_with('-') && token != "-" && token != "--"
+    token == "-" || (token.starts_with('-') && token != "--")
 }
 
 fn env_option_exits_without_command(token: &str) -> bool {
     matches!(token, "--help" | "--version")
 }
 
+fn env_option_is_split_string(token: &str) -> bool {
+    matches!(token, "-S" | "--split-string")
+}
+
+fn env_split_string_inline_value(token: &str) -> Option<&str> {
+    if let Some(value) = token.strip_prefix("--split-string=") {
+        return Some(value);
+    }
+    token.strip_prefix("-S").filter(|value| !value.is_empty())
+}
+
 fn env_option_takes_value(token: &str) -> bool {
     if token.contains('=') {
         return false;
     }
-    matches!(
-        token,
-        "-u" | "--unset" | "-C" | "--chdir" | "-S" | "--split-string" | "--argv0"
-    )
+    matches!(token, "-u" | "--unset" | "-C" | "--chdir" | "--argv0")
 }
 
 fn is_command_execution_option(token: &str) -> bool {
@@ -564,6 +634,10 @@ mod tests {
         assert!(guard.is_forbidden("env --ignore-environment rm -r'f' /"));
         assert!(guard.is_forbidden("env -u PATH rm -r'f' /"));
         assert!(guard.is_forbidden("env FOO=bar -i rm -r'f' /"));
+        assert!(guard.is_forbidden("env - rm -r'f' /"));
+        assert!(guard.is_forbidden("env -S \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env --split-string \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env --split-string=\"rm -r'f' /\""));
         assert!(guard.is_forbidden("env -- rm -r'f' /"));
         assert!(guard.is_forbidden("command rm -r'f' /"));
         assert!(guard.is_forbidden("command -p rm -r'f' /"));
