@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:50:46.675Z",
+  "last_checkpoint_at": "2026-04-26T02:51:36.962Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -58,9 +58,10 @@
     },
     "M09": {
       "status": "in_progress",
-      "phase": "P1_complete -> P2",
+      "phase": "P2_complete",
       "p0_status": "merged",
-      "p1_status": "all 11 merged"
+      "p1_status": "all 11 merged",
+      "p2_status": "all 4 merged"
     },
     "M10": {
       "status": "pending",
@@ -627,14 +628,15 @@
       }
     },
     "M09.P2.T3": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 46,
+      "merged_sha": "180ba1f3baca84519ba3f222580a545c99c1c95f",
+      "branch": "wave/W1/m09/p2.t3-slsa-l2-provenance",
+      "merged_at": "2026-04-26T02:51:36.962Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P2.T4": {
       "status": "merged",
