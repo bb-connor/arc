@@ -245,6 +245,34 @@ release is the correct response.
 
 ---
 
+## Supply-chain artifacts
+
+Every binary release built by
+[`.github/workflows/release-binaries.yml`](../../.github/workflows/release-binaries.yml)
+emits two complementary supply-chain artifacts in addition to the
+`.tar.gz` / `.zip` archive and its `.sha256` sidecar.
+
+| Artifact | Producer | Where to find it |
+|---|---|---|
+| Embedded `auditable` dependency graph | `cargo auditable build` (cargo-auditable v0.7.4, M09.P2.T1) | Inside the `chio` binary itself; read with `cargo audit -f <binary>`. |
+| CycloneDX 1.6 JSON SBOM | `syft` v1.18.1 with [`infra/sbom/syft.yaml`](../../infra/sbom/syft.yaml) (M09.P2.T2) | GitHub Actions artifact `sbom-<target>` (90-day retention). One file per matrix leg, named `chio-<target>.cyclonedx.json`. |
+
+Both artifacts are produced per matrix leg, so each of the five
+release targets (linux x86_64 / aarch64, macOS x86_64 / aarch64,
+windows x86_64) ships its own embedded graph and its own SBOM.
+
+The release job validates the SBOM with
+`jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"'` before
+upload; a missing or malformed SBOM fails the workflow rather than
+silently publishing without one.
+
+Cosign signing of these artifacts and SLSA L2 provenance attachment
+land in M09.P2.T3 and M09.P3 respectively; see
+`.planning/trajectory/09-supply-chain-attestation.md` for the full
+attestation roadmap.
+
+---
+
 ## Troubleshooting
 
 **`invalid-publisher: invalid audience in JWT`** during PyPI upload

@@ -141,6 +141,53 @@ jobs:
             --bin "${BINARY_NAME}" \
             --target "${{ matrix.target }}"
 
+      - name: Install syft
+        # Pinned to v1.18.1 to match the M09.P2.T2 acceptance gate. The
+        # upstream install.sh validates the downloaded checksum against
+        # the tag before extracting, so the bare curl pipe is acceptable
+        # here. Output goes to ${HOME}/.local/bin which the next line
+        # appends to GITHUB_PATH for subsequent steps in the job.
+        # Windows runners use the same script under Git Bash so the
+        # syft.exe lands on PATH for the powershell stage step too.
+        shell: bash
+        run: |
+          set -euo pipefail
+          SYFT_VERSION=v1.18.1
+          mkdir -p "${HOME}/.local/bin"
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b "${HOME}/.local/bin" "${SYFT_VERSION}"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Emit CycloneDX 1.6 SBOM
+        # Generates a CycloneDX 1.6 JSON SBOM for the just-built chio
+        # binary. The binary already carries the cargo-auditable dep
+        # graph (see M09.P2.T1); syft adds an external, machine-readable
+        # SBOM so downstream consumers have a standards-based artifact
+        # without needing to parse the embedded auditable section.
+        # The jq assertion fails the job loudly if syft ever changes its
+        # default schema version or the config file is mis-loaded.
+        shell: bash
+        env:
+          CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          CHIO_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/sbom
+          out_file="out/sbom/chio-${CHIO_TARGET}.cyclonedx.json"
+          syft --config infra/sbom/syft.yaml \
+            -o "cyclonedx-json@1.6=${out_file}" \
+            "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}"
+          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"' \
+            "${out_file}" > /dev/null
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.target }}
+          path: out/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Resolve release version
         id: version
         shell: bash
