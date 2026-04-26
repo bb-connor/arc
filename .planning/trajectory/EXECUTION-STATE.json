@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:31:46.781Z",
+  "last_checkpoint_at": "2026-04-26T01:32:18.034Z",
   "current_wave": "1a",
   "halt": {
-    "halted": false,
-    "reason": null,
-    "trigger_event_id": null,
-    "halted_at": null
+    "halted": true,
+    "reason": "operator-discretion: 11/42 wave-1a tickets merged. Pausing for batch-cadence direction.",
+    "trigger_event_id": "01KQ3PMZ7JRB61RS0QY42W7WN8",
+    "halted_at": "2026-04-26T01:32:18.034Z"
   },
   "milestones": {
     "M01": {
