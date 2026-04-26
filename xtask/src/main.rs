@@ -33,6 +33,14 @@
 //! `shasum -a 256` so the manifest can be verified with that tool. With
 //! `--check` it compares the computed manifest against the on-disk file and
 //! exits non-zero on drift; CI uses this mode to catch unfrozen vectors.
+//!
+//! `codegen rust` (alias: `codegen --lang rust`) regenerates the
+//! schema-derived Rust types under `crates/chio-core-types/src/_generated/`
+//! by invoking `chio_spec_codegen::codegen_rust`. With `--check` it renders
+//! the codegen to memory and exits non-zero if the bytes disagree with the
+//! on-disk file (used by the M01.P3.T5 spec-drift CI lane). Subsequent
+//! tickets (M01.P3.T2-T4) extend the dispatcher with `--lang python`,
+//! `--lang ts`, and `--lang go`.
 
 use std::env;
 use std::ffi::OsStr;
@@ -63,6 +71,7 @@ enum XtaskError {
     Json(String, serde_json::Error),
     Drift(String),
     Validation(String),
+    Codegen(chio_spec_codegen::CodegenError),
 }
 
 impl fmt::Display for XtaskError {
@@ -74,6 +83,7 @@ impl fmt::Display for XtaskError {
             Self::Json(path, err) => write!(f, "json error in {path}: {err}"),
             Self::Drift(detail) => write!(f, "manifest drift: {detail}"),
             Self::Validation(detail) => write!(f, "scenario validation failed: {detail}"),
+            Self::Codegen(err) => write!(f, "codegen failed: {err}"),
         }
     }
 }
@@ -85,6 +95,7 @@ fn main() -> ExitCode {
         "trajectory" => run_trajectory(args.collect()),
         "validate-scenarios" => validate_scenarios(args.collect()),
         "freeze-vectors" => freeze_vectors(args.collect()),
+        "codegen" => run_codegen(args.collect()),
         "" | "help" | "--help" | "-h" => {
             print_help();
             return ExitCode::SUCCESS;
@@ -105,6 +116,8 @@ fn print_help() {
     println!("  trajectory regen-manifest [--check]");
     println!("  validate-scenarios");
     println!("  freeze-vectors [--check]");
+    println!("  codegen rust [--check]");
+    println!("  codegen --lang rust [--check]");
 }
 
 fn run_trajectory(args: Vec<String>) -> Result<(), XtaskError> {
@@ -471,6 +484,117 @@ fn freeze_vectors(args: Vec<String>) -> Result<(), XtaskError> {
             entries.len()
         );
     }
+    Ok(())
+}
+
+/// Relative path (from workspace root) of the chio-wire/v1 schema directory.
+const CHIO_WIRE_V1_SCHEMAS: &str = "spec/schemas/chio-wire/v1";
+/// Relative path (from workspace root) of the generated Rust output dir.
+const CHIO_WIRE_V1_RUST_OUT: &str = "crates/chio-core-types/src/_generated";
+
+fn run_codegen(args: Vec<String>) -> Result<(), XtaskError> {
+    // Accepted forms:
+    //   cargo xtask codegen rust [--check]
+    //   cargo xtask codegen --lang rust [--check]
+    let mut lang: Option<String> = None;
+    let mut check_only = false;
+
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--check" => check_only = true,
+            "--lang" => match iter.next() {
+                Some(value) => lang = Some(value),
+                None => {
+                    return Err(XtaskError::Usage(
+                        "codegen: --lang requires an argument (e.g. --lang rust)".into(),
+                    ));
+                }
+            },
+            "rust" | "python" | "ts" | "go" => {
+                if lang.is_none() {
+                    lang = Some(arg);
+                } else {
+                    return Err(XtaskError::Usage(format!(
+                        "codegen: language already specified; unexpected argument: {arg}"
+                    )));
+                }
+            }
+            other => {
+                return Err(XtaskError::Usage(format!(
+                    "codegen: unknown argument: {other}"
+                )));
+            }
+        }
+    }
+
+    let lang = lang.ok_or_else(|| {
+        XtaskError::Usage("codegen: language is required (rust|python|ts|go)".into())
+    })?;
+
+    match lang.as_str() {
+        "rust" => codegen_rust(check_only),
+        // Wired by M01.P3.T2-T4. Surfaced here so the dispatcher returns a
+        // clean usage error rather than `unknown argument` once the lang
+        // argument parses.
+        "python" => Err(XtaskError::Usage(
+            "codegen: --lang python is not yet wired (lands in M01.P3.T2)".into(),
+        )),
+        "ts" => Err(XtaskError::Usage(
+            "codegen: --lang ts is not yet wired (lands in M01.P3.T3)".into(),
+        )),
+        "go" => Err(XtaskError::Usage(
+            "codegen: --lang go is not yet wired (lands in M01.P3.T4)".into(),
+        )),
+        other => Err(XtaskError::Usage(format!(
+            "codegen: unknown language: {other} (expected rust|python|ts|go)"
+        ))),
+    }
+}
+
+fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
+    let workspace_root = workspace_root()?;
+    let schemas_dir = workspace_root.join(CHIO_WIRE_V1_SCHEMAS);
+    let out_dir = workspace_root.join(CHIO_WIRE_V1_RUST_OUT);
+
+    if check_only {
+        let computed =
+            chio_spec_codegen::render_chio_wire_v1(&schemas_dir).map_err(XtaskError::Codegen)?;
+        let out_path = out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT);
+        if !out_path.exists() {
+            return Err(XtaskError::Drift(format!(
+                "{} is missing; rerun `cargo xtask codegen rust`",
+                display_path(&out_path)
+            )));
+        }
+        let existing = fs::read_to_string(&out_path)
+            .map_err(|err| XtaskError::Io(display_path(&out_path), err))?;
+        if existing != computed {
+            return Err(XtaskError::Drift(format!(
+                "{} is stale; rerun `cargo xtask codegen rust` (computed {} bytes, on-disk {} bytes)",
+                display_path(&out_path),
+                computed.len(),
+                existing.len()
+            )));
+        }
+        println!(
+            "codegen rust: {} in sync ({} bytes)",
+            display_path(&out_path),
+            existing.len()
+        );
+        return Ok(());
+    }
+
+    chio_spec_codegen::codegen_rust(&schemas_dir, &out_dir).map_err(XtaskError::Codegen)?;
+    let out_path = out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT);
+    let mod_path = out_dir.join(chio_spec_codegen::MOD_FILE);
+    let bytes = fs::metadata(&out_path).map(|m| m.len()).unwrap_or_default();
+    println!(
+        "codegen rust: wrote {} ({} bytes) and refreshed {}",
+        display_path(&out_path),
+        bytes,
+        display_path(&mod_path)
+    );
     Ok(())
 }
 
