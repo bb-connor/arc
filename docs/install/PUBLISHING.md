@@ -266,10 +266,11 @@ The release job validates the SBOM with
 upload; a missing or malformed SBOM fails the workflow rather than
 silently publishing without one.
 
-Cosign signing of these `release-binaries.yml` archives lands in
-M09.P3.T3; see
-`.planning/trajectory/09-supply-chain-attestation.md` for the full
-attestation roadmap.
+Cosign keyless signing of every `release-binaries.yml` archive
+landed in M09.P3.T3; the consumer verification recipe lives below
+in [Release-binaries archive signing](#release-binaries-archive-signing).
+See `.planning/trajectory/09-supply-chain-attestation.md` for the
+broader attestation roadmap.
 
 ---
 
@@ -355,6 +356,114 @@ release mints a fresh ephemeral certificate. The Sigstore TUF trust
 root that `chio-attest-verify` ships is refreshed by the quarterly
 [`tuf-rebake.yml`](../../.github/workflows/tuf-rebake.yml) job and
 landed via a CODEOWNERS-reviewed PR.
+
+---
+
+## Release-binaries archive signing
+
+Owned by M09 (M09.P3.T3). Every per-target archive built by
+[`.github/workflows/release-binaries.yml`](../../.github/workflows/release-binaries.yml)
+(five legs: linux x86_64 / aarch64, macOS x86_64 / aarch64, windows
+x86_64) is keyless-signed with [Sigstore cosign](https://docs.sigstore.dev/cosign/)
+immediately after the staging step that materializes the `.tar.gz`
+or `.zip`. Two siblings are uploaded alongside each archive on the
+GitHub Release:
+
+| Sibling                 | Producer                          | Purpose                                                  |
+|-------------------------|-----------------------------------|----------------------------------------------------------|
+| `<archive>.sig`         | `cosign sign-blob --output-signature` | Detached signature blob over the archive bytes.       |
+| `<archive>.pem`         | `cosign sign-blob --output-certificate` | PEM-encoded short-lived Fulcio certificate (the SAN carries the workflow identity used at verify time). |
+
+The existing `<archive>.sha256` and the combined `SHA256SUMS`
+sidecars are unchanged.
+
+### How signing works
+
+1. `sigstore/cosign-installer@v3.7.0` pins cosign at `v2.4.1` on each
+   matrix runner. The pin matches the sidecar-image workflow
+   ([Sidecar image signing](#sidecar-image-signing)) so consumers
+   only need one cosign version on the verifier side.
+2. The `build` job runs with `permissions.id-token: write`, which
+   lets `cosign sign-blob --yes` exchange a GitHub-issued OIDC token
+   for a short-lived Fulcio signing certificate. No long-lived
+   signing key is held in repo secrets.
+3. After the per-target archive is staged into `dist/`, the workflow
+   runs `cosign sign-blob --yes --output-signature <archive>.sig
+   --output-certificate <archive>.pem <archive>` and asserts both
+   outputs are non-empty before the upload-artifact step. A failed
+   signing aborts the matrix leg before any artifact is uploaded.
+4. The `release` job copies the `.sig` and `.pem` siblings into
+   `release/` alongside the archives and lets
+   `softprops/action-gh-release@v2` attach them to the GitHub
+   Release with `fail_on_unmatched_files: true`. Missing siblings
+   fail the release rather than ship an unsigned archive.
+
+### Consumer verification
+
+Every archive's certificate SAN is the same `release-binaries.yml`
+workflow identity, scoped to a tag push, so the verification regex
+narrows to the `refs/tags/v...` arm only. `workflow_dispatch` runs
+under the same workflow file but ship pre-release builds for
+operator-driven rebuilds; consumers who require strict release-only
+verification reject anything outside this regex shape.
+
+```bash
+# Pin the version you intend to install and pick a target triple.
+VERSION=0.1.0
+TARGET=x86_64-unknown-linux-gnu
+ARCHIVE="chio-${VERSION}-${TARGET}.tar.gz"
+
+# Download the archive plus its cosign siblings.
+gh release download "v${VERSION}" --repo <owner>/chio \
+    --pattern "${ARCHIVE}" \
+    --pattern "${ARCHIVE}.sig" \
+    --pattern "${ARCHIVE}.pem" \
+    --pattern "${ARCHIVE}.sha256"
+
+# Verify the cosign signature against the workflow identity.
+cosign verify-blob \
+    --certificate "${ARCHIVE}.pem" \
+    --signature   "${ARCHIVE}.sig" \
+    --certificate-identity-regexp \
+        "^https://github\.com/<owner>/chio/\.github/workflows/release-binaries\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$" \
+    --certificate-oidc-issuer \
+        "https://token.actions.githubusercontent.com" \
+    "${ARCHIVE}"
+
+# Confirm the SHA-256 against the published manifest.
+shasum -a 256 -c "${ARCHIVE}.sha256"
+```
+
+The `<owner>` placeholder is the lower-cased GitHub repository owner
+(e.g. `backbay-industries`). Five archive variants ship per release
+(one per matrix leg) and each carries its own `.sig` + `.pem`
+pair; verifying one platform never implies verifying another.
+
+The cert-identity regex is deliberately narrower than the
+[Sidecar image signing](#sidecar-image-signing) regex: release
+archives only ship from `refs/tags/v...`, never from
+`refs/heads/main`, so accepting the `main` arm here would let an
+attacker substitute a non-tag build under a release name.
+
+### Programmatic verification from chio code
+
+In-tree code MUST go through `chio_attest_verify::AttestVerifier`
+rather than calling `sigstore-rs` directly. The trait surface is
+documented in [`crates/chio-attest-verify/README.md`](../../crates/chio-attest-verify/README.md)
+(landed in M09.P3.T1) and exposes `verify_blob`, `verify_bytes`, and
+`verify_bundle` with a single canonical `ExpectedIdentity`
+(`certificate_identity_regexp`, `certificate_oidc_issuer`). The
+release-binaries workflow's signing identity matches that surface
+directly: pass the regex shape above and the
+`https://token.actions.githubusercontent.com` issuer.
+
+### Rotation and rebake
+
+The same Sigstore TUF trust root that gates sidecar image
+verification gates archive verification, refreshed by the quarterly
+[`tuf-rebake.yml`](../../.github/workflows/tuf-rebake.yml) job. The
+ephemeral cert in each `<archive>.pem` is bound to a single workflow
+run via Rekor; there is no long-lived key to rotate.
 
 ---
 
