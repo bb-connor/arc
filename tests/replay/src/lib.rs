@@ -27,10 +27,11 @@
 //! - [`golden_reader`]: read goldens back as raw `Vec<u8>` (T4).
 //! - [`byte_compare`]: byte-equivalence harness (T4).
 //! - [`fs_iter`]: deterministic `LC_ALL=C` directory enumeration (T7).
-//! - `bless` (future): `--bless` flag plus the gate-logic checks added in Phase 2.
+//! - [`bless`]: CHIO_BLESS gate logic for the `--bless` flow (Phase 2 T1).
 
 #![forbid(unsafe_code)]
 
+pub mod bless;
 pub mod byte_compare;
 pub mod driver;
 pub mod fs_iter;
