@@ -73,3 +73,9 @@ fn did_resolve_smoke() {
     use chio_did::fuzz::fuzz_did_resolve;
     each_seed("did_resolve", fuzz_did_resolve);
 }
+
+#[test]
+fn anchor_bundle_verify_smoke() {
+    use chio_anchor::fuzz::fuzz_anchor_bundle_verify;
+    each_seed("anchor_bundle_verify", fuzz_anchor_bundle_verify);
+}

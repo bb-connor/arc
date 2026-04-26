@@ -29,6 +29,7 @@ cargo-fuzz = true
 [workspace]
 
 [dependencies]
+chio-anchor = { path = "../crates/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
@@ -44,6 +45,16 @@ arbitrary = { version = "1", features = ["derive"] }
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+# M02.P1.T2: Chio anchor proof-bundle / checkpoint-publication-records
+# trust boundary.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "anchor_bundle_verify"
+path = "fuzz_targets/anchor_bundle_verify.rs"
+test = false
+doc = false
+bench = false
 
 [[bin]]
 name = "attest_verify"
