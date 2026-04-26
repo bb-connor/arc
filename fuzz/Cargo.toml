@@ -29,6 +29,7 @@ cargo-fuzz = true
 [workspace]
 
 [dependencies]
+chio-a2a-adapter = { path = "../crates/chio-a2a-adapter", features = ["fuzz"] }
 chio-anchor = { path = "../crates/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
@@ -47,6 +48,17 @@ arbitrary = { version = "1", features = ["derive"] }
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+# M02.P1.T3.b: Chio A2A adapter SSE-decode + per-envelope fan-out trust
+# boundary (parse_sse_stream + JSON-RPC envelope unwrap + stream-response
+# validator).
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "a2a_envelope_decode"
+path = "fuzz_targets/a2a_envelope_decode.rs"
+test = false
+doc = false
+bench = false
 
 # M02.P1.T2: Chio anchor proof-bundle / checkpoint-publication-records
 # trust boundary.
