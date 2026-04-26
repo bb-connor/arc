@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T08:05:00Z",
-  "current_wave": "1b-nearly-complete",
+  "last_checkpoint_at": "2026-04-26T08:15:00Z",
+  "current_wave": "1b-complete-pending-m02-execution",
   "halt": {
     "halted": false,
     "reason": null,
@@ -21,11 +21,12 @@
       "p5_status": "not authored (wave 2)"
     },
     "M02": {
-      "status": "blocked",
-      "phase": "P0",
+      "status": "P0+P1 unblocked (PR #13 merged); ticket files authored",
+      "phase": "ready_for_p0",
       "owner_branch": null,
       "scheduled_in_wave": "1b",
-      "blocked_on": "PR #13 merge"
+      "blocked_on": null,
+      "tickets_authored": "P1 (14) + P2 (7) + P3 (2) + P4 (8); P0 was Wave 0 deliverable"
     },
     "M03": {
       "status": "MILESTONE COMPLETE (P0+P1+P2+P3 all merged)",
@@ -38,28 +39,30 @@
       "p3_status": "all 7 merged"
     },
     "M04": {
-      "status": "pending",
-      "phase": null,
+      "status": "ticket files authored (P1-P6, 36 tickets)",
+      "phase": "ready_for_p1",
       "owner_branch": null
     },
     "M05": {
-      "status": "pending",
-      "phase": null,
-      "owner_branch": null
+      "status": "ticket files authored (P0-P4, 29 tickets)",
+      "phase": "ready_for_p0",
+      "owner_branch": null,
+      "trust_boundary": true
     },
     "M06": {
-      "status": "pending",
-      "phase": null,
-      "owner_branch": null
+      "status": "ticket files authored (P0-P4, 26 tickets); P1 gates on M05.P1.T3 sha; P2 gates on M09.P3.T1 sha (merged)",
+      "phase": "ready_for_p0",
+      "owner_branch": null,
+      "trust_boundary": true
     },
     "M07": {
-      "status": "pending",
-      "phase": null,
+      "status": "ticket files authored (P1-P4, 29 tickets)",
+      "phase": "ready_for_p1",
       "owner_branch": null
     },
     "M08": {
-      "status": "pending",
-      "phase": null,
+      "status": "ticket files authored (P1-P3, 13 tickets); P3 is decision-only",
+      "phase": "ready_for_p1",
       "owner_branch": null
     },
     "M09": {
@@ -71,8 +74,8 @@
       "p3_status": "all 6 merged"
     },
     "M10": {
-      "status": "pending",
-      "phase": null,
+      "status": "ticket files authored (P1+P2+P2.5+P3, 22 tickets); P2.5 is fixture-graduation boundary",
+      "phase": "ready_for_p1",
       "owner_branch": null
     }
   },
@@ -978,10 +981,12 @@
   "wave_gate_history": [],
   "pr_state_cache": {
     "13": {
-      "state": "OPEN",
-      "mergeStateStatus": "UNSTABLE",
+      "state": "MERGED",
+      "merge_commit": "d2816aa060ba7c0fd10edcece9192e9b4c2850fd",
       "headRefName": "codex/fuzz-production-hardening",
-      "fetched_at": "2026-04-26T00:22:28.898Z"
+      "merged_at": "2026-04-26T08:10:00Z",
+      "fetched_at": "2026-04-26T08:10:00Z",
+      "note": "PR #13 merged into main (not project/roadmap-04-25-2026); M02 P0+P1 unblocked"
     }
   },
   "preflight": {
