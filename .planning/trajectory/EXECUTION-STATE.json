@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T07:25:00Z",
+  "last_checkpoint_at": "2026-04-26T07:55:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -61,11 +61,12 @@
       "owner_branch": null
     },
     "M09": {
-      "status": "in_progress",
-      "phase": "P2_complete",
+      "status": "P3 nearly done; T3 in flight",
+      "phase": "P3_in_progress",
       "p0_status": "merged",
       "p1_status": "all 11 merged",
-      "p2_status": "all 4 merged"
+      "p2_status": "all 4 merged",
+      "p3_status": "T1+T2+T4+T5+T6 merged; T3 executor running"
     },
     "M10": {
       "status": "pending",
@@ -915,6 +916,48 @@
       "divergence_checks": {
         "result": "PASS",
         "two_axis_fallback": "file-path widen (chio-kernel-core, chio-core-types) + outside-range widen + diff-failed widen; bash 3.2 portable"
+      }
+    },
+    "M09.P3.T2": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 73,
+      "merged_sha": "1ea33cb1a74edd0ca82b03ec0906ab1f79866d65",
+      "branch": "wave/W1/m09/p3.t2-cosign-sign-sidecar-image",
+      "merged_at": "2026-04-26T07:35:00Z",
+      "divergence_checks": {"result": "PASS"}
+    },
+    "M09.P3.T6": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 74,
+      "merged_sha": "0de31a6d1dd72c8e7a2ca9df14ba951e66686560",
+      "branch": "wave/W1/m09/p3.t6-m06-migration-tracking-issue",
+      "merged_at": "2026-04-26T07:38:00Z",
+      "divergence_checks": {"result": "PASS"}
+    },
+    "M09.P3.T4": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 75,
+      "merged_sha": "b4e28b3410bde8e819ac9cb8642537b53804f5fb",
+      "branch": "wave/W1/m09/p3.t4-cosign-sign-pypi-npm",
+      "merged_at": "2026-04-26T07:50:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "drive_by": "shellcheck SC2016 false positive on existing node -e step suppressed inline; verbatim ticket gate now exits 0"
+      }
+    },
+    "M09.P3.T5": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 76,
+      "merged_sha": "ecd6533d767ba1a62260a2273050910897b141c8",
+      "branch": "wave/W1/m09/p3.t5-fuzz-target-attest-verify",
+      "merged_at": "2026-04-26T07:55:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "fuzz_crate": "bootstrapped from scratch with empty [workspace] stanza; M02 PR #13 will layer the 7 baseline targets on top later"
       }
     }
   },
