@@ -142,8 +142,15 @@ jobs:
 
   build:
     name: Build ${{ matrix.package }}
+    # owner: M09
     needs: plan
     runs-on: ubuntu-latest
+    permissions:
+      # Required for cosign keyless signing via Sigstore Fulcio.
+      # See M09.P3.T1 chio-attest-verify (crates/chio-attest-verify/README.md)
+      # for the verification trait surface and OIDC identity contract.
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       # Keep publishes deterministic; node-http must build before
@@ -279,6 +286,11 @@ jobs:
           # published tarball, so every `file:../<pkg>` dep is rewritten
           # to `^<pkg.version>` before `npm pack`. The rewrite is
           # in-place on the working copy for this matrix leg only.
+          # The single-quoted heredoc below is a JS program with template
+          # literals (`${name}`); the `${...}` are JS, not bash, so the
+          # SC2016 "expressions don't expand in single quotes" diagnostic
+          # is a false positive here.
+          # shellcheck disable=SC2016
           node -e '
             const fs = require("fs");
             const path = require("path");
@@ -316,11 +328,62 @@ jobs:
           mv "$tarball" "${GITHUB_WORKSPACE}/npm-dist/"
           echo "tarball=${tarball}" >> "$GITHUB_OUTPUT"
 
+      - name: Install cosign
+        # Pinned to a tagged release of sigstore/cosign-installer so the
+        # signing-side toolchain version is auditable. The Renovate config
+        # in .github/renovate.json (M09 NEW sub-task) tracks upstream
+        # cosign-installer releases for review.
+        uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: "v2.4.1"
+
+      - name: Sign npm tarball with cosign keyless
+        # owner: M09
+        # Produces a detached `.sig` and Fulcio leaf cert `.pem` for
+        # the npm tarball. npm provenance via `--provenance` (the
+        # publish job below) and cosign keyless are complementary:
+        # provenance is enforced by the npm registry, cosign is verified
+        # client-side via the recipe in docs/install/VERIFY.md and via
+        # the chio-attest-verify trait surface
+        # (crates/chio-attest-verify/README.md, M09.P3.T1).
+        shell: bash
+        env:
+          COSIGN_YES: "true"
+          COSIGN_EXPERIMENTAL: "1"
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          cd "${GITHUB_WORKSPACE}/npm-dist"
+          if [[ ! -f "${TARBALL}" ]]; then
+            echo "::error::expected npm tarball ${TARBALL} not found in npm-dist" >&2
+            ls -la
+            exit 1
+          fi
+          echo "Signing ${TARBALL}"
+          cosign sign-blob --yes \
+            --output-signature "${TARBALL}.sig" \
+            --output-certificate "${TARBALL}.pem" \
+            "${TARBALL}"
+          # Sanity-check both sidecars exist and are non-empty so a silent
+          # cosign success that produced no files fails the job.
+          for ext in sig pem; do
+            if [[ ! -s "${TARBALL}.${ext}" ]]; then
+              echo "::error::cosign produced empty ${TARBALL}.${ext}" >&2
+              exit 1
+            fi
+          done
+          ls -la
+
       - name: Upload tarball artifact
         uses: actions/upload-artifact@v4
         with:
           name: npm-dist-${{ steps.meta.outputs.slug }}
-          path: npm-dist/*
+          # Include .sig + .pem so the release-attest job can attach
+          # them to the GitHub Release alongside each tarball.
+          path: |
+            npm-dist/*.tgz
+            npm-dist/*.sig
+            npm-dist/*.pem
           retention-days: 7
           if-no-files-found: error
 
@@ -389,5 +452,61 @@ jobs:
           tarball=$(find npm-dist -maxdepth 1 -name '*.tgz' -print -quit)
           echo "Publishing $tarball"
           # `--access public` is required for scoped packages (@chio-protocol/*)
-          # to be accessible without auth.
+          # to be accessible without auth. Only the .tgz is uploaded; the
+          # cosign `.sig`/`.pem` sidecars in the same directory ride to
+          # the GitHub Release via the release-attest job, not to npm.
           npm publish "$tarball" --access public --provenance
+
+  release-attest:
+    name: Attach cosign signatures to GitHub Release
+    # owner: M09
+    # Attaches `.sig` (cosign signature) + `.pem` (Fulcio leaf cert) for
+    # every npm tarball to the GitHub Release that the `ts/...` tag
+    # produces. Verification recipe lives in docs/install/VERIFY.md and
+    # cross-references the chio-attest-verify trait surface
+    # (crates/chio-attest-verify/README.md, M09.P3.T1).
+    needs: [plan, build]
+    # Skip on workflow_dispatch dry runs; only attach on real tag pushes.
+    if: needs.plan.outputs.dry_run != 'true' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all tarball artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: npm-dist-*
+          merge-multiple: true
+
+      - name: Stage release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # Copy tarballs and their cosign sidecars. The tarball itself
+          # is also attached so consumers can fetch the exact byte-for-byte
+          # artifact registry-side copies of npm differ across mirrors;
+          # `cosign verify-blob` requires the original file alongside its
+          # `.sig` + `.pem`.
+          find artifacts -maxdepth 2 -type f \
+            \( -name '*.tgz' -o -name '*.sig' -o -name '*.pem' \) \
+            -exec cp {} release/ \;
+          (cd release && ls -la)
+
+      - name: Attach signatures to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          # release-npm.yml fires from either a meta tag (ts/v0.2.0) or
+          # a slug-specific tag (ts/express-v1.2.0); the GitHub Release
+          # for that tag may not exist yet, so let action-gh-release
+          # create it on first run. Subsequent re-runs append rather
+          # than fail the upload.
+          fail_on_unmatched_files: true
+          files: |
+            release/*.tgz
+            release/*.sig
+            release/*.pem

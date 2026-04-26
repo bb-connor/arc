@@ -155,8 +155,15 @@ jobs:
 
   build:
     name: Build ${{ matrix.package }}
+    # owner: M09
     needs: plan
     runs-on: ubuntu-latest
+    permissions:
+      # Required for cosign keyless signing via Sigstore Fulcio.
+      # See M09.P3.T1 chio-attest-verify (crates/chio-attest-verify/README.md)
+      # for the verification trait surface and OIDC identity contract.
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -272,11 +279,67 @@ jobs:
           python3 -c "import importlib, sys; m = importlib.import_module('$import_name'); print('imported', m.__name__, 'from', getattr(m, '__file__', '?'))"
           deactivate
 
+      - name: Install cosign
+        # Pinned to a tagged release of sigstore/cosign-installer so the
+        # signing-side toolchain version is auditable. The Renovate config
+        # in .github/renovate.json (M09 NEW sub-task) tracks upstream
+        # cosign-installer releases for review.
+        uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: "v2.4.1"
+
+      - name: Sign sdist and wheel with cosign keyless
+        # owner: M09
+        # Produces a detached `.sig` and Fulcio leaf cert `.pem` for
+        # every sdist + wheel in dist-out. The signatures and certs are
+        # uploaded as workflow artifacts and attached to the GitHub
+        # Release in the release-attest job below.
+        #
+        # Verification recipe lives in docs/install/VERIFY.md and uses
+        # the same OIDC identity regex contract that chio-attest-verify
+        # (crates/chio-attest-verify/README.md, M09.P3.T1) enforces from
+        # Rust callers via SigstoreVerifier.
+        shell: bash
+        env:
+          COSIGN_YES: "true"
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          cd "${GITHUB_WORKSPACE}/dist-out"
+          artifacts=( *.tar.gz *.whl )
+          if [[ "${#artifacts[@]}" -eq 0 ]]; then
+            echo "::error::no sdist/wheel artifacts found in dist-out to sign" >&2
+            exit 1
+          fi
+          for artifact in "${artifacts[@]}"; do
+            echo "Signing ${artifact}"
+            cosign sign-blob --yes \
+              --output-signature "${artifact}.sig" \
+              --output-certificate "${artifact}.pem" \
+              "${artifact}"
+            # Sanity-check both sidecars exist and are non-empty so a
+            # silent cosign success that produced no files fails the job.
+            for ext in sig pem; do
+              if [[ ! -s "${artifact}.${ext}" ]]; then
+                echo "::error::cosign produced empty ${artifact}.${ext}" >&2
+                exit 1
+              fi
+            done
+          done
+          ls -la
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: pypi-dist-${{ steps.meta.outputs.name }}
-          path: dist-out/*
+          # Include .sig + .pem so the release-attest job can attach
+          # them to the GitHub Release alongside each sdist/wheel.
+          path: |
+            dist-out/*.tar.gz
+            dist-out/*.whl
+            dist-out/*.sig
+            dist-out/*.pem
           retention-days: 7
           if-no-files-found: error
 
@@ -322,6 +385,24 @@ jobs:
           name: pypi-dist-${{ steps.meta.outputs.name }}
           path: dist-out
 
+      - name: Separate cosign sidecars from upload set
+        # twine refuses unknown file extensions; the cosign `.sig`/`.pem`
+        # sidecars produced in the build job ride along to the GitHub
+        # Release in the release-attest job, not to PyPI. Move them out
+        # of dist-out before pypa/gh-action-pypi-publish runs.
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-sigs
+          shopt -s nullglob
+          for f in dist-out/*.sig dist-out/*.pem; do
+            mv "$f" dist-sigs/
+          done
+          echo "Files staged for PyPI upload:"
+          ls -la dist-out
+          echo "Cosign sidecars staged for GitHub Release:"
+          ls -la dist-sigs
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -331,3 +412,59 @@ jobs:
           # docs/install/PUBLISHING.md.
           skip-existing: true
           print-hash: true
+
+  release-attest:
+    name: Attach cosign signatures to GitHub Release
+    # owner: M09
+    # Attaches `.sig` (cosign signature) + `.pem` (Fulcio leaf cert) for
+    # every sdist + wheel to the GitHub Release that the `py/...` tag
+    # produces. Verification recipe lives in docs/install/VERIFY.md and
+    # cross-references the chio-attest-verify trait surface
+    # (crates/chio-attest-verify/README.md, M09.P3.T1).
+    needs: [plan, build]
+    # Skip on workflow_dispatch dry runs; only attach on real tag pushes.
+    if: needs.plan.outputs.dry_run != 'true' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: pypi-dist-*
+          merge-multiple: true
+
+      - name: Stage release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # Copy sdists, wheels, and their cosign sidecars. The wheel
+          # itself is also attached to the GitHub Release so consumers
+          # can fetch the exact byte-for-byte artifact that PyPI hosts;
+          # `cosign verify-blob` requires the original file alongside
+          # its `.sig` + `.pem`.
+          find artifacts -maxdepth 2 -type f \
+            \( -name '*.tar.gz' -o -name '*.whl' \
+               -o -name '*.sig' -o -name '*.pem' \) \
+            -exec cp {} release/ \;
+          (cd release && ls -la)
+
+      - name: Attach signatures to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          # The release-pypi.yml workflow can fire from either a meta
+          # tag (py/v0.2.0) or a slug-specific tag (py/chio-crewai-v1.2.0)
+          # and a Release for that tag may not exist yet; let
+          # action-gh-release create it on first run. Subsequent re-runs
+          # for the same tag append rather than fail the upload.
+          fail_on_unmatched_files: true
+          files: |
+            release/*.tar.gz
+            release/*.whl
+            release/*.sig
+            release/*.pem
