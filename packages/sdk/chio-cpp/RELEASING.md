@@ -59,10 +59,83 @@ party runtime dependencies. The published port omits the optional
 `wit-bindgen` and WASI component build paths; those remain available via the
 from-source CMake options.
 
-## Private registry placeholder
+## Private registry endpoints
 
-Until the private vcpkg overlay registry and Conan remote are stood up, the
-`conan create` step seeds packages into the local Conan cache only and the
-vcpkg dry-run uses the manifest format check for SDKs whose dependencies are
-not in vcpkg upstream (`chio-cpp` for `chio-drogon`). When the registry lands,
-update the gate to publish each artifact.
+### Conan: Sonatype Nexus 3 OSS on the platform-dev OKE cluster
+
+Remote URL: `https://nexus.dev.backbay.io/repository/chio-conan/`
+
+Add the remote and authenticate as the publisher service account (token lives
+in OCI Vault at `chio-registry/chio-publisher`, property `token`):
+
+```bash
+conan remote add chio-private https://nexus.dev.backbay.io/repository/chio-conan/
+conan remote login chio-private chio-publisher --password-stdin <<< "${CHIO_NEXUS_PUBLISHER_TOKEN}"
+```
+
+Tag-driven publishes are wired through `.github/workflows/release-cpp.yml` and
+do not require operator action. Manual publishes (e.g. one-off republish):
+
+```bash
+conan upload chio-cpp/0.1.0 -r=chio-private --confirm
+conan upload chio-cpp-kernel/0.1.0 -r=chio-private --confirm
+conan upload chio-guard-cpp/0.1.0 -r=chio-private --confirm
+conan upload chio-drogon/0.1.0 -r=chio-private --confirm
+```
+
+### vcpkg: overlay registry plus OCI Object Storage binary cache
+
+The four SDKs are exposed to vcpkg consumers through a separate private git
+repo, `backbay-labs/chio-vcpkg-registry`, which holds one `ports/<sdk>/` tree
+per SDK and a `versions/` index. Port file sources live in this repo under
+`tools/vcpkg-overlay/`; the release CI mirrors them to the registry repo on
+tag push.
+
+Consumers point vcpkg at both upstream and the chio overlay through a
+`vcpkg-configuration.json` checked into their project root:
+
+```json
+{
+  "default-registry": {
+    "kind": "git",
+    "repository": "https://github.com/microsoft/vcpkg",
+    "baseline": "<vcpkg-baseline-sha>"
+  },
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/backbay-labs/chio-vcpkg-registry",
+      "baseline": "<chio-overlay-sha>",
+      "packages": ["chio-cpp", "chio-cpp-kernel", "chio-guard-cpp", "chio-drogon"]
+    }
+  ]
+}
+```
+
+The binary cache lives in OCI Object Storage; consumers point vcpkg at it via
+the `x-aws` provider against the OCI S3-compatible endpoint:
+
+```bash
+export VCPKG_BINARY_SOURCES="clear;x-aws,s3://chio-vcpkg-cache/cache,readwrite"
+export AWS_ENDPOINT_URL_S3="https://<namespace>.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+export AWS_DEFAULT_REGION="us-ashburn-1"
+export AWS_ACCESS_KEY_ID="<from terraform output: chio_vcpkg_cache_access_key_id>"
+export AWS_SECRET_ACCESS_KEY="<from terraform output: chio_vcpkg_cache_secret_access_key>"
+```
+
+The full endpoint string and bucket name come from the platform terraform
+outputs `chio_vcpkg_cache_endpoint` and `chio_vcpkg_cache_vcpkg_binary_sources`
+in `infra/terraform/envs/dev/us-ashburn-1/platform-dev/cluster/`.
+
+### Operator one-time setup
+
+Before the first release the platform team must:
+
+- Seed `chio-registry/nexus-admin` (property `admin-password`) and
+  `chio-registry/chio-publisher` (property `token`) in OCI Vault. The
+  `nexus-bootstrap-job` consumes both via ExternalSecrets.
+- Provision the `backbay-labs/chio-vcpkg-registry` private GitHub repo and
+  add the deploy key whose private half is stored as the GitHub Actions
+  secret `CHIO_VCPKG_REGISTRY_DEPLOY_KEY` on this repo.
+- Confirm the platform-dev cluster has merged the GitOps PR that ships
+  `infra/gitops/apps/platform/nexus.yaml` and friends.
