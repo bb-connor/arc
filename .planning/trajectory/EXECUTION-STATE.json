@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T06:55:00Z",
+  "last_checkpoint_at": "2026-04-26T07:10:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -26,13 +26,13 @@
       "blocked_on": "PR #13 merge"
     },
     "M03": {
-      "status": "P3 COMPLETE; P2 nearly done",
-      "phase": "P2 T1-T5 merged; T6+T7 in flight; P3 fully merged",
+      "status": "P3 COMPLETE; P2 T1-T6 merged; T7 in flight",
+      "phase": "P2 nearly done (T7 last)",
       "owner_branch": null,
       "scheduled_in_wave": "1a",
       "p0_status": "merged",
       "p1_status": "all 7 merged",
-      "p2_status": "T1-T5 merged; T6 executor running, T7 sequential after",
+      "p2_status": "T1-T6 merged; T7 executor running",
       "p3_status": "all 7 merged"
     },
     "M04": {
@@ -891,6 +891,18 @@
         "gate": "per-package uv sync + pytest across 17 adapters; 16/17 pass clean (511 passed total); 1 chio-streaming failure is pre-existing (confluent-kafka import) unrelated to codegen regen",
         "diff": "0 files, 0 insertions, 0 deletions; chio_sdk.models re-export shim from M01.P3.T2 covers entire adapter call-site surface verbatim",
         "gate_string_deviation": "ticket spec `uv sync --workspace` is invalid (uv 0.8.x removed --workspace; only --all-packages exists). Parent backbay/pyproject.toml workspace does not include standalone/arc/sdks/python/* as members anyway. Per-package iteration is the correct gate."
+      }
+    },
+    "M03.P2.T6": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 71,
+      "merged_sha": "723311b66685e6cbd5fd642a2b792e7edbfe5194",
+      "branch": "wave/W1/m03/p2.t6-split-slow-kani-nightly",
+      "merged_at": "2026-04-26T07:10:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "wall_clock": "14 harnesses total 134s locally; T5 heuristic inverted by data (verify_* are 1-3s, public_* are 11-31s); all in lanes.pr; lanes.nightly_only kept empty for future re-bucketing"
       }
     }
   },
