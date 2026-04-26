@@ -35,6 +35,9 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 default = ["std"]
 std = ["chio-core-types/std", "serde/std", "serde_json/std"]
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
