@@ -21,13 +21,15 @@
       "p5_status": "not authored (wave 2)"
     },
     "M02": {
-      "status": "P0+P1 COMPLETE (14/14 tickets merged); P2 unblocked; P3+P4 still pending",
-      "phase": "P1_complete",
+      "status": "P0+P1+P2 COMPLETE (21/21 tickets merged); P3 (mutation gate flips blocking) + P4 (triage + corpus operations) still pending",
+      "phase": "P2_complete",
       "owner_branch": null,
-      "scheduled_in_wave": "1b",
+      "scheduled_in_wave": "1b+2a",
       "p0_status": "merged (orchestrator-direct no-op cascade-gate baseline)",
       "p1_status": "all 14 merged (T1.a #79, T1.b #83, T1.c #87, T2 #88, T3.a #89, T3.b #90, T3.c #91, T4.a #92, T4.b #93, T5.a #95, T5.b #96, T6 #98, T7 #99, T8 #101)",
-      "p2_status": "ready (mutation testing scaffold + OSS-Fuzz infra; depends_on M02.P1.T8 satisfied)"
+      "p2_status": "all 7 merged (T1 #102, T2 #103, T3 #105, T4 #107, T5 #106, T6 #104, T7 #108)",
+      "p3_status": "ready (mutation gate flips blocking; depends_on M02.P2.T2 satisfied)",
+      "p4_status": "ready (triage + corpus operations; concurrent with P3 per source-doc scope note)"
     },
     "M03": {
       "status": "MILESTONE COMPLETE (P0+P1+P2+P3 all merged)",
@@ -460,6 +462,108 @@
       },
       "naming_choice": "GoldenLoaded for reader (vs T3 GoldenSet writer); RootHexInvalid carries expected_len=64 + actual_len + content for clearer diagnostics",
       "extra_test": "load_rejects_missing_receipts_file_only added beyond ticket spec (locks MissingFile shape independently)"
+    },
+    "M02.P2.T4": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a229d84606d182777",
+      "branch": "wave/W2/m02/p2.t4-dudect-nightly-workflow",
+      "pr_number": 107,
+      "merged_sha": "7113f6364915f1462eee4b727269bb6ae7459d75",
+      "merged_at": "2026-04-26T21:11:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "all 5 PASS (actionlint + cron grep + bash -n + dry-run + 4.5 threshold grep); dry-run parser max|t|=5.7321 matches synthetic"
+      },
+      "design": "schedule 15 4 * * * UTC; 3-harness matrix (jwt_verify+mac_eq+scope_subset) with workflow_dispatch.harness selector; correlate job downloads current+prior nightly artifacts via gh run download, opens timing-leak labelled issue iff both runs FAIL same harness (mitigates noisy-host false positives); fully advisory continue-on-error",
+      "deviations": "workflow_dispatch.harness default 'all' (actionlint rejects empty); correlate body via printf (heredoc tripped actionlint YAML pre-parse)"
+    },
+    "M02.P2.T5": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a0dc4fbc2c572f465",
+      "branch": "wave/W2/m02/p2.t5-oss-fuzz-integration",
+      "pr_number": 106,
+      "merged_sha": "5465a910a21e6841e26796dfa4fd21ba1dfe1481",
+      "merged_at": "2026-04-26T21:05:59Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "9/9 PASS (project.yaml+Dockerfile+build.sh exist + language:rust + primary_contact + address+undefined sanitizers + bash -n build.sh + oss-fuzz in continuous.md)"
+      },
+      "deviations": "zip apt-installed (build.sh needs it for corpus packing); non-empty-corpus guard via ls -A; backup-contact TODO + upstream OSS-Fuzz PR filing tracked as Phase-2 follow-up (not exit gate; 2-6 week acceptance lag)"
+    },
+    "M02.P2.T3": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-aa8db01b7f88f80e6",
+      "branch": "wave/W2/m02/p2.t3-dudect-harness-scaffold",
+      "pr_number": 105,
+      "merged_sha": "f272a9df4e8a0a51fc0a5f9a2372359e45a82b44",
+      "merged_at": "2026-04-26T21:05:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "all 6 PASS (cargo build x2 + 3 test files + dudect grep); workspace+clippy+fmt PASS"
+      },
+      "entry_points": "jwt_verify -> chio_credentials::verify_chio_passport_jwt_vc_json; mac_eq -> chio_core_types::crypto::Signature PartialEq (no own mac_eq in kernel-core); scope_subset -> chio_kernel_core::NormalizedScope::is_subset_of",
+      "deviations": "dudect-bencher 0.7 (latest; spec said 0.6); MAC surface chosen as Signature::eq with module-doc rationale; trust-boundary classification cosmetic"
+    },
+    "M02.P2.T7": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ab70b5f60b91abab3",
+      "branch": "wave/W2/m02/p2.t7-mutants-fuzz-cocoverage",
+      "pr_number": 108,
+      "merged_sha": "4bb2afc1d28a3b5976eff1ebd63950c062912f6d",
+      "merged_at": "2026-04-26T21:08:43Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "all 4 PASS (actionlint + cron grep + bash -n + cocoverage doc grep); advisory smoke test exit 0 with placeholder summary.json"
+      },
+      "design": "cron 05:45 UTC (after mutants-nightly 05:00, after fuzz.yml 03:23); explicit map_source_to_fuzz_target table to prevent wrong-corpus inflation; jq optional with line-grep fallback; always exits 0 except --package validation; coalesces replays per fuzz target via seen_targets dedup",
+      "milestone_close": "M02 P2 COMPLETE 7/7"
+    },
+    "M02.P2.T6": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a9957b7206a456665",
+      "branch": "wave/W2/m02/p2.t6-canonical-json-structure-aware-mutator",
+      "pr_number": 104,
+      "merged_sha": "d90fbdafc9f87901a093df4670b8ec5ce8e84337",
+      "merged_at": "2026-04-26T20:55:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "all 4 cargo +nightly fuzz build PASS + LLVMFuzzerCustomMutator grep PASS; mutator unit tests 7/7 PASS; clippy+fmt PASS"
+      },
+      "design": "real LLVMFuzzerCustomMutator integration via libfuzzer_sys::fuzz_mutator!; 8-way mutation menu (add key, remove key, swap array, replace string boundary, replace number i64::MIN/u64::MAX/1e308, insert duplicate-after-fold, replace UTF-8 surrogate-edge/BOM/control, identity-canonicalize); stateless+deterministic in seed; canonicalized via sorted-key Map rebuild before serde_json::to_vec; 7 unit tests cover parse-pass-through+empty+shape-preservation+determinism+respects_max_size+canonicalize",
+      "wired_targets": "canonical_json (NEW) + capability_receipt (NEW; CapabilityToken+ChioReceipt) + manifest_roundtrip (NEW; ToolManifest decode-encode-decode equal-canonical-bytes) + mcp_envelope_decode (EXTENDS T1.T3.a, body unchanged)"
+    },
+    "M02.P2.T2": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-aea25e6f73795d94f",
+      "branch": "wave/W2/m02/p2.t2-mutants-workflow-advisory",
+      "pr_number": 103,
+      "merged_sha": "386290d26880705259d694eaf1bd3e746e9d213d",
+      "merged_at": "2026-04-26T20:50:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "all 9 PASS (actionlint + 4 grep + 2 bash -n + 2 file/grep); mutants-gate.sh smoke test exit=pass while cycle_end_tag empty"
+      },
+      "deviations": "replaced pre-existing scaffold mutants.yml that didn't satisfy the gate (different crate list, no mutants-pr/nightly job names, no helpers); rewrote to canonical two-job shape pinned to T1's four crates"
+    },
+    "M02.P2.T1": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a0e269d67f090f3ff",
+      "branch": "wave/W2/m02/p2.t1-cargo-mutants-config",
+      "pr_number": 102,
+      "merged_sha": "92f1b71c848db6f2bd54165195309bc4a9d22f4f",
+      "merged_at": "2026-04-26T20:37:28Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "all 9 file+grep checks PASS; timeout_multiplier=3 + examine_globs/exclude_globs in kernel-core + cargo-mutants string in mutants.md"
+      },
+      "config_summary": "workspace .cargo/mutants.toml (timeout_multiplier=3, minimum_test_timeout=60, --exclude chio-cpp-kernel-ffi); per-crate examine_globs scoped to evaluate/capability/scope/receipt hot paths in kernel-core, evaluate engine+matchers+conditions in policy, pipeline+22 boundary guards in guards, JWT VC + OID4VP + reputation in credentials"
     },
     "M02.P1.T8": {
       "status": "merged",
