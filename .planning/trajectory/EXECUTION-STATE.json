@@ -39,9 +39,11 @@
       "p3_status": "all 7 merged"
     },
     "M04": {
-      "status": "ticket files authored (P1-P6, 36 tickets)",
-      "phase": "ready_for_p1",
-      "owner_branch": null
+      "status": "P1 COMPLETE (T1-T7 all merged); P2-P6 still pending",
+      "phase": "P1_complete",
+      "owner_branch": null,
+      "p1_status": "all 7 merged (T1 PR#78, T2 PR#80, T3 PR#81, T5 PR#82, T4 PR#84, T6 PR#85, T7 PR#86)",
+      "p2_status": "ready (CI gate + bless workflow); next M04 work"
     },
     "M05": {
       "status": "ticket files authored (P0-P4, 29 tickets)",
@@ -357,6 +359,137 @@
         "preexisting_failures_noted": "xtask clippy::items-after-test-module + chio-kernel-core/tests/property_evaluate.rs fmt drift (pre-existing on tree pre-T1; logged in PR body for future cleanup ticket)"
       },
       "coordination_note": "M04 agent rescued M02.P1.T1.a parallel agent's working-tree mods via stash+pop while completing T1. Future parallel runs should use git worktrees per agent to avoid shared-checkout race."
+    },
+    "M04.P1.T5": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ac9abd0129539b523",
+      "branch": "wave/W2/m04/p1.t5-fifty-fixture-manifests",
+      "pr_number": 82,
+      "merged_sha": "3b28d12af307d4cac54658b2cb515263f5b8a7fe",
+      "merged_at": "2026-04-26T15:55:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "50 == 50 (find tests/replay/fixtures -name '*.json' | wc -l)",
+        "per_family": "allow_simple=8 allow_with_delegation=6 allow_metered=5 deny_expired=5 deny_scope_mismatch=6 deny_revoked=4 guard_rewrite=6 replay_attack=4 tampered_signature=3 tampered_canonical_json=3 = 50",
+        "schema_audit": "fixed_nonce_seed_index covers 0..49 exactly once; allow families verdict=allow with null failure_class; deny families verdict=deny with matching failure_class; guard_rewrite=allow+none"
+      },
+      "deny_scope_mismatch_full_list": "01_wrong_resource, 02_wrong_action, 03_path_prefix_miss, 04_method_excluded, 05_argument_oob, 06_attenuation_undershoot"
+    },
+    "M04.P1.T3": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a2a0b1587ea20195e",
+      "branch": "wave/W2/m04/p1.t3-golden-writer-ndjson",
+      "pr_number": 81,
+      "merged_sha": "547c488f5477e351299b791811090ca00ee807b5",
+      "merged_at": "2026-04-26T15:50:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo test golden_writer::tests -> 14/14 PASS",
+        "tests": "canonicalize_{primitives,array_order,nested,objects,object_keys}, commit_{without_root,without_checkpoint,with_empty_receipts}_fails, append_receipt_then_commit_writes_ndjson, ndjson_terminator_is_lf_only, root_hex_lowercase_64chars_no_newline, checkpoint_json_canonical, no_tmp_files_remain, commit_creates_directory"
+      },
+      "decisions": "root.hex no trailing newline; receipts.ndjson all-lines LF terminated incl final; checkpoint.json no insignificant whitespace; validation-before-mkdir; atomic writes via .tmp+rename; canonicalize via BTreeMap rebuild"
+    },
+    "M04.P1.T2": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ab5ba3f12434f817d",
+      "branch": "wave/W2/m04/p1.t2-scenario-driver-fixed-inputs",
+      "pr_number": 80,
+      "merged_sha": "9274586aa07c4a317b80d6a8390247b2ef1614ab",
+      "merged_at": "2026-04-26T15:39:52Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo test -p chio-replay-gate --lib driver::tests -> 4 passed (fixed_clock, next_nonce monotonic+unique, signer_seed pubkey match, signing_is_deterministic)",
+        "owner_glob_compliance": "5 files within ticket spec + Cargo.toml deps + Cargo.lock"
+      },
+      "trust_roots": {
+        "seed_hex": "1335337915b7d8b81391fa776eee31a5808cbab959aa3dcc91f93049cbf4fd44",
+        "seed_file_sha256": "b32580c7001b8ad7cc9d29d4f8d4faf2ad067db558add9bb7e02bf8f5f9a01af",
+        "ed25519_verifying_key_hex": "801e0fd63c1b9903dac8a19a6390321e571872eca0d049329baccdc6fe8e9c36",
+        "canonical_test_sig_hex_for_chio_replay_gate_test": "18846af815c63d5e1648f2fa4ef6f112eea217b9c559707381826fb283dfc3395a61670159ce6101038438064e26047ef9621602c97f419e519c0340f33ead05",
+        "fixed_clock": "2026-01-01T00:00:00Z",
+        "_note": "T3+ should pin against these for golden output cross-checks"
+      },
+      "deviations": "minor expansions: verifying_key() accessor added (T3+ will need it); DriverError::SeedRead carries PathBuf for diagnosis; DriverError::InvalidFixedClock tripwire branch; net dep delta -sha2 +hex (hex used in tests for golden comparison)"
+    },
+    "M04.P1.T7": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ac795659afd1640f4",
+      "branch": "wave/W2/m04/p1.t7-deterministic-fs-iteration",
+      "pr_number": 86,
+      "merged_sha": "682dc50e43e6e2001427d4a42109f23ece01af0a",
+      "merged_at": "2026-04-26T16:11:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo test fs_iter::tests 7/7 PASS; corpus_smoke regression re-run PASS; full chio-replay-gate suite 41 tests pass",
+        "phase_1_complete": "M04 P1 COMPLETE (T1+T2+T3+T4+T5+T6+T7 all merged)"
+      },
+      "decisions": "symlink handling: skip-during-recursion fail-closed in walk_files_sorted; read_dir_sorted does NOT filter symlinks (caller choice); fs::symlink_metadata not file_type so symlink-to-dir doesn't silently resolve; corpus_smoke refactored to consume fs_iter::walk_files_sorted in same commit"
+    },
+    "M04.P1.T6": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a555e7838b5bf746e",
+      "branch": "wave/W2/m04/p1.t6-corpus-smoke-test",
+      "pr_number": 85,
+      "merged_sha": "8d7a658cd3797a71871ecf8f32d234fc5b2ed836",
+      "merged_at": "2026-04-26T16:05:40Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo test corpus_smoke 1/1 PASS in 0.06s; 50 manifests enumerated; per-family 8+6+5+5+6+4+6+4+3+3=50; fixed_nonce_seed_index BTreeSet == 0..50",
+        "phase_1_exit_gate": "GREEN"
+      },
+      "decisions": "hand-rolled fs::read_dir recursion (no walkdir dep); SHA-256 of receipt+checkpoint canonical-JSON for synthetic root; explicit [[test]] registration; LC_ALL=C-equivalent path-string sort"
+    },
+    "M04.P1.T4": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ab1bae399b6af34ad",
+      "branch": "wave/W2/m04/p1.t4-golden-reader-byte-compare",
+      "pr_number": 84,
+      "merged_sha": "3738246d5b77715319af0bfcfab31e5b3b186954",
+      "merged_at": "2026-04-26T15:58:43Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo test byte_compare::tests 8/8 PASS + golden_reader::tests 8/8 PASS; full crate suite 34 passed",
+        "no_serde_roundtrip": "byte_compare path takes only &[u8] (one &str cast via as_bytes); load+compare uses raw bytes throughout"
+      },
+      "naming_choice": "GoldenLoaded for reader (vs T3 GoldenSet writer); RootHexInvalid carries expected_len=64 + actual_len + content for clearer diagnostics",
+      "extra_test": "load_rejects_missing_receipts_file_only added beyond ticket spec (locks MissingFile shape independently)"
+    },
+    "M02.P1.T1.c": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a5a906c340c5adbe5",
+      "branch": "wave/W1/m02/p1.t1.c-did-resolve-target",
+      "pr_number": 87,
+      "merged_sha": "c63c6a2d447a841f20e0b393b4086161a09ffd70",
+      "merged_at": "2026-04-26T16:19:46Z",
+      "divergence_checks": {
+        "result": "PASS-WITH-DEFERRED",
+        "gate": "build PASS (3m 28s); fuzz-run HANG-DEFERRED (macOS arm64 libFuzzer init); smoke PASS 1/1; workspace build+clippy PASS",
+        "entry_points": "DidChio::from_str + resolve_did_arc + DidService::new + serde_json::from_slice<DidDocument>"
+      },
+      "deviations": "added serde_json optional dep gated behind fuzz feature (zero new production deps); 6 corpus seeds incl did_chio.bin (5 spec'd); did_doc_minimal.bin enriched with required @context/authentication/assertionMethod fields so DidDocument deserializes successfully; xorshift32 deterministic garbage.bin"
+    },
+    "M02.P1.T1.b": {
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-abae51bbc60186442",
+      "branch": "wave/W1/m02/p1.t1.b-oid4vp-presentation-target",
+      "pr_number": 83,
+      "merged_sha": "cbb3082efaa9c3cf7d42d047064d9a60fe06485b",
+      "merged_at": "2026-04-26T15:58:39Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "cargo +nightly fuzz build PASS (3m 19s); cargo +nightly fuzz run -runs=0 PASS (no macOS arm64 hang this time, exit 0); cargo test smoke oid4vp_presentation_smoke 1/1 PASS; workspace build+clippy PASS",
+        "entry_point": "chio_credentials::verify_oid4vp_direct_post_response (already pub; no production-API changes)"
+      },
+      "drive_by": "rewrote both smoke tests to pass fuzz fn directly (each_seed(name, fuzz_fn) instead of closure) per clippy 1.93 redundant_closure lint",
+      "coordination_warning": "agent's worktree was dismantled mid-execution (orchestrator pruned wrong worktree); agent recovered via salvage. Lesson: do NOT git worktree remove while agent still running."
     },
     "M02.P1.T1.a": {
       "status": "merged",
