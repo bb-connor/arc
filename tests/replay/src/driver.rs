@@ -30,6 +30,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use thiserror::Error;
 
+use crate::fs_iter::{self, FsIterError};
+
 /// Length, in bytes, of an Ed25519 signing seed.
 const SEED_LEN: usize = 32;
 
@@ -215,6 +217,29 @@ impl ScenarioDriver {
     pub fn verifying_key(&self) -> VerifyingKey {
         self.signing_key.verifying_key()
     }
+}
+
+/// List the inputs directory for `scenario` in deterministic
+/// `LC_ALL=C`-equivalent byte order.
+///
+/// This is the load-bearing wire-up for T7: every replay-gate code
+/// path that enumerates a scenario's input directory MUST go through
+/// this function (or [`crate::fs_iter::read_dir_sorted`] /
+/// [`crate::fs_iter::walk_files_sorted`]) rather than calling
+/// `fs::read_dir` directly. Native `read_dir` order varies across
+/// hosts (HFS+/APFS case-insensitive normalization, ext4 inode order,
+/// NTFS case-insensitive), which would silently desync the corpus
+/// between developer machines and CI; the byte-order pass through
+/// `fs_iter` is what makes the corpus byte-equivalent across hosts.
+///
+/// # Errors
+///
+/// - [`FsIterError::Io`] if `scenario.inputs_dir` cannot be opened or
+///   any directory entry cannot be read.
+/// - [`FsIterError::NonUtf8Path`] on non-Unix targets only, if any
+///   child name is not valid UTF-8.
+pub fn list_scenario_inputs(scenario: &Scenario) -> Result<Vec<PathBuf>, FsIterError> {
+    fs_iter::read_dir_sorted(&scenario.inputs_dir)
 }
 
 #[cfg(test)]
