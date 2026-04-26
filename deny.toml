@@ -1,28 +1,115 @@
-[advisories]
-# In cargo-deny 0.14+ the old severity fields (vulnerability, unmaintained)
-# were removed (see https://github.com/EmbarkStudios/cargo-deny/pull/611).
-# Vulnerabilities are denied by default. unmaintained now takes a scope:
-# "all" | "workspace" | "transitive" | "none".
-unmaintained = "all"
-ignore = []
+# Workspace-wide cargo-deny configuration.
+# Source of truth: .planning/trajectory/09-supply-chain-attestation.md (Phase 1).
+# Changes to this file require CODEOWNERS review.
 
+[graph]
+all-features = true
+no-default-features = false
+
+# NOTE: the verbatim Phase 1 block in 09-supply-chain-attestation.md
+# included an [output] feedback-level = "error" key that no cargo-deny in
+# the ^0.16 band accepts (only feature-depth is recognized under [output]
+# in 0.16.x). Dropped the [output] block here to make the config parse;
+# the orchestrator should amend the milestone doc in a follow-up so the
+# trajectory remains the single source of truth.
+
+# NOTE: cargo-deny PR #611 also removed `unmaintained` and `notice` from
+# [advisories] (severity is now implicit; everything except yanked is "deny"
+# unless ignored). The verbatim Phase 1 block had both keys; dropped here
+# to make the config parse. Same trajectory-doc amendment applies.
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+ignore = [
+    # Format: "RUSTSEC-YYYY-NNNN", with a CODEOWNERS-reviewed comment naming
+    # (a) the affected crate, (b) why we accept the risk, (c) the upstream
+    # tracking issue. Empty at baseline; entries land via PR review.
+]
+
+# NOTE: the verbatim Phase 1 block had unlicensed/copyleft/allow-osi-fsf-free/default
+# keys removed in cargo-deny per https://github.com/EmbarkStudios/cargo-deny/pull/611.
+# The 0.16 schema enforces an explicit allow-list only; unlisted licenses are denied
+# by default, copyleft licenses must be explicitly allowed (none are here), and
+# OSI/FSF status is no longer a config concern. Schema deviation logged in commit body.
 [licenses]
-# In cargo-deny 0.14+ the `unlicensed` severity field was removed.
-# Unlicensed crates are denied by default when not in the allow list.
+confidence-threshold = 0.93
 allow = [
     "MIT",
     "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Zlib",
+    "MPL-2.0",
 ]
 
+[[licenses.exceptions]]
+# `ring` ships under a bespoke license that is OpenSSL-derived but not
+# OSI-approved. It is the de-facto Rust crypto primitive and the rustls
+# stack depends on it transitively. Tracked: ring#2746.
+name = "ring"
+allow = ["OpenSSL", "ISC", "MIT"]
+
+[[licenses.exceptions]]
+# `webpki-roots` carries the Mozilla CA bundle under MPL-2.0 within an
+# otherwise-permissive crate; pin the exception to the crate to avoid
+# widening the workspace allow-list.
+name = "webpki-roots"
+allow = ["MPL-2.0"]
+
 [bans]
-multiple-versions = "warn"
+multiple-versions = "deny"
 wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+[[bans.deny]]
+# `time` 0.1 is unmaintained and depends on a soundness-bug-prone localtime
+# call. Use `time` >= 0.3 or `chrono` >= 0.4.31.
+name = "time"
+version = "<0.3"
+
+[[bans.deny]]
+# `openssl-sys` is forbidden in favor of rustls; `chio` must not absorb
+# OpenSSL transitively. If a dep needs OpenSSL, vendor a rustls fork or
+# add a documented [bans.skip] entry with CODEOWNERS sign-off.
+name = "openssl-sys"
+
+[[bans.deny]]
+# `chrono` 0.4.0..=0.4.30 has a localtime soundness bug. Pin newer.
+name = "chrono"
+version = "<0.4.31"
+
+[[bans.skip]]
+# `windows-sys` ships multiple major versions across the ecosystem and the
+# crate graph cannot be flattened without forking ten upstreams. Tracked
+# weekly via Renovate; revisit when wasmtime/tokio converge.
+name = "windows-sys"
+
+[[bans.skip]]
+# `syn` 1.x lingers in proc-macro chains. Force-bump on the next workspace
+# audit pass once `darling` and `serde_derive` align on `syn` 2.x.
+name = "syn"
+version = "1"
+
+[[bans.skip]]
+# `bitflags` 1.x is pinned by `clap` and `wasmtime`. Acceptable until both
+# converge on 2.x.
+name = "bitflags"
+version = "1"
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = [
+    # Every git dep is enumerated here with a comment naming the upstream
+    # crate, the reason a registry version cannot be used, and the tracking
+    # issue. Empty at baseline; new entries require CODEOWNERS review.
+]
