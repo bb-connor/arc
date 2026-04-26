@@ -167,12 +167,53 @@ A surviving mutant can be addressed in one of three ways:
    triage issue. This requires CODEOWNERS sign-off on the crate's
    `mutants.toml`.
 
+## Cocoverage with the fuzz corpus
+
+The nightly `mutants-fuzz-cocoverage.yml` workflow replays the
+accumulated fuzz corpus against surviving mutants. The intuition:
+
+- cargo-mutants produces a "surviving mutant" when the unit test
+  suite fails to distinguish the original from the mutation - the
+  mutant is a test-gap signal.
+- The fuzz corpus under `fuzz/corpus/<target>/` is a DIFFERENT oracle
+  (libFuzzer-accumulated adversarial inputs) that may notice the
+  mutation when the unit tests didn't.
+- Cross-oracle reduction in missed-mutant count: expected **5-15%**
+  per the source doc Round-2 (NEW) section.
+
+Workflow lives at `.github/workflows/mutants-fuzz-cocoverage.yml`.
+Implementation script at `scripts/mutants-fuzz-cocoverage.sh`.
+Nightly only; never runs on the PR lane (would duplicate cost
+without adding signal). Always advisory: the workflow never blocks
+merges, and the script always exits 0.
+
+The mapping from cargo-mutants source-file paths to libFuzzer target
+directories under `fuzz/corpus/` is in
+`scripts/mutants-fuzz-cocoverage.sh::map_source_to_fuzz_target`.
+Add new mappings there when new fuzz targets land. Unmapped survivors
+are counted in the report but skip the replay step (intentional;
+silent fall-through to an unrelated corpus would inflate the "caught"
+metric and corrupt the audit story).
+
+Output artifacts (uploaded with 30-day retention):
+
+- `cocoverage-out/<package>/summary.json` - machine-readable counts
+  (survivors, mapped, attempted, caught) plus the 5-15% expected
+  reduction band.
+- `cocoverage-out/<package>/report.md` - human-readable rollup.
+- `cocoverage-out/<package>/replay.log` - per-target replay detail.
+- `mutants-out/<package>/` - the cargo-mutants outcomes that drove
+  the replay.
+
+This lane closes M02 P2 (T7).
+
 ## Cross-references
 
 - `.planning/trajectory/02-fuzzing-post-pr13.md`, sections "Mutation-testing
-  approach (phase 3 deliverable)" and "Mutation-testing CI shape (Phase 3)".
+  approach (phase 3 deliverable)", "Mutation-testing CI shape (Phase 3)",
+  and Round-2 (NEW) P3.T7 (re-homed to Phase 2 as M02.P2.T7).
 - `.planning/trajectory/tickets/M02/P2.yml` -- atomic ticket spec for this
-  lane (T1 = config, T2 = workflow + `releases.toml`).
+  lane (T1 = config, T2 = workflow + `releases.toml`, T7 = cocoverage).
 - `.cargo/mutants.toml` -- workspace defaults.
 - `crates/<crate>/mutants.toml` -- per-crate scope.
 - `releases.toml` -- per-crate budgets and the advisory / blocking flip
