@@ -22,13 +22,17 @@
 //!
 //! # Module map
 //!
-//! - [`driver`]: `Scenario` and `ScenarioDriver` (T2).
-//! - `golden` (future): writer / reader / byte-equivalence helpers (T3, T4).
+//! - [`driver`]: `Scenario` and `ScenarioDriver` (T2, extended in T7).
+//! - [`golden_writer`]: NDJSON receipts + JSON checkpoint + hex Merkle root (T3).
+//! - [`golden_reader`]: read goldens back as raw `Vec<u8>` (T4).
+//! - [`byte_compare`]: byte-equivalence harness (T4).
+//! - [`fs_iter`]: deterministic `LC_ALL=C` directory enumeration (T7).
 //! - `bless` (future): `--bless` flag plus the gate-logic checks added in Phase 2.
 
 #![forbid(unsafe_code)]
 
 pub mod byte_compare;
 pub mod driver;
+pub mod fs_iter;
 pub mod golden_reader;
 pub mod golden_writer;

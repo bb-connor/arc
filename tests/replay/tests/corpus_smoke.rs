@@ -26,11 +26,11 @@
 //!   on-disk invariants (root.hex == 64 bytes, checkpoint > 0, receipts
 //!   > 0).
 //!
-//! Recursion strategy: hand-rolled `fs::read_dir` (no `walkdir` dep,
-//! keeps the dev-dep surface minimal). Path enumeration is sorted by
-//! lexicographic byte order on the path's UTF-8 string form, which
-//! matches `LC_ALL=C` ordering for the ASCII-only fixture filenames in
-//! this corpus.
+//! Recursion strategy (T7): delegate to
+//! [`chio_replay_gate::fs_iter::walk_files_sorted`] so this test and
+//! any future Scenario-loader code share a single canonical
+//! `LC_ALL=C`-equivalent byte-order enumerator. Symbolic links are
+//! filtered out fail-closed during recursion.
 //!
 //! Synthetic root strategy: SHA-256 of the canonical-JSON receipt bytes
 //! concatenated with the canonical-JSON checkpoint bytes. The SHA-256
@@ -44,6 +44,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chio_replay_gate::driver::ScenarioDriver;
+use chio_replay_gate::fs_iter;
 use chio_replay_gate::golden_writer::{GoldenSet, GoldenSetSummary};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -299,49 +300,23 @@ fn fixtures_root() -> PathBuf {
 }
 
 /// Recursively enumerate every `.json` manifest under `root`, sorted
-/// lexicographically by UTF-8 path string. Sorting is `LC_ALL=C`-
-/// equivalent for the ASCII-only fixture filenames in the M04 corpus,
-/// which is what the gate diffs against.
+/// lexicographically by raw byte order. Delegates to
+/// [`fs_iter::walk_files_sorted`] (T7) so this test and any future
+/// Scenario-loader code use the same canonicalization. Symlinks and
+/// special files are filtered out fail-closed by the walker.
 fn enumerate_manifests(root: &Path) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    walk_dir(root, &mut out);
-    out.sort_by(|a, b| {
-        let a_str = a.to_string_lossy();
-        let b_str = b.to_string_lossy();
-        a_str.as_bytes().cmp(b_str.as_bytes())
-    });
-    out
-}
-
-/// Hand-rolled recursive directory walker. Skips entries we cannot
-/// stat (which is fail-closed for our purposes: the only such entries
-/// in a clean checkout would be permissions issues, which the gate
-/// must not silently swallow). Only `.json` files are emitted.
-fn walk_dir(dir: &Path, out: &mut Vec<PathBuf>) {
-    let entries = fs::read_dir(dir)
-        .unwrap_or_else(|err| panic!("failed to read directory {}: {err}", dir.display()));
-    for entry in entries {
-        let entry = entry
-            .unwrap_or_else(|err| panic!("failed to iterate entry under {}: {err}", dir.display()));
-        let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .unwrap_or_else(|err| panic!("failed to stat file type of {}: {err}", path.display()));
-        if file_type.is_dir() {
-            walk_dir(&path, out);
-        } else if file_type.is_file()
-            && path
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case("json"))
-                .unwrap_or(false)
-        {
-            out.push(path);
-        }
-        // Symlinks and special files are ignored: the corpus is plain
-        // files only, and surfacing a symlink to the gate would risk
-        // path-traversal nondeterminism we have not vetted.
-    }
+    fs_iter::walk_files_sorted(root, |p| {
+        p.extension()
+            .and_then(|s| s.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("json"))
+            .unwrap_or(false)
+    })
+    .unwrap_or_else(|err| {
+        panic!(
+            "failed to enumerate manifests under {}: {err}",
+            root.display()
+        )
+    })
 }
 
 /// Group manifest paths by their parent directory leaf, which is the
