@@ -1,0 +1,16 @@
+homepage: "https://github.com/bb-connor/arc"
+language: rust
+primary_contact: "whelan.connor11@gmail.com"
+auto_ccs:
+  - "whelan.connor11@gmail.com"
+  # TODO(M02.P2): add backup contact before opening the upstream OSS-Fuzz PR.
+  # Tracked in the M02 P2 follow-up issue (TBD-backup); leaving the slot open
+  # here keeps the file shape stable when the second contact lands.
+main_repo: "https://github.com/bb-connor/arc"
+sanitizers:
+  - address
+  - undefined
+architectures:
+  - x86_64
+fuzzing_engines:
+  - libfuzzer
