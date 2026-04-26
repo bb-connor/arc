@@ -140,3 +140,19 @@ path = "fuzz_targets/wasm_preinstantiate_validate.rs"
 test = false
 doc = false
 bench = false
+
+# M02.P1.T4.b: Chio WASM guards WIT host-call boundary deserialization
+# trust boundary. Drives arbitrary bytes through the serde surfaces that
+# materialize guest-supplied / guest-emitted payloads into Rust structs:
+# `GuardRequest` (host-to-guest WIT request envelope) and
+# `GuestDenyResponse` (canonical guest-to-host `chio_deny_reason` payload,
+# the actual deser site at runtime.rs `read_structured_deny_reason`).
+# `GuardVerdict` is intentionally excluded -- it crosses the WIT boundary
+# as an `i32` return code, not a serialized struct.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "wit_host_call_boundary"
+path = "fuzz_targets/wit_host_call_boundary.rs"
+test = false
+doc = false
+bench = false

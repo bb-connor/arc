@@ -106,3 +106,9 @@ fn wasm_preinstantiate_validate_smoke() {
         fuzz_wasm_preinstantiate_validate,
     );
 }
+
+#[test]
+fn wit_host_call_boundary_smoke() {
+    use chio_wasm_guards::fuzz::fuzz_wit_host_call_boundary;
+    each_seed("wit_host_call_boundary", fuzz_wit_host_call_boundary);
+}
