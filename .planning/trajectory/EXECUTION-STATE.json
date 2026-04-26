@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T00:59:31.519Z",
+  "last_checkpoint_at": "2026-04-26T01:09:55.688Z",
   "current_wave": "1a",
   "halt": {
-    "halted": true,
-    "reason": "operator-discretion: session_budget_review after 5 wave-1a tickets merged. ~37 wave-1a tickets remain (each genuine implementation work). User direction needed on session topology.",
-    "trigger_event_id": "01KQ3MRYSZ1CP75PGEK6H0DNH1",
-    "halted_at": "2026-04-26T00:59:31.519Z"
+    "halted": false,
+    "reason": null,
+    "trigger_event_id": null,
+    "halted_at": null
   },
   "milestones": {
     "M01": {
@@ -108,14 +108,22 @@
       }
     },
     "M01.P1.T2": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a2e9031619dcc1848",
+      "branch": "wave/W1/m01/p1.t2-capability-schemas",
+      "pr_number": 16,
+      "merged_at": "2026-04-26T01:09:55.688Z",
+      "merged_sha": "667f7aa7a02ffa13ee96325ba689c93f1a58553f",
+      "diff_stats": {
+        "files": 5,
+        "insertions": 446,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "result": "PASS",
+        "checks": 6
+      }
     },
     "M01.P1.T3": {
       "status": "pending",
