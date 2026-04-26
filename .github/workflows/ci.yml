@@ -293,3 +293,24 @@ jobs:
         run: cargo install cargo-vet --locked --version "^0.10"
       - name: cargo vet --locked
         run: cargo vet --locked
+
+  cargo-deny:
+    name: cargo-deny (supply-chain bans/advisories/licenses)
+    # owner: M09
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked --version "^0.19"
+      - name: cargo deny check advisories
+        run: cargo deny check advisories
+      - name: cargo deny check licenses
+        run: cargo deny check licenses
+      - name: cargo deny check bans (advisory)
+        continue-on-error: true
+        run: cargo deny check bans
