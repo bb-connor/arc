@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T05:15:00Z",
+  "last_checkpoint_at": "2026-04-26T06:40:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -11,12 +11,12 @@
   },
   "milestones": {
     "M01": {
-      "status": "P3 in progress (T1 merged; T2-T6 pending)",
+      "status": "P3 mostly merged (T1-T4 merged; T5+T6 in flight)",
       "phase": "P3_in_progress",
       "p0_status": "merged",
       "p1_status": "all 9 merged",
       "p2_status": "all 8 merged",
-      "p3_status": "T1 merged"
+      "p3_status": "T1-T4 merged; T5+T6 executors running"
     },
     "M02": {
       "status": "blocked",
@@ -26,13 +26,13 @@
       "blocked_on": "PR #13 merge"
     },
     "M03": {
-      "status": "P3 COMPLETE; P2 in flight",
-      "phase": "P2 in flight (T1-T4 merged); P3 fully merged (T1-T7)",
+      "status": "P3 COMPLETE; P2 nearly done",
+      "phase": "P2 T1-T5 merged; T6+T7 in flight; P3 fully merged",
       "owner_branch": null,
       "scheduled_in_wave": "1a",
       "p0_status": "merged",
       "p1_status": "all 7 merged",
-      "p2_status": "T1-T4 merged; T5-T7 pending (sequential)",
+      "p2_status": "T1-T5 merged; T6 executor running, T7 sequential after",
       "p3_status": "all 7 merged"
     },
     "M04": {
@@ -838,6 +838,33 @@
         "kani_checks": "0 of 190 failed (1 unreachable=expected); 0.48s",
         "harness_count": "13 -> 14",
         "mapping_md_row_added": "in same PR"
+      }
+    },
+    "M01.P3.T2": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 68,
+      "merged_sha": "b43c6e00f2a1f3d249453f24dc586be27300201b",
+      "branch": "wave/W1/m01/p3.t2-codegen-python-pydantic-v2",
+      "merged_at": "2026-04-26T06:30:00Z",
+      "divergence_checks": {
+        "result": "PASS-WITH-NOTES",
+        "gate": "python --check in sync (35 schemas, 45 .py files); pytest 85/85; rust+ts+go --check still in sync after rebase",
+        "rebase_conflicts_resolved": "8+ regions in xtask/src/main.rs (kept HEAD's rust+go+ts and appended python codegen + helpers + TempDir); manually verified all 4 langs in sync post-merge",
+        "gate_string_deviation": "ticket spec literal `uv run --package chio-sdk-python pytest sdks/python/chio-sdk-python/tests` failed because parent backbay/pyproject.toml workspace is broken (missing pyproject.toml in clusters/providence/...); used cd-then-uv-run equivalent"
+      }
+    },
+    "M03.P2.T5": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 69,
+      "merged_sha": "9636b7604357daf3c4605499b3fe78aba7f4367b",
+      "branch": "wave/W1/m03/p2.t5-kani-public-coverage-ten",
+      "merged_at": "2026-04-26T06:35:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "covered_symbols": "5 -> 10",
+        "lanes": "[lanes.pr] 11 harnesses + [lanes.nightly_only] 3 harnesses (heuristic; M03.P2.T6 will re-measure)"
       }
     }
   },
