@@ -57,8 +57,15 @@ version = "2.4.1"
 # Checked-in regen pattern (script + committed output). The xtask shells out
 # to `bash sdks/go/chio-go-http/scripts/regen-types.sh` (M01.P3.T4).
 consumed_by = "sdks/go/chio-go-http/scripts/regen-types.sh"
+runtime_dep = "github.com/oapi-codegen/runtime"
+runtime_dep_version = "1.2.0"
 notes = """
 Go is a checked-in regen rather than a live pipeline target so we avoid
 adding a Go toolchain to the standard developer image; CI installs it on
-demand via the regen-types.sh script.
+demand via the regen-types.sh script. The generated file imports
+github.com/oapi-codegen/runtime for union helper types (oneOf members);
+runtime v1.2.0 is the latest release that targets go 1.20+ and so keeps
+the chio-go-http module's `go 1.21` directive valid. Bumping to runtime
+v1.3.x or later requires bumping the go directive to 1.24, which is a
+spec-affecting change that travels with the next oapi-codegen pin bump.
 """
