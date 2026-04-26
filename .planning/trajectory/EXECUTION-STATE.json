@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T04:00:47Z",
+  "last_checkpoint_at": "2026-04-26T04:14:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -27,11 +27,13 @@
     },
     "M03": {
       "status": "in_progress",
-      "phase": "P1_complete",
+      "phase": "P2+P3 in flight",
       "owner_branch": null,
       "scheduled_in_wave": "1a",
       "p0_status": "merged",
-      "p1_status": "all 7 merged"
+      "p1_status": "all 7 merged",
+      "p2_status": "T1+T2 merged; T3-T7 pending (sequential)",
+      "p3_status": "T1+T7 merged; T2-T6 pending"
     },
     "M04": {
       "status": "pending",
@@ -689,6 +691,43 @@
       "divergence_checks": {
         "result": "PASS-WITH-NOTES",
         "notes": "Cargo.lock delta 116 lines exceeded 25-line halt threshold; waived per ticket spec since T1 introduces the typify chain (new tooling crate). Test file under tests/ not src/ as per cargo --test resolution."
+      }
+    },
+    "M03.P2.T2": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 57,
+      "merged_sha": "64632a5093ffd0fdca7b71a1ef785a356b55fb65",
+      "branch": "wave/W1/m03/p2.t2-delegation-chain-step",
+      "merged_at": "2026-04-26T04:11:38Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "kani_checks": "0 of 12 failed; 0.079s",
+        "harness_count": "11 -> 12"
+      }
+    },
+    "M09.P3.T1": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 56,
+      "merged_sha": "728af18438b1c5f37fb3f8b7fe7e60fd3670d6cb",
+      "branch": "wave/W1/m09/p3.t1-chio-attest-verify",
+      "merged_at": "2026-04-26T04:13:00Z",
+      "divergence_checks": {
+        "result": "PASS-WITH-NOTES",
+        "trust_boundary_review": "Security x2 (opus + sonnet); opus approve; sonnet request_changes on OIDC issuer constant-time compare; resolved by adding documentation comments clarifying public-URL non-secret status (commit 84753a7e2)",
+        "follow_up": "upstream sigstore-rs 0.13 leaves Merkle inclusion (step 5) and SET (step 6) as TODO(tnytown); rekor_inclusion_verified=true reflects log-entry consistency only; track for future tightening"
+      }
+    },
+    "M03.P3.T7": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 58,
+      "merged_sha": "72b50e3ea34ccd7845eafaa240710cd9f36e6ace",
+      "branch": "wave/W1/m03/p3.t7-owners-template-scaffold",
+      "merged_at": "2026-04-26T04:14:00Z",
+      "divergence_checks": {
+        "result": "PASS"
       }
     }
   },
