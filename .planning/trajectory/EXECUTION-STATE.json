@@ -729,6 +729,18 @@
       "divergence_checks": {
         "result": "PASS"
       }
+    },
+    "M03.P3.T2": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 59,
+      "merged_sha": "35494e39a070ce78f56a01120421c50f43ee8ca2",
+      "branch": "wave/W1/m03/p3.t2-tla-safety-skeleton",
+      "merged_at": "2026-04-26T04:25:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "apalache_check": "length=4 PROCS=4 CAPS=8 EXITCODE: OK (~6 min local)"
+      }
     }
   },
   "wave_gate_history": [],
