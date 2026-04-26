@@ -30,10 +30,23 @@ name = "chio_kernel_core"
 chio-core-types = { path = "../chio-core-types", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
+# `arbitrary` is gated behind the `fuzz` feature so production builds stay
+# free of fuzz instrumentation. Pulled in by
+# `fuzz/fuzz_targets/receipt_log_replay.rs` (M02.P1.T8) via
+# `chio-kernel-core = { features = ["fuzz"] }`.
+arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [features]
 default = ["std"]
 std = ["chio-core-types/std", "serde/std", "serde_json/std"]
+# Enables `chio_kernel_core::fuzz`, the libFuzzer entry-point module for the
+# receipt-log replay verifier (M02.P1.T8). Implies `std` because libFuzzer
+# itself only runs in a hosted environment, so the `no_std + alloc` portable
+# proof never observes this surface. Off by default; turned on only by the
+# `chio-fuzz` standalone workspace at `../../fuzz`.
+# Reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
+# (Round-2 trust-boundary fuzz target #12).
+fuzz = ["dep:arbitrary", "std"]
 
 [dev-dependencies]
 proptest = { workspace = true }

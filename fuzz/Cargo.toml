@@ -36,6 +36,7 @@ chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-config = { path = "../crates/chio-config", features = ["fuzz"] }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
+chio-kernel-core = { path = "../crates/chio-kernel-core", features = ["fuzz"] }
 chio-mcp-adapter = { path = "../crates/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/chio-mcp-edge", features = ["fuzz"] }
 chio-openapi-mcp-bridge = { path = "../crates/chio-openapi-mcp-bridge", features = ["fuzz"] }
@@ -149,6 +150,21 @@ bench = false
 [[bin]]
 name = "openapi_ingest"
 path = "fuzz_targets/openapi_ingest.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P1.T8: Chio kernel-core receipt-log replay trust boundary
+# (`fuzz_receipt_log_replay`: NDJSON receipt-log decode -> per-receipt
+# `ChioReceipt::verify_signature` -> chain-invariant traversal). Round-2
+# add per `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
+# lines 379-385: catches reordered / corrupted-chain bugs that
+# `merkle_checkpoint` cannot, since the merkle root only commits to leaf
+# hashes and not to the canonical-bytes-equal-the-leaf invariant nor to
+# cross-receipt timestamp / signer consistency.
+[[bin]]
+name = "receipt_log_replay"
+path = "fuzz_targets/receipt_log_replay.rs"
 test = false
 doc = false
 bench = false

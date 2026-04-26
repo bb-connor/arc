@@ -124,3 +124,9 @@ fn openapi_ingest_smoke() {
     use chio_openapi_mcp_bridge::fuzz::fuzz_openapi_ingest;
     each_seed("openapi_ingest", fuzz_openapi_ingest);
 }
+
+#[test]
+fn receipt_log_replay_smoke() {
+    use chio_kernel_core::fuzz::fuzz_receipt_log_replay;
+    each_seed("receipt_log_replay", fuzz_receipt_log_replay);
+}
