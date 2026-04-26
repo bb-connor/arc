@@ -63,6 +63,14 @@
 //! drift, mirroring the Rust target. The schema-set sha256 is stamped into
 //! the file header so a downstream auditor can confirm the regeneration
 //! input.
+//!
+//! `codegen --lang python [--check]` regenerates the Pydantic v2 bindings
+//! under `sdks/python/chio-sdk-python/src/chio_sdk/_generated/` by shelling
+//! out to `datamodel-code-generator` (pinned in
+//! `xtask/codegen-tools.lock.toml`). The xtask invokes the tool via
+//! `uv tool run --from "datamodel-code-generator==<pin>" datamodel-codegen`
+//! so the toolchain is hermetic and never enters Cargo. With `--check` it
+//! renders to a temp dir and exits non-zero on byte drift.
 
 use std::env;
 use std::ffi::OsStr;
@@ -95,6 +103,8 @@ enum XtaskError {
     Validation(String),
     Codegen(chio_spec_codegen::CodegenError),
     Process(String),
+    ToolMissing(String),
+    ToolFailed(String),
 }
 
 impl fmt::Display for XtaskError {
@@ -108,6 +118,8 @@ impl fmt::Display for XtaskError {
             Self::Validation(detail) => write!(f, "scenario validation failed: {detail}"),
             Self::Codegen(err) => write!(f, "codegen failed: {err}"),
             Self::Process(msg) => write!(f, "subprocess error: {msg}"),
+            Self::ToolMissing(detail) => write!(f, "codegen tool missing: {detail}"),
+            Self::ToolFailed(detail) => write!(f, "codegen tool failed: {detail}"),
         }
     }
 }
@@ -145,6 +157,8 @@ fn print_help() {
     println!("  codegen --lang go [--check]");
     println!("  codegen ts [--check]");
     println!("  codegen --lang ts [--check]");
+    println!("  codegen python [--check]");
+    println!("  codegen --lang python [--check]");
 }
 
 fn run_trajectory(args: Vec<String>) -> Result<(), XtaskError> {
@@ -563,12 +577,7 @@ fn run_codegen(args: Vec<String>) -> Result<(), XtaskError> {
         "rust" => codegen_rust(check_only),
         "ts" => codegen_ts(check_only),
         "go" => codegen_go(check_only),
-        // Wired by M01.P3.T2. Surfaced here so the dispatcher returns a
-        // clean usage error rather than `unknown argument` once the lang
-        // argument parses.
-        "python" => Err(XtaskError::Usage(
-            "codegen: --lang python is not yet wired (lands in M01.P3.T2)".into(),
-        )),
+        "python" => codegen_python(check_only),
         other => Err(XtaskError::Usage(format!(
             "codegen: unknown language: {other} (expected rust|python|ts|go)"
         ))),
@@ -1121,4 +1130,412 @@ fn workspace_root() -> Result<PathBuf, XtaskError> {
 
 fn display_path(path: &Path) -> String {
     path.display().to_string()
+}
+
+/// Pinned tool spec for the Python codegen target. Reflected in
+/// `[python]` in `xtask/codegen-tools.lock.toml`. Bumping this is a
+/// spec-affecting change and must regenerate every `_generated/*.py` byte.
+const PYTHON_CODEGEN_TOOL_PIN: &str = "datamodel-code-generator==0.34.0";
+
+/// Relative path (from workspace root) of the generated Python output dir.
+const CHIO_WIRE_V1_PYTHON_OUT: &str = "sdks/python/chio-sdk-python/src/chio_sdk/_generated";
+
+/// Filename of the per-package `__init__.py` re-export written under each
+/// generated subpackage. The xtask does not author these; datamodel-codegen
+/// emits them as part of its directory-mode output.
+const PYTHON_INIT_FILE: &str = "__init__.py";
+
+fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
+    let workspace_root = workspace_root()?;
+    let schemas_dir = workspace_root.join(CHIO_WIRE_V1_SCHEMAS);
+    let final_out_dir = workspace_root.join(CHIO_WIRE_V1_PYTHON_OUT);
+
+    if !schemas_dir.exists() {
+        return Err(XtaskError::Codegen(
+            chio_spec_codegen::CodegenError::SchemasDirMissing(schemas_dir.clone()),
+        ));
+    }
+
+    let mut schema_files: Vec<PathBuf> = Vec::new();
+    walk_schema_json(&schemas_dir, &mut schema_files)?;
+    schema_files.sort();
+    let schema_digest = hash_schema_set(&workspace_root, &schema_files)?;
+
+    let staging = TempDir::new("chio-codegen-py")
+        .map_err(|err| XtaskError::Io("<temp staging dir for codegen python>".to_string(), err))?;
+
+    let clean_input = staging.path().join("input");
+    mirror_schema_tree(&schemas_dir, &clean_input, &schema_files)?;
+
+    let staging_out = staging.path().join("output");
+    fs::create_dir_all(&staging_out)
+        .map_err(|err| XtaskError::Io(display_path(&staging_out), err))?;
+
+    let header_path = staging.path().join("file-header.txt");
+    fs::write(&header_path, build_python_file_header(&schema_digest))
+        .map_err(|err| XtaskError::Io(display_path(&header_path), err))?;
+
+    invoke_datamodel_codegen(&clean_input, &staging_out, &header_path)?;
+
+    let top_init = staging_out.join(PYTHON_INIT_FILE);
+    fs::write(&top_init, build_python_top_init(&schema_digest))
+        .map_err(|err| XtaskError::Io(display_path(&top_init), err))?;
+
+    if check_only {
+        let drift = diff_python_trees(&staging_out, &final_out_dir)?;
+        if let Some(detail) = drift {
+            return Err(XtaskError::Drift(format!(
+                "{} is stale; rerun `cargo xtask codegen python` ({} schema files inspected)\n{}",
+                display_path(&final_out_dir),
+                schema_files.len(),
+                detail
+            )));
+        }
+        println!(
+            "codegen python: {} in sync ({} schema files, {} python files)",
+            display_path(&final_out_dir),
+            schema_files.len(),
+            count_python_files(&staging_out)?
+        );
+        return Ok(());
+    }
+
+    if final_out_dir.exists() {
+        fs::remove_dir_all(&final_out_dir)
+            .map_err(|err| XtaskError::Io(display_path(&final_out_dir), err))?;
+    }
+    if let Some(parent) = final_out_dir.parent() {
+        fs::create_dir_all(parent).map_err(|err| XtaskError::Io(display_path(parent), err))?;
+    }
+    copy_dir_recursive(&staging_out, &final_out_dir)?;
+    let py_count = count_python_files(&final_out_dir)?;
+    println!(
+        "codegen python: wrote {} ({} python files; {} schema files; sha256={})",
+        display_path(&final_out_dir),
+        py_count,
+        schema_files.len(),
+        schema_digest
+    );
+    Ok(())
+}
+
+fn build_python_file_header(schema_digest: &str) -> String {
+    format!(
+        "# DO NOT EDIT - regenerate via 'cargo xtask codegen --lang python'.\n\
+         #\n\
+         # Source: spec/schemas/chio-wire/v1/**/*.schema.json\n\
+         # Tool:   {PYTHON_CODEGEN_TOOL_PIN} (see xtask/codegen-tools.lock.toml)\n\
+         # Schema sha256: {schema_digest}\n\
+         #\n\
+         # Manual edits will be overwritten by the next regeneration; the\n\
+         # M01.P3.T5 spec-drift CI lane enforces this header on every file\n\
+         # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.\n"
+    )
+}
+
+fn build_python_top_init(schema_digest: &str) -> String {
+    let header = build_python_file_header(schema_digest);
+    format!(
+        "{header}\n\
+         \"\"\"Generated Pydantic v2 models for the Chio wire protocol (chio-wire/v1).\n\
+         \n\
+         Re-exports every subpackage so callers can write\n\
+         ``from chio_sdk._generated import CapabilityToken`` without knowing the\n\
+         per-subpackage layout. The SCHEMA_SHA256 constant pins the schema set\n\
+         this build was generated from; the M01.P3.T5 spec-drift CI lane reads\n\
+         it to detect tampering.\n\
+         \"\"\"\n\
+         \n\
+         from __future__ import annotations\n\
+         \n\
+         #: SHA-256 of the lexicographically sorted concatenation of every\n\
+         #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was\n\
+         #: fed into datamodel-code-generator at build time.\n\
+         SCHEMA_SHA256 = \"{schema_digest}\"\n\
+         \n\
+         __all__ = [\"SCHEMA_SHA256\"]\n"
+    )
+}
+
+fn mirror_schema_tree(
+    src_root: &Path,
+    dst_root: &Path,
+    schema_files: &[PathBuf],
+) -> Result<(), XtaskError> {
+    fs::create_dir_all(dst_root).map_err(|err| XtaskError::Io(display_path(dst_root), err))?;
+    for path in schema_files {
+        let rel = path.strip_prefix(src_root).map_err(|_| {
+            XtaskError::Usage(format!(
+                "codegen python: schema file {} is not under {}",
+                display_path(path),
+                display_path(src_root)
+            ))
+        })?;
+        let dest = dst_root.join(rel);
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|err| XtaskError::Io(display_path(parent), err))?;
+        }
+        fs::copy(path, &dest).map_err(|err| XtaskError::Io(display_path(&dest), err))?;
+    }
+    Ok(())
+}
+
+fn invoke_datamodel_codegen(
+    input_dir: &Path,
+    output_dir: &Path,
+    header_path: &Path,
+) -> Result<(), XtaskError> {
+    let mut cmd = Command::new("uv");
+    cmd.arg("tool")
+        .arg("run")
+        .arg("--from")
+        .arg(PYTHON_CODEGEN_TOOL_PIN)
+        .arg("datamodel-codegen")
+        .arg("--input")
+        .arg(input_dir)
+        .arg("--input-file-type")
+        .arg("jsonschema")
+        .arg("--output")
+        .arg(output_dir)
+        .arg("--output-model-type")
+        .arg("pydantic_v2.BaseModel")
+        .arg("--target-python-version")
+        .arg("3.11")
+        .arg("--use-double-quotes")
+        .arg("--use-standard-collections")
+        .arg("--use-union-operator")
+        .arg("--use-schema-description")
+        .arg("--disable-timestamp")
+        .arg("--custom-file-header-path")
+        .arg(header_path);
+
+    let output = cmd.output().map_err(|err| {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            XtaskError::ToolMissing(format!(
+                "`uv` not found on PATH; install via https://docs.astral.sh/uv/ then rerun (underlying error: {err})"
+            ))
+        } else {
+            XtaskError::Io("uv tool run datamodel-codegen".to_string(), err)
+        }
+    })?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(XtaskError::ToolFailed(format!(
+            "datamodel-codegen exited {}\nstdout: {}\nstderr: {}",
+            output.status,
+            stdout.trim(),
+            stderr.trim()
+        )));
+    }
+    Ok(())
+}
+
+fn hash_schema_set(workspace_root: &Path, schema_files: &[PathBuf]) -> Result<String, XtaskError> {
+    let mut hasher = Sha256::new();
+    for path in schema_files {
+        let rel = path.strip_prefix(workspace_root).map_err(|_| {
+            XtaskError::Usage(format!(
+                "codegen python: schema file {} is not under workspace root",
+                display_path(path)
+            ))
+        })?;
+        let rel_str = rel
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("/");
+        hasher.update(rel_str.as_bytes());
+        hasher.update(b"\n");
+        let bytes = fs::read(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+        hasher.update(&bytes);
+        hasher.update(b"\n");
+    }
+    Ok(digest_to_hex(&hasher.finalize()))
+}
+
+fn count_python_files(dir: &Path) -> Result<usize, XtaskError> {
+    let mut count = 0usize;
+    walk_python_files(dir, &mut count)?;
+    Ok(count)
+}
+
+fn walk_python_files(dir: &Path, count: &mut usize) -> Result<(), XtaskError> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    let entries = fs::read_dir(dir).map_err(|err| XtaskError::Io(display_path(dir), err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| XtaskError::Io(display_path(dir), err))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| XtaskError::Io(display_path(&path), err))?;
+        if file_type.is_dir() {
+            walk_python_files(&path, count)?;
+        } else if file_type.is_file() {
+            if let Some(ext) = path.extension().and_then(OsStr::to_str) {
+                if ext == "py" {
+                    *count += 1;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), XtaskError> {
+    fs::create_dir_all(dst).map_err(|err| XtaskError::Io(display_path(dst), err))?;
+    let entries = fs::read_dir(src).map_err(|err| XtaskError::Io(display_path(src), err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| XtaskError::Io(display_path(src), err))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| XtaskError::Io(display_path(&path), err))?;
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        if name == "__pycache__" {
+            continue;
+        }
+        let target = dst.join(name);
+        if file_type.is_dir() {
+            copy_dir_recursive(&path, &target)?;
+        } else if file_type.is_file() {
+            if let Some(ext) = path.extension().and_then(OsStr::to_str) {
+                if ext == "pyc" || ext == "pyo" {
+                    continue;
+                }
+            }
+            fs::copy(&path, &target).map_err(|err| XtaskError::Io(display_path(&target), err))?;
+        }
+    }
+    Ok(())
+}
+
+fn diff_python_trees(expected: &Path, actual: &Path) -> Result<Option<String>, XtaskError> {
+    if !actual.exists() {
+        return Ok(Some(format!(
+            "  on-disk dir {} is missing entirely",
+            display_path(actual)
+        )));
+    }
+    let mut expected_files: Vec<PathBuf> = Vec::new();
+    let mut actual_files: Vec<PathBuf> = Vec::new();
+    collect_relative_files(expected, expected, &mut expected_files)?;
+    collect_relative_files(actual, actual, &mut actual_files)?;
+    expected_files.sort();
+    actual_files.sort();
+
+    let mut diff_lines: Vec<String> = Vec::new();
+    let limit = 12usize;
+    let mut differing = 0usize;
+
+    let exp_set: std::collections::BTreeSet<_> = expected_files.iter().cloned().collect();
+    let act_set: std::collections::BTreeSet<_> = actual_files.iter().cloned().collect();
+    for missing in exp_set.difference(&act_set) {
+        differing += 1;
+        if diff_lines.len() < limit {
+            diff_lines.push(format!("  + missing on disk: {}", missing.display()));
+        }
+    }
+    for extra in act_set.difference(&exp_set) {
+        differing += 1;
+        if diff_lines.len() < limit {
+            diff_lines.push(format!(
+                "  - present on disk but not regenerated: {}",
+                extra.display()
+            ));
+        }
+    }
+    for rel in exp_set.intersection(&act_set) {
+        let exp_bytes = fs::read(expected.join(rel))
+            .map_err(|err| XtaskError::Io(display_path(&expected.join(rel)), err))?;
+        let act_bytes = fs::read(actual.join(rel))
+            .map_err(|err| XtaskError::Io(display_path(&actual.join(rel)), err))?;
+        if exp_bytes != act_bytes {
+            differing += 1;
+            if diff_lines.len() < limit {
+                diff_lines.push(format!(
+                    "  ! bytes differ: {} (expected {} bytes, on-disk {} bytes)",
+                    rel.display(),
+                    exp_bytes.len(),
+                    act_bytes.len()
+                ));
+            }
+        }
+    }
+
+    if differing == 0 {
+        return Ok(None);
+    }
+    let mut summary = diff_lines.join("\n");
+    if differing > limit {
+        summary.push_str(&format!(
+            "\n  ... ({} more differing entries)",
+            differing - limit
+        ));
+    }
+    Ok(Some(summary))
+}
+
+fn collect_relative_files(
+    root: &Path,
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+) -> Result<(), XtaskError> {
+    let entries = fs::read_dir(dir).map_err(|err| XtaskError::Io(display_path(dir), err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| XtaskError::Io(display_path(dir), err))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| XtaskError::Io(display_path(&path), err))?;
+        let name = path.file_name().and_then(OsStr::to_str).unwrap_or("");
+        if name == "__pycache__" {
+            continue;
+        }
+        if file_type.is_dir() {
+            collect_relative_files(root, &path, out)?;
+        } else if file_type.is_file() {
+            if let Some(ext) = path.extension().and_then(OsStr::to_str) {
+                if ext == "pyc" || ext == "pyo" {
+                    continue;
+                }
+            }
+            if let Ok(rel) = path.strip_prefix(root) {
+                out.push(rel.to_path_buf());
+            }
+        }
+    }
+    Ok(())
+}
+
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new(prefix: &str) -> std::io::Result<Self> {
+        let mut base = std::env::temp_dir();
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let pid = std::process::id();
+        base.push(format!("{prefix}-{pid}-{nanos}"));
+        fs::create_dir_all(&base)?;
+        Ok(Self { path: base })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
 }
