@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T00:58:36.430Z",
+  "last_checkpoint_at": "2026-04-26T00:59:31.519Z",
   "current_wave": "1a",
   "halt": {
-    "halted": false,
-    "reason": null,
-    "trigger_event_id": null,
-    "halted_at": null
+    "halted": true,
+    "reason": "operator-discretion: session_budget_review after 5 wave-1a tickets merged. ~37 wave-1a tickets remain (each genuine implementation work). User direction needed on session topology.",
+    "trigger_event_id": "01KQ3MRYSZ1CP75PGEK6H0DNH1",
+    "halted_at": "2026-04-26T00:59:31.519Z"
   },
   "milestones": {
     "M01": {
