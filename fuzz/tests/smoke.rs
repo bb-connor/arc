@@ -67,3 +67,9 @@ fn oid4vp_presentation_smoke() {
     use chio_credentials::fuzz::fuzz_oid4vp_presentation;
     each_seed("oid4vp_presentation", fuzz_oid4vp_presentation);
 }
+
+#[test]
+fn did_resolve_smoke() {
+    use chio_did::fuzz::fuzz_did_resolve;
+    each_seed("did_resolve", fuzz_did_resolve);
+}

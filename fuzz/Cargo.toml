@@ -31,6 +31,7 @@ cargo-fuzz = true
 [dependencies]
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
+chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
 # `arbitrary` is pulled in directly by libFuzzer harnesses that take
 # structured input; the `derive` feature lets per-target structs annotate
@@ -47,6 +48,15 @@ expect_used = "deny"
 [[bin]]
 name = "attest_verify"
 path = "fuzz_targets/attest_verify.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P1.T1.c: Chio DID resolve trust boundary.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "did_resolve"
+path = "fuzz_targets/did_resolve.rs"
 test = false
 doc = false
 bench = false
