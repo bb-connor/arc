@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T00:56:58.853Z",
+  "last_checkpoint_at": "2026-04-26T00:58:36.430Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -90,14 +90,22 @@
       "resolution": "no_op_baseline_via_cascade_gate"
     },
     "M01.P1.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a5a46b89e19203246",
+      "branch": "wave/W1/m01/p1.t1-schema-coverage-audit",
+      "pr_number": 15,
+      "merged_at": "2026-04-26T00:58:36.430Z",
+      "merged_sha": "84b1e29ca8fe68eb3020f51e8e691eb6a0058c72",
+      "diff_stats": {
+        "files": 1,
+        "insertions": 325,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "result": "PASS",
+        "checks": 5
+      }
     },
     "M01.P1.T2": {
       "status": "pending",
