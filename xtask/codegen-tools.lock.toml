@@ -43,12 +43,21 @@ re-export from chio_sdk.models, so this pin gates them all.
 [typescript]
 tool = "json-schema-to-typescript"
 version = "15.0.4"
-# Will be installed via sdks/typescript/scripts/package.json (M01.P3.T3) and
-# invoked by the xtask through pnpm.
+# Installed via sdks/typescript/scripts/package.json (lockfile lives next to
+# it as package-lock.json). The xtask `codegen --lang ts` dispatcher invokes
+# the tool directly via sdks/typescript/scripts/node_modules/.bin/json2ts so
+# the cargo wrapper does not depend on `npx` resolution -- callers run
+# `npm ci` inside sdks/typescript/scripts/ once before the first regen.
 consumed_by = "sdks/typescript/scripts/package.json"
 notes = """
-Emits a single .d.ts-style file per schema; the xtask concatenates them into
-sdks/typescript/packages/conformance/src/_generated/index.ts.
+Emits one TS chunk per schema; the xtask wraps each chunk in a `namespace`
+keyed by `<group>_<stem>` (see ts_namespace_name in xtask/src/main.rs) so
+collisions across schemas (e.g. `Operation` between capability/grant and
+capability/token) are scoped. The concatenated bytes land at
+sdks/typescript/packages/conformance/src/_generated/index.ts and the file
+header carries a sha256 of the schema-set inputs for audit. M01.P3.T5 will
+add the `codegen-no-diff` and `header-stamp-untouched` CI lanes that gate
+this pin via `cargo xtask codegen --lang ts --check`.
 """
 
 [go]
