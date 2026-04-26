@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T07:10:00Z",
+  "last_checkpoint_at": "2026-04-26T07:25:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -26,13 +26,13 @@
       "blocked_on": "PR #13 merge"
     },
     "M03": {
-      "status": "P3 COMPLETE; P2 T1-T6 merged; T7 in flight",
-      "phase": "P2 nearly done (T7 last)",
+      "status": "MILESTONE COMPLETE (P0+P1+P2+P3 all merged)",
+      "phase": "complete",
       "owner_branch": null,
       "scheduled_in_wave": "1a",
       "p0_status": "merged",
       "p1_status": "all 7 merged",
-      "p2_status": "T1-T6 merged; T7 executor running",
+      "p2_status": "all 7 merged",
       "p3_status": "all 7 merged"
     },
     "M04": {
@@ -903,6 +903,18 @@
       "divergence_checks": {
         "result": "PASS",
         "wall_clock": "14 harnesses total 134s locally; T5 heuristic inverted by data (verify_* are 1-3s, public_* are 11-31s); all in lanes.pr; lanes.nightly_only kept empty for future re-bucketing"
+      }
+    },
+    "M03.P2.T7": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 72,
+      "merged_sha": "6a3b4ec4c2f0b466d6c0014bbafe0e716738b7d3",
+      "branch": "wave/W1/m03/p2.t7-pr-kani-changed-only",
+      "merged_at": "2026-04-26T07:25:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "two_axis_fallback": "file-path widen (chio-kernel-core, chio-core-types) + outside-range widen + diff-failed widen; bash 3.2 portable"
       }
     }
   },
