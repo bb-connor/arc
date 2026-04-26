@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:32:18.034Z",
+  "last_checkpoint_at": "2026-04-26T01:39:39.103Z",
   "current_wave": "1a",
   "halt": {
-    "halted": true,
-    "reason": "operator-discretion: 11/42 wave-1a tickets merged. Pausing for batch-cadence direction.",
-    "trigger_event_id": "01KQ3PMZ7JRB61RS0QY42W7WN8",
-    "halted_at": "2026-04-26T01:32:18.034Z"
+    "halted": false,
+    "reason": null,
+    "trigger_event_id": null,
+    "halted_at": null
   },
   "milestones": {
     "M01": {
@@ -26,10 +26,11 @@
     },
     "M03": {
       "status": "in_progress",
-      "phase": "P1",
+      "phase": "P1_complete",
       "owner_branch": null,
       "scheduled_in_wave": "1a",
-      "p0_status": "merged"
+      "p0_status": "merged",
+      "p1_status": "all 7 merged"
     },
     "M04": {
       "status": "pending",
@@ -141,14 +142,20 @@
       }
     },
     "M01.P1.T4.a": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a399e91521c0517e6",
+      "branch": "wave/W1/m01/p1.t4.a-jsonrpc-framing-schemas",
+      "pr_number": 24,
+      "merged_at": "2026-04-26T01:39:39.103Z",
+      "merged_sha": "c99d975ec",
+      "diff_stats": {
+        "files": 5,
+        "insertions": 153
+      },
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P1.T4.b": {
       "status": "pending",
@@ -396,24 +403,37 @@
       }
     },
     "M03.P1.T6": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "orchestrator-direct",
+      "branch": "wave/W1/m03/p1.t6-tier-proptest-cases",
+      "pr_number": 22,
+      "merged_at": "2026-04-26T01:39:39.103Z",
+      "merged_sha": "29f6d616d",
+      "diff_stats": {
+        "files": 2,
+        "insertions": 69
+      },
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M03.P1.T7": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "orchestrator-direct",
+      "branch": "wave/W1/m03/p1.t7-proptest-coverage-gate",
+      "pr_number": 23,
+      "merged_at": "2026-04-26T01:39:39.103Z",
+      "merged_sha": "dbc7109b1",
+      "diff_stats": {
+        "files": 2,
+        "insertions": 91
+      },
+      "divergence_checks": {
+        "result": "PASS",
+        "gate_run": "18 of 18 invariants present"
+      }
     },
     "M09.P0.T1": {
       "status": "merged",
