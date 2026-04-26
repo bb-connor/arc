@@ -1,9 +1,11 @@
-// owned-by: M02 (fuzz lane); module authored under M02.P1.T4.a.
+// owned-by: M02 (fuzz lane); module authored under M02.P1.T4.a, extended
+// under M02.P1.T4.b with `fuzz_wit_host_call_boundary`.
 //
 //! libFuzzer entry-point module for `chio-wasm-guards`.
 //!
 //! Authored under M02.P1.T4.a (`.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 1, trust-boundary fuzz target #8). This module is gated behind the
+//! Phase 1, trust-boundary fuzz target #8) and extended under M02.P1.T4.b
+//! (same source-of-truth, target #9). This module is gated behind the
 //! `fuzz` Cargo feature so it only compiles into the standalone `chio-fuzz`
 //! workspace at `../../fuzz`. Production builds of `chio-wasm-guards` never
 //! pull in `arbitrary`, never expose these symbols, and never get recompiled
@@ -145,4 +147,67 @@ pub fn fuzz_wasm_preinstantiate_validate(data: &[u8]) {
     // Same engine reuse pattern.
     let mut wasmtime_backend = WasmtimeBackend::with_engine(Arc::clone(engine));
     let _ = wasmtime_backend.load_module(data, FUZZ_FUEL_LIMIT);
+}
+
+// ---------------------------------------------------------------------------
+// M02.P1.T4.b -- WIT host-call boundary deserialization fuzzer
+// ---------------------------------------------------------------------------
+
+/// Drive arbitrary bytes through the WIT host-call boundary serde surface.
+///
+/// Authored under M02.P1.T4.b (`.planning/trajectory/02-fuzzing-post-pr13.md`
+/// Phase 1, trust-boundary fuzz target #9). The trust boundary is the point
+/// at which the host accepts bytes that crossed the WIT marshaller from the
+/// guest WASM module and invokes serde to materialize them into typed Rust
+/// structs. A fault here (panic, abort, UB) lets a malicious guest crash the
+/// host process, so the contract is that every byte sequence either
+/// deserializes to a well-formed value or surfaces as
+/// `Err(serde_json::Error)` (good).
+///
+/// # Chosen ABI surfaces
+///
+/// Two serde-derived guard ABI types from [`crate::abi`] are exercised:
+///
+/// 1. [`GuardRequest`](crate::abi::GuardRequest) - the host-to-guest
+///    WIT-marshalled request envelope. The host serializes it via
+///    `serde_json::to_string` and writes the bytes into guest linear memory
+///    before calling `evaluate`. T4.b exercises the symmetric inverse
+///    (`from_slice`) so any future code path that round-trips a
+///    guest-supplied request body through serde is fuzz-hardened in advance,
+///    and so the derived `Deserialize` impl itself is panic-tested against
+///    arbitrary input. The struct's nested `serde_json::Value` field
+///    (`arguments`) gives libFuzzer's mutators a wide deserialization
+///    surface to explore.
+/// 2. [`GuestDenyResponse`](crate::abi::GuestDenyResponse) - the
+///    canonical guest-to-host wire payload. This is the actual deser site
+///    at `crate::runtime::wasmtime_backend::WasmtimeBackend::read_structured_deny_reason`
+///    (runtime.rs `serde_json::from_slice::<GuestDenyResponse>(&buf)`),
+///    which materializes bytes the guest writes via the `chio_deny_reason`
+///    export into a `String` reason field. Hardening this path closes the
+///    loop on the documented host-call boundary contract.
+///
+/// [`GuardVerdict`](crate::abi::GuardVerdict) is intentionally NOT fuzzed:
+/// it does not derive `Deserialize` because the verdict crosses the WIT
+/// boundary as an `i32` return code (`VERDICT_ALLOW` / `VERDICT_DENY`), not
+/// as a serialized struct. Adding `Deserialize` to fuzz it would widen the
+/// production ABI for no defensive gain.
+///
+/// # Coverage shape
+///
+/// The same `data` byte slice is fed unchanged into both serde surfaces on
+/// every iteration. Errors at every step are silently consumed so libFuzzer
+/// only flags genuine panics or aborts in the serde / serde_json /
+/// serde_derive chain (or in the nested `serde_json::Value` deserializer).
+/// The `Ok(_)` branch is rare but possible (canonical-shape seeds in the
+/// corpus reach it on purpose); it is discarded because the post-condition
+/// we care about is "no panic", not "value validates".
+pub fn fuzz_wit_host_call_boundary(data: &[u8]) {
+    use crate::abi::{GuardRequest, GuestDenyResponse};
+
+    // Surface 1: GuardRequest -- host-to-guest WIT request envelope.
+    let _ = serde_json::from_slice::<GuardRequest>(data);
+
+    // Surface 2: GuestDenyResponse -- the canonical guest-to-host
+    // host-call boundary deser site (see runtime.rs read_structured_deny_reason).
+    let _ = serde_json::from_slice::<GuestDenyResponse>(data);
 }
