@@ -123,6 +123,10 @@ rust_public_entrypoints = [
     "chio-policy",
 ]
 
+[workspace.metadata.cargo-vet]
+# M09 supply-chain audit metadata; later tickets layer on upstream
+# imports (T2), per-crate certifications (T3), and CI lanes (T8/T9).
+
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
