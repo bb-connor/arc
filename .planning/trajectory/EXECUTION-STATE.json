@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T06:40:00Z",
+  "last_checkpoint_at": "2026-04-26T06:55:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -11,12 +11,12 @@
   },
   "milestones": {
     "M01": {
-      "status": "P3 mostly merged (T1-T4 merged; T5+T6 in flight)",
-      "phase": "P3_in_progress",
+      "status": "P3 COMPLETE (T1-T5 merged; T6 verified-no-changes)",
+      "phase": "P3_complete_pending_t6_archive",
       "p0_status": "merged",
       "p1_status": "all 9 merged",
       "p2_status": "all 8 merged",
-      "p3_status": "T1-T4 merged; T5+T6 executors running"
+      "p3_status": "T1-T5 merged; T6 verified clean (no diff; M01.P3.T2 shim covers all 17 adapters)"
     },
     "M02": {
       "status": "blocked",
@@ -865,6 +865,32 @@
         "result": "PASS",
         "covered_symbols": "5 -> 10",
         "lanes": "[lanes.pr] 11 harnesses + [lanes.nightly_only] 3 harnesses (heuristic; M03.P2.T6 will re-measure)"
+      }
+    },
+    "M01.P3.T5": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 70,
+      "merged_sha": "3f756e0816d6fc27f3da9aa848ea9894c0754e3b",
+      "branch": "wave/W1/m01/p3.t5-codegen-check-and-ci",
+      "merged_at": "2026-04-26T06:50:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "make codegen-check + actionlint clean; all 4 langs in sync"
+      }
+    },
+    "M01.P3.T6": {
+      "status": "verified-no-changes",
+      "attempts": 1,
+      "pr_number": null,
+      "merged_sha": null,
+      "branch": "wave/W1/m01/p3.t6-python-adapter-regression (deleted; no diff)",
+      "verified_at": "2026-04-26T06:55:00Z",
+      "divergence_checks": {
+        "result": "VERIFIED-CLEAN",
+        "gate": "per-package uv sync + pytest across 17 adapters; 16/17 pass clean (511 passed total); 1 chio-streaming failure is pre-existing (confluent-kafka import) unrelated to codegen regen",
+        "diff": "0 files, 0 insertions, 0 deletions; chio_sdk.models re-export shim from M01.P3.T2 covers entire adapter call-site surface verbatim",
+        "gate_string_deviation": "ticket spec `uv sync --workspace` is invalid (uv 0.8.x removed --workspace; only --all-packages exists). Parent backbay/pyproject.toml workspace does not include standalone/arc/sdks/python/* as members anyway. Per-package iteration is the correct gate."
       }
     }
   },
