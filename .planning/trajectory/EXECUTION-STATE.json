@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:30:40.617Z",
+  "last_checkpoint_at": "2026-04-26T03:36:12.829Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -11,10 +11,11 @@
   },
   "milestones": {
     "M01": {
-      "status": "in_progress",
-      "phase": "P1_complete",
+      "status": "P1+P2 complete; remaining P3-P5 are wave-2",
+      "phase": "P2_complete",
       "p0_status": "merged",
-      "p1_status": "all 9 merged"
+      "p1_status": "all 9 merged",
+      "p2_status": "all 8 merged"
     },
     "M02": {
       "status": "blocked",
@@ -298,14 +299,15 @@
       }
     },
     "M01.P2.T8": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 52,
+      "merged_sha": "3658d96fa4bdd616fc89992112900d18a55a6c0d",
+      "branch": "wave/W1/m01/p2.t8-vectors-schema-pair",
+      "merged_at": "2026-04-26T03:36:12.829Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M02.P0.T1": {
       "status": "pending",
