@@ -23,6 +23,9 @@ base64 = { workspace = true }
 rand_core = { workspace = true, features = ["getrandom"] }
 sha2 = { workspace = true }
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
