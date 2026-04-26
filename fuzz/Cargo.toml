@@ -1,0 +1,47 @@
+# owned-by: M02 (fuzz lane); current entries layered by M09.P3.T5.
+#
+# Standalone Cargo workspace so libFuzzer / nightly requirements do not
+# leak into the main stable/MSRV workspace lanes. M02's PR #13 layers the
+# seven baseline targets enumerated in `fuzz/target-map.toml` on top of
+# this file; later tickets layer their target-specific `[[bin]]` entries
+# alongside their `fuzz_target!` definitions.
+#
+# Reference: `.planning/trajectory/02-fuzzing-post-pr13.md`
+# (continuous fuzzing path) and
+# `.planning/trajectory/09-supply-chain-attestation.md`
+# Phase 3 task 5 (this entry: `attest_verify`).
+
+[package]
+name = "chio-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+# An empty `[workspace]` stanza marks this crate as the root of its own
+# Cargo workspace. Without it, `cargo +nightly fuzz build` would attempt
+# to fold the fuzz crate into the parent workspace at `../Cargo.toml`,
+# which forbids `unwrap`/`expect` workspace-wide and pins a stable MSRV
+# that libFuzzer's nightly-only runtime cannot satisfy.
+[workspace]
+
+[dependencies]
+chio-attest-verify = { path = "../crates/chio-attest-verify" }
+libfuzzer-sys = "0.4"
+
+# `unwrap_used`/`expect_used` denied so fuzz targets cannot mask panics
+# behind a hidden `.unwrap()`. Targets must use `if let Ok(_) = ...` or
+# `match` to consume `Result` values from the trust-boundary surface.
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[[bin]]
+name = "attest_verify"
+path = "fuzz_targets/attest_verify.rs"
+test = false
+doc = false
+bench = false
