@@ -77,9 +77,21 @@ scripts/install-orchestrator-tools.sh        @bb-connor
 scripts/check-fuzz-budget.sh                 @bb-connor
 scripts/classify-trust-diff.sh               @bb-connor
 
-# ---------- M02 fuzz/regression-test deletion gate ----------
-# Personal-handle review for accidental regression-test deletion; matches
-# 02-fuzzing-post-pr13.md P4.T4 explicitly.
+# ---------- M02 P4.T4 fuzz/regression-test deletion gate ----------
+# Personal-handle review for accidental regression-test deletion or fuzz
+# corpus tampering. Matches 02-fuzzing-post-pr13.md Phase 4 P4.T4 (CODEOWNERS
+# gate paragraph) and ticket .planning/trajectory/tickets/M02/P4.yml#M02.P4.T4.
+#
+# Gate contract (from ticket gate_check):
+#   grep -qE '^/?crates/\*/tests/regression_\*\.rs.*@bb-connor' CODEOWNERS
+#   grep -qE '^/?tests/regression_\*\.rs.*@bb-connor'           CODEOWNERS
+#   grep -qE '^/?fuzz/corpus/.*@bb-connor'                      CODEOWNERS
+#
+# The regression_*.rs patterns cover both per-crate test dirs (where
+# scripts/promote_fuzz_seed.sh writes M02.P4.T2 outputs) and the legacy
+# repo-root tests/ dir. The fuzz/corpus/ entry duplicates the broader
+# fuzz/corpus/** rule above intentionally so the deletion gate's intent
+# is explicit at this point of the file.
 crates/*/tests/regression_*.rs               @bb-connor
 tests/regression_*.rs                        @bb-connor
 fuzz/corpus/**                               @bb-connor
