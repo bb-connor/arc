@@ -805,3 +805,187 @@ fn verify_receipt_roundtrip() {
     assert!(model_verify(signer_id, message_class, resigned));
     assert_eq!(honest, resigned);
 }
+
+// NOTE (M03.P2.T4): Budget overflow never partial-commits. The runtime
+// branch in `crates/chio-kernel/src/budget_store.rs` (around line 1035 at
+// pin time) computes `current_total.checked_add(cost_units).ok_or_else(
+// || BudgetStoreError::Overflow(...))?` BEFORE any mutation of
+// `self.counts` / `entry.invocation_count` / `entry.total_cost_exposed`,
+// and returns `Err(...)` via `?`. The same pattern repeats for
+// `total_cost_exposed.checked_add(cost_units)` a few lines below. The
+// algebraic content of "no partial commit on overflow" therefore reduces
+// to two pure properties of a checked, cap-bounded additive update:
+//
+//   (a) if `current.checked_add(delta).is_none()`, the operation MUST
+//       fail closed and the post-state MUST equal the pre-state;
+//   (b) on success, the post-state MUST satisfy `new_state <= cap`.
+//
+// We model the operation as a free function over `u64` axes and lift the
+// "state" to a single scalar (the same shape the runtime exposes
+// per-row: `total_cost_exposed`, `total_cost_realized_spend`,
+// `invocation_count`). The function returns `Result<u64, BudgetError>`
+// without ever mutating its caller's state, which is the strongest
+// expression of "no partial commit": the only way the caller's state
+// changes is by pattern-matching `Ok(new)` and assigning it.
+//
+// Bound axes: matching the rest of this module, every "small" axis is a
+// u8 promoted to u64 (so `current + delta` stays well below u64::MAX in
+// the bulk of the search space). The overflow arm is *vacuous* under
+// pure u8 bounds (max sum 510), so we add a second axis that pins
+// `current = u64::MAX - tail` for a small symbolic `tail`, and lets
+// `delta` range freely as `u64::from(any::<u8>())`. This forces Kani
+// to enumerate concrete (current, delta) pairs that DO overflow, so
+// branch (a) is non-vacuous. No new constants are introduced beyond the
+// existing `u8 -> u64` promotion idiom.
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ModelBudgetError {
+    Overflow,
+    CapExceeded,
+}
+
+fn model_budget_checked_add(current: u64, delta: u64, cap: u64) -> Result<u64, ModelBudgetError> {
+    // Mirrors the runtime: `checked_add` first (overflow is fail-closed
+    // BEFORE any cap comparison), then the cap check. The order matters:
+    // a saturating add followed by a cap check would silently clamp at
+    // u64::MAX, which the runtime explicitly refuses to do.
+    match current.checked_add(delta) {
+        None => Err(ModelBudgetError::Overflow),
+        Some(new) if new > cap => Err(ModelBudgetError::CapExceeded),
+        Some(new) => Ok(new),
+    }
+}
+
+fn model_budget_apply(state: u64, delta: u64, cap: u64) -> (Result<u64, ModelBudgetError>, u64) {
+    // Lift the pure function to a state-update shape. The caller's state
+    // only ever changes via `Ok(new) => new`; every error arm leaves
+    // state intact. This is the literal "no partial commit" semantics
+    // the runtime relies on by returning `Err(...)?` before any
+    // `self.counts` mutation.
+    match model_budget_checked_add(state, delta, cap) {
+        Ok(new) => (Ok(new), new),
+        Err(err) => (Err(err), state),
+    }
+}
+
+#[kani::proof]
+fn verify_budget_checked_add_no_overflow() {
+    // Phase 1: bounded axes. Every component is a u8 promoted to u64,
+    // matching the existing module convention. This phase witnesses
+    // the cap-arm and the success-arm densely (full 256^3 enumeration
+    // of small budgets); the overflow arm is unreachable here because
+    // 255 + 255 = 510 < u64::MAX.
+    let current = u64::from(kani::any::<u8>());
+    let delta = u64::from(kani::any::<u8>());
+    let cap = u64::from(kani::any::<u8>());
+
+    let (result, post) = model_budget_apply(current, delta, cap);
+    match result {
+        Ok(new) => {
+            // (b) on success, the post-state never exceeds the cap.
+            assert!(new <= cap);
+            // The post-state IS the new value (functional update).
+            assert_eq!(post, new);
+            // The success arm only fires when no overflow occurred and
+            // the sum is within the cap. Cross-check both witnesses to
+            // pin the predicate's branch structure.
+            assert!(current.checked_add(delta).is_some());
+            assert_eq!(current.checked_add(delta), Some(new));
+        }
+        Err(ModelBudgetError::CapExceeded) => {
+            // (a) cap-exceeded is fail-closed: post-state equals
+            // pre-state. The runtime's `if new_total > max_total {
+            // allowed = false; }` branch denies admission but does
+            // not mutate the count rows; this is the same algebra.
+            assert_eq!(post, current);
+            // Cap-exceeded implies the addition itself succeeded
+            // (otherwise we would be in the Overflow arm). Pin the
+            // dispatch order so a future regression that flipped the
+            // arms is caught directly.
+            let sum = current
+                .checked_add(delta)
+                .unwrap_or_else(|| unreachable!("cap-exceeded arm only fires on Some(_)"));
+            assert!(sum > cap);
+        }
+        Err(ModelBudgetError::Overflow) => {
+            // (a) Even though u8-bounded `current + delta` (max 510)
+            // cannot overflow u64::MAX, we still assert the
+            // load-bearing property here so a future widening of the
+            // bounds that DOES expose overflow in Phase 1 is caught
+            // by the same invariant rather than silently pruned.
+            assert_eq!(post, current);
+            assert!(current.checked_add(delta).is_none());
+        }
+    }
+
+    // Phase 2: dedicated overflow witness. Pin `current` to the top of
+    // the u64 range (`u64::MAX - tail` for a small symbolic `tail`) so
+    // the overflow arm of `checked_add` is non-vacuous. `delta` ranges
+    // freely as a u8-promoted u64; whenever `delta > tail`, the
+    // addition overflows and the operation MUST fail closed without
+    // mutating the state. Whenever `delta <= tail`, the addition
+    // succeeds and either lands within the cap or trips the
+    // cap-exceeded arm; both must leave the post-state untouched on
+    // failure and equal to the new sum on success.
+    let tail = u64::from(kani::any::<u8>());
+    let overflow_current = u64::MAX - tail;
+    let overflow_delta = u64::from(kani::any::<u8>());
+    // Cap is symbolic but bounded to a u8-promoted u64 to match the
+    // rest of the module; this keeps the cap-arm non-vacuous while
+    // still letting the overflow arm fire (cap is irrelevant once
+    // checked_add returns None, by the dispatch order proven above).
+    let overflow_cap = u64::from(kani::any::<u8>());
+
+    let (overflow_result, overflow_post) =
+        model_budget_apply(overflow_current, overflow_delta, overflow_cap);
+    match overflow_result {
+        Ok(new) => {
+            // Success path under high-`current`: must still satisfy
+            // both invariants.
+            assert!(new <= overflow_cap);
+            assert_eq!(overflow_post, new);
+            // Success implies no overflow.
+            assert!(overflow_delta <= tail);
+        }
+        Err(ModelBudgetError::Overflow) => {
+            // (a) The load-bearing arm: overflow MUST leave the
+            // pre-state untouched. This is the property the ticket
+            // exists to prove.
+            assert_eq!(overflow_post, overflow_current);
+            // Witness: overflow only fires when delta exceeds the
+            // remaining headroom (`u64::MAX - current = tail`).
+            assert!(overflow_delta > tail);
+            // The post-state never exceeds u64::MAX, trivially, but
+            // also: the "state" coordinate the runtime would have
+            // committed (`new_total`) was never computed, so any
+            // downstream invariant of the form `state <= cap` still
+            // holds for the unchanged pre-state IFF it held before.
+            // We pin that conditional preservation so a regression
+            // that "patched" overflow by saturating at u64::MAX would
+            // be caught here.
+            assert_eq!(overflow_post, overflow_current);
+        }
+        Err(ModelBudgetError::CapExceeded) => {
+            // Cap-exceeded under high-`current`: the addition fit in
+            // u64 (so `delta <= tail`) but the sum overshot the cap.
+            assert_eq!(overflow_post, overflow_current);
+            assert!(overflow_delta <= tail);
+            let sum = overflow_current
+                .checked_add(overflow_delta)
+                .unwrap_or_else(|| unreachable!("cap-exceeded arm only fires on Some(_)"));
+            assert!(sum > overflow_cap);
+        }
+    }
+
+    // (c) Idempotence on failure: applying the same overflowing delta
+    // twice in a row to the (untouched) pre-state still yields the
+    // same Err and the same untouched state. This is the algebraic
+    // restatement of "no partial commit": the operation is a partial
+    // function whose failure set is closed under repetition.
+    let (retry_result, retry_post) =
+        model_budget_apply(overflow_post, overflow_delta, overflow_cap);
+    if matches!(overflow_result, Err(_)) {
+        assert_eq!(retry_post, overflow_post);
+        assert_eq!(retry_result.is_err(), overflow_result.is_err());
+    }
+}
