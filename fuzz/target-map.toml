@@ -1,0 +1,94 @@
+# fuzz/target-map.toml - PR-#13 fuzz target inventory.
+#
+# Owned by M02. Lists the seven libFuzzer targets that PR #13 lands as the
+# baseline fuzzing surface. Each entry maps a target binary name to its
+# source-path triggers; the cflite_pr.yml workflow uses changed-target
+# sampling against this map to decide which targets a PR must run.
+#
+# The full M02 trajectory adds eleven more targets in P1; those entries
+# land alongside their fuzz_target! definitions, not pre-emptively here.
+#
+# Schema:
+#   [targets.<name>]
+#   crate    = workspace member that owns the target
+#   path     = path to the fuzz_target! source file under fuzz/fuzz_targets
+#   triggers = source-path globs that, if changed, require this target to
+#              run on the PR
+#   seeds    = directory of seed corpora under fuzz/corpora (M01 vector
+#              graduates land here)
+#   notes    = optional human-readable rationale
+
+[targets.canonical_json_roundtrip]
+crate    = "chio-canonical-json"
+path     = "fuzz/fuzz_targets/canonical_json_roundtrip.rs"
+triggers = [
+    "crates/chio-canonical-json/**",
+    "spec/schemas/canonical/**",
+    "tests/bindings/vectors/canonical/**",
+]
+seeds    = "fuzz/corpora/canonical_json_roundtrip"
+notes    = "Round-trips canonical JSON; catches sort drift and float canonicalization regressions."
+
+[targets.manifest_decode]
+crate    = "chio-core-types"
+path     = "fuzz/fuzz_targets/manifest_decode.rs"
+triggers = [
+    "crates/chio-core-types/src/manifest*.rs",
+    "spec/schemas/manifest/**",
+    "tests/bindings/vectors/manifest/**",
+]
+seeds    = "fuzz/corpora/manifest_decode"
+notes    = "Decodes wire-shape manifests; M01 P2 vector corpus seeds this."
+
+[targets.receipt_decode]
+crate    = "chio-core-types"
+path     = "fuzz/fuzz_targets/receipt_decode.rs"
+triggers = [
+    "crates/chio-core-types/src/receipt*.rs",
+    "spec/schemas/receipt/**",
+    "tests/bindings/vectors/receipt/**",
+]
+seeds    = "fuzz/corpora/receipt_decode"
+notes    = "Receipt envelope decode; downstream of M01 receipt vectors."
+
+[targets.capability_decode]
+crate    = "chio-core-types"
+path     = "fuzz/fuzz_targets/capability_decode.rs"
+triggers = [
+    "crates/chio-core-types/src/capability*.rs",
+    "spec/schemas/capability/**",
+    "tests/bindings/vectors/capability/**",
+]
+seeds    = "fuzz/corpora/capability_decode"
+notes    = "Capability decode; intersects M03 capability algebra invariants."
+
+[targets.scope_decode]
+crate    = "chio-core-types"
+path     = "fuzz/fuzz_targets/scope_decode.rs"
+triggers = [
+    "crates/chio-core-types/src/scope*.rs",
+    "spec/schemas/scope/**",
+]
+seeds    = "fuzz/corpora/scope_decode"
+notes    = "Scope decode; M03 invariants depend on scope-shape correctness."
+
+[targets.policy_decision_decode]
+crate    = "chio-policy"
+path     = "fuzz/fuzz_targets/policy_decision_decode.rs"
+triggers = [
+    "crates/chio-policy/**",
+    "spec/schemas/policy/**",
+]
+seeds    = "fuzz/corpora/policy_decision_decode"
+notes    = "Policy decision-result decode; trust-boundary."
+
+[targets.signing_envelope_decode]
+crate    = "chio-credentials"
+path     = "fuzz/fuzz_targets/signing_envelope_decode.rs"
+triggers = [
+    "crates/chio-credentials/**",
+    "spec/schemas/signing/**",
+    "tests/bindings/vectors/signing/**",
+]
+seeds    = "fuzz/corpora/signing_envelope_decode"
+notes    = "Signing envelope decode; trust-boundary; constant-time compare assertions live here."
