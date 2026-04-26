@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:26:05.277Z",
+  "last_checkpoint_at": "2026-04-26T02:28:06.191Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -567,14 +567,16 @@
       }
     },
     "M09.P1.T7": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-abb79b858a2227a98",
+      "branch": "wave/W1/m09/p1.t7-license-exceptions-audit",
+      "pr_number": 35,
+      "merged_at": "2026-04-26T02:28:06.191Z",
+      "merged_sha": "f012a63540f755cd573f7f58f61512955bf357c7",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P1.T8": {
       "status": "pending",
