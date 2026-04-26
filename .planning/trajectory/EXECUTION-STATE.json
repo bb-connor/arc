@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:31:11.357Z",
+  "last_checkpoint_at": "2026-04-26T02:31:45.974Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -12,10 +12,9 @@
   "milestones": {
     "M01": {
       "status": "in_progress",
-      "phase": "P1",
-      "owner_branch": null,
-      "scheduled_in_wave": "1a",
-      "p0_status": "merged"
+      "phase": "P1_complete",
+      "p0_status": "merged",
+      "p1_status": "all 9 merged"
     },
     "M02": {
       "status": "blocked",
@@ -210,14 +209,15 @@
       }
     },
     "M01.P1.T7": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 38,
+      "merged_sha": "bc6d298a8492c3d7a1ec0113712a16b91d5b91d1",
+      "branch": "wave/W1/m01/p1.t7-deprecation-headers-and-readme",
+      "merged_at": "2026-04-26T02:31:45.974Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P2.T1": {
       "status": "pending",
