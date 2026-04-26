@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:30:17.131Z",
+  "last_checkpoint_at": "2026-04-26T02:31:11.357Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -483,14 +483,15 @@
       }
     },
     "M09.P1.T10": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 37,
+      "merged_sha": "928b7d4a56bf844f5ce5846408919d3c829b7a2b",
+      "branch": "wave/W1/m09/p1.t10-supply-chain-readme",
+      "merged_at": "2026-04-26T02:31:11.357Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P1.T11": {
       "status": "pending",
