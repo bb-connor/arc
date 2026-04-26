@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:30:53.155Z",
+  "last_checkpoint_at": "2026-04-26T01:31:46.781Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -383,14 +383,17 @@
       }
     },
     "M03.P1.T5": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a3364a5e58305e264",
+      "branch": "wave/W1/m03/p1.t5-policy-evaluate-invariants",
+      "pr_number": 21,
+      "merged_at": "2026-04-26T01:31:46.781Z",
+      "merged_sha": "607806dc4ab89c6bf23ec8fe8ce5bbb857c400f9",
+      "divergence_checks": {
+        "result": "PASS",
+        "test_pass": 4
+      }
     },
     "M03.P1.T6": {
       "status": "pending",
