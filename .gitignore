@@ -79,6 +79,12 @@ crates/chio-cli/dashboard/dist/
 crates/chio-cli/dashboard/node_modules/
 tests/conformance/results/generated/
 tests/conformance/reports/generated/
+
+# sdks/typescript/scripts is the codegen tool pin install root used by
+# `cargo xtask codegen --lang ts`. The package-lock.json is checked in
+# (see xtask/codegen-tools.lock.toml [typescript] block); node_modules is
+# regenerated via `npm ci` inside the script directory.
+sdks/typescript/scripts/node_modules/
 *.pyc
 *.pyo
 *.pyd
