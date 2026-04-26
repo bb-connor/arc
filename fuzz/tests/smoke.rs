@@ -79,3 +79,9 @@ fn anchor_bundle_verify_smoke() {
     use chio_anchor::fuzz::fuzz_anchor_bundle_verify;
     each_seed("anchor_bundle_verify", fuzz_anchor_bundle_verify);
 }
+
+#[test]
+fn mcp_envelope_decode_smoke() {
+    use chio_mcp_edge::fuzz::fuzz_mcp_envelope_decode;
+    each_seed("mcp_envelope_decode", fuzz_mcp_envelope_decode);
+}
