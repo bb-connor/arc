@@ -172,6 +172,14 @@ jobs:
             sudo apt-get install -y chromium-driver chromium-browser
           fi
 
+      # M03.P1.T7: gate the eighteen named capability-algebra invariants.
+      # Source of truth for the name set is in the script itself, mirroring
+      # .planning/trajectory/03-capability-algebra-properties.md Phase 1.
+      # A silent rename of any invariant fn fails this step before the
+      # workspace lane builds.
+      - name: Proptest invariant coverage
+        run: ./scripts/check-proptest-coverage.sh
+
       - name: Workspace CI lane
         env:
           CARGO_BUILD_JOBS: "1"
