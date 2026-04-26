@@ -385,10 +385,10 @@ jobs:
             --config=formal/tla/MCRevocationPropagation.cfg \
             formal/tla/RevocationPropagation.tla
 
-  # M03.P2.T6: PR-tier Kani lane for the public chio-kernel-core
-  # harnesses listed under `[lanes.pr]` in
-  # formal/rust-verification/kani-public-harnesses.toml. Each harness
-  # is invoked with `cargo kani -p chio-kernel-core --lib --harness <h>
+  # M03.P2.T6 + M03.P2.T7: PR-tier Kani lane for the public
+  # chio-kernel-core harnesses listed under `[lanes.pr]` in
+  # formal/rust-verification/kani-public-harnesses.toml. Each harness is
+  # invoked with `cargo kani -p chio-kernel-core --lib --harness <h>
   # --default-unwind 8 --no-unwinding-checks`, mirroring the per-harness
   # contract that scripts/check-kani-public-core.sh enforces locally.
   # T6 wall-clocked all fourteen harnesses (~134s total on Apple
@@ -396,9 +396,16 @@ jobs:
   # by the data, so the full sweep now lives in `lanes.pr` and
   # `lanes.nightly_only` is empty. The nightly job (kani-public-nightly
   # in nightly.yml) runs the union of both lanes and serves as a backstop
-  # if a future harness pushes past the 6-minute PR budget. M03.P2.T7
-  # will additionally scope the PR run to changed harnesses while
-  # preserving the full sweep on `main`.
+  # if a future harness pushes past the 6-minute PR budget.
+  #
+  # T7 narrows the per-PR sweep to only those `lanes.pr` harnesses whose
+  # source line was changed in the PR diff via
+  # scripts/kani-changed-harnesses.sh. Pushes to `main` keep the full
+  # sweep (this job runs the full lane on `push`), and the nightly lane
+  # is unchanged. The script falls back to running every harness in
+  # `lanes.pr` if the diff base cannot be resolved or if any
+  # proof-relevant file outside the harness source has changed, so the
+  # PR signal is never silently weakened.
   kani-public-pr:
     name: kani-public-pr (lanes.pr harnesses)
     # owner: M03
@@ -409,6 +416,12 @@ jobs:
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so scripts/kani-changed-harnesses.sh can resolve
+          # the merge-base of HEAD with the PR base SHA. A shallow clone
+          # would force the script's fallback (full lane sweep), which is
+          # safe but defeats the point of the narrowing.
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         run: |
@@ -433,14 +446,42 @@ jobs:
           cargo kani setup
           cargo kani --version
 
+      - name: Resolve Kani diff base
+        id: kani-base
+        shell: bash
+        env:
+          GH_EVENT: ${{ github.event_name }}
+          GH_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GH_EVENT" == "pull_request" && -n "$GH_PR_BASE_SHA" ]]; then
+            echo "base=$GH_PR_BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "narrow=true" >> "$GITHUB_OUTPUT"
+            echo "Resolved Kani diff base for PR: $GH_PR_BASE_SHA"
+          else
+            # Push to main (or any non-PR trigger): preserve the full
+            # sweep contract from M03.P2.T6 by leaving narrow=false.
+            echo "base=" >> "$GITHUB_OUTPUT"
+            echo "narrow=false" >> "$GITHUB_OUTPUT"
+            echo "Non-PR event ($GH_EVENT); running full lanes.pr sweep."
+          fi
+
       - name: Run lanes.pr Kani harnesses
         shell: bash
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          KANI_DIFF_BASE: ${{ steps.kani-base.outputs.base }}
+          KANI_NARROW: ${{ steps.kani-base.outputs.narrow }}
         run: |
           set -euo pipefail
-          mapfile -t HARNESSES < <(python3 - <<'PY'
+          if [[ "$KANI_NARROW" == "true" ]]; then
+            echo "::group::kani-changed-harnesses.sh --dry-run (PR narrowing)"
+            bash scripts/kani-changed-harnesses.sh --dry-run
+            echo "::endgroup::"
+            HARNESSES_RAW=$(bash scripts/kani-changed-harnesses.sh)
+          else
+            HARNESSES_RAW=$(python3 - <<'PY'
           from pathlib import Path
           try:
               import tomllib
@@ -453,14 +494,27 @@ jobs:
               print(h)
           PY
           )
+          fi
+
+          HARNESSES=()
+          while IFS= read -r h; do
+            [[ -z "$h" ]] && continue
+            HARNESSES+=("$h")
+          done <<< "$HARNESSES_RAW"
+
           if [[ "${#HARNESSES[@]}" -eq 0 ]]; then
+            if [[ "$KANI_NARROW" == "true" ]]; then
+              echo "kani-changed-harnesses.sh emitted no harnesses; PR did not touch lanes.pr surface. Skipping sweep."
+              exit 0
+            fi
             echo "lanes.pr is empty in kani-public-harnesses.toml" >&2
             exit 1
           fi
+
           for harness in "${HARNESSES[@]}"; do
             echo "::group::cargo kani --harness ${harness}"
             cargo kani -p chio-kernel-core --lib --harness "${harness}" \
               --default-unwind 8 --no-unwinding-checks
             echo "::endgroup::"
           done
-          echo "lanes.pr Kani sweep passed (${#HARNESSES[@]} harnesses)"
+          echo "lanes.pr Kani sweep passed (${#HARNESSES[@]} harnesses, narrow=${KANI_NARROW})"
