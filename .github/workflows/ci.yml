@@ -518,3 +518,28 @@ jobs:
             echo "::endgroup::"
           done
           echo "lanes.pr Kani sweep passed (${#HARNESSES[@]} harnesses, narrow=${KANI_NARROW})"
+
+  # M02.P4.T3: regression-test deletion guard.
+  #
+  # Detects deletion of fuzz-promoted regression tests under
+  # tests/regression_*.rs or crates/*/tests/regression_*.rs between the
+  # PR base and HEAD. Fails CI when such a deletion has no paired issue
+  # link (closes #N / fixes #N / tracks #N or a github.com URL) in the
+  # PR body or commit-message range. Source-doc anchor:
+  # .planning/trajectory/02-fuzzing-post-pr13.md Phase 4 P4.T3 +
+  # Crash-triage automation > CODEOWNERS gate paragraph.
+  check-regression-tests:
+    name: check-regression-tests
+    # owner: M02
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 so the guard can git-diff between BASE..HEAD.
+          fetch-depth: 0
+      - name: Run regression-test deletion guard
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/check-regression-tests.sh
