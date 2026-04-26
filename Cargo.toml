@@ -97,6 +97,9 @@ members = [
     # Tests
     "formal/diff-tests",
     "tests/e2e",
+    #
+    # Tooling
+    "xtask",
 ]
 
 [workspace.package]
