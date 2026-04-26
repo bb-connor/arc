@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:36:12.829Z",
-  "current_wave": "1a",
+  "last_checkpoint_at": "2026-04-26T03:43:30.953Z",
+  "current_wave": "1b",
   "halt": {
     "halted": false,
     "reason": null,
@@ -652,6 +652,17 @@
       "merged_sha": "2cf14f7bb0b70385765f5da3db239bfce3911fd6",
       "branch": "wave/W1/m09/p2.t4-tuf-rebake",
       "merged_at": "2026-04-26T02:36:48.660Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
+    },
+    "M03.P3.T1": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 53,
+      "merged_sha": "8fae51619842043ce505d1a1ccb9db5c07e075b4",
+      "branch": "wave/W1/m03/p3.t1-apalache-installer",
+      "merged_at": "2026-04-26T03:43:30.953Z",
       "divergence_checks": {
         "result": "PASS"
       }
