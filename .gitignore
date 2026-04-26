@@ -2,6 +2,12 @@
 /target/
 **/*.rs.bk
 
+# Orchestrator runtime state
+.worktrees/
+.planning/trajectory/*.bak
+.planning/trajectory/tool-versions.lock
+.planning/trajectory/EXECUTION-LOG.[0-9]*.ndjson
+
 # Editor files
 *.swp
 *.swo

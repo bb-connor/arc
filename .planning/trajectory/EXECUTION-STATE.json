@@ -1,0 +1,99 @@
+{
+  "schema_version": "1",
+  "started_at": "2026-04-25T23:20:18.372Z",
+  "last_checkpoint_at": "2026-04-26T00:22:28.898Z",
+  "current_wave": 0,
+  "halt": {
+    "halted": false,
+    "reason": null,
+    "trigger_event_id": null,
+    "halted_at": null
+  },
+  "milestones": {
+    "M01": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M02": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M03": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M04": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M05": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M06": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M07": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M08": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M09": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    },
+    "M10": {
+      "status": "pending",
+      "phase": null,
+      "owner_branch": null
+    }
+  },
+  "tickets": {},
+  "wave_gate_history": [],
+  "pr_state_cache": {
+    "13": {
+      "state": "OPEN",
+      "mergeStateStatus": "UNSTABLE",
+      "headRefName": "codex/fuzz-production-hardening",
+      "fetched_at": "2026-04-26T00:22:28.898Z"
+    }
+  },
+  "preflight": {
+    "checklist_path": ".planning/trajectory/EXECUTION-BOARD.md",
+    "checklist_section": "Pre-flight checklist",
+    "user_blockers": [
+      "PR #13 merge",
+      "PR #13 shepherd named in decisions.yml (single-owner: implicitly @bb-connor; an amendment can lock the row to status=locked, decided_by=user)",
+      "GitHub branch ruleset on main (path restriction + m05-freeze-guard required check) -- safety net; needed before M05 P1 starts",
+      "Acceptance of 2,000 GHA runner-min/month fuzz cap (already locked in decisions.yml; user may attest separately if desired)"
+    ],
+    "wave0_artifacts": [
+      ".planning/trajectory/OWNERS.toml (committed; team handles collapsed to @bb-connor)",
+      "CODEOWNERS (committed; regenerated for single-owner trajectory)",
+      ".planning/trajectory/freezes.yml (committed; review_team values flipped to @bb-connor)",
+      ".planning/trajectory/decisions.yml (committed; npm-namespace row unchanged; m02-pr13-shepherd row still status=open)",
+      ".planning/trajectory/tickets/schema.json (committed; review_required regex now permits personal handles)",
+      ".planning/trajectory/tickets/manifest.yml (committed; empty seed)",
+      ".planning/trajectory/tickets/M{nn}/P{n}.yml (Wave 1a phases pending authoring)",
+      "scripts/install-orchestrator-tools.sh (committed)",
+      "scripts/check-fuzz-budget.sh (Wave 0 deliverable; not yet committed)",
+      "scripts/classify-trust-diff.sh (Wave 0 deliverable; not yet committed)",
+      "scripts/regen-codeowners.sh (Wave 0 deliverable; not yet committed)",
+      "fuzz/target-map.toml (Wave 0 deliverable; not yet committed)",
+      "GitHub branch ruleset on main (configured externally; user prereq)"
+    ]
+  }
+}

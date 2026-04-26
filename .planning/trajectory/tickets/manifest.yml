@@ -1,0 +1,18 @@
+# GENERATED from per-phase files under .planning/trajectory/tickets/M{nn}/P{n}.yml
+# Do not hand-edit. Regenerate with `cargo xtask trajectory regen-manifest`
+# (Wave 0 deliverable). CI validates manifest.yml against schema.json on
+# every PR.
+#
+# Wave-0 seed state: per-phase ticket files are authored by the milestone
+# owners as part of the Wave 0 preflight PR. Until those files land, this
+# manifest is empty by design. Wave 1a CANNOT start scheduling until the
+# Wave 1a per-phase tickets (M01/P1.yml, M01/P2.yml, M03/P1.yml,
+# M09/P1.yml, M09/P2.yml plus the four Wave-opener lock-bump tickets) are
+# present and pass schema validation.
+#
+# To author the Wave 1a tickets:
+#   1. Read the milestone doc's "Phase N task breakdown (atomic)" section.
+#   2. Translate each (P{n}.T{k}) entry into a ticket per schema.json.
+#   3. Commit under .planning/trajectory/tickets/M{nn}/P{n}.yml.
+#   4. Regenerate this manifest.
+[]
