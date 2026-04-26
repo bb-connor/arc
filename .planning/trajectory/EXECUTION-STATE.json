@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T04:14:00Z",
+  "last_checkpoint_at": "2026-04-26T04:55:00Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -32,8 +32,8 @@
       "scheduled_in_wave": "1a",
       "p0_status": "merged",
       "p1_status": "all 7 merged",
-      "p2_status": "T1+T2 merged; T3-T7 pending (sequential)",
-      "p3_status": "T1+T7 merged; T2-T6 pending"
+      "p2_status": "T1+T2+T3 merged; T4-T7 pending",
+      "p3_status": "T1+T2+T3+T5+T7 merged; T4+T6 pending"
     },
     "M04": {
       "status": "pending",
@@ -740,6 +740,67 @@
       "divergence_checks": {
         "result": "PASS",
         "apalache_check": "length=4 PROCS=4 CAPS=8 EXITCODE: OK (~6 min local)"
+      }
+    },
+    "M01.P3.T4": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 60,
+      "merged_sha": "7de1bb192edc5844d8133e6d535e3bdde37a6197",
+      "branch": "wave/W1/m01/p3.t4-codegen-go-oapi",
+      "merged_at": "2026-04-26T04:35:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "regen-types.sh + git diff --exit-code + go build/test all 0; deterministic regen"
+      }
+    },
+    "M03.P3.T5": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 61,
+      "merged_sha": "162fa0c7c7481a674b3cbeb90479d20b05f6a166",
+      "branch": "wave/W1/m03/p3.t5-mapping-doc-and-check",
+      "merged_at": "2026-04-26T04:40:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "coverage": "3/4 TLA invariants (RevocationEventuallySeen lands in T3) + 12/12 Kani harnesses"
+      }
+    },
+    "M01.P3.T3": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 62,
+      "merged_sha": "040a397d969ccf42f4d81dd4d726142914e3ddf8",
+      "branch": "wave/W1/m01/p3.t3-codegen-ts-jsonschema",
+      "merged_at": "2026-04-26T04:45:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "gate": "ts --check in sync (57188 bytes); pnpm conformance test 53/53 pass; rust + go --check still in sync after rebase merge"
+      }
+    },
+    "M03.P2.T3": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 63,
+      "merged_sha": "a7af32b0f0470a0bc20430ac11ae3545a27b073f",
+      "branch": "wave/W1/m03/p2.t3-receipt-roundtrip",
+      "merged_at": "2026-04-26T04:50:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "kani_checks": "0 of 35 failed; 0.18s",
+        "harness_count": "12 -> 13"
+      }
+    },
+    "M03.P3.T3": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 64,
+      "merged_sha": "8d33d39d842cc7fdc7275c9eb506cf6450c0a5a8",
+      "branch": "wave/W1/m03/p3.t3-tla-liveness-lane",
+      "merged_at": "2026-04-26T04:55:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "apalache_check": "length=4 EXITCODE: OK (3m 40s)"
       }
     }
   },
