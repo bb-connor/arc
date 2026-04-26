@@ -2468,6 +2468,12 @@ dependencies = [
 [[package]]
 name = "chio-replay-gate"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "chio-reputation"
