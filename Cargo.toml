@@ -85,6 +85,7 @@ members = [
     "crates/chio-bindings-ffi",
     "crates/chio-cpp-kernel-ffi",
     "crates/chio-conformance",
+    "crates/chio-spec-codegen",
     "crates/chio-spec-validate",
     #
     # Examples

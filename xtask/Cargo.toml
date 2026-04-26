@@ -14,3 +14,4 @@ serde_json = { workspace = true }
 serde_yml = { workspace = true }
 sha2 = { workspace = true }
 chio-spec-validate = { path = "../crates/chio-spec-validate" }
+chio-spec-codegen = { path = "../crates/chio-spec-codegen" }
