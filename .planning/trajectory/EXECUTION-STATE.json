@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T07:55:00Z",
-  "current_wave": "1b",
+  "last_checkpoint_at": "2026-04-26T08:05:00Z",
+  "current_wave": "1b-nearly-complete",
   "halt": {
     "halted": false,
     "reason": null,
@@ -11,12 +11,14 @@
   },
   "milestones": {
     "M01": {
-      "status": "P3 COMPLETE (T1-T5 merged; T6 verified-no-changes)",
-      "phase": "P3_complete_pending_t6_archive",
+      "status": "MILESTONE COMPLETE through P3 (P4-P5 wave-2 deferred)",
+      "phase": "P3_complete",
       "p0_status": "merged",
       "p1_status": "all 9 merged",
       "p2_status": "all 8 merged",
-      "p3_status": "T1-T5 merged; T6 verified clean (no diff; M01.P3.T2 shim covers all 17 adapters)"
+      "p3_status": "T1-T5 merged + T6 verified-clean (M01.P3.T2 shim covers all 17 adapters; 511 pytest pass)",
+      "p4_status": "not authored (wave 2)",
+      "p5_status": "not authored (wave 2)"
     },
     "M02": {
       "status": "blocked",
@@ -61,12 +63,12 @@
       "owner_branch": null
     },
     "M09": {
-      "status": "P3 nearly done; T3 in flight",
-      "phase": "P3_in_progress",
+      "status": "MILESTONE COMPLETE (P0+P1+P2+P3 all merged)",
+      "phase": "complete",
       "p0_status": "merged",
       "p1_status": "all 11 merged",
       "p2_status": "all 4 merged",
-      "p3_status": "T1+T2+T4+T5+T6 merged; T3 executor running"
+      "p3_status": "all 6 merged"
     },
     "M10": {
       "status": "pending",
@@ -958,6 +960,18 @@
       "divergence_checks": {
         "result": "PASS",
         "fuzz_crate": "bootstrapped from scratch with empty [workspace] stanza; M02 PR #13 will layer the 7 baseline targets on top later"
+      }
+    },
+    "M09.P3.T3": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 77,
+      "merged_sha": "96d6b410113716ce4c407e81360e97a5523b75e7",
+      "branch": "wave/W1/m09/p3.t3-cosign-sign-release-archives",
+      "merged_at": "2026-04-26T08:05:00Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "matrix_signing": "5 archive variants (linux x86_64-gnu/aarch64-gnu, macOS x86_64/aarch64, windows x86_64-msvc); per-runner signing pattern matching T2"
       }
     }
   },
