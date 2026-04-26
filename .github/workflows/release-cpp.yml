@@ -170,7 +170,11 @@ jobs:
             conan profile detect --force
           fi
           conan remote add chio-private "${CHIO_NEXUS_REMOTE_URL}" || true
-          printf '%s' "${PUBLISHER_TOKEN}" | conan remote login chio-private chio-publisher --password-stdin
+          # Conan v2 `remote login` takes -p <token>; --password-stdin is
+          # not supported. The token is masked in workflow logs and the
+          # ephemeral runner is single-tenant so the brief ps-visibility
+          # window is acceptable.
+          conan remote login chio-private chio-publisher -p "${PUBLISHER_TOKEN}"
 
       - name: Upload SDK packages
         run: |
@@ -261,13 +265,28 @@ jobs:
           baseline = json.loads(baseline_path.read_text())
           baseline.setdefault("default", {})
 
+          # Materialize the staged index into a real tree object so we can
+          # walk it for per-port subtree SHAs. `git rev-parse :ports/<port>`
+          # works for blobs but not for synthesised directory entries; the
+          # index only stores blobs and computes tree objects on demand via
+          # `git write-tree`.
+          top_tree = subprocess.check_output(
+              ["git", "write-tree"],
+              text=True,
+          ).strip()
+
           for port in ports:
-              git_tree = subprocess.check_output(
-                  ["git", "rev-parse", f":ports/{port}"],
+              entry = subprocess.check_output(
+                  ["git", "ls-tree", top_tree, f"ports/{port}"],
                   text=True,
               ).strip()
-              if not git_tree:
-                  raise SystemExit(f"no staged tree for ports/{port}")
+              if not entry:
+                  raise SystemExit(f"ports/{port} missing from tree {top_tree}")
+              # ls-tree emits "<mode> <type> <sha>\t<path>"; split on whitespace
+              parts = entry.split()
+              if len(parts) < 3 or parts[1] != "tree":
+                  raise SystemExit(f"unexpected ls-tree row for {port}: {entry!r}")
+              git_tree = parts[2]
 
               versions_dir = Path(f"versions/{port[0]}-")
               versions_dir.mkdir(parents=True, exist_ok=True)
