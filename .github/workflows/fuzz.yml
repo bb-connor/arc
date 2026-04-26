@@ -59,7 +59,7 @@ jobs:
 
       - name: Install cargo-fuzz
         run: |
-          installed_version="$(cargo fuzz --version 2>/dev/null | awk '{print $2}')"
+          installed_version="$(cargo fuzz --version 2>/dev/null | awk '{print $2}' || true)"
           if [ "${installed_version}" != "${CARGO_FUZZ_VERSION}" ]; then
             cargo install cargo-fuzz --locked --version "=${CARGO_FUZZ_VERSION}"
           fi
@@ -138,7 +138,7 @@ jobs:
 
       - name: Install cargo-fuzz
         run: |
-          installed_version="$(cargo fuzz --version 2>/dev/null | awk '{print $2}')"
+          installed_version="$(cargo fuzz --version 2>/dev/null | awk '{print $2}' || true)"
           if [ "${installed_version}" != "${CARGO_FUZZ_VERSION}" ]; then
             cargo install cargo-fuzz --locked --version "=${CARGO_FUZZ_VERSION}"
           fi
@@ -214,7 +214,7 @@ jobs:
 
       - name: Install cargo-fuzz
         run: |
-          installed_version="$(cargo fuzz --version 2>/dev/null | awk '{print $2}')"
+          installed_version="$(cargo fuzz --version 2>/dev/null | awk '{print $2}' || true)"
           if [ "${installed_version}" != "${CARGO_FUZZ_VERSION}" ]; then
             cargo install cargo-fuzz --locked --version "=${CARGO_FUZZ_VERSION}"
           fi

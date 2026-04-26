@@ -213,18 +213,21 @@ fn expand_env_split_string_options(tokens: &[String]) -> Vec<String> {
                 index += 1;
                 continue;
             }
-            if let Some(value) = env_split_string_inline_value(env_token) {
-                expanded.extend(shlex_split_best_effort(value));
-                index += 1;
-                continue;
-            }
-            if env_option_is_split_string(env_token) {
-                if let Some(value) = tokens.get(index + 1) {
-                    expanded.extend(shlex_split_best_effort(value));
-                    index += 2;
-                } else {
-                    expanded.push(tokens[index].clone());
-                    index += 1;
+            if let Some(split_string) = env_split_string_arg(env_token) {
+                match split_string {
+                    EnvSplitStringArg::Inline(value) => {
+                        expanded.extend(shlex_split_best_effort(value));
+                        index += 1;
+                    }
+                    EnvSplitStringArg::Next => {
+                        if let Some(value) = tokens.get(index + 1) {
+                            expanded.extend(shlex_split_best_effort(value));
+                            index += 2;
+                        } else {
+                            expanded.push(tokens[index].clone());
+                            index += 1;
+                        }
+                    }
                 }
                 continue;
             }
@@ -371,22 +374,55 @@ fn env_option_exits_without_command(token: &str) -> bool {
     matches!(token, "--help" | "--version")
 }
 
-fn env_option_is_split_string(token: &str) -> bool {
-    matches!(token, "-S" | "--split-string")
+enum EnvSplitStringArg<'a> {
+    Inline(&'a str),
+    Next,
 }
 
-fn env_split_string_inline_value(token: &str) -> Option<&str> {
-    if let Some(value) = token.strip_prefix("--split-string=") {
-        return Some(value);
+fn env_split_string_arg(token: &str) -> Option<EnvSplitStringArg<'_>> {
+    if token == "-S" || token == "--split-string" {
+        return Some(EnvSplitStringArg::Next);
     }
-    token.strip_prefix("-S").filter(|value| !value.is_empty())
+    if let Some(value) = token.strip_prefix("--split-string=") {
+        return Some(EnvSplitStringArg::Inline(value));
+    }
+    if let Some(value) = token.strip_prefix("-S").filter(|value| !value.is_empty()) {
+        return Some(EnvSplitStringArg::Inline(value));
+    }
+
+    let short_options = token.strip_prefix('-')?;
+    if short_options.is_empty() || short_options.starts_with('-') {
+        return None;
+    }
+
+    for (offset, option) in short_options.char_indices() {
+        if option == 'S' {
+            let value_start = offset + option.len_utf8();
+            if value_start < short_options.len() {
+                return Some(EnvSplitStringArg::Inline(&short_options[value_start..]));
+            }
+            return Some(EnvSplitStringArg::Next);
+        }
+        if !env_short_option_can_precede_split_string(option) {
+            return None;
+        }
+    }
+
+    None
+}
+
+fn env_short_option_can_precede_split_string(option: char) -> bool {
+    matches!(option, '0' | 'i' | 'v')
 }
 
 fn env_option_takes_value(token: &str) -> bool {
     if token.contains('=') {
         return false;
     }
-    matches!(token, "-u" | "--unset" | "-C" | "--chdir" | "--argv0")
+    matches!(
+        token,
+        "-u" | "--unset" | "-C" | "--chdir" | "-P" | "--path" | "--argv0"
+    )
 }
 
 fn is_command_execution_option(token: &str) -> bool {
@@ -636,6 +672,9 @@ mod tests {
         assert!(guard.is_forbidden("env FOO=bar -i rm -r'f' /"));
         assert!(guard.is_forbidden("env - rm -r'f' /"));
         assert!(guard.is_forbidden("env -S \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -iS \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -ivS \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -iS\"rm -r'f' /\""));
         assert!(guard.is_forbidden("env --split-string \"rm -r'f' /\""));
         assert!(guard.is_forbidden("env --split-string=\"rm -r'f' /\""));
         assert!(guard.is_forbidden("env -- rm -r'f' /"));
@@ -670,6 +709,7 @@ mod tests {
     fn allows_rm_text_as_shell_data() {
         let guard = ShellCommandGuard::new();
         assert!(!guard.is_forbidden("echo rm -r'f' /"));
+        assert!(!guard.is_forbidden("env -uS \"rm -r'f' /\""));
     }
 
     #[test]
