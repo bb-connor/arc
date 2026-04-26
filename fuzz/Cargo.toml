@@ -30,6 +30,7 @@ cargo-fuzz = true
 
 [dependencies]
 chio-a2a-adapter = { path = "../crates/chio-a2a-adapter", features = ["fuzz"] }
+chio-acp-edge = { path = "../crates/chio-acp-edge", features = ["fuzz"] }
 chio-anchor = { path = "../crates/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
@@ -56,6 +57,16 @@ expect_used = "deny"
 [[bin]]
 name = "a2a_envelope_decode"
 path = "fuzz_targets/a2a_envelope_decode.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P1.T3.c: Chio ACP edge envelope decode plus handle_jsonrpc dispatch
+# trust boundary (NDJSON-framed JSON-RPC envelopes -> ChioAcpEdge::handle_jsonrpc).
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "acp_envelope_decode"
+path = "fuzz_targets/acp_envelope_decode.rs"
 test = false
 doc = false
 bench = false

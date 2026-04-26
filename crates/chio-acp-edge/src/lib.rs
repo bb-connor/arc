@@ -19,6 +19,14 @@
 //! helpers remain available for compatibility and tests but are not sufficient
 //! for full cross-protocol attestation claims.
 
+/// libFuzzer entry-point module gated behind the `fuzz` Cargo feature.
+///
+/// See `crates/chio-acp-edge/src/fuzz.rs` (M02.P1.T3.c) for the
+/// decode-then-handle_jsonrpc trust-boundary surface this module exposes.
+/// The production build of `chio-acp-edge` never enables this feature.
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
+
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};

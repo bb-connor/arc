@@ -1603,6 +1603,7 @@ dependencies = [
 name = "chio-acp-edge"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "chio-core-types",
  "chio-cross-protocol",
  "chio-kernel",
