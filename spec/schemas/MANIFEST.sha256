@@ -1,8 +1,12 @@
 8485e3d08cdfce8736e8f898fff5a212b1432ba0224a43cdf8df996c96721809  spec/schemas/chio-http/v1/caller-identity.schema.json
 57a3244c167440f71409d97ffc7c9c3e3142a28f512535e7a0d277bb7ebc8b19  spec/schemas/chio-http/v1/chio-http-request.schema.json
+b37251380c87eb2f34aea4561da300c9d4ea70d9a79643e609b58091fa12aa77  spec/schemas/chio-http/v1/error-envelope.schema.json
 396b4642e8a76e6cab9e5d4a686ea2f0aa92a34875fbc71b5d34b6e055f57e5c  spec/schemas/chio-http/v1/evaluate-request.schema.json
 2f28760f2a4d4af3f55d07aaca512e0b1bcb453d190e01871d0ba2562a8b6b2b  spec/schemas/chio-http/v1/evaluate-response.schema.json
 6550d7c3ad5b227f261844fe93925609f3b0cf225302b74b00b0e39a4f49635a  spec/schemas/chio-http/v1/http-receipt.schema.json
+789dd0fd7a8c09c939209e19f430a5f8133b7075a10e0c6972e3ea996b001679  spec/schemas/chio-http/v1/session-init.schema.json
+a70456b5ce3ad1b67e90087acb2c8850de6ed2c7c0b78069d29b6cef9e4a3359  spec/schemas/chio-http/v1/session-resume.schema.json
+ecd2edd28c8f6db06fd18428fe4b00027742d8bee714fd7e661ec65acf0c7f2a  spec/schemas/chio-http/v1/stream-frame.schema.json
 6af7535d28313ea3bcbd9445f55ebbfbefa5ba463c7456cf1a8d24e6728d20d4  spec/schemas/chio-http/v1/verdict.schema.json
 79919a3cf6f16b03fa5c44eb00e6a79d7fe3b70b8223cace0dd520ea71179b18  spec/schemas/chio-wire/v1/agent/heartbeat.schema.json
 fb7f0ae9a9819cb1ddc01a36cdbc345c7a146e26f17abf29bdc9ee1bd6d8b25f  spec/schemas/chio-wire/v1/agent/list_capabilities.schema.json
