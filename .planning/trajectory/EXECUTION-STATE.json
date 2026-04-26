@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:48:19.771Z",
+  "last_checkpoint_at": "2026-04-26T02:50:46.675Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -230,14 +230,16 @@
       }
     },
     "M01.P2.T2": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 45,
+      "merged_sha": "15f29d236f205b09cc90344a9a9d6482f7f11acf",
+      "branch": "wave/W1/m01/p2.t2-manifest-vectors",
+      "merged_at": "2026-04-26T02:50:46.675Z",
+      "divergence_checks": {
+        "result": "PASS-WITH-FOLLOWUP"
+      },
+      "follow_up": "chio-binding-helpers vector_fixtures test stale"
     },
     "M01.P2.T3": {
       "status": "pending",
