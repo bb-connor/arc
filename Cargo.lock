@@ -2260,6 +2260,7 @@ dependencies = [
 name = "chio-kernel-core"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "chio-core-types",
  "proptest",
  "serde",
@@ -2441,6 +2442,7 @@ dependencies = [
 name = "chio-openapi-mcp-bridge"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "chio-core-types",
  "chio-kernel",
  "chio-manifest",
