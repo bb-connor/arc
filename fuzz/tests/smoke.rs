@@ -59,5 +59,11 @@ fn each_seed<F: FnMut(&[u8])>(target: &str, mut f: F) {
 #[test]
 fn jwt_vc_verify_smoke() {
     use chio_credentials::fuzz::fuzz_jwt_vc_verify;
-    each_seed("jwt_vc_verify", |bytes| fuzz_jwt_vc_verify(bytes));
+    each_seed("jwt_vc_verify", fuzz_jwt_vc_verify);
+}
+
+#[test]
+fn oid4vp_presentation_smoke() {
+    use chio_credentials::fuzz::fuzz_oid4vp_presentation;
+    each_seed("oid4vp_presentation", fuzz_oid4vp_presentation);
 }

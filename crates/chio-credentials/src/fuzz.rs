@@ -25,7 +25,12 @@ use std::sync::OnceLock;
 
 use chio_core::{Keypair, PublicKey};
 
-use crate::verify_chio_passport_jwt_vc_json;
+use crate::{
+    verify_chio_passport_jwt_vc_json, verify_oid4vp_direct_post_response, Oid4vpDcqlQuery,
+    Oid4vpRequestObject, Oid4vpRequestedCredential, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
+    CHIO_PASSPORT_SD_JWT_VC_TYPE, OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI,
+    OID4VP_RESPONSE_MODE_DIRECT_POST_JWT, OID4VP_RESPONSE_TYPE_VP_TOKEN,
+};
 
 /// Deterministic 32-byte seed used to materialise the test issuer keypair.
 /// Fixed so the corpus surface is stable across libFuzzer runs.
@@ -61,4 +66,76 @@ pub fn fuzz_jwt_vc_verify(data: &[u8]) {
     };
     // Errors are discarded by design; we are exercising the parse path.
     let _ = verify_chio_passport_jwt_vc_json(compact, issuer_public_key(), FUZZ_NOW);
+}
+
+/// Stable Chio OID4VP verifier identifier used for the fuzz request fixture.
+/// All endpoint URLs in the fixture are rooted at this issuer so
+/// [`Oid4vpRequestObject::validate`] succeeds; the OID4VP fail-closed
+/// contract then guarantees that arbitrary bytes routed through the response
+/// verifier cannot produce `Ok(_)` (the holder-binding signature check will
+/// always reject them).
+const FUZZ_VERIFIER_CLIENT_ID: &str = "https://verifier.fuzz.chio";
+
+/// Fixed request-object fixture passed to the OID4VP response verifier on
+/// every fuzz iteration. Built lazily and cached so each iteration sees the
+/// same constant request shape; varying the request would mask response
+/// parse-path failures behind nonce/state/audience mismatches that the
+/// verifier reports before reaching the embedded VP-token decode path.
+fn oid4vp_request_fixture() -> &'static Oid4vpRequestObject {
+    static REQUEST: OnceLock<Oid4vpRequestObject> = OnceLock::new();
+    REQUEST.get_or_init(|| Oid4vpRequestObject {
+        client_id: FUZZ_VERIFIER_CLIENT_ID.to_string(),
+        client_id_scheme: OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI.to_string(),
+        response_uri: format!("{FUZZ_VERIFIER_CLIENT_ID}/oid4vp/response"),
+        response_mode: OID4VP_RESPONSE_MODE_DIRECT_POST_JWT.to_string(),
+        response_type: OID4VP_RESPONSE_TYPE_VP_TOKEN.to_string(),
+        nonce: "fuzz-nonce".to_string(),
+        state: "fuzz-state".to_string(),
+        iat: FUZZ_NOW.saturating_sub(60),
+        exp: FUZZ_NOW.saturating_add(86_400),
+        jti: "fuzz-request-id".to_string(),
+        request_uri: format!("{FUZZ_VERIFIER_CLIENT_ID}/oid4vp/request/fuzz"),
+        dcql_query: Oid4vpDcqlQuery {
+            credentials: vec![Oid4vpRequestedCredential {
+                id: "fuzz-credential".to_string(),
+                format: CHIO_PASSPORT_SD_JWT_VC_FORMAT.to_string(),
+                vct: CHIO_PASSPORT_SD_JWT_VC_TYPE.to_string(),
+                claims: Vec::new(),
+                issuer_allowlist: Vec::new(),
+            }],
+        },
+        identity_assertion: None,
+    })
+}
+
+/// Drive arbitrary bytes through the Chio OID4VP presentation-response
+/// verify trust boundary.
+///
+/// Bytes are interpreted as a UTF-8 compact-JWT string carrying a
+/// `direct_post.jwt` OID4VP response (see
+/// `crates/chio-credentials/src/oid4vp.rs::verify_oid4vp_direct_post_response`).
+/// The verifier parses three base64url segments, decodes the header and
+/// payload as JSON, decodes the embedded `vp_token` as an SD-JWT VC, and
+/// verifies the holder-binding signature against the credential's `cnf.jwk`.
+/// Every step is fail-closed: arbitrary bytes can only surface as
+/// `Err(CredentialError::InvalidOid4vp{Request,Response,...})` or as a panic
+/// or abort that libFuzzer reports as a crash.
+///
+/// A constant [`Oid4vpRequestObject`] fixture pins `client_id`, `nonce`,
+/// `state`, `response_uri`, the credential `id/format/vct`, and the
+/// validity window. The fixture's nonce/state/audience guarantee that no
+/// arbitrary byte stream can satisfy the post-decode equality checks, so
+/// `Ok(_)` is unreachable. The issuer key is the same fixture-controlled
+/// keypair as [`fuzz_jwt_vc_verify`] for symmetry across the two targets.
+pub fn fuzz_oid4vp_presentation(data: &[u8]) {
+    let Ok(compact) = std::str::from_utf8(data) else {
+        return;
+    };
+    // Errors are discarded by design; we are exercising the parse path.
+    let _ = verify_oid4vp_direct_post_response(
+        compact,
+        oid4vp_request_fixture(),
+        issuer_public_key(),
+        FUZZ_NOW,
+    );
 }
