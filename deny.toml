@@ -87,20 +87,55 @@ name = "chrono"
 version = "<0.4.31"
 
 [[bans.skip]]
-# `windows-sys` ships multiple major versions across the ecosystem and the
-# crate graph cannot be flattened without forking ten upstreams. Tracked
-# weekly via Renovate; revisit when wasmtime/tokio converge.
+# `windows-sys` ships v0.52 (pulled by ring, socket2, tonic) and v0.59
+# (pulled by rustix/wasmtime). Cannot be flattened without forking the
+# wasmtime or rustls stacks. Tracked weekly via Renovate; revisit when
+# wasmtime and the rustls/ring family converge on a single major.
 name = "windows-sys"
 
 [[bans.skip]]
-# `syn` 1.x lingers in proc-macro chains. Force-bump on the next workspace
-# audit pass once `darling` and `serde_derive` align on `syn` 2.x.
+# `windows-targets` duplicates as a direct consequence of the windows-sys
+# 0.52 vs 0.59 split above. The seven `windows_<arch>_<abi>` platform
+# sub-crates (gnu/gnullvm/msvc across aarch64/i686/x86_64) also duplicate
+# in lockstep but are intentionally NOT listed individually here; the
+# ~8-entry skip cap is a deliberate smell threshold and listing them
+# would mask the real fix (forcing an ecosystem bump on windows-sys).
+# `cargo deny check bans` will continue to flag those seven; that is
+# expected until the windows-sys major split resolves upstream.
+name = "windows-targets"
+
+[[bans.skip]]
+# `hashbrown` resolves to 0.12 (tonic 0.12 -> tower 0.4 -> indexmap 1),
+# 0.14 (wasmtime/cranelift 29.x), and 0.15/0.16 (everything else). Cannot
+# unify without bumping tonic or wasmtime, both gated on separate roadmap
+# items. Revisit when chio-envoy-ext-authz moves to tonic 0.13+.
+name = "hashbrown"
+
+[[bans.skip]]
+# `getrandom` cascades through the `rand` family: 0.2 (rand 0.8 consumers),
+# 0.3 (rand 0.9), 0.4 (rand 0.10). The rand ecosystem is mid-migration;
+# pinning to a single major would force a fork of rcgen, ring, or wasmtime.
+name = "getrandom"
+
+[[bans.skip]]
+# `rand` 0.8 (chio-guards/internal), 0.9 (transitive through alloy), and
+# 0.10 (newer crates) coexist. Same cascade as getrandom above.
+name = "rand"
+
+[[bans.skip]]
+# `syn` 1.x is documented as a known proc-macro lingerer. Currently no
+# v1 instances in the lockfile (cargo-deny will emit an unmatched-skip
+# warning, which is informational only). Kept as forward defense so a
+# regression via a new transitive proc-macro dep does not flip the gate.
+# Force-bump audit when `darling` and `serde_derive` align on `syn` 2.x.
 name = "syn"
 version = "1"
 
 [[bans.skip]]
-# `bitflags` 1.x is pinned by `clap` and `wasmtime`. Acceptable until both
-# converge on 2.x.
+# `bitflags` 1.x is documented as historically pinned by `clap` and
+# `wasmtime`. Currently no v1 instances in the lockfile (unmatched-skip
+# warning is informational). Retain as forward defense; remove once we
+# confirm no upstream regresses to bitflags 1.
 name = "bitflags"
 version = "1"
 
