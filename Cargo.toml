@@ -49,6 +49,9 @@ members = [
     "crates/chio-web3",
     "crates/chio-web3-bindings",
     #
+    # Supply-chain attestation
+    "crates/chio-attest-verify",
+    #
     # Identity, credentials, federation
     "crates/chio-credentials",
     "crates/chio-did",
