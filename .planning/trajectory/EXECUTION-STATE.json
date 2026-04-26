@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:23:13.144Z",
+  "last_checkpoint_at": "2026-04-26T02:26:05.277Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -198,14 +198,16 @@
       }
     },
     "M01.P1.T6": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ae6e91e4513b24285",
+      "branch": "wave/W1/m01/p1.t6-spec-validate-binary",
+      "pr_number": 34,
+      "merged_at": "2026-04-26T02:26:05.277Z",
+      "merged_sha": "22f8533d88b22a6df920ca09962d424222680919",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P1.T7": {
       "status": "pending",
