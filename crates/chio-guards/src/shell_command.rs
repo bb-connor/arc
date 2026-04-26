@@ -162,29 +162,35 @@ impl chio_kernel::Guard for ShellCommandGuard {
 fn is_recursive_rm_root(tokens: &[String]) -> bool {
     for segment in tokens.split(|token| is_shell_separator(token)) {
         let expanded_segment = expand_env_split_string_options(segment);
-        let Some(index) = executable_rm_index(&expanded_segment) else {
-            continue;
-        };
-
-        let args = expanded_segment.iter().skip(index + 1);
-        let mut has_recursive_flag = false;
-        let mut has_root_target = false;
-
-        for arg in args {
-            if arg == "--recursive" || is_short_rm_recursive_flag(arg) {
-                has_recursive_flag = true;
+        for expanded_shell_segment in expanded_segment.split(|token| is_shell_separator(token)) {
+            if segment_has_recursive_rm_root(expanded_shell_segment) {
+                return true;
             }
-            if arg == "/" || arg == "/*" {
-                has_root_target = true;
-            }
-        }
-
-        if has_recursive_flag && has_root_target {
-            return true;
         }
     }
 
     false
+}
+
+fn segment_has_recursive_rm_root(tokens: &[String]) -> bool {
+    let Some(index) = executable_rm_index(tokens) else {
+        return false;
+    };
+
+    let args = tokens.iter().skip(index + 1);
+    let mut has_recursive_flag = false;
+    let mut has_root_target = false;
+
+    for arg in args {
+        if arg == "--recursive" || is_short_rm_recursive_flag(arg) {
+            has_recursive_flag = true;
+        }
+        if arg == "/" || arg == "/*" {
+            has_root_target = true;
+        }
+    }
+
+    has_recursive_flag && has_root_target
 }
 
 fn expand_env_split_string_options(tokens: &[String]) -> Vec<String> {
@@ -672,7 +678,11 @@ mod tests {
         assert!(guard.is_forbidden("env FOO=bar -i rm -r'f' /"));
         assert!(guard.is_forbidden("env - rm -r'f' /"));
         assert!(guard.is_forbidden("env -S \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -S \"echo ; rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -S \"echo | rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -S \"echo && rm -r'f' /\""));
         assert!(guard.is_forbidden("env -iS \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("env -iS \"echo ; rm -r'f' /\""));
         assert!(guard.is_forbidden("env -ivS \"rm -r'f' /\""));
         assert!(guard.is_forbidden("env -iS\"rm -r'f' /\""));
         assert!(guard.is_forbidden("env --split-string \"rm -r'f' /\""));
