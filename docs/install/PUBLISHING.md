@@ -266,10 +266,71 @@ The release job validates the SBOM with
 upload; a missing or malformed SBOM fails the workflow rather than
 silently publishing without one.
 
-Cosign signing of these artifacts and SLSA L2 provenance attachment
-land in M09.P2.T3 and M09.P3 respectively; see
+Cosign signing of these artifacts lands in a follow-up task; see
 `.planning/trajectory/09-supply-chain-attestation.md` for the full
 attestation roadmap.
+
+---
+
+## SLSA L2 provenance
+
+[`.github/workflows/slsa.yml`](../../.github/workflows/slsa.yml)
+(M09.P2.T3) wires the upstream
+[`slsa-framework/slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator)
+reusable workflow at the pinned tag `v2.1.0` to produce a signed
+[SLSA](https://slsa.dev) Level 2 provenance attestation for every
+release built by `release-binaries.yml`.
+
+### Trigger model
+
+The provenance lane runs as a `workflow_run` listener on a successful
+`Release Binaries` invocation rather than as an inline job. This keeps
+the release matrix lean and confines the elevated permissions
+(`id-token: write` and `contents: write`, required by the upstream
+generator) to a single, auditable workflow file. A failed release
+build short-circuits the listener via
+`if: github.event.workflow_run.conclusion == 'success'`, so the
+generator never runs against a half-built release.
+
+### What gets attested
+
+`collect-digests` downloads the per-target `chio-<target>` artifacts
+that `release-binaries.yml` uploaded, computes one SHA-256 digest per
+archive (`*.tar.gz` and `*.zip`), and emits the digests as a
+base64-encoded subjects list. The reusable
+`generator_generic_slsa3.yml` job consumes that list and emits an
+in-toto attestation named
+`chio-<head_sha>.intoto.jsonl`. With `upload-assets: true` the
+attestation is uploaded to the GitHub Release that the build job
+already created, so the provenance ships next to the binaries it
+covers.
+
+### Verification
+
+A consumer with `slsa-verifier` installed can verify any release
+archive against its provenance:
+
+```bash
+slsa-verifier verify-artifact \
+  --provenance-path chio-<head_sha>.intoto.jsonl \
+  --source-uri github.com/<owner>/chio \
+  --source-tag <release-tag> \
+  chio-<version>-<target>.tar.gz
+```
+
+The verifier confirms the artifact digest is listed in the signed
+attestation, that the attestation was produced by the pinned
+`slsa-github-generator` workflow, and that the source repo and tag
+match the build's claimed origin.
+
+### Pinning policy
+
+`slsa.yml` pins
+`slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0`.
+Bumping to a newer tag is intentionally a manual change because the
+upstream workflow's identity is part of the verification chain;
+unpinning to `@main` or to a commit SHA outside an audited tag would
+weaken the L2 guarantees.
 
 ---
 
