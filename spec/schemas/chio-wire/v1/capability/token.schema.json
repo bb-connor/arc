@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/token/v1",
+  "title": "Chio CapabilityToken",
+  "description": "A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "issuer",
+    "subject",
+    "scope",
+    "issued_at",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique token ID (UUIDv7 recommended), used for revocation."
+    },
+    "issuer": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token."
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint)."
+    },
+    "scope": {
+      "$ref": "#/$defs/chioScope"
+    },
+    "issued_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the token was issued."
+    },
+    "expires_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the token expires."
+    },
+    "delegation_chain": {
+      "type": "array",
+      "description": "Ordered list of delegation links from the root authority to this token. Omitted (or empty) for direct issuances.",
+      "items": {
+        "$ref": "#/$defs/delegationLink"
+      }
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": ["ed25519", "p256", "p384"],
+      "description": "Signing algorithm envelope hint. Omitted for legacy Ed25519 tokens to preserve byte-for-byte compatibility. Verification dispatches off the signature hex prefix, not this field."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]+$",
+      "minLength": 96,
+      "description": "Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+)."
+    }
+  },
+  "$defs": {
+    "chioScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.",
+      "properties": {
+        "grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/toolGrant"
+          }
+        },
+        "resource_grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resourceGrant"
+          }
+        },
+        "prompt_grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/promptGrant"
+          }
+        }
+      }
+    },
+    "toolGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["server_id", "tool_name", "operations"],
+      "description": "Authorization to invoke a single tool. Mirrors `ToolGrant`.",
+      "properties": {
+        "server_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/constraint"
+          }
+        },
+        "max_invocations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_per_invocation": {
+          "$ref": "#/$defs/monetaryAmount"
+        },
+        "max_total_cost": {
+          "$ref": "#/$defs/monetaryAmount"
+        },
+        "dpop_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "resourceGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri_pattern", "operations"],
+      "description": "Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.",
+      "properties": {
+        "uri_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        }
+      }
+    },
+    "promptGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt_name", "operations"],
+      "description": "Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.",
+      "properties": {
+        "prompt_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        }
+      }
+    },
+    "operation": {
+      "enum": [
+        "invoke",
+        "read_result",
+        "read",
+        "subscribe",
+        "get",
+        "delegate"
+      ]
+    },
+    "monetaryAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["units", "currency"],
+      "properties": {
+        "units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["type"],
+      "description": "Tagged enum mirroring `Constraint` in `chio-core-types`. Encoded as `{ type, value }` (or just `{ type }` for unit variants such as `governed_intent_required`). Constraint variants intentionally remain extensible; `additionalProperties` is permissive here so new variants do not require schema rev-locks.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "delegationLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "delegator",
+        "delegatee",
+        "timestamp",
+        "signature"
+      ],
+      "description": "A single link in a delegation chain. Mirrors `DelegationLink`.",
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delegator": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "delegatee": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "attenuations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]+$",
+          "minLength": 96
+        }
+      }
+    }
+  }
+}
