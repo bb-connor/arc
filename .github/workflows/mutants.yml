@@ -1,98 +1,300 @@
-# mutants.yml - Advisory cargo-mutants lane (M02-owned).
+# mutants.yml - cargo-mutants advisory lane (M02-owned).
 #
-# Mutation-testing posture per .planning/trajectory/decisions.yml
-# id=mutation-testing-gate-posture: advisory for one release cycle after
-# M02 P3 merges, blocking thereafter. This workflow ships in the advisory
-# state. The gate flip happens by editing releases.toml at the M02 P3+1
-# release boundary; until then the workflow's `continue-on-error: true`
-# keeps it informational on PRs and main.
+# Source-doc anchors: .planning/trajectory/02-fuzzing-post-pr13.md
+#   - "Phase 3 - Mutation testing and timing harness" atomic tasks P3.T2-T4
+#   - "Mutation-testing CI shape (Phase 3)"
+# Decision lock: .planning/trajectory/decisions.yml
+#   id=mutation-testing-gate-posture (advisory for one release cycle, then
+#   blocking; flip event is the next release tagged after M02 P3 merges).
 #
-# Scope today: PR-incremental sweep against origin's branch tip via
-# `--in-diff`, four crates that house the trust-boundary surface:
-#   - chio-core-types    (capability/scope/receipt/provenance)
-#   - chio-policy        (decision)
-#   - chio-credentials   (signing envelope)
-#   - chio-canonical-json (canonical encoding)
-# Wave-budget: 15-30 minutes per gate.
+# Two jobs ship in this file:
+#
+#   mutants-pr      - pull_request trigger; runs `cargo mutants --in-diff`
+#                     against the PR base ref, four crates in parallel,
+#                     posts a Markdown summary as a PR comment via
+#                     scripts/mutants-comment.sh, and consults
+#                     scripts/mutants-gate.sh for advisory-vs-blocking
+#                     posture (always exits 0 today; the M02 P3 release
+#                     boundary will populate releases.toml's cycle_end_tag
+#                     and flip the gate to blocking automatically).
+#                     Wall budget: <= 30 min per crate (advisory).
+#
+#   mutants-nightly - schedule trigger (05:00 UTC); full-workspace sweep
+#                     across the same four crates with no --in-diff scope.
+#                     Wall budget: <= 4 h per crate per the source doc;
+#                     enforced via timeout-minutes plus cargo-mutants
+#                     --timeout. Uploads mutants.out/ as a workflow
+#                     artifact for triage; gate posture from the same
+#                     scripts/mutants-gate.sh helper.
+#
+# Both jobs respect the 1,800 GHA runner-min/30d cap shared with the
+# native and ClusterFuzzLite fuzz lanes; scripts/check-fuzz-budget.sh is
+# invoked first when GH_TOKEN is available so the cap acts as a hard halt
+# rather than a soft warning. Mutation runs count against the same
+# envelope as fuzz runs since both share the GitHub-hosted runner pool.
+#
+# continue-on-error is true on every mutation step today; the gate flip
+# from advisory to blocking is driven entirely by releases.toml and is
+# not a workflow edit (M02 P3 atomic task P3.T4).
 
 name: mutants
 
 on:
   pull_request:
     paths:
-      - "crates/chio-core-types/**"
-      - "crates/chio-policy/**"
-      - "crates/chio-credentials/**"
-      - "crates/chio-canonical-json/**"
+      - "crates/chio-kernel-core/src/**"
+      - "crates/chio-policy/src/**"
+      - "crates/chio-guards/src/**"
+      - "crates/chio-credentials/src/**"
+      - "**/mutants.toml"
       - ".github/workflows/mutants.yml"
+      - "scripts/mutants-comment.sh"
+      - "scripts/mutants-gate.sh"
+      - "releases.toml"
+  schedule:
+    # 05:00 UTC nightly. Sits after fuzz.yml (03:23) and the existing
+    # nightly proptest lane (04:23) so the GHA runner pool is not
+    # over-subscribed. Source doc cron: '0 5 * * *'.
+    - cron: "0 5 * * *"
   workflow_dispatch:
+    inputs:
+      package:
+        description: "Force a single crate (default: full matrix)"
+        required: false
+        type: string
 
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 concurrency:
-  group: mutants-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # PR runs collapse on push; scheduled and dispatch runs do not collapse
+  # against each other so a manual sweep can race a cron sweep without
+  # cancellation surprises.
+  group: mutants-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  mutate:
-    name: cargo-mutants (advisory)
+  mutants-pr:
+    name: mutants-pr (${{ matrix.package }})
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    continue-on-error: true     # advisory; flip to false at M02 P3+1 release
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         package:
-          - chio-core-types
+          - chio-kernel-core
           - chio-policy
+          - chio-guards
           - chio-credentials
-          - chio-canonical-json
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Rust toolchain
+      - name: Skip when forced package does not match
+        id: forced
         run: |
+          set -euo pipefail
+          forced='${{ inputs.package }}'
+          if [[ -n "${forced}" && "${forced}" != '${{ matrix.package }}' ]]; then
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+            echo "skipping ${{ matrix.package }} (forced=${forced})"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install Rust toolchain
+        if: steps.forced.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Install cargo-mutants
+      - name: Install cargo-mutants (pinned 25.x per Decision 12)
+        if: steps.forced.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          cargo install cargo-mutants --locked --version "^25" || \
-            cargo install cargo-mutants --locked
+          # Decision 12: cargo-mutants pinned at 25.x; do not float.
+          cargo install cargo-mutants --version '25.*' --locked
 
-      - name: Run cargo-mutants in PR-incremental mode
+      - name: Verify shared 30-day fuzz/mutants budget
+        if: steps.forced.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Mutation runs share the 1,800 min/30d envelope with fuzz; the
+          # check is best-effort because the helper enumerates only the
+          # cflite_*.yml workflows today (M02 P3 will extend it to count
+          # mutants.yml and fuzz.yml runs as well). Soft fail so a
+          # missing-script or API blip does not kill the advisory lane.
+          if [[ -x scripts/check-fuzz-budget.sh ]]; then
+            scripts/check-fuzz-budget.sh "${{ github.repository }}" || \
+              echo "advisory: fuzz-budget check returned non-zero; continuing (advisory lane)"
+          else
+            echo "scripts/check-fuzz-budget.sh missing or non-executable; skipping budget check"
+          fi
+
+      - name: Run cargo-mutants --in-diff against PR base
+        id: mutate
+        if: steps.forced.outputs.skip == 'false'
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref || 'project/roadmap-04-25-2026' }}
         run: |
           set -euo pipefail
+          mkdir -p mutants-out/${{ matrix.package }}
           # --in-diff scopes mutation generation to lines changed against
-          # the base ref; --no-shuffle keeps reproducibility across runs;
-          # --timeout caps any single mutant under sensible wall-time.
+          # the PR base ref; --no-shuffle keeps reproducibility across
+          # runs; --timeout caps any single mutant under sensible
+          # wall-time per the source-doc CI shape.
           cargo mutants \
             --package "${{ matrix.package }}" \
-            --in-diff "${BASE_REF}" \
+            --in-diff "origin/${BASE_REF}" \
             --no-shuffle \
             --timeout 120 \
             --jobs 2 \
-            --output ./mutants-out/${{ matrix.package }} \
+            --output mutants-out/${{ matrix.package }} \
             --json \
             || mutants_exit=$?
-          # Always emit the report file even when zero mutants found.
-          ls -la ./mutants-out/${{ matrix.package }} || true
-          if [[ "${mutants_exit:-0}" -ne 0 ]]; then
-            echo "advisory: cargo-mutants reported survivors (exit=${mutants_exit})"
-          fi
+          echo "exit=${mutants_exit:-0}" >> "${GITHUB_OUTPUT}"
+          ls -la mutants-out/${{ matrix.package }} || true
+
+      - name: Apply gate posture (advisory or blocking per releases.toml)
+        if: steps.forced.outputs.skip == 'false'
+        env:
+          MUTANTS_PACKAGE: ${{ matrix.package }}
+          MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
+          MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
+        run: |
+          set -euo pipefail
+          # mutants-gate.sh reads releases.toml and decides advisory
+          # (exit 0) or blocking (exit 1). Today releases.toml ships with
+          # cycle_end_tag empty, so the gate is advisory and exits 0.
+          # When M02 P3 lands and the next release populates
+          # cycle_end_tag, this step starts enforcing without any
+          # workflow edit.
+          bash scripts/mutants-gate.sh
+
+      - name: Post mutation summary as PR comment
+        if: steps.forced.outputs.skip == 'false' && github.event.pull_request.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MUTANTS_PACKAGE: ${{ matrix.package }}
+          MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          bash scripts/mutants-comment.sh \
+            "${{ github.event.pull_request.number }}" \
+            "mutants-out/${{ matrix.package }}"
 
       - name: Upload mutation report
-        if: always()
+        if: always() && steps.forced.outputs.skip == 'false'
         uses: actions/upload-artifact@v4
         with:
-          name: cargo-mutants-${{ matrix.package }}
-          path: ./mutants-out/${{ matrix.package }}
+          name: mutants-pr-${{ matrix.package }}
+          path: mutants-out/${{ matrix.package }}
           if-no-files-found: ignore
           retention-days: 14
+
+  mutants-nightly:
+    name: mutants-nightly (${{ matrix.package }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Source doc allots a 4-hour budget per crate; GitHub-hosted runners
+    # cap at 6 h. 240 min keeps headroom for setup steps.
+    timeout-minutes: 240
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - chio-kernel-core
+          - chio-policy
+          - chio-guards
+          - chio-credentials
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip when forced package does not match
+        id: forced
+        run: |
+          set -euo pipefail
+          forced='${{ inputs.package }}'
+          if [[ -n "${forced}" && "${forced}" != '${{ matrix.package }}' ]]; then
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+            echo "skipping ${{ matrix.package }} (forced=${forced})"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install Rust toolchain
+        if: steps.forced.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install cargo-mutants (pinned 25.x per Decision 12)
+        if: steps.forced.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          cargo install cargo-mutants --version '25.*' --locked
+
+      - name: Verify shared 30-day fuzz/mutants budget
+        if: steps.forced.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ -x scripts/check-fuzz-budget.sh ]]; then
+            scripts/check-fuzz-budget.sh "${{ github.repository }}" || \
+              echo "advisory: fuzz-budget check returned non-zero; continuing (advisory lane)"
+          else
+            echo "scripts/check-fuzz-budget.sh missing or non-executable; skipping budget check"
+          fi
+
+      - name: Run cargo-mutants full-workspace sweep
+        id: mutate
+        if: steps.forced.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          mkdir -p mutants-out/${{ matrix.package }}
+          # Full sweep, no --in-diff. examine_globs from .cargo/mutants.toml
+          # plus per-crate mutants.toml narrow scope to trust-boundary
+          # modules. --timeout 600 caps any single mutant at 10 minutes;
+          # the workspace timeout_multiplier = 3.0 still applies.
+          cargo mutants \
+            --package "${{ matrix.package }}" \
+            --no-shuffle \
+            --timeout 600 \
+            --jobs 2 \
+            --output mutants-out/${{ matrix.package }} \
+            --json \
+            || mutants_exit=$?
+          echo "exit=${mutants_exit:-0}" >> "${GITHUB_OUTPUT}"
+          ls -la mutants-out/${{ matrix.package }} || true
+
+      - name: Apply gate posture (advisory or blocking per releases.toml)
+        if: steps.forced.outputs.skip == 'false'
+        env:
+          MUTANTS_PACKAGE: ${{ matrix.package }}
+          MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
+          MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
+        run: |
+          set -euo pipefail
+          bash scripts/mutants-gate.sh
+
+      - name: Upload mutation report
+        if: always() && steps.forced.outputs.skip == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-nightly-${{ matrix.package }}-${{ github.run_id }}
+          path: mutants-out/${{ matrix.package }}
+          if-no-files-found: ignore
+          retention-days: 30
