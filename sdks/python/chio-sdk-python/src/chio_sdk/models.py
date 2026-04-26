@@ -1,3 +1,6 @@
+# chio-deprecation: this hand-typed module will be replaced by
+# generated bindings in milestone M01 P3 (datamodel-code-generator,
+# pydantic v2). Mirror schemas under spec/schemas/chio-wire/v1/.
 """Typed Python models mirroring Chio core Rust types.
 
 All models use Pydantic v2 for validation and serialization. Field names and
