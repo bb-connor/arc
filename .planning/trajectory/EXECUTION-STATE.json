@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:18:54.665Z",
+  "last_checkpoint_at": "2026-04-26T02:23:13.144Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -553,14 +553,16 @@
       }
     },
     "M09.P1.T6": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-a01aea877beb32c25",
+      "branch": "wave/W1/m09/p1.t6-advisories-ignore-audit",
+      "pr_number": 33,
+      "merged_at": "2026-04-26T02:23:13.144Z",
+      "divergence_checks": {
+        "result": "PASS",
+        "note": "cap soft-exceeded (28 vs ~6); 3 upstream-fix clusters; documented in commit body"
+      }
     },
     "M09.P1.T7": {
       "status": "pending",
