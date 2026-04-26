@@ -1644,6 +1644,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
+ "arbitrary",
  "base64 0.22.1",
  "chio-core",
  "chio-kernel",
