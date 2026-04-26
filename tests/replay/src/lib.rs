@@ -28,5 +28,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod byte_compare;
 pub mod driver;
+pub mod golden_reader;
 pub mod golden_writer;
