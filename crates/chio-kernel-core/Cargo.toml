@@ -35,6 +35,15 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 # `fuzz/fuzz_targets/receipt_log_replay.rs` (M02.P1.T8) via
 # `chio-kernel-core = { features = ["fuzz"] }`.
 arbitrary = { version = "1", features = ["derive"], optional = true }
+# `dudect-bencher` is gated behind the `dudect` feature so default builds
+# never pull it in. Used by the timing-leak harnesses at
+# `tests/dudect/{mac_eq,scope_subset}.rs` (M02.P2.T3) which are wired as
+# `harness = false` test binaries below. The harnesses statistically detect
+# data-dependent timing in (a) `Signature` byte equality (the kernel-core's
+# MAC-eq surface during signature verification) and (b)
+# `NormalizedScope::is_subset_of` (the capability-algebra subset check).
+# Reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 3 P3.T5.
+dudect-bencher = { version = "0.7", optional = true }
 
 [features]
 default = ["std"]
@@ -47,9 +56,32 @@ std = ["chio-core-types/std", "serde/std", "serde_json/std"]
 # Reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
 # (Round-2 trust-boundary fuzz target #12).
 fuzz = ["dep:arbitrary", "std"]
+# Enables the dudect timing-leak harnesses at `tests/dudect/{mac_eq,
+# scope_subset}.rs`. Implies `std` because dudect-bencher is a hosted-only
+# tool (clap, ctrlc, OS time syscalls) that never runs in the portable
+# `no_std + alloc` proof. Off by default; opt in via
+# `cargo test -p chio-kernel-core --features dudect --release {mac_eq|scope_subset}`.
+# CI lane: `.github/workflows/dudect.yml` (M02.P2.T4).
+dudect = ["dep:dudect-bencher", "std"]
 
 [dev-dependencies]
 proptest = { workspace = true }
+
+# Timing-leak dudect harnesses (M02.P2.T3). `harness = false` so each test
+# binary's `main` is provided by `dudect_bencher::ctbench_main!`. Gated
+# behind the `dudect` feature so default `cargo test` does not try to
+# compile them (the sources are `#![cfg(feature = "dudect")]`).
+[[test]]
+name = "dudect_mac_eq"
+path = "tests/dudect/mac_eq.rs"
+harness = false
+required-features = ["dudect"]
+
+[[test]]
+name = "dudect_scope_subset"
+path = "tests/dudect/scope_subset.rs"
+harness = false
+required-features = ["dudect"]
 
 [lints.clippy]
 unwrap_used = "deny"
