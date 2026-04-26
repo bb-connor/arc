@@ -22,6 +22,15 @@ chrono = { workspace = true, features = ["clock"] }
 base64 = { workspace = true }
 rand_core = { workspace = true, features = ["getrandom"] }
 sha2 = { workspace = true }
+# `arbitrary` is gated behind the `fuzz` feature so production builds stay
+# free of fuzz instrumentation. Pulled in by `fuzz/fuzz_targets/jwt_vc_verify.rs`
+# (M02.P1.T1.a) via `chio-credentials = { features = ["fuzz"] }`.
+arbitrary = { version = "1", features = ["derive"], optional = true }
+
+[features]
+# Enables `chio_credentials::fuzz`, the libFuzzer entry-point module.
+# Off by default; turned on only by the `chio-fuzz` standalone workspace.
+fuzz = ["dep:arbitrary"]
 
 [dev-dependencies]
 proptest = { workspace = true }
