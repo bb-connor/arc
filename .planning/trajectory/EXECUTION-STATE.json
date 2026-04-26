@@ -1,20 +1,21 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T00:43:45.998Z",
-  "current_wave": 1,
+  "last_checkpoint_at": "2026-04-26T00:51:31.741Z",
+  "current_wave": "1a",
   "halt": {
-    "halted": true,
-    "reason": "operator-discretion: session_budget_review at Wave 0 -> Wave 1a transition. Not a canonical halt-and-ping trigger; user direction needed on whether to proceed in this session.",
-    "trigger_event_id": "01KQ3KW3EEAVB5G9GR54VES3HQ",
-    "halted_at": "2026-04-26T00:43:45.998Z"
+    "halted": false,
+    "reason": null,
+    "trigger_event_id": null,
+    "halted_at": null
   },
   "milestones": {
     "M01": {
-      "status": "pending",
-      "phase": "P0",
+      "status": "in_progress",
+      "phase": "P1",
       "owner_branch": null,
-      "scheduled_in_wave": "1a"
+      "scheduled_in_wave": "1a",
+      "p0_status": "merged"
     },
     "M02": {
       "status": "blocked",
@@ -24,10 +25,11 @@
       "blocked_on": "PR #13 merge"
     },
     "M03": {
-      "status": "pending",
-      "phase": "P0",
+      "status": "in_progress",
+      "phase": "P1",
       "owner_branch": null,
-      "scheduled_in_wave": "1a"
+      "scheduled_in_wave": "1a",
+      "p0_status": "merged"
     },
     "M04": {
       "status": "pending",
@@ -55,10 +57,11 @@
       "owner_branch": null
     },
     "M09": {
-      "status": "pending",
-      "phase": "P0",
+      "status": "in_progress",
+      "phase": "P1",
       "owner_branch": null,
-      "scheduled_in_wave": "1a"
+      "scheduled_in_wave": "1a",
+      "p0_status": "merged"
     },
     "M10": {
       "status": "pending",
@@ -68,14 +71,23 @@
   },
   "tickets": {
     "M01.P0.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "orchestrator-direct",
+      "branch": "wave/W1/m01/p0.t1-wave-opener-lock-bump",
       "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "merged_at": "2026-04-26T00:51:31.741Z",
+      "merged_sha": "2d2f951a1322db6cf6e52b814397286af14efba9",
+      "diff_stats": {
+        "files": 0,
+        "insertions": 0,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "cascade_gate_event": "01KQ3MAA9BJ6X5NB9DF4R575ZP",
+        "result": "PASS"
+      },
+      "resolution": "no_op_baseline_via_cascade_gate"
     },
     "M01.P1.T1": {
       "status": "pending",
@@ -258,14 +270,23 @@
       "divergence_checks": null
     },
     "M03.P0.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "orchestrator-direct",
+      "branch": "wave/W1/m03/p0.t1-wave-opener-lock-bump",
       "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "merged_at": "2026-04-26T00:51:31.741Z",
+      "merged_sha": "2d2f951a1322db6cf6e52b814397286af14efba9",
+      "diff_stats": {
+        "files": 0,
+        "insertions": 0,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "cascade_gate_event": "01KQ3MAA9BJ6X5NB9DF4R575ZP",
+        "result": "PASS"
+      },
+      "resolution": "no_op_baseline_via_cascade_gate"
     },
     "M03.P1.T1": {
       "status": "pending",
@@ -338,14 +359,23 @@
       "divergence_checks": null
     },
     "M09.P0.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "orchestrator-direct",
+      "branch": "wave/W1/m09/p0.t1-wave-opener-lock-bump",
       "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "merged_at": "2026-04-26T00:51:31.741Z",
+      "merged_sha": "2d2f951a1322db6cf6e52b814397286af14efba9",
+      "diff_stats": {
+        "files": 0,
+        "insertions": 0,
+        "deletions": 0
+      },
+      "divergence_checks": {
+        "cascade_gate_event": "01KQ3MAA9BJ6X5NB9DF4R575ZP",
+        "result": "PASS"
+      },
+      "resolution": "no_op_baseline_via_cascade_gate"
     },
     "M09.P1.T1": {
       "status": "pending",
@@ -534,7 +564,7 @@
   },
   "wave_heads": {
     "WAVE_0_HEAD": "bad404f1985536e84cb948c7380dc325b2d94e50",
-    "WAVE_1_HEAD": null,
+    "WAVE_1_HEAD": "2d2f951a1322db6cf6e52b814397286af14efba9",
     "WAVE_2_HEAD": null,
     "WAVE_3_HEAD": null,
     "WAVE_4_HEAD": null
