@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:44:41.336Z",
+  "last_checkpoint_at": "2026-04-26T02:48:19.771Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -614,14 +614,15 @@
       }
     },
     "M09.P2.T2": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 44,
+      "merged_sha": "08a58cf6e99c80a2d6d90b98998251fd20bda0e3",
+      "branch": "wave/W1/m09/p2.t2-syft-sbom",
+      "merged_at": "2026-04-26T02:48:19.771Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P2.T3": {
       "status": "pending",
