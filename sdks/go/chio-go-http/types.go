@@ -1,5 +1,9 @@
 package chio
 
+// chio-deprecation: this hand-typed package will be replaced by
+// generated bindings in milestone M01 P3 (oapi-codegen).
+// Mirror schemas under spec/schemas/chio-wire/v1/.
+
 // Core types for the Chio HTTP substrate.
 // These types mirror the Rust chio-http-core crate and define the contract
 // between Go middleware and the Chio sidecar kernel.

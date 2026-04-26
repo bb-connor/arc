@@ -1,3 +1,6 @@
+// chio-deprecation: this hand-typed surface will be replaced by
+// generated bindings in milestone M01 P3 (json-schema-to-typescript).
+// Mirror schemas under spec/schemas/chio-wire/v1/.
 /**
  * @chio-protocol/conformance
  *
