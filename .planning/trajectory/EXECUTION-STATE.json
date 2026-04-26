@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:43:30.953Z",
+  "last_checkpoint_at": "2026-04-26T03:46:05.598Z",
   "current_wave": "1b",
   "halt": {
     "halted": false,
@@ -663,6 +663,17 @@
       "merged_sha": "8fae51619842043ce505d1a1ccb9db5c07e075b4",
       "branch": "wave/W1/m03/p3.t1-apalache-installer",
       "merged_at": "2026-04-26T03:43:30.953Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
+    },
+    "M03.P2.T1": {
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 54,
+      "merged_sha": "00c8535bc6ba6061859423a1cb00980ec40477fd",
+      "branch": "wave/W1/m03/p2.t1-kani-harness-pair",
+      "merged_at": "2026-04-26T03:46:05.598Z",
       "divergence_checks": {
         "result": "PASS"
       }
