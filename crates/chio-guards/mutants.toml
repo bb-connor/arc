@@ -1,0 +1,83 @@
+# cargo-mutants config for chio-guards (M02 P2)
+#
+# Anchored to .planning/trajectory/02-fuzzing-post-pr13.md, Phase 3,
+# "Mutation-testing approach" + "Mutation-testing CI shape (Phase 3)".
+# Decision 12: cargo-mutants pinned at 25.x; do not float.
+#
+# Trust-boundary modules in this crate (the native guard set). The
+# pipeline + the boundary-enforcing guards are the priority. Advisory
+# guards and pure-text utilities are de-prioritized for this lane.
+#
+#   - pipeline.rs              : fail-closed guard pipeline orchestration
+#   - shell_command.rs         : ShellCommandGuard (PR #13 hardening lane)
+#   - forbidden_path.rs        : sensitive-path block
+#   - path_allowlist.rs        : allowlist path access
+#   - path_normalization.rs    : path canonicalization (boundary input)
+#   - egress_allowlist.rs      : egress domain allowlist
+#   - internal_network.rs      : SSRF block on private/reserved addresses
+#   - secret_leak.rs           : secret detection on writes
+#   - patch_integrity.rs       : patch validation
+#   - mcp_tool.rs              : MCP tool restriction
+#   - prompt_injection.rs      : prompt-injection detector
+#   - jailbreak.rs             : jailbreak detection (heuristic + statistical)
+#   - jailbreak_detector.rs    : jailbreak detection (ML projection)
+#   - input_injection.rs       : CUA input-injection detection
+#   - response_sanitization.rs : PII/PHI redaction on responses
+#   - data_flow.rs             : cumulative bytes-in/out limits
+#   - behavioral_sequence.rs   : tool ordering policy
+#   - behavioral_profile.rs    : per-agent behavior baselines
+#   - agent_velocity.rs        : per-agent rate limiting
+#   - velocity.rs              : per-session rate limiting
+#   - code_execution.rs        : code-execution gating
+#   - browser_automation.rs    : browser-automation gating
+#   - computer_use.rs          : CUA gating
+#   - remote_desktop.rs        : remote-desktop gating
+#   - content_review.rs        : content-review pre-flight
+#   - memory_governance.rs     : memory-governance gating
+#   - post_invocation.rs       : post-invocation review
+#
+# Out of scope: action.rs (pure types), advisory guards (non-blocking by
+# design), text_utils.rs (pure helpers), spider_sense.rs (advisory),
+# external/ adapters (remote-process bridges), and the `external`
+# directory tree (covered by integration tests, not mutation).
+
+examine_globs = [
+    "src/pipeline.rs",
+    "src/shell_command.rs",
+    "src/forbidden_path.rs",
+    "src/path_allowlist.rs",
+    "src/path_normalization.rs",
+    "src/egress_allowlist.rs",
+    "src/internal_network.rs",
+    "src/secret_leak.rs",
+    "src/patch_integrity.rs",
+    "src/mcp_tool.rs",
+    "src/prompt_injection.rs",
+    "src/jailbreak.rs",
+    "src/jailbreak_detector.rs",
+    "src/input_injection.rs",
+    "src/response_sanitization.rs",
+    "src/data_flow.rs",
+    "src/behavioral_sequence.rs",
+    "src/behavioral_profile.rs",
+    "src/agent_velocity.rs",
+    "src/velocity.rs",
+    "src/code_execution.rs",
+    "src/browser_automation.rs",
+    "src/computer_use.rs",
+    "src/remote_desktop.rs",
+    "src/content_review.rs",
+    "src/memory_governance.rs",
+    "src/post_invocation.rs",
+]
+
+exclude_globs = [
+    "src/**/tests.rs",
+    "src/**/test_*.rs",
+    "src/lib.rs",
+    "src/action.rs",
+    "src/text_utils.rs",
+    "src/advisory.rs",
+    "src/spider_sense.rs",
+    "src/external/**",
+]

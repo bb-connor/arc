@@ -1,0 +1,65 @@
+# cargo-mutants workspace config (M02 P2)
+#
+# Anchored to .planning/trajectory/02-fuzzing-post-pr13.md
+# - "Mutation-testing approach" (phase 3 deliverable)
+# - "Mutation-testing CI shape (Phase 3)"
+# - Decision 12: cargo-mutants pinned at 25.x; do not float.
+#
+# This file is the workspace-level default. Per-crate overrides live in
+# crates/<crate>/mutants.toml and narrow the examined source set to the
+# trust-boundary modules for that crate.
+#
+# CI lane: .github/workflows/mutants.yml (lands in M02.P2.T2)
+#   - mutants-pr      : runs `cargo mutants --in-diff` on PRs (advisory)
+#   - mutants-nightly : full sweep on a 4-hour-per-crate budget
+#
+# Local-dev usage:
+#   cargo install cargo-mutants --version '~25' --locked
+#   cargo mutants --in-diff origin/main
+#
+# Catch-ratio target per crate: >= 80%.
+# Advisory for one release cycle, then blocking (see releases.toml).
+
+# Run the workspace test suite per mutant, but exclude the C++ FFI crate.
+# That crate ships through a separate vcpkg/conan release lane and is not
+# built or tested by the default `cargo test --workspace` invocation in
+# the mutation-testing workflow.
+additional_cargo_test_args = ["--workspace", "--exclude", "chio-cpp-kernel-ffi"]
+
+# cargo-mutants reruns the full test suite once per generated mutant.
+# A 3x multiplier on the baseline test wall-clock is the documented guard
+# against slow-test flakes masquerading as surviving mutants. Tuned per
+# the "Mutation-testing CI shape" section of the source doc.
+timeout_multiplier = 3.0
+
+# Floor on per-mutant test timeout in seconds. Prevents the multiplier
+# from collapsing to a sub-second value on very fast suites and giving
+# false "TIMEOUT" verdicts on cold caches.
+minimum_test_timeout = 60
+
+# Default examined-package set. Per-crate mutants.toml files narrow this
+# further to the trust-boundary modules within each crate.
+#
+# Scope priority (from source doc Phase 3 deliverable):
+#   1. chio-kernel-core (capability validation, guard pipeline, receipts)
+#   2. chio-policy      (HushSpec parse/compile, evaluator)
+#   3. chio-guards      (native guard set including ShellCommandGuard)
+#   4. chio-credentials (JWT VC verify, OID4VP, SD-JWT)
+examine_globs = [
+    "crates/chio-kernel-core/**/*.rs",
+    "crates/chio-policy/**/*.rs",
+    "crates/chio-guards/**/*.rs",
+    "crates/chio-credentials/**/*.rs",
+]
+
+# Workspace-wide skip list (from source doc): pure plumbing, generated
+# code, and test/bench scaffolding. Per-crate configs can extend.
+exclude_globs = [
+    "**/tests.rs",
+    "**/test_*.rs",
+    "**/*_test.rs",
+    "**/tests/**",
+    "**/benches/**",
+    "**/build.rs",
+    "**/fuzz.rs",
+]
