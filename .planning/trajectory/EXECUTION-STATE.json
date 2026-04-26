@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:36:48.660Z",
+  "last_checkpoint_at": "2026-04-26T02:43:27.018Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -219,14 +219,15 @@
       }
     },
     "M01.P2.T1": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 42,
+      "merged_sha": "3405b14f796071d05b3d83041a7a01f1a2ee38f8",
+      "branch": "wave/W1/m01/p2.t1-vectors-oracle-canonical-20",
+      "merged_at": "2026-04-26T02:43:27.018Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P2.T2": {
       "status": "pending",
