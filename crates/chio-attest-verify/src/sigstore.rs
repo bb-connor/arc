@@ -316,6 +316,9 @@ fn map_webpki_error(err: webpki::Error) -> AttestError {
 
 fn match_identity(cert: &Certificate, expected: &ExpectedIdentity) -> Result<String, AttestError> {
     // 1) OIDC issuer extension MUST exactly equal the expected issuer.
+    // The OIDC issuer is a public well-known URL (e.g. https://token.actions.githubusercontent.com),
+    // not secret material. Plain `!=` is acceptable; constant-time equality is unnecessary because
+    // there is no secret on either side of the comparison whose timing leak would matter.
     let issuer = read_oidc_issuer_extension(cert)?;
     if issuer != expected.certificate_oidc_issuer {
         return Err(AttestError::IssuerMismatch);
@@ -518,6 +521,7 @@ impl VerificationPolicy for IssuerOnlyPolicy {
                 let Some(actual) = parsed else {
                     return Err(PolicyError::ExtensionNotFound);
                 };
+                // Plain `==` on a public OIDC issuer URL: no secret-material timing channel.
                 if actual == self.expected_issuer {
                     return Ok(());
                 }
