@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T03:15:00.524Z",
+  "last_checkpoint_at": "2026-04-26T03:25:04.747Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -276,14 +276,15 @@
       }
     },
     "M01.P2.T6": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 50,
+      "merged_sha": "f67c6c6f92db4a7797d425d3cbd2685c30cc87c3",
+      "branch": "wave/W1/m01/p2.t6-capability-vectors",
+      "merged_at": "2026-04-26T03:25:04.747Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M01.P2.T7": {
       "status": "pending",
