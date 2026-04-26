@@ -1,0 +1,66 @@
+# slsa.yml - SLSA L2 provenance generation for release binaries.
+#
+# Owned by M09 per OWNERS.toml workflow lane table. Triggered on
+# successful completion of release-binaries.yml. Consumes the
+# per-target binary digests from that workflow's uploaded artifacts
+# and emits a signed provenance attestation alongside each release.
+#
+# The workflow_run trigger fires after release-binaries.yml succeeds
+# (which itself runs on `v*.*.*` tag pushes or workflow_dispatch). We
+# avoid coupling the SLSA generator step into release-binaries.yml
+# directly because the reusable slsa-github-generator workflow needs
+# `id-token: write` and `contents: write` and is easier to audit when
+# isolated from the build matrix.
+
+name: slsa
+
+on:
+  workflow_run:
+    workflows: ["Release Binaries"]
+    types: [completed]
+    branches: [main, project/roadmap-04-25-2026]
+
+permissions:
+  id-token: write
+  contents: write
+  actions: read
+
+jobs:
+  collect-digests:
+    name: Collect binary digests from release-binaries
+    # owner: M09
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      subjects: ${{ steps.compute.outputs.subjects }}
+    steps:
+      - name: Download artifacts from release-binaries.yml
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: chio-*
+          path: artifacts/
+      - name: Compute base64-encoded subjects
+        id: compute
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          SUBJECTS=$(find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; | base64 -w0)
+          echo "subjects=${SUBJECTS}" >> "${GITHUB_OUTPUT}"
+
+  provenance:
+    name: SLSA L2 provenance
+    # owner: M09
+    needs: [collect-digests]
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.collect-digests.outputs.subjects }}
+      provenance-name: chio-${{ github.event.workflow_run.head_sha }}.intoto.jsonl
+      upload-assets: true
