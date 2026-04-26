@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T01:27:31.507Z",
+  "last_checkpoint_at": "2026-04-26T01:30:53.155Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -366,14 +366,21 @@
       }
     },
     "M03.P1.T4": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-aea207f107a8c9b3e",
+      "branch": "wave/W1/m03/p1.t4-credentials-passport-invariants",
+      "pr_number": 20,
+      "merged_at": "2026-04-26T01:30:53.155Z",
+      "merged_sha": "6e29f2bc527ff238168333d6853c6d393df47744",
+      "diff_stats": {
+        "files": 1,
+        "insertions": 490
+      },
+      "divergence_checks": {
+        "result": "PASS",
+        "test_pass": 4
+      }
     },
     "M03.P1.T5": {
       "status": "pending",
