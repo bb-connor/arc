@@ -106,7 +106,7 @@ fn push_segment_path_candidates(out: &mut Vec<String>, tokens: &[String]) {
             if let Some(next) = tokens.get(i + 1) {
                 push_path_candidate(out, next);
             }
-            i += 1;
+            i += 2;
             continue;
         }
         if let Some((_, rest)) = split_inline_redirection(t) {
@@ -650,6 +650,23 @@ mod tests {
     fn blocks_redirection_to_forbidden_path() {
         let guard = ShellCommandGuard::new();
         assert!(guard.is_forbidden("echo hi > ~/.ssh/id_rsa"));
+    }
+
+    #[test]
+    fn redirection_path_target_is_not_reprocessed() {
+        let guard = ShellCommandGuard::new();
+        let commandline = "echo hi > ~/.ssh/id_rsa /tmp/after";
+        let tokens = shlex_split_best_effort(commandline);
+        let paths = guard.extract_candidate_paths(commandline, &tokens);
+
+        assert_eq!(
+            paths
+                .iter()
+                .filter(|path| path.as_str() == "~/.ssh/id_rsa")
+                .count(),
+            1
+        );
+        assert!(paths.iter().any(|path| path == "/tmp/after"));
     }
 
     #[test]
