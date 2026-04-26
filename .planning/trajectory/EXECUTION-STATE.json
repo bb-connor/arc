@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:31:45.974Z",
+  "last_checkpoint_at": "2026-04-26T02:32:15.321Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -591,14 +591,15 @@
       }
     },
     "M09.P1.T9": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "pr_number": 39,
+      "merged_sha": "64e6aec0d53ec768caddb97a18a332477390aef1",
+      "branch": "wave/W1/m09/p1.t9-cargo-deny-ci-lane",
+      "merged_at": "2026-04-26T02:32:15.321Z",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P2.T1": {
       "status": "pending",
