@@ -37,6 +37,7 @@ chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
 chio-mcp-adapter = { path = "../crates/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/chio-mcp-edge", features = ["fuzz"] }
+chio-wasm-guards = { path = "../crates/chio-wasm-guards", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
 # `arbitrary` is pulled in directly by libFuzzer harnesses that take
 # structured input; the `derive` feature lets per-target structs annotate
@@ -121,6 +122,21 @@ bench = false
 [[bin]]
 name = "oid4vp_presentation"
 path = "fuzz_targets/oid4vp_presentation.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P1.T4.a: Chio WASM guards preinstantiate-validate trust boundary
+# (`ComponentBackend::load_module` plus `WasmtimeBackend::load_module` plus
+# `detect_wasm_format`). Hardens the parse / validate pipeline that runs
+# BEFORE instantiation against malformed or malicious `.wasm` bytes. M09
+# P3's signed-module branch is `cfg(feature = "attest_verify")`-gated and
+# exercises the same `load_module` entry point post-signature check; T4.a
+# focuses on the unsigned validation path.
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+[[bin]]
+name = "wasm_preinstantiate_validate"
+path = "fuzz_targets/wasm_preinstantiate_validate.rs"
 test = false
 doc = false
 bench = false
