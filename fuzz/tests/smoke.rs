@@ -118,3 +118,9 @@ fn chio_yaml_parse_smoke() {
     use chio_config::fuzz::fuzz_chio_yaml_parse;
     each_seed("chio_yaml_parse", fuzz_chio_yaml_parse);
 }
+
+#[test]
+fn openapi_ingest_smoke() {
+    use chio_openapi_mcp_bridge::fuzz::fuzz_openapi_ingest;
+    each_seed("openapi_ingest", fuzz_openapi_ingest);
+}

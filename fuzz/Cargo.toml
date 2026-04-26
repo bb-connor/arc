@@ -38,6 +38,7 @@ chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
 chio-mcp-adapter = { path = "../crates/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/chio-mcp-edge", features = ["fuzz"] }
+chio-openapi-mcp-bridge = { path = "../crates/chio-openapi-mcp-bridge", features = ["fuzz"] }
 chio-wasm-guards = { path = "../crates/chio-wasm-guards", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
 # `arbitrary` is pulled in directly by libFuzzer harnesses that take
@@ -135,6 +136,19 @@ bench = false
 [[bin]]
 name = "oid4vp_presentation"
 path = "fuzz_targets/oid4vp_presentation.rs"
+test = false
+doc = false
+bench = false
+
+# M02.P1.T5.b: Chio OpenAPI-MCP bridge spec-ingest trust boundary
+# (`OpenApiMcpBridge::from_spec`: JSON/YAML auto-detect parse plus
+# OpenAPI 3.x version validation plus manifest generation plus
+# `validate_manifest`).
+# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
+# (trust-boundary fuzz target #11).
+[[bin]]
+name = "openapi_ingest"
+path = "fuzz_targets/openapi_ingest.rs"
 test = false
 doc = false
 bench = false
