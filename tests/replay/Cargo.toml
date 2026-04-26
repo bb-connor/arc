@@ -17,6 +17,10 @@ name = "chio-replay-gate"
 path = "src/main.rs"
 
 [dependencies]
+chrono = { workspace = true, features = ["clock"] }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"
