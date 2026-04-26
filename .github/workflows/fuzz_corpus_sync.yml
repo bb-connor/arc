@@ -61,6 +61,14 @@ jobs:
           fetch-depth: 0
           path: chio
 
+      # M02.P4.T8 sunset gate: refuse to run a corpus sync while
+      # fuzz/upstream_skips.toml contains expired or out-of-bounds
+      # entries. Source: .planning/trajectory/02-fuzzing-post-pr13.md
+      # Phase 2 P2.T4 (force re-evaluation of false-positive skips).
+      - name: Check upstream-skips sunset
+        working-directory: chio
+        run: bash scripts/check-upstream-skips.sh
+
       - name: Checkout arc-fuzz-corpus sibling repo
         uses: actions/checkout@v4
         with:
