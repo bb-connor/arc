@@ -266,9 +266,95 @@ The release job validates the SBOM with
 upload; a missing or malformed SBOM fails the workflow rather than
 silently publishing without one.
 
-Cosign signing of these artifacts lands in a follow-up task; see
+Cosign signing of these `release-binaries.yml` archives lands in
+M09.P3.T3; see
 `.planning/trajectory/09-supply-chain-attestation.md` for the full
 attestation roadmap.
+
+---
+
+## Sidecar image signing
+
+Owned by M09 (M09.P3.T2). The multi-arch sidecar OCI image built by
+[`.github/workflows/sidecar-image.yml`](../../.github/workflows/sidecar-image.yml)
+is keyless-signed with [Sigstore cosign](https://docs.sigstore.dev/cosign/)
+immediately after the `docker/build-push-action@v6` push step. The
+signature is keyed to the image's content-addressed digest, so every
+tag the metadata-action emits (`vMAJOR.MINOR.PATCH`, `MAJOR.MINOR`,
+short SHA, `latest` on default branch, optional `workflow_dispatch`
+override) is covered by a single signature on the underlying manifest.
+
+### How signing works
+
+1. `sigstore/cosign-installer@v3.7.0` pins cosign at `v2.4.1` on the
+   GitHub-hosted runner.
+2. The workflow already runs with `permissions.id-token: write`, which
+   lets `cosign sign --yes` exchange a GitHub-issued OIDC token for a
+   short-lived Fulcio signing certificate. No long-lived signing key is
+   held in repo secrets.
+3. `cosign sign --yes ghcr.io/<owner>/chio-sidecar@sha256:<digest>`
+   uploads the resulting signature blob and certificate to the
+   sigstore cosign signature tag (`sha256-<digest>.sig`) on the same
+   ghcr.io repository, and writes a Rekor transparency-log entry that
+   binds the signature to the workflow run that produced it.
+
+### Consumer verification
+
+Operators pulling the image can confirm the signature offline against
+Sigstore's transparency log:
+
+```bash
+# Pin the digest you intend to deploy (recommended in production).
+DIGEST=$(docker buildx imagetools inspect \
+  ghcr.io/<owner>/chio-sidecar:<tag> --format '{{json .Manifest}}' \
+  | jq -r .digest)
+
+cosign verify \
+  --certificate-identity-regexp \
+    "^https://github\.com/<owner>/chio/\.github/workflows/sidecar-image\.yml@refs/(tags/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|heads/main)$" \
+  --certificate-oidc-issuer \
+    "https://token.actions.githubusercontent.com" \
+  ghcr.io/<owner>/chio-sidecar@${DIGEST}
+```
+
+The `<owner>` placeholder is the lower-cased GitHub repository owner;
+the `Normalize image repository` step in the workflow performs the
+same lower-casing for the image name itself. Pin a tag rather than
+following `:latest` if you need reproducible deploys; the digest is
+the canonical reference.
+
+The regex covers the three trigger shapes the workflow accepts:
+
+| Trigger             | SAN suffix                               |
+|---------------------|------------------------------------------|
+| `v*.*.*` tag push   | `@refs/tags/v<MAJOR.MINOR.PATCH[-pre]>`  |
+| `main` branch push  | `@refs/heads/main`                       |
+| `workflow_dispatch` | `@refs/heads/<branch>` (run by operator) |
+
+Operators who require strict release-only verification should narrow
+the `--certificate-identity-regexp` to just the `refs/tags/v...` arm
+and reject `main`-branch and `workflow_dispatch` images at deploy
+time.
+
+### Programmatic verification from chio code
+
+In-tree code MUST go through `chio_attest_verify::AttestVerifier`
+rather than calling `sigstore-rs` directly. The trait surface is
+documented in [`crates/chio-attest-verify/README.md`](../../crates/chio-attest-verify/README.md)
+(landed in M09.P3.T1) and exposes `verify_blob`, `verify_bytes`, and
+`verify_bundle` with a single canonical `ExpectedIdentity`
+(`certificate_identity_regexp`, `certificate_oidc_issuer`). The
+sidecar-image workflow's signing identity matches that surface
+directly: pass the regex shape above and the
+`https://token.actions.githubusercontent.com` issuer.
+
+### Rotation and rebake
+
+Keyless signatures do not need rotation in the long-key sense; each
+release mints a fresh ephemeral certificate. The Sigstore TUF trust
+root that `chio-attest-verify` ships is refreshed by the quarterly
+[`tuf-rebake.yml`](../../.github/workflows/tuf-rebake.yml) job and
+landed via a CODEOWNERS-reviewed PR.
 
 ---
 
