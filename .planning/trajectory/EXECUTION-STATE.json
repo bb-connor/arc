@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T02:12:19.541Z",
+  "last_checkpoint_at": "2026-04-26T02:17:45.306Z",
   "current_wave": "1a",
   "halt": {
     "halted": false,
@@ -514,14 +514,16 @@
       }
     },
     "M09.P1.T3": {
-      "status": "pending",
-      "attempts": 0,
-      "executor_id": null,
-      "branch": null,
-      "pr_number": null,
-      "merged_at": null,
-      "diff_stats": null,
-      "divergence_checks": null
+      "status": "merged",
+      "attempts": 1,
+      "executor_id": "exec-subagent-ac41f9027fabe380d",
+      "branch": "wave/W1/m09/p1.t3-cargo-vet-certify",
+      "pr_number": 30,
+      "merged_at": "2026-04-26T02:17:45.306Z",
+      "merged_sha": "d16ddcff8",
+      "divergence_checks": {
+        "result": "PASS"
+      }
     },
     "M09.P1.T4": {
       "status": "merged",
