@@ -91,3 +91,9 @@ fn a2a_envelope_decode_smoke() {
     use chio_a2a_adapter::fuzz::fuzz_a2a_envelope_decode;
     each_seed("a2a_envelope_decode", fuzz_a2a_envelope_decode);
 }
+
+#[test]
+fn acp_envelope_decode_smoke() {
+    use chio_acp_edge::fuzz::fuzz_acp_envelope_decode;
+    each_seed("acp_envelope_decode", fuzz_acp_envelope_decode);
+}
