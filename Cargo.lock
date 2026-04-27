@@ -2483,6 +2483,7 @@ dependencies = [
  "chio-cross-protocol",
  "chio-kernel",
  "chio-manifest",
+ "chio-tool-call-fabric",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
