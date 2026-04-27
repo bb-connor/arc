@@ -2263,6 +2263,11 @@ fn main() {
                 password: password.as_deref(),
                 allow_http_registry: allow_http_registry.clone(),
             }),
+            GuardCommands::Blocklist { command } => match command {
+                GuardBlocklistCommands::Remove { digest } => {
+                    commands::guard_blocklist::cmd_guard_blocklist_remove(&digest)
+                }
+            },
             GuardCommands::Install { path, target_dir } => guard::cmd_guard_install(&path, &target_dir),
             GuardCommands::Sign { wasm, key, name, version } => {
                 guards::sign::cmd_guard_sign(&wasm, &key, &name, &version)
