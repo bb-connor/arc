@@ -16,6 +16,18 @@ tests/bindings/vectors/**                    @bb-connor
 tests/conformance/**                         @bb-connor
 tests/replay/fixtures/**                     @bb-connor
 
+# ---------- M04 P2.T6 deterministic-replay golden + seed lock ----------
+# Blessed-corpus and signing-seed paths owned by M04. Re-blessing the corpus
+# is gated by CHIO_BLESS in chio-replay-gate.yml; the seed-immutable rule is
+# enforced by the seed-immutable job (any change to test-key.seed,
+# test-key.seed.sha256, or test-key.seed.README fails the replay-gate).
+# Source: .planning/trajectory/04-deterministic-replay.md Phase 2 task 6
+# Source: .planning/trajectory/tickets/M04/P2.yml ticket M04.P2.T6
+tests/replay/goldens/**                      @bb-connor
+tests/replay/test-key.seed                   @bb-connor
+tests/replay/test-key.seed.sha256            @bb-connor
+tests/replay/test-key.seed.README            @bb-connor
+
 # ---------- Algebra and core ----------
 crates/chio-core-types/src/capability*.rs    @bb-connor
 crates/chio-core-types/src/scope*.rs         @bb-connor

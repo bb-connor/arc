@@ -56,6 +56,26 @@ glob   = "tests/replay/fixtures/**"
 owners = ["M04", "M07", "M10"]
 notes  = "M04 owns the corpus; M07 adds per-provider scenarios; M10 graduates captures via chio replay --bless"
 
+[[ownership]]
+glob   = "tests/replay/goldens/**"
+owners = ["M04"]
+notes  = "Blessed corpus; only re-blessed via CHIO_BLESS gate (see 04-deterministic-replay.md)"
+
+[[ownership]]
+glob   = "tests/replay/test-key.seed"
+owners = ["M04"]
+notes  = "Test signing seed; seed-immutable enforced by chio-replay-gate.yml seed-immutable job"
+
+[[ownership]]
+glob   = "tests/replay/test-key.seed.sha256"
+owners = ["M04"]
+notes  = "SHA256 of test-key.seed; mismatch fails the replay-gate"
+
+[[ownership]]
+glob   = "tests/replay/test-key.seed.README"
+owners = ["M04"]
+notes  = "Public-seed warning README; coupled to test-key.seed"
+
 # ---------- Kernel - the contended crate ----------
 
 [[ownership]]
