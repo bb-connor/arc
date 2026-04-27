@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: addbe60437bb0258103fb68da7ee1ee5c1d4fade2ca6aab98f2d5ddc89f0b7e1
+# Schema sha256: 47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5
 #
 # Manual edits will be overwritten by the next regeneration; the
 # M01.P3.T5 spec-drift CI lane enforces this header on every file
@@ -64,16 +64,31 @@ class DelegationLink(BaseModel):
         extra="forbid",
     )
     capability_id: constr(min_length=1)
-    delegator: constr(pattern=r"^[0-9a-f]{64}$")
-    delegatee: constr(pattern=r"^[0-9a-f]{64}$")
+    delegator: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ) = Field(
+        ...,
+        description="Delegating public key. Same encoding as the token-level `issuer`/`subject`.",
+    )
+    delegatee: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ) = Field(
+        ...,
+        description="Receiving public key. Same encoding as the token-level `issuer`/`subject`.",
+    )
     attenuations: list[Attenuation] | None = None
     timestamp: conint(ge=0)
-    signature: constr(pattern=r"^[0-9a-f]+$", min_length=96)
+    signature: constr(pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$") = (
+        Field(
+            ...,
+            description="Delegation-link signature. Same encoding as the token-level `signature`.",
+        )
+    )
 
 
 class ToolGrant(BaseModel):
     """
-    Authorization to invoke a single tool. Mirrors `ToolGrant`.
+    Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
     """
 
     model_config = ConfigDict(
@@ -91,7 +106,7 @@ class ToolGrant(BaseModel):
 
 class ResourceGrant(BaseModel):
     """
-    Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+    Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
     """
 
     model_config = ConfigDict(
@@ -103,7 +118,7 @@ class ResourceGrant(BaseModel):
 
 class PromptGrant(BaseModel):
     """
-    Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+    Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
     """
 
     model_config = ConfigDict(
@@ -128,7 +143,7 @@ class ChioScope(BaseModel):
 
 class ChioCapabilitytoken(BaseModel):
     """
-    A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens.
+    A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens. PublicKey serde renders Ed25519 keys as bare 64-character lowercase hex (`PublicKey::to_hex` in `crates/chio-core-types/src/crypto.rs`), and renders FIPS keys with a self-describing prefix (`p256:<130-char hex>` for uncompressed SEC1 P-256, `p384:<194-char hex>` for P-384). Signatures follow the same convention: bare 128-char hex for Ed25519, `p256:<DER hex>` and `p384:<DER hex>` for FIPS algorithms. The grant `$defs` (`toolGrant`, `resourceGrant`, `promptGrant`, `operation`, `monetaryAmount`, `constraint`) are duplicated with `capability/grant.schema.json` because the current Rust codegen pipeline (`typify =0.4.3`) does not support cross-file `$ref`; both copies must be kept byte-identical when either file is edited until the M01 phase 3 codegen split lands.
     """
 
     model_config = ConfigDict(
@@ -137,13 +152,17 @@ class ChioCapabilitytoken(BaseModel):
     id: constr(min_length=1) = Field(
         ..., description="Unique token ID (UUIDv7 recommended), used for revocation."
     )
-    issuer: constr(pattern=r"^[0-9a-f]{64}$") = Field(
+    issuer: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ) = Field(
         ...,
-        description="Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.",
+        description="Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).",
     )
-    subject: constr(pattern=r"^[0-9a-f]{64}$") = Field(
+    subject: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ) = Field(
         ...,
-        description="Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).",
+        description="Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.",
     )
     scope: ChioScope
     issued_at: conint(ge=0) = Field(
@@ -160,7 +179,9 @@ class ChioCapabilitytoken(BaseModel):
         None,
         description="Signing algorithm envelope hint. Omitted for legacy Ed25519 tokens to preserve byte-for-byte compatibility. Verification dispatches off the signature hex prefix, not this field.",
     )
-    signature: constr(pattern=r"^[0-9a-f]+$", min_length=96) = Field(
-        ...,
-        description="Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).",
+    signature: constr(pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$") = (
+        Field(
+            ...,
+            description="Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
+        )
     )

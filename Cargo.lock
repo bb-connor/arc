@@ -1954,6 +1954,7 @@ name = "chio-core-types"
 version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
+ "chio-spec-codegen",
  "ed25519-dalek",
  "getrandom 0.2.17",
  "hex",

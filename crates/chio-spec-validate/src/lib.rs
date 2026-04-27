@@ -68,14 +68,22 @@ pub fn validate(schema_path: &Path, doc_path: &Path) -> Result<(), ValidateError
 /// Validate an in-memory document against an in-memory schema.
 ///
 /// `schema_path` and `doc_path` are used only for diagnostics and may be any
-/// representative path (for example, a synthetic `<inline>`).
+/// representative path (for example, a synthetic `<inline>`). When
+/// `schema_path` has a parent directory, it is used as the base URI for
+/// resolving sibling-file `$ref` references, matching the
+/// `spec/schemas/<area>/v1/*.schema.json` convention used in the workspace.
 pub fn validate_value(
     schema_path: &Path,
     schema: &Value,
     doc_path: &Path,
     doc: &Value,
 ) -> Result<(), ValidateError> {
-    let validator = jsonschema::validator_for(schema)
+    let mut options = jsonschema::options();
+    if let Some(base_uri) = schema_base_uri(schema_path) {
+        options = options.with_base_uri(base_uri);
+    }
+    let validator = options
+        .build(schema)
         .map_err(|err| ValidateError::SchemaCompile(schema_path.to_path_buf(), err.to_string()))?;
     if validator.is_valid(doc) {
         return Ok(());
@@ -89,4 +97,32 @@ pub fn validate_value(
         doc_path.to_path_buf(),
         errors,
     ))
+}
+
+/// Build a `file://` base URI from a schema's parent directory so that the
+/// `jsonschema` `resolve-file` retriever can follow `$ref` strings such as
+/// `caller-identity.schema.json` (sibling file) or `../shared/foo.json`.
+///
+/// Returns `None` when the schema path has no parent or cannot be canonicalized
+/// to an absolute path; callers fall back to library defaults in that case.
+fn schema_base_uri(schema_path: &Path) -> Option<String> {
+    let parent = schema_path.parent()?;
+    if parent.as_os_str().is_empty() {
+        return None;
+    }
+    let canonical = match parent.canonicalize() {
+        Ok(path) => path,
+        Err(_) => parent.to_path_buf(),
+    };
+    // Normalize backslashes to forward slashes for Windows paths, then ensure
+    // exactly one leading slash so the result is a well-formed `file:///...`
+    // URI on every host platform.
+    let mut path_str = canonical.to_string_lossy().replace('\\', "/");
+    if !path_str.starts_with('/') {
+        path_str.insert(0, '/');
+    }
+    if !path_str.ends_with('/') {
+        path_str.push('/');
+    }
+    Some(format!("file://{path_str}"))
 }

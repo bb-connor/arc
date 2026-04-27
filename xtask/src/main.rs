@@ -16,14 +16,17 @@
 //! header. With `--check` it exits non-zero on drift instead of writing.
 //!
 //! `validate-scenarios` walks `tests/conformance/scenarios/**/*.json`, looks
-//! up each scenario's declared `$schema` URI (resolved against the
-//! `https://chio-protocol.dev/schemas/` prefix to a path under
-//! `spec/schemas/`), and validates the scenario via `chio-spec-validate`.
+//! up each scenario's declared `$schema` URI (resolved primarily through an
+//! index of `$id` values discovered under `spec/schemas/**`, with a
+//! fallback to the legacy `https://chio-protocol.dev/schemas/` strip-prefix
+//! mapping), and validates the scenario via `chio-spec-validate`.
 //! Scenarios without a `$schema` field are skipped (so that legacy
-//! conformance descriptors continue to load). Prints a per-scenario
-//! `PASS|FAIL|SKIP` line and exits non-zero on any FAIL. If the scenarios
-//! directory is missing or contains no JSON files, it prints `no scenarios
-//! found` and exits 0.
+//! conformance descriptors continue to load). Scenarios that DO declare a
+//! `$schema` URI but fail to resolve are treated as a hard failure rather
+//! than a SKIP, so a typo in the URI cannot silently bypass validation.
+//! Prints a per-scenario `PASS|FAIL|SKIP` line and exits non-zero on any
+//! FAIL. If the scenarios directory is missing or contains no JSON files,
+//! it prints `no scenarios found` and exits 0.
 //!
 //! `freeze-vectors` walks `tests/bindings/vectors/**/*.json`, computes a
 //! sha256 digest per file, and writes
@@ -350,6 +353,17 @@ fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
         return Ok(());
     }
 
+    // Build a `$id` URI -> schema-path index by scanning every
+    // *.schema.json under spec/schemas/. Each schema declares its canonical
+    // identifier in `$id`; scenarios authored against a schema reference
+    // that exact value (which does NOT match the on-disk path one-to-one,
+    // see for example
+    // `chio-wire/v1/capability/token/v1` vs the file
+    // `chio-wire/v1/capability/token.schema.json`). We resolve the URI via
+    // this index and fall back to the legacy strip-prefix path mapping for
+    // hosts that pre-date `$id` adoption.
+    let schema_index = build_schema_index(&schemas_root)?;
+
     let mut failures: Vec<String> = Vec::new();
     let mut pass_count: usize = 0;
     let mut skip_count: usize = 0;
@@ -367,16 +381,22 @@ fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
             skip_count += 1;
             continue;
         };
-        let Some(rel) = uri.strip_prefix(SCHEMA_URI_PREFIX) else {
-            println!(
-                "SKIP {} (unrecognized $schema URI: {})",
-                display_path(scenario),
-                uri
-            );
-            skip_count += 1;
-            continue;
+        let schema_path = match resolve_schema_path(uri, &schema_index, &schemas_root) {
+            Some(path) => path,
+            None => {
+                // Unrecognized `$schema` URIs were previously SKIPped, which
+                // meant a typo could silently bypass validation. Treat them
+                // as a hard failure: a scenario that opted into schema
+                // validation must point at a real schema.
+                println!(
+                    "FAIL {}: unrecognized $schema URI: {}",
+                    display_path(scenario),
+                    uri
+                );
+                failures.push(display_path(scenario));
+                continue;
+            }
         };
-        let schema_path = schemas_root.join(rel);
         match chio_spec_validate::validate(&schema_path, scenario) {
             Ok(()) => {
                 println!("PASS {}", display_path(scenario));
@@ -406,6 +426,69 @@ fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
             failures.join(", ")
         )))
     }
+}
+
+/// Mapping from a schema's canonical `$id` URI (and a few normalized
+/// variants) to the absolute path of the schema file on disk. Built once
+/// per `validate-scenarios` invocation by walking `spec/schemas/`.
+type SchemaIndex = std::collections::BTreeMap<String, PathBuf>;
+
+fn build_schema_index(schemas_root: &Path) -> Result<SchemaIndex, XtaskError> {
+    let mut index: SchemaIndex = SchemaIndex::new();
+    if !schemas_root.exists() {
+        return Ok(index);
+    }
+    let mut schema_files: Vec<PathBuf> = Vec::new();
+    walk_schema_json(schemas_root, &mut schema_files)?;
+    for path in schema_files {
+        let raw =
+            fs::read_to_string(&path).map_err(|err| XtaskError::Io(display_path(&path), err))?;
+        let value: serde_json::Value =
+            serde_json::from_str(&raw).map_err(|err| XtaskError::Json(display_path(&path), err))?;
+        if let Some(id) = value.get("$id").and_then(|v| v.as_str()) {
+            index.insert(id.to_string(), path.clone());
+            // Some scenario authors paste the URI with or without a
+            // trailing slash; treat both as the same schema.
+            if let Some(trimmed) = id.strip_suffix('/') {
+                index.insert(trimmed.to_string(), path.clone());
+            } else {
+                index.insert(format!("{id}/"), path.clone());
+            }
+        }
+    }
+    Ok(index)
+}
+
+/// Resolve a `$schema` URI to a schema path using (in order):
+///   1. an exact match in the `$id` index built from `spec/schemas/`,
+///   2. the legacy strip-prefix mapping (`<prefix><rel>` ->
+///      `<schemas_root>/<rel>` plus `.schema.json`), retained for
+///      backwards compatibility with scenarios that pre-date `$id` adoption.
+///
+/// Returns `None` when neither path resolves to a file on disk; callers
+/// then surface a hard failure rather than silently skipping the scenario.
+fn resolve_schema_path(
+    uri: &str,
+    schema_index: &SchemaIndex,
+    schemas_root: &Path,
+) -> Option<PathBuf> {
+    if let Some(path) = schema_index.get(uri) {
+        return Some(path.clone());
+    }
+    let trimmed_uri = uri.trim_end_matches('/');
+    if let Some(path) = schema_index.get(trimmed_uri) {
+        return Some(path.clone());
+    }
+    let rel = uri.strip_prefix(SCHEMA_URI_PREFIX)?;
+    let direct = schemas_root.join(rel);
+    if direct.is_file() {
+        return Some(direct);
+    }
+    let with_suffix = schemas_root.join(format!("{}.schema.json", rel.trim_end_matches('/')));
+    if with_suffix.is_file() {
+        return Some(with_suffix);
+    }
+    None
 }
 
 fn collect_scenario_files(scenarios_dir: &Path) -> Result<Vec<PathBuf>, XtaskError> {
@@ -590,29 +673,58 @@ fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
     let out_dir = workspace_root.join(CHIO_WIRE_V1_RUST_OUT);
 
     if check_only {
-        let computed =
-            chio_spec_codegen::render_chio_wire_v1(&schemas_dir).map_err(XtaskError::Codegen)?;
-        let out_path = out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT);
-        if !out_path.exists() {
-            return Err(XtaskError::Drift(format!(
-                "{} is missing; rerun `cargo xtask codegen rust`",
-                display_path(&out_path)
-            )));
+        // Render BOTH the consolidated chio_wire_v1.rs and the placeholder
+        // mod.rs into a temporary staging directory and compare every file
+        // byte-for-byte with the on-disk copy. The previous implementation
+        // only checked chio_wire_v1.rs, so a stale or missing mod.rs slipped
+        // past the spec-drift CI lane.
+        let staging = TempDir::new("chio-codegen-rust-check").map_err(|err| {
+            XtaskError::Io("<temp staging dir for codegen rust --check>".into(), err)
+        })?;
+        chio_spec_codegen::codegen_rust(&schemas_dir, staging.path())
+            .map_err(XtaskError::Codegen)?;
+
+        let mut differences: Vec<String> = Vec::new();
+        let mut total_bytes: u64 = 0;
+        for filename in [
+            chio_spec_codegen::CHIO_WIRE_V1_OUTPUT,
+            chio_spec_codegen::MOD_FILE,
+        ] {
+            let staged = staging.path().join(filename);
+            let on_disk = out_dir.join(filename);
+            let staged_bytes =
+                fs::read(&staged).map_err(|err| XtaskError::Io(display_path(&staged), err))?;
+            if !on_disk.exists() {
+                differences.push(format!(
+                    "{} is missing on disk (computed {} bytes)",
+                    display_path(&on_disk),
+                    staged_bytes.len()
+                ));
+                continue;
+            }
+            let on_disk_bytes =
+                fs::read(&on_disk).map_err(|err| XtaskError::Io(display_path(&on_disk), err))?;
+            total_bytes += on_disk_bytes.len() as u64;
+            if staged_bytes != on_disk_bytes {
+                differences.push(format!(
+                    "{} is stale (computed {} bytes, on-disk {} bytes)",
+                    display_path(&on_disk),
+                    staged_bytes.len(),
+                    on_disk_bytes.len()
+                ));
+            }
         }
-        let existing = fs::read_to_string(&out_path)
-            .map_err(|err| XtaskError::Io(display_path(&out_path), err))?;
-        if existing != computed {
+        if !differences.is_empty() {
             return Err(XtaskError::Drift(format!(
-                "{} is stale; rerun `cargo xtask codegen rust` (computed {} bytes, on-disk {} bytes)",
-                display_path(&out_path),
-                computed.len(),
-                existing.len()
+                "rerun `cargo xtask codegen rust`:\n  - {}",
+                differences.join("\n  - ")
             )));
         }
         println!(
-            "codegen rust: {} in sync ({} bytes)",
-            display_path(&out_path),
-            existing.len()
+            "codegen rust: {} and {} in sync ({} bytes total)",
+            display_path(&out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT)),
+            display_path(&out_dir.join(chio_spec_codegen::MOD_FILE)),
+            total_bytes
         );
         return Ok(());
     }
@@ -664,45 +776,66 @@ fn codegen_go(check_only: bool) -> Result<(), XtaskError> {
         )));
     }
 
-    // Run the regen script with the workspace root as CWD so any relative
-    // paths inside the script resolve consistently with manual invocations
-    // documented in `sdks/go/chio-go-http/scripts/regen-types.sh`.
-    let status = std::process::Command::new("bash")
-        .arg(&script_path)
-        .current_dir(&workspace_root)
-        .status()
-        .map_err(|err| XtaskError::Io(display_path(&script_path), err))?;
-    if !status.success() {
-        return Err(XtaskError::Codegen(
-            chio_spec_codegen::CodegenError::Typify(
-                script_path.clone(),
-                format!("regen-types.sh exited with {}", status.code().unwrap_or(-1)),
-            ),
-        ));
-    }
-
     if check_only {
-        // Mirror the Rust target's --check semantics by using `git diff
-        // --exit-code` on just the generated file. Any drift between the
-        // committed bytes and the freshly-regenerated bytes causes a
-        // non-zero exit, which CI surfaces as a spec-drift failure.
-        let diff_status = std::process::Command::new("git")
-            .args(["diff", "--exit-code", "--"])
-            .arg(CHIO_GO_OUTPUT_FILE)
-            .current_dir(&workspace_root)
-            .status()
-            .map_err(|err| XtaskError::Io("git diff".into(), err))?;
-        if !diff_status.success() {
-            return Err(XtaskError::Drift(format!(
-                "{} drifted from committed bytes; rerun `cargo xtask codegen --lang go` and commit the result",
-                display_path(&output_path)
-            )));
+        // `--check` MUST NOT mutate the on-disk types.go. Snapshot the
+        // committed bytes, run the regen, compare in-memory, and restore
+        // the original bytes regardless of outcome. Any drift yields a
+        // hard error rather than a silent rewrite.
+        let original = if output_path.exists() {
+            Some(
+                fs::read(&output_path)
+                    .map_err(|err| XtaskError::Io(display_path(&output_path), err))?,
+            )
+        } else {
+            None
+        };
+
+        let run_result = run_go_regen_script(&script_path, &workspace_root);
+        let regen_bytes = if run_result.is_ok() && output_path.exists() {
+            fs::read(&output_path).map_err(|err| XtaskError::Io(display_path(&output_path), err))?
+        } else {
+            Vec::new()
+        };
+
+        // Restore the original committed bytes (or remove the file if it
+        // did not exist before the regen) so callers see no on-disk side
+        // effects from `--check`.
+        match &original {
+            Some(bytes) => {
+                fs::write(&output_path, bytes)
+                    .map_err(|err| XtaskError::Io(display_path(&output_path), err))?;
+            }
+            None => {
+                if output_path.exists() {
+                    fs::remove_file(&output_path)
+                        .map_err(|err| XtaskError::Io(display_path(&output_path), err))?;
+                }
+            }
         }
-        println!(
-            "codegen go: {} in sync with committed bytes",
-            display_path(&output_path)
-        );
+
+        run_result?;
+
+        match &original {
+            Some(bytes) if bytes == &regen_bytes => {
+                println!(
+                    "codegen go: {} in sync with committed bytes",
+                    display_path(&output_path)
+                );
+                Ok(())
+            }
+            Some(bytes) => Err(XtaskError::Drift(format!(
+                "{} drifted from committed bytes (committed {} bytes, regenerated {} bytes); rerun `cargo xtask codegen --lang go` and commit the result",
+                display_path(&output_path),
+                bytes.len(),
+                regen_bytes.len()
+            ))),
+            None => Err(XtaskError::Drift(format!(
+                "{} is missing on disk; rerun `cargo xtask codegen --lang go` and commit the result",
+                display_path(&output_path)
+            ))),
+        }
     } else {
+        run_go_regen_script(&script_path, &workspace_root)?;
         let bytes = fs::metadata(&output_path)
             .map(|m| m.len())
             .unwrap_or_default();
@@ -712,6 +845,26 @@ fn codegen_go(check_only: bool) -> Result<(), XtaskError> {
             bytes,
             display_path(&script_path)
         );
+        Ok(())
+    }
+}
+
+/// Invoke the Go regen script with the workspace root as CWD. Surfaces a
+/// dedicated `Process` error for shell-level failures instead of wrapping
+/// them in the Rust-specific `Codegen(Typify(...))` variant, which made
+/// shell errors look like a typify panic in CI logs.
+fn run_go_regen_script(script_path: &Path, workspace_root: &Path) -> Result<(), XtaskError> {
+    let status = std::process::Command::new("bash")
+        .arg(script_path)
+        .current_dir(workspace_root)
+        .status()
+        .map_err(|err| XtaskError::Io(display_path(script_path), err))?;
+    if !status.success() {
+        return Err(XtaskError::Process(format!(
+            "{} exited with code {}",
+            display_path(script_path),
+            status.code().unwrap_or(-1)
+        )));
     }
     Ok(())
 }
@@ -1177,9 +1330,20 @@ fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
 
     invoke_datamodel_codegen(&clean_input, &staging_out, &header_path)?;
 
+    // Walk the freshly-generated tree and rewrite each subpackage's
+    // `__init__.py` to re-export its top-level model classes. The
+    // top-level `__init__.py` then star-imports every subpackage. Together
+    // these provide the documented `from chio_sdk._generated import
+    // CapabilityToken` import path; without this step datamodel-codegen's
+    // empty subpackage stubs cause that import to raise `ImportError`.
+    let subpackage_exports = rewrite_python_subpackage_inits(&staging_out, &schema_digest)?;
+
     let top_init = staging_out.join(PYTHON_INIT_FILE);
-    fs::write(&top_init, build_python_top_init(&schema_digest))
-        .map_err(|err| XtaskError::Io(display_path(&top_init), err))?;
+    fs::write(
+        &top_init,
+        build_python_top_init(&schema_digest, &subpackage_exports),
+    )
+    .map_err(|err| XtaskError::Io(display_path(&top_init), err))?;
 
     if check_only {
         let drift = diff_python_trees(&staging_out, &final_out_dir)?;
@@ -1233,8 +1397,40 @@ fn build_python_file_header(schema_digest: &str) -> String {
     )
 }
 
-fn build_python_top_init(schema_digest: &str) -> String {
+/// Per-subpackage re-export plan built by [`rewrite_python_subpackage_inits`].
+///
+/// Each entry is `(subpackage_dir_name, [class_name, ...])` sorted by
+/// `subpackage_dir_name`. Class names are sorted within each subpackage so
+/// the output is byte-stable across regenerations on different filesystems.
+type PythonSubpackageExports = Vec<(String, Vec<String>)>;
+
+fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExports) -> String {
     let header = build_python_file_header(schema_digest);
+
+    // Build the deterministic re-export block. Each line is
+    // `from .<subpkg> import <Class1>, <Class2>` plus an `__all__` listing
+    // every re-exported name and the SCHEMA_SHA256 constant.
+    let mut imports = String::new();
+    let mut all_names: Vec<String> = vec!["SCHEMA_SHA256".to_string()];
+    for (subpkg, classes) in subpackages {
+        if classes.is_empty() {
+            continue;
+        }
+        imports.push_str(&format!(
+            "from .{subpkg} import {names}\n",
+            names = classes.join(", ")
+        ));
+        all_names.extend(classes.iter().cloned());
+    }
+    all_names.sort();
+    all_names.dedup();
+
+    let mut all_block = String::from("__all__ = [\n");
+    for name in &all_names {
+        all_block.push_str(&format!("    \"{name}\",\n"));
+    }
+    all_block.push_str("]\n");
+
     format!(
         "{header}\n\
          \"\"\"Generated Pydantic v2 models for the Chio wire protocol (chio-wire/v1).\n\
@@ -1253,8 +1449,144 @@ fn build_python_top_init(schema_digest: &str) -> String {
          #: fed into datamodel-code-generator at build time.\n\
          SCHEMA_SHA256 = \"{schema_digest}\"\n\
          \n\
-         __all__ = [\"SCHEMA_SHA256\"]\n"
+         {imports}\n\
+         {all_block}"
     )
+}
+
+/// Walk every subpackage directory under `root_dir`, scan each `*.py` module
+/// (other than `__init__.py`) for top-level `class Name(...):` declarations,
+/// rewrite the subpackage's `__init__.py` to re-export those classes, and
+/// return the (sorted) plan so the top-level `__init__.py` can re-export
+/// each subpackage in turn.
+fn rewrite_python_subpackage_inits(
+    root_dir: &Path,
+    schema_digest: &str,
+) -> Result<PythonSubpackageExports, XtaskError> {
+    let header = build_python_file_header(schema_digest);
+    let mut subpackages: PythonSubpackageExports = Vec::new();
+    let entries =
+        fs::read_dir(root_dir).map_err(|err| XtaskError::Io(display_path(root_dir), err))?;
+    let mut subdirs: Vec<PathBuf> = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|err| XtaskError::Io(display_path(root_dir), err))?;
+        let path = entry.path();
+        if path.is_dir() {
+            subdirs.push(path);
+        }
+    }
+    subdirs.sort();
+
+    for subdir in subdirs {
+        let Some(name) = subdir.file_name().and_then(OsStr::to_str) else {
+            continue;
+        };
+        if name.starts_with('_') {
+            continue;
+        }
+        let mut module_classes: Vec<(String, Vec<String>)> = Vec::new();
+        let module_entries =
+            fs::read_dir(&subdir).map_err(|err| XtaskError::Io(display_path(&subdir), err))?;
+        let mut modules: Vec<PathBuf> = Vec::new();
+        for me in module_entries {
+            let me = me.map_err(|err| XtaskError::Io(display_path(&subdir), err))?;
+            let p = me.path();
+            if !p.is_file() {
+                continue;
+            }
+            let Some(stem) = p.file_stem().and_then(OsStr::to_str) else {
+                continue;
+            };
+            if p.extension().and_then(OsStr::to_str) != Some("py") {
+                continue;
+            }
+            if stem == "__init__" {
+                continue;
+            }
+            modules.push(p);
+        }
+        modules.sort();
+
+        let mut all_classes: Vec<String> = Vec::new();
+        for module in &modules {
+            let stem = module
+                .file_stem()
+                .and_then(OsStr::to_str)
+                .unwrap_or_default()
+                .to_string();
+            let body = fs::read_to_string(module)
+                .map_err(|err| XtaskError::Io(display_path(module), err))?;
+            let classes = extract_top_level_python_classes(&body);
+            if !classes.is_empty() {
+                all_classes.extend(classes.iter().cloned());
+                module_classes.push((stem, classes));
+            }
+        }
+        all_classes.sort();
+        all_classes.dedup();
+
+        // Rewrite the subpackage __init__.py with explicit imports per
+        // module and a deterministic __all__. The header is preserved so
+        // the M01.P3.T5 spec-drift CI lane's per-file header check still
+        // passes.
+        let init_path = subdir.join(PYTHON_INIT_FILE);
+        let mut body = header.clone();
+        body.push('\n');
+        body.push_str("from __future__ import annotations\n\n");
+        for (module_stem, classes) in &module_classes {
+            body.push_str(&format!(
+                "from .{module_stem} import {names}\n",
+                names = classes.join(", ")
+            ));
+        }
+        body.push('\n');
+        body.push_str("__all__ = [\n");
+        for name in &all_classes {
+            body.push_str(&format!("    \"{name}\",\n"));
+        }
+        body.push_str("]\n");
+        fs::write(&init_path, body).map_err(|err| XtaskError::Io(display_path(&init_path), err))?;
+
+        subpackages.push((name.to_string(), all_classes));
+    }
+    Ok(subpackages)
+}
+
+/// Extract top-level `class Name(...):` declarations from a Python module
+/// source. Datamodel-codegen output uses 4-space indentation and never
+/// nests classes at the module top level beyond a single colon-suffix
+/// declaration line, so a string-prefix scan is sufficient (and avoids
+/// adding a Python-AST dependency to xtask).
+fn extract_top_level_python_classes(body: &str) -> Vec<String> {
+    let mut classes: Vec<String> = Vec::new();
+    for line in body.lines() {
+        // Must begin in column zero (top-level), with `class ` then the
+        // identifier, optionally followed by a parenthesized base list
+        // and a trailing colon.
+        let Some(rest) = line.strip_prefix("class ") else {
+            continue;
+        };
+        let mut name = String::new();
+        for ch in rest.chars() {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                name.push(ch);
+            } else {
+                break;
+            }
+        }
+        if name.is_empty() {
+            continue;
+        }
+        // Skip private classes (datamodel-codegen does not emit any, but be
+        // defensive against future changes).
+        if name.starts_with('_') {
+            continue;
+        }
+        classes.push(name);
+    }
+    classes.sort();
+    classes.dedup();
+    classes
 }
 
 fn mirror_schema_tree(

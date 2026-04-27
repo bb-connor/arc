@@ -810,25 +810,25 @@ fn canonical_vector_fixture_matches_checked_in_json() {
 }
 
 #[test]
-#[ignore = "M01.P2.T3+ will expand the on-disk hashing corpus past the 5-case bootstrap"]
+#[ignore = "M01.P2.T3 expanded hashing corpus to 20 cases; on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
 fn hashing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&hashing_fixture_path(), &hashing_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T5+ will expand the on-disk receipt corpus past the 5-case bootstrap"]
+#[ignore = "M01.P2.T5 expanded receipt corpus to 20 cases; on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
 fn receipt_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&receipt_fixture_path(), &receipt_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T4+ will expand the on-disk signing corpus past the 5-case bootstrap"]
+#[ignore = "M01.P2.T4 expanded signing corpus to 22 cases (with per-case seed overrides); on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
 fn signing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&signing_fixture_path(), &signing_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T6+ will expand the on-disk capability corpus past the 5-case bootstrap"]
+#[ignore = "M01.P2.T6 expanded capability corpus to 20 cases (with per-case max_delegation_depth overrides); on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
 fn capability_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&capability_fixture_path(), &capability_vector_fixture());
 }
@@ -854,7 +854,14 @@ fn canonical_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn hashing_fixture_cases_round_trip_through_public_api() {
-    let fixture = hashing_vector_fixture();
+    // Read the on-disk corpus as ground truth so the test exercises every
+    // case regardless of whether the in-Rust generator has been updated.
+    // M01.P2.T3 grew the hashing corpus from 5 to 20 cases; iterating the
+    // disk JSON keeps round-trip parity with the cross-language consumers
+    // (chio-go, chio-py, chio-ts) without depending on the bootstrap
+    // generator.
+    let raw = fs::read_to_string(hashing_fixture_path()).expect("read hashing fixture");
+    let fixture: Value = serde_json::from_str(&raw).expect("parse hashing fixture");
     for case in fixture["cases"].as_array().expect("cases array") {
         let input = case["input_utf8"].as_str().expect("input_utf8");
         let expected = case["sha256_hex"].as_str().expect("sha256_hex");
@@ -865,7 +872,11 @@ fn hashing_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn receipt_fixture_cases_round_trip_through_public_api() {
-    let fixture = receipt_vector_fixture();
+    // Read the on-disk corpus (M01.P2.T5 grew it from 5 to 20 cases) so the
+    // round-trip covers every case rather than only the bootstrap five
+    // emitted by the in-Rust generator.
+    let raw = fs::read_to_string(receipt_fixture_path()).expect("read receipt fixture");
+    let fixture: Value = serde_json::from_str(&raw).expect("parse receipt fixture");
     for case in fixture["cases"].as_array().expect("cases array") {
         let receipt: ChioReceipt =
             serde_json::from_value(case["receipt"].clone()).expect("parse receipt case");
@@ -878,8 +889,16 @@ fn receipt_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn signing_fixture_cases_round_trip_through_public_api() {
-    let fixture = signing_vector_fixture();
-    let seed_hex = fixture["signing_key_seed_hex"]
+    // Read the on-disk corpus (M01.P2.T4 grew it from 5 to 22 cases across
+    // utf8_cases + json_cases). Some cases carry a per-case
+    // `signing_key_seed_hex` override that pins the keypair used to produce
+    // the recorded signature; honoring it is what makes the round-trip
+    // exact for those cases (the previous implementation always used the
+    // top-level seed and so silently emitted a different public key for
+    // alt-seed cases).
+    let raw = fs::read_to_string(signing_fixture_path()).expect("read signing fixture");
+    let fixture: Value = serde_json::from_str(&raw).expect("parse signing fixture");
+    let global_seed_hex = fixture["signing_key_seed_hex"]
         .as_str()
         .expect("signing_key_seed_hex");
 
@@ -888,6 +907,9 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         let public_key_hex = case["public_key_hex"].as_str().expect("public_key_hex");
         let signature_hex = case["signature_hex"].as_str().expect("signature_hex");
         let expected_verify = case["expected_verify"].as_bool().expect("expected_verify");
+        let seed_hex = case["signing_key_seed_hex"]
+            .as_str()
+            .unwrap_or(global_seed_hex);
 
         if expected_verify {
             let signed = sign_utf8_message_ed25519(input, seed_hex).expect("sign utf8 case");
@@ -914,6 +936,9 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         let public_key_hex = case["public_key_hex"].as_str().expect("public_key_hex");
         let signature_hex = case["signature_hex"].as_str().expect("signature_hex");
         let expected_verify = case["expected_verify"].as_bool().expect("expected_verify");
+        let seed_hex = case["signing_key_seed_hex"]
+            .as_str()
+            .unwrap_or(global_seed_hex);
 
         assert_eq!(
             canonicalize_json_str(input).expect("canonicalize json case"),
@@ -949,16 +974,55 @@ fn signing_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn capability_fixture_cases_round_trip_through_public_api() {
-    let fixture = capability_vector_fixture();
+    // Read the on-disk corpus (M01.P2.T6 grew it from 5 to 20 cases). The
+    // shared `expected` field is depth-AGNOSTIC so cross-language consumers
+    // (chio-go / chio-py / chio-ts) that cannot parameterize
+    // max_delegation_depth still compare against the same vectors. Cases
+    // that exercise depth-aware behavior carry an optional
+    // `max_delegation_depth` plus `expected_with_max_delegation_depth`
+    // pair; this test asserts both branches when present.
+    let raw = fs::read_to_string(capability_fixture_path()).expect("read capability fixture");
+    let fixture: Value = serde_json::from_str(&raw).expect("parse capability fixture");
     for case in fixture["cases"].as_array().expect("cases array") {
         let capability: CapabilityToken =
             serde_json::from_value(case["capability"].clone()).expect("parse capability case");
         let verify_at = case["verify_at"].as_u64().expect("verify_at");
         let expected: CapabilityVerification =
             serde_json::from_value(case["expected"].clone()).expect("parse capability expectation");
-        let actual =
-            verify_capability(&capability, verify_at, Some(4)).expect("verify capability case");
-        assert_eq!(actual, expected, "capability case {}", case["id"]);
+
+        // Depth-agnostic verification: every consumer in the cross-language
+        // matrix (chio-go, chio-py, chio-ts) runs this exact assertion.
+        let actual_no_depth =
+            verify_capability(&capability, verify_at, None).expect("verify capability case");
+        assert_eq!(
+            actual_no_depth, expected,
+            "capability case {} (no max depth)",
+            case["id"]
+        );
+
+        // Optional depth-aware branch: only Rust currently parameterizes
+        // max_delegation_depth, so we gate on the presence of the per-case
+        // override fields.
+        if let Some(max_depth) = case
+            .get("max_delegation_depth")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+        {
+            let depth_expected_value = case
+                .get("expected_with_max_delegation_depth")
+                .cloned()
+                .unwrap_or_else(|| case["expected"].clone());
+            let depth_expected: CapabilityVerification =
+                serde_json::from_value(depth_expected_value)
+                    .expect("parse depth-aware capability expectation");
+            let actual_with_depth = verify_capability(&capability, verify_at, Some(max_depth))
+                .expect("verify capability case (max depth)");
+            assert_eq!(
+                actual_with_depth, depth_expected,
+                "capability case {} (max_delegation_depth={})",
+                case["id"], max_depth
+            );
+        }
     }
 }
 

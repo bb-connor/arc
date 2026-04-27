@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: addbe60437bb0258103fb68da7ee1ee5c1d4fade2ca6aab98f2d5ddc89f0b7e1
+# Schema sha256: 47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5
 #
 # Manual edits will be overwritten by the next regeneration; the
 # M01.P3.T5 spec-drift CI lane enforces this header on every file
@@ -180,19 +180,19 @@ class ChioReceiptRecord(BaseModel):
         None,
         description="Phase 1.5 multi-tenant receipt isolation: tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields. Omitted from the wire when unset so single-tenant receipts remain byte-identical.",
     )
-    kernel_key: constr(pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]+|p384:[0-9a-f]+)$") = (
-        Field(
-            ...,
-            description="Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.",
-        )
+    kernel_key: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ) = Field(
+        ...,
+        description="Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.",
     )
     algorithm: Algorithm | None = Field(
         None,
         description="Signing algorithm envelope hint. Omitted for legacy Ed25519 receipts to preserve byte-for-byte compatibility. Verification dispatches off the signature hex prefix, not this field.",
     )
-    signature: constr(
-        pattern=r"^([0-9a-f]+|p256:[0-9a-f]+|p384:[0-9a-f]+)$", min_length=96
-    ) = Field(
-        ...,
-        description="Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).",
+    signature: constr(pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$") = (
+        Field(
+            ...,
+            description="Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
+        )
     )

@@ -29,10 +29,12 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Header line that must begin every regenerated Rust file under
-/// `_generated/`. Must agree with `chio_spec_codegen::GENERATED_HEADER`.
-const HEADER_PREFIX: &str =
-    "// DO NOT EDIT - regenerate via 'make regen-rust' or 'cargo xtask codegen rust'.";
+/// Full canonical header that must begin every regenerated Rust file under
+/// `_generated/`. This is the byte-for-byte source of truth: any change to
+/// the header in `chio_spec_codegen::GENERATED_HEADER` must be mirrored here
+/// (and vice versa). Asserting the full string rather than a single-line
+/// prefix prevents stale tool-pin/source metadata from slipping through CI.
+const CANONICAL_HEADER: &str = chio_spec_codegen::GENERATED_HEADER;
 
 /// Marker that some past contributor might use to opt out of the
 /// regeneration policy. We forbid it: every file under `_generated/` must be
@@ -54,9 +56,13 @@ fn every_generated_file_has_canonical_header() {
             failures.push(format!("could not read {}", path.display()));
             continue;
         };
-        if !body.starts_with(HEADER_PREFIX) {
+        // Enforce the full canonical header byte-for-byte. The previous
+        // check tested only the first line, so a stale `Tool:` pin or
+        // out-of-date `Source:` path could pass. The header is short and
+        // checked into `chio_spec_codegen`; equality is the stated invariant.
+        if !body.starts_with(CANONICAL_HEADER) {
             failures.push(format!(
-                "{} is missing the canonical `// DO NOT EDIT` header",
+                "{} does not begin with the byte-for-byte canonical header (chio_spec_codegen::GENERATED_HEADER)",
                 path.display()
             ));
         }

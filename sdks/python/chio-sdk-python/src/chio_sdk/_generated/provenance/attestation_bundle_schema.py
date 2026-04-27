@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: addbe60437bb0258103fb68da7ee1ee5c1d4fade2ca6aab98f2d5ddc89f0b7e1
+# Schema sha256: 47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5
 #
 # Manual edits will be overwritten by the next regeneration; the
 # M01.P3.T5 spec-drift CI lane enforces this header on every file
@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
@@ -35,6 +36,51 @@ class Tier(Enum):
     basic = "basic"
     attested = "attested"
     verified = "verified"
+
+
+class Scheme(Enum):
+    """
+    Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+    """
+
+    spiffe = "spiffe"
+
+
+class CredentialKind(Enum):
+    """
+    Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+    """
+
+    uri = "uri"
+    x509_svid = "x509_svid"
+    jwt_svid = "jwt_svid"
+
+
+class WorkloadIdentity(BaseModel):
+    """
+    Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    scheme: Scheme = Field(
+        ...,
+        description="Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).",
+    )
+    credentialKind: CredentialKind = Field(
+        ...,
+        description="Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.",
+    )
+    uri: constr(min_length=1) = Field(
+        ..., description="Canonical workload identifier URI."
+    )
+    trustDomain: constr(min_length=1) = Field(
+        ..., description="Stable trust domain resolved from the identifier."
+    )
+    path: str = Field(
+        ..., description="Canonical workload path within the trust domain."
+    )
 
 
 class Statement(BaseModel):
@@ -67,7 +113,15 @@ class Statement(BaseModel):
     )
     runtime_identity: constr(min_length=1) | None = Field(
         None,
-        description="Optional runtime or workload identifier associated with the evidence.",
+        description="Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.",
+    )
+    workload_identity: WorkloadIdentity | None = Field(
+        None,
+        description="Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.",
+    )
+    claims: Any | None = Field(
+        None,
+        description="Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`.",
     )
 
 
@@ -93,7 +147,7 @@ class ChioProvenanceAttestationBundle(BaseModel):
     )
     statements: list[Statement] = Field(
         ...,
-        description="Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence`. The struct does not carry `serde(rename_all)`, so per-statement field names are snake_case.",
+        description="Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence` in `crates/chio-core-types/src/capability.rs` (lines 484-507). The struct does not carry `serde(rename_all)`, so the per-statement scalar fields are snake_case; the embedded `workload_identity` carries `serde(rename_all = camelCase)` so its inner fields are camelCase. Optional fields (`runtime_identity`, `workload_identity`, `claims`) are omitted from the wire when their underlying `Option<...>` is `None`.",
         min_length=1,
     )
     issuer: constr(min_length=1) | None = Field(
