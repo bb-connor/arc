@@ -1,0 +1,27 @@
+[package]
+name = "chio-tee"
+description = "Chio TEE shadow runner: replays kernel decisions inside a TEE for attestation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_tee"
+
+[[bin]]
+name = "chio-tee"
+path = "src/main.rs"
+
+[dependencies]
+chio-tee-frame = { path = "../chio-tee-frame" }
+chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

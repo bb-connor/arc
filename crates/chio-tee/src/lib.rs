@@ -1,0 +1,8 @@
+//! Chio TEE shadow runner: replays kernel decisions inside a TEE for attestation.
+//!
+//! Phase 1 of M10. T1 lands the workspace member skeleton; T2-T9 fill in
+//! the shadow runner + replay frame format.
+
+#![forbid(unsafe_code)]
+
+pub const TEE_VERSION: &str = "0.1.0-skeleton";

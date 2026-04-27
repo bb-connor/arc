@@ -1,0 +1,12 @@
+# Dockerfile.tee - container image for chio-tee shadow runner.
+# Phase 1 of M10. T1 lands the skeleton; T2-T9 wire the actual TEE attestation
+# bridge.
+
+FROM rust:1.93-slim AS builder
+WORKDIR /build
+COPY . .
+RUN cargo build --release -p chio-tee
+
+FROM debian:bookworm-slim
+COPY --from=builder /build/target/release/chio-tee /usr/local/bin/chio-tee
+ENTRYPOINT ["/usr/local/bin/chio-tee"]
