@@ -3075,6 +3075,7 @@ dependencies = [
  "chio-data-guards-redactors-default",
  "chio-store-sqlite",
  "chio-tee-frame",
+ "proptest",
  "serde",
  "serde_json",
  "signal-hook",
