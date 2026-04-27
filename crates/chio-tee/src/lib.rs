@@ -5,4 +5,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod tap;
+
+pub use tap::{TapError, TapResult, TrafficTap};
+
 pub const TEE_VERSION: &str = "0.1.0-skeleton";
