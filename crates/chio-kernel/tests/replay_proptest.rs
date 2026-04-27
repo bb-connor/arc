@@ -27,11 +27,13 @@
 // Plus a third declared property:
 // - `shuffle_independent_receipts_preserves_bytes`
 //
-// `signing_is_a_function` lives in its own `proptest! { ... }` block with a
-// raised `cases` budget (`SIGNING_FUNCTION_CASES`); the other two share the
-// standard `PROPTEST_BUDGET_CASES` block. Splitting the macro invocations is
-// the only way to per-test-tune the case count, since `proptest!` only
-// honours the `#![proptest_config(...)]` inner attribute at block scope.
+// `signing_is_a_function` and `replay_root_is_idempotent` each live in their
+// own `proptest! { ... }` block with a raised `cases` budget
+// (`SIGNING_FUNCTION_CASES` and `REPLAY_ROOT_CASES` respectively);
+// `shuffle_independent_receipts_preserves_bytes` keeps the standard
+// `PROPTEST_BUDGET_CASES`. Splitting the macro invocations is the only way to
+// per-test-tune the case count, since `proptest!` only honours the
+// `#![proptest_config(...)]` inner attribute at block scope.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -59,6 +61,19 @@ const PROPTEST_BUDGET_CASES: u32 = 64;
 /// property to evaluate (one body, one keypair, no Merkle anchoring) so we
 /// can afford a denser sweep without breaching the 30s CI budget.
 const SIGNING_FUNCTION_CASES: u32 = 256;
+
+/// Higher case count for `replay_root_is_idempotent`. Each case builds two
+/// Merkle trees over up to 32 leaves and asserts byte equality on the root.
+/// 256 cases brings the property up to parity with `signing_is_a_function`
+/// (per the M04 P5 T3 contract) and stays inside the 30s CI budget because
+/// the per-case work (two anchors, no signature verification) is cheap.
+const REPLAY_ROOT_CASES: u32 = 256;
+
+/// Maximum batch size for the random arm of `replay_sequence()`. Picked to
+/// match the original Phase 5 T1 strategy (`1..16`) on the small end while
+/// extending the upper bound to 32 receipts so the property exercises the
+/// next power-of-two RFC 6962 padding boundary.
+const REPLAY_RANDOM_MAX: usize = 32;
 
 fn kernel_keypair() -> Keypair {
     Keypair::from_seed(&KERNEL_SEED)
@@ -195,6 +210,40 @@ fn signing_edge_tuple() -> impl Strategy<Value = ReceiptTuple> {
     ]
 }
 
+/// `replay_sequence()`: produces sequences of receipt tuples covering the
+/// boundary shapes that have caused replay-root regressions in the past:
+///
+/// - `0` receipts: empty sequence. `MerkleTree::from_leaves` returns
+///   `Err(Error::EmptyTree)` for this input; the idempotence property still
+///   holds (both replays must produce the same error variant), and the
+///   property handler exercises that path explicitly.
+/// - `1` receipt: degenerate single-leaf tree (root is the leaf hash).
+/// - `2` receipts: smallest non-trivial RFC 6962 tree (one internal node,
+///   no padding).
+/// - `3..=REPLAY_RANDOM_MAX` receipts: random batch sizes spanning every
+///   power-of-two padding boundary up to 32 leaves.
+///
+/// Nonces are filtered for uniqueness per batch; this guarantees each tuple
+/// produces distinct canonical bytes (the nonce is woven into the receipt id,
+/// capability id, and policy hash by `body_from_tuple`).
+fn replay_sequence() -> impl Strategy<Value = Vec<ReceiptTuple>> {
+    prop_oneof![
+        // Empty sequence: idempotent failure mode (both replays must yield
+        // the same `EmptyTree` error).
+        1 => Just(Vec::<ReceiptTuple>::new()),
+        // Single-receipt sequence: degenerate leaf-as-root case.
+        1 => proptest::collection::vec(arbitrary_receipt_tuple(), 1..=1),
+        // Two-receipt sequence: smallest non-trivial tree.
+        1 => proptest::collection::vec(arbitrary_receipt_tuple(), 2..=2),
+        // Random N-receipt sequence: covers padding boundaries through 32.
+        4 => proptest::collection::vec(arbitrary_receipt_tuple(), 3..=REPLAY_RANDOM_MAX),
+    ]
+    .prop_filter("receipt nonces must be unique per batch", |ts| {
+        let mut seen = std::collections::HashSet::new();
+        ts.iter().all(|t| seen.insert(t.nonce.clone()))
+    })
+}
+
 /// Build a `ChioReceiptBody` from a tuple. The `nonce` is woven into the
 /// receipt id, the capability id, and the policy hash so two tuples with
 /// distinct nonces produce different canonical bytes.
@@ -229,15 +278,32 @@ fn canonical_body_bytes(body: &ChioReceiptBody) -> Vec<u8> {
     canonical_json_bytes(body).expect("body canonicalises")
 }
 
-/// Anchor a sequence of signed receipts via an RFC 6962 Merkle tree over the
-/// canonical body bytes. This mirrors `build_checkpoint`'s leaf shape.
-fn anchor_root(receipts: &[ChioReceipt]) -> [u8; 32] {
+/// Outcome of anchoring a (possibly empty) receipt batch. The empty-batch
+/// case is a documented failure mode of `MerkleTree::from_leaves`; the
+/// idempotence property treats it as a value to compare across replays.
+#[derive(Debug, PartialEq, Eq)]
+enum AnchorOutcome {
+    /// Successful anchor: the 32-byte root hash.
+    Root([u8; 32]),
+    /// Documented failure mode: the empty-tree error string. We compare the
+    /// `Display` form rather than the typed variant because `chio_core`'s
+    /// `Error` does not derive `PartialEq`; the `Display` impl is the stable
+    /// surface that callers (including replay tooling) rely on.
+    EmptyTree(String),
+}
+
+/// Anchor a (possibly empty) receipt batch. Used by `replay_root_is_idempotent`
+/// so the empty-sequence boundary is exercised as a first-class case rather
+/// than panicking via `expect`.
+fn try_anchor_root(receipts: &[ChioReceipt]) -> AnchorOutcome {
     let leaves: Vec<Vec<u8>> = receipts
         .iter()
         .map(|r| canonical_body_bytes(&r.body()))
         .collect();
-    let tree = MerkleTree::from_leaves(&leaves).expect("non-empty receipt batch");
-    *tree.root().as_bytes()
+    match MerkleTree::from_leaves(&leaves) {
+        Ok(tree) => AnchorOutcome::Root(*tree.root().as_bytes()),
+        Err(err) => AnchorOutcome::EmptyTree(err.to_string()),
+    }
 }
 
 /// Path to the regression archive directory required by the source-of-truth
@@ -342,11 +408,15 @@ proptest! {
     }
 }
 
-// Properties 2 and 3 share the standard budget: each case builds a full
-// Merkle tree over a batch of receipts, so we keep the case count modest.
+// Property 2 lives in its own `proptest!` block so we can dial up the case
+// count specifically for `replay_root_is_idempotent` (256 cases, matching
+// `signing_is_a_function`) without slowing Property 3 (which sorts both
+// the baseline and shuffled byte vectors per case). The strategy
+// (`replay_sequence()`) covers the boundary shapes named in the M04 P5 T3
+// contract: empty, single-receipt, two-receipt, and random N up to 32.
 proptest! {
     #![proptest_config(ProptestConfig {
-        cases: PROPTEST_BUDGET_CASES,
+        cases: REPLAY_ROOT_CASES,
         failure_persistence: Some(regression_persistence()),
         .. ProptestConfig::default()
     })]
@@ -354,18 +424,12 @@ proptest! {
     /// Property 2 (named exit-criterion test):
     /// replaying the receipt log twice yields the same anchored root. We
     /// build the same receipt batch twice and assert byte equality on the
-    /// computed Merkle root.
+    /// computed Merkle root. The strategy covers four boundary shapes:
+    /// empty (idempotent `EmptyTree` error), single-receipt (leaf-as-root),
+    /// two-receipt (smallest non-trivial RFC 6962 tree), and random N-receipt
+    /// up to 32 leaves (every padding boundary through `2^5`).
     #[test]
-    fn replay_root_is_idempotent(
-        tuples in proptest::collection::vec(arbitrary_receipt_tuple(), 1..16)
-            .prop_filter(
-                "receipt nonces must be unique per batch",
-                |ts| {
-                    let mut seen = std::collections::HashSet::new();
-                    ts.iter().all(|t| seen.insert(t.nonce.clone()))
-                },
-            ),
-    ) {
+    fn replay_root_is_idempotent(tuples in replay_sequence()) {
         let kp = kernel_keypair();
 
         let receipts_a: Vec<ChioReceipt> = tuples
@@ -377,10 +441,42 @@ proptest! {
             .map(|t| sign_body(&body_from_tuple(t, &kp), &kp))
             .collect();
 
-        let root_a = anchor_root(&receipts_a);
-        let root_b = anchor_root(&receipts_b);
-        prop_assert_eq!(root_a, root_b);
+        let outcome_a = try_anchor_root(&receipts_a);
+        let outcome_b = try_anchor_root(&receipts_b);
+        prop_assert_eq!(&outcome_a, &outcome_b);
+
+        // Empty input must take the documented failure path on both replays.
+        // Non-empty input must produce a 32-byte root on both replays. This
+        // pins the strategy's empty-arm to its expected branch and stops a
+        // future regression that silently swallows the empty case.
+        match (&outcome_a, tuples.is_empty()) {
+            (AnchorOutcome::EmptyTree(_), true) => {}
+            (AnchorOutcome::Root(_), false) => {}
+            (AnchorOutcome::EmptyTree(_), false) => {
+                prop_assert!(
+                    false,
+                    "non-empty receipt batch produced EmptyTree outcome"
+                );
+            }
+            (AnchorOutcome::Root(_), true) => {
+                prop_assert!(
+                    false,
+                    "empty receipt batch produced a Merkle root"
+                );
+            }
+        }
     }
+}
+
+// Property 3 keeps the standard budget: each case builds a full Merkle tree
+// over a batch of receipts and sorts both the baseline and shuffled byte
+// vectors, so we keep the case count modest.
+proptest! {
+    #![proptest_config(ProptestConfig {
+        cases: PROPTEST_BUDGET_CASES,
+        failure_persistence: Some(regression_persistence()),
+        .. ProptestConfig::default()
+    })]
 
     /// Property 3:
     /// shuffling independent receipts (no shared nonce) does not change the
