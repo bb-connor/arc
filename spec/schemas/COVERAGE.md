@@ -123,19 +123,21 @@ receipt, and trust-control wire schemas in Phase 1.
 
 | Domain      | File                                       | Cases     |
 |-------------|--------------------------------------------|-----------|
-| canonical   | `tests/bindings/vectors/canonical/v1.json` | 5         |
-| capability  | `tests/bindings/vectors/capability/v1.json`| 5         |
-| hashing     | `tests/bindings/vectors/hashing/v1.json`   | 3         |
-| manifest    | `tests/bindings/vectors/manifest/v1.json`  | 5         |
-| receipt     | `tests/bindings/vectors/receipt/v1.json`   | 4         |
-| signing     | `tests/bindings/vectors/signing/v1.json`   | 2 + 2 (json + utf8) |
+| canonical   | `tests/bindings/vectors/canonical/v1.json` | 20        |
+| capability  | `tests/bindings/vectors/capability/v1.json`| 20        |
+| hashing     | `tests/bindings/vectors/hashing/v1.json`   | 20        |
+| manifest    | `tests/bindings/vectors/manifest/v1.json`  | 20        |
+| receipt     | `tests/bindings/vectors/receipt/v1.json`   | 20        |
+| signing     | `tests/bindings/vectors/signing/v1.json`   | 8 + 14 (json + utf8) |
 
 Note: the milestone-doc text quotes the historical totals as 5/5/8/10/3/4
 (canonical / manifest / receipt / capability / hashing / signing), summing
 to 35. The values in the table above are the literal `length` of each
 file's `cases` (or `json_cases` plus `utf8_cases` for signing) on the
-current tip. Phase 2 grows every domain to at least 20 cases regardless of
-which baseline is canonical.
+current tip, recomputed via `jq '.cases | length'` (and the analogous
+sum for signing). Phase 2 grows every domain to at least 20 cases
+regardless of which baseline is canonical; the on-disk corpus has now
+reached that floor for every domain.
 
 ---
 
@@ -217,15 +219,15 @@ notes).
 
 | Domain      | Current | Target | Delta | Ticket  | Notes |
 |-------------|---------|--------|-------|---------|-------|
-| canonical   |    5    |   20   |  +15  | P2.T2   | RFC 8785 edge cases (-0, lone surrogate, 5e-324, 9007199254740993, 0.1+0.2, surrogate-pair key sort) |
-| manifest    |    5    |   20   |  +15  | P2.T3   | Per-case `id`/`description`/`input`/`canonical_json`/`sha256` |
-| hashing     |    3    |   20   |  +17  | P2.T3   | Same envelope shape as manifest |
-| signing     |    4    |   20   |  +16  | P2.T3   | Adds `signed_bytes`; covers `json_cases` plus `utf8_cases` |
-| receipt     |    8    |   20   |  +12  | P2.T4   | Must include all four allow/deny/cancelled/incomplete result variants and at least 4 anchored-inclusion-proof cases (M04 contract) |
-| capability  |   10    |   20   |  +10  | P2.T4   | `verify_only: bool` tag (default false) drives the M08 browser/edge subset filter |
+| canonical   |   20    |   20   |   0   | P2.T2   | RFC 8785 edge cases (-0, lone surrogate, 5e-324, 9007199254740993, 0.1+0.2, surrogate-pair key sort) |
+| manifest    |   20    |   20   |   0   | P2.T3   | Per-case `id`/`description`/`input`/`canonical_json`/`sha256` |
+| hashing     |   20    |   20   |   0   | P2.T3   | Same envelope shape as manifest |
+| signing     |   22    |   20   |   0   | P2.T3   | Adds `signed_bytes`; covers `json_cases` (8) plus `utf8_cases` (14); already exceeds the >= 20 floor |
+| receipt     |   20    |   20   |   0   | P2.T4   | Must include all four allow/deny/cancelled/incomplete result variants and at least 4 anchored-inclusion-proof cases (M04 contract) |
+| capability  |   20    |   20   |   0   | P2.T4   | `verify_only: bool` tag (default false) drives the M08 browser/edge subset filter |
 
-Aggregate growth: at least 85 new vector cases (current 35 baseline -> 120
-target across six domains). Phase 2 also lands:
+Aggregate state: every domain is at or above the >= 20 floor on the
+current tip (sum across six domains: 122). Phase 2 also lands:
 
 - `tests/bindings/vectors/MANIFEST.sha256` (P2.T5)
 - `cargo xtask freeze-vectors` and `--check` mode (P2.T5)

@@ -440,8 +440,14 @@ sys.stdout.write(receipt_body_canonical_json(receipt))
     let output = match output {
         Ok(o) => o,
         Err(err) => {
-            eprintln!("skipping live python differential; spawn failed: {err}");
-            return;
+            // Spawn failures (for example `python3` invoked but the binary
+            // vanished between the PATH probe and the spawn) are real CI
+            // problems, not "skip" conditions. Fail-fast with a descriptive
+            // message so the live differential cannot silently degrade to a
+            // pass when the toolchain is broken.
+            panic!(
+                "live python differential: failed to spawn python3 subprocess: {err}"
+            );
         }
     };
     if !output.status.success() {
@@ -491,18 +497,37 @@ fn live_ts_encoder_matches_rust() {
     }
 
     // Node script reads a JSON receipt from stdin and emits the canonical
-    // body bytes the chio-ts SDK produces.
+    // body bytes the chio-ts SDK produces. The script differentiates SDK
+    // setup issues (exit code 2: module not loadable, expected export
+    // missing) from real encoder failures (exit code 1: runtime exception
+    // inside `receiptBodyCanonicalJson`). The Rust harness mirrors the
+    // python test by treating exit 2 as a skippable setup gap and any
+    // other non-zero exit as a fail-fast assertion failure.
     let script = format!(
         r#"
-const path = require("path");
-const sdk = require("{sdk}/index.js");
+let sdk;
+try {{
+    sdk = require("{sdk}/index.js");
+}} catch (exc) {{
+    process.stderr.write("chio-ts not loadable: " + (exc && exc.message ? exc.message : exc) + "\n");
+    process.exit(2);
+}}
+if (typeof sdk.receiptBodyCanonicalJson !== "function") {{
+    process.stderr.write("chio-ts missing expected export receiptBodyCanonicalJson\n");
+    process.exit(2);
+}}
 let buf = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {{ buf += chunk; }});
 process.stdin.on("end", () => {{
-    const receipt = JSON.parse(buf);
-    const out = sdk.receiptBodyCanonicalJson(receipt);
-    process.stdout.write(out);
+    try {{
+        const receipt = JSON.parse(buf);
+        const out = sdk.receiptBodyCanonicalJson(receipt);
+        process.stdout.write(out);
+    }} catch (exc) {{
+        process.stderr.write("chio-ts encoder threw: " + (exc && exc.stack ? exc.stack : exc) + "\n");
+        process.exit(1);
+    }}
 }});
 "#,
         sdk = sdk_dist.display()
@@ -528,14 +553,28 @@ process.stdin.on("end", () => {{
     let output = match output {
         Ok(o) => o,
         Err(err) => {
-            eprintln!("skipping live typescript differential; spawn failed: {err}");
-            return;
+            // A spawn failure here means the toolchain probe lied (node
+            // disappeared between `command_available` and the actual spawn,
+            // or the kernel rejected the invocation). That is a real CI
+            // problem, not a skip condition; fail-fast so the live
+            // differential cannot silently degrade to a pass.
+            panic!(
+                "live typescript differential: failed to spawn node subprocess: {err}"
+            );
         }
     };
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("skipping live typescript differential; node peer reported: {stderr}");
-        return;
+        if output.status.code() == Some(2) {
+            eprintln!(
+                "skipping live typescript differential; chio-ts not loadable: {stderr}"
+            );
+            return;
+        }
+        panic!(
+            "typescript receipt-encoder peer failed: status={:?} stderr={}",
+            output.status, stderr
+        );
     }
 
     let actual = String::from_utf8(output.stdout).expect("node output utf-8");

@@ -81,6 +81,26 @@ jobs:
             sdks/typescript/packages/conformance/src/_generated \
             sdks/go/chio-go-http/types.go
 
+      - name: Assert no untracked files in generated trees
+        run: |
+          set -euo pipefail
+          # Defense in depth: `git diff --exit-code` only reports changes to
+          # tracked files. If a codegen lane accidentally creates a NEW file
+          # under any `_generated/` tree (or alongside the checked-in Go
+          # file), `git diff` will not flag it. Use `git ls-files --others
+          # --exclude-standard` to list untracked files; fail if any land in
+          # a path the codegen lanes write to.
+          untracked=$(git ls-files --others --exclude-standard -- \
+            crates/chio-core-types/src/_generated \
+            sdks/python/chio-sdk-python/src/chio_sdk/_generated \
+            sdks/typescript/packages/conformance/src/_generated \
+            sdks/go/chio-go-http)
+          if [ -n "$untracked" ]; then
+            echo "::error::codegen produced untracked files in a generated path:"
+            echo "$untracked"
+            exit 1
+          fi
+
   header-stamp-untouched:
     name: header-stamp-untouched (do-not-edit grep gate)
     # owner: M01
@@ -182,6 +202,21 @@ jobs:
           # silently absorb the drift. The xtask is supposed to be idempotent
           # under --check, so this should always be a no-op on green runs.
           git diff --exit-code tests/bindings/vectors
+
+      - name: Assert no untracked files in vectors tree
+        run: |
+          set -euo pipefail
+          # `git diff --exit-code` only reports changes to tracked files; a
+          # `freeze-vectors --check` lane that accidentally writes a NEW
+          # vector file would slip through. Use `git ls-files --others
+          # --exclude-standard` to flag untracked entries under the vectors
+          # tree and fail the job if any appear.
+          untracked=$(git ls-files --others --exclude-standard -- tests/bindings/vectors)
+          if [ -n "$untracked" ]; then
+            echo "::error::freeze-vectors --check produced untracked files under tests/bindings/vectors:"
+            echo "$untracked"
+            exit 1
+          fi
 
   schema-coverage:
     name: schema-coverage (vectors_schema_pair)
