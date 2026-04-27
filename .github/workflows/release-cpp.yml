@@ -41,7 +41,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  CHIO_NEXUS_REMOTE_URL: https://nexus.dev.backbay.io/repository/chio-conan/
+  # No trailing slash. Some Conan/Nexus combos loop on redirects when the
+  # configured remote URL doesn't match the canonical form Nexus serves.
+  CHIO_NEXUS_REMOTE_URL: https://nexus.dev.backbay.io/repository/chio-conan
   CHIO_VCPKG_REGISTRY_REPO: backbay-labs/chio-vcpkg-registry
 
 jobs:
@@ -183,9 +185,13 @@ jobs:
           CONAN_PASSWORD_CHIO_PRIVATE: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
         run: |
           set -euo pipefail
+          # `-v debug` logs every HTTP method + URL + response so the next
+          # failure mode (if any) is diagnosable from the GHA log alone.
+          # Drop this back to default verbosity once the publish path is
+          # stable.
           for sdk in chio-cpp chio-cpp-kernel chio-guard-cpp chio-drogon; do
             conan upload "${sdk}/${{ needs.qualify.outputs.version }}" \
-              -r=chio-private --confirm
+              -r=chio-private --confirm -v debug
           done
 
   publish-vcpkg:
