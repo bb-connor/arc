@@ -210,6 +210,43 @@ enum Commands {
         #[command(subcommand)]
         command: GuardCommands,
     },
+
+    /// Run the cross-language conformance harness against a peer adapter.
+    Conformance {
+        #[command(subcommand)]
+        command: ConformanceCommands,
+    },
+}
+
+/// Conformance harness commands.
+//
+// NOTE (M01.P4.T2): only the `Run` subcommand is implemented in this PR.
+// The `fetch-peers` subcommand for downloading pinned peer binaries is
+// deferred to M01.P4.T4 (see .planning/trajectory/01-spec-codegen-conformance.md).
+#[derive(Subcommand)]
+enum ConformanceCommands {
+    /// Execute conformance scenarios against a peer language adapter.
+    Run {
+        /// Peer language adapter to exercise (`js`, `python`, `go`, `cpp`, or `all`).
+        #[arg(long)]
+        peer: String,
+
+        /// Optional report format. Pass `json` to emit machine-readable JSON
+        /// summarising the run; omit to print a human-readable summary.
+        #[arg(long)]
+        report: Option<String>,
+
+        /// Optional scenario id filter. When set, only scenarios with this id
+        /// are surfaced in the printed/written report; the underlying harness
+        /// still executes the full corpus.
+        #[arg(long)]
+        scenario: Option<String>,
+
+        /// Optional output file. When provided, the report is written to this
+        /// path; otherwise the report is printed to stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
 }
 
 /// Guard development lifecycle commands.
