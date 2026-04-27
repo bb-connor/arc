@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::{canonical_json_bytes, sha256_hex};
@@ -71,26 +72,65 @@ impl InflightRequest {
 }
 
 /// Registry of requests that are currently active within a session.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub struct InflightRegistry {
-    requests: HashMap<RequestId, InflightRequest>,
+    requests: RwLock<HashMap<RequestId, InflightRequest>>,
+    active_count: AtomicU64,
+}
+
+impl Clone for InflightRegistry {
+    fn clone(&self) -> Self {
+        let requests = self.read_requests().clone();
+        Self {
+            active_count: AtomicU64::new(requests.len() as u64),
+            requests: RwLock::new(requests),
+        }
+    }
+}
+
+impl Default for InflightRegistry {
+    fn default() -> Self {
+        Self {
+            requests: RwLock::new(HashMap::new()),
+            active_count: AtomicU64::new(0),
+        }
+    }
 }
 
 impl InflightRegistry {
+    fn read_requests(&self) -> RwLockReadGuard<'_, HashMap<RequestId, InflightRequest>> {
+        loop {
+            if let Ok(requests) = self.requests.try_read() {
+                return requests;
+            }
+            std::thread::yield_now();
+        }
+    }
+
+    fn write_requests(&self) -> RwLockWriteGuard<'_, HashMap<RequestId, InflightRequest>> {
+        loop {
+            if let Ok(requests) = self.requests.try_write() {
+                return requests;
+            }
+            std::thread::yield_now();
+        }
+    }
+
     pub fn track(
-        &mut self,
+        &self,
         context: &OperationContext,
         operation_kind: OperationKind,
         session_anchor_id: &str,
         cancellable: bool,
     ) -> Result<(), SessionError> {
-        if self.requests.contains_key(&context.request_id) {
+        let mut requests = self.write_requests();
+        if requests.contains_key(&context.request_id) {
             return Err(SessionError::DuplicateInflightRequest {
                 request_id: context.request_id.clone(),
             });
         }
 
-        self.requests.insert(
+        requests.insert(
             context.request_id.clone(),
             InflightRequest {
                 request_id: context.request_id.clone(),
@@ -103,23 +143,35 @@ impl InflightRegistry {
                 cancellable,
             },
         );
+        self.active_count.fetch_add(1, Ordering::AcqRel);
         Ok(())
     }
 
-    pub fn complete(&mut self, request_id: &RequestId) -> Result<InflightRequest, SessionError> {
-        self.requests
-            .remove(request_id)
-            .ok_or_else(|| SessionError::RequestNotInflight {
-                request_id: request_id.clone(),
+    pub fn complete(&self, request_id: &RequestId) -> Result<InflightRequest, SessionError> {
+        let mut requests = self.write_requests();
+        let completed =
+            requests
+                .remove(request_id)
+                .ok_or_else(|| SessionError::RequestNotInflight {
+                    request_id: request_id.clone(),
+                })?;
+        if self
+            .active_count
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_sub(1)
             })
+            .is_err()
+        {
+            self.active_count
+                .store(requests.len() as u64, Ordering::Release);
+        }
+        Ok(completed)
     }
 
-    pub fn mark_cancellation_requested(
-        &mut self,
-        request_id: &RequestId,
-    ) -> Result<(), SessionError> {
+    pub fn mark_cancellation_requested(&self, request_id: &RequestId) -> Result<(), SessionError> {
+        let mut requests = self.write_requests();
         let request =
-            self.requests
+            requests
                 .get_mut(request_id)
                 .ok_or_else(|| SessionError::RequestNotInflight {
                     request_id: request_id.clone(),
@@ -135,20 +187,21 @@ impl InflightRegistry {
         Ok(())
     }
 
-    pub fn get(&self, request_id: &RequestId) -> Option<&InflightRequest> {
-        self.requests.get(request_id)
+    pub fn get(&self, request_id: &RequestId) -> Option<InflightRequest> {
+        self.read_requests().get(request_id).cloned()
     }
 
     pub fn len(&self) -> usize {
-        self.requests.len()
+        self.active_count.load(Ordering::Acquire) as usize
     }
 
     pub fn is_empty(&self) -> bool {
-        self.requests.is_empty()
+        self.active_count.load(Ordering::Acquire) == 0
     }
 
-    pub fn clear(&mut self) {
-        self.requests.clear();
+    pub fn clear(&self) {
+        self.write_requests().clear();
+        self.active_count.store(0, Ordering::Release);
     }
 }
 
@@ -383,8 +436,8 @@ pub struct Session {
     issued_capabilities: Vec<CapabilityToken>,
     inflight: InflightRegistry,
     subscriptions: SubscriptionRegistry,
-    terminal: TerminalRegistry,
-    request_lineage: HashMap<RequestId, RequestLineageRecord>,
+    terminal: RwLock<TerminalRegistry>,
+    request_lineage: RwLock<HashMap<RequestId, RequestLineageRecord>>,
     pending_url_elicitations: HashMap<String, PendingUrlElicitation>,
     late_events: VecDeque<LateSessionEvent>,
 }
@@ -404,8 +457,8 @@ impl Clone for Session {
             issued_capabilities: self.issued_capabilities.clone(),
             inflight: self.inflight.clone(),
             subscriptions: self.subscriptions.clone(),
-            terminal: self.terminal.clone(),
-            request_lineage: self.request_lineage.clone(),
+            terminal: RwLock::new(self.read_terminal().clone()),
+            request_lineage: RwLock::new(self.read_request_lineage().clone()),
             pending_url_elicitations: self.pending_url_elicitations.clone(),
             late_events: self.late_events.clone(),
         }
@@ -434,8 +487,8 @@ impl Session {
             issued_capabilities,
             inflight: InflightRegistry::default(),
             subscriptions: SubscriptionRegistry::default(),
-            terminal: TerminalRegistry::default(),
-            request_lineage: HashMap::new(),
+            terminal: RwLock::new(TerminalRegistry::default()),
+            request_lineage: RwLock::new(HashMap::new()),
             pending_url_elicitations: HashMap::new(),
             late_events: VecDeque::new(),
         }
@@ -454,6 +507,46 @@ impl Session {
         loop {
             if let Ok(inner) = self.inner.try_write() {
                 return inner;
+            }
+            std::thread::yield_now();
+        }
+    }
+
+    fn read_terminal(&self) -> RwLockReadGuard<'_, TerminalRegistry> {
+        loop {
+            if let Ok(terminal) = self.terminal.try_read() {
+                return terminal;
+            }
+            std::thread::yield_now();
+        }
+    }
+
+    fn write_terminal(&self) -> RwLockWriteGuard<'_, TerminalRegistry> {
+        loop {
+            if let Ok(terminal) = self.terminal.try_write() {
+                return terminal;
+            }
+            std::thread::yield_now();
+        }
+    }
+
+    fn read_request_lineage(
+        &self,
+    ) -> RwLockReadGuard<'_, HashMap<RequestId, RequestLineageRecord>> {
+        loop {
+            if let Ok(request_lineage) = self.request_lineage.try_read() {
+                return request_lineage;
+            }
+            std::thread::yield_now();
+        }
+    }
+
+    fn write_request_lineage(
+        &self,
+    ) -> RwLockWriteGuard<'_, HashMap<RequestId, RequestLineageRecord>> {
+        loop {
+            if let Ok(request_lineage) = self.request_lineage.try_write() {
+                return request_lineage;
             }
             std::thread::yield_now();
         }
@@ -479,8 +572,8 @@ impl Session {
         &self.session_anchor
     }
 
-    pub fn request_lineage(&self, request_id: &RequestId) -> Option<&RequestLineageRecord> {
-        self.request_lineage.get(request_id)
+    pub fn request_lineage(&self, request_id: &RequestId) -> Option<RequestLineageRecord> {
+        self.read_request_lineage().get(request_id).cloned()
     }
 
     pub fn peer_capabilities(&self) -> &PeerCapabilities {
@@ -513,8 +606,8 @@ impl Session {
         &self.subscriptions
     }
 
-    pub fn terminal(&self) -> &TerminalRegistry {
-        &self.terminal
+    pub fn terminal(&self) -> TerminalRegistry {
+        self.read_terminal().clone()
     }
 
     pub fn register_pending_url_elicitation(
@@ -670,7 +763,7 @@ impl Session {
     }
 
     pub fn track_request(
-        &mut self,
+        &self,
         context: &OperationContext,
         operation_kind: OperationKind,
         cancellable: bool,
@@ -679,12 +772,13 @@ impl Session {
         if let Some(parent_request_id) = &context.parent_request_id {
             self.validate_parent_request_lineage(&context.request_id, parent_request_id)?;
         }
+        let mut request_lineage = self.write_request_lineage();
         if self.inflight.get(&context.request_id).is_some() {
             return Err(SessionError::DuplicateInflightRequest {
                 request_id: context.request_id.clone(),
             });
         }
-        if self.request_lineage.contains_key(&context.request_id) {
+        if request_lineage.contains_key(&context.request_id) {
             return Err(SessionError::DuplicateRequestLineage {
                 request_id: context.request_id.clone(),
             });
@@ -695,7 +789,7 @@ impl Session {
             self.session_anchor.id(),
             cancellable,
         )?;
-        self.request_lineage.insert(
+        request_lineage.insert(
             context.request_id.clone(),
             RequestLineageRecord {
                 request_id: context.request_id.clone(),
@@ -711,27 +805,27 @@ impl Session {
     }
 
     pub fn complete_request(
-        &mut self,
+        &self,
         request_id: &RequestId,
     ) -> Result<InflightRequest, SessionError> {
         self.complete_request_with_terminal_state(request_id, OperationTerminalState::Completed)
     }
 
     pub fn complete_request_with_terminal_state(
-        &mut self,
+        &self,
         request_id: &RequestId,
         terminal_state: OperationTerminalState,
     ) -> Result<InflightRequest, SessionError> {
         let inflight = self.inflight.complete(request_id)?;
-        self.terminal
+        self.write_terminal()
             .record(request_id.clone(), terminal_state.clone());
-        if let Some(lineage) = self.request_lineage.get_mut(request_id) {
+        if let Some(lineage) = self.write_request_lineage().get_mut(request_id) {
             lineage.terminal_state = Some(terminal_state);
         }
         Ok(inflight)
     }
 
-    pub fn request_cancellation(&mut self, request_id: &RequestId) -> Result<(), SessionError> {
+    pub fn request_cancellation(&self, request_id: &RequestId) -> Result<(), SessionError> {
         self.inflight.mark_cancellation_requested(request_id)
     }
 
@@ -739,14 +833,15 @@ impl Session {
         &self,
         request_id: &RequestId,
         parent_request_id: &RequestId,
-    ) -> Result<&RequestLineageRecord, SessionError> {
+    ) -> Result<RequestLineageRecord, SessionError> {
         let Some(parent_inflight) = self.inflight.get(parent_request_id) else {
             return Err(SessionError::ParentRequestNotInflight {
                 request_id: request_id.clone(),
                 parent_request_id: parent_request_id.clone(),
             });
         };
-        let Some(parent_lineage) = self.request_lineage.get(parent_request_id) else {
+        let Some(parent_lineage) = self.read_request_lineage().get(parent_request_id).cloned()
+        else {
             return Err(SessionError::ParentRequestNotInflight {
                 request_id: request_id.clone(),
                 parent_request_id: parent_request_id.clone(),
@@ -991,7 +1086,7 @@ mod tests {
 
     #[test]
     fn inflight_registry_tracks_and_completes_requests() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let context = make_context("req-1");
 
         session.activate().unwrap();
@@ -1013,7 +1108,7 @@ mod tests {
 
     #[test]
     fn child_request_requires_parent_inflight() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let mut child_context = make_context("req-child");
         child_context.parent_request_id = Some(RequestId::new("req-parent"));
 
@@ -1026,7 +1121,7 @@ mod tests {
 
     #[test]
     fn duplicate_inflight_request_is_rejected() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let context = make_context("req-1");
 
         session.activate().unwrap();
@@ -1042,7 +1137,7 @@ mod tests {
 
     #[test]
     fn cancellation_marks_cancellable_request() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let context = make_context("req-1");
 
         session.activate().unwrap();
@@ -1057,7 +1152,7 @@ mod tests {
 
     #[test]
     fn inflight_request_reports_request_owned_semantics() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let context = make_context("req-1");
 
         session.activate().unwrap();
@@ -1080,7 +1175,7 @@ mod tests {
 
     #[test]
     fn complete_request_can_record_cancelled_terminal_state() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let context = make_context("req-1");
 
         session.activate().unwrap();
@@ -1104,6 +1199,50 @@ mod tests {
                 reason: "cancelled by client".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn inflight_request_lifecycle_accepts_shared_session_borrow() {
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let context = make_context("req-shared");
+        let shared = &session;
+
+        shared.activate().unwrap();
+        shared
+            .track_request(&context, OperationKind::ToolCall, true)
+            .unwrap();
+        shared.request_cancellation(&context.request_id).unwrap();
+        let completed = shared.complete_request(&context.request_id).unwrap();
+
+        assert_eq!(completed.request_id, context.request_id);
+        assert!(completed.cancellation_requested);
+        assert!(shared.inflight().is_empty());
+        assert_eq!(
+            shared.terminal().get(&context.request_id),
+            Some(&OperationTerminalState::Completed)
+        );
+    }
+
+    #[test]
+    fn inflight_registry_complete_missing_request_keeps_zero_count() {
+        let registry = InflightRegistry::default();
+        let request_id = RequestId::new("missing");
+
+        let err = registry.complete(&request_id).unwrap_err();
+        assert!(matches!(err, SessionError::RequestNotInflight { .. }));
+        assert_eq!(registry.len(), 0);
+
+        let context = make_context("req-1");
+        registry
+            .track(&context, OperationKind::ToolCall, "anchor-1", true)
+            .unwrap();
+        assert_eq!(registry.len(), 1);
+        registry.complete(&context.request_id).unwrap();
+        assert_eq!(registry.len(), 0);
+
+        let err = registry.complete(&context.request_id).unwrap_err();
+        assert!(matches!(err, SessionError::RequestNotInflight { .. }));
+        assert_eq!(registry.len(), 0);
     }
 
     #[test]
