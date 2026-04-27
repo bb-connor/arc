@@ -33,6 +33,7 @@ members = [
     "crates/chio-openai",
     "crates/chio-openapi",
     "crates/chio-openapi-mcp-bridge",
+    "crates/chio-tool-call-fabric",
     "crates/chio-tower",
     #
     # Economics & settlement

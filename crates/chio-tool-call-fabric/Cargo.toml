@@ -1,0 +1,19 @@
+[package]
+name = "chio-tool-call-fabric"
+description = "Provider-agnostic tool-call fabric for Chio LLM adapter integrations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
