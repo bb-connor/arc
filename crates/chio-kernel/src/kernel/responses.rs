@@ -1347,10 +1347,7 @@ impl ChioKernel {
                 self.maybe_trigger_checkpoint(seq)?;
             }
         }
-        self.receipt_log
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt log lock poisoned".to_string()))?
-            .append(receipt.clone());
+        self.append_chio_receipt_to_local_log(receipt.clone());
         Ok(())
     }
 

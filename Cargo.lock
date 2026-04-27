@@ -2702,6 +2702,7 @@ dependencies = [
 name = "chio-kernel"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "chio-appraisal",
  "chio-core",
  "chio-core-types",

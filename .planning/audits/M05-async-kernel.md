@@ -225,6 +225,41 @@ sub-wave gate after T7 per `.planning/trajectory/05-async-kernel-real.md`
 Phase 1 finalization. T6 uses the ticket-authorized focused kernel gate plus
 workspace clippy/fmt/diff/em-dash checks.
 
+### 2026-04-27 (P2.T4 ChioKernel std mutex retirement)
+
+Scope: M05.P2.T4 owned path `crates/chio-kernel/src/kernel/mod.rs`, plus
+the direct private-field append call site in
+`crates/chio-kernel/src/kernel/responses.rs`.
+
+Closure:
+
+| Field | Previous type | Replacement |
+|-------|---------------|-------------|
+| `receipt_log` | `Mutex<ReceiptLog>` | `ArcSwap<ReceiptLog>` with RCU append |
+| `child_receipt_log` | `Mutex<ChildReceiptLog>` | `ArcSwap<ChildReceiptLog>` with RCU append |
+| `emergency_stop_reason` | `Mutex<Option<String>>` | `ArcSwap<Option<String>>` |
+| `federation_peers` | `RwLock<HashMap<String, FederationPeer>>` | `ArcSwap<HashMap<String, FederationPeer>>` |
+| `federation_dual_receipts` | `Mutex<HashMap<String, DualSignedReceipt>>` | `DashMap<String, DualSignedReceipt>` |
+| `federation_local_kernel_id` | `Mutex<Option<String>>` | `ArcSwap<Option<String>>` |
+
+Result:
+
+- `ChioKernel` no longer has `std::sync::Mutex` fields.
+- `ChioKernel` no longer has `std::sync::RwLock` fields.
+- The emergency-stop reason and federation local kernel id are lock-free
+  `ArcSwap<Option<String>>` cells as required by the Phase 2 trajectory.
+- `arc-swap` was already pinned in workspace dependencies by P0.T2; this
+  ticket adds the dependency edge to `chio-kernel`.
+
+Reproduction:
+
+```bash
+! grep -nE 'std::sync::Mutex' crates/chio-kernel/src/kernel/mod.rs
+grep -q 'ArcSwap' crates/chio-kernel/src/kernel/mod.rs
+rg -n 'Mutex<|RwLock<' crates/chio-kernel/src/kernel/mod.rs
+# no matches
+```
+
 ## cargo-mutants baseline (M05.P0.T5)
 
 Date: 2026-04-27
