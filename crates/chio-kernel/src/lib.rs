@@ -401,3 +401,12 @@ pub use kernel::{
 // `.planning/trajectory/05-async-kernel-real.md` Phase 1 for the
 // migration sequence (T1 mechanical extraction; T3+ async-native bodies).
 pub use kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
+
+/// M05.P1.T3: default bounded capacity for the kernel's mpsc-backed
+/// signing-task channel. Re-exported from the crate-private
+/// `kernel::signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY` so the
+/// `tests/receipt_signing_async.rs` integration test can assert
+/// against the configured value without leaking the
+/// `signing_task` module path through the public surface.
+pub const M05_T3_SIGNING_CHANNEL_DEFAULT_CAPACITY: usize =
+    kernel::signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY;

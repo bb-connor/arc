@@ -20,13 +20,19 @@
 //!   route through the crate-internal sync helper exactly as it did before;
 //!   the only structural change is that the routing now passes through
 //!   `BlockingToolEvaluator::default().evaluate(&kernel, request)`.
-//! - **T2 (this commit)**: rename the long-form sync entrypoint from
+//! - **T2 (merged)**: rename the long-form sync entrypoint from
 //!   `evaluate_tool_call_sync_with_session_roots` to
 //!   `evaluate_tool_call_sync_inner` and mark it `#[doc(hidden)]`. The public
 //!   surface remains the trait method (and the `evaluate_tool_call_sync`
 //!   crate-private shim added in T1).
-//! - **T3**: replace [`ToolEvaluator::sign_receipt`]'s default body with an
-//!   mpsc-backed signing task; receipt signing leaves the lock-step path.
+//! - **T3 (this commit)**: replace [`ToolEvaluator::sign_receipt`]'s default
+//!   body with an mpsc-backed signing task; receipt signing leaves the
+//!   lock-step path. The trait method now accepts a pre-built
+//!   `ChioReceiptBody` and returns a signed `ChioReceipt`, routing through
+//!   `ChioKernel::sign_receipt_via_channel` which submits the body to the
+//!   spawned signing task. Receipt bytes are byte-identical to the inline
+//!   `build_and_sign_receipt` path because both delegate to
+//!   `chio_kernel_core::sign_receipt`.
 //! - **T4**: replace [`ToolEvaluator::dispatch`]'s default body with a real
 //!   async dispatch.
 //! - **T5-T7**: deprecate `evaluate_tool_call_blocking`, gate behind
@@ -36,7 +42,9 @@
 //! sequence and `.planning/audits/M05-async-kernel.md` for the audit trail.
 
 use crate::kernel::ChioKernel;
-use crate::{KernelError, ToolCallRequest, ToolCallResponse, Verdict};
+use crate::{
+    ChioReceipt, ChioReceiptBody, KernelError, ToolCallRequest, ToolCallResponse, Verdict,
+};
 
 /// The four logical phases of a tool-call evaluation, surfaced as an
 /// async-capable trait so subsequent M05 tickets can swap each phase out for
@@ -112,17 +120,42 @@ pub trait ToolEvaluator: Send + Sync {
         self.evaluate(kernel, request).await
     }
 
-    /// Sign the receipt for the (allow or deny) outcome of `request`.
+    /// Sign the receipt for the (allow or deny) outcome of a tool call.
     ///
-    /// In T1 the default body routes through [`Self::evaluate`]. T3 will
-    /// replace this with the mpsc-backed signing task so producers `.await`
-    /// on a channel rather than on a mutex.
+    /// Accepts a fully-constructed [`ChioReceiptBody`] (built by the
+    /// caller from the active `ToolCallRequest` plus tenant scope,
+    /// guard evidence, and policy hash) and returns the signed
+    /// [`ChioReceipt`].
+    ///
+    /// ## T3 contract (this commit)
+    ///
+    /// The default body routes through `kernel.sign_receipt_via_channel`,
+    /// which submits the body to the kernel's mpsc-backed signing task
+    /// and `.await`s the oneshot reply. Producers wait on bounded
+    /// backpressure when the channel is full; they NEVER wait on a
+    /// receipt-log mutex.
+    ///
+    /// The signed receipt is byte-identical to the receipt the existing
+    /// synchronous `build_and_sign_receipt` helper would produce: both
+    /// paths funnel through the same `chio_kernel_core::sign_receipt`
+    /// portable entrypoint and use the same kernel signing keypair
+    /// (the signing task owns a clone of `kernel.config.keypair`).
+    /// M04 replay-equivalence goldens stay green across the channel
+    /// boundary.
+    ///
+    /// ## Migration sequence reminder
+    ///
+    /// T3 lands the channel infrastructure and routes `sign_receipt`
+    /// through it. The internal call sites of `build_and_sign_receipt`
+    /// in `responses.rs` and `session_ops.rs` are unchanged; they keep
+    /// the inline path. T4+ migrate those sites once dispatch is also
+    /// async-native.
     async fn sign_receipt(
         &self,
         kernel: &ChioKernel,
-        request: &ToolCallRequest,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate(kernel, request).await
+        body: ChioReceiptBody,
+    ) -> Result<ChioReceipt, KernelError> {
+        kernel.sign_receipt_via_channel(body).await
     }
 }
 

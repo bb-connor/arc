@@ -958,6 +958,20 @@ pub struct ChioKernel {
     /// encoding of the kernel's signing public key, but operators can
     /// override it to a stable DNS name via `with_federation_peers`.
     federation_local_kernel_id: Mutex<Option<String>>,
+    /// M05.P1.T3 mpsc-backed signing task handle. Owns a clone of
+    /// `config.keypair` and pulls signing requests from a bounded
+    /// channel; producers `.await` on backpressure rather than on a
+    /// mutex. Spawned at [`ChioKernel::new`] and joined by
+    /// [`ChioKernel::shutdown`]. Wrapped in `Arc` so any future
+    /// `Arc<ChioKernel>` sharing (Phase 3 tower middleware) can hand
+    /// the signing handle to in-flight evaluators without cloning the
+    /// whole kernel.
+    ///
+    /// The existing synchronous `build_and_sign_receipt` helper in
+    /// `responses.rs` is unchanged: T3 only adds the channel path that
+    /// `ToolEvaluator::sign_receipt` routes through. Later phase work
+    /// migrates the inline call sites onto the channel.
+    signing_task: std::sync::Arc<signing_task::SigningTaskHandle>,
 }
 
 #[derive(Clone, Copy)]
@@ -1306,6 +1320,19 @@ impl ChioKernel {
         info!("initializing Chio kernel");
         let authority_keypair = config.keypair.clone();
         let checkpoint_batch_size = config.checkpoint_batch_size;
+        // M05.P1.T3: build the mpsc-backed signing-task handle. The
+        // handle clones the signing keypair so the receipt-signing
+        // critical path no longer borrows from `self.config.keypair`
+        // while the evaluate pipeline is mid-flight. The underlying
+        // tokio task is spawned LAZILY on first `signing_task.sign(_)`
+        // call; this keeps `ChioKernel::new` constructible from sync
+        // contexts (229+ test-harness call sites today) while still
+        // ensuring the signing path is async-native. By the time any
+        // caller reaches `sign` they are inside an async function and
+        // a tokio runtime is necessarily active.
+        let signing_keypair = config.keypair.clone();
+        let signing_task =
+            std::sync::Arc::new(signing_task::SigningTaskHandle::spawn(signing_keypair));
         Self {
             config,
             guards: Vec::new(),
@@ -1342,7 +1369,73 @@ impl ChioKernel {
             federation_cosigner: None,
             federation_dual_receipts: Mutex::new(HashMap::new()),
             federation_local_kernel_id: Mutex::new(None),
+            signing_task,
         }
+    }
+
+    /// M05.P1.T3: borrow the kernel's mpsc-backed signing-task handle.
+    ///
+    /// Internal callers (`ToolEvaluator::sign_receipt`, the M05.P4.T4
+    /// crash-recovery test harness) submit `ChioReceiptBody` payloads
+    /// through this handle and `.await` the signed `ChioReceipt`. The
+    /// underlying tokio task is spawned lazily on the first call.
+    ///
+    /// Not exposed publicly: callers should go through
+    /// [`Self::sign_receipt_via_channel`] (or, eventually, the
+    /// `ToolEvaluator` trait) so the channel boundary stays an
+    /// implementation detail of the kernel crate. Phase 3's
+    /// `chio-tower::KernelService` handles do not need direct access;
+    /// they wrap `evaluate_tool_call` which routes through the trait.
+    ///
+    /// `#[allow(dead_code)]` because T3 only adds the entrypoint; the
+    /// integration test in `tests/receipt_signing_async.rs` uses the
+    /// public `sign_receipt_via_channel` plus `shutdown` instead. P4
+    /// crash-recovery work consumes this directly.
+    #[allow(dead_code)]
+    pub(crate) fn signing_task_handle(&self) -> &signing_task::SigningTaskHandle {
+        &self.signing_task
+    }
+
+    /// M05.P1.T3: sign a [`ChioReceiptBody`] off the kernel critical
+    /// path via the mpsc-backed signing task.
+    ///
+    /// Producers `.await` on bounded backpressure rather than on a
+    /// receipt-log mutex. Returns
+    /// `Err(KernelError::ReceiptSigningFailed)` if the signing step
+    /// itself rejected the body (e.g. the body's `kernel_key` does not
+    /// match the kernel's signing public key) and
+    /// `Err(KernelError::Internal)` if the signing task is no longer
+    /// running.
+    ///
+    /// This method is async because it `.await`s on the channel send
+    /// (backpressure) and on the oneshot reply. The caller must run
+    /// inside a tokio runtime; every kernel-internal call site already
+    /// does (the `ToolEvaluator` trait methods are async, and so is
+    /// the public `evaluate_tool_call` entrypoint).
+    pub async fn sign_receipt_via_channel(
+        &self,
+        body: ChioReceiptBody,
+    ) -> Result<ChioReceipt, KernelError> {
+        self.signing_task.sign(body).await
+    }
+
+    /// M05.P1.T3: drain the in-flight signing-task queue and join the
+    /// task. After this call, every signing request that successfully
+    /// `.send().await`-ed before shutdown has been signed and replied
+    /// to; new sends surface `KernelError::Internal`.
+    ///
+    /// Idempotent: safe to call more than once. Safe to call on a
+    /// kernel whose signing task was never spawned (no signing
+    /// happened); in that case shutdown is a no-op.
+    ///
+    /// Note: shutdown does NOT mark the kernel as terminally stopped
+    /// for other paths (capability validation, guard pipeline, store
+    /// lookups). Operators that want a hard stop should call
+    /// [`Self::emergency_stop`] in addition. Phase 4 work
+    /// (`tests/signer_crash.rs`, M05.P4.T4) layers crash-recovery
+    /// semantics on top of this method.
+    pub async fn shutdown(&self) {
+        self.signing_task.shutdown().await;
     }
 
     pub fn set_receipt_store(&mut self, receipt_store: Box<dyn ReceiptStore>) {
@@ -5825,6 +5918,13 @@ pub mod evaluator;
 mod responses;
 #[path = "session_ops.rs"]
 mod session_ops;
+// M05.P1.T3: mpsc-backed signing task. Owns a clone of the kernel
+// signing keypair and pulls signing requests from a bounded
+// `tokio::sync::mpsc` channel so receipt signing leaves the synchronous
+// critical path. Default body of `ToolEvaluator::sign_receipt` routes
+// through this module.
+#[path = "signing_task.rs"]
+pub(crate) mod signing_task;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
