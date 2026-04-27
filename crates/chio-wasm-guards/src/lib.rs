@@ -45,6 +45,7 @@
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 pub mod abi;
+pub mod bundle_store;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod component;
 pub mod config;
@@ -66,6 +67,7 @@ pub mod wiring;
 pub mod fuzz;
 
 pub use abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
+pub use bundle_store::{BundleError, BundleStore, InMemoryBundleStore};
 #[cfg(feature = "wasmtime-runtime")]
 pub use component::ComponentBackend;
 pub use config::WasmGuardConfig;
