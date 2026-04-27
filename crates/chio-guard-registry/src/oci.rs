@@ -128,6 +128,52 @@ pub enum GuardRegistryError {
         /// Digest returned by the registry.
         actual: String,
     },
+
+    /// Sigstore verification failed because the artifact signature did not match.
+    #[error("guard Sigstore verification failed: artifact signature mismatch")]
+    VerifySignatureMismatch,
+
+    /// Sigstore verification failed because the Fulcio subject did not match.
+    #[error("guard Sigstore verification failed: Fulcio subject mismatch")]
+    VerifyWrongSubject,
+
+    /// Sigstore verification failed because the OIDC issuer did not match.
+    #[error("guard Sigstore verification failed: OIDC issuer mismatch")]
+    VerifyWrongOidcIssuer,
+
+    /// Sigstore verification failed because Rekor inclusion was missing or invalid.
+    #[error("guard Sigstore verification failed: Rekor proof missing or invalid")]
+    VerifyMissingRekorProof,
+
+    /// Sigstore verification failed because the certificate is not currently valid.
+    #[error("guard Sigstore verification failed: certificate outside validity window")]
+    VerifyCertificateExpired,
+
+    /// Sigstore verification failed because the trust root is missing or stale.
+    #[error("guard Sigstore verification failed: trust root missing or stale")]
+    VerifyTrustRoot,
+
+    /// Sigstore verification failed because the bundle or certificate was malformed.
+    #[error("guard Sigstore verification failed: malformed bundle or certificate: {message}")]
+    VerifyMalformedBundle {
+        /// Verifier-provided parse context.
+        message: String,
+    },
+
+    /// Sigstore verification failed while reading verification material.
+    #[error("guard Sigstore verification I/O failed: {source}")]
+    VerifyIo {
+        /// Underlying I/O error.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// Sigstore verification returned a future error variant. Unknown errors deny.
+    #[error("guard Sigstore verification failed closed: {message}")]
+    VerifyFailedClosed {
+        /// Verifier-provided failure context.
+        message: String,
+    },
 }
 
 /// A validated `sha256:<hex>` digest.

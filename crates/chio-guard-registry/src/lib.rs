@@ -1,14 +1,18 @@
 //! Chio guard registry support.
 //!
 //! This crate owns the OCI distribution surface for `.arcguard` wasm-component
-//! artifacts. It intentionally stops at registry transport and artifact shape
-//! checks; Sigstore verification is wired by later M06 tickets through
-//! `chio-attest-verify`.
+//! artifacts. Registry transport and artifact shape checks stay local, while
+//! Sigstore verification is delegated to `chio-attest-verify`.
 
 pub mod cache;
 pub mod oci;
 pub mod publish;
 pub mod pull;
+pub mod verify;
+
+pub use chio_attest_verify::{
+    AttestError, AttestVerifier, ExpectedIdentity, SigstoreVerifier, VerifiedAttestation,
+};
 
 pub use cache::{
     CachedGuardArtifact, GuardCache, GuardCacheArtifact, GuardCacheLayout, CACHE_CONFIG_JSON_FILE,
@@ -28,3 +32,4 @@ pub use publish::{
     GUARD_SIGNER_SUBJECT_ANNOTATION, GUARD_WIT_WORLD, GUARD_WIT_WORLD_ANNOTATION,
 };
 pub use pull::{GuardPullRequest, GuardPullResponse, RESERVED_SIGSTORE_BUNDLE_JSON};
+pub use verify::{expected_identity_from_config, GuardSigstoreVerifier};
