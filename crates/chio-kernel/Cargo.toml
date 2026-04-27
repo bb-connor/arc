@@ -15,6 +15,7 @@ name = "chio_kernel"
 [features]
 default = ["legacy-sync"]
 legacy-sync = []
+tokio-console-smoke = ["tokio/tracing"]
 
 [dependencies]
 chio-appraisal = { path = "../chio-appraisal" }
@@ -112,6 +113,11 @@ path = "tests/replay_proptest.rs"
 [[test]]
 name = "dual_track_receipt_identity"
 path = "tests/dual_track_receipt_identity.rs"
+
+[[test]]
+name = "tokio_console_smoke"
+path = "tests/tokio_console_smoke.rs"
+required-features = ["tokio-console-smoke"]
 
 [lints.clippy]
 unwrap_used = "deny"
