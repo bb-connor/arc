@@ -12,14 +12,16 @@
 //    `tenant_sig: ed25519:<base64>` against an Ed25519 public key over
 //    the RFC 8785 canonical-JSON encoding of the frame body
 //    (everything except `tenant_sig`).
-// 3. **M01 invocation validator**: deserializes the opaque
+// 3. **Redaction-pass availability gate**: rejects frames captured with a
+//    redaction pass this binary cannot re-run or compare.
+// 4. **M01 invocation validator**: deserializes the opaque
 //    `invocation` JSON value into a `chio_tool_call_fabric::ToolInvocation`
 //    and asserts that re-canonicalizing the round-tripped value
 //    produces byte-identical bytes (a cheap canonical-JSON proof that
 //    the M01 ToolInvocation schema holds).
 //
 // Every pass is fail-closed and returns a structured error mapped to
-// the canonical M04 exit code registry (20 / 30 / 40). See
+// the canonical M04 exit code registry (20 / 30 / 40 / 50). See
 // `.planning/trajectory/04-deterministic-replay.md` "EXIT CODES".
 //
 // Reference: `.planning/trajectory/10-tee-replay-harness.md` Phase 2
@@ -37,6 +39,12 @@ pub const EXIT_SCHEMA_MISMATCH: i32 = 40;
 
 /// Canonical exit code: tenant-sig verification failed.
 pub const EXIT_BAD_TENANT_SIG: i32 = 20;
+
+/// Canonical exit code: redaction pass unavailable or mismatch.
+pub const EXIT_REDACTION_MISMATCH: i32 = 50;
+
+/// Redaction pass this binary can re-run for local traffic fixtures.
+const SUPPORTED_REDACTION_PASS_ID: &str = "m06-redactors@1.4.0+default";
 
 /// Categorized validation failure for a single frame.
 #[derive(Debug, thiserror::Error)]
@@ -56,6 +64,10 @@ pub enum ValidateError {
     #[error("tenant signature verification failed: {0}")]
     TenantSig(String),
 
+    /// The captured redaction pass cannot be replayed by this binary.
+    #[error("redaction mismatch: {0}")]
+    Redaction(String),
+
     /// `invocation` does not deserialize into a
     /// `chio_tool_call_fabric::ToolInvocation` or is not RFC 8785
     /// canonical.
@@ -69,6 +81,7 @@ impl ValidateError {
         match self {
             Self::SchemaVersion(_) | Self::Schema(_) | Self::Invocation(_) => EXIT_SCHEMA_MISMATCH,
             Self::TenantSig(_) => EXIT_BAD_TENANT_SIG,
+            Self::Redaction(_) => EXIT_REDACTION_MISMATCH,
         }
     }
 }
@@ -239,6 +252,22 @@ pub fn validate_m01_invocation(frame: &chio_tee_frame::Frame) -> Result<(), Vali
     Ok(())
 }
 
+/// Redaction-pass availability gate.
+///
+/// M04 reserves exit code 50 for captures whose recorded redaction pass is
+/// unavailable or whose re-run manifest differs. The current traffic runner
+/// has one in-tree deterministic redactor identity, so an unknown
+/// `redaction_pass_id` fails closed before replay continues.
+pub fn validate_redaction_pass(frame: &chio_tee_frame::Frame) -> Result<(), ValidateError> {
+    if frame.redaction_pass_id == SUPPORTED_REDACTION_PASS_ID {
+        return Ok(());
+    }
+    Err(ValidateError::Redaction(format!(
+        "redaction_pass_id {:?} is unavailable in this build",
+        frame.redaction_pass_id,
+    )))
+}
+
 /// Aggregate report shape suitable for human and `--json` rendering.
 ///
 /// T1 ships the structural validators; the dispatcher in
@@ -291,6 +320,7 @@ pub fn validate_frame(
     tenant_pubkey: Option<&[u8; 32]>,
 ) -> Result<(), ValidateError> {
     schema_version_gate(frame, expected_schema_name)?;
+    validate_redaction_pass(frame)?;
     if let Some(pk) = tenant_pubkey {
         verify_tenant_sig(frame, pk)?;
     }
@@ -505,6 +535,7 @@ mod replay_validate_tests {
         // dispatch layer cannot drift silently.
         assert_eq!(EXIT_SCHEMA_MISMATCH, 40);
         assert_eq!(EXIT_BAD_TENANT_SIG, 20);
+        assert_eq!(EXIT_REDACTION_MISMATCH, 50);
     }
 
     #[test]
