@@ -2618,6 +2618,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-tee"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-tee-frame",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-tee-frame"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-tower"
 version = "0.1.0"
 dependencies = [

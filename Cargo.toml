@@ -51,6 +51,8 @@ members = [
     #
     # Supply-chain attestation
     "crates/chio-attest-verify",
+    "crates/chio-tee",
+    "crates/chio-tee-frame",
     #
     # Identity, credentials, federation
     "crates/chio-credentials",
