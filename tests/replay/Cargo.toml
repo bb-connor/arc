@@ -31,6 +31,10 @@ sha2 = { workspace = true }
 name = "corpus_smoke"
 path = "tests/corpus_smoke.rs"
 
+[[test]]
+name = "golden_byte_equivalence"
+path = "tests/golden_byte_equivalence.rs"
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
