@@ -1,0 +1,84 @@
+name: bench-regression
+
+on:
+  pull_request:
+    branches: [main, project/roadmap-04-25-2026]
+  workflow_dispatch:
+
+concurrency:
+  group: bench-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  bench-regression:
+    name: bench-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Resolve benchmark refs
+        id: refs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_BASE_SHA" ]]; then
+            echo "baseline=$PR_BASE_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "baseline=HEAD^" >> "$GITHUB_OUTPUT"
+          fi
+          echo "current=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare benchmark worktrees
+        shell: bash
+        env:
+          BASELINE_REF: ${{ steps.refs.outputs.baseline }}
+          CURRENT_REF: ${{ steps.refs.outputs.current }}
+        run: |
+          set -euo pipefail
+          git worktree add "$RUNNER_TEMP/chio-bench-baseline" "$BASELINE_REF"
+          git worktree add "$RUNNER_TEMP/chio-bench-current" "$CURRENT_REF"
+
+      - name: Run baseline kernel benchmarks
+        working-directory: ${{ runner.temp }}/chio-bench-baseline
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-bench-baseline-target
+          CARGO_BUILD_JOBS: "1"
+          CARGO_INCREMENTAL: "0"
+        run: |
+          cargo bench -p chio-kernel -- --noplot --sample-size 100
+
+      - name: Run current kernel benchmarks
+        working-directory: ${{ runner.temp }}/chio-bench-current
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-bench-current-target
+          CARGO_BUILD_JOBS: "1"
+          CARGO_INCREMENTAL: "0"
+        run: |
+          cargo bench -p chio-kernel -- --noplot --sample-size 100
+
+      - name: Required kernel bench regression gate
+        run: |
+          bash scripts/criterion-compare.sh \
+            --baseline "$RUNNER_TEMP/chio-bench-baseline-target/criterion" \
+            --current "$RUNNER_TEMP/chio-bench-current-target/criterion" \
+            --threshold-percent 10
