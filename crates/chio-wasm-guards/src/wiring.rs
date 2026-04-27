@@ -177,9 +177,11 @@ mod tests {
             "name: test-guard\n\
              version: \"1.0.0\"\n\
              abi_version: \"{abi_version}\"\n\
+             wit_world: \"{wit_world}\"\n\
              wasm_path: {wasm_filename}\n\
              wasm_sha256: {wasm_sha256}\n\
-             {config_yaml}"
+             {config_yaml}",
+            wit_world = crate::manifest::REQUIRED_WIT_WORLD,
         );
         let manifest_path = dir.join(crate::manifest::MANIFEST_FILENAME);
         let mut f = std::fs::File::create(&manifest_path).unwrap();
