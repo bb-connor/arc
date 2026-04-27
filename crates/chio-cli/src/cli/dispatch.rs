@@ -2233,6 +2233,19 @@ fn main() {
             }
             GuardCommands::Verify { wasm } => guards::sign::cmd_guard_verify(&wasm),
         },
+        Commands::Conformance { command } => match command {
+            ConformanceCommands::Run {
+                peer,
+                report,
+                scenario,
+                output,
+            } => cmd_conformance_run(
+                &peer,
+                report.as_deref(),
+                scenario.as_deref(),
+                output.as_deref(),
+            ),
+        },
     };
 
     if let Err(e) = result {
