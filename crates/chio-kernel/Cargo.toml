@@ -46,6 +46,7 @@ ureq = { version = "2.10", features = ["json"] }
 [dev-dependencies]
 chio-store-sqlite = { path = "../chio-store-sqlite" }
 criterion = { workspace = true }
+loom = { workspace = true }
 # proptest = "1.10" (via workspace.dependencies). Used by:
 # - tests/property_budget_store.rs (M03)
 # - tests/replay_proptest.rs (M04.P5: replay-invariance suite)
@@ -115,3 +116,6 @@ path = "tests/dual_track_receipt_identity.rs"
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(loom)", "cfg(chio_kernel_loom)"] }
