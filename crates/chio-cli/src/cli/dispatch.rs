@@ -2252,6 +2252,17 @@ fn main() {
                 password: password.as_deref(),
                 allow_http_registry: allow_http_registry.clone(),
             }),
+            GuardCommands::Pull {
+                reference,
+                username,
+                password,
+                allow_http_registry,
+            } => guard::cmd_guard_pull(guard::GuardPullCommand {
+                reference: &reference,
+                username: username.as_deref(),
+                password: password.as_deref(),
+                allow_http_registry: allow_http_registry.clone(),
+            }),
             GuardCommands::Install { path, target_dir } => guard::cmd_guard_install(&path, &target_dir),
             GuardCommands::Sign { wasm, key, name, version } => {
                 guards::sign::cmd_guard_sign(&wasm, &key, &name, &version)

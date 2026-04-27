@@ -6,9 +6,10 @@ use crate::CliError;
 
 use base64::Engine;
 use chio_guard_registry::{
-    GuardArtifactConfig, GuardPublishArtifact, GuardPublishArtifactInput, GuardPublishRef,
-    GuardRegistryClient, GuardRegistryConfig, RegistryCredentials, GUARD_ARTIFACT_MEDIA_TYPE,
-    GUARD_CONFIG_MEDIA_TYPE, GUARD_WIT_WORLD,
+    GuardArtifactConfig, GuardCache, GuardOciRef, GuardPublishArtifact,
+    GuardPublishArtifactInput, GuardPublishRef, GuardPullRequest, GuardRegistryClient,
+    GuardRegistryConfig, RegistryCredentials, GUARD_ARTIFACT_MEDIA_TYPE, GUARD_CONFIG_MEDIA_TYPE,
+    GUARD_WIT_WORLD,
 };
 use chio_wasm_guards::abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 use chio_wasm_guards::manifest::GuardManifest;
@@ -666,6 +667,71 @@ pub(crate) fn cmd_guard_publish(command: GuardPublishCommand<'_>) -> Result<(), 
     println!("config_digest:     {}", response.config_digest);
     println!("config_url:        {}", response.config_url);
     println!("manifest_url:      {}", response.manifest_url);
+
+    Ok(())
+}
+
+pub(crate) struct GuardPullCommand<'a> {
+    pub reference: &'a str,
+    pub username: Option<&'a str>,
+    pub password: Option<&'a str>,
+    pub allow_http_registry: Vec<String>,
+}
+
+pub(crate) fn cmd_guard_pull(command: GuardPullCommand<'_>) -> Result<(), CliError> {
+    let reference = command
+        .reference
+        .parse::<GuardOciRef>()
+        .map_err(|e| CliError::Other(e.to_string()))?;
+    let credentials = registry_credentials(command.username, command.password);
+    let cache = GuardCache::from_environment().map_err(|e| CliError::Other(e.to_string()))?;
+    let client = GuardRegistryClient::try_new(GuardRegistryConfig {
+        allow_http_registries: command.allow_http_registry,
+        ..GuardRegistryConfig::default()
+    })
+    .map_err(|e| CliError::Other(e.to_string()))?;
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| CliError::Other(format!("failed to create pull runtime: {e}")))?;
+    let response = runtime
+        .block_on(client.pull_guard_to_cache(GuardPullRequest {
+            reference: &reference,
+            credentials: &credentials,
+            cache: &cache,
+        }))
+        .map_err(|e| CliError::Other(e.to_string()))?;
+
+    println!("pulled guard artifact");
+    println!("reference:        {reference}");
+    println!("digest:           {}", response.cached.digest);
+    println!(
+        "manifest_digest:  {}",
+        response.registry_manifest_digest
+    );
+    println!("cache_dir:        {}", response.cached.layout.directory().display());
+    println!(
+        "manifest_json:    {}",
+        response.cached.layout.manifest_json_path().display()
+    );
+    println!(
+        "config_json:      {}",
+        response.cached.layout.config_json_path().display()
+    );
+    println!("wit_bin:          {}", response.cached.layout.wit_bin_path().display());
+    println!(
+        "module_wasm:      {}",
+        response.cached.layout.module_wasm_path().display()
+    );
+    println!(
+        "sigstore_bundle:  {}",
+        response
+            .cached
+            .layout
+            .sigstore_bundle_json_path()
+            .display()
+    );
 
     Ok(())
 }
