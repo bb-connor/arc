@@ -20,8 +20,13 @@ path = "src/main.rs"
 chrono = { workspace = true, features = ["clock"] }
 ed25519-dalek = { workspace = true }
 hex = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+# `toml` is added directly here (not via [workspace.dependencies]) following the
+# precedent from chio-conformance (M02.P4.T4 PR #127). Used by
+# `cross_version::CompatMatrix` to parse `tests/replay/release_compat_matrix.toml`.
+toml = "0.8"
 
 [dev-dependencies]
 tempfile = { workspace = true }
