@@ -24,7 +24,7 @@ uuid = { workspace = true, features = ["v7"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
-tower = { version = "0.5", features = ["util", "timeout"] }
+tower = { version = "0.5", features = ["util", "timeout", "limit"] }
 tower-layer = "0.3"
 tower-service = "0.3"
 http = "1"

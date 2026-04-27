@@ -38,7 +38,8 @@ pub use evaluator::{ChioEvaluator, EvaluationResult};
 pub use identity::{extract_identity, IdentityExtractor};
 pub use kernel_service::{
     build_layered, KernelRequest, KernelResponse, KernelService, KernelServiceError,
-    KernelTraceLayer, KernelTraceService, TenantId,
+    KernelTraceLayer, KernelTraceService, TenantConcurrencyLimitLayer,
+    TenantConcurrencyLimitService, TenantId,
 };
 pub use layer::ChioLayer;
 pub use service::ChioService;
