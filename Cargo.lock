@@ -2976,6 +2976,8 @@ dependencies = [
  "chio-manifest",
  "chio-openai-adapter",
  "chio-tool-call-fabric",
+ "chrono",
+ "clap 4.6.0",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

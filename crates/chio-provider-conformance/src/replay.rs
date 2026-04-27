@@ -1,5 +1,14 @@
 //! Replay OpenAI provider captures through the native adapter surface.
 
+#![cfg_attr(
+    not(any(
+        feature = "fixtures-openai",
+        feature = "fixtures-anthropic",
+        feature = "fixtures-bedrock"
+    )),
+    allow(dead_code, unused_imports)
+)]
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,8 +24,7 @@ use thiserror::Error;
 use crate::assertions::{
     assert_canonical_json_eq, assert_verdict_eq, canonical_json_bytes_for, AssertionError,
 };
-
-const CAPTURE_SCHEMA: &str = "chio-provider-conformance.capture.v1";
+use crate::capture::{CaptureDirection, CaptureRecord, CapturedVerdictKind, CAPTURE_SCHEMA};
 
 /// Replay error with fixture path context.
 #[derive(Debug, Error)]
@@ -125,38 +133,6 @@ pub struct ComparableProvenance {
     pub api_version: String,
     pub principal: Principal,
     pub received_at: Value,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct CaptureRecord {
-    schema: String,
-    fixture_id: String,
-    direction: CaptureDirection,
-    provider: String,
-    #[serde(default)]
-    invocation_id: Option<String>,
-    #[serde(default)]
-    verdict: Option<CapturedVerdictKind>,
-    #[serde(default)]
-    receipt_id: Option<String>,
-    #[serde(default)]
-    payload: Value,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-enum CaptureDirection {
-    UpstreamRequest,
-    UpstreamResponse,
-    UpstreamEvent,
-    KernelVerdict,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-enum CapturedVerdictKind {
-    Allow,
-    Deny,
 }
 
 /// Return the OpenAI fixture corpus path.
