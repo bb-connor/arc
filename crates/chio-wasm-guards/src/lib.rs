@@ -78,8 +78,8 @@ pub use error::WasmGuardError;
 #[cfg(feature = "wasmtime-runtime")]
 pub use host::WasmHostState;
 pub use hot_reload::{
-    DebouncedReload, Engine, HotReloadError, RegistryDigestPoller, ReloadBackendFactory,
-    ReloadTrigger, ReloadTriggerSource,
+    CanaryCorpus, CanaryFixture, DebouncedReload, Engine, HotReloadError, RegistryDigestPoller,
+    ReloadBackendFactory, ReloadTrigger, ReloadTriggerSource, CANARY_FIXTURE_COUNT,
 };
 pub use manifest::{
     load_signature_sidecar, signature_sidecar_path, signed_module_message, verify_guard_signature,
