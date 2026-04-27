@@ -15,7 +15,7 @@
 # mismatch (cleanup-c11d; PR #94 review thread r3144022628 - P1).
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO backbay-labs/chio
+    REPO bb-connor/arc
     REF "cpp/v${VERSION}"
     SHA512 0
     HEAD_REF main
