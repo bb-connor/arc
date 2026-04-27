@@ -21,6 +21,17 @@ chio-core = { package = "chio-core-types", path = "../chio-core-types" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+# M10.P1.T4: mode resolver + SIGUSR1 hot-toggle.
+arc-swap = { workspace = true }
+toml = "0.8"
+
+[target.'cfg(unix)'.dependencies]
+# Signal handling for SIGUSR1 hot-toggle. Linux/BSD/macOS only; the toggle
+# path is RPC-only on Windows.
+signal-hook = "0.3"
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"
