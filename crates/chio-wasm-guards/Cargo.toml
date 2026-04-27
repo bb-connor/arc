@@ -14,6 +14,13 @@ name = "chio_wasm_guards"
 [features]
 default = []
 # Enable the wasmtime-based runtime backend.
+#
+# Note (M06.P1.T1): the WIT contract has been bumped to `chio:guard@0.2.0`
+# (see `wit/chio-guard/world.wit` and `docs/guards/MIGRATION-0.1-to-0.2.md`).
+# Host wiring still uses raw `Linker::func_wrap` calls; M06.P1.T2 will
+# replace those with `wasmtime::component::bindgen!`-generated wiring
+# pinned to `chio:guard/guard@0.2.0`. No new dependencies are added in
+# T1; the wasmtime feature flags below stay byte-for-byte the same.
 wasmtime-runtime = ["dep:wasmtime", "dep:wasmparser"]
 # Enables `chio_wasm_guards::fuzz`, the libFuzzer entry-point module.
 # Off by default; turned on only by the `chio-fuzz` standalone workspace
