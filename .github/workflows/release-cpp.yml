@@ -162,21 +162,23 @@ jobs:
           tar -C "$HOME/.conan2" -xzf "${RUNNER_TEMP}/snapshot/conan-cache.tar.gz"
 
       - name: Configure Nexus remote
-        env:
-          PUBLISHER_TOKEN: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
         run: |
           set -euo pipefail
           if ! conan profile path default >/dev/null 2>&1; then
             conan profile detect --force
           fi
           conan remote add chio-private "${CHIO_NEXUS_REMOTE_URL}" || true
-          # Conan v2 `remote login` takes -p <token>; --password-stdin is
-          # not supported. The token is masked in workflow logs and the
-          # ephemeral runner is single-tenant so the brief ps-visibility
-          # window is acceptable.
-          conan remote login chio-private chio-publisher -p "${PUBLISHER_TOKEN}"
 
       - name: Upload SDK packages
+        # Conan v2 `remote login` obtains a session token but the token
+        # storage doesn't reliably persist across separate `conan` invocations
+        # in CI; subsequent commands re-prompt for credentials and EOF on
+        # closed stdin. The supported non-interactive path is per-remote
+        # env vars, which Conan reads on every command. The remote-name
+        # suffix uses the literal name (with hyphens) as Conan parses it.
+        env:
+          CONAN_LOGIN_USERNAME_chio-private: chio-publisher
+          CONAN_PASSWORD_chio-private: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
         run: |
           set -euo pipefail
           for sdk in chio-cpp chio-cpp-kernel chio-guard-cpp chio-drogon; do
