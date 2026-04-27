@@ -18,12 +18,17 @@ path = "src/main.rs"
 [dependencies]
 chio-tee-frame = { path = "../chio-tee-frame" }
 chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+chio-data-guards-redactors-default = { path = "../chio-data-guards/redactors/default" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 # M10.P1.T4: mode resolver + SIGUSR1 hot-toggle.
 arc-swap = { workspace = true }
 toml = "0.8"
+# M10.P1.T6: zeroize-on-drop raw-payload buffers. Pinned to 1.8.x; the
+# derive feature provides the `Zeroize` + `ZeroizeOnDrop` derives used by
+# `RawPayloadBuffer` in `src/buffer.rs`.
+zeroize = { version = "1.8", features = ["derive"] }
 
 [target.'cfg(unix)'.dependencies]
 # Signal handling for SIGUSR1 hot-toggle. Linux/BSD/macOS only; the toggle

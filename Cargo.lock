@@ -2646,6 +2646,7 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "chio-core-types",
+ "chio-data-guards-redactors-default",
  "chio-tee-frame",
  "serde",
  "serde_json",
@@ -2653,6 +2654,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "toml 0.8.23",
+ "zeroize",
 ]
 
 [[package]]

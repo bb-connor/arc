@@ -5,11 +5,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod buffer;
 pub mod config;
 pub mod frame;
 pub mod mode;
+pub mod redact;
 pub mod tap;
 
+pub use buffer::RawPayloadBuffer;
 pub use config::{
     load_env_mode, load_tenant_manifest_mode, load_tenant_manifest_mode_from_str, load_toml_mode,
     parse_env_mode, parse_toml_mode_from_str, resolve_toml_path, ConfigError, DEFAULT_TOML_PATH,
@@ -21,6 +24,10 @@ pub use frame::{
 };
 pub use mode::{
     Direction, Mode, ModeInputs, MoteState, ParseModeError, ResolvedMode, Source, TransitionError,
+};
+pub use redact::{
+    DefaultRedactor, RedactClass, RedactError, RedactPass, RedactedPayload, RedactionManifest,
+    RedactionMatch, Redactor, RedactorError, PARANOID_ZERO_MATCH_THRESHOLD,
 };
 pub use tap::{TapError, TapResult, TrafficTap};
 
