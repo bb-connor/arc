@@ -2019,7 +2019,20 @@ impl ChioKernel {
         BlockingToolEvaluator.evaluate(self, request).await
     }
 
+    #[cfg(feature = "legacy-sync")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "use evaluate_tool_call().await; gated under feature legacy-sync from next release"
+    )]
     pub fn evaluate_tool_call_blocking(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_inner(request, None, None)
+    }
+
+    #[cfg(not(feature = "legacy-sync"))]
+    pub(crate) fn evaluate_tool_call_blocking(
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {

@@ -12,6 +12,10 @@ publish = false
 [lib]
 name = "chio_kernel"
 
+[features]
+default = ["legacy-sync"]
+legacy-sync = []
+
 [dependencies]
 chio-appraisal = { path = "../chio-appraisal" }
 chio-core = { path = "../chio-core" }
