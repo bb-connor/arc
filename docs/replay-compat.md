@@ -88,3 +88,40 @@ bundle artifact URL produced by `release-qualification.yml`.)
 | date       | branch                                          | reason                                              |
 | ---------- | ----------------------------------------------- | --------------------------------------------------- |
 | 2026-04-26 | `wave/W2/m04/p2.t5-initial-fifty-goldens-bless` | Initial bless of replay corpus (M04.P2.T5).         |
+
+## Ratchet rule
+
+The cross-version compatibility matrix
+(`tests/replay/release_compat_matrix.toml`) ratchets forward as new tags
+land:
+
+- The **last N=5 tagged releases** are supported by current `main`. They
+  are listed with `compat = "supported"` and a `supported_until` field
+  pointing five minor releases ahead.
+- Tags older than the window remain in the matrix marked
+  `compat = "best_effort"` until they fall off entirely (`compat = "broken"`
+  with rationale).
+- **`v3.0` is the floor** for the strict ratchet. Tags `v0.1.0` and `v2.0`
+  predate the canonicalization freeze; they are recorded with
+  `compat = "best_effort"` and the cross-version harness skips them
+  unless explicitly invoked with `--allow-best-effort`.
+- A new tag's row is auto-appended by `release-tagged.yml` (M04.P3.T5).
+  The PR opened by that workflow flips its `compat` from the
+  default `"supported"` to `"best_effort"` only if the diff against the
+  previous bundle exceeds an established threshold; that decision is
+  documented in the PR body.
+
+### `compat = "broken"` requires rationale
+
+A row with `compat = "broken"` MUST have a `notes` field describing why
+the bundle no longer round-trips, and an entry in this document below
+the table linking to the tracking issue. The cross-version job skips
+broken rows but the docs gate (`grep -q broken-rationale-XXXX`) fails
+the build if a broken row lacks documentation.
+
+### Promoting from best_effort to supported
+
+A `best_effort` row is promoted to `supported` only after the canonical
+formats have stabilized for at least one full release cycle and the row
+is within the N=5 window. Promotion lands as a single PR titled
+`chore(replay): promote vX.Y to supported in release_compat_matrix.toml`.
