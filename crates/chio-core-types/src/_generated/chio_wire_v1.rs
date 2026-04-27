@@ -3236,7 +3236,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityRevocationEntryCapabilityI
             })
     }
 }
-///A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens.
+///A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens. PublicKey serde renders Ed25519 keys as bare 64-character lowercase hex (`PublicKey::to_hex` in `crates/chio-core-types/src/crypto.rs`), and renders FIPS keys with a self-describing prefix (`p256:<130-char hex>` for uncompressed SEC1 P-256, `p384:<194-char hex>` for P-384). Signatures follow the same convention: bare 128-char hex for Ed25519, `p256:<DER hex>` and `p384:<DER hex>` for FIPS algorithms. The grant `$defs` (`toolGrant`, `resourceGrant`, `promptGrant`, `operation`, `monetaryAmount`, `constraint`) are duplicated with `capability/grant.schema.json` because the current Rust codegen pipeline (`typify =0.4.3`) does not support cross-file `$ref`; both copies must be kept byte-identical when either file is edited until the M01 phase 3 codegen split lands.
 ///
 /// <details><summary>JSON schema</summary>
 ///
@@ -3244,7 +3244,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityRevocationEntryCapabilityI
 ///{
 ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/token/v1",
 ///  "title": "Chio CapabilityToken",
-///  "description": "A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens.",
+///  "description": "A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens. PublicKey serde renders Ed25519 keys as bare 64-character lowercase hex (`PublicKey::to_hex` in `crates/chio-core-types/src/crypto.rs`), and renders FIPS keys with a self-describing prefix (`p256:<130-char hex>` for uncompressed SEC1 P-256, `p384:<194-char hex>` for P-384). Signatures follow the same convention: bare 128-char hex for Ed25519, `p256:<DER hex>` and `p384:<DER hex>` for FIPS algorithms. The grant `$defs` (`toolGrant`, `resourceGrant`, `promptGrant`, `operation`, `monetaryAmount`, `constraint`) are duplicated with `capability/grant.schema.json` because the current Rust codegen pipeline (`typify =0.4.3`) does not support cross-file `$ref`; both copies must be kept byte-identical when either file is edited until the M01 phase 3 codegen split lands.",
 ///  "type": "object",
 ///  "required": [
 ///    "expires_at",
@@ -3288,23 +3288,22 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityRevocationEntryCapabilityI
 ///      "minimum": 0.0
 ///    },
 ///    "issuer": {
-///      "description": "Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.",
+///      "description": "Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).",
 ///      "type": "string",
-///      "pattern": "^[0-9a-f]{64}$"
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///    },
 ///    "scope": {
 ///      "$ref": "#/$defs/chioScope"
 ///    },
 ///    "signature": {
-///      "description": "Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).",
+///      "description": "Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
 ///      "type": "string",
-///      "minLength": 96,
-///      "pattern": "^[0-9a-f]+$"
+///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
 ///    },
 ///    "subject": {
-///      "description": "Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).",
+///      "description": "Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.",
 ///      "type": "string",
-///      "pattern": "^[0-9a-f]{64}$"
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///    }
 ///  },
 ///  "additionalProperties": false
@@ -3326,12 +3325,12 @@ pub struct ChioCapabilityToken {
     pub id: ChioCapabilityTokenId,
     ///Unix timestamp (seconds) when the token was issued.
     pub issued_at: u64,
-    ///Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.
+    ///Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).
     pub issuer: ChioCapabilityTokenIssuer,
     pub scope: ChioScope,
-    ///Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).
+    ///Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
     pub signature: ChioCapabilityTokenSignature,
-    ///Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).
+    ///Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.
     pub subject: ChioCapabilityTokenSubject,
 }
 impl ::std::convert::From<&ChioCapabilityToken> for ChioCapabilityToken {
@@ -3504,15 +3503,15 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityTokenId {
             })
     }
 }
-///Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.
+///Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.",
+///  "description": "Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).",
 ///  "type": "string",
-///  "pattern": "^[0-9a-f]{64}$"
+///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///}
 /// ```
 /// </details>
@@ -3541,9 +3540,17 @@ impl ::std::str::FromStr for ChioCapabilityTokenIssuer {
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
-        { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+        {
+            ::regress::Regex::new(
+                    "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                )
+                .unwrap()
+        });
         if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            return Err(
+                "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
+                    .into(),
+            );
         }
         Ok(Self(value.to_string()))
     }
@@ -3584,16 +3591,15 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityTokenIssuer {
             })
     }
 }
-///Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).
+///Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).",
+///  "description": "Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
 ///  "type": "string",
-///  "minLength": 96,
-///  "pattern": "^[0-9a-f]+$"
+///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
 ///}
 /// ```
 /// </details>
@@ -3622,13 +3628,16 @@ impl ::std::str::FromStr for ChioCapabilityTokenSignature {
     fn from_str(
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        if value.chars().count() < 96usize {
-            return Err("shorter than 96 characters".into());
-        }
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
-        { ::regress::Regex::new("^[0-9a-f]+$").unwrap() });
+        {
+            ::regress::Regex::new("^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$")
+                .unwrap()
+        });
         if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[0-9a-f]+$\"".into());
+            return Err(
+                "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$\""
+                    .into(),
+            );
         }
         Ok(Self(value.to_string()))
     }
@@ -3669,15 +3678,15 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityTokenSignature {
             })
     }
 }
-///Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).
+///Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).",
+///  "description": "Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.",
 ///  "type": "string",
-///  "pattern": "^[0-9a-f]{64}$"
+///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///}
 /// ```
 /// </details>
@@ -3706,9 +3715,17 @@ impl ::std::str::FromStr for ChioCapabilityTokenSubject {
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
-        { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+        {
+            ::regress::Regex::new(
+                    "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                )
+                .unwrap()
+        });
         if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            return Err(
+                "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
+                    .into(),
+            );
         }
         Ok(Self(value.to_string()))
     }
@@ -10564,7 +10581,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioKernelMessageToolCallResponseResultR
 ///      "minLength": 1
 ///    },
 ///    "statements": {
-///      "description": "Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence`. The struct does not carry `serde(rename_all)`, so per-statement field names are snake_case.",
+///      "description": "Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence` in `crates/chio-core-types/src/capability.rs` (lines 484-507). The struct does not carry `serde(rename_all)`, so the per-statement scalar fields are snake_case; the embedded `workload_identity` carries `serde(rename_all = camelCase)` so its inner fields are camelCase. Optional fields (`runtime_identity`, `workload_identity`, `claims`) are omitted from the wire when their underlying `Option<...>` is `None`.",
 ///      "type": "array",
 ///      "items": {
 ///        "type": "object",
@@ -10577,6 +10594,9 @@ impl<'de> ::serde::Deserialize<'de> for ChioKernelMessageToolCallResponseResultR
 ///          "verifier"
 ///        ],
 ///        "properties": {
+///          "claims": {
+///            "description": "Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`."
+///          },
 ///          "evidence_sha256": {
 ///            "description": "Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs.",
 ///            "type": "string",
@@ -10593,7 +10613,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioKernelMessageToolCallResponseResultR
 ///            "minimum": 0.0
 ///          },
 ///          "runtime_identity": {
-///            "description": "Optional runtime or workload identifier associated with the evidence.",
+///            "description": "Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.",
 ///            "type": "string",
 ///            "minLength": 1
 ///          },
@@ -10616,6 +10636,50 @@ impl<'de> ::serde::Deserialize<'de> for ChioKernelMessageToolCallResponseResultR
 ///            "description": "Attestation verifier or relying party that accepted the evidence.",
 ///            "type": "string",
 ///            "minLength": 1
+///          },
+///          "workload_identity": {
+///            "description": "Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.",
+///            "type": "object",
+///            "required": [
+///              "credentialKind",
+///              "path",
+///              "scheme",
+///              "trustDomain",
+///              "uri"
+///            ],
+///            "properties": {
+///              "credentialKind": {
+///                "description": "Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.",
+///                "type": "string",
+///                "enum": [
+///                  "uri",
+///                  "x509_svid",
+///                  "jwt_svid"
+///                ]
+///              },
+///              "path": {
+///                "description": "Canonical workload path within the trust domain.",
+///                "type": "string"
+///              },
+///              "scheme": {
+///                "description": "Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).",
+///                "type": "string",
+///                "enum": [
+///                  "spiffe"
+///                ]
+///              },
+///              "trustDomain": {
+///                "description": "Stable trust domain resolved from the identifier.",
+///                "type": "string",
+///                "minLength": 1
+///              },
+///              "uri": {
+///                "description": "Canonical workload identifier URI.",
+///                "type": "string",
+///                "minLength": 1
+///              }
+///            },
+///            "additionalProperties": false
 ///          }
 ///        },
 ///        "additionalProperties": false
@@ -10642,7 +10706,7 @@ pub struct ChioProvenanceAttestationBundle {
     ///Optional identifier of the bundle assembler (kernel, gateway, or trust-control authority). Omitted when the bundle is locally assembled by the receiving kernel.
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub issuer: ::std::option::Option<ChioProvenanceAttestationBundleIssuer>,
-    ///Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence`. The struct does not carry `serde(rename_all)`, so per-statement field names are snake_case.
+    ///Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence` in `crates/chio-core-types/src/capability.rs` (lines 484-507). The struct does not carry `serde(rename_all)`, so the per-statement scalar fields are snake_case; the embedded `workload_identity` carries `serde(rename_all = camelCase)` so its inner fields are camelCase. Optional fields (`runtime_identity`, `workload_identity`, `claims`) are omitted from the wire when their underlying `Option<...>` is `None`.
     pub statements: ::std::vec::Vec<ChioProvenanceAttestationBundleStatementsItem>,
 }
 impl ::std::convert::From<&ChioProvenanceAttestationBundle>
@@ -10920,6 +10984,9 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceAttestationBundleIssuer {
 ///    "verifier"
 ///  ],
 ///  "properties": {
+///    "claims": {
+///      "description": "Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`."
+///    },
 ///    "evidence_sha256": {
 ///      "description": "Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs.",
 ///      "type": "string",
@@ -10936,7 +11003,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceAttestationBundleIssuer {
 ///      "minimum": 0.0
 ///    },
 ///    "runtime_identity": {
-///      "description": "Optional runtime or workload identifier associated with the evidence.",
+///      "description": "Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.",
 ///      "type": "string",
 ///      "minLength": 1
 ///    },
@@ -10959,6 +11026,50 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceAttestationBundleIssuer {
 ///      "description": "Attestation verifier or relying party that accepted the evidence.",
 ///      "type": "string",
 ///      "minLength": 1
+///    },
+///    "workload_identity": {
+///      "description": "Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.",
+///      "type": "object",
+///      "required": [
+///        "credentialKind",
+///        "path",
+///        "scheme",
+///        "trustDomain",
+///        "uri"
+///      ],
+///      "properties": {
+///        "credentialKind": {
+///          "description": "Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.",
+///          "type": "string",
+///          "enum": [
+///            "uri",
+///            "x509_svid",
+///            "jwt_svid"
+///          ]
+///        },
+///        "path": {
+///          "description": "Canonical workload path within the trust domain.",
+///          "type": "string"
+///        },
+///        "scheme": {
+///          "description": "Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).",
+///          "type": "string",
+///          "enum": [
+///            "spiffe"
+///          ]
+///        },
+///        "trustDomain": {
+///          "description": "Stable trust domain resolved from the identifier.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "uri": {
+///          "description": "Canonical workload identifier URI.",
+///          "type": "string",
+///          "minLength": 1
+///        }
+///      },
+///      "additionalProperties": false
 ///    }
 ///  },
 ///  "additionalProperties": false
@@ -10968,13 +11079,16 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceAttestationBundleIssuer {
 #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ChioProvenanceAttestationBundleStatementsItem {
+    ///Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`.
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub claims: ::std::option::Option<::serde_json::Value>,
     ///Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs.
     pub evidence_sha256: ChioProvenanceAttestationBundleStatementsItemEvidenceSha256,
     ///Unix timestamp (seconds) when this attestation expires. Bundle assembly fails closed when `assembledAt < issued_at` or `assembledAt >= expires_at`.
     pub expires_at: u64,
     ///Unix timestamp (seconds) when this attestation was issued.
     pub issued_at: u64,
-    ///Optional runtime or workload identifier associated with the evidence.
+    ///Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub runtime_identity: ::std::option::Option<
         ChioProvenanceAttestationBundleStatementsItemRuntimeIdentity,
@@ -10985,6 +11099,10 @@ pub struct ChioProvenanceAttestationBundleStatementsItem {
     pub tier: ChioProvenanceAttestationBundleStatementsItemTier,
     ///Attestation verifier or relying party that accepted the evidence.
     pub verifier: ChioProvenanceAttestationBundleStatementsItemVerifier,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub workload_identity: ::std::option::Option<
+        ChioProvenanceAttestationBundleStatementsItemWorkloadIdentity,
+    >,
 }
 impl ::std::convert::From<&ChioProvenanceAttestationBundleStatementsItem>
 for ChioProvenanceAttestationBundleStatementsItem {
@@ -11081,13 +11199,13 @@ for ChioProvenanceAttestationBundleStatementsItemEvidenceSha256 {
             })
     }
 }
-///Optional runtime or workload identifier associated with the evidence.
+///Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Optional runtime or workload identifier associated with the evidence.",
+///  "description": "Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.",
 ///  "type": "string",
 ///  "minLength": 1
 ///}
@@ -11424,6 +11542,449 @@ for ChioProvenanceAttestationBundleStatementsItemVerifier {
 }
 impl<'de> ::serde::Deserialize<'de>
 for ChioProvenanceAttestationBundleStatementsItemVerifier {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.",
+///  "type": "object",
+///  "required": [
+///    "credentialKind",
+///    "path",
+///    "scheme",
+///    "trustDomain",
+///    "uri"
+///  ],
+///  "properties": {
+///    "credentialKind": {
+///      "description": "Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.",
+///      "type": "string",
+///      "enum": [
+///        "uri",
+///        "x509_svid",
+///        "jwt_svid"
+///      ]
+///    },
+///    "path": {
+///      "description": "Canonical workload path within the trust domain.",
+///      "type": "string"
+///    },
+///    "scheme": {
+///      "description": "Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).",
+///      "type": "string",
+///      "enum": [
+///        "spiffe"
+///      ]
+///    },
+///    "trustDomain": {
+///      "description": "Stable trust domain resolved from the identifier.",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "uri": {
+///      "description": "Canonical workload identifier URI.",
+///      "type": "string",
+///      "minLength": 1
+///    }
+///  },
+///  "additionalProperties": false
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ChioProvenanceAttestationBundleStatementsItemWorkloadIdentity {
+    ///Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+    #[serde(rename = "credentialKind")]
+    pub credential_kind: ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind,
+    ///Canonical workload path within the trust domain.
+    pub path: ::std::string::String,
+    ///Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+    pub scheme: ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme,
+    ///Stable trust domain resolved from the identifier.
+    #[serde(rename = "trustDomain")]
+    pub trust_domain: ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain,
+    ///Canonical workload identifier URI.
+    pub uri: ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri,
+}
+impl ::std::convert::From<&ChioProvenanceAttestationBundleStatementsItemWorkloadIdentity>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentity {
+    fn from(
+        value: &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentity,
+    ) -> Self {
+        value.clone()
+    }
+}
+///Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.",
+///  "type": "string",
+///  "enum": [
+///    "uri",
+///    "x509_svid",
+///    "jwt_svid"
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+pub enum ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    #[serde(rename = "uri")]
+    Uri,
+    #[serde(rename = "x509_svid")]
+    X509Svid,
+    #[serde(rename = "jwt_svid")]
+    JwtSvid,
+}
+impl ::std::convert::From<&Self>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    fn from(
+        value: &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind,
+    ) -> Self {
+        value.clone()
+    }
+}
+impl ::std::fmt::Display
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Uri => f.write_str("uri"),
+            Self::X509Svid => f.write_str("x509_svid"),
+            Self::JwtSvid => f.write_str("jwt_svid"),
+        }
+    }
+}
+impl ::std::str::FromStr
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "uri" => Ok(Self::Uri),
+            "x509_svid" => Ok(Self::X509Svid),
+            "jwt_svid" => Ok(Self::JwtSvid),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityCredentialKind {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+///Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).",
+///  "type": "string",
+///  "enum": [
+///    "spiffe"
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+pub enum ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    #[serde(rename = "spiffe")]
+    Spiffe,
+}
+impl ::std::convert::From<&Self>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    fn from(
+        value: &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme,
+    ) -> Self {
+        value.clone()
+    }
+}
+impl ::std::fmt::Display
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Spiffe => f.write_str("spiffe"),
+        }
+    }
+}
+impl ::std::str::FromStr
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "spiffe" => Ok(Self::Spiffe),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityScheme {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+///Stable trust domain resolved from the identifier.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Stable trust domain resolved from the identifier.",
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain(
+    ::std::string::String,
+);
+impl ::std::ops::Deref
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<
+    ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain,
+> for ::std::string::String {
+    fn from(
+        value: ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain,
+    ) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<
+    &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain,
+> for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    fn from(
+        value: &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain,
+    ) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityTrustDomain {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///Canonical workload identifier URI.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Canonical workload identifier URI.",
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri(
+    ::std::string::String,
+);
+impl ::std::ops::Deref
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<
+    ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri,
+> for ::std::string::String {
+    fn from(
+        value: ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri,
+    ) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<
+    &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri,
+> for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
+    fn from(
+        value: &ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri,
+    ) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceAttestationBundleStatementsItemWorkloadIdentityUri {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -12305,7 +12866,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceStampRequestId {
             })
     }
 }
-///One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Optional fields preserve the policy `reason` and `guard` when the verdict is not `allow` and the `evidenceClass` Chio resolved when the verdict was rendered. The verdict vocabulary mirrors the HTTP verdict tagged union in `spec/schemas/chio-http/v1/verdict.schema.json` and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.
+///One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Verdict-specific required fields are enforced via `oneOf` so the wire shape stays in lock-step with the HTTP verdict union in `spec/schemas/chio-http/v1/verdict.schema.json`: `deny` requires both `reason` and `guard`; `cancel` and `incomplete` require `reason`; `allow` rejects either. The verdict vocabulary mirrors the HTTP verdict tagged union and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.
 ///
 /// <details><summary>JSON schema</summary>
 ///
@@ -12313,8 +12874,86 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceStampRequestId {
 ///{
 ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/provenance/verdict-link/v1",
 ///  "title": "Chio Provenance Verdict Link",
-///  "description": "One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Optional fields preserve the policy `reason` and `guard` when the verdict is not `allow` and the `evidenceClass` Chio resolved when the verdict was rendered. The verdict vocabulary mirrors the HTTP verdict tagged union in `spec/schemas/chio-http/v1/verdict.schema.json` and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.",
+///  "description": "One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Verdict-specific required fields are enforced via `oneOf` so the wire shape stays in lock-step with the HTTP verdict union in `spec/schemas/chio-http/v1/verdict.schema.json`: `deny` requires both `reason` and `guard`; `cancel` and `incomplete` require `reason`; `allow` rejects either. The verdict vocabulary mirrors the HTTP verdict tagged union and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.",
 ///  "type": "object",
+///  "oneOf": [
+///    {
+///      "title": "allow",
+///      "description": "Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.",
+///      "not": {
+///        "anyOf": [
+///          {
+///            "required": [
+///              "reason"
+///            ]
+///          },
+///          {
+///            "required": [
+///              "guard"
+///            ]
+///          }
+///        ]
+///      },
+///      "required": [
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "allow"
+///        }
+///      }
+///    },
+///    {
+///      "title": "deny",
+///      "description": "Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.",
+///      "required": [
+///        "guard",
+///        "reason",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "deny"
+///        }
+///      }
+///    },
+///    {
+///      "title": "cancel",
+///      "description": "Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.",
+///      "not": {
+///        "required": [
+///          "guard"
+///        ]
+///      },
+///      "required": [
+///        "reason",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "cancel"
+///        }
+///      }
+///    },
+///    {
+///      "title": "incomplete",
+///      "description": "Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.",
+///      "not": {
+///        "required": [
+///          "guard"
+///        ]
+///      },
+///      "required": [
+///        "reason",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "incomplete"
+///        }
+///      }
+///    }
+///  ],
 ///  "required": [
 ///    "chainId",
 ///    "renderedAt",
@@ -12337,11 +12976,11 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceStampRequestId {
 ///      ]
 ///    },
 ///    "guard": {
-///      "description": "Optional policy guard identifier that produced a `deny` verdict. Mirrors the `guard` field on the HTTP verdict union. Omitted for non-deny verdicts.",
+///      "description": "Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.",
 ///      "type": "string"
 ///    },
 ///    "reason": {
-///      "description": "Optional policy reason string. Required by the HTTP verdict union for `deny`, `cancel`, and `incomplete` verdicts. Omitted for `allow`.",
+///      "description": "Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.",
 ///      "type": "string"
 ///    },
 ///    "receiptId": {
@@ -12375,42 +13014,323 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceStampRequestId {
 /// ```
 /// </details>
 #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum ChioProvenanceVerdictLink {
+    Variant0(ChioProvenanceVerdictLinkVariant0),
+    Variant1 {
+        #[serde(
+            flatten,
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        subtype_0: ::std::option::Option<ChioProvenanceVerdictLinkVariant1Subtype0>,
+        #[serde(
+            flatten,
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        subtype_1: ::std::option::Option<ChioProvenanceVerdictLinkVariant1Subtype1>,
+    },
+    Variant2(ChioProvenanceVerdictLinkVariant2),
+    Variant3(ChioProvenanceVerdictLinkVariant3),
+}
+impl ::std::convert::From<&Self> for ChioProvenanceVerdictLink {
+    fn from(value: &ChioProvenanceVerdictLink) -> Self {
+        value.clone()
+    }
+}
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant0>
+for ChioProvenanceVerdictLink {
+    fn from(value: ChioProvenanceVerdictLinkVariant0) -> Self {
+        Self::Variant0(value)
+    }
+}
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant2>
+for ChioProvenanceVerdictLink {
+    fn from(value: ChioProvenanceVerdictLinkVariant2) -> Self {
+        Self::Variant2(value)
+    }
+}
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant3>
+for ChioProvenanceVerdictLink {
+    fn from(value: ChioProvenanceVerdictLinkVariant3) -> Self {
+        Self::Variant3(value)
+    }
+}
+///`ChioProvenanceVerdictLinkVariant0`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "allOf": [
+///    {
+///      "type": "object",
+///      "required": [
+///        "chainId",
+///        "renderedAt",
+///        "requestId",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "chainId": {
+///          "description": "Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "evidenceClass": {
+///          "description": "Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
+///          "type": "string",
+///          "enum": [
+///            "asserted",
+///            "observed",
+///            "verified"
+///          ]
+///        },
+///        "guard": {
+///          "description": "Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.",
+///          "type": "string"
+///        },
+///        "reason": {
+///          "description": "Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.",
+///          "type": "string"
+///        },
+///        "receiptId": {
+///          "description": "Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "renderedAt": {
+///          "description": "Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.",
+///          "type": "integer",
+///          "minimum": 0.0
+///        },
+///        "requestId": {
+///          "description": "Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "verdict": {
+///          "description": "Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.",
+///          "type": "string",
+///          "enum": [
+///            "allow",
+///            "deny",
+///            "cancel",
+///            "incomplete"
+///          ]
+///        }
+///      },
+///      "additionalProperties": false
+///    },
+///    {
+///      "title": "allow",
+///      "description": "Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.",
+///      "not": {
+///        "anyOf": [
+///          {
+///            "required": [
+///              "reason"
+///            ]
+///          },
+///          {
+///            "required": [
+///              "guard"
+///            ]
+///          }
+///        ]
+///      },
+///      "required": [
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "allow"
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "deny",
+///        "description": "Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.",
+///        "required": [
+///          "guard",
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "deny"
+///          }
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "cancel",
+///        "description": "Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.",
+///        "not": {
+///          "required": [
+///            "guard"
+///          ]
+///        },
+///        "required": [
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "cancel"
+///          }
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "incomplete",
+///        "description": "Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.",
+///        "not": {
+///          "required": [
+///            "guard"
+///          ]
+///        },
+///        "required": [
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "incomplete"
+///          }
+///        }
+///      }
+///    }
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
 #[serde(deny_unknown_fields)]
-pub struct ChioProvenanceVerdictLink {
+pub enum ChioProvenanceVerdictLinkVariant0 {}
+impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkVariant0 {
+    fn from(value: &ChioProvenanceVerdictLinkVariant0) -> Self {
+        value.clone()
+    }
+}
+///`ChioProvenanceVerdictLinkVariant1Subtype0`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "object",
+///  "required": [
+///    "chainId",
+///    "guard",
+///    "reason",
+///    "renderedAt",
+///    "requestId",
+///    "verdict"
+///  ],
+///  "properties": {
+///    "chainId": {
+///      "description": "Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "evidenceClass": {
+///      "description": "Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
+///      "type": "string",
+///      "enum": [
+///        "asserted",
+///        "observed",
+///        "verified"
+///      ]
+///    },
+///    "guard": {
+///      "description": "Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.",
+///      "type": "string"
+///    },
+///    "reason": {
+///      "description": "Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.",
+///      "type": "string"
+///    },
+///    "receiptId": {
+///      "description": "Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "renderedAt": {
+///      "description": "Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.",
+///      "type": "integer",
+///      "minimum": 0.0
+///    },
+///    "requestId": {
+///      "description": "Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "verdict": {
+///      "type": "string",
+///      "enum": [
+///        "deny"
+///      ]
+///    }
+///  },
+///  "additionalProperties": false
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ChioProvenanceVerdictLinkVariant1Subtype0 {
     ///Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.
     #[serde(rename = "chainId")]
-    pub chain_id: ChioProvenanceVerdictLinkChainId,
+    pub chain_id: ChioProvenanceVerdictLinkVariant1Subtype0ChainId,
     ///Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.
     #[serde(
         rename = "evidenceClass",
         default,
         skip_serializing_if = "::std::option::Option::is_none"
     )]
-    pub evidence_class: ::std::option::Option<ChioProvenanceVerdictLinkEvidenceClass>,
-    ///Optional policy guard identifier that produced a `deny` verdict. Mirrors the `guard` field on the HTTP verdict union. Omitted for non-deny verdicts.
-    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-    pub guard: ::std::option::Option<::std::string::String>,
-    ///Optional policy reason string. Required by the HTTP verdict union for `deny`, `cancel`, and `incomplete` verdicts. Omitted for `allow`.
-    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-    pub reason: ::std::option::Option<::std::string::String>,
+    pub evidence_class: ::std::option::Option<
+        ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass,
+    >,
+    ///Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.
+    pub guard: ::std::string::String,
+    ///Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
+    pub reason: ::std::string::String,
     ///Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.
     #[serde(
         rename = "receiptId",
         default,
         skip_serializing_if = "::std::option::Option::is_none"
     )]
-    pub receipt_id: ::std::option::Option<ChioProvenanceVerdictLinkReceiptId>,
+    pub receipt_id: ::std::option::Option<
+        ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId,
+    >,
     ///Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.
     #[serde(rename = "renderedAt")]
     pub rendered_at: u64,
     ///Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).
     #[serde(rename = "requestId")]
-    pub request_id: ChioProvenanceVerdictLinkRequestId,
-    ///Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.
-    pub verdict: ChioProvenanceVerdictLinkVerdict,
+    pub request_id: ChioProvenanceVerdictLinkVariant1Subtype0RequestId,
+    pub verdict: ChioProvenanceVerdictLinkVariant1Subtype0Verdict,
 }
-impl ::std::convert::From<&ChioProvenanceVerdictLink> for ChioProvenanceVerdictLink {
-    fn from(value: &ChioProvenanceVerdictLink) -> Self {
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype0>
+for ChioProvenanceVerdictLinkVariant1Subtype0 {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype0) -> Self {
         value.clone()
     }
 }
@@ -12428,25 +13348,26 @@ impl ::std::convert::From<&ChioProvenanceVerdictLink> for ChioProvenanceVerdictL
 /// </details>
 #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
-pub struct ChioProvenanceVerdictLinkChainId(::std::string::String);
-impl ::std::ops::Deref for ChioProvenanceVerdictLinkChainId {
+pub struct ChioProvenanceVerdictLinkVariant1Subtype0ChainId(::std::string::String);
+impl ::std::ops::Deref for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
     type Target = ::std::string::String;
     fn deref(&self) -> &::std::string::String {
         &self.0
     }
 }
-impl ::std::convert::From<ChioProvenanceVerdictLinkChainId> for ::std::string::String {
-    fn from(value: ChioProvenanceVerdictLinkChainId) -> Self {
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant1Subtype0ChainId>
+for ::std::string::String {
+    fn from(value: ChioProvenanceVerdictLinkVariant1Subtype0ChainId) -> Self {
         value.0
     }
 }
-impl ::std::convert::From<&ChioProvenanceVerdictLinkChainId>
-for ChioProvenanceVerdictLinkChainId {
-    fn from(value: &ChioProvenanceVerdictLinkChainId) -> Self {
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype0ChainId>
+for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype0ChainId) -> Self {
         value.clone()
     }
 }
-impl ::std::str::FromStr for ChioProvenanceVerdictLinkChainId {
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
     type Err = self::error::ConversionError;
     fn from_str(
         value: &str,
@@ -12457,7 +13378,7 @@ impl ::std::str::FromStr for ChioProvenanceVerdictLinkChainId {
         Ok(Self(value.to_string()))
     }
 }
-impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkChainId {
+impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &str,
@@ -12466,7 +13387,7 @@ impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkChainId {
     }
 }
 impl ::std::convert::TryFrom<&::std::string::String>
-for ChioProvenanceVerdictLinkChainId {
+for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &::std::string::String,
@@ -12475,7 +13396,7 @@ for ChioProvenanceVerdictLinkChainId {
     }
 }
 impl ::std::convert::TryFrom<::std::string::String>
-for ChioProvenanceVerdictLinkChainId {
+for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: ::std::string::String,
@@ -12483,7 +13404,8 @@ for ChioProvenanceVerdictLinkChainId {
         value.parse()
     }
 }
-impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkChainId {
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceVerdictLinkVariant1Subtype0ChainId {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -12523,7 +13445,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkChainId {
     PartialEq,
     PartialOrd
 )]
-pub enum ChioProvenanceVerdictLinkEvidenceClass {
+pub enum ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
     #[serde(rename = "asserted")]
     Asserted,
     #[serde(rename = "observed")]
@@ -12531,12 +13453,13 @@ pub enum ChioProvenanceVerdictLinkEvidenceClass {
     #[serde(rename = "verified")]
     Verified,
 }
-impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkEvidenceClass {
-    fn from(value: &ChioProvenanceVerdictLinkEvidenceClass) -> Self {
+impl ::std::convert::From<&Self>
+for ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass) -> Self {
         value.clone()
     }
 }
-impl ::std::fmt::Display for ChioProvenanceVerdictLinkEvidenceClass {
+impl ::std::fmt::Display for ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         match *self {
             Self::Asserted => f.write_str("asserted"),
@@ -12545,7 +13468,7 @@ impl ::std::fmt::Display for ChioProvenanceVerdictLinkEvidenceClass {
         }
     }
 }
-impl ::std::str::FromStr for ChioProvenanceVerdictLinkEvidenceClass {
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
     type Err = self::error::ConversionError;
     fn from_str(
         value: &str,
@@ -12558,7 +13481,8 @@ impl ::std::str::FromStr for ChioProvenanceVerdictLinkEvidenceClass {
         }
     }
 }
-impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkEvidenceClass {
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &str,
@@ -12567,7 +13491,7 @@ impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkEvidenceClass {
     }
 }
 impl ::std::convert::TryFrom<&::std::string::String>
-for ChioProvenanceVerdictLinkEvidenceClass {
+for ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &::std::string::String,
@@ -12576,7 +13500,7 @@ for ChioProvenanceVerdictLinkEvidenceClass {
     }
 }
 impl ::std::convert::TryFrom<::std::string::String>
-for ChioProvenanceVerdictLinkEvidenceClass {
+for ChioProvenanceVerdictLinkVariant1Subtype0EvidenceClass {
     type Error = self::error::ConversionError;
     fn try_from(
         value: ::std::string::String,
@@ -12598,25 +13522,26 @@ for ChioProvenanceVerdictLinkEvidenceClass {
 /// </details>
 #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
-pub struct ChioProvenanceVerdictLinkReceiptId(::std::string::String);
-impl ::std::ops::Deref for ChioProvenanceVerdictLinkReceiptId {
+pub struct ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId(::std::string::String);
+impl ::std::ops::Deref for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
     type Target = ::std::string::String;
     fn deref(&self) -> &::std::string::String {
         &self.0
     }
 }
-impl ::std::convert::From<ChioProvenanceVerdictLinkReceiptId> for ::std::string::String {
-    fn from(value: ChioProvenanceVerdictLinkReceiptId) -> Self {
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId>
+for ::std::string::String {
+    fn from(value: ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId) -> Self {
         value.0
     }
 }
-impl ::std::convert::From<&ChioProvenanceVerdictLinkReceiptId>
-for ChioProvenanceVerdictLinkReceiptId {
-    fn from(value: &ChioProvenanceVerdictLinkReceiptId) -> Self {
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId>
+for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId) -> Self {
         value.clone()
     }
 }
-impl ::std::str::FromStr for ChioProvenanceVerdictLinkReceiptId {
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
     type Err = self::error::ConversionError;
     fn from_str(
         value: &str,
@@ -12627,7 +13552,8 @@ impl ::std::str::FromStr for ChioProvenanceVerdictLinkReceiptId {
         Ok(Self(value.to_string()))
     }
 }
-impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkReceiptId {
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &str,
@@ -12636,7 +13562,7 @@ impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkReceiptId {
     }
 }
 impl ::std::convert::TryFrom<&::std::string::String>
-for ChioProvenanceVerdictLinkReceiptId {
+for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &::std::string::String,
@@ -12645,7 +13571,7 @@ for ChioProvenanceVerdictLinkReceiptId {
     }
 }
 impl ::std::convert::TryFrom<::std::string::String>
-for ChioProvenanceVerdictLinkReceiptId {
+for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: ::std::string::String,
@@ -12653,7 +13579,8 @@ for ChioProvenanceVerdictLinkReceiptId {
         value.parse()
     }
 }
-impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkReceiptId {
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceVerdictLinkVariant1Subtype0ReceiptId {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -12679,25 +13606,26 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkReceiptId {
 /// </details>
 #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
-pub struct ChioProvenanceVerdictLinkRequestId(::std::string::String);
-impl ::std::ops::Deref for ChioProvenanceVerdictLinkRequestId {
+pub struct ChioProvenanceVerdictLinkVariant1Subtype0RequestId(::std::string::String);
+impl ::std::ops::Deref for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
     type Target = ::std::string::String;
     fn deref(&self) -> &::std::string::String {
         &self.0
     }
 }
-impl ::std::convert::From<ChioProvenanceVerdictLinkRequestId> for ::std::string::String {
-    fn from(value: ChioProvenanceVerdictLinkRequestId) -> Self {
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant1Subtype0RequestId>
+for ::std::string::String {
+    fn from(value: ChioProvenanceVerdictLinkVariant1Subtype0RequestId) -> Self {
         value.0
     }
 }
-impl ::std::convert::From<&ChioProvenanceVerdictLinkRequestId>
-for ChioProvenanceVerdictLinkRequestId {
-    fn from(value: &ChioProvenanceVerdictLinkRequestId) -> Self {
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype0RequestId>
+for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype0RequestId) -> Self {
         value.clone()
     }
 }
-impl ::std::str::FromStr for ChioProvenanceVerdictLinkRequestId {
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
     type Err = self::error::ConversionError;
     fn from_str(
         value: &str,
@@ -12708,7 +13636,8 @@ impl ::std::str::FromStr for ChioProvenanceVerdictLinkRequestId {
         Ok(Self(value.to_string()))
     }
 }
-impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkRequestId {
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &str,
@@ -12717,7 +13646,7 @@ impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkRequestId {
     }
 }
 impl ::std::convert::TryFrom<&::std::string::String>
-for ChioProvenanceVerdictLinkRequestId {
+for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &::std::string::String,
@@ -12726,7 +13655,7 @@ for ChioProvenanceVerdictLinkRequestId {
     }
 }
 impl ::std::convert::TryFrom<::std::string::String>
-for ChioProvenanceVerdictLinkRequestId {
+for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
     type Error = self::error::ConversionError;
     fn try_from(
         value: ::std::string::String,
@@ -12734,7 +13663,8 @@ for ChioProvenanceVerdictLinkRequestId {
         value.parse()
     }
 }
-impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkRequestId {
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceVerdictLinkVariant1Subtype0RequestId {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -12746,19 +13676,15 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkRequestId {
             })
     }
 }
-///Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.
+///`ChioProvenanceVerdictLinkVariant1Subtype0Verdict`
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.",
 ///  "type": "string",
 ///  "enum": [
-///    "allow",
-///    "deny",
-///    "cancel",
-///    "incomplete"
+///    "deny"
 ///  ]
 ///}
 /// ```
@@ -12775,46 +13701,34 @@ impl<'de> ::serde::Deserialize<'de> for ChioProvenanceVerdictLinkRequestId {
     PartialEq,
     PartialOrd
 )]
-pub enum ChioProvenanceVerdictLinkVerdict {
-    #[serde(rename = "allow")]
-    Allow,
+pub enum ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
     #[serde(rename = "deny")]
     Deny,
-    #[serde(rename = "cancel")]
-    Cancel,
-    #[serde(rename = "incomplete")]
-    Incomplete,
 }
-impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkVerdict {
-    fn from(value: &ChioProvenanceVerdictLinkVerdict) -> Self {
+impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype0Verdict) -> Self {
         value.clone()
     }
 }
-impl ::std::fmt::Display for ChioProvenanceVerdictLinkVerdict {
+impl ::std::fmt::Display for ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         match *self {
-            Self::Allow => f.write_str("allow"),
             Self::Deny => f.write_str("deny"),
-            Self::Cancel => f.write_str("cancel"),
-            Self::Incomplete => f.write_str("incomplete"),
         }
     }
 }
-impl ::std::str::FromStr for ChioProvenanceVerdictLinkVerdict {
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
     type Err = self::error::ConversionError;
     fn from_str(
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         match value {
-            "allow" => Ok(Self::Allow),
             "deny" => Ok(Self::Deny),
-            "cancel" => Ok(Self::Cancel),
-            "incomplete" => Ok(Self::Incomplete),
             _ => Err("invalid value".into()),
         }
     }
 }
-impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkVerdict {
+impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &str,
@@ -12823,7 +13737,7 @@ impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkVerdict {
     }
 }
 impl ::std::convert::TryFrom<&::std::string::String>
-for ChioProvenanceVerdictLinkVerdict {
+for ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
     type Error = self::error::ConversionError;
     fn try_from(
         value: &::std::string::String,
@@ -12832,12 +13746,880 @@ for ChioProvenanceVerdictLinkVerdict {
     }
 }
 impl ::std::convert::TryFrom<::std::string::String>
-for ChioProvenanceVerdictLinkVerdict {
+for ChioProvenanceVerdictLinkVariant1Subtype0Verdict {
     type Error = self::error::ConversionError;
     fn try_from(
         value: ::std::string::String,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         value.parse()
+    }
+}
+///`ChioProvenanceVerdictLinkVariant1Subtype1`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "object",
+///  "required": [
+///    "chainId",
+///    "guard",
+///    "reason",
+///    "renderedAt",
+///    "requestId",
+///    "verdict"
+///  ],
+///  "properties": {
+///    "chainId": {
+///      "description": "Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "evidenceClass": {
+///      "description": "Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
+///      "type": "string",
+///      "enum": [
+///        "asserted",
+///        "observed",
+///        "verified"
+///      ]
+///    },
+///    "guard": {
+///      "description": "Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.",
+///      "type": "string"
+///    },
+///    "reason": {
+///      "description": "Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.",
+///      "type": "string"
+///    },
+///    "receiptId": {
+///      "description": "Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "renderedAt": {
+///      "description": "Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.",
+///      "type": "integer",
+///      "minimum": 0.0
+///    },
+///    "requestId": {
+///      "description": "Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).",
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "verdict": {
+///      "type": "string",
+///      "enum": [
+///        "deny"
+///      ]
+///    }
+///  },
+///  "additionalProperties": false
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ChioProvenanceVerdictLinkVariant1Subtype1 {
+    ///Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.
+    #[serde(rename = "chainId")]
+    pub chain_id: ChioProvenanceVerdictLinkVariant1Subtype1ChainId,
+    ///Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.
+    #[serde(
+        rename = "evidenceClass",
+        default,
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub evidence_class: ::std::option::Option<
+        ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass,
+    >,
+    ///Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.
+    pub guard: ::std::string::String,
+    ///Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
+    pub reason: ::std::string::String,
+    ///Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.
+    #[serde(
+        rename = "receiptId",
+        default,
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub receipt_id: ::std::option::Option<
+        ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId,
+    >,
+    ///Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.
+    #[serde(rename = "renderedAt")]
+    pub rendered_at: u64,
+    ///Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).
+    #[serde(rename = "requestId")]
+    pub request_id: ChioProvenanceVerdictLinkVariant1Subtype1RequestId,
+    pub verdict: ChioProvenanceVerdictLinkVariant1Subtype1Verdict,
+}
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype1>
+for ChioProvenanceVerdictLinkVariant1Subtype1 {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype1) -> Self {
+        value.clone()
+    }
+}
+///Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.",
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioProvenanceVerdictLinkVariant1Subtype1ChainId(::std::string::String);
+impl ::std::ops::Deref for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant1Subtype1ChainId>
+for ::std::string::String {
+    fn from(value: ChioProvenanceVerdictLinkVariant1Subtype1ChainId) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype1ChainId>
+for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype1ChainId) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceVerdictLinkVariant1Subtype1ChainId {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
+///  "type": "string",
+///  "enum": [
+///    "asserted",
+///    "observed",
+///    "verified"
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+pub enum ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    #[serde(rename = "asserted")]
+    Asserted,
+    #[serde(rename = "observed")]
+    Observed,
+    #[serde(rename = "verified")]
+    Verified,
+}
+impl ::std::convert::From<&Self>
+for ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass) -> Self {
+        value.clone()
+    }
+}
+impl ::std::fmt::Display for ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Asserted => f.write_str("asserted"),
+            Self::Observed => f.write_str("observed"),
+            Self::Verified => f.write_str("verified"),
+        }
+    }
+}
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "asserted" => Ok(Self::Asserted),
+            "observed" => Ok(Self::Observed),
+            "verified" => Ok(Self::Verified),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1EvidenceClass {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+///Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.",
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId(::std::string::String);
+impl ::std::ops::Deref for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId>
+for ::std::string::String {
+    fn from(value: ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId>
+for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceVerdictLinkVariant1Subtype1ReceiptId {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).",
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioProvenanceVerdictLinkVariant1Subtype1RequestId(::std::string::String);
+impl ::std::ops::Deref for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<ChioProvenanceVerdictLinkVariant1Subtype1RequestId>
+for ::std::string::String {
+    fn from(value: ChioProvenanceVerdictLinkVariant1Subtype1RequestId) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<&ChioProvenanceVerdictLinkVariant1Subtype1RequestId>
+for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype1RequestId) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioProvenanceVerdictLinkVariant1Subtype1RequestId {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///`ChioProvenanceVerdictLinkVariant1Subtype1Verdict`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "string",
+///  "enum": [
+///    "deny"
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+pub enum ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    #[serde(rename = "deny")]
+    Deny,
+}
+impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    fn from(value: &ChioProvenanceVerdictLinkVariant1Subtype1Verdict) -> Self {
+        value.clone()
+    }
+}
+impl ::std::fmt::Display for ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Deny => f.write_str("deny"),
+        }
+    }
+}
+impl ::std::str::FromStr for ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "deny" => Ok(Self::Deny),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioProvenanceVerdictLinkVariant1Subtype1Verdict {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+///`ChioProvenanceVerdictLinkVariant2`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "allOf": [
+///    {
+///      "type": "object",
+///      "required": [
+///        "chainId",
+///        "renderedAt",
+///        "requestId",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "chainId": {
+///          "description": "Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "evidenceClass": {
+///          "description": "Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
+///          "type": "string",
+///          "enum": [
+///            "asserted",
+///            "observed",
+///            "verified"
+///          ]
+///        },
+///        "guard": {
+///          "description": "Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.",
+///          "type": "string"
+///        },
+///        "reason": {
+///          "description": "Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.",
+///          "type": "string"
+///        },
+///        "receiptId": {
+///          "description": "Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "renderedAt": {
+///          "description": "Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.",
+///          "type": "integer",
+///          "minimum": 0.0
+///        },
+///        "requestId": {
+///          "description": "Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "verdict": {
+///          "description": "Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.",
+///          "type": "string",
+///          "enum": [
+///            "allow",
+///            "deny",
+///            "cancel",
+///            "incomplete"
+///          ]
+///        }
+///      },
+///      "additionalProperties": false
+///    },
+///    {
+///      "title": "cancel",
+///      "description": "Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.",
+///      "not": {
+///        "required": [
+///          "guard"
+///        ]
+///      },
+///      "required": [
+///        "reason",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "cancel"
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "allow",
+///        "description": "Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.",
+///        "not": {
+///          "anyOf": [
+///            {
+///              "required": [
+///                "reason"
+///              ]
+///            },
+///            {
+///              "required": [
+///                "guard"
+///              ]
+///            }
+///          ]
+///        },
+///        "required": [
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "allow"
+///          }
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "deny",
+///        "description": "Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.",
+///        "required": [
+///          "guard",
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "deny"
+///          }
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "incomplete",
+///        "description": "Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.",
+///        "not": {
+///          "required": [
+///            "guard"
+///          ]
+///        },
+///        "required": [
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "incomplete"
+///          }
+///        }
+///      }
+///    }
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+#[serde(deny_unknown_fields)]
+pub enum ChioProvenanceVerdictLinkVariant2 {}
+impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkVariant2 {
+    fn from(value: &ChioProvenanceVerdictLinkVariant2) -> Self {
+        value.clone()
+    }
+}
+///`ChioProvenanceVerdictLinkVariant3`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "allOf": [
+///    {
+///      "type": "object",
+///      "required": [
+///        "chainId",
+///        "renderedAt",
+///        "requestId",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "chainId": {
+///          "description": "Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "evidenceClass": {
+///          "description": "Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
+///          "type": "string",
+///          "enum": [
+///            "asserted",
+///            "observed",
+///            "verified"
+///          ]
+///        },
+///        "guard": {
+///          "description": "Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.",
+///          "type": "string"
+///        },
+///        "reason": {
+///          "description": "Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.",
+///          "type": "string"
+///        },
+///        "receiptId": {
+///          "description": "Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "renderedAt": {
+///          "description": "Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.",
+///          "type": "integer",
+///          "minimum": 0.0
+///        },
+///        "requestId": {
+///          "description": "Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).",
+///          "type": "string",
+///          "minLength": 1
+///        },
+///        "verdict": {
+///          "description": "Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.",
+///          "type": "string",
+///          "enum": [
+///            "allow",
+///            "deny",
+///            "cancel",
+///            "incomplete"
+///          ]
+///        }
+///      },
+///      "additionalProperties": false
+///    },
+///    {
+///      "title": "incomplete",
+///      "description": "Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.",
+///      "not": {
+///        "required": [
+///          "guard"
+///        ]
+///      },
+///      "required": [
+///        "reason",
+///        "verdict"
+///      ],
+///      "properties": {
+///        "verdict": {
+///          "const": "incomplete"
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "allow",
+///        "description": "Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.",
+///        "not": {
+///          "anyOf": [
+///            {
+///              "required": [
+///                "reason"
+///              ]
+///            },
+///            {
+///              "required": [
+///                "guard"
+///              ]
+///            }
+///          ]
+///        },
+///        "required": [
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "allow"
+///          }
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "deny",
+///        "description": "Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.",
+///        "required": [
+///          "guard",
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "deny"
+///          }
+///        }
+///      }
+///    },
+///    {
+///      "not": {
+///        "title": "cancel",
+///        "description": "Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.",
+///        "not": {
+///          "required": [
+///            "guard"
+///          ]
+///        },
+///        "required": [
+///          "reason",
+///          "verdict"
+///        ],
+///        "properties": {
+///          "verdict": {
+///            "const": "cancel"
+///          }
+///        }
+///      }
+///    }
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+#[serde(deny_unknown_fields)]
+pub enum ChioProvenanceVerdictLinkVariant3 {}
+impl ::std::convert::From<&Self> for ChioProvenanceVerdictLinkVariant3 {
+    fn from(value: &ChioProvenanceVerdictLinkVariant3) -> Self {
+        value.clone()
     }
 }
 ///Merkle inclusion proof for a single receipt leaf in a receipt-log Merkle tree. Mirrors the serde shape of `MerkleProof` in `crates/chio-core-types/src/merkle.rs`. The proof allows an auditor, holding only the published Merkle root and the original leaf bytes, to verify that the leaf was included in a tree of the given size at the given position. The audit path is the ordered list of sibling hashes encountered when walking from the leaf up to the root; siblings whose subtree was carried upward without pairing (the right-edge of an unbalanced level) are omitted. M04 deterministic-replay consumes this schema as the contract for golden-bundle inclusion artifacts under `tests/replay/goldens/<family>/<name>/`.
@@ -13042,9 +14824,9 @@ impl<'de> ::serde::Deserialize<'de> for ChioReceiptMerkleInclusionProofAuditPath
 ///      "minLength": 1
 ///    },
 ///    "kernel_key": {
-///      "description": "Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.",
+///      "description": "Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.",
 ///      "type": "string",
-///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///    },
 ///    "metadata": {
 ///      "description": "Optional receipt metadata for stream/accounting/financial details. Schema-less by design (mirrors `Option<serde_json::Value>`)."
@@ -13055,10 +14837,9 @@ impl<'de> ::serde::Deserialize<'de> for ChioReceiptMerkleInclusionProofAuditPath
 ///      "minLength": 1
 ///    },
 ///    "signature": {
-///      "description": "Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).",
+///      "description": "Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
 ///      "type": "string",
-///      "minLength": 96,
-///      "pattern": "^([0-9a-f]+|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
+///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
 ///    },
 ///    "tenant_id": {
 ///      "description": "Phase 1.5 multi-tenant receipt isolation: tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields. Omitted from the wire when unset so single-tenant receipts remain byte-identical.",
@@ -13111,14 +14892,14 @@ pub struct ChioReceiptRecord {
     pub evidence: ::std::vec::Vec<GuardEvidence>,
     ///Unique receipt ID. UUIDv7 recommended.
     pub id: ChioReceiptRecordId,
-    ///Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.
+    ///Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.
     pub kernel_key: ChioReceiptRecordKernelKey,
     ///Optional receipt metadata for stream/accounting/financial details. Schema-less by design (mirrors `Option<serde_json::Value>`).
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub metadata: ::std::option::Option<::serde_json::Value>,
     ///SHA-256 hash (or symbolic identifier) of the policy that was applied. Mirrors the `String` shape on `ChioReceipt::policy_hash` rather than enforcing a hex pattern, since some deployments embed a symbolic version id (e.g. `policy-bindings-v1`) rather than a raw digest.
     pub policy_hash: ChioReceiptRecordPolicyHash,
-    ///Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).
+    ///Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
     pub signature: ChioReceiptRecordSignature,
     ///Phase 1.5 multi-tenant receipt isolation: tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields. Omitted from the wire when unset so single-tenant receipts remain byte-identical.
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
@@ -13463,15 +15244,15 @@ impl<'de> ::serde::Deserialize<'de> for ChioReceiptRecordId {
             })
     }
 }
-///Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.
+///Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.",
+///  "description": "Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.",
 ///  "type": "string",
-///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
+///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///}
 /// ```
 /// </details>
@@ -13501,12 +15282,14 @@ impl ::std::str::FromStr for ChioReceiptRecordKernelKey {
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
         {
-            ::regress::Regex::new("^([0-9a-f]{64}|p256:[0-9a-f]+|p384:[0-9a-f]+)$")
+            ::regress::Regex::new(
+                    "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                )
                 .unwrap()
         });
         if PATTERN.find(value).is_none() {
             return Err(
-                "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]+|p384:[0-9a-f]+)$\""
+                "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
                     .into(),
             );
         }
@@ -13627,16 +15410,15 @@ impl<'de> ::serde::Deserialize<'de> for ChioReceiptRecordPolicyHash {
             })
     }
 }
-///Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).
+///Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).",
+///  "description": "Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
 ///  "type": "string",
-///  "minLength": 96,
-///  "pattern": "^([0-9a-f]+|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
+///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
 ///}
 /// ```
 /// </details>
@@ -13664,16 +15446,14 @@ impl ::std::str::FromStr for ChioReceiptRecordSignature {
     fn from_str(
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        if value.chars().count() < 96usize {
-            return Err("shorter than 96 characters".into());
-        }
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
         {
-            ::regress::Regex::new("^([0-9a-f]+|p256:[0-9a-f]+|p384:[0-9a-f]+)$").unwrap()
+            ::regress::Regex::new("^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$")
+                .unwrap()
         });
         if PATTERN.find(value).is_none() {
             return Err(
-                "doesn't match pattern \"^([0-9a-f]+|p256:[0-9a-f]+|p384:[0-9a-f]+)$\""
+                "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$\""
                     .into(),
             );
         }
@@ -15780,7 +17560,7 @@ for ChioToolCallResultStreamComplete {
         value.clone()
     }
 }
-///One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-millisecond expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future.
+///One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-second expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future. NOTE: `leaseExpiresAt` and `termStartedAt` are unix **seconds** (computed in `cluster_and_reports.rs` lines 1580-1606 as `unix_timestamp_now() + lease_ttl_ms / 1000`), even though `leaseTtlMs` itself is in milliseconds. The asymmetry mirrors the live runtime shape and is preserved on the wire so consumers do not have to re-scale by 1000.
 ///
 /// <details><summary>JSON schema</summary>
 ///
@@ -15788,7 +17568,7 @@ for ChioToolCallResultStreamComplete {
 ///{
 ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust-control/lease/v1",
 ///  "title": "Chio Trust-Control Authority Lease",
-///  "description": "One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-millisecond expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future.",
+///  "description": "One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-second expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future. NOTE: `leaseExpiresAt` and `termStartedAt` are unix **seconds** (computed in `cluster_and_reports.rs` lines 1580-1606 as `unix_timestamp_now() + lease_ttl_ms / 1000`), even though `leaseTtlMs` itself is in milliseconds. The asymmetry mirrors the live runtime shape and is preserved on the wire so consumers do not have to re-scale by 1000.",
 ///  "type": "object",
 ///  "required": [
 ///    "authorityId",
@@ -15817,7 +17597,7 @@ for ChioToolCallResultStreamComplete {
 ///      "minimum": 0.0
 ///    },
 ///    "leaseExpiresAt": {
-///      "description": "Unix-millisecond timestamp at which the lease expires if not renewed.",
+///      "description": "Unix-second timestamp at which the lease expires if not renewed. Computed as `unix_timestamp_now() + lease_ttl_ms / 1000` in `cluster_and_reports.rs` lines 1580-1606. The unit is seconds (not milliseconds) even though the configured TTL is expressed in milliseconds; downstream consumers MUST treat this field as a unix-second timestamp.",
 ///      "type": "integer",
 ///      "minimum": 0.0
 ///    },
@@ -15827,7 +17607,7 @@ for ChioToolCallResultStreamComplete {
 ///      "minLength": 1
 ///    },
 ///    "leaseTtlMs": {
-///      "description": "Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839).",
+///      "description": "Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839). NOTE: this field is the only millisecond-denominated quantity in the lease projection; `termStartedAt` and `leaseExpiresAt` are unix seconds.",
 ///      "type": "integer",
 ///      "minimum": 0.0
 ///    },
@@ -15841,7 +17621,7 @@ for ChioToolCallResultStreamComplete {
 ///      "minimum": 0.0
 ///    },
 ///    "termStartedAt": {
-///      "description": "Optional unix-millisecond timestamp at which the current term began on this leader. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown.",
+///      "description": "Optional unix-second timestamp at which the current term began on this leader. Captured via `unix_timestamp_now()` in `cluster_and_reports.rs` line 1603. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown (no quorum or no leader).",
 ///      "type": "integer",
 ///      "minimum": 0.0
 ///    }
@@ -15862,13 +17642,13 @@ pub struct ChioTrustControlAuthorityLease {
     ///Lease epoch carried alongside `leaseId`. Currently equals `term`; kept distinct on the wire so future epoch bumps within a term remain expressible.
     #[serde(rename = "leaseEpoch")]
     pub lease_epoch: u64,
-    ///Unix-millisecond timestamp at which the lease expires if not renewed.
+    ///Unix-second timestamp at which the lease expires if not renewed. Computed as `unix_timestamp_now() + lease_ttl_ms / 1000` in `cluster_and_reports.rs` lines 1580-1606. The unit is seconds (not milliseconds) even though the configured TTL is expressed in milliseconds; downstream consumers MUST treat this field as a unix-second timestamp.
     #[serde(rename = "leaseExpiresAt")]
     pub lease_expires_at: u64,
     ///Composite lease identifier in the form `{leaderUrl}#term-{leaseEpoch}`. Authoritative for downstream writes.
     #[serde(rename = "leaseId")]
     pub lease_id: ChioTrustControlAuthorityLeaseLeaseId,
-    ///Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839).
+    ///Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839). NOTE: this field is the only millisecond-denominated quantity in the lease projection; `termStartedAt` and `leaseExpiresAt` are unix seconds.
     #[serde(rename = "leaseTtlMs")]
     pub lease_ttl_ms: u64,
     ///True only when the cluster currently has quorum and `leaseExpiresAt` has not yet passed. Trust-control fails closed and rejects authority-bearing writes when this is false.
@@ -15876,7 +17656,7 @@ pub struct ChioTrustControlAuthorityLease {
     pub lease_valid: bool,
     ///Cluster election term that minted this lease. Monotonically non-decreasing.
     pub term: u64,
-    ///Optional unix-millisecond timestamp at which the current term began on this leader. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown.
+    ///Optional unix-second timestamp at which the current term began on this leader. Captured via `unix_timestamp_now()` in `cluster_and_reports.rs` line 1603. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown (no quorum or no leader).
     #[serde(
         rename = "termStartedAt",
         default,
@@ -18106,17 +19886,19 @@ impl ::std::convert::From<&Self> for Decision {
 ///      "minLength": 1
 ///    },
 ///    "delegatee": {
+///      "description": "Receiving public key. Same encoding as the token-level `issuer`/`subject`.",
 ///      "type": "string",
-///      "pattern": "^[0-9a-f]{64}$"
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///    },
 ///    "delegator": {
+///      "description": "Delegating public key. Same encoding as the token-level `issuer`/`subject`.",
 ///      "type": "string",
-///      "pattern": "^[0-9a-f]{64}$"
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///    },
 ///    "signature": {
+///      "description": "Delegation-link signature. Same encoding as the token-level `signature`.",
 ///      "type": "string",
-///      "minLength": 96,
-///      "pattern": "^[0-9a-f]+$"
+///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
 ///    },
 ///    "timestamp": {
 ///      "type": "integer",
@@ -18133,8 +19915,11 @@ pub struct DelegationLink {
     #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
     pub attenuations: ::std::vec::Vec<DelegationLinkAttenuationsItem>,
     pub capability_id: DelegationLinkCapabilityId,
+    ///Receiving public key. Same encoding as the token-level `issuer`/`subject`.
     pub delegatee: DelegationLinkDelegatee,
+    ///Delegating public key. Same encoding as the token-level `issuer`/`subject`.
     pub delegator: DelegationLinkDelegator,
+    ///Delegation-link signature. Same encoding as the token-level `signature`.
     pub signature: DelegationLinkSignature,
     pub timestamp: u64,
 }
@@ -18330,14 +20115,15 @@ impl<'de> ::serde::Deserialize<'de> for DelegationLinkCapabilityId {
             })
     }
 }
-///`DelegationLinkDelegatee`
+///Receiving public key. Same encoding as the token-level `issuer`/`subject`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
+///  "description": "Receiving public key. Same encoding as the token-level `issuer`/`subject`.",
 ///  "type": "string",
-///  "pattern": "^[0-9a-f]{64}$"
+///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///}
 /// ```
 /// </details>
@@ -18366,9 +20152,17 @@ impl ::std::str::FromStr for DelegationLinkDelegatee {
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
-        { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+        {
+            ::regress::Regex::new(
+                    "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                )
+                .unwrap()
+        });
         if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            return Err(
+                "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
+                    .into(),
+            );
         }
         Ok(Self(value.to_string()))
     }
@@ -18409,14 +20203,15 @@ impl<'de> ::serde::Deserialize<'de> for DelegationLinkDelegatee {
             })
     }
 }
-///`DelegationLinkDelegator`
+///Delegating public key. Same encoding as the token-level `issuer`/`subject`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
+///  "description": "Delegating public key. Same encoding as the token-level `issuer`/`subject`.",
 ///  "type": "string",
-///  "pattern": "^[0-9a-f]{64}$"
+///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
 ///}
 /// ```
 /// </details>
@@ -18445,9 +20240,17 @@ impl ::std::str::FromStr for DelegationLinkDelegator {
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
-        { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+        {
+            ::regress::Regex::new(
+                    "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                )
+                .unwrap()
+        });
         if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            return Err(
+                "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
+                    .into(),
+            );
         }
         Ok(Self(value.to_string()))
     }
@@ -18488,15 +20291,15 @@ impl<'de> ::serde::Deserialize<'de> for DelegationLinkDelegator {
             })
     }
 }
-///`DelegationLinkSignature`
+///Delegation-link signature. Same encoding as the token-level `signature`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
+///  "description": "Delegation-link signature. Same encoding as the token-level `signature`.",
 ///  "type": "string",
-///  "minLength": 96,
-///  "pattern": "^[0-9a-f]+$"
+///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$"
 ///}
 /// ```
 /// </details>
@@ -18524,13 +20327,16 @@ impl ::std::str::FromStr for DelegationLinkSignature {
     fn from_str(
         value: &str,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        if value.chars().count() < 96usize {
-            return Err("shorter than 96 characters".into());
-        }
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
-        { ::regress::Regex::new("^[0-9a-f]+$").unwrap() });
+        {
+            ::regress::Regex::new("^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$")
+                .unwrap()
+        });
         if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[0-9a-f]+$\"".into());
+            return Err(
+                "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$\""
+                    .into(),
+            );
         }
         Ok(Self(value.to_string()))
     }
@@ -19086,13 +20892,13 @@ impl ::std::convert::From<&PromptGrant> for PromptGrant {
         value.clone()
     }
 }
-///Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+///Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.",
+///  "description": "Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.",
 ///  "type": "object",
 ///  "required": [
 ///    "operations",
@@ -19243,13 +21049,13 @@ impl ::std::convert::From<&ResourceGrant> for ResourceGrant {
         value.clone()
     }
 }
-///Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+///Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.",
+///  "description": "Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.",
 ///  "type": "object",
 ///  "required": [
 ///    "operations",
@@ -19560,13 +21366,13 @@ impl ::std::convert::From<&ToolGrant> for ToolGrant {
         value.clone()
     }
 }
-///Authorization to invoke a single tool. Mirrors `ToolGrant`.
+///Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Authorization to invoke a single tool. Mirrors `ToolGrant`.",
+///  "description": "Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.",
 ///  "type": "object",
 ///  "required": [
 ///    "operations",
