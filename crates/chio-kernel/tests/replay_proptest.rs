@@ -27,13 +27,13 @@
 // Plus a third declared property:
 // - `shuffle_independent_receipts_preserves_bytes`
 //
-// `signing_is_a_function` and `replay_root_is_idempotent` each live in their
-// own `proptest! { ... }` block with a raised `cases` budget
-// (`SIGNING_FUNCTION_CASES` and `REPLAY_ROOT_CASES` respectively);
-// `shuffle_independent_receipts_preserves_bytes` keeps the standard
-// `PROPTEST_BUDGET_CASES`. Splitting the macro invocations is the only way to
-// per-test-tune the case count, since `proptest!` only honours the
-// `#![proptest_config(...)]` inner attribute at block scope.
+// `signing_is_a_function`, `replay_root_is_idempotent`, and
+// `shuffle_independent_receipts_preserves_bytes` each live in their own
+// `proptest! { ... }` block with a raised `cases` budget
+// (`SIGNING_FUNCTION_CASES`, `REPLAY_ROOT_CASES`, and
+// `SHUFFLE_INDEPENDENCE_CASES` respectively). Splitting the macro invocations
+// is the only way to per-test-tune the case count, since `proptest!` only
+// honours the `#![proptest_config(...)]` inner attribute at block scope.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -55,8 +55,6 @@ const KERNEL_SEED: [u8; 32] = [
     0x1E, 0x55, 0xAA, 0x77, 0x16, 0x9C, 0x3B, 0xE0, 0x4F, 0x82, 0x69, 0x12, 0xBD, 0x05, 0x2A, 0xCC,
 ];
 
-const PROPTEST_BUDGET_CASES: u32 = 64;
-
 /// Higher case count for `signing_is_a_function`. Signing is the cheapest
 /// property to evaluate (one body, one keypair, no Merkle anchoring) so we
 /// can afford a denser sweep without breaching the 30s CI budget.
@@ -68,6 +66,20 @@ const SIGNING_FUNCTION_CASES: u32 = 256;
 /// (per the M04 P5 T3 contract) and stays inside the 30s CI budget because
 /// the per-case work (two anchors, no signature verification) is cheap.
 const REPLAY_ROOT_CASES: u32 = 256;
+
+/// Higher case count for `shuffle_independent_receipts_preserves_bytes`. Each
+/// case signs up to 16 receipts and compares per-receipt canonical bytes
+/// across a deterministic permutation; 256 cases brings the property up to
+/// parity with the other two named exit-criterion tests (per the M04 P5 T4
+/// contract) and stays inside the 30s CI budget because the per-case work
+/// (signatures only, no Merkle anchoring) is bounded.
+const SHUFFLE_INDEPENDENCE_CASES: u32 = 256;
+
+/// Maximum batch size for the independence shuffle property. The doc anchor
+/// (`.planning/trajectory/04-deterministic-replay.md` Phase 5 T4) calls for
+/// "N up to ~16"; we honour that ceiling so the shuffle exercises both small
+/// degenerate cases (2-3 receipts) and a non-trivial mid-range batch.
+const SHUFFLE_INDEPENDENCE_MAX: usize = 16;
 
 /// Maximum batch size for the random arm of `replay_sequence()`. Picked to
 /// match the original Phase 5 T1 strategy (`1..16`) on the small end while
@@ -468,32 +480,88 @@ proptest! {
     }
 }
 
-// Property 3 keeps the standard budget: each case builds a full Merkle tree
-// over a batch of receipts and sorts both the baseline and shuffled byte
-// vectors, so we keep the case count modest.
+/// `independent_tuple_batch()`: produces 2..=`SHUFFLE_INDEPENDENCE_MAX`
+/// "independent" receipt tuples whose **nonces are pairwise distinct** AND
+/// whose **payloads are pairwise distinct** (which forces pairwise distinct
+/// `content_hash` values, since `content_hash` is derived from the canonical
+/// bytes of the payload via `ToolCallAction::from_parameters`).
+///
+/// Independence here means no cross-reference: each tuple is signed in
+/// isolation and shares no fields with any other tuple in the batch. This is
+/// the precondition the shuffle-invariance property depends on; the property
+/// body re-asserts it (see the `independence_*` checks) so a future strategy
+/// regression cannot silently weaken the guarantee.
+///
+/// Implementation notes:
+/// - The strategy stamps the nonce into the payload's `method` field so a
+///   distinct nonce mechanically produces a distinct payload, which in turn
+///   produces a distinct `content_hash`. This avoids a `prop_filter` rejection
+///   loop on the (nonce x payload) cross-product.
+/// - Nonce uniqueness is enforced by a `prop_filter` HashSet check; the regex
+///   alphabet (`[a-z0-9]{8,32}`) keeps the rejection rate low at our batch
+///   sizes (max 16 entries from a >36^8 alphabet).
+fn independent_tuple_batch() -> impl Strategy<Value = Vec<ReceiptTuple>> {
+    proptest::collection::vec(arbitrary_receipt_tuple(), 2..=SHUFFLE_INDEPENDENCE_MAX)
+        .prop_filter("receipt nonces must be unique per batch", |ts| {
+            let mut seen = std::collections::HashSet::new();
+            ts.iter().all(|t| seen.insert(t.nonce.clone()))
+        })
+        .prop_map(|ts| {
+            // Fold the nonce into each payload's `method` field. Distinct
+            // nonces (already enforced above) now guarantee distinct payloads
+            // and therefore distinct content_hashes, which is the explicit
+            // independence guarantee the shuffle property relies on.
+            ts.into_iter()
+                .map(|mut t| {
+                    if let Some(obj) = t.payload.as_object_mut() {
+                        obj.insert(
+                            "method".to_string(),
+                            serde_json::Value::String(format!("m-{}", t.nonce)),
+                        );
+                    } else {
+                        t.payload = json!({
+                            "method": format!("m-{}", t.nonce),
+                            "bytes": Vec::<u8>::new(),
+                            "magnitude": 0,
+                        });
+                    }
+                    t
+                })
+                .collect()
+        })
+}
+
+// Property 3 lives in its own `proptest!` block so we can dial up the case
+// count specifically for `shuffle_independent_receipts_preserves_bytes`
+// (256 cases, matching `signing_is_a_function` and `replay_root_is_idempotent`)
+// without rebudgeting the other two properties. Each case signs up to 16
+// receipts and compares per-receipt canonical bytes across a deterministic
+// permutation; this is more expensive than signing alone but cheaper than
+// building a Merkle tree, so 256 cases stay well inside the 30s CI budget.
 proptest! {
     #![proptest_config(ProptestConfig {
-        cases: PROPTEST_BUDGET_CASES,
+        cases: SHUFFLE_INDEPENDENCE_CASES,
         failure_persistence: Some(regression_persistence()),
         .. ProptestConfig::default()
     })]
 
     /// Property 3:
-    /// shuffling independent receipts (no shared nonce) does not change the
-    /// per-receipt canonical body bytes. The anchored root WILL change when
-    /// the receipt order changes (RFC 6962 trees are order-sensitive), but
-    /// each receipt's individual signing payload is invariant under
+    /// shuffling **independent** receipts (no shared nonce, no shared
+    /// content_hash, no cross-reference) does not change any individual
+    /// receipt's canonical body bytes. The anchored Merkle root WILL change
+    /// when the receipt order changes (RFC 6962 trees are order-sensitive),
+    /// but each receipt's individual signing payload is invariant under
     /// reordering of the surrounding batch.
+    ///
+    /// The "independent" qualifier is the load-bearing precondition: this
+    /// property does NOT claim invariance for receipts that share a nonce or
+    /// reference each other. The strategy (`independent_tuple_batch`)
+    /// guarantees pairwise-distinct nonces and pairwise-distinct payloads, and
+    /// the property body re-asserts both invariants up front so a strategy
+    /// regression that silently weakens the guarantee fails the test.
     #[test]
     fn shuffle_independent_receipts_preserves_bytes(
-        tuples in proptest::collection::vec(arbitrary_receipt_tuple(), 2..12)
-            .prop_filter(
-                "receipt nonces must be unique per batch",
-                |ts| {
-                    let mut seen = std::collections::HashSet::new();
-                    ts.iter().all(|t| seen.insert(t.nonce.clone()))
-                },
-            ),
+        tuples in independent_tuple_batch(),
         seed in any::<u64>(),
     ) {
         let kp = kernel_keypair();
@@ -506,6 +574,32 @@ proptest! {
             .iter()
             .map(|r| canonical_body_bytes(&r.body()))
             .collect();
+
+        // Independence guarantee 1: pairwise-distinct nonces. Re-asserted
+        // here so a future strategy regression that drops the uniqueness
+        // filter is caught by the property itself, not just by code review.
+        let nonces: std::collections::HashSet<&str> =
+            tuples.iter().map(|t| t.nonce.as_str()).collect();
+        prop_assert_eq!(nonces.len(), tuples.len());
+
+        // Independence guarantee 2: pairwise-distinct content hashes. The
+        // strategy stamps the nonce into each payload's `method` field, so
+        // distinct nonces mechanically produce distinct content_hashes; this
+        // assertion pins that invariant to the property surface.
+        let content_hashes: std::collections::HashSet<String> = receipts
+            .iter()
+            .map(|r| r.body().content_hash.clone())
+            .collect();
+        prop_assert_eq!(content_hashes.len(), receipts.len());
+
+        // Independence guarantee 3: every baseline byte vector is unique
+        // (no two receipts canonicalize to the same bytes). This is the
+        // strongest cross-reference guard: if two receipts produced
+        // identical bytes, the shuffle would trivially preserve "per-receipt
+        // bytes" by aliasing, which is not what the property asserts.
+        let baseline_set: std::collections::HashSet<Vec<u8>> =
+            baseline_bytes.iter().cloned().collect();
+        prop_assert_eq!(baseline_set.len(), baseline_bytes.len());
 
         // Deterministic Fisher-Yates permutation seeded by the proptest
         // input. We avoid pulling in `rand` here: a linear congruential
@@ -527,8 +621,26 @@ proptest! {
             .map(|r| canonical_body_bytes(&r.body()))
             .collect();
 
-        // Per-receipt bytes are invariant under reordering: every shuffled
-        // entry must match exactly one baseline entry, with multiplicities.
+        // Per-receipt assertion (strongest form): the receipt at position
+        // `j` of the shuffled batch maps back to original index
+        // `indices[j]`, and its canonical bytes must equal the baseline
+        // bytes at that original index exactly. This is stronger than the
+        // multiset comparison below: it pins the byte-identity of each
+        // logical receipt across the permutation rather than just the
+        // multiset of byte vectors.
+        for (j, &original_index) in indices.iter().enumerate() {
+            prop_assert_eq!(
+                &shuffled_bytes[j],
+                &baseline_bytes[original_index],
+            );
+        }
+
+        // Multiset assertion (set-of-bytes regardless of order): every
+        // shuffled entry must match exactly one baseline entry, with
+        // multiplicities. This is a weaker check than the per-receipt
+        // assertion above, but it pins the strategy's "no duplicate bytes"
+        // invariant and catches a regression that would corrupt the receipt
+        // body during the shuffle copy without altering positions.
         let mut baseline_sorted = baseline_bytes.clone();
         baseline_sorted.sort();
         let mut shuffled_sorted = shuffled_bytes.clone();
