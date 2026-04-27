@@ -1,0 +1,114 @@
+# chio-replay-gate.yml - Deterministic-replay corpus gate (M04 P2.T2).
+#
+# Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
+#   - Phase 2 ("CI gate and bless workflow", lines ~206-244): the workflow
+#     runs the chio-replay-gate corpus on every PR and on push to main /
+#     project/* branches; the `--bless` path is the only way to update
+#     goldens and is gated programmatically by `tests/replay/src/bless.rs`
+#     (M04.P2.T1).
+#   - "CHIO_BLESS gate logic" (lines ~474-503): CI is explicitly banned
+#     from blessing. This workflow sets `CHIO_BLESS=0` and the binary
+#     refuses any bless invocation when `CI=true`. There is no
+#     "auto-bless on green" path.
+#
+# T2 scope (this commit) is intentionally narrow: a single Linux job named
+# `replay-gate` that builds the chio-replay-gate binary release-mode and
+# exercises the corpus_smoke test. T3 layers a macOS read-only smoke job
+# and the seed-immutable PR guard on top (see
+# .planning/trajectory/tickets/M04/P2.yml id=M04.P2.T3). Determinism canary
+# and goldens-size budget are follow-ons listed in the doc's "New
+# sub-tasks" section.
+#
+# Determinism contract: `LC_ALL=C` and `LANG=C` are pinned at the workflow
+# level so receipt serialisation, sort orderings, and any locale-sensitive
+# output are reproducible across the Linux runner. `CARGO_INCREMENTAL=0`
+# pins out incremental codegen so the build contributes no host-specific
+# state to the receipts the gate compares.
+#
+# Required-on-main: the `replay-gate / replay-gate (linux)` check should be
+# promoted to a required status check on the branch ruleset for `main`
+# alongside the existing `check`, `msrv`, and freeze-guard required checks
+# (see ci.yml's required-check inventory). The ruleset itself is managed
+# out-of-band; this workflow is the producer of the check.
+
+name: chio-replay-gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'project/**'
+
+concurrency:
+  group: chio-replay-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Determinism pins: receipt byte-equivalence depends on a stable locale
+  # (string sort orders, number formatting) and a non-incremental codegen
+  # path. CHIO_BLESS=0 is the CI bless ban from
+  # .planning/trajectory/04-deterministic-replay.md "CHIO_BLESS gate logic".
+  LC_ALL: C
+  LANG: C
+  CHIO_BLESS: "0"
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  replay-gate:
+    name: replay-gate (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Confirm CI cannot bless
+        # Defence in depth on top of the binary's CI=true refusal: if
+        # CHIO_BLESS leaks in via a misconfigured runner, fail the job
+        # before any test step executes.
+        run: |
+          set -euo pipefail
+          if [ "${CHIO_BLESS:-0}" != "0" ]; then
+            echo "ERROR: CHIO_BLESS must be 0 in CI; got '${CHIO_BLESS}'" >&2
+            exit 1
+          fi
+          echo "CHIO_BLESS=${CHIO_BLESS} (CI bless ban honoured)"
+
+      - name: Build chio-replay-gate (release)
+        run: cargo build -p chio-replay-gate --release
+
+      - name: Run replay-gate corpus smoke
+        run: cargo test -p chio-replay-gate --release --test corpus_smoke
+
+      - name: Run replay-gate golden byte-equivalence (when goldens land)
+        # The golden_byte_equivalence integration test arrives in M04.P2.T5
+        # together with the initial bless of the 50 goldens. Until then the
+        # test target is absent; skip-on-missing keeps the gate green for
+        # the T2 commit while still wiring the invocation. Once T5 lands
+        # this branch becomes the gating assertion (zero diffs vs. blessed
+        # goldens).
+        run: |
+          set -euo pipefail
+          if cargo test -p chio-replay-gate --release --test golden_byte_equivalence --no-run --quiet 2>/dev/null; then
+            cargo test -p chio-replay-gate --release --test golden_byte_equivalence
+          else
+            echo "golden_byte_equivalence test target not yet present (lands in M04.P2.T5); skipping"
+          fi
