@@ -16,6 +16,19 @@ thiserror = { workspace = true }
 async-trait = "0.1"
 anyhow = "1"
 
+[dev-dependencies]
+# Used by tests/invariants.rs (M07.P1.T5: 8 proptest invariants for fabric
+# round-trip and schema subsumption). Pinned via the workspace at 1.10.
+proptest = { workspace = true }
+
+[features]
+# Soft-dependency on M01 capability schema. When the canonical
+# `chio-tool-call-fabric.v1` schema lands in the workspace, enabling this
+# feature turns invariant (h) "schema subsumption" into a hard assertion via
+# the `jsonschema` crate. Until then the property runs as a structural
+# self-check that the fabric round-trips through canonical JSON.
+m01-schema-subsumption = []
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

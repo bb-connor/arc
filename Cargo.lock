@@ -2661,6 +2661,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chio-core-types",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
