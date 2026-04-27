@@ -1,16 +1,179 @@
 //! Hot-reload engine for WASM guards.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
+use tracing::warn;
 
 use crate::{EpochId, WasmGuard, WasmGuardAbi, WasmGuardError};
+use crate::{GuardRequest, GuardVerdict};
+
+/// Required number of frozen fixtures in a canary corpus.
+pub const CANARY_FIXTURE_COUNT: usize = 32;
+
+const MANIFEST_FILE_NAME: &str = "MANIFEST.sha256";
+
+/// Frozen canary corpus for one guard.
+#[derive(Debug, Clone)]
+pub struct CanaryCorpus {
+    guard_id: String,
+    fixtures: Vec<CanaryFixture>,
+}
+
+impl CanaryCorpus {
+    /// Load and verify a guard canary corpus from
+    /// `tests/corpora/<guard_id>/canary`.
+    pub fn from_dir(
+        guard_id: impl Into<String>,
+        canary_dir: impl AsRef<Path>,
+    ) -> Result<Self, HotReloadError> {
+        let guard_id = guard_id.into();
+        let canary_dir = canary_dir.as_ref();
+        let manifest_path = canary_dir.join(MANIFEST_FILE_NAME);
+        let manifest = read_to_string(&manifest_path)?;
+        let manifest_entries = parse_manifest(&manifest_path, &manifest)?;
+        let fixture_names = json_fixture_names(canary_dir)?;
+        let manifest_names = manifest_entries
+            .iter()
+            .map(|entry| entry.file_name.clone())
+            .collect::<BTreeSet<_>>();
+
+        if fixture_names != manifest_names {
+            return Err(HotReloadError::CanaryManifest {
+                path: manifest_path,
+                reason: format!(
+                    "manifest fixture set does not match directory fixtures: manifest={manifest_names:?} directory={fixture_names:?}"
+                ),
+            });
+        }
+
+        let mut fixtures = Vec::with_capacity(manifest_entries.len());
+        for entry in manifest_entries {
+            let fixture_path = canary_dir.join(&entry.file_name);
+            let bytes = read_bytes(&fixture_path)?;
+            let actual_sha256 = hex::encode(Sha256::digest(&bytes));
+            if actual_sha256 != entry.sha256 {
+                return Err(HotReloadError::CanaryManifest {
+                    path: manifest_path.clone(),
+                    reason: format!(
+                        "fixture {} digest mismatch: expected {} got {}",
+                        entry.file_name, entry.sha256, actual_sha256
+                    ),
+                });
+            }
+
+            let fixture_file: CanaryFixtureFile =
+                serde_json::from_slice(&bytes).map_err(|source| {
+                    HotReloadError::CanaryFixtureJson {
+                        path: fixture_path.clone(),
+                        source,
+                    }
+                })?;
+            serde_json::from_slice::<CanaryExpectedVerdict>(
+                fixture_file.expected_verdict_bytes.as_bytes(),
+            )
+            .map_err(|source| HotReloadError::CanaryFixtureJson {
+                path: fixture_path.clone(),
+                source,
+            })?;
+
+            fixtures.push(CanaryFixture {
+                file_name: entry.file_name,
+                request: fixture_file.request,
+                expected_verdict_bytes: fixture_file.expected_verdict_bytes.into_bytes(),
+            });
+        }
+
+        if fixtures.len() != CANARY_FIXTURE_COUNT {
+            return Err(HotReloadError::CanaryFixtureCount {
+                guard_id,
+                expected: CANARY_FIXTURE_COUNT,
+                actual: fixtures.len(),
+            });
+        }
+
+        Ok(Self { guard_id, fixtures })
+    }
+
+    /// Guard identifier this corpus belongs to.
+    #[must_use]
+    pub fn guard_id(&self) -> &str {
+        &self.guard_id
+    }
+
+    /// Frozen canary fixtures in manifest order.
+    #[must_use]
+    pub fn fixtures(&self) -> &[CanaryFixture] {
+        &self.fixtures
+    }
+}
+
+/// One frozen canary fixture.
+#[derive(Debug, Clone)]
+pub struct CanaryFixture {
+    file_name: String,
+    request: GuardRequest,
+    expected_verdict_bytes: Vec<u8>,
+}
+
+impl CanaryFixture {
+    /// Fixture file name relative to its canary directory.
+    #[must_use]
+    pub fn file_name(&self) -> &str {
+        &self.file_name
+    }
+
+    /// Request evaluated during canary verification.
+    #[must_use]
+    pub fn request(&self) -> &GuardRequest {
+        &self.request
+    }
+
+    /// Frozen expected verdict bytes.
+    #[must_use]
+    pub fn expected_verdict_bytes(&self) -> &[u8] {
+        &self.expected_verdict_bytes
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct CanaryFixtureFile {
+    request: GuardRequest,
+    expected_verdict_bytes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "decision", rename_all = "snake_case")]
+enum CanaryExpectedVerdict {
+    Allow,
+    Deny { reason: Option<String> },
+}
+
+impl From<&GuardVerdict> for CanaryExpectedVerdict {
+    fn from(verdict: &GuardVerdict) -> Self {
+        match verdict {
+            GuardVerdict::Allow => Self::Allow,
+            GuardVerdict::Deny { reason } => Self::Deny {
+                reason: reason.clone(),
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ManifestEntry {
+    sha256: String,
+    file_name: String,
+}
 
 /// Factory used by [`Engine`] to compile replacement module bytes.
 pub trait ReloadBackendFactory: Send + Sync + 'static {
@@ -141,6 +304,80 @@ pub enum HotReloadError {
         /// Guard identifier passed to reload.
         guard_id: String,
     },
+
+    /// Canary corpus file IO failed.
+    #[error("canary corpus IO failed at {}: {source}", path.display())]
+    CanaryIo {
+        /// Corpus path.
+        path: PathBuf,
+        /// IO error.
+        #[source]
+        source: io::Error,
+    },
+
+    /// Canary fixture JSON failed to parse or validate.
+    #[error("canary fixture JSON invalid at {}: {source}", path.display())]
+    CanaryFixtureJson {
+        /// Fixture path.
+        path: PathBuf,
+        /// JSON error.
+        #[source]
+        source: serde_json::Error,
+    },
+
+    /// Canary manifest failed validation.
+    #[error("canary manifest invalid at {}: {reason}", path.display())]
+    CanaryManifest {
+        /// Manifest path.
+        path: PathBuf,
+        /// Validation failure.
+        reason: String,
+    },
+
+    /// Canary corpus fixture count is not the required value.
+    #[error("guard {guard_id:?} canary fixture count mismatch: expected {expected}, got {actual}")]
+    CanaryFixtureCount {
+        /// Guard identifier.
+        guard_id: String,
+        /// Expected fixture count.
+        expected: usize,
+        /// Actual fixture count.
+        actual: usize,
+    },
+
+    /// Canary corpus was supplied for a different guard.
+    #[error(
+        "canary corpus guard mismatch: reload guard {guard_id:?}, corpus guard {corpus_guard_id:?}"
+    )]
+    CanaryGuardMismatch {
+        /// Guard requested for reload.
+        guard_id: String,
+        /// Guard recorded on the corpus.
+        corpus_guard_id: String,
+    },
+
+    /// Canary verdict serialization failed.
+    #[error("canary verdict serialization failed: {source}")]
+    CanaryVerdictSerialize {
+        /// JSON serialization error.
+        #[source]
+        source: serde_json::Error,
+    },
+
+    /// Canary verification failed before the replacement module was published.
+    #[error(
+        "guard {guard_id:?} canary fixture {fixture:?} failed: expected {expected}, got {actual}"
+    )]
+    CanaryFailed {
+        /// Guard requested for reload.
+        guard_id: String,
+        /// Fixture file name.
+        fixture: String,
+        /// Expected verdict bytes as UTF-8 lossless text.
+        expected: String,
+        /// Actual verdict bytes or error text.
+        actual: String,
+    },
 }
 
 /// Runtime hot-reload engine.
@@ -217,6 +454,85 @@ where
             })?;
         let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
 
+        guard
+            .replace_loaded_module(backend, Some(module_sha256))
+            .ok_or_else(|| HotReloadError::EpochCounterExhausted {
+                guard_id: guard_id.to_string(),
+            })
+    }
+
+    /// Verify the replacement module against a frozen canary corpus, then
+    /// publish it atomically if all expected verdict bytes match.
+    pub fn reload_with_canary(
+        &self,
+        guard_id: &str,
+        new_module_bytes: &[u8],
+        corpus: &CanaryCorpus,
+    ) -> Result<EpochId, HotReloadError> {
+        if corpus.guard_id() != guard_id {
+            return Err(HotReloadError::CanaryGuardMismatch {
+                guard_id: guard_id.to_string(),
+                corpus_guard_id: corpus.guard_id().to_string(),
+            });
+        }
+
+        let guard = self
+            .guard(guard_id)?
+            .ok_or_else(|| HotReloadError::GuardNotFound {
+                guard_id: guard_id.to_string(),
+            })?;
+
+        let mut backend = self
+            .backend_factory
+            .build_backend(new_module_bytes)
+            .map_err(|source| HotReloadError::ReplacementLoad {
+                guard_id: guard_id.to_string(),
+                source,
+            })?;
+
+        for fixture in corpus.fixtures() {
+            let actual = match backend.evaluate(fixture.request()) {
+                Ok(verdict) => serialize_canary_verdict(&verdict)?,
+                Err(source) => {
+                    let actual = format!("error:{source}");
+                    warn!(
+                        event = "chio.guard.reload.canary_failed",
+                        guard_id,
+                        fixture = fixture.file_name(),
+                        expected = %String::from_utf8_lossy(fixture.expected_verdict_bytes()),
+                        actual = %actual,
+                        "WASM guard reload canary failed"
+                    );
+                    return Err(HotReloadError::CanaryFailed {
+                        guard_id: guard_id.to_string(),
+                        fixture: fixture.file_name().to_string(),
+                        expected: String::from_utf8_lossy(fixture.expected_verdict_bytes())
+                            .into_owned(),
+                        actual,
+                    });
+                }
+            };
+            if actual != fixture.expected_verdict_bytes() {
+                let actual = String::from_utf8_lossy(&actual).into_owned();
+                warn!(
+                    event = "chio.guard.reload.canary_failed",
+                    guard_id,
+                    fixture = fixture.file_name(),
+                    expected = %String::from_utf8_lossy(fixture.expected_verdict_bytes()),
+                    actual = %actual,
+                    "WASM guard reload canary failed"
+                );
+                return Err(HotReloadError::CanaryFailed {
+                    guard_id: guard_id.to_string(),
+                    fixture: fixture.file_name().to_string(),
+                    expected: String::from_utf8_lossy(fixture.expected_verdict_bytes())
+                        .into_owned(),
+                    actual,
+                });
+            }
+        }
+
+        let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
         guard
             .replace_loaded_module(backend, Some(module_sha256))
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
@@ -389,4 +705,104 @@ fn is_reload_file_event(kind: &EventKind) -> bool {
         kind,
         EventKind::Any | EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
     )
+}
+
+fn read_to_string(path: &Path) -> Result<String, HotReloadError> {
+    fs::read_to_string(path).map_err(|source| HotReloadError::CanaryIo {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn read_bytes(path: &Path) -> Result<Vec<u8>, HotReloadError> {
+    fs::read(path).map_err(|source| HotReloadError::CanaryIo {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn parse_manifest(
+    manifest_path: &Path,
+    manifest: &str,
+) -> Result<Vec<ManifestEntry>, HotReloadError> {
+    let mut entries = Vec::new();
+    let mut names = BTreeSet::new();
+    for (index, line) in manifest.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some((sha256, file_name)) = line.split_once("  ") else {
+            return Err(HotReloadError::CanaryManifest {
+                path: manifest_path.to_path_buf(),
+                reason: format!("line {} must be '<sha256>  <filename>'", index + 1),
+            });
+        };
+        if sha256.len() != 64 || !sha256.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            return Err(HotReloadError::CanaryManifest {
+                path: manifest_path.to_path_buf(),
+                reason: format!("line {} has invalid sha256 digest", index + 1),
+            });
+        }
+        if !is_safe_fixture_name(file_name) {
+            return Err(HotReloadError::CanaryManifest {
+                path: manifest_path.to_path_buf(),
+                reason: format!("line {} has unsafe fixture name {file_name:?}", index + 1),
+            });
+        }
+        if !names.insert(file_name.to_string()) {
+            return Err(HotReloadError::CanaryManifest {
+                path: manifest_path.to_path_buf(),
+                reason: format!("line {} duplicates fixture {file_name:?}", index + 1),
+            });
+        }
+        entries.push(ManifestEntry {
+            sha256: sha256.to_ascii_lowercase(),
+            file_name: file_name.to_string(),
+        });
+    }
+    Ok(entries)
+}
+
+fn json_fixture_names(canary_dir: &Path) -> Result<BTreeSet<String>, HotReloadError> {
+    let entries = fs::read_dir(canary_dir).map_err(|source| HotReloadError::CanaryIo {
+        path: canary_dir.to_path_buf(),
+        source,
+    })?;
+    let mut names = BTreeSet::new();
+    for entry in entries {
+        let entry = entry.map_err(|source| HotReloadError::CanaryIo {
+            path: canary_dir.to_path_buf(),
+            source,
+        })?;
+        let file_type = entry
+            .file_type()
+            .map_err(|source| HotReloadError::CanaryIo {
+                path: entry.path(),
+                source,
+            })?;
+        if !file_type.is_file() {
+            continue;
+        }
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if file_name.ends_with(".json") {
+            names.insert(file_name);
+        }
+    }
+    Ok(names)
+}
+
+fn is_safe_fixture_name(file_name: &str) -> bool {
+    let path = Path::new(file_name);
+    !file_name.is_empty()
+        && file_name.ends_with(".json")
+        && path.components().count() == 1
+        && path
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+}
+
+fn serialize_canary_verdict(verdict: &GuardVerdict) -> Result<Vec<u8>, HotReloadError> {
+    serde_json::to_vec(&CanaryExpectedVerdict::from(verdict))
+        .map_err(|source| HotReloadError::CanaryVerdictSerialize { source })
 }
