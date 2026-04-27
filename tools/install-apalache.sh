@@ -43,8 +43,15 @@ esac
 
 current_version=""
 if [[ -x "${symlink}" ]]; then
-    current_version="$("${symlink}" version 2>/dev/null \
-        | awk '/^EXITCODE/ {next} /[0-9]+\.[0-9]+\.[0-9]+/ {print $NF; exit}')"
+    # Probe the existing launcher non-fatally. Any failure here (wrong Java
+    # version, corrupted install, transient runtime error) must NOT abort
+    # the script under `set -euo pipefail`; the installer recovers by
+    # reinstalling the pinned tarball below. Match the recovery posture in
+    # `scripts/install-orchestrator-tools.sh`.
+    version_output="$("${symlink}" version 2>/dev/null || true)"
+    current_version="$(printf '%s\n' "${version_output}" \
+        | awk '/^EXITCODE/ {next} /[0-9]+\.[0-9]+\.[0-9]+/ {print $NF; exit}' \
+        || true)"
 fi
 
 if [[ "${current_version}" == "${APALACHE_VERSION}" ]]; then
@@ -58,7 +65,22 @@ if [[ ! -x "${launcher}" ]]; then
     url="https://github.com/apalache-mc/apalache/releases/download/${APALACHE_RELEASE}/${asset}"
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "${tmp_dir}"' EXIT
-    curl -fsSL --retry 3 "${url}" -o "${tmp_dir}/${asset}"
+    # Retry the download explicitly so a single transient curl failure does
+    # not abort the installer under `set -euo pipefail`. curl's own --retry
+    # already handles in-band retries; the outer loop survives total
+    # connection failures (DNS flakes, GitHub release mirror hiccups).
+    curl_attempts=0
+    curl_max_attempts=5
+    until curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 30 \
+            "${url}" -o "${tmp_dir}/${asset}"; do
+        curl_attempts=$((curl_attempts + 1))
+        if [[ "${curl_attempts}" -ge "${curl_max_attempts}" ]]; then
+            echo "error: failed to download ${url} after ${curl_max_attempts} attempts" >&2
+            exit 5
+        fi
+        echo "warning: curl failed (attempt ${curl_attempts}/${curl_max_attempts}); retrying" >&2
+        sleep $((curl_attempts * 2))
+    done
     tar -xzf "${tmp_dir}/${asset}" -C "${share_dir}"
     if [[ ! -x "${launcher}" ]]; then
         echo "error: extracted tree missing launcher at ${launcher}" >&2

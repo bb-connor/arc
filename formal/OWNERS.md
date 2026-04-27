@@ -30,7 +30,7 @@ The formal owners (primary and backup) are jointly on the hook for:
 
 - **Apalache configuration:** keep `formal/tla/` model-checker configs
   (`.cfg` files, invariants, and the pinned Apalache version under
-  `scripts/install-apalache.sh`) green and reproducible. Bump the pin
+  `tools/install-apalache.sh`) green and reproducible. Bump the pin
   deliberately, never silently.
 - **Invariant maintenance:** when the capability algebra, scope lattice,
   receipt chain, or revocation propagation rules change in

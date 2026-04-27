@@ -14,15 +14,19 @@
 (*   - MonotoneLog                                                          *)
 (*   - AttenuationPreserving                                                *)
 (*                                                                          *)
-(* M03.P3.T3 (this commit) extends the module with the named liveness      *)
-(* property RevocationEventuallySeen and adds the weak-fairness conjunct   *)
-(*                                                                          *)
-(*   WF_vars(\E m \in pending : Propagate(m))                              *)
-(*                                                                          *)
-(* to Spec, so that pending propagation messages cannot be starved          *)
-(* indefinitely. Liveness is checked in the nightly formal-tla-liveness    *)
-(* lane (M03.P3.T4) at the larger PROCS=6, CAPS=16 config; the PR job      *)
-(* continues to check only the safety invariants at PROCS=4, CAPS=8.       *)
+(* M03.P3.T3 extends the module with the named liveness property          *)
+(* RevocationEventuallySeen and adds a weak-fairness conjunct to Spec so   *)
+(* that pending propagation messages cannot be starved indefinitely.       *)
+(* The fairness conjunct is WF_vars(PropagateAny) where PropagateAny is    *)
+(* the top-level named action `pending # {} /\ \E m \in pending :          *)
+(* Propagate(m)`. The named-action form is required because Apalache's     *)
+(* tableau encoding (PDR-017) supports WF_vars(<named action>) but does    *)
+(* not support an existential quantifier nested directly under WF_vars     *)
+(* (the [cleanup-c9] follow-up replaced the former                         *)
+(* WF_vars(\E m \in pending : Propagate(m)) with this lifted form).        *)
+(* Liveness is checked in the nightly formal-tla-liveness lane             *)
+(* (M03.P3.T4) at PROCS=4, CAPS=8 via Apalache's `--temporal=` flag; the   *)
+(* PR job continues to check only the safety invariants via `--inv=`.      *)
 (*                                                                          *)
 (* Code mapping (full cross-reference in formal/MAPPING.md, landed at      *)
 (* M03.P3.T5):                                                              *)
@@ -31,27 +35,31 @@
 (*   - receipt_log      -> crates/chio-kernel/src/receipt_store.rs         *)
 (*   - clock            -> kernel monotonic receipt counter                *)
 (*                                                                          *)
-(* CONSTANTS PROCS and CAPS are bounded integer counts (set by the         *)
-(* MCRevocationPropagation.cfg companion at PROCS=4, CAPS=8 for the PR    *)
-(* job and PROCS=6, CAPS=16 for the nightly liveness lane). Internal      *)
-(* index sets ProcSet and CapSet are derived from them. DEPTH_MAX is a    *)
-(* definition (not a CONSTANT) so the existing T1 cfg, which only         *)
-(* declares PROCS and CAPS, loads against this module unchanged.          *)
+(* CONSTANTS PROCS, CAPS, and DEPTH_MAX are bounded integer counts (set    *)
+(* by the MCRevocationPropagation.cfg companion at PROCS=4, CAPS=8,        *)
+(* DEPTH_MAX=4 for the PR job and PROCS=6, CAPS=16, DEPTH_MAX=4 for the    *)
+(* nightly liveness lane). Internal index sets ProcSet and CapSet are     *)
+(* derived from PROCS and CAPS. DEPTH_MAX matches the trajectory phase    *)
+(* doc spec at .planning/trajectory/03-capability-algebra-properties.md   *)
+(* (Phase 3, lines 137-256).                                               *)
 (***************************************************************************)
 
 EXTENDS Naturals, Sequences, FiniteSets, TLC
 
 CONSTANTS
     \* @type: Int;
-    PROCS,    \* number of authority/process identifiers (must be >= 1)
+    PROCS,     \* number of authority/process identifiers (must be >= 1)
     \* @type: Int;
-    CAPS      \* number of capability identifiers (must be >= 1)
+    CAPS,      \* number of capability identifiers (must be >= 1)
+    \* @type: Int;
+    DEPTH_MAX  \* maximum delegation depth per (authority, cap) pair (>= 0)
 
 ASSUME
-    /\ PROCS \in Nat
-    /\ CAPS  \in Nat
-    /\ PROCS >= 1
-    /\ CAPS  >= 1
+    /\ PROCS     \in Nat
+    /\ CAPS      \in Nat
+    /\ DEPTH_MAX \in Nat
+    /\ PROCS     >= 1
+    /\ CAPS      >= 1
 
 (***************************************************************************)
 (* Internal index sets. Derived from the integer-valued CONSTANTS so the   *)
@@ -59,15 +67,6 @@ ASSUME
 (***************************************************************************)
 ProcSet == 1..PROCS
 CapSet  == 1..CAPS
-
-(***************************************************************************)
-(* DEPTH_MAX caps the per-process delegation depth. Kept as a definition  *)
-(* so the T1-landed MCRevocationPropagation.cfg, which declares only PROCS *)
-(* and CAPS, loads against this module unchanged. If a future tightening  *)
-(* needs DEPTH_MAX in the cfg, promote this to a CONSTANT and update the   *)
-(* cfg in the same commit.                                                 *)
-(***************************************************************************)
-DEPTH_MAX == 4
 
 (***************************************************************************)
 (* Per-process current view of a capability's lifecycle state. Three      *)
@@ -210,6 +209,21 @@ Evaluate(a, c) ==
     /\ UNCHANGED << state, depth, rev_epoch, pending >>
 
 (***************************************************************************)
+(* PropagateAny: existentially-quantified Propagate as a top-level named  *)
+(* action so that weak fairness can be expressed without nesting an       *)
+(* existential under WF_vars. Apalache's tableau-based temporal encoding  *)
+(* (PDR-017) accepts WF_vars(<named action>) but does not support         *)
+(* WF_vars(\E ... : <action>) because the existential under ENABLED       *)
+(* defeats its SMT translation. Lifting the existential to a named        *)
+(* action preserves the intended semantics: PropagateAny is enabled iff   *)
+(* pending is non-empty, exactly the precondition the original           *)
+(* WF_vars(\E m \in pending : Propagate(m)) was asserting.                *)
+(***************************************************************************)
+PropagateAny ==
+    /\ pending # {}
+    /\ \E m \in pending : Propagate(m)
+
+(***************************************************************************)
 (* Next-state relation. Disjunction over all action shapes. Existential  *)
 (* quantifications are bounded by ProcSet, CapSet, and pending (a finite  *)
 (* subset of Message at every reachable state).                           *)
@@ -218,7 +232,7 @@ Next ==
     \/ \E a \in ProcSet, c \in CapSet : Attenuate(a, c)
     \/ \E a \in ProcSet, c \in CapSet : Revoke(a, c)
     \/ \E a \in ProcSet, c \in CapSet : Evaluate(a, c)
-    \/ \E m \in pending                : Propagate(m)
+    \/ PropagateAny
 
 (***************************************************************************)
 (* Spec is the temporal formula characterizing valid behaviors:            *)
@@ -226,24 +240,26 @@ Next ==
 (*   - Init: the initial-state predicate.                                   *)
 (*   - [][Next]_vars: every step is either a Next-allowed action or a      *)
 (*     stuttering step on vars.                                             *)
-(*   - WF_vars(\E m \in pending : Propagate(m)): weak fairness on the      *)
-(*     existentially-quantified Propagate action. If a propagation         *)
-(*     message is continuously enabled (i.e. pending is non-empty in       *)
-(*     every state from some point on), some Propagate(m) eventually       *)
-(*     fires. This is the load-bearing assumption for                       *)
-(*     RevocationEventuallySeen below.                                      *)
+(*   - WF_vars(PropagateAny): weak fairness on the top-level named         *)
+(*     action PropagateAny. PropagateAny is enabled exactly when pending   *)
+(*     is non-empty; weak fairness then says that a continuously enabled   *)
+(*     PropagateAny eventually fires, which is the load-bearing            *)
+(*     assumption for RevocationEventuallySeen below. Apalache's           *)
+(*     tableau-based fairness encoding (PDR-017) supports                  *)
+(*     WF_vars(<named action>) but rejects WF_vars(\E ... : <action>);     *)
+(*     PropagateAny is the named-action workaround.                         *)
 (*                                                                          *)
-(* Strong fairness is not required: Propagate is enabled whenever pending  *)
-(* is non-empty, so the standard "continuously enabled implies eventually  *)
-(* taken" weak-fairness rule suffices. Strengthening to SF would only be   *)
-(* needed if some other action could disable Propagate by emptying pending *)
-(* infinitely often, which Revoke-broadcasts make impossible once any     *)
-(* unseen revocation is in flight.                                         *)
+(* Strong fairness is not required: PropagateAny is enabled whenever       *)
+(* pending is non-empty, so the standard "continuously enabled implies     *)
+(* eventually taken" weak-fairness rule suffices. Strengthening to SF      *)
+(* would only be needed if some other action could disable PropagateAny    *)
+(* by emptying pending infinitely often, which Revoke-broadcasts make      *)
+(* impossible once any unseen revocation is in flight.                     *)
 (***************************************************************************)
 Spec ==
     /\ Init
     /\ [][Next]_vars
-    /\ WF_vars(\E m \in pending : Propagate(m))
+    /\ WF_vars(PropagateAny)
 
 (***************************************************************************)
 (*                          Safety invariants                              *)
@@ -306,9 +322,10 @@ SafetyInv ==
 (* RevocationEventuallySeen is the named liveness property checked by the *)
 (* nightly formal-tla-liveness lane (M03.P3.T4). The name MUST stay        *)
 (* verbatim: the M03.P3.T3 gate_check greps for it, the nightly job cites *)
-(* it via --inv=RevocationEventuallySeen, and formal/MAPPING.md            *)
-(* (M03.P3.T5) cross-references it back to the propagation-lag clause in *)
-(* spec/PROTOCOL.md.                                                        *)
+(* it via --temporal=RevocationEventuallySeen (corrected in [cleanup-c9]   *)
+(* from the original --inv=, which Apalache reserves for state             *)
+(* invariants), and formal/MAPPING.md (M03.P3.T5) cross-references it     *)
+(* back to the propagation-lag clause in spec/PROTOCOL.md.                 *)
 (*                                                                          *)
 (* Statement (matching the phase doc verbatim, modulo PROCS/CAPS being    *)
 (* integer-count CONSTANTS in this module so the pair-quantifier ranges   *)
@@ -324,10 +341,10 @@ SafetyInv ==
 (* so the property reads: in every state where rev_epoch[a][c] is         *)
 (* non-zero, some later state satisfies rev_epoch[b][c] >= rev_epoch[a][c].*)
 (*                                                                          *)
-(* The property is gated on WF_vars(\E m \in pending : Propagate(m))       *)
-(* (declared in Spec above). Without that fairness conjunct the model     *)
-(* admits behaviors where pending Propagate messages are starved forever  *)
-(* and RevocationEventuallySeen would not hold.                            *)
+(* The property is gated on WF_vars(PropagateAny) declared in Spec above. *)
+(* Without that fairness conjunct the model admits behaviors where         *)
+(* pending Propagate messages are starved forever and                      *)
+(* RevocationEventuallySeen would not hold.                                 *)
 (*                                                                          *)
 (* The a = b case is trivially satisfied (rev_epoch[a][c] >=               *)
 (* rev_epoch[a][c]) and is left in the quantifier rather than excluded so *)

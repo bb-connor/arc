@@ -68,24 +68,40 @@ for name in "${named_tla_invariants[@]}"; do
 done
 
 # --- Kani #[kani::proof] harnesses ------------------------------------------
-# Extract the function name on the line immediately following each
-# #[kani::proof] attribute. The harness body and helper functions are
+# Extract the function name on the first `fn <ident>(` line that follows
+# each #[kani::proof] attribute. The harness body and helper functions are
 # intentionally ignored.
+#
+# The parser tolerates blank lines, comments (`//`, `/* */`), and stacked
+# attributes (e.g. `#[kani::unwind(N)]`) between the `#[kani::proof]`
+# attribute and the `fn` declaration. The previous version unconditionally
+# consumed the very next line and reset `want = 0`, which silently dropped
+# harnesses whose declaration was preceded by such intervening lines and
+# fail-opened the gate (PR #61, comment r3142992290).
 #
 # Portability: this script targets bash 3.2 (default macOS) and BSD awk.
 # That rules out `mapfile` and the gawk-only 3-arg `match()`. We use a
-# two-pass awk that captures the line after the attribute, then a sub()
-# / gsub() to strip everything except the identifier.
+# state machine in awk and sub() to strip everything except the identifier.
 kani_harness_list="$(
   awk '
     /^#\[kani::proof\]/ { want = 1; next }
     want {
       line = $0
-      # Strip leading whitespace and the leading `fn ` keyword.
+      # Strip leading whitespace.
       sub(/^[[:space:]]+/, "", line)
+      # Skip blank lines, line comments, block-comment openers, and stacked
+      # attributes - keep `want = 1` until we actually see a `fn` line.
+      if (line == "") { next }
+      if (line ~ /^\/\//) { next }
+      if (line ~ /^\/\*/) { next }
+      if (line ~ /^\*/) { next }
+      if (line ~ /^#\[/) { next }
+      # We expect `fn <ident>(...)`. Anything else means the attribute was
+      # not followed by a function definition; reset and continue scanning.
+      if (line !~ /^fn[[:space:]]+/) { want = 0; next }
       sub(/^fn[[:space:]]+/, "", line)
-      # Strip everything from the first `(` onward.
-      sub(/\(.*/, "", line)
+      # Strip everything from the first `(` or `<` onward (generic params).
+      sub(/[(<].*/, "", line)
       # Strip any residual whitespace.
       sub(/[[:space:]]+$/, "", line)
       if (line != "") {
@@ -105,11 +121,19 @@ fi
 
 # --- Mapping presence check --------------------------------------------------
 # For each enforced name, require it to appear as `<name>` (backtick-wrapped)
-# in formal/MAPPING.md. Backtick wrapping is the canonical form used in the
-# table rows and is what authors should use when they add a new row.
+# inside a markdown TABLE ROW in formal/MAPPING.md. Table rows begin with
+# `|` (after optional leading whitespace); the table-header separator row
+# (`| ----- | ----- |`) is filtered out below. Prose mentions, bullet
+# lists, and code-fence excerpts are NOT counted - they are not the unit
+# of cross-reference the gate is asserting (PR #61 comment r3142986117 and
+# r3142992287). Without this scoping the gate fail-opens whenever the
+# author drops a backtick mention of a property name into prose.
+table_rows="$(grep -E '^[[:space:]]*\|' "${mapping}" \
+    | grep -v -E '^[[:space:]]*\|[[:space:]]*-+' || true)"
+
 unmapped_tla=()
 for name in "${defined_tla_invariants[@]}"; do
-  if ! grep -qF "\`${name}\`" "${mapping}"; then
+  if ! printf '%s\n' "${table_rows}" | grep -qF "\`${name}\`"; then
     unmapped_tla+=("${name}")
   fi
 done
@@ -120,7 +144,7 @@ for name in "${kani_harnesses[@]}"; do
   if [[ -z "${name}" ]]; then
     continue
   fi
-  if ! grep -qF "\`${name}\`" "${mapping}"; then
+  if ! printf '%s\n' "${table_rows}" | grep -qF "\`${name}\`"; then
     unmapped_kani+=("${name}")
   fi
 done

@@ -31,18 +31,20 @@ same PR or `scripts/check-mapping.sh` will fail.
 
 ## TLA+ named invariants (RevocationPropagation.tla)
 
-Source file: `formal/tla/RevocationPropagation.tla`. The three names below
-are model-checked by `formal/tla/MCRevocationPropagation.cfg` via the
-aggregate `SafetyInv`. The aggregate itself is intentionally NOT a row in
-this table; the script greps for the leaf-named invariants. If the
-liveness invariant `RevocationEventuallySeen` lands at M03.P3.T3, append it
-to this section in the same PR.
+Source file: `formal/tla/RevocationPropagation.tla`. The three safety
+names below are model-checked by `formal/tla/MCRevocationPropagation.cfg`
+via the aggregate SafetyInv. The aggregate itself is intentionally NOT a
+row in this table; the script greps for the leaf-named invariants. The
+fourth row is the named liveness property RevocationEventuallySeen, which
+the nightly Apalache lane checks via `--temporal=` (M03.P3.T4 and the
+[cleanup-c9] follow-up that switched the lane off `--inv=`).
 
-| Property                | Source                                          | Rust path constrained                                                                                          | Assumption discharge                                                                          | One-line description                                                                                          |
-| ----------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `NoAllowAfterRevoke`    | `formal/tla/RevocationPropagation.tla` (~L238) | `crates/chio-kernel-core/src/evaluate.rs::evaluate`, `crates/chio-kernel/src/capability_lineage.rs`            | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY (per-row), retired-cross-row tracked at T6 | Every `allow` receipt was issued at a time when the issuing authority had not yet observed any revocation.    |
-| `MonotoneLog`           | `formal/tla/RevocationPropagation.tla` (~L250) | `crates/chio-kernel/src/receipt_store.rs`                                                                      | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY; jointly discharges RETIRED-SQLITE-CROSS-ROW (T6) | Per-authority receipt-log timestamps are strictly increasing; the log is append-only.                         |
-| `AttenuationPreserving` | `formal/tla/RevocationPropagation.tla` (~L262) | `crates/chio-core-types/src/capability.rs` (`ChioScope::is_subset_of`), `crates/chio-kernel-core/src/normalized.rs` | n/a (structural; bounded by `DEPTH_MAX`)                                                      | `depth` stays within `0..DEPTH_MAX`; any cap in the `attenuated` state has been delegated at least once.      |
+| Property                    | Source                                          | Rust path constrained                                                                                          | Assumption discharge                                                                          | One-line description                                                                                                            |
+| --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `NoAllowAfterRevoke`        | `formal/tla/RevocationPropagation.tla` (~L238) | `crates/chio-kernel-core/src/evaluate.rs::evaluate`, `crates/chio-kernel/src/capability_lineage.rs`            | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY (per-row), retired-cross-row tracked at T6 | Every `allow` receipt was issued at a time when the issuing authority had not yet observed any revocation.                      |
+| `MonotoneLog`               | `formal/tla/RevocationPropagation.tla` (~L250) | `crates/chio-kernel/src/receipt_store.rs`                                                                      | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY; jointly discharges RETIRED-SQLITE-CROSS-ROW (T6) | Per-authority receipt-log timestamps are strictly increasing; the log is append-only.                                           |
+| `AttenuationPreserving`     | `formal/tla/RevocationPropagation.tla` (~L262) | `crates/chio-core-types/src/capability.rs` (`ChioScope::is_subset_of`), `crates/chio-kernel-core/src/normalized.rs` | n/a (structural; bounded by `DEPTH_MAX`)                                                      | `depth` stays within `0..DEPTH_MAX`; any cap in the `attenuated` state has been delegated at least once.                        |
+| `RevocationEventuallySeen`  | `formal/tla/RevocationPropagation.tla` (~L336) | `crates/chio-kernel/src/capability_lineage.rs`, `crates/chio-kernel/src/receipt_store.rs`                      | `formal/assumptions.toml` ASSUME-PROPAGATE-FAIRNESS (weak fairness on `Propagate`)            | Once one authority observes a non-zero revocation epoch for a cap, every other authority eventually catches up to that epoch.   |
 
 Lean cross-references (informational; the script does not enforce these):
 
