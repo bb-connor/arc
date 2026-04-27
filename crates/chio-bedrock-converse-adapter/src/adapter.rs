@@ -5,6 +5,9 @@
 //! Chio fabric shape, and lowers verdicts back into Bedrock `toolResult`
 //! content blocks. Transport dispatch remains outside this module.
 
+#[path = "streaming.rs"]
+pub mod streaming;
+
 use std::collections::BTreeSet;
 use std::future::Future;
 use std::pin::Pin;
