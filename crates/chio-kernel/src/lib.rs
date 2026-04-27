@@ -36,6 +36,7 @@ pub mod memory_provenance;
 pub mod operator_report;
 pub mod payment;
 pub mod post_invocation;
+#[allow(deprecated)]
 pub mod provider_verdict;
 pub mod receipt_analytics;
 pub mod receipt_query;
