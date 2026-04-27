@@ -1,9 +1,14 @@
 //! Hot-reload engine for WASM guards.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha2::{Digest, Sha256};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 
 use crate::{EpochId, WasmGuard, WasmGuardAbi, WasmGuardError};
 
@@ -26,6 +31,45 @@ where
     ) -> Result<Box<dyn WasmGuardAbi>, WasmGuardError> {
         self(new_module_bytes)
     }
+}
+
+/// Poller used by [`Engine`] to fetch the current registry digest for a guard.
+pub trait RegistryDigestPoller: Send + 'static {
+    /// Return the current digest for a guard, if the registry has one.
+    fn current_digest(&mut self, guard_id: &str) -> Result<Option<String>, HotReloadError>;
+}
+
+impl<F> RegistryDigestPoller for F
+where
+    F: for<'a> FnMut(&'a str) -> Result<Option<String>, HotReloadError> + Send + 'static,
+{
+    fn current_digest(&mut self, guard_id: &str) -> Result<Option<String>, HotReloadError> {
+        self(guard_id)
+    }
+}
+
+/// Source-specific reload trigger details.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReloadTriggerSource {
+    /// A watched file or directory changed.
+    FileChanged {
+        /// Path reported by the file watcher.
+        path: PathBuf,
+    },
+    /// A registry poll observed a new digest for the guard artifact.
+    RegistryDigestChanged {
+        /// New digest returned by the registry poller.
+        digest: String,
+    },
+}
+
+/// Reload trigger emitted by file watchers and registry poll tasks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReloadTrigger {
+    /// Guard identifier associated with the trigger.
+    pub guard_id: String,
+    /// Trigger source.
+    pub source: ReloadTriggerSource,
 }
 
 /// Errors returned by the hot-reload engine.
@@ -58,6 +102,14 @@ pub enum HotReloadError {
     /// The internal guard registry lock was poisoned.
     #[error("hot-reload guard registry lock poisoned")]
     RegistryLockPoisoned,
+
+    /// File watcher setup failed.
+    #[error("hot-reload file watcher failed: {0}")]
+    FileWatcher(#[from] notify::Error),
+
+    /// Reload trigger receiver was closed before the trigger could be sent.
+    #[error("reload trigger receiver closed")]
+    TriggerReceiverClosed,
 }
 
 /// Runtime hot-reload engine.
@@ -138,4 +190,84 @@ where
                 guard_id: guard_id.to_string(),
             })
     }
+
+    /// Watch a guard path and emit reload triggers when it changes.
+    pub fn watch_guard_path(
+        &self,
+        guard_id: impl Into<String>,
+        path: impl AsRef<Path>,
+        trigger_tx: std::sync::mpsc::Sender<ReloadTrigger>,
+    ) -> Result<RecommendedWatcher, HotReloadError> {
+        let guard_id = guard_id.into();
+        let watched_path = path.as_ref().to_path_buf();
+        let fallback_path = watched_path.clone();
+        let mut watcher =
+            notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
+                let Ok(event) = result else {
+                    return;
+                };
+                if !is_reload_file_event(&event.kind) {
+                    return;
+                }
+                let path = event
+                    .paths
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| fallback_path.clone());
+                let _ = trigger_tx.send(ReloadTrigger {
+                    guard_id: guard_id.clone(),
+                    source: ReloadTriggerSource::FileChanged { path },
+                });
+            })?;
+        watcher.watch(&watched_path, RecursiveMode::NonRecursive)?;
+        Ok(watcher)
+    }
+
+    /// Spawn a registry digest poll task keyed by guard ID.
+    ///
+    /// The task emits a reload trigger each time the observed digest changes
+    /// from the last seen digest.
+    pub fn spawn_registry_poll_task<P>(
+        &self,
+        guard_id: impl Into<String>,
+        initial_digest: Option<String>,
+        interval: Duration,
+        mut poller: P,
+        trigger_tx: mpsc::Sender<ReloadTrigger>,
+    ) -> JoinHandle<Result<(), HotReloadError>>
+    where
+        P: RegistryDigestPoller,
+    {
+        let guard_id = guard_id.into();
+        tokio::spawn(async move {
+            let mut last_digest = initial_digest;
+            let mut interval = tokio::time::interval(interval);
+            loop {
+                interval.tick().await;
+                let Some(current_digest) = poller.current_digest(&guard_id)? else {
+                    continue;
+                };
+                if last_digest.as_deref() == Some(current_digest.as_str()) {
+                    continue;
+                }
+                last_digest = Some(current_digest.clone());
+                trigger_tx
+                    .send(ReloadTrigger {
+                        guard_id: guard_id.clone(),
+                        source: ReloadTriggerSource::RegistryDigestChanged {
+                            digest: current_digest,
+                        },
+                    })
+                    .await
+                    .map_err(|_| HotReloadError::TriggerReceiverClosed)?;
+            }
+        })
+    }
+}
+
+fn is_reload_file_event(kind: &EventKind) -> bool {
+    matches!(
+        kind,
+        EventKind::Any | EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+    )
 }
