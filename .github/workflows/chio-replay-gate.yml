@@ -315,10 +315,10 @@ jobs:
     #   - replay_root_is_idempotent (named exit-criterion test)
     #   - shuffle_independent_receipts_preserves_bytes
     #
-    # Budget: 30 seconds wall-clock for the proptest harness itself
-    # (PROPTEST_CASES bounded in the test file; timeout-minutes is a
-    # belt-and-braces upper bound that includes toolchain install and
-    # cargo build). PROPTEST_MAX_GLOBAL_REJECTS is set so the strategy's
+    # Budget: 30 seconds wall-clock for the proptest harness itself. The
+    # job-level timeout-minutes covers runner setup and compilation only;
+    # the test execution step below uses `timeout 30s` as the enforceable
+    # budget signal. PROPTEST_MAX_GLOBAL_REJECTS is set so the strategy's
     # `prop_filter` constraints (unique-nonce batches) cannot exhaust the
     # global rejection budget under shrink.
     #
@@ -347,15 +347,21 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Compile replay proptest target
+        # Compilation can exceed the runtime budget on a cold runner, so keep
+        # it outside the 30s harness timer. The next step is the actual
+        # property execution budget.
+        run: cargo test -p chio-kernel --test replay_proptest --release --no-run
+
       - name: Run replay proptest (30s budget)
         # The proptest harness itself is bounded by PROPTEST_CASES inside
-        # the test source. The `timeout 60s` wrapper enforces the doc's
-        # explicit "30 second" budget with a 2x slack for cold-cache
-        # toolchain warmup; if the test ever exceeds 60s of wall clock the
-        # wrapper kills it and the gate fails.
+        # the test source. The `timeout 30s` wrapper enforces the doc's
+        # explicit "30 second" budget after runner setup and compilation;
+        # if the harness exceeds 30s of wall clock the wrapper kills it and
+        # the gate fails.
         run: |
           set -euo pipefail
-          timeout 60s cargo test -p chio-kernel --test replay_proptest --release -- --nocapture
+          timeout 30s cargo test -p chio-kernel --test replay_proptest --release -- --nocapture
 
       - name: Upload proptest regressions on failure
         if: failure()
@@ -364,6 +370,7 @@ jobs:
           name: proptest-regressions
           path: tests/replay/proptest-regressions/
           if-no-files-found: ignore
+          retention-days: 30
 
   cross-version:
     # M04 P3.T5 scope: cross-version receipt-compatibility sanity job.
