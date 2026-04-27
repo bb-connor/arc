@@ -8,8 +8,9 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
+use tower::load_shed::{LoadShed, LoadShedLayer};
 use tower::timeout::TimeoutLayer;
-use tower::{Service, ServiceExt};
+use tower::Service;
 use tower_layer::Layer;
 
 /// Tenant identifier carried for tower-side admission layers.
@@ -65,7 +66,7 @@ pub enum KernelServiceError {
     /// Inner kernel evaluation failed.
     #[error("kernel: {0}")]
     Kernel(#[from] chio_kernel::KernelError),
-    /// Reserved for the P3 load-shed ticket.
+    /// Tenant or global service saturation caused load shedding.
     #[error("overloaded")]
     Overloaded,
     /// Request exceeded the configured tower timeout.
@@ -207,8 +208,10 @@ impl<S> Layer<S> for TenantConcurrencyLimitLayer {
 pub struct TenantConcurrencyLimitService<S> {
     inner: S,
     per_tenant_limit: usize,
-    tenants: Arc<Mutex<HashMap<TenantId, ConcurrencyLimit<S>>>>,
+    tenants: Arc<Mutex<HashMap<TenantId, TenantBucketService<S>>>>,
 }
+
+type TenantBucketService<S> = LoadShed<ConcurrencyLimit<S>>;
 
 impl<S> TenantConcurrencyLimitService<S>
 where
@@ -217,14 +220,16 @@ where
     fn service_for_tenant(
         &self,
         tenant_id: &TenantId,
-    ) -> Result<ConcurrencyLimit<S>, KernelServiceError> {
+    ) -> Result<TenantBucketService<S>, KernelServiceError> {
         let mut tenants = self.tenants.lock().map_err(|_| {
             KernelServiceError::Middleware("tenant concurrency limit state poisoned".to_string())
         })?;
         let service = tenants
             .entry(tenant_id.clone())
             .or_insert_with(|| {
-                ConcurrencyLimitLayer::new(self.per_tenant_limit).layer(self.inner.clone())
+                let service =
+                    ConcurrencyLimitLayer::new(self.per_tenant_limit).layer(self.inner.clone());
+                LoadShedLayer::new().layer(service)
             })
             .clone();
         Ok(service)
@@ -251,8 +256,22 @@ where
 
         Box::pin(async move {
             let mut service = service?;
-            service.ready().await?.call(req).await
+            poll_ready_once(&mut service)?;
+            service.call(req).await.map_err(normalize_tower_error)
         })
+    }
+}
+
+fn poll_ready_once<S>(service: &mut TenantBucketService<S>) -> Result<(), KernelServiceError>
+where
+    TenantBucketService<S>: Service<KernelRequest, Error = tower::BoxError>,
+{
+    let waker = std::task::Waker::noop();
+    let mut cx = Context::from_waker(waker);
+    match service.poll_ready(&mut cx) {
+        Poll::Ready(Ok(())) => Ok(()),
+        Poll::Ready(Err(error)) => Err(normalize_tower_error(error)),
+        Poll::Pending => Err(KernelServiceError::Overloaded),
     }
 }
 
@@ -284,16 +303,16 @@ where
         Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(normalize_timeout_error)
+        self.inner.poll_ready(cx).map_err(normalize_tower_error)
     }
 
     fn call(&mut self, request: Request) -> Self::Future {
         let future = self.inner.call(request);
-        Box::pin(async move { future.await.map_err(normalize_timeout_error) })
+        Box::pin(async move { future.await.map_err(normalize_tower_error) })
     }
 }
 
-fn normalize_timeout_error(error: tower::BoxError) -> KernelServiceError {
+fn normalize_tower_error(error: tower::BoxError) -> KernelServiceError {
     let error = match error.downcast::<KernelServiceError>() {
         Ok(kernel_error) => return *kernel_error,
         Err(error) => error,
@@ -303,13 +322,17 @@ fn normalize_timeout_error(error: tower::BoxError) -> KernelServiceError {
         return KernelServiceError::Timeout;
     }
 
+    if error.is::<tower::load_shed::error::Overloaded>() {
+        return KernelServiceError::Overloaded;
+    }
+
     KernelServiceError::Middleware(error.to_string())
 }
 
 /// Build the M05 P3 kernel service stack.
 ///
-/// Request flow is trace, then timeout, then per-tenant concurrency, then
-/// kernel dispatch. Later P3 tickets add load shedding and auth prechecks
+/// Request flow is trace, then timeout, then per-tenant load shedding and
+/// concurrency, then kernel dispatch. Later P3 tickets add auth prechecks
 /// around this stack.
 pub fn build_layered(
     kernel: Arc<chio_kernel::ChioKernel>,
