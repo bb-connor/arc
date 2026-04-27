@@ -206,15 +206,23 @@ impl AttestVerifier for SigstoreVerifier {
             expected_issuer: expected.certificate_oidc_issuer.clone(),
         };
 
-        // 3) Drive the async verifier on our owned runtime. Hash the
-        //    artifact as we go; the bundle Verifier verifies the digest
-        //    against the bundle's signed payload.
+        // 3) Drive the async verifier. `verify_bundle` is a synchronous
+        //    trait method, but `sigstore-rs`'s bundle verifier API is
+        //    async, so the future must be driven by *some* runtime. The
+        //    naive `self.runtime.block_on(...)` panics with "Cannot
+        //    start a runtime from within a runtime" whenever the caller
+        //    is itself running inside a tokio runtime (the typical case
+        //    for the kernel) - even when the inner runtime is a
+        //    different `Runtime` instance. Since this crate sits on a
+        //    trust boundary and explicitly forbids verification-path
+        //    panics via `#![forbid]` lints, we route around the panic
+        //    with a runtime-detection helper (cleanup-c11d; PR #56
+        //    thread r3142974715 - High Severity).
         let mut hasher = Sha256::new();
         hasher.update(artifact);
         let bundle_clone = bundle.clone();
         let verifier = self.build_bundle_verifier()?;
-        self.runtime
-            .block_on(verifier.verify_digest(hasher, bundle_clone, &issuer_policy, true))
+        run_async_bundle_verify(&self.runtime, verifier, hasher, bundle_clone, issuer_policy)
             .map_err(map_bundle_verification_error)?;
 
         // 4) Re-parse the bundle for metadata extraction (the verifier
@@ -245,6 +253,68 @@ impl AttestVerifier for SigstoreVerifier {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Drive the async `sigstore-rs` bundle verifier from a synchronous
+/// trait method without panicking when the caller is itself running
+/// inside a tokio runtime.
+///
+/// `tokio::runtime::Runtime::block_on` panics with "Cannot start a
+/// runtime from within a runtime" whenever the calling thread already
+/// has a tokio runtime context, even if the inner runtime is a
+/// different `Runtime` instance. The two safe options are
+/// `tokio::task::block_in_place` (only works on the multi-thread
+/// flavor of tokio - we cannot rely on that being the caller's
+/// runtime kind) and a fresh OS thread that owns its own runtime.
+///
+/// The strategy below picks per call:
+///
+/// - If `Handle::try_current()` succeeds the caller is inside a
+///   runtime; we move the verifier inputs onto a fresh OS thread,
+///   build a private current-thread runtime there, and join.
+/// - Otherwise we drive the future on the verifier's own embedded
+///   runtime (the no-runtime-in-context case, e.g. tests, CLI).
+///
+/// All inputs are moved by value to keep the cross-thread path
+/// borrow-free; `IssuerOnlyPolicy` is a `String` wrapper and
+/// `verifier` / `bundle` are owned.
+fn run_async_bundle_verify(
+    fallback_runtime: &tokio::runtime::Runtime,
+    verifier: AsyncBundleVerifier,
+    hasher: Sha256,
+    bundle: Bundle,
+    issuer_policy: IssuerOnlyPolicy,
+) -> sigstore::bundle::verify::VerificationResult {
+    if tokio::runtime::Handle::try_current().is_ok() {
+        // Caller is inside a tokio runtime. A fresh OS thread with
+        // its own runtime side-steps the nested-runtime panic. The
+        // join handle is consumed in-line; if the new thread panics
+        // mid-verify (e.g. allocator failure inside sigstore-rs) we
+        // surface that as `VerificationError::Other` instead of
+        // unwinding the trust-boundary caller.
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(err) => {
+                    return Err(sigstore::bundle::verify::VerificationError::Input(
+                        io::Error::other(format!("spawn helper-runtime: {err}")),
+                    ));
+                }
+            };
+            rt.block_on(verifier.verify_digest(hasher, bundle, &issuer_policy, true))
+        })
+        .join()
+        .unwrap_or_else(|_| {
+            Err(sigstore::bundle::verify::VerificationError::Input(
+                io::Error::other("verify helper thread panicked"),
+            ))
+        })
+    } else {
+        fallback_runtime.block_on(verifier.verify_digest(hasher, bundle, &issuer_policy, true))
+    }
+}
 
 /// Accept either a PEM-armored or raw-DER certificate input. The cosign
 /// CLI emits PEM by default; some pipelines double-base64-encode. We
@@ -371,22 +441,40 @@ fn read_oidc_issuer_extension(cert: &Certificate) -> Result<String, AttestError>
     for ext in extensions.iter() {
         if ext.extn_id == OIDC_ISSUER_OID {
             let bytes = ext.extn_value.as_bytes();
-            // The issuer extension is a UTF8 String per Fulcio docs;
-            // some issuers leave it as raw UTF-8 and others wrap it in
-            // a DER UTF8 string. Accept both.
-            if let Ok(direct) = std::str::from_utf8(bytes) {
-                if !direct.is_empty() && direct.is_ascii() {
-                    return Ok(direct.to_owned());
-                }
-            }
-            // Fall back to DER UTF8String parse.
-            if let Ok(parsed) = x509_cert::der::asn1::Utf8StringRef::from_der(bytes) {
-                return Ok(parsed.as_str().to_owned());
-            }
+            return decode_oidc_issuer_value(bytes);
         }
     }
 
     Err(AttestError::IssuerMismatch)
+}
+
+/// Decode the bytes of the Fulcio OIDC issuer X.509 extension. Real-world
+/// Fulcio leaves wrap the issuer as a DER UTF8String (tag 0x0C); some
+/// older / hand-rolled emitters embed the raw UTF-8 directly. The DER
+/// path is tried FIRST so that an extension carrying the DER prefix
+/// (`0x0C <len> ...`) is not silently misread as raw UTF-8: `0x0C` is a
+/// valid ASCII byte (form feed), so a naive `str::from_utf8` +
+/// `is_ascii()` filter would return the bytes including the tag/length
+/// prefix and produce a malformed issuer that fails string equality
+/// downstream (cleanup-c11d; PR #56 review thread r3142968181 - P1).
+fn decode_oidc_issuer_value(bytes: &[u8]) -> Result<String, AttestError> {
+    // 1) DER UTF8String first.
+    if let Ok(parsed) = x509_cert::der::asn1::Utf8StringRef::from_der(bytes) {
+        return Ok(parsed.as_str().to_owned());
+    }
+
+    // 2) Fall back to raw UTF-8. Reject empty / non-printable strings;
+    //    a real OIDC issuer is a URL, never empty and never starts with
+    //    a control byte.
+    if let Ok(direct) = std::str::from_utf8(bytes) {
+        if !direct.is_empty() && direct.chars().all(|c| !c.is_control()) {
+            return Ok(direct.to_owned());
+        }
+    }
+
+    Err(AttestError::Malformed(
+        "OIDC issuer extension is neither DER UTF8String nor printable raw UTF-8".into(),
+    ))
 }
 
 fn certificate_validity(cert: &Certificate) -> Result<(SystemTime, SystemTime), AttestError> {
@@ -509,17 +597,16 @@ impl VerificationPolicy for IssuerOnlyPolicy {
         for ext in extensions.iter() {
             if ext.extn_id == OIDC_ISSUER_OID {
                 let bytes = ext.extn_value.as_bytes();
-                let parsed: Option<String> = std::str::from_utf8(bytes)
-                    .ok()
-                    .filter(|s| !s.is_empty() && s.is_ascii())
-                    .map(|s| s.to_owned())
-                    .or_else(|| {
-                        x509_cert::der::asn1::Utf8StringRef::from_der(bytes)
-                            .ok()
-                            .map(|s| s.as_str().to_owned())
-                    });
-                let Some(actual) = parsed else {
-                    return Err(PolicyError::ExtensionNotFound);
+                // Use the same DER-first decoder as
+                // `read_oidc_issuer_extension`: trying raw UTF-8 first
+                // silently mis-reads DER UTF8String wrappers because
+                // the tag byte (0x0C) is ASCII (cleanup-c11d; PR #56
+                // thread r3142968181). Decoder failure surfaces as
+                // ExtensionNotFound to match the upstream policy
+                // contract.
+                let actual = match decode_oidc_issuer_value(bytes) {
+                    Ok(s) => s,
+                    Err(_) => return Err(PolicyError::ExtensionNotFound),
                 };
                 // Plain `==` on a public OIDC issuer URL: no secret-material timing channel.
                 if actual == self.expected_issuer {

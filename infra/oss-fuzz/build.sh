@@ -38,7 +38,15 @@ TARGETS=(
 
 for target in "${TARGETS[@]}"; do
     cargo +nightly fuzz build "$target" --release --sanitizer "$SANITIZER"
-    cp "../target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
+    # Binaries land under the fuzz workspace's own `target/` tree
+    # (the script `cd`'d into `$SRC/arc/fuzz` above, which is itself
+    # a standalone Cargo workspace with its own `[workspace]`
+    # stanza). The previous `../target/...` prefix pointed at the
+    # parent project's target dir, where no fuzz binaries exist, so
+    # `cp` failed on the first target and the build script exited
+    # before exporting any fuzzers (cleanup-c11d; PR #106 review
+    # threads r3144168547 / r3144176024 - High Severity).
+    cp "target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
 
     # Pack the per-target seed corpus when one exists in-tree.
     if [ -d "corpus/$target" ] && [ -n "$(ls -A "corpus/$target" 2>/dev/null)" ]; then

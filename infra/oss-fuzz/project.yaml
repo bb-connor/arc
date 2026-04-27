@@ -8,8 +8,14 @@ auto_ccs:
   # here keeps the file shape stable when the second contact lands.
 main_repo: "https://github.com/bb-connor/arc"
 sanitizers:
+  # OSS-Fuzz Rust integration only supports `address` for Rust
+  # projects; `cargo fuzz build --sanitizer undefined` fails with an
+  # unrecognised value (cargo-fuzz accepts address/leak/memory/thread
+  # but NOT undefined / UBSan). Listing `undefined` here would let
+  # OSS-Fuzz launch a build with `$SANITIZER=undefined` that always
+  # fails, breaking half the fuzzing configurations (cleanup-c11d;
+  # PR #106 review thread r3144176028 - High Severity).
   - address
-  - undefined
 architectures:
   - x86_64
 fuzzing_engines:
