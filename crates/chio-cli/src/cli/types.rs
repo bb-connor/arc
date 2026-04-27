@@ -216,6 +216,56 @@ enum Commands {
         #[command(subcommand)]
         command: ConformanceCommands,
     },
+
+    /// Re-evaluate a captured receipt log against the current build.
+    ///
+    /// Reads a directory of signed receipts (or an NDJSON tee stream),
+    /// re-verifies every signature, recomputes the Merkle root incrementally,
+    /// and reports the first divergence by byte offset and JSON pointer.
+    /// Composes with `chio tee` output (see milestone M10).
+    ///
+    /// EXIT CODES:
+    ///   0  All receipts (or tee frames) verify and root matches expectation.
+    ///   10 Verdict drift: a receipt's allow/deny decision differs from the
+    ///      current build for the same input.
+    ///   20 Signature mismatch: Ed25519 verification failed on at least one
+    ///      receipt or frame `tenant_sig`.
+    ///   30 Parse error: malformed JSON or missing required field.
+    ///   40 Schema mismatch: unsupported `schema_version` or schema validation
+    ///      failed against the canonical-JSON schema set.
+    ///   50 Redaction mismatch: `redaction_pass_id` unavailable, or rerunning
+    ///      the redaction manifest produces a different result.
+    Replay(ReplayArgs),
+}
+
+/// Arguments for the `chio replay` subcommand.
+///
+/// The handler logic for these arguments is implemented incrementally in
+/// tickets M04.P4.T2 through M04.P4.T7. This T1 ticket only wires the
+/// clap parser surface so downstream tickets have a stable seam.
+#[derive(clap::Args)]
+pub struct ReplayArgs {
+    /// Path to a receipt-log directory or NDJSON stream.
+    pub log: PathBuf,
+
+    /// Treat `log` as an M10 tee NDJSON stream. When omitted, the reader
+    /// auto-detects the input shape (directory vs. NDJSON file).
+    #[arg(long)]
+    pub from_tee: bool,
+
+    /// Assert the recomputed Merkle root matches this hex string.
+    #[arg(long, value_name = "HEX")]
+    pub expect_root: Option<String>,
+
+    /// Emit a structured JSON report on stdout (instead of human text).
+    #[arg(long)]
+    pub json: bool,
+
+    /// (Restricted) Convert `log` into a goldens directory. Requires
+    /// `CHIO_BLESS=1`, `BLESS_REASON`, a feature branch, and an audit log
+    /// entry. The bless gate is fail-closed; see milestone M04 phase 5.
+    #[arg(long)]
+    pub bless: bool,
 }
 
 /// Conformance harness commands.

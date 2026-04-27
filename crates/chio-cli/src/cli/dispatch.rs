@@ -2257,6 +2257,7 @@ fn main() {
                 lockfile.as_deref(),
             ),
         },
+        Commands::Replay(args) => cmd_replay(&args),
     };
 
     if let Err(e) = result {

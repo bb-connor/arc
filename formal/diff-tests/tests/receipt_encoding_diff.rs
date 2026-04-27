@@ -445,9 +445,7 @@ sys.stdout.write(receipt_body_canonical_json(receipt))
             // problems, not "skip" conditions. Fail-fast with a descriptive
             // message so the live differential cannot silently degrade to a
             // pass when the toolchain is broken.
-            panic!(
-                "live python differential: failed to spawn python3 subprocess: {err}"
-            );
+            panic!("live python differential: failed to spawn python3 subprocess: {err}");
         }
     };
     if !output.status.success() {
@@ -558,17 +556,13 @@ process.stdin.on("end", () => {{
             // or the kernel rejected the invocation). That is a real CI
             // problem, not a skip condition; fail-fast so the live
             // differential cannot silently degrade to a pass.
-            panic!(
-                "live typescript differential: failed to spawn node subprocess: {err}"
-            );
+            panic!("live typescript differential: failed to spawn node subprocess: {err}");
         }
     };
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if output.status.code() == Some(2) {
-            eprintln!(
-                "skipping live typescript differential; chio-ts not loadable: {stderr}"
-            );
+            eprintln!("skipping live typescript differential; chio-ts not loadable: {stderr}");
             return;
         }
         panic!(
