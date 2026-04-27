@@ -81,4 +81,34 @@ describe("replay anchored-root tuples", () => {
       expectedCount: EXPECTED_FIXTURE_COUNT,
     })).rejects.toThrow("failed to stat replay fixture root");
   });
+
+  it("fails closed when a receipt leaf byte is tampered", async () => {
+    const outputs = await runReplayScenarios({
+      fixturesRoot: FIXTURES_ROOT,
+      expectedCount: EXPECTED_FIXTURE_COUNT,
+    });
+    const output = outputs.find((candidate) => candidate.scenario.name === CANARY_RECEIPT_ID);
+    expect(output).toBeDefined();
+    if (output == null) {
+      throw new Error(`missing replay output for ${CANARY_RECEIPT_ID}`);
+    }
+
+    const tamperedLeafBytes = new Uint8Array(output.receiptBytes);
+    tamperedLeafBytes[0] ^= 0x01;
+    const changedBytes = tamperedLeafBytes.reduce(
+      (count, byte, index) => count + (byte === output.receiptBytes[index] ? 0 : 1),
+      0,
+    );
+    expect(changedBytes).toBe(1);
+
+    const tamperedLeafHash = leafHash(tamperedLeafBytes);
+    expect(tamperedLeafHash).not.toBe(output.anchoredRoot.leaf_hash);
+    expect(
+      verifyInclusionProof(
+        tamperedLeafHash,
+        output.anchoredRoot.inclusion_proof,
+        output.anchoredRoot.root,
+      ),
+    ).toBe(false);
+  });
 });

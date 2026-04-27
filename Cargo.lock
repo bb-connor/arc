@@ -2540,6 +2540,7 @@ dependencies = [
 name = "chio-formal-diff-tests"
 version = "0.1.0"
 dependencies = [
+ "chio-anchor",
  "chio-core-types",
  "chio-kernel-core",
  "getrandom 0.3.4",
