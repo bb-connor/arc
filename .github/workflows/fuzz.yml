@@ -90,8 +90,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Reuse the cflite budget guard; it counts every fuzz workflow
-          # (cflite_pr, cflite_batch, fuzz) against the 1,800-min cap.
+          # Reuse the cflite budget guard; its WORKFLOWS array enumerates
+          # every fuzz workflow (cflite_pr.yml, cflite_batch.yml, fuzz.yml)
+          # against the 1,800-min/30-day cap.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
 
   fuzz-scheduled:
@@ -130,27 +131,44 @@ jobs:
           # matrix).
           - receipt_log_replay
     steps:
-      - name: Skip when forced target does not match
-        if: inputs.target != '' && inputs.target != matrix.target
+      # Cleanup C6: GHA `exit 0` only marks the step successful; it does
+      # not skip subsequent steps in the same job. Set a `selected` step
+      # output that every later step gates on so a `workflow_dispatch`
+      # with `inputs.target` set short-circuits all the non-matching
+      # matrix entries instead of running the full toolchain-install
+      # plus fuzz-run pipeline 13 times.
+      - name: Resolve forced-target selection
+        id: select
         run: |
-          echo "skipping ${{ matrix.target }} (forced=${{ inputs.target }})"
-          exit 0
+          set -euo pipefail
+          forced='${{ inputs.target }}'
+          if [[ -n "${forced}" && "${forced}" != "${{ matrix.target }}" ]]; then
+            echo "skipping ${{ matrix.target }} (forced=${forced})"
+            echo "selected=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "selected=true" >> "${GITHUB_OUTPUT}"
+          fi
 
-      - uses: actions/checkout@v4
+      - name: Checkout
+        if: steps.select.outputs.selected == 'true'
+        uses: actions/checkout@v4
 
       - name: Install nightly Rust toolchain
+        if: steps.select.outputs.selected == 'true'
         run: |
           set -euo pipefail
           rustup toolchain install nightly --profile minimal --component rust-src
           rustup default nightly
 
       - name: Install cargo-fuzz
+        if: steps.select.outputs.selected == 'true'
         run: |
           set -euo pipefail
           cargo install cargo-fuzz --locked || cargo install cargo-fuzz
 
       - name: Confirm fuzz target binary exists
         id: confirm
+        if: steps.select.outputs.selected == 'true'
         run: |
           set -euo pipefail
           if grep -qE "^name = \"${{ matrix.target }}\"" fuzz/Cargo.toml; then
@@ -161,7 +179,7 @@ jobs:
           fi
 
       - name: Build fuzz target with ASan
-        if: steps.confirm.outputs.exists == 'true'
+        if: steps.select.outputs.selected == 'true' && steps.confirm.outputs.exists == 'true'
         env:
           RUSTFLAGS: "-Z sanitizer=address"
         run: |
@@ -170,7 +188,7 @@ jobs:
           cargo +nightly fuzz build --sanitizer address ${{ matrix.target }}
 
       - name: Run fuzz target (ASan, max_total_time = ${{ env.CHIO_FUZZ_MAX_TOTAL_TIME }}s)
-        if: steps.confirm.outputs.exists == 'true'
+        if: steps.select.outputs.selected == 'true' && steps.confirm.outputs.exists == 'true'
         run: |
           set -euo pipefail
           cd fuzz
@@ -189,7 +207,7 @@ jobs:
             -rss_limit_mb=2048
 
       - name: Upload crash artifacts
-        if: failure() && steps.confirm.outputs.exists == 'true'
+        if: failure() && steps.select.outputs.selected == 'true' && steps.confirm.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}

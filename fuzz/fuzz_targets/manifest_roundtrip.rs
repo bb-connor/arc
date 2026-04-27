@@ -7,10 +7,20 @@
 //! `ToolManifest` deserializes with `serde(deny_unknown_fields)` across
 //! every nested struct, so any structural drift between the wire format
 //! and the Rust types surfaces as `Err(serde_json::Error)`. The
-//! roundtrip arm asserts that once a manifest is decoded, its
-//! re-encoded canonical bytes parse back into an equal-shape value
-//! (via `serde_json::Value`-level structural equality, not Rust-level
-//! `PartialEq`, since `ToolManifest` does not derive `PartialEq`).
+//! roundtrip arm asserts a BYTE-level invariant on the second-pass
+//! re-serialization: once a manifest is decoded and re-encoded, the
+//! `decode -> encode` cycle on those bytes MUST emit the exact same
+//! bytes a second time. That catches nondeterministic serialization
+//! (object-key reorderings, whitespace drift, optional-field round-trip
+//! anomalies) that a `serde_json::Value`-level structural compare
+//! would silently mask.
+//!
+//! Cleanup C6: previously the assertion compared two reparsed
+//! `serde_json::Value`s, which forgives wire-format drift as long as
+//! the abstract object-set is equal. The new assertion is on raw
+//! bytes; structural equality is kept as a pre-check so a benign
+//! `serde_json` fmt drift surfaces with a clear panic message rather
+//! than a raw byte diff.
 //!
 //! The structure-aware canonical-JSON mutator is wired in via
 //! [`libfuzzer_sys::fuzz_mutator!`].
@@ -54,9 +64,25 @@ fuzz_target!(|data: &[u8]| {
         Err(_) => return,
     };
 
-    // Structural equality: a successful decode must roundtrip to an
-    // equal canonical-JSON value. Inequality is a fuzz finding.
-    assert_eq!(first_value, second_value, "manifest roundtrip drift");
+    // Structural equality is a pre-check: catches the easy class of
+    // fuzz finding (a re-encode that drops or rewires fields) with a
+    // diagnostic that names the offending shape.
+    assert_eq!(
+        first_value, second_value,
+        "manifest roundtrip drift (structural)"
+    );
+
+    // Byte-level equality is the actual stated invariant: two
+    // back-to-back `to_vec` passes over the same `ToolManifest` must
+    // emit byte-identical output. Drift here is the canonical-shape
+    // bug this target was authored to catch (object-key reordering,
+    // whitespace drift, optional-field flip-flop). We compare the raw
+    // byte strings, not their parses, so a re-encode that produces
+    // structurally-equal-but-not-byte-equal output FAILS this assert.
+    assert_eq!(
+        reserialized, second_serialized,
+        "manifest roundtrip drift (byte-level): repeated to_vec emitted different bytes"
+    );
 });
 
 fuzz_mutator!(|data: &mut [u8], size: usize, max_size: usize, seed: u32| {
