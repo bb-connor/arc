@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex, MutexGuard};
 use std::thread;
 
 use chio_core::capability::{
@@ -38,7 +38,7 @@ use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
 struct SqliteReceiptStore {
-    connection: Connection,
+    connection: Mutex<Connection>,
 }
 
 impl SqliteReceiptStore {
@@ -100,14 +100,22 @@ impl SqliteReceiptStore {
                 );
                 "#,
         )?;
-        Ok(Self { connection })
+        Ok(Self {
+            connection: Mutex::new(connection),
+        })
+    }
+
+    fn connection(&self) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
+        self.connection.lock().map_err(|_| {
+            ReceiptStoreError::Conflict("sqlite receipt store lock poisoned".to_string())
+        })
     }
 
     fn load_checkpoint_by_seq(
         &self,
         checkpoint_seq: u64,
     ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
-        self.connection
+        self.connection()?
             .query_row(
                 "SELECT raw_json FROM kernel_checkpoints WHERE checkpoint_seq = ?1",
                 params![checkpoint_seq as i64],
@@ -141,7 +149,7 @@ impl SqliteReceiptStore {
 
         while let Some(current_id) = current.take() {
             let snapshot = self
-                .connection
+                .connection()?
                 .query_row(
                     r#"
                         SELECT
@@ -175,7 +183,7 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
-        self.connection
+        self.connection()?
             .query_row(
                 r#"
                     SELECT
@@ -209,11 +217,11 @@ impl SqliteReceiptStore {
     }
 
     fn record_credit_bond(
-        &mut self,
+        &self,
         bond: &SignedCreditBond,
         lifecycle_state: CreditBondLifecycleState,
     ) -> Result<(), ReceiptStoreError> {
-        self.connection.execute(
+        self.connection()?.execute(
             "INSERT OR REPLACE INTO credit_bonds (bond_id, lifecycle_state, expires_at, raw_json)
                  VALUES (?1, ?2, ?3, ?4)",
             params![
@@ -234,7 +242,7 @@ impl SqliteReceiptStore {
 }
 
 impl ReceiptStore for SqliteReceiptStore {
-    fn append_chio_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt)?;
         Ok(())
     }
@@ -244,11 +252,12 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn append_chio_receipt_returning_seq(
-        &mut self,
+        &self,
         receipt: &ChioReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
-        let rows = self.connection.execute(
+        let connection = self.connection()?;
+        let rows = connection.execute(
             r#"
                 INSERT INTO chio_tool_receipts (
                     receipt_id,
@@ -265,15 +274,15 @@ impl ReceiptStore for SqliteReceiptStore {
                 raw_json,
             ],
         )?;
-        Ok((rows > 0).then(|| self.connection.last_insert_rowid().max(0) as u64))
+        Ok((rows > 0).then(|| connection.last_insert_rowid().max(0) as u64))
     }
 
     fn append_child_receipt(
-        &mut self,
+        &self,
         receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
                 INSERT INTO chio_child_receipts (
                     receipt_id,
@@ -314,7 +323,8 @@ impl ReceiptStore for SqliteReceiptStore {
         start_seq: u64,
         end_seq: u64,
     ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
                 SELECT seq, raw_json
                 FROM chio_tool_receipts
@@ -336,9 +346,9 @@ impl ReceiptStore for SqliteReceiptStore {
         .collect()
     }
 
-    fn store_checkpoint(&mut self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
+    fn store_checkpoint(&self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
         let raw_json = serde_json::to_string(checkpoint)?;
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
                 INSERT INTO kernel_checkpoints (checkpoint_seq, raw_json)
                 VALUES (?1, ?2)
@@ -353,7 +363,7 @@ impl ReceiptStore for SqliteReceiptStore {
         &self,
         bond_id: &str,
     ) -> Result<Option<CreditBondRow>, ReceiptStoreError> {
-        self.connection
+        self.connection()?
             .query_row(
                 "SELECT raw_json, lifecycle_state FROM credit_bonds WHERE bond_id = ?1",
                 params![bond_id],
@@ -384,7 +394,7 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn record_capability_snapshot(
-        &mut self,
+        &self,
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
@@ -392,7 +402,7 @@ impl ReceiptStore for SqliteReceiptStore {
         let subject_key = token.subject.to_hex();
         let issuer_key = token.issuer.to_hex();
         let delegation_depth = if let Some(parent_id) = parent_capability_id {
-            self.connection
+            self.connection()?
                 .query_row(
                     "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
                     params![parent_id],
@@ -405,7 +415,7 @@ impl ReceiptStore for SqliteReceiptStore {
             0
         };
 
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
                 INSERT OR REPLACE INTO capability_lineage (
                     capability_id,
@@ -499,7 +509,7 @@ impl RevocationStore for SqliteRevocationStore {
         Ok(exists != 0)
     }
 
-    fn revoke(&mut self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+    fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
         let connection = self.connection()?;
         let revoked_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1241,12 +1251,12 @@ impl ResourceProvider for DocsResourceProvider {
 struct AppendOnlyReceiptStore;
 
 impl ReceiptStore for AppendOnlyReceiptStore {
-    fn append_chio_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
     fn append_child_receipt(
-        &mut self,
+        &self,
         _receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
         Ok(())
@@ -1257,19 +1267,19 @@ impl ReceiptStore for AppendOnlyReceiptStore {
 struct FailingSessionAnchorReceiptStore;
 
 impl ReceiptStore for FailingSessionAnchorReceiptStore {
-    fn append_chio_receipt(&mut self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
     fn append_child_receipt(
-        &mut self,
+        &self,
         _receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 
     fn record_session_anchor(
-        &mut self,
+        &self,
         _session_id: &str,
         _anchor_id: &str,
         _auth_context_fingerprint: &str,
@@ -5436,9 +5446,8 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
     assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -5486,9 +5495,8 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
     assert_eq!(financial["cost_charged"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -5544,9 +5552,8 @@ fn monetary_allow_receipt_contains_financial_metadata() {
     assert_eq!(attribution["grant_index"].as_u64(), Some(0));
 
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -5588,9 +5595,8 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
     let authorize_event_id = format!("{hold_id}:authorize");
     let reconcile_event_id = format!("{hold_id}:reconcile");
     let events = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .list_mutation_events(10, Some(&cap.id), Some(0))
         .unwrap();
 
@@ -5804,9 +5810,8 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
 
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -6931,9 +6936,8 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -7741,9 +7745,8 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
     assert_eq!(financial["settlement_status"], "not_applicable");
 
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -8043,9 +8046,8 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
     assert_eq!(governed["intent_id"], intent.id);
 
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -8274,9 +8276,8 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
     assert_eq!(governed["commerce"]["seller"], "wrong-merchant.example");
 
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
@@ -8397,9 +8398,8 @@ fn monetary_tool_server_error_releases_precharged_budget() {
 
     assert_eq!(response.verdict, Verdict::Deny);
     let usage = kernel
+        
         .budget_store
-        .lock()
-        .unwrap()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();

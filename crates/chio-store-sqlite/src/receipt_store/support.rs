@@ -4345,12 +4345,12 @@ impl SqliteReceiptStore {
 }
 
 impl ReceiptStore for SqliteReceiptStore {
-    fn append_chio_receipt(&mut self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
     fn append_chio_receipt_returning_seq(
-        &mut self,
+        &self,
         receipt: &ChioReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         let connection = self.connection()?;
@@ -4372,7 +4372,7 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::receipts_canonical_bytes_range(self, start_seq, end_seq)
     }
 
-    fn store_checkpoint(&mut self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
+    fn store_checkpoint(&self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
 
@@ -4466,7 +4466,7 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn record_capability_snapshot(
-        &mut self,
+        &self,
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
@@ -4504,7 +4504,7 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn record_session_anchor(
-        &mut self,
+        &self,
         session_id: &str,
         anchor_id: &str,
         auth_context_fingerprint: &str,
@@ -4523,7 +4523,7 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn record_request_lineage(
-        &mut self,
+        &self,
         session_id: &str,
         request_id: &str,
         parent_request_id: Option<&str>,
@@ -4544,7 +4544,7 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn record_receipt_lineage_statement(
-        &mut self,
+        &self,
         child_receipt_id: &str,
         request_id: Option<&str>,
         session_id: Option<&str>,
@@ -4582,7 +4582,7 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::list_receipt_lineage_statement_links(self, receipt_id)
     }
 
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+    fn as_any_mut(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }
 
@@ -4604,10 +4604,7 @@ impl ReceiptStore for SqliteReceiptStore {
         .map(|report| report.bonds.into_iter().next())
     }
 
-    fn append_child_receipt(
-        &mut self,
-        receipt: &ChildRequestReceipt,
-    ) -> Result<(), ReceiptStoreError> {
+    fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
         verify_latest_checkpoint_integrity(&connection)?;
