@@ -1916,10 +1916,36 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_with_session_roots(request, None, None)
+        // M05.P1.T1: route the public async entrypoint through the
+        // ToolEvaluator trait so subsequent M05 tickets (T3 receipt-signing,
+        // T4 dispatch) can swap in async-native step bodies without touching
+        // this call site again. T1 is mechanical: the default
+        // BlockingToolEvaluator delegates straight back to the existing sync
+        // pipeline below, so semantics are byte-identical.
+        use crate::kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
+        BlockingToolEvaluator.evaluate(self, request).await
     }
 
     pub fn evaluate_tool_call_blocking(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_with_session_roots(request, None, None)
+    }
+
+    /// Crate-private sync entrypoint invoked by the
+    /// [`crate::kernel::evaluator::ToolEvaluator`] default
+    /// implementation. Wraps the long-form
+    /// `evaluate_tool_call_sync_with_session_roots` so the trait body does
+    /// not need to plumb the `session_filesystem_roots` /
+    /// `extra_metadata` parameters; both default to `None` on this path,
+    /// matching the previous direct delegation from
+    /// `evaluate_tool_call`.
+    ///
+    /// T2 will rename the long-form helper to
+    /// `evaluate_tool_call_sync_inner` and mark it `#[doc(hidden)]`; this
+    /// shim exists to keep T1 strictly mechanical.
+    pub(crate) fn evaluate_tool_call_sync(
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -5790,6 +5816,8 @@ pub(crate) fn current_unix_timestamp() -> u64 {
         .unwrap_or(0)
 }
 
+#[path = "evaluator.rs"]
+pub mod evaluator;
 #[allow(dead_code)]
 #[path = "responses.rs"]
 mod responses;

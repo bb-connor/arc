@@ -396,3 +396,8 @@ pub use kernel::{
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
 };
+
+// M05.P1.T1: extracted ToolEvaluator trait. See
+// `.planning/trajectory/05-async-kernel-real.md` Phase 1 for the
+// migration sequence (T1 mechanical extraction; T3+ async-native bodies).
+pub use kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
