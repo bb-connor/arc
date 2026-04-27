@@ -36,6 +36,7 @@ pub mod memory_provenance;
 pub mod operator_report;
 pub mod payment;
 pub mod post_invocation;
+pub mod provider_verdict;
 pub mod receipt_analytics;
 pub mod receipt_query;
 pub mod receipt_store;
@@ -357,6 +358,10 @@ pub use payment::{
 pub use post_invocation::{
     PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationPipeline,
     PostInvocationVerdict,
+};
+pub use provider_verdict::{
+    build_tool_call_request, canonical_invocation_bytes, verdict_result_from_response,
+    ProviderVerdictError, FABRIC_SHIM_PROVIDER_LANES,
 };
 pub use receipt_analytics::{
     AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,
