@@ -1,0 +1,44 @@
+name: Provider conformance
+
+on:
+  pull_request:
+    branches:
+      - project/roadmap-04-25-2026
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/chio-provider-conformance/**
+      - crates/chio-openai/**
+      - crates/chio-tool-call-fabric/**
+      - .github/workflows/provider-conformance.yml
+  push:
+    branches:
+      - project/roadmap-04-25-2026
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/chio-provider-conformance/**
+      - crates/chio-openai/**
+      - crates/chio-tool-call-fabric/**
+      - .github/workflows/provider-conformance.yml
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  openai-fixtures:
+    name: OpenAI provider replay fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Replay OpenAI provider fixtures
+        run: cargo test -p chio-provider-conformance --features fixtures-openai

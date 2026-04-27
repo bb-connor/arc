@@ -36,6 +36,7 @@ members = [
     "crates/chio-openai",
     "crates/chio-openapi",
     "crates/chio-openapi-mcp-bridge",
+    "crates/chio-provider-conformance",
     "crates/chio-tool-call-fabric",
     "crates/chio-tower",
     #

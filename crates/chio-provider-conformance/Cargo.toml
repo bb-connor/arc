@@ -1,0 +1,27 @@
+[package]
+name = "chio-provider-conformance"
+description = "Provider replay harness for Chio native adapter conformance fixtures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+chio-openai = { package = "chio-openai-adapter", path = "../chio-openai", features = ["provider-adapter"], optional = true }
+chio-tool-call-fabric = { path = "../chio-tool-call-fabric" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[features]
+default = []
+fixtures-openai = ["dep:chio-openai"]
+fixtures-anthropic = []
+fixtures-bedrock = []
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
