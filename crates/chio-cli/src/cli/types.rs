@@ -500,6 +500,22 @@ enum GuardCommands {
         allow_http_registry: Vec<String>,
     },
 
+    /// Pull a digest-pinned guard OCI artifact into the local content-addressed cache.
+    Pull {
+        /// Digest-pinned OCI source, for example oci://ghcr.io/chio/tool-gate@sha256:<digest>.
+        #[arg(long = "ref")]
+        reference: String,
+        /// Registry username for HTTP basic auth.
+        #[arg(long)]
+        username: Option<String>,
+        /// Registry password or token for HTTP basic auth.
+        #[arg(long, requires = "username")]
+        password: Option<String>,
+        /// Registry host allowed to use HTTP instead of HTTPS.
+        #[arg(long = "allow-http-registry")]
+        allow_http_registry: Vec<String>,
+    },
+
     /// Install a .arcguard archive to the guard directory.
     Install {
         /// Path to the .arcguard archive file.

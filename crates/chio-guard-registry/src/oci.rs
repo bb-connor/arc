@@ -2,6 +2,7 @@
 
 use std::convert::TryFrom;
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use oci_distribution::client::{ClientConfig, ClientProtocol, Config, ImageData, ImageLayer};
@@ -102,6 +103,31 @@ pub enum GuardRegistryError {
     /// The artifact config could not be serialized.
     #[error("failed to serialize guard artifact config: {0}")]
     ConfigSerialize(#[from] serde_json::Error),
+
+    /// No cache root could be derived from XDG_CACHE_HOME or HOME.
+    #[error("could not derive Chio guard cache root from XDG_CACHE_HOME or HOME")]
+    CacheRootUnavailable,
+
+    /// A cache filesystem operation failed.
+    #[error("failed to {operation} guard cache path {path}: {source}")]
+    CacheIo {
+        /// Filesystem operation being attempted.
+        operation: &'static str,
+        /// Cache path involved in the operation.
+        path: PathBuf,
+        /// Underlying I/O error.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// The registry returned a manifest digest that did not match the pinned digest.
+    #[error("guard OCI manifest digest mismatch: expected {expected}, got {actual}")]
+    ManifestDigestMismatch {
+        /// Digest pinned in the pull reference.
+        expected: String,
+        /// Digest returned by the registry.
+        actual: String,
+    },
 }
 
 /// A validated `sha256:<hex>` digest.
@@ -188,15 +214,17 @@ impl FromStr for GuardOciRef {
             return Err(GuardRegistryError::MissingRegistry);
         }
 
+        let digest = match without_scheme.rsplit_once('@') {
+            Some((_name, digest)) => Some(digest.parse::<Sha256Digest>()?),
+            None => None,
+        };
+        let has_explicit_tag = has_explicit_tag(without_scheme);
         let reference = without_scheme.parse::<Reference>()?;
-        if reference.tag().is_some() {
+        if has_explicit_tag && reference.tag().is_some() {
             return Err(GuardRegistryError::TaggedDigestReference);
         }
 
-        let digest = reference
-            .digest()
-            .ok_or(GuardRegistryError::MissingDigest)?
-            .parse::<Sha256Digest>()?;
+        let digest = digest.ok_or(GuardRegistryError::MissingDigest)?;
 
         Ok(Self { reference, digest })
     }
@@ -208,6 +236,14 @@ pub(crate) fn has_explicit_registry(reference: &str) -> bool {
     };
 
     first_component == "localhost" || first_component.contains('.') || first_component.contains(':')
+}
+
+fn has_explicit_tag(reference: &str) -> bool {
+    let last_component = reference.rsplit('/').next().unwrap_or(reference);
+    let name = last_component
+        .split_once('@')
+        .map_or(last_component, |(name, _digest)| name);
+    name.contains(':')
 }
 
 /// Concrete credentials supported by this scaffold.
