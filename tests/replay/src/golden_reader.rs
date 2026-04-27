@@ -40,20 +40,9 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-/// Length, in bytes, of a Merkle root hash.
-const ROOT_LEN: usize = 32;
-
-/// Length, in characters, of a 32-byte root encoded as lowercase hex.
-const ROOT_HEX_LEN: usize = ROOT_LEN * 2;
-
-/// Filename for the per-scenario NDJSON receipt stream.
-const RECEIPTS_FILENAME: &str = "receipts.ndjson";
-
-/// Filename for the per-scenario canonical-JSON checkpoint.
-const CHECKPOINT_FILENAME: &str = "checkpoint.json";
-
-/// Filename for the per-scenario raw-hex Merkle root.
-const ROOT_FILENAME: &str = "root.hex";
+use crate::golden_format::{
+    CHECKPOINT_FILENAME, RECEIPTS_FILENAME, ROOT_FILENAME, ROOT_HEX_LEN, ROOT_LEN,
+};
 
 /// Errors produced while loading a goldens directory.
 #[derive(Debug, Error)]
@@ -101,8 +90,10 @@ pub enum GoldenReaderError {
     #[error("root.hex failed to decode as 32 bytes: {0}")]
     RootHexDecode(#[from] hex::FromHexError),
 
-    /// `receipts.ndjson` did not end with a `0x0a` (LF) terminator.
-    /// The writer always terminates the final line.
+    /// `receipts.ndjson` did not end with exactly one `0x0a` (LF)
+    /// terminator. The writer always terminates the final line with
+    /// a single LF; an empty file or a file ending with a blank
+    /// line (`\n\n`) is corruption.
     #[error("receipts.ndjson must end with a single LF terminator")]
     ReceiptsMissingTerminator,
 
@@ -193,11 +184,19 @@ impl GoldenLoaded {
         let mut root_bytes = [0u8; ROOT_LEN];
         root_bytes.copy_from_slice(&root_bytes_vec);
 
-        // receipts.ndjson contract: terminator byte must be LF.
-        // Empty receipts files would also fail this check, which
-        // matches the writer's `EmptyReceipts` rejection.
+        // receipts.ndjson contract: file must end with EXACTLY one
+        // `0x0a` (LF). An empty file fails the check (writer's
+        // `EmptyReceipts` invariant), as does a file that ends with a
+        // blank line `...\n\n` (corruption). The penultimate-byte
+        // check guards against the latter so the reader fails
+        // closed when an editor or buggy concatenation appends a
+        // stray LF after the final receipt.
         match receipts.last() {
-            Some(&b'\n') => {}
+            Some(&b'\n') => {
+                if receipts.len() >= 2 && receipts[receipts.len() - 2] == b'\n' {
+                    return Err(GoldenReaderError::ReceiptsMissingTerminator);
+                }
+            }
             _ => return Err(GoldenReaderError::ReceiptsMissingTerminator),
         }
 
@@ -360,6 +359,26 @@ mod tests {
             }
             other => panic!("expected RootHexNotLowercase, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn load_rejects_receipts_with_double_lf_terminator() {
+        // The writer terminates each line with a single LF and never
+        // emits a trailing blank line. A file ending with `...\n\n`
+        // is corruption; the reader must fail-closed instead of
+        // silently accepting the malformed golden.
+        let tmp = make_dir();
+        let dir = tmp.path().join("scenario_receipts_double_lf");
+        write_scenario(&dir, [4u8; 32]);
+
+        let receipts_path = dir.join(RECEIPTS_FILENAME);
+        let mut bytes = fs::read(&receipts_path).unwrap();
+        assert_eq!(*bytes.last().unwrap(), b'\n');
+        bytes.push(b'\n'); // produces a trailing blank line.
+        fs::write(&receipts_path, &bytes).unwrap();
+
+        let err = GoldenLoaded::load(&dir).expect_err("load must fail with trailing blank line");
+        assert!(matches!(err, GoldenReaderError::ReceiptsMissingTerminator));
     }
 
     #[test]

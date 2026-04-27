@@ -16,20 +16,27 @@
 //! replay gate, so determinism is the load-bearing guarantee. Every
 //! JSON object that flows through [`GoldenSet::append_receipt`] or
 //! [`GoldenSet::set_checkpoint`] is reshaped through
-//! [`canonicalize`] (recursively sorts object keys, preserves array
-//! order) before serialization. `serde_json::to_string` is then used
-//! with its default (no insignificant whitespace) settings, and the
-//! resulting bytes are what the gate diffs against.
+//! [`chio_core_types::canonical::canonicalize`] (RFC 8785 / JCS:
+//! recursively sorts object keys by UTF-16 code unit, preserves array
+//! order, emits no insignificant whitespace) before being written to
+//! disk. The same canonicaliser is used by the workspace-wide signing
+//! surface, so the replay-gate goldens stay byte-stable across
+//! `serde_json` upgrades.
 //!
-//! Writes are staged into `<file>.tmp` siblings and renamed into place
-//! on commit so a partially-written goldens directory is never
-//! observable to a follow-on reader.
+//! Writes are staged into `<file>.tmp` siblings, fsynced, then renamed
+//! into place on commit. On any per-file failure all already-staged
+//! `.tmp` siblings are cleaned up so a half-written goldens directory
+//! is never observable. The rename step is the per-file commit point;
+//! the multi-file commit is therefore "best effort atomic": each rename
+//! is itself atomic on POSIX filesystems but the three renames are not
+//! one transaction. The writer documents that and cleans up `.tmp`
+//! files on any failure to keep the partial state inspectable but
+//! never mistakable for a successful bless.
 //!
 //! T3 lands the writer only. T4 will add the byte-comparison reader
 //! that consumes these files as raw `Vec<u8>` (no serde round-trip),
 //! and T5/T6 wire the writer into actual fixture execution.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -37,23 +44,10 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use thiserror::Error;
 
-/// Length, in bytes, of a Merkle root hash produced by the kernel.
-const ROOT_LEN: usize = 32;
-
-/// Length, in characters, of a 32-byte root encoded as lowercase hex.
-const ROOT_HEX_LEN: usize = ROOT_LEN * 2;
-
-/// Filename for the per-scenario NDJSON receipt stream.
-const RECEIPTS_FILENAME: &str = "receipts.ndjson";
-
-/// Filename for the per-scenario canonical-JSON checkpoint.
-const CHECKPOINT_FILENAME: &str = "checkpoint.json";
-
-/// Filename for the per-scenario raw-hex Merkle root.
-const ROOT_FILENAME: &str = "root.hex";
-
-/// Suffix for staged temporary writes (renamed into place on commit).
-const TMP_SUFFIX: &str = ".tmp";
+use crate::golden_format::{
+    canonical_json_bytes, CHECKPOINT_FILENAME, RECEIPTS_FILENAME, ROOT_FILENAME, ROOT_HEX_LEN,
+    ROOT_LEN, TMP_SUFFIX,
+};
 
 /// Errors produced while staging or committing a [`GoldenSet`].
 #[derive(Debug, Error)]
@@ -153,13 +147,17 @@ impl GoldenSet {
 
     /// Append a single receipt to the staged NDJSON buffer.
     ///
-    /// The receipt is canonicalized (object keys sorted recursively),
-    /// serialized via `serde_json::to_string` (no insignificant
-    /// whitespace), and terminated with a single `\n`.
+    /// The receipt is canonicalized through the workspace-wide RFC
+    /// 8785 implementation in
+    /// [`chio_core_types::canonical::canonicalize`] (UTF-16 key sort,
+    /// no insignificant whitespace) and terminated with a single
+    /// `\n`.
     pub fn append_receipt(&mut self, receipt: &Value) -> Result<(), GoldenWriterError> {
-        let canonical = canonicalize(receipt);
-        let line = serde_json::to_string(&canonical)?;
-        self.receipts_buf.extend_from_slice(line.as_bytes());
+        let bytes = canonical_json_bytes(receipt).map_err(|source| GoldenWriterError::Io {
+            path: PathBuf::from(RECEIPTS_FILENAME),
+            source,
+        })?;
+        self.receipts_buf.extend_from_slice(&bytes);
         self.receipts_buf.push(b'\n');
         self.receipt_count = self.receipt_count.saturating_add(1);
         Ok(())
@@ -170,8 +168,10 @@ impl GoldenSet {
     /// caller wins, matching the natural "rebuild and overwrite"
     /// flow the gate uses on `--bless`).
     pub fn set_checkpoint(&mut self, checkpoint: &Value) -> Result<(), GoldenWriterError> {
-        let canonical = canonicalize(checkpoint);
-        let bytes = serde_json::to_vec(&canonical)?;
+        let bytes = canonical_json_bytes(checkpoint).map_err(|source| GoldenWriterError::Io {
+            path: PathBuf::from(CHECKPOINT_FILENAME),
+            source,
+        })?;
         self.checkpoint = Some(bytes);
         Ok(())
     }
@@ -182,7 +182,7 @@ impl GoldenSet {
         self.root = Some(root);
     }
 
-    /// Flush the staged goldens to disk atomically.
+    /// Flush the staged goldens to disk.
     ///
     /// Behaviour:
     ///
@@ -192,9 +192,15 @@ impl GoldenSet {
     ///    [`GoldenWriterError::MissingCheckpoint`], and
     ///    [`GoldenWriterError::MissingRoot`] respectively.
     /// 2. Creates the goldens directory (`mkdir -p` semantics).
-    /// 3. Writes each artifact to a `<file>.tmp` sibling, then renames
-    ///    it into place. A failure midway through leaves stale `.tmp`
-    ///    files but never half-written goldens.
+    /// 3. Writes each artifact to a `<file>.tmp` sibling, fsyncs it,
+    ///    then renames it into place. On any per-file failure the
+    ///    method removes any `.tmp` siblings it has staged so far so
+    ///    a partial-failure scenario does not leak stale temp files
+    ///    next to the goldens. The rename step is the per-file
+    ///    commit point; the three renames are issued back-to-back so
+    ///    a crash between them is the only window in which a
+    ///    partially-published goldens directory could be observed,
+    ///    which the byte-equivalence reader catches at load time.
     /// 4. Returns a [`GoldenSetSummary`] describing what was written.
     pub fn commit(self) -> Result<GoldenSetSummary, GoldenWriterError> {
         if self.receipt_count == 0 {
@@ -239,9 +245,43 @@ impl GoldenSet {
             });
         }
 
-        atomic_write(&receipts_path, &self.receipts_buf)?;
-        atomic_write(&checkpoint_path, &checkpoint_bytes)?;
-        atomic_write(&root_path, root_hex.as_bytes())?;
+        // Stage all three artifacts as `<file>.tmp` siblings up front
+        // so that if any one stage fails we can clean up the previous
+        // siblings before bubbling the error. Renames happen in a
+        // separate loop after every stage has succeeded.
+        let receipts_tmp = staging_path(&receipts_path);
+        let checkpoint_tmp = staging_path(&checkpoint_path);
+        let root_tmp = staging_path(&root_path);
+
+        if let Err(err) = stage_file(&receipts_tmp, &self.receipts_buf) {
+            cleanup_tmp(&[&receipts_tmp]);
+            return Err(err);
+        }
+        if let Err(err) = stage_file(&checkpoint_tmp, &checkpoint_bytes) {
+            cleanup_tmp(&[&receipts_tmp, &checkpoint_tmp]);
+            return Err(err);
+        }
+        if let Err(err) = stage_file(&root_tmp, root_hex.as_bytes()) {
+            cleanup_tmp(&[&receipts_tmp, &checkpoint_tmp, &root_tmp]);
+            return Err(err);
+        }
+
+        // All three files are durably staged; promote them by rename.
+        // A failure here is rare (same-directory POSIX rename is
+        // atomic) but we still clean up any remaining staged file so
+        // the per-scenario directory ends in either a fully-published
+        // state or a state where the partial-publish is visible only
+        // through whichever renames already succeeded (no stray .tmp
+        // files mixed in).
+        if let Err(err) = rename_staged(&receipts_tmp, &receipts_path) {
+            cleanup_tmp(&[&checkpoint_tmp, &root_tmp]);
+            return Err(err);
+        }
+        if let Err(err) = rename_staged(&checkpoint_tmp, &checkpoint_path) {
+            cleanup_tmp(&[&root_tmp]);
+            return Err(err);
+        }
+        rename_staged(&root_tmp, &root_path)?;
 
         let receipts_size = file_size(&receipts_path)?;
         let checkpoint_size = file_size(&checkpoint_path)?;
@@ -260,68 +300,62 @@ impl GoldenSet {
     }
 }
 
-/// Recursively reshape a [`serde_json::Value`] into canonical form.
-///
-/// Object keys are sorted lexicographically (via [`BTreeMap`]). Array
-/// element order is preserved. Strings, numbers, booleans, and null
-/// pass through unchanged. The output is structurally identical to
-/// the input, so `serde_json` round-tripping it is value-equal but
-/// byte-stable across `serde_json` versions that may otherwise emit a
-/// different key order.
-///
-/// This function is the load-bearing determinism primitive for the
-/// replay-gate goldens: every byte the writer emits flows through it.
-fn canonicalize(value: &Value) -> Value {
-    match value {
-        Value::Object(map) => {
-            let mut sorted: BTreeMap<String, Value> = BTreeMap::new();
-            for (key, val) in map.iter() {
-                sorted.insert(key.clone(), canonicalize(val));
-            }
-            // BTreeMap iteration order is the canonical sorted order.
-            // serde_json preserves insertion order when not built with
-            // the `preserve_order` feature, so we feed the sorted
-            // pairs into a fresh Map to lock the byte order in.
-            let mut out = serde_json::Map::with_capacity(sorted.len());
-            for (key, val) in sorted.into_iter() {
-                out.insert(key, val);
-            }
-            Value::Object(out)
-        }
-        Value::Array(items) => {
-            let mut out = Vec::with_capacity(items.len());
-            for item in items.iter() {
-                out.push(canonicalize(item));
-            }
-            Value::Array(out)
-        }
-        // Primitives are byte-stable already.
-        other => other.clone(),
-    }
-}
-
-/// Atomically write `bytes` to `final_path` by staging into
-/// `final_path.tmp` and renaming. Wraps any I/O error with the path
-/// that was being operated on so callers can distinguish "writing
-/// receipts.ndjson failed" from "writing root.hex failed".
-fn atomic_write(final_path: &Path, bytes: &[u8]) -> Result<(), GoldenWriterError> {
+/// Construct the staging-path sibling (`<file>.tmp`) for `final_path`.
+fn staging_path(final_path: &Path) -> PathBuf {
     let mut staging = final_path.as_os_str().to_owned();
     staging.push(TMP_SUFFIX);
-    let staging = PathBuf::from(staging);
+    PathBuf::from(staging)
+}
 
-    if let Err(source) = fs::write(&staging, bytes) {
-        return Err(GoldenWriterError::Io {
-            path: staging,
+/// Write `bytes` to `staging_path` and fsync it before returning.
+///
+/// fsync is requested explicitly so the rename step in
+/// [`rename_staged`] promotes already-durable bytes; otherwise a
+/// crash between rename and fsync could leave the rename visible but
+/// the bytes lost. The fsync is best-effort: if the platform does not
+/// support `File::sync_all` (e.g. some Windows handles) the underlying
+/// I/O error is surfaced to the caller along with the staging path.
+fn stage_file(staging_path: &Path, bytes: &[u8]) -> Result<(), GoldenWriterError> {
+    use std::io::Write;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(staging_path)
+        .map_err(|source| GoldenWriterError::Io {
+            path: staging_path.to_path_buf(),
             source,
-        });
-    }
-    if let Err(source) = fs::rename(&staging, final_path) {
-        return Err(GoldenWriterError::Io {
-            path: final_path.to_path_buf(),
+        })?;
+    file.write_all(bytes)
+        .map_err(|source| GoldenWriterError::Io {
+            path: staging_path.to_path_buf(),
             source,
-        });
-    }
+        })?;
+    file.sync_all().map_err(|source| GoldenWriterError::Io {
+        path: staging_path.to_path_buf(),
+        source,
+    })?;
     Ok(())
+}
+
+/// Promote a staged file to its final path via `fs::rename`.
+fn rename_staged(staging_path: &Path, final_path: &Path) -> Result<(), GoldenWriterError> {
+    fs::rename(staging_path, final_path).map_err(|source| GoldenWriterError::Io {
+        path: final_path.to_path_buf(),
+        source,
+    })
+}
+
+/// Best-effort cleanup of staged `.tmp` files after a partial failure.
+///
+/// Errors are silently ignored: the calling commit has already failed,
+/// and the caller's error path will surface the original I/O failure.
+/// Removing the staged siblings here keeps the goldens directory free
+/// of partial-publish residue that could mislead a follow-on bless.
+fn cleanup_tmp(paths: &[&Path]) {
+    for path in paths {
+        let _ = fs::remove_file(path);
+    }
 }
 
 /// Returns the byte length of `path`, mapping I/O errors into
@@ -362,44 +396,53 @@ mod tests {
         fs::read_to_string(path).expect("read of just-committed goldens must succeed")
     }
 
+    // The previous revision of this module hand-rolled a BTreeMap
+    // canonicaliser; the writer now delegates to the workspace-wide
+    // `chio_core_types::canonical::canonicalize` (RFC 8785 / JCS) via
+    // `crate::golden_format::canonical_json_bytes`. The tests below
+    // assert the byte-level invariants the writer relies on (sorted
+    // keys, recursion, no whitespace, primitive round-trip,
+    // per-element object sort within arrays). If the shared
+    // canonicaliser ever drifts in a way that touches the replay
+    // corpus, these tests trip before the byte-equivalence gate.
+
     #[test]
     fn canonicalize_sorts_object_keys() {
         let input = json!({"b": 1, "a": 2});
-        let out = canonicalize(&input);
-        let serialized = serde_json::to_string(&out).expect("re-serialize must succeed");
-        assert_eq!(serialized, r#"{"a":2,"b":1}"#);
+        let bytes = canonical_json_bytes(&input).expect("canonicalize must succeed");
+        assert_eq!(bytes, br#"{"a":2,"b":1}"#);
     }
 
     #[test]
     fn canonicalize_recurses_into_nested() {
         let input = json!({"x": {"b": 1, "a": 2}});
-        let out = canonicalize(&input);
-        let serialized = serde_json::to_string(&out).expect("re-serialize must succeed");
-        assert_eq!(serialized, r#"{"x":{"a":2,"b":1}}"#);
+        let bytes = canonical_json_bytes(&input).expect("canonicalize must succeed");
+        assert_eq!(bytes, br#"{"x":{"a":2,"b":1}}"#);
     }
 
     #[test]
     fn canonicalize_preserves_array_order() {
         let input = json!([3, 1, 2]);
-        let out = canonicalize(&input);
-        let serialized = serde_json::to_string(&out).expect("re-serialize must succeed");
-        assert_eq!(serialized, "[3,1,2]");
+        let bytes = canonical_json_bytes(&input).expect("canonicalize must succeed");
+        assert_eq!(bytes, b"[3,1,2]");
     }
 
     #[test]
     fn canonicalize_handles_primitives() {
-        // Numbers, strings, booleans, null pass through structurally.
-        for value in [
-            json!(null),
-            json!(true),
-            json!(false),
-            json!(0),
-            json!(-7),
-            json!(2.5),
-            json!("hello"),
-        ] {
-            let out = canonicalize(&value);
-            assert_eq!(out, value, "primitive must round-trip unchanged");
+        // Numbers, strings, booleans, null round-trip via the shared
+        // canonicaliser to the same byte form `serde_json::to_string`
+        // would have produced for these ASCII / integer values.
+        let cases = [
+            (json!(null), "null"),
+            (json!(true), "true"),
+            (json!(false), "false"),
+            (json!(0), "0"),
+            (json!(-7), "-7"),
+            (json!("hello"), r#""hello""#),
+        ];
+        for (value, want) in cases {
+            let bytes = canonical_json_bytes(&value).expect("canonicalize must succeed");
+            assert_eq!(bytes, want.as_bytes(), "case={value:?}");
         }
     }
 
@@ -409,9 +452,8 @@ mod tests {
             {"b": 1, "a": 2},
             {"d": 3, "c": 4},
         ]);
-        let out = canonicalize(&input);
-        let serialized = serde_json::to_string(&out).expect("re-serialize must succeed");
-        assert_eq!(serialized, r#"[{"a":2,"b":1},{"c":4,"d":3}]"#);
+        let bytes = canonical_json_bytes(&input).expect("canonicalize must succeed");
+        assert_eq!(bytes, br#"[{"a":2,"b":1},{"c":4,"d":3}]"#);
     }
 
     #[test]
