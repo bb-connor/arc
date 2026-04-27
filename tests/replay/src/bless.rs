@@ -54,6 +54,20 @@ use thiserror::Error;
 /// "audit log moves in lockstep with the goldens" invariant of clause 7.
 pub const AUDIT_LOG_RELATIVE_PATH: &str = "tests/replay/.bless-audit.log";
 
+/// Placeholder written into the `<sha>` audit-log column at bless time.
+///
+/// At bless time the goldens, audit-log line, and (optionally)
+/// `docs/replay-compat.md` have been staged but not committed, so
+/// `git rev-parse HEAD` does NOT yet reflect the SHA the audit-log
+/// entry will be embedded in. The bless flow writes this placeholder
+/// instead and the operator runs `scripts/seal-bless-audit.sh` (or
+/// the equivalent post-merge script) to rewrite the placeholder rows
+/// to the real merge SHA on a follow-up commit. The audit-log file
+/// header documents the same convention. Sealing is operator-initiated
+/// (rather than hooked off `post-commit`) so a single audit-trail row
+/// records exactly one commit SHA.
+pub const PENDING_SHA_MARKER: &str = "<commit-sha-pending>";
+
 /// Working-tree path prefix that is allowed to be dirty during bless.
 ///
 /// Anything under `tests/replay/goldens/` is the legitimate output of
@@ -300,9 +314,15 @@ pub fn evaluate_gate(
     }
 
     // All seven clauses cleared: collect identity bits for the audit
-    // entry. SHA / name / email reads are deferred to here so a clause
-    // failure does not invoke unnecessary git subprocesses.
-    let sha = git.head_sha()?;
+    // entry. The SHA column is intentionally a placeholder
+    // (`<commit-sha-pending>`) because at bless time the staged goldens
+    // and audit line are not yet committed; the post-bless sealing
+    // step (`scripts/seal-bless-audit.sh`) rewrites the placeholder
+    // rows to the actual merge SHA on a follow-up commit. We still
+    // confirm `git rev-parse HEAD` succeeds so a broken repo state
+    // surfaces here rather than later.
+    let _ = git.head_sha()?;
+    let sha = PENDING_SHA_MARKER.to_string();
     let user_name = git.user_name()?;
     let user_email = git.user_email()?;
 
@@ -723,7 +743,14 @@ mod tests {
             Err(e) => panic!("expected Ok, got {e:?}"),
         };
         assert_eq!(ctx.branch, "wave/W2/m04/p2.t1-bless-gate-logic");
-        assert_eq!(ctx.sha, "deadbeefcafebabe1234567890abcdef12345678");
+        // SHA column is intentionally the pending-bless placeholder;
+        // the actual commit SHA is filled in by the post-bless sealing
+        // step (see `scripts/seal-bless-audit.sh` and
+        // `PENDING_SHA_MARKER`). The stub git provider's
+        // `head_sha` is still consulted (so a broken repo surfaces
+        // here), but its value is not propagated into the audit
+        // context.
+        assert_eq!(ctx.sha, PENDING_SHA_MARKER);
         assert_eq!(ctx.user_name, "Jane Tester");
         assert_eq!(ctx.user_email, "jane@example.com");
         assert_eq!(ctx.bless_reason, "fix corpus drift after kernel bump");
@@ -1032,6 +1059,8 @@ mod tests {
         let fs = StubFs::new();
         let ctx = BlessContext {
             branch: "wave/W2/m04/p2.t1-bless-gate-logic".to_string(),
+            // Real bless flow stores the placeholder; this test pins
+            // the literal SHA to keep field-parsing assertions tight.
             sha: "deadbeefcafebabe1234567890abcdef12345678".to_string(),
             user_name: "Jane Tester".to_string(),
             user_email: "jane@example.com".to_string(),

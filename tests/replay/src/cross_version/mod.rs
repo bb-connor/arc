@@ -237,7 +237,25 @@ fn is_valid_sha256(s: &str) -> bool {
 /// `tests/replay` dependency. Catches leap-year and out-of-range edge
 /// cases that a regex would miss (`2026-02-30` would pass a regex but
 /// fails chrono).
+///
+/// `parse_from_str` is padding-agnostic for `%m` and `%d` (it accepts
+/// `2026-1-1`), so an explicit length-and-shape pre-check enforces the
+/// strict zero-padded `YYYY-MM-DD` form before delegating to chrono.
 fn is_valid_date(s: &str) -> bool {
+    if s.len() != 10 {
+        return false;
+    }
+    let bytes = s.as_bytes();
+    if bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    let digits_only = bytes
+        .iter()
+        .enumerate()
+        .all(|(i, b)| i == 4 || i == 7 || b.is_ascii_digit());
+    if !digits_only {
+        return false;
+    }
     chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok()
 }
 
@@ -428,6 +446,26 @@ extra_field = "not allowed"
             matches!(&err, LoadError::InvalidDate(s) if s == "2026-02-30"),
             "expected InvalidDate(2026-02-30), got {err:?}"
         );
+    }
+
+    /// Strict YYYY-MM-DD: padding-light forms must reject. `chrono`'s
+    /// `%m`/`%d` are padding-agnostic and will accept `2026-1-1`; the
+    /// loader pre-checks the literal `YYYY-MM-DD` shape first so a
+    /// human-typed unpadded date is caught up front.
+    #[test]
+    fn rejects_unpadded_month_and_day() {
+        for unpadded in ["2026-1-1", "2026-1-01", "2026-01-1", "2026-1-15"] {
+            let bad = VALID_BASE.replace(
+                "released_at = \"2025-08-12\"",
+                &format!("released_at = \"{unpadded}\""),
+            );
+            let err =
+                CompatMatrix::from_toml_str(&bad).expect_err("unpadded month/day must reject");
+            assert!(
+                matches!(&err, LoadError::InvalidDate(s) if s == unpadded),
+                "expected InvalidDate({unpadded}), got {err:?}"
+            );
+        }
     }
 
     /// Unknown `compat` enum variant rejected by serde at parse time.

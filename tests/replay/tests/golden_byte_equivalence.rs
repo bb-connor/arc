@@ -178,6 +178,19 @@ fn write_synthetic_goldens(manifest: &Value, manifest_path: &Path, scenario_dir:
     let scenario_name = require_str(manifest, "name", manifest_path);
     let expected_verdict = require_str(manifest, "expected_verdict", manifest_path);
     let clock = require_str(manifest, "clock", manifest_path);
+    let seed_index = require_u64(manifest, "fixed_nonce_seed_index", manifest_path);
+
+    // Advance the driver's nonce counter so the bless-time nonce for
+    // this scenario uniquely tracks the manifest's
+    // `fixed_nonce_seed_index`. Each `next_nonce()` call increments the
+    // counter by exactly 1 (see `ScenarioDriver::next_nonce`), so
+    // calling it `seed_index` times before the load-bearing call lines
+    // counter == seed_index for the recorded nonce. This keeps the 50
+    // synthetic goldens distinct in the `nonce` field rather than
+    // collapsing to counter-zero across all of them.
+    for _ in 0..seed_index {
+        let _ = driver.next_nonce();
+    }
 
     let nonce = driver.next_nonce();
     let nonce_hex = hex::encode(nonce);
@@ -262,6 +275,25 @@ fn require_str(manifest: &Value, key: &str, path: &Path) -> String {
             )
         })
         .to_string()
+}
+
+/// Pull a required non-negative integer field out of a manifest.
+///
+/// Panics with a path-tagged message if absent, non-numeric, or not
+/// representable as `u64`. Used by [`write_synthetic_goldens`] to read
+/// `fixed_nonce_seed_index`, which must drive the bless-time nonce
+/// counter so each of the 50 scenarios records a distinct nonce in its
+/// receipt rather than counter-zero across the corpus.
+fn require_u64(manifest: &Value, key: &str, path: &Path) -> u64 {
+    manifest
+        .get(key)
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| {
+            panic!(
+                "manifest {} missing required u64 key {key:?}",
+                path.display()
+            )
+        })
 }
 
 /// Pretty-print a [`ByteDiff::Different`] for the failure surface.
