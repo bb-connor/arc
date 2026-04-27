@@ -18,7 +18,8 @@ pub use native_suite::{
     NativeScenarioDescriptor, NativeScenarioResult, NativeStatus, NativeSuiteError,
 };
 pub use peers::{
-    sha256_hex, PeerEntry, PeersLock, PeersLockError, PEERS_LOCK_SCHEMA, SUPPORTED_LANGUAGES,
+    default_peers_lock_path, sha256_hex, PeerEntry, PeersLock, PeersLockError, PEERS_LOCK_FILENAME,
+    PEERS_LOCK_SCHEMA, SUPPORTED_LANGUAGES,
 };
 pub use report::generate_markdown_report;
 pub use runner::{

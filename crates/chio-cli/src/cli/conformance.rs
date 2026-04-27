@@ -20,21 +20,19 @@ fn cmd_conformance_run(
     scenario: Option<&str>,
     output: Option<&Path>,
 ) -> Result<(), CliError> {
+    // Cleanup C5 issue C: reject unknown `--report` values BEFORE running
+    // the conformance harness. Previously the validation lived after
+    // `run_conformance_harness`, so a `--report typo` invocation forced
+    // users to wait through the full live run before receiving the
+    // "unsupported value" error.
+    let json_report = parse_report_format(report)?;
+
     let mut options = chio_conformance::default_run_options();
     options.peers = parse_peer_selection(peer)?;
 
     let summary = chio_conformance::run_conformance_harness(&options).map_err(|error| {
         CliError::Other(format!("conformance harness failed: {error}"))
     })?;
-
-    let json_report = matches!(report, Some(value) if value.eq_ignore_ascii_case("json"));
-    if let Some(value) = report {
-        if !json_report && !value.eq_ignore_ascii_case("human") {
-            return Err(CliError::Other(format!(
-                "unsupported --report value `{value}`; expected `json` or `human`",
-            )));
-        }
-    }
 
     let scenarios = chio_conformance::load_scenarios_from_dir(&options.scenarios_dir).map_err(
         |error| CliError::Other(format!("failed to load scenarios: {error}")),
@@ -50,6 +48,27 @@ fn cmd_conformance_run(
         write_json_report(&summary, &scenarios, &results, scenario, output)
     } else {
         write_human_report(&summary, &results, scenario, output)
+    }
+}
+
+/// Validate the `--report` flag value at clap-parse time (well, at the
+/// start of the dispatch handler) so that users do not have to wait
+/// through a live harness run before learning that they typed
+/// `--report invalid`. Returns whether the report should be JSON-shaped.
+fn parse_report_format(report: Option<&str>) -> Result<bool, CliError> {
+    match report {
+        None => Ok(false),
+        Some(value) => {
+            if value.eq_ignore_ascii_case("json") {
+                Ok(true)
+            } else if value.eq_ignore_ascii_case("human") {
+                Ok(false)
+            } else {
+                Err(CliError::Other(format!(
+                    "unsupported --report value `{value}`; expected `json` or `human`",
+                )))
+            }
+        }
     }
 }
 
@@ -183,30 +202,37 @@ fn write_human_report(
     Ok(())
 }
 
-/// Path of the canonical lockfile shipped inside the chio-conformance crate.
-/// Resolved relative to the chio-cli binary's source layout so that the
-/// subcommand works from a fresh checkout without extra arguments.
-fn default_peers_lock_path() -> PathBuf {
-    // CARGO_MANIFEST_DIR is defined at compile time for the chio-cli crate.
-    // The lockfile lives in a sibling crate.
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("chio-conformance")
-        .join("peers.lock.toml")
+/// HTTP timeout for peer-binary downloads. Cleanup C5 issue F: the
+/// blocking reqwest client previously had no timeout, so a stalled mirror
+/// could hang the CLI indefinitely.
+const FETCH_PEERS_HTTP_TIMEOUT_SECS: u64 = 120;
+
+/// Resolve the path to `peers.lock.toml`, honouring the `--lockfile`
+/// override first and falling back to the layered runtime resolver in
+/// chio-conformance. Cleanup C5 issue B.
+fn resolve_peers_lock_path(explicit: Option<&Path>) -> PathBuf {
+    if let Some(path) = explicit {
+        return path.to_path_buf();
+    }
+    chio_conformance::default_peers_lock_path()
 }
 
 /// Dispatch entry-point for `chio conformance fetch-peers`.
 ///
 /// `--check` parses and validates the lockfile only; it never touches the
-/// network. Without `--check`, each entry is downloaded, sha256-verified,
-/// and written under `out/`. The `language` filter, when set, restricts
-/// the loop to entries matching that adapter (`python`, `js`, `go`, `cpp`).
+/// network. Without `--check`, each published entry is downloaded,
+/// sha256-verified, and extracted under `out/`. The `language` filter,
+/// when set, restricts the loop to entries matching that adapter
+/// (`python`, `js`, `go`, `cpp`). Entries flagged `published = false`
+/// (cleanup C5 issue D) are SKIPPED with a clear message rather than
+/// failing the run with a sha256 mismatch.
 fn cmd_conformance_fetch_peers(
     check: bool,
     out: &Path,
     language: Option<&str>,
+    lockfile: Option<&Path>,
 ) -> Result<(), CliError> {
-    let lock_path = default_peers_lock_path();
+    let lock_path = resolve_peers_lock_path(lockfile);
     let lock = chio_conformance::PeersLock::load(&lock_path).map_err(|error| {
         CliError::Other(format!(
             "failed to load peers lockfile `{}`: {error}",
@@ -230,6 +256,8 @@ fn cmd_conformance_fetch_peers(
         Some(value) => lock.entries_for_language(value),
         None => lock.peers.iter().collect(),
     };
+    let (published_entries, skipped_entries) =
+        chio_conformance::PeersLock::partition_by_published(&entries);
 
     if check {
         let mut stdout = std::io::stdout().lock();
@@ -244,18 +272,21 @@ fn cmd_conformance_fetch_peers(
         })?;
         writeln!(
             stdout,
-            "validated {} entries (filter: {})",
+            "validated {} entries ({} published, {} skipped) (filter: {})",
             entries.len(),
+            published_entries.len(),
+            skipped_entries.len(),
             language.unwrap_or("<none>"),
         )
         .map_err(|error| {
             CliError::Other(format!("failed to write check summary: {error}"))
         })?;
         for entry in &entries {
+            let marker = if entry.published { "" } else { " (unpublished, will skip)" };
             writeln!(
                 stdout,
-                "  - {} {} -> {}",
-                entry.language, entry.target, entry.url,
+                "  - {} {} -> {}{}",
+                entry.language, entry.target, entry.url, marker,
             )
             .map_err(|error| {
                 CliError::Other(format!("failed to write check entry: {error}"))
@@ -271,13 +302,30 @@ fn cmd_conformance_fetch_peers(
         ))
     })?;
 
+    // Cleanup C5 issue F: bound the HTTP client timeout so a stalled
+    // release-asset mirror cannot hang the CLI indefinitely.
     let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(FETCH_PEERS_HTTP_TIMEOUT_SECS))
         .build()
         .map_err(|error| {
             CliError::Other(format!("failed to build http client: {error}"))
         })?;
 
-    for entry in &entries {
+    {
+        let mut stdout = std::io::stdout().lock();
+        for entry in &skipped_entries {
+            writeln!(
+                stdout,
+                "skipping unpublished peer `{} / {}`: lockfile entry has `published = false` (no real binary uploaded yet)",
+                entry.language, entry.target,
+            )
+            .map_err(|error| {
+                CliError::Other(format!("failed to write skip line: {error}"))
+            })?;
+        }
+    }
+
+    for entry in &published_entries {
         download_and_verify(&client, entry, out)?;
     }
     Ok(())
@@ -321,19 +369,73 @@ fn download_and_verify(
         .rsplit('/')
         .next()
         .unwrap_or("peer.bin");
-    let target_dir = out.join(&entry.language).join(&entry.target);
-    fs::create_dir_all(&target_dir).map_err(|error| {
+    // Cleanup C5 issue F: bundles land under
+    // `<out>/<language>-<target>/` so consumers find the extracted
+    // binary at a stable path (matches the docs in
+    // `docs/conformance.md`).
+    let extract_dir = out.join(format!("{}-{}", entry.language, entry.target));
+    fs::create_dir_all(&extract_dir).map_err(|error| {
         CliError::Other(format!(
             "failed to create `{}`: {error}",
-            target_dir.display(),
+            extract_dir.display(),
         ))
     })?;
-    let target_path = target_dir.join(filename);
-    fs::write(&target_path, &bytes).map_err(|error| {
+    let archive_path = extract_dir.join(filename);
+    fs::write(&archive_path, &bytes).map_err(|error| {
         CliError::Other(format!(
             "failed to write `{}`: {error}",
-            target_path.display(),
+            archive_path.display(),
         ))
     })?;
+
+    extract_archive(&archive_path, &extract_dir, &entry.url)?;
     Ok(())
+}
+
+/// Cleanup C5 issue F: extract `.tar.gz` (or `.tgz`) bundles into the
+/// per-target directory so that the binary is usable without the user
+/// running `tar` themselves. `.zip` is recognised by extension but
+/// not yet implemented; the M01 release pipeline emits `.tar.gz` for all
+/// platforms today, so the missing branch is logged but not fatal.
+fn extract_archive(archive: &Path, dest: &Path, source_url: &str) -> Result<(), CliError> {
+    let lower = archive
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
+        let archive_file = fs::File::open(archive).map_err(|error| {
+            CliError::Other(format!(
+                "failed to open archive `{}`: {error}",
+                archive.display(),
+            ))
+        })?;
+        let decompressed = flate2::read::GzDecoder::new(archive_file);
+        let mut tar = tar::Archive::new(decompressed);
+        tar.unpack(dest).map_err(|error| {
+            CliError::Other(format!(
+                "failed to extract `{}` into `{}`: {error}",
+                archive.display(),
+                dest.display(),
+            ))
+        })?;
+        Ok(())
+    } else if lower.ends_with(".zip") {
+        Err(CliError::Other(format!(
+            "zip archives are not yet supported (got `{}` from `{source_url}`); the M01 release pipeline emits .tar.gz for every target",
+            archive.display(),
+        )))
+    } else {
+        // Unknown archive format: leave the bundle on disk but warn so the
+        // operator can extract it manually rather than silently shipping a
+        // half-installed peer.
+        let mut stderr = std::io::stderr().lock();
+        let _ = writeln!(
+            stderr,
+            "note: bundle `{}` is not a recognised archive format; downloaded bytes are preserved unchanged",
+            archive.display(),
+        );
+        Ok(())
+    }
 }

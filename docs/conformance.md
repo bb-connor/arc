@@ -39,7 +39,9 @@ You will need:
 The full external-consumer flow is three commands.
 
 ```bash
-# 1. Install the harness and the chio CLI from crates.io.
+# 1. Install the chio CLI (which provides the `chio conformance` subcommand)
+#    plus the conformance harness library / runner binaries.
+cargo install --git https://github.com/bb-connor/arc chio-cli
 cargo install chio-conformance
 
 # 2. Fetch sha256-pinned peer binaries for the languages you care about.
@@ -51,19 +53,36 @@ chio conformance run --peer python --report json --output /tmp/report.json
 
 Each step is described in detail below.
 
-## 1. Install the conformance crate
+## 1. Install the conformance crate and the `chio` binary
+
+The `chio` binary lives in the `chio-cli` crate, not `chio-conformance`.
+The chio-conformance crate ships its own
+`chio-conformance-runner` and `chio-conformance-report` binaries plus
+the harness library, but the higher-level `chio conformance ...`
+subcommands belong to `chio-cli`. Cleanup C5 issue G corrected an
+earlier draft that conflated the two.
 
 ```bash
+# `chio` binary (the surface this guide demonstrates).
+cargo install --git https://github.com/bb-connor/arc chio-cli
+
+# Bundled harness + scenarios + reference peers (published on crates.io).
 cargo install chio-conformance
 ```
 
-This installs the `chio` binary with the `conformance` subcommand group
-enabled. The published crate bundles:
+`chio-cli` is `publish = false` while it stabilises; install it
+directly from the git source until it lands on crates.io. After both
+crates are installed, every `chio conformance ...` invocation in this
+guide works as written.
+
+The published `chio-conformance` crate bundles:
 
 - The Rust harness library (`chio_conformance`).
 - The `chio-conformance-runner`, `chio-conformance-report`, and the
   native runner binaries for direct use without the higher-level CLI.
-- The full scenario tree at `tests/conformance/scenarios/**`.
+- The full scenario tree under `tests/conformance/scenarios/**`
+  (vendored into the published crate via a symlinked subtree at
+  `crates/chio-conformance/tests/conformance/`).
 - The reference Python peer (`tests/conformance/peers/python/**`) and
   Node.js peer (`tests/conformance/peers/js/**`).
 
@@ -71,6 +90,7 @@ If you are building from a source checkout instead of crates.io, the
 in-repo equivalent is:
 
 ```bash
+cargo install --path crates/chio-cli
 cargo install --path crates/chio-conformance
 ```
 
@@ -261,6 +281,40 @@ The Markdown compatibility report under `tests/conformance/reports/` is
 considered a CI artifact rather than a stable public surface; consumers
 should depend on the JSON envelope for downstream tooling.
 
+## Lockfile resolution
+
+The `chio conformance fetch-peers` subcommand looks for
+`peers.lock.toml` in the following order (cleanup C5 issue B):
+
+1. `--lockfile <path>` (explicit override).
+2. `$CHIO_PEERS_LOCK` env var.
+3. `$XDG_CONFIG_HOME/chio/peers.lock.toml` (or
+   `$HOME/.config/chio/peers.lock.toml`).
+4. `<repo-root>/crates/chio-conformance/peers.lock.toml` (in-repo
+   default).
+5. `./peers.lock.toml` (cwd-relative).
+
+The runtime resolver mirrors the M04.P3.T3 cache-dir strategy so
+`cargo install`-installed binaries do not depend on the compile-time
+`CARGO_MANIFEST_DIR` of the crate that is no longer on disk.
+
+## Unpublished peer entries
+
+The lockfile carries `published = false` placeholders for peers whose
+release artifacts have not been cut yet (cleanup C5 issue D). The
+`fetch-peers` subcommand SKIPS those entries with a clear message
+rather than failing the run with a sha256 mismatch:
+
+```
+$ chio conformance fetch-peers --language python
+skipping unpublished peer `python / x86_64-unknown-linux-gnu`: lockfile entry has `published = false` (no real binary uploaded yet)
+skipping unpublished peer `python / aarch64-apple-darwin`: lockfile entry has `published = false` (no real binary uploaded yet)
+```
+
+Once the M01 release pipeline cuts a real artifact, the lockfile
+updater replaces the placeholder sha256 and flips `published = true`;
+no consumer-facing change is required.
+
 ## Troubleshooting
 
 ### `cargo install chio-conformance` fails on a build dependency
@@ -313,6 +367,9 @@ the source tree and crates.io is caught within 24 hours.
 External consumers can copy the same pattern into their own CI:
 
 ```yaml
+- name: Install Chio CLI (provides the `chio conformance` subcommand)
+  run: cargo install --git https://github.com/bb-connor/arc chio-cli
+
 - name: Install Chio conformance harness
   run: cargo install chio-conformance --version 0.1.0
 

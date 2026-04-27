@@ -14,7 +14,7 @@
 //! mirroring the gating used by `crates/chio-conformance/tests/mcp_core_live.rs`.
 
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use insta::{assert_json_snapshot, assert_snapshot};
 use tempfile::TempDir;
@@ -25,16 +25,6 @@ fn workspace_root() -> PathBuf {
         .nth(2)
         .expect("workspace root")
         .to_path_buf()
-}
-
-fn command_available(program: &str) -> bool {
-    Command::new(program)
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
 }
 
 fn python3_supports_chio_sdk() -> bool {
@@ -86,16 +76,21 @@ fn conformance_run_help_shape_is_stable() {
 /// structural shape. Asserts all 5 mcp-core scenarios are green before
 /// snapshotting so the snapshot reflects a passing run.
 ///
-/// The test silently no-ops if Node.js or Python 3.11+ is unavailable on
-/// the host, which keeps the test green on stripped-down CI runners that
-/// lack peer toolchains. Live harness runs are also gated by the
+/// The test silently no-ops if Python 3.11+ is unavailable on the host,
+/// which keeps the test green on stripped-down CI runners that lack the
+/// Python toolchain. Live harness runs are also gated by the
 /// `CHIO_SKIP_CONFORMANCE_LIVE` env var for ad-hoc opt-out.
+///
+/// Cleanup C5 issue H: the gate previously also required `node`, which
+/// silently no-op'd this test on Python-only environments even though
+/// `--peer python` exercises only the Python toolchain. The detection is
+/// now per-peer: this `--peer python` test only checks for python3.
 #[test]
 fn conformance_run_python_report_shape_is_stable() {
     if std::env::var_os("CHIO_SKIP_CONFORMANCE_LIVE").is_some() {
         return;
     }
-    if !command_available("node") || !python3_supports_chio_sdk() {
+    if !python3_supports_chio_sdk() {
         return;
     }
 
@@ -135,9 +130,7 @@ fn conformance_run_python_report_shape_is_stable() {
     assert_eq!(results.len(), 5, "expected 5 mcp-core scenarios");
     let pass_count = results
         .iter()
-        .filter(|result| {
-            result.get("status").and_then(serde_json::Value::as_str) == Some("pass")
-        })
+        .filter(|result| result.get("status").and_then(serde_json::Value::as_str) == Some("pass"))
         .count();
     assert_eq!(
         pass_count, 5,

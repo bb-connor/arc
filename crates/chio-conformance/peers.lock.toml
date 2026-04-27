@@ -7,11 +7,14 @@
 # implementers who do not have a Python, Node.js, Go, or C++ toolchain
 # available locally.
 #
-# The placeholder sha256 values (all-zeros / all-ones) and `v0.1.0` URLs are
-# intentional. They are filled in by the M01 release pipeline once the peer
-# binaries are built and uploaded to the GitHub release. The schema and
-# structure are stable; only the content of `url` and `sha256` is expected to
-# churn between releases.
+# `published = false` flags an entry as a forward-looking placeholder: the
+# M01 release pipeline has not yet uploaded the corresponding binary, so
+# `chio conformance fetch-peers` SKIPS the entry with a clear message
+# rather than failing the run with a sha256 mismatch. Once the release
+# pipeline cuts a real artifact, the lockfile updater MUST replace the
+# placeholder sha256 (the all-zeros / all-ones strings below), update the
+# url to the cut tag, and flip `published = true`. Cleanup C5 issue D
+# documents this gating contract.
 #
 # House rules:
 #   - `url` MUST be https.
@@ -20,6 +23,7 @@
 #   - `target` SHOULD be a Rust target triple (matches the host the binary
 #     was built for).
 #   - `binary` is the executable name inside the downloaded archive.
+#   - `published = false` SKIPS the entry during fetch-peers. Default true.
 
 schema = "chio.conformance.peers/v1"
 
@@ -31,6 +35,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-py-peer-li
 sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 target = "x86_64-unknown-linux-gnu"
 binary = "chio-py-peer"
+published = false
 
 [[peer]]
 language = "python"
@@ -38,6 +43,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-py-peer-da
 sha256 = "1111111111111111111111111111111111111111111111111111111111111111"
 target = "aarch64-apple-darwin"
 binary = "chio-py-peer"
+published = false
 
 # -- js ----------------------------------------------------------------------
 
@@ -47,6 +53,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-js-peer-li
 sha256 = "2222222222222222222222222222222222222222222222222222222222222222"
 target = "x86_64-unknown-linux-gnu"
 binary = "chio-js-peer"
+published = false
 
 [[peer]]
 language = "js"
@@ -54,6 +61,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-js-peer-da
 sha256 = "3333333333333333333333333333333333333333333333333333333333333333"
 target = "aarch64-apple-darwin"
 binary = "chio-js-peer"
+published = false
 
 # -- go ----------------------------------------------------------------------
 
@@ -63,6 +71,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-go-peer-li
 sha256 = "4444444444444444444444444444444444444444444444444444444444444444"
 target = "x86_64-unknown-linux-gnu"
 binary = "chio-go-peer"
+published = false
 
 [[peer]]
 language = "go"
@@ -70,6 +79,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-go-peer-da
 sha256 = "5555555555555555555555555555555555555555555555555555555555555555"
 target = "aarch64-apple-darwin"
 binary = "chio-go-peer"
+published = false
 
 # -- cpp ---------------------------------------------------------------------
 
@@ -79,6 +89,7 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-cpp-peer-l
 sha256 = "6666666666666666666666666666666666666666666666666666666666666666"
 target = "x86_64-unknown-linux-gnu"
 binary = "chio-cpp-peer"
+published = false
 
 [[peer]]
 language = "cpp"
@@ -86,3 +97,4 @@ url = "https://github.com/bb-connor/arc/releases/download/v0.1.0/chio-cpp-peer-d
 sha256 = "7777777777777777777777777777777777777777777777777777777777777777"
 target = "aarch64-apple-darwin"
 binary = "chio-cpp-peer"
+published = false
