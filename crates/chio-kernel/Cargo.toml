@@ -39,6 +39,9 @@ ureq = { version = "2.10", features = ["json"] }
 [dev-dependencies]
 chio-store-sqlite = { path = "../chio-store-sqlite" }
 criterion = { workspace = true }
+# proptest = "1.10" (via workspace.dependencies). Used by:
+# - tests/property_budget_store.rs (M03)
+# - tests/replay_proptest.rs (M04.P5: replay-invariance suite)
 proptest = { workspace = true }
 
 [[bench]]
@@ -88,6 +91,14 @@ harness = false
 [[bench]]
 name = "dispatch_deny"
 harness = false
+
+# M04.P5: property-based replay-invariance suite (signing-is-a-function,
+# replay-root-is-idempotent, shuffle-preserves-bytes). Cargo would auto-
+# discover this test target from `tests/replay_proptest.rs`; the explicit
+# block exists so the CI gate can refer to the test by canonical name.
+[[test]]
+name = "replay_proptest"
+path = "tests/replay_proptest.rs"
 
 [lints.clippy]
 unwrap_used = "deny"

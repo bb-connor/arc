@@ -305,6 +305,66 @@ jobs:
 
           echo "seed-immutable: ${seed} digest matches workflow-pinned ${expected} (mode ${mode})"
 
+  proptest:
+    # M04 P5.T1 scope: property-based replay-invariance suite.
+    #
+    # Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
+    # Phase 5 ("property-based replay invariance"). Three properties run
+    # against arbitrary `(decision, payload, clock, nonce)` receipt tuples:
+    #   - signing_is_a_function (named exit-criterion test)
+    #   - replay_root_is_idempotent (named exit-criterion test)
+    #   - shuffle_independent_receipts_preserves_bytes
+    #
+    # Budget: 30 seconds wall-clock for the proptest harness itself
+    # (PROPTEST_CASES bounded in the test file; timeout-minutes is a
+    # belt-and-braces upper bound that includes toolchain install and
+    # cargo build). PROPTEST_MAX_GLOBAL_REJECTS is set so the strategy's
+    # `prop_filter` constraints (unique-nonce batches) cannot exhaust the
+    # global rejection budget under shrink.
+    #
+    # Failed shrinks persist under tests/replay/proptest-regressions/ via
+    # FileFailurePersistence::Direct; CI uploads that directory as an
+    # artifact so contributors can replay the seed locally.
+    name: proptest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROPTEST_MAX_GLOBAL_REJECTS: "8192"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run replay proptest (30s budget)
+        # The proptest harness itself is bounded by PROPTEST_CASES inside
+        # the test source. The `timeout 60s` wrapper enforces the doc's
+        # explicit "30 second" budget with a 2x slack for cold-cache
+        # toolchain warmup; if the test ever exceeds 60s of wall clock the
+        # wrapper kills it and the gate fails.
+        run: |
+          set -euo pipefail
+          timeout 60s cargo test -p chio-kernel --test replay_proptest --release -- --nocapture
+
+      - name: Upload proptest regressions on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proptest-regressions
+          path: tests/replay/proptest-regressions/
+          if-no-files-found: ignore
+
   cross-version:
     # M04 P3.T5 scope: cross-version receipt-compatibility sanity job.
     # Runs the non-ignored sanity test in tests/replay/tests/cross_version_replay.rs
