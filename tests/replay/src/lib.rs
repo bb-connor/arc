@@ -28,11 +28,15 @@
 //! - [`byte_compare`]: byte-equivalence harness (T4).
 //! - [`fs_iter`]: deterministic `LC_ALL=C` directory enumeration (T7).
 //! - [`bless`]: CHIO_BLESS gate logic for the `--bless` flow (Phase 2 T1).
+//! - [`cross_version`]: strict TOML loader for
+//!   `tests/replay/release_compat_matrix.toml` (Phase 3 T2). Bundle fetch
+//!   (T3) and re-verify path (T4) extend this module.
 
 #![forbid(unsafe_code)]
 
 pub mod bless;
 pub mod byte_compare;
+pub mod cross_version;
 pub mod driver;
 pub mod fs_iter;
 pub mod golden_reader;
