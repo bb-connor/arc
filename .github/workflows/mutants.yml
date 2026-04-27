@@ -47,6 +47,20 @@
 #     sweep is dashboard-only - it surfaces survivors via the uploaded
 #     artifact and (eventually) issue-on-budget-breach, but the workflow
 #     run itself never gates a PR merge.
+#
+# Override paths (M02.P3.T2):
+#
+#   1. Label-based (preferred): a PR labelled `mutants-gate-override`
+#      clears cycle_end_tag in releases.toml and re-enters advisory mode
+#      for one cycle. CODEOWNERS routes releases.toml to @bb-connor so
+#      the override cannot land without principal-engineer review.
+#
+#   2. Env-var escape hatch (single CI run): set
+#      MUTANTS_GATE_OVERRIDE_REASON=<reason> on the run; the gate
+#      script downgrades a blocking-fail to a loud advisory pass and
+#      appends a row to docs/fuzzing/mutants-overrides.log. Use only
+#      when a label-based PR is not feasible (e.g. release-train
+#      hot-fix). See docs/fuzzing/mutants.md "Override paths".
 
 name: mutants
 
@@ -201,6 +215,16 @@ jobs:
           MUTANTS_PACKAGE: ${{ matrix.package }}
           MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
           MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
+          # M02.P3.T2 escape hatch: forward the env-var override from the
+          # repository variable MUTANTS_GATE_OVERRIDE_REASON when set.
+          # Empty by default; setting the variable downgrades a blocking
+          # fail to a loud advisory pass and appends an audit row to
+          # docs/fuzzing/mutants-overrides.log. The label-based override
+          # path (`mutants-gate-override` PR clearing cycle_end_tag with
+          # CODEOWNERS review on releases.toml) is the preferred path;
+          # this env-var is for in-flight CI runs only.
+          MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
           # mutants-gate.sh reads releases.toml and decides advisory
@@ -318,6 +342,12 @@ jobs:
           MUTANTS_PACKAGE: ${{ matrix.package }}
           MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
           MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
+          # M02.P3.T2 escape hatch (see header comment). Forward the
+          # `mutants-gate-override` env-var when the repository variable
+          # is set; the gate script then audits and downgrades a
+          # blocking-fail to advisory-pass for this run only.
+          MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
           bash scripts/mutants-gate.sh

@@ -321,3 +321,10 @@ notes  = "PLANNED-NEW; lands in M02 P0/P1"
 glob   = "scripts/classify-trust-diff.sh"
 owners = ["SEQUENCER"]
 notes  = "PLANNED-NEW; lands in Wave 0 alongside trust-boundary policy enforcement"
+
+# ---------- M02 P3.T2 mutants release-cycle gate ----------
+
+[[ownership]]
+glob   = "releases.toml"
+owners = ["M02"]
+notes  = "Mutation-testing advisory/blocking flip state (cycle_end_tag). Edits gated by CODEOWNERS so the override path (PR labelled 'mutants-gate-override' clearing cycle_end_tag) requires principal-engineer review. Source: 02-fuzzing-post-pr13.md Mutation-testing CI shape > Override paragraph; ticket M02.P3.T2."

@@ -187,6 +187,53 @@ If the workflow re-runs against an older tag (workflow_dispatch, repush,
 etc.) the empty-string regex guard makes the write a no-op, so a single
 release cannot accidentally overwrite a previously activated flip.
 
+### Override paths (M02.P3.T2)
+
+There are two override paths once the gate is blocking. Both leave an
+audit trail; pick the one that matches the situation.
+
+**1. Label-based override (preferred / permanent).** A maintainer opens
+a PR that clears `cycle_end_tag` in `releases.toml`, labels the PR
+`mutants-gate-override`, and merges. The lane returns to advisory for
+one cycle. CODEOWNERS routes any edit on `releases.toml` to
+`@bb-connor` (principal-engineer review), so the override cannot land
+without explicit sign-off. Use this path when the project needs to
+re-enter advisory mode for an entire release cycle (e.g. a large
+refactor temporarily depresses the catch ratio while tests are
+rewritten). Suggested PR title:
+
+```
+chore(mutants): re-enter advisory cycle [mutants-gate-override]
+```
+
+**2. Env-var escape hatch (single-run, in-flight CI).** When a single
+mutants-nightly or mutants-pr run needs to ship without a full
+CODEOWNERS-reviewed PR (e.g. a release-train hot-fix at 2 AM), set the
+environment variable `MUTANTS_GATE_OVERRIDE_REASON=<reason>` for that
+run only. `scripts/mutants-gate.sh` then:
+
+- emits a loud `WARN mutants-gate-override engaged` line on stderr,
+- appends a row to `docs/fuzzing/mutants-overrides.log` (timestamp,
+  package, exit code, cycle_end_tag, actor, reason),
+- downgrades the verdict from blocking-fail to advisory-pass (exit 0).
+
+```bash
+# Hot-fix CI run with the env-var escape hatch.
+MUTANTS_GATE_OVERRIDE_REASON='hot-fix release v0.7.1; followup #NNN' \
+  bash scripts/mutants-gate.sh
+```
+
+The env-var path is intentionally noisy: every override appends a row
+that survives in git, and the WARN line surfaces in the workflow
+summary. House rule: every env-var override must be backed by an issue
+or PR in the `reason` field; bare reasons like `'idk'` will be
+challenged in retrospective.
+
+CODEOWNERS gate on `releases.toml` (the permanent path) and the
+append-only `docs/fuzzing/mutants-overrides.log` (the in-flight path)
+are the two complementary audit surfaces required by the source-doc
+override paragraph.
+
 ## Triage policy
 
 Surviving mutants beyond a per-crate budget open an issue tagged

@@ -108,6 +108,23 @@ crates/*/tests/regression_*.rs               @bb-connor
 tests/regression_*.rs                        @bb-connor
 fuzz/corpus/**                               @bb-connor
 
+# ---------- M02 P3.T2 mutants release-cycle gate on releases.toml ----------
+# Personal-handle review on releases.toml so the mutants-gate override path
+# (a PR labelled `mutants-gate-override` that clears cycle_end_tag and
+# re-enters advisory mode for one cycle) cannot land without principal-
+# engineer review. Edits to releases.toml outside the override flow (e.g.
+# the M02.P3.T1 release-binaries auto-flip PR titled
+# `chore(mutants): activate blocking gate after cycle <tag>`) traverse
+# the same gate.
+#
+# Gate contract (from ticket gate_check):
+#   grep -qE '^/?releases\.toml.*@bb-connor' CODEOWNERS
+#
+# Source: .planning/trajectory/02-fuzzing-post-pr13.md
+#   "Mutation-testing CI shape (Phase 3) > Override paragraph"
+# Ticket: .planning/trajectory/tickets/M02/P3.yml ticket M02.P3.T2.
+releases.toml                                @bb-connor
+
 # ---------- Kernel - the contended crate (FROZEN during M05 P1-P3) ----------
 # These patterns appear last so they override any broader rule above.
 # During the freeze window only [M05]-prefixed PRs may modify these paths;
