@@ -24,6 +24,14 @@ use chio_manifest::{ToolDefinition, ToolManifest};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+#[cfg(feature = "provider-adapter")]
+pub mod adapter;
+
+#[cfg(feature = "provider-adapter")]
+pub use adapter::{
+    OpenAiAdapter, OpenAiAdapterConfig as OpenAiProviderAdapterConfig, OPENAI_RESPONSES_API_VERSION,
+};
+
 /// Errors produced by the OpenAI adapter.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAiAdapterError {
