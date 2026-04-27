@@ -36,7 +36,8 @@ need the raw output to reproduce.
 > For every pair of authorities (a, b) and every capability c, if `a`'s
 > local revocation epoch for c is non-zero, then `b`'s local revocation
 > epoch for c eventually catches up to at least `a`'s value, under
-> `WF_vars(\E m \in pending : Propagate(m))`.
+> `WF_vars(PropagateAny)` (the top-level named-action form of weak
+> fairness on Propagate; see comments in `RevocationPropagation.tla`).
 
 If your counterexample is in fact a safety violation (one of
 `NoAllowAfterRevoke`, `MonotoneLog`, `AttenuationPreserving`), close
@@ -51,11 +52,14 @@ Apalache version (capture from `apalache-mc version`):
 ```
 
 Exact command (paste from the failed CI step or local run; do not
-reformat):
+reformat). Note: `RevocationEventuallySeen` is a temporal property
+(uses the leads-to operator `~>`), so it is supplied to Apalache via
+`--temporal=` and not `--inv=` (`--inv=` is reserved for state
+invariants):
 
 ```bash
 apalache-mc check \
-    --inv=RevocationEventuallySeen \
+    --temporal=RevocationEventuallySeen \
     --length=<N> \
     --config=formal/tla/MCRevocationPropagation.cfg \
     formal/tla/RevocationPropagation.tla
@@ -95,11 +99,11 @@ formal/tla/counterexamples/RevocationEventuallySeen-<UTC-date>-<short-sha>.txt
 2. Which authority `b` fails to catch up, and why the relevant
    `Propagate(m)` is starved (or never enabled):
    - `<fill in>`
-3. Whether the lasso loop violates weak fairness on
-   `\E m \in pending : Propagate(m)` (i.e. some `m` is continuously
-   enabled in the cycle but never taken). If it does, the model is
-   unsound; if it does not, the property is genuinely violated and
-   needs spec or implementation work.
+3. Whether the lasso loop violates weak fairness on `PropagateAny`
+   (i.e. `pending` is non-empty in every state of the cycle but no
+   `Propagate(m)` is taken). If it does, the model is unsound; if it
+   does not, the property is genuinely violated and needs spec or
+   implementation work.
    - `<fill in>`
 
 ## Severity-tier guidance

@@ -107,11 +107,18 @@ jobs:
 
       - name: Apalache liveness check (RevocationEventuallySeen length=24)
         shell: bash
+        # RevocationEventuallySeen is a temporal property (uses the
+        # leads-to operator `~>` in formal/tla/RevocationPropagation.tla),
+        # so it is supplied to Apalache via `--temporal=` and NOT `--inv=`.
+        # `--inv=` is reserved for state invariants and would either error
+        # out or silently mischeck the property. The original M03.P3.T4
+        # invocation used `--inv=`; this was corrected in [cleanup-c9]
+        # after PR #66 review (comments r3142998135 and r3142998192).
         run: |
           set -euo pipefail
           apalache-mc check \
             --length=24 \
-            --inv=RevocationEventuallySeen \
+            --temporal=RevocationEventuallySeen \
             --config=formal/tla/MCRevocationPropagation.cfg \
             formal/tla/RevocationPropagation.tla
 
