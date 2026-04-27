@@ -10,6 +10,7 @@
     "packages/browser",
     "packages/workers",
     "packages/edge",
+    "packages/deno",
     "packages/conformance",
     "packages/elysia",
     "packages/express",
