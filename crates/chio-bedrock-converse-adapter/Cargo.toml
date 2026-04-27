@@ -22,10 +22,13 @@ aws_sdk_bedrockruntime_workspace_dependency = "1.130.0"
 
 [dependencies]
 aws-sdk-bedrockruntime = { workspace = true }
+aws-sdk-sts = "1"
+chio-attest-verify = { path = "../chio-attest-verify" }
 chio-tool-call-fabric = { path = "../chio-tool-call-fabric" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+toml = "0.8"
 
 [lints.clippy]
 unwrap_used = "deny"
