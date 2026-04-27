@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -285,15 +285,19 @@ impl Default for TerminalRegistry {
 }
 
 impl TerminalRegistry {
-    pub fn record(&mut self, request_id: RequestId, state: OperationTerminalState) {
-        if !self.states.contains_key(&request_id) {
-            self.order.push_back(request_id.clone());
-        }
-        self.states.insert(request_id, state);
+    pub fn record(&mut self, request_id: RequestId, state: OperationTerminalState) -> bool {
+        match self.states.entry(request_id.clone()) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(entry) => {
+                self.order.push_back(request_id);
+                entry.insert(state);
 
-        while self.order.len() > self.limit {
-            if let Some(oldest) = self.order.pop_front() {
-                self.states.remove(&oldest);
+                while self.order.len() > self.limit {
+                    if let Some(oldest) = self.order.pop_front() {
+                        self.states.remove(&oldest);
+                    }
+                }
+                true
             }
         }
     }
@@ -817,12 +821,23 @@ impl Session {
         terminal_state: OperationTerminalState,
     ) -> Result<InflightRequest, SessionError> {
         let inflight = self.inflight.complete(request_id)?;
-        self.write_terminal()
-            .record(request_id.clone(), terminal_state.clone());
-        if let Some(lineage) = self.write_request_lineage().get_mut(request_id) {
-            lineage.terminal_state = Some(terminal_state);
-        }
+        self.mark_request_terminal(request_id, terminal_state);
         Ok(inflight)
+    }
+
+    fn mark_request_terminal(
+        &self,
+        request_id: &RequestId,
+        terminal_state: OperationTerminalState,
+    ) {
+        let recorded = self
+            .write_terminal()
+            .record(request_id.clone(), terminal_state.clone());
+        if recorded {
+            if let Some(lineage) = self.write_request_lineage().get_mut(request_id) {
+                lineage.terminal_state = Some(terminal_state);
+            }
+        }
     }
 
     pub fn request_cancellation(&self, request_id: &RequestId) -> Result<(), SessionError> {
@@ -1199,6 +1214,50 @@ mod tests {
                 reason: "cancelled by client".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn terminal_registry_keeps_first_terminal_state() {
+        let mut registry = TerminalRegistry::default();
+        let request_id = RequestId::new("req-terminal");
+        let first_state = OperationTerminalState::Completed;
+
+        assert!(registry.record(request_id.clone(), first_state.clone()));
+        assert!(!registry.record(
+            request_id.clone(),
+            OperationTerminalState::Cancelled {
+                reason: "late cancellation".to_string(),
+            },
+        ));
+
+        assert_eq!(registry.len(), 1);
+        assert_eq!(registry.get(&request_id), Some(&first_state));
+    }
+
+    #[test]
+    fn terminal_marking_accepts_shared_session_borrow_and_updates_lineage() {
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let context = make_context("req-terminal-shared");
+        let terminal_state = OperationTerminalState::Incomplete {
+            reason: "upstream closed".to_string(),
+        };
+        let shared = &session;
+
+        shared.activate().unwrap();
+        shared
+            .track_request(&context, OperationKind::ToolCall, true)
+            .unwrap();
+        shared
+            .complete_request_with_terminal_state(&context.request_id, terminal_state.clone())
+            .unwrap();
+
+        assert!(shared.inflight().is_empty());
+        assert_eq!(
+            shared.terminal().get(&context.request_id),
+            Some(&terminal_state)
+        );
+        let lineage = shared.request_lineage(&context.request_id).unwrap();
+        assert_eq!(lineage.terminal_state, Some(terminal_state));
     }
 
     #[test]
