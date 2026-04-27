@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
 use dashmap::DashMap;
 
@@ -884,8 +885,8 @@ pub struct ChioKernel {
     resource_providers: Vec<Box<dyn ResourceProvider>>,
     prompt_providers: Vec<Box<dyn PromptProvider>>,
     sessions: DashMap<SessionId, Arc<Session>>,
-    receipt_log: Mutex<ReceiptLog>,
-    child_receipt_log: Mutex<ChildReceiptLog>,
+    receipt_log: ArcSwap<ReceiptLog>,
+    child_receipt_log: ArcSwap<ChildReceiptLog>,
     receipt_store: Option<Arc<dyn ReceiptStore>>,
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
@@ -927,10 +928,9 @@ pub struct ChioKernel {
     /// after `emergency_stopped` is set to `false`.
     emergency_stopped_since: AtomicU64,
     /// Operator-supplied reason for the most recent emergency stop. Set on
-    /// `emergency_stop`, cleared on `emergency_resume`. Guarded by a mutex
-    /// because the payload is a heap-allocated `String`; callers that only
-    /// need presence information can read `emergency_stopped` instead.
-    emergency_stop_reason: Mutex<Option<String>>,
+    /// `emergency_stop`, cleared on `emergency_resume`. Stored behind
+    /// ArcSwap so health probes can read the current reason without blocking.
+    emergency_stop_reason: ArcSwap<Option<String>>,
     /// Phase 18.2 memory-provenance chain. When installed, every
     /// governed `MemoryWrite` action appends an entry after the allow
     /// receipt is signed, and every `MemoryRead` attaches the latest
@@ -944,7 +944,7 @@ pub struct ChioKernel {
     /// here (fresh), the kernel invokes `federation_cosigner` after
     /// locally signing the receipt to obtain the origin kernel's
     /// co-signature. Absent in non-federated deployments.
-    federation_peers: RwLock<HashMap<String, chio_federation::FederationPeer>>,
+    federation_peers: ArcSwap<HashMap<String, chio_federation::FederationPeer>>,
     /// Phase 20.3 bilateral co-signer. Separate from the peer set so
     /// runtime can install it independently -- for instance, a deployment
     /// can declare peers while still using a mock cosigner in tests.
@@ -953,12 +953,12 @@ pub struct ChioKernel {
     /// Populated only when the post-sign hook fires successfully. Kept
     /// in-memory; persistent storage plugs in via the federation-state
     /// APIs already in chio-federation.
-    federation_dual_receipts: Mutex<HashMap<String, chio_federation::DualSignedReceipt>>,
+    federation_dual_receipts: DashMap<String, chio_federation::DualSignedReceipt>,
     /// Phase 20.3 operator-declared kernel identifier used as the
     /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
     /// encoding of the kernel's signing public key, but operators can
     /// override it to a stable DNS name via `with_federation_peers`.
-    federation_local_kernel_id: Mutex<Option<String>>,
+    federation_local_kernel_id: ArcSwap<Option<String>>,
     /// M05.P1.T3 mpsc-backed signing task handle. Owns a clone of
     /// `config.keypair` and pulls signing requests from a bounded
     /// channel; producers `.await` on backpressure rather than on a
@@ -1321,8 +1321,8 @@ impl ChioKernel {
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
             sessions: DashMap::new(),
-            receipt_log: Mutex::new(ReceiptLog::new()),
-            child_receipt_log: Mutex::new(ChildReceiptLog::new()),
+            receipt_log: ArcSwap::from_pointee(ReceiptLog::new()),
+            child_receipt_log: ArcSwap::from_pointee(ChildReceiptLog::new()),
             receipt_store: None,
             payment_adapter: None,
             price_oracle: None,
@@ -1340,12 +1340,12 @@ impl ChioKernel {
             )),
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
-            emergency_stop_reason: Mutex::new(None),
+            emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
             memory_provenance: None,
-            federation_peers: RwLock::new(HashMap::new()),
+            federation_peers: ArcSwap::from_pointee(HashMap::new()),
             federation_cosigner: None,
-            federation_dual_receipts: Mutex::new(HashMap::new()),
-            federation_local_kernel_id: Mutex::new(None),
+            federation_dual_receipts: DashMap::new(),
+            federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
             signing_task,
         }
     }
@@ -1516,12 +1516,11 @@ impl ChioKernel {
     /// onto `ChioKernel::new(config)`.
     #[must_use]
     pub fn with_federation_peers(self, peers: Vec<chio_federation::FederationPeer>) -> Self {
-        if let Ok(mut map) = self.federation_peers.write() {
-            map.clear();
-            for peer in peers {
-                map.insert(peer.kernel_id.clone(), peer);
-            }
+        let mut next = HashMap::new();
+        for peer in peers {
+            next.insert(peer.kernel_id.clone(), peer);
         }
+        self.federation_peers.store(Arc::new(next));
         self
     }
 
@@ -1541,9 +1540,8 @@ impl ChioKernel {
     /// signing public key is used. Setting this is recommended in
     /// production so receipts reference DNS names rather than raw keys.
     pub fn set_federation_local_kernel_id(&self, kernel_id: impl Into<String>) {
-        if let Ok(mut slot) = self.federation_local_kernel_id.lock() {
-            *slot = Some(kernel_id.into());
-        }
+        self.federation_local_kernel_id
+            .store(Arc::new(Some(kernel_id.into())));
     }
 
     /// Phase 20.3: resolve the active federation peer for
@@ -1553,8 +1551,8 @@ impl ChioKernel {
         remote_kernel_id: &str,
         now: u64,
     ) -> Option<chio_federation::FederationPeer> {
-        let map = self.federation_peers.read().ok()?;
-        let peer = map.get(remote_kernel_id)?.clone();
+        let peers = self.federation_peers.load();
+        let peer = peers.get(remote_kernel_id)?.clone();
         if peer.is_fresh(now) {
             Some(peer)
         } else {
@@ -1564,10 +1562,7 @@ impl ChioKernel {
 
     /// Phase 20.3: snapshot the currently-pinned federation peer set.
     pub fn federation_peers_snapshot(&self) -> Vec<chio_federation::FederationPeer> {
-        self.federation_peers
-            .read()
-            .map(|map| map.values().cloned().collect())
-            .unwrap_or_default()
+        self.federation_peers.load().values().cloned().collect()
     }
 
     /// Phase 20.3: look up a dual-signed receipt by the underlying
@@ -1580,19 +1575,15 @@ impl ChioKernel {
         receipt_id: &str,
     ) -> Option<chio_federation::DualSignedReceipt> {
         self.federation_dual_receipts
-            .lock()
-            .ok()?
             .get(receipt_id)
-            .cloned()
+            .map(|entry| entry.value().clone())
     }
 
     /// Local kernel identifier used in bilateral co-signing. Falls back
     /// to the hex encoding of the signing public key.
     pub fn federation_local_kernel_id(&self) -> String {
-        if let Ok(slot) = self.federation_local_kernel_id.lock() {
-            if let Some(id) = slot.as_ref() {
-                return id.clone();
-            }
+        if let Some(id) = self.federation_local_kernel_id.load_full().as_ref() {
+            return id.clone();
         }
         self.config.keypair.public_key().to_hex()
     }
@@ -1642,11 +1633,8 @@ impl ChioKernel {
         )
         .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
 
-        let mut map = self
-            .federation_dual_receipts
-            .lock()
-            .map_err(|_| KernelError::Internal("federation dual receipts lock poisoned".into()))?;
-        map.insert(receipt.id.clone(), dual);
+        self.federation_dual_receipts
+            .insert(receipt.id.clone(), dual);
         Ok(())
     }
 
@@ -1665,14 +1653,13 @@ impl ChioKernel {
     /// this method should call it; until then, capability revocation is
     /// delegated to natural expiration.
     ///
-    /// Fails closed: if the reason mutex is poisoned we still leave the
-    /// kernel in the stopped state (the flag is set before any fallible
-    /// step) and surface the poison to the caller.
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
         let now = current_unix_timestamp();
         // Record the timestamp first so any concurrent reader that observes
         // `emergency_stopped == true` sees a non-zero `since` value.
         self.emergency_stopped_since.store(now, Ordering::SeqCst);
+        self.emergency_stop_reason
+            .store(Arc::new(Some(reason.to_string())));
         self.emergency_stopped.store(true, Ordering::SeqCst);
 
         warn!(
@@ -1680,11 +1667,6 @@ impl ChioKernel {
             timestamp = now,
             "emergency stop engaged -- all evaluations will be denied"
         );
-
-        let mut slot = self.emergency_stop_reason.lock().map_err(|_| {
-            KernelError::Internal("emergency stop reason mutex poisoned".to_string())
-        })?;
-        *slot = Some(reason.to_string());
         Ok(())
     }
 
@@ -1700,10 +1682,8 @@ impl ChioKernel {
 
         warn!("emergency stop disengaged -- evaluations will resume");
 
-        let mut slot = self.emergency_stop_reason.lock().map_err(|_| {
-            KernelError::Internal("emergency stop reason mutex poisoned".to_string())
-        })?;
-        *slot = None;
+        self.emergency_stop_reason
+            .store(Arc::new(Option::<String>::None));
         Ok(())
     }
 
@@ -1729,16 +1709,13 @@ impl ChioKernel {
     }
 
     /// Return the operator-supplied reason for the current emergency stop,
-    /// or `None` when the kernel is running normally or the mutex is
-    /// poisoned (fail-closed readers should treat `None` as "no reason
-    /// available").
+    /// or `None` when the kernel is running normally.
     #[must_use]
     pub fn emergency_stop_reason(&self) -> Option<String> {
         if !self.is_emergency_stopped() {
             return None;
         }
-        let guard = self.emergency_stop_reason.lock().ok()?;
-        guard.clone()
+        self.emergency_stop_reason.load_full().as_ref().clone()
     }
 
     /// Install a DPoP nonce replay store and verification config.
@@ -3259,17 +3236,11 @@ impl ChioKernel {
 
     /// Read-only access to the receipt log.
     pub fn receipt_log(&self) -> ReceiptLog {
-        match self.receipt_log.lock() {
-            Ok(log) => log.clone(),
-            Err(_) => panic!("receipt log lock poisoned"),
-        }
+        self.receipt_log.load_full().as_ref().clone()
     }
 
     pub fn child_receipt_log(&self) -> ChildReceiptLog {
-        match self.child_receipt_log.lock() {
-            Ok(log) => log.clone(),
-            Err(_) => panic!("child receipt log lock poisoned"),
-        }
+        self.child_receipt_log.load_full().as_ref().clone()
     }
 
     pub fn guard_count(&self) -> usize {
@@ -5406,20 +5377,20 @@ impl ChioKernel {
     }
 
     fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
-        let chio_receipt_match = self.receipt_log.lock().ok().is_some_and(|log| {
-            log.receipts()
-                .iter()
-                .any(|receipt| receipt.id == receipt_id)
-        });
+        let receipt_log = self.receipt_log.load();
+        let chio_receipt_match = receipt_log
+            .receipts()
+            .iter()
+            .any(|receipt| receipt.id == receipt_id);
         if chio_receipt_match {
             return true;
         }
 
-        self.child_receipt_log.lock().ok().is_some_and(|log| {
-            log.receipts()
-                .iter()
-                .any(|receipt| receipt.id == receipt_id)
-        })
+        let child_receipt_log = self.child_receipt_log.load();
+        child_receipt_log
+            .receipts()
+            .iter()
+            .any(|receipt| receipt.id == receipt_id)
     }
 
     fn is_trusted_governed_continuation_signer(&self, signer: &chio_core::PublicKey) -> bool {
@@ -5441,24 +5412,24 @@ impl ChioKernel {
     }
 
     fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
-        let tool_match = self.receipt_log.lock().ok().and_then(|log| {
-            log.receipts()
-                .iter()
-                .find(|receipt| receipt.id == receipt_id)
-                .cloned()
-                .map(LocalReceiptArtifact::Tool)
-        });
+        let receipt_log = self.receipt_log.load();
+        let tool_match = receipt_log
+            .receipts()
+            .iter()
+            .find(|receipt| receipt.id == receipt_id)
+            .cloned()
+            .map(LocalReceiptArtifact::Tool);
         if tool_match.is_some() {
             return tool_match;
         }
 
-        self.child_receipt_log.lock().ok().and_then(|log| {
-            log.receipts()
-                .iter()
-                .find(|receipt| receipt.id == receipt_id)
-                .cloned()
-                .map(LocalReceiptArtifact::Child)
-        })
+        let child_receipt_log = self.child_receipt_log.load();
+        child_receipt_log
+            .receipts()
+            .iter()
+            .find(|receipt| receipt.id == receipt_id)
+            .cloned()
+            .map(LocalReceiptArtifact::Child)
     }
 
     fn unwind_aborted_monetary_invocation(
@@ -5663,12 +5634,25 @@ impl ChioKernel {
     fn record_child_receipts(&self, receipts: Vec<ChildRequestReceipt>) -> Result<(), KernelError> {
         for receipt in receipts {
             let _ = self.with_receipt_store(|store| Ok(store.append_child_receipt(&receipt)?))?;
-            self.child_receipt_log
-                .lock()
-                .map_err(|_| KernelError::Internal("child receipt log lock poisoned".to_string()))?
-                .append(receipt);
+            self.append_child_receipt_to_local_log(receipt);
         }
         Ok(())
+    }
+
+    pub(crate) fn append_chio_receipt_to_local_log(&self, receipt: ChioReceipt) {
+        self.receipt_log.rcu(|log| {
+            let mut next = log.as_ref().clone();
+            next.append(receipt.clone());
+            next
+        });
+    }
+
+    fn append_child_receipt_to_local_log(&self, receipt: ChildRequestReceipt) {
+        self.child_receipt_log.rcu(|log| {
+            let mut next = log.as_ref().clone();
+            next.append(receipt.clone());
+            next
+        });
     }
 }
 
