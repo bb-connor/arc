@@ -113,12 +113,14 @@ ignore = [
 [licenses]
 confidence-threshold = 0.93
 # Workspace-wide allow-list. Strictly permissive: no GPL / AGPL / LGPL /
-# EUPL or other strong copyleft. MPL-2.0 is allowed because it is a
-# file-level (weak) copyleft that does not infect statically-linked
-# consumers, and the `uniffi` family (uniffi, uniffi_bindgen, uniffi_build,
-# uniffi_checksum_derive, uniffi_core, uniffi_macros, uniffi_meta,
-# uniffi_testing, uniffi_udl) all ship under MPL-2.0; pinning each as a
-# per-crate exception would push us past the ~10-entry exception cap.
+# EUPL or other strong copyleft, and MPL-2.0 is NOT in the global list
+# (cleanup-c11c; PR #28 review threads r3142866284 / r3142870711). MPL-2.0
+# is file-level (weak) copyleft - it does not infect statically-linked
+# consumers - but admitting it globally would silently green-light any
+# new MPL-2.0 dependency without explicit review. Instead the uniffi
+# family (which is the only legitimate consumer in the graph today) is
+# pinned via per-crate `[[licenses.exceptions]]` entries below; new MPL
+# transitives must add a similar pinned exception.
 # The prior `Unicode-DFS-2016` entry was removed because the Unicode
 # consortium relicensed under `Unicode-3.0` (already allowed) and no
 # remaining crate in the lockfile ships the older identifier (cargo-deny
@@ -133,7 +135,6 @@ allow = [
     "Unicode-3.0",
     "CC0-1.0",
     "Zlib",
-    "MPL-2.0",
 ]
 
 # Workspace-internal crates (notably examples/guards/{tool-gate,enriched-inspector})
@@ -170,6 +171,39 @@ allow = ["CDLA-Permissive-2.0"]
 # Source: https://crates.io/crates/webpki-root-certs (Cargo.toml `license` field).
 name = "webpki-root-certs"
 allow = ["CDLA-Permissive-2.0"]
+
+# uniffi family: weak-copyleft MPL-2.0 (cleanup-c11c). Pinned per crate
+# instead of widening the global allow list. Each crate is named below
+# (cargo-deny does not support glob `name` matchers for exceptions). Add
+# a sibling block for any new uniffi sub-crate that lands; do not move
+# MPL-2.0 back into [licenses].allow without CODEOWNERS sign-off.
+[[licenses.exceptions]]
+name = "uniffi"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_bindgen"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_build"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_checksum_derive"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_core"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_macros"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_meta"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_testing"
+allow = ["MPL-2.0"]
+[[licenses.exceptions]]
+name = "uniffi_udl"
+allow = ["MPL-2.0"]
 
 [bans]
 multiple-versions = "deny"
