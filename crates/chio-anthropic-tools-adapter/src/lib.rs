@@ -10,11 +10,11 @@
 //!
 //! This crate lands in four atomic tickets:
 //!
-//! - **T1 (this ticket)** scaffolds the crate, pins the API version, and
+//! - **T1** scaffolds the crate, pins the API version, and
 //!   declares the `computer-use` cargo feature. It defines the in-memory
 //!   shape of [`native::ToolUseBlock`], [`native::ToolResultBlock`], and the
 //!   structural [`transport::Transport`] trait. No HTTP client and no
-//!   [`chio_tool_call_fabric::ProviderAdapter`] impl ship in T1.
+//!   [`chio_tool_call_fabric::ProviderAdapter`] impl shipped in T1.
 //! - **T2** implements the [`chio_tool_call_fabric::ProviderAdapter`] trait
 //!   for batch `messages.create`: parse `tool_use` blocks, build
 //!   [`chio_tool_call_fabric::ToolInvocation`], lower the kernel verdict
@@ -39,10 +39,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod adapter;
 pub mod native;
 pub mod transport;
 
+use std::collections::VecDeque;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use chio_tool_call_fabric::ProviderId;
 use serde::{Deserialize, Serialize};
@@ -99,14 +102,15 @@ impl AnthropicAdapterConfig {
 
 /// Adapter handle.
 ///
-/// T1 holds the configuration and a shared [`Transport`]; T2/T3 layer the
-/// `messages.create` and `messages.stream` flows on top via the
-/// [`chio_tool_call_fabric::ProviderAdapter`] trait. The adapter is `Clone`
-/// because the streaming work in T3 hands a borrow into a per-stream task.
+/// Holds the configuration, shared [`Transport`], and the tool-use ids that
+/// need to be lowered into the next Anthropic `tool_result` block. The
+/// adapter is `Clone` because the streaming work in T3 hands a borrow into a
+/// per-stream task.
 #[derive(Clone)]
 pub struct AnthropicAdapter {
     config: AnthropicAdapterConfig,
     transport: Arc<dyn Transport>,
+    pending_tool_use_ids: Arc<Mutex<VecDeque<String>>>,
 }
 
 impl AnthropicAdapter {
@@ -116,7 +120,11 @@ impl AnthropicAdapter {
     /// client can back several adapter instances (one per workspace, for
     /// example).
     pub fn new(config: AnthropicAdapterConfig, transport: Arc<dyn Transport>) -> Self {
-        Self { config, transport }
+        Self {
+            config,
+            transport,
+            pending_tool_use_ids: Arc::new(Mutex::new(VecDeque::new())),
+        }
     }
 
     /// Provider identifier for this adapter.
