@@ -171,3 +171,11 @@ proptest = "1.10"
 criterion = "0.5"
 tempfile = "3"
 jsonschema = { version = "0.46", default-features = false, features = ["resolve-file"] }
+# M05 async-kernel pivot (Phase 0): pin concurrency primitives + tower feature
+# set in the workspace so member crates can share resolved versions during the
+# upcoming async-kernel work. See .planning/trajectory/05-async-kernel-real.md.
+dashmap = "6"
+arc-swap = "1"
+loom = "0.7"
+parking_lot = "0.12"
+tower = { version = "0.5", features = ["util", "make", "buffer", "timeout", "load-shed", "limit", "retry"] }
