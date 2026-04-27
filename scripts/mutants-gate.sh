@@ -29,10 +29,25 @@
 #                         ratio threshold check).
 #   MUTANTS_EXIT        : exit code from the cargo-mutants step
 #                         (0 = clean, non-zero = survivors).
+#   MUTANTS_GATE_OVERRIDE_REASON
+#                       : optional escape hatch (M02.P3.T2). When set to a
+#                         non-empty string, a blocking-fail verdict is
+#                         downgraded to a loud advisory pass: the script
+#                         emits a `WARN mutants-gate-override` line on
+#                         stderr, appends an audit row to
+#                         docs/fuzzing/mutants-overrides.log (timestamp,
+#                         package, exit code, cycle_end_tag, reason) and
+#                         exits 0. Empty/unset = no override (default).
+#                         The corresponding label-based override path is a
+#                         PR titled `mutants-gate-override` that clears
+#                         cycle_end_tag in releases.toml; CODEOWNERS gates
+#                         that PR on principal-engineer review.
 #
 # Exit codes:
-#   0 advisory pass (or blocking pass when survivors == 0)
-#   1 blocking fail (cycle_end_tag non-empty AND survivors detected)
+#   0 advisory pass (or blocking pass when survivors == 0, or
+#     blocking-fail downgraded by MUTANTS_GATE_OVERRIDE_REASON)
+#   1 blocking fail (cycle_end_tag non-empty AND survivors detected AND
+#     no override reason supplied)
 #
 # This script is invoked by .github/workflows/mutants.yml's mutants-pr
 # and mutants-nightly jobs. It is also safe to run locally:
@@ -48,6 +63,7 @@ set -euo pipefail
 PACKAGE="${MUTANTS_PACKAGE:-unknown}"
 OUTPUT_DIR="${MUTANTS_OUTPUT_DIR:-}"
 EXIT_CODE="${MUTANTS_EXIT:-0}"
+OVERRIDE_REASON="${MUTANTS_GATE_OVERRIDE_REASON:-}"
 
 # Locate releases.toml relative to the script. The script lives in
 # scripts/ at the repo root, so releases.toml sits one directory up.
@@ -107,4 +123,37 @@ printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=fail (cycle_en
 if [[ -n "${OUTPUT_DIR}" && -d "${OUTPUT_DIR}" ]]; then
     printf 'mutants-gate: see %s for outcomes.json detail\n' "${OUTPUT_DIR}" >&2
 fi
+
+# M02.P3.T2 escape hatch: MUTANTS_GATE_OVERRIDE_REASON downgrades a blocking
+# fail to a loud advisory pass and appends an audit row. The corresponding
+# permanent path is a PR labelled `mutants-gate-override` that clears
+# cycle_end_tag in releases.toml; CODEOWNERS gates that PR on principal
+# engineer review. The env-var path here exists for in-flight CI runs
+# where waiting on a CODEOWNERS-reviewed PR is not feasible (e.g. a
+# release-train hot-fix). Either path leaves an audit trail.
+if [[ -n "${OVERRIDE_REASON}" ]]; then
+    audit_log="${repo_root}/docs/fuzzing/mutants-overrides.log"
+    timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    # Sanitize the reason: collapse newlines/tabs to single spaces so the
+    # audit row stays on one line. Pipe character is reserved as the field
+    # separator; replace any embedded pipes with a slash.
+    reason_clean="${OVERRIDE_REASON//$'\n'/ }"
+    reason_clean="${reason_clean//$'\t'/ }"
+    reason_clean="${reason_clean//|/\/}"
+    actor="${GITHUB_ACTOR:-${USER:-unknown}}"
+    if [[ -f "${audit_log}" ]]; then
+        printf '%s | package=%s | exit=%s | cycle_end_tag=%s | actor=%s | reason=%s\n' \
+            "${timestamp}" "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}" \
+            "${actor}" "${reason_clean}" >> "${audit_log}"
+    else
+        printf 'mutants-gate: WARN audit log missing at %s; override not recorded\n' \
+            "${audit_log}" >&2
+    fi
+    printf 'mutants-gate: WARN mutants-gate-override engaged package=%s actor=%s reason=%s\n' \
+        "${PACKAGE}" "${actor}" "${reason_clean}" >&2
+    printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=override (cycle_end_tag=%s)\n' \
+        "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}"
+    exit 0
+fi
+
 exit 1
