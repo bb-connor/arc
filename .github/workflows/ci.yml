@@ -18,6 +18,7 @@ name: CI
 #     - "cargo-vet (supply-chain audit)"                     # cargo-vet job
 #     - "cargo-deny (supply-chain bans/advisories/licenses)" # cargo-deny job
 #     - "freeze-guard"                                       # m05-freeze-guard.yml
+#     - "bench-regression"                                  # bench-regression.yml
 #
 #   advisory (do not gate):
 #     - "JVM build", "Coverage", "Mutants"
