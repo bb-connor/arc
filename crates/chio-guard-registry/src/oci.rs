@@ -429,18 +429,7 @@ pub struct PulledGuardArtifact {
 impl PulledGuardArtifact {
     fn from_image_data(reference: GuardOciRef, image: ImageData) -> Result<Self> {
         validate_config(&image.config)?;
-        validate_layers(&image.layers)?;
-
-        let mut layers = image.layers.into_iter();
-        let Some(wit) = layers.next() else {
-            return Err(GuardRegistryError::LayerCount { actual: 0 });
-        };
-        let Some(module) = layers.next() else {
-            return Err(GuardRegistryError::LayerCount { actual: 1 });
-        };
-        let Some(manifest) = layers.next() else {
-            return Err(GuardRegistryError::LayerCount { actual: 2 });
-        };
+        let (wit, module, manifest) = normalize_layers(image.layers)?;
 
         Ok(Self {
             reference,
@@ -464,31 +453,41 @@ fn validate_config(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn validate_layers(layers: &[ImageLayer]) -> Result<()> {
-    const EXPECTED: [&str; 3] = [
-        GUARD_WIT_LAYER_MEDIA_TYPE,
-        GUARD_MODULE_LAYER_MEDIA_TYPE,
-        GUARD_MANIFEST_LAYER_MEDIA_TYPE,
-    ];
+fn normalize_layers(layers: Vec<ImageLayer>) -> Result<(ImageLayer, ImageLayer, ImageLayer)> {
+    const EXPECTED_LEN: usize = 3;
 
-    if layers.len() != EXPECTED.len() {
+    if layers.len() != EXPECTED_LEN {
         return Err(GuardRegistryError::LayerCount {
             actual: layers.len(),
         });
     }
 
-    for (index, expected) in EXPECTED.iter().enumerate() {
-        let actual = &layers[index].media_type;
-        if actual != expected {
-            return Err(GuardRegistryError::LayerMediaType {
-                index,
-                expected,
-                actual: actual.clone(),
-            });
-        }
-    }
+    let mut layers = layers;
+    let wit = take_layer(&mut layers, 0, GUARD_WIT_LAYER_MEDIA_TYPE)?;
+    let module = take_layer(&mut layers, 1, GUARD_MODULE_LAYER_MEDIA_TYPE)?;
+    let manifest = take_layer(&mut layers, 2, GUARD_MANIFEST_LAYER_MEDIA_TYPE)?;
 
-    Ok(())
+    Ok((wit, module, manifest))
+}
+
+fn take_layer(
+    layers: &mut Vec<ImageLayer>,
+    index: usize,
+    expected: &'static str,
+) -> Result<ImageLayer> {
+    let Some(position) = layers.iter().position(|layer| layer.media_type == expected) else {
+        let actual = layers
+            .get(index)
+            .or_else(|| layers.first())
+            .map_or_else(|| "<missing>".to_owned(), |layer| layer.media_type.clone());
+        return Err(GuardRegistryError::LayerMediaType {
+            index,
+            expected,
+            actual,
+        });
+    };
+
+    Ok(layers.remove(position))
 }
 
 /// Layer bytes with their normalized Chio role.
@@ -601,9 +600,9 @@ mod tests {
     fn validates_guard_artifact_shape() {
         let reference = parsed_reference();
         let image = image_data(vec![
+            ImageLayer::new(vec![3], GUARD_MANIFEST_LAYER_MEDIA_TYPE.to_owned(), None),
             ImageLayer::new(vec![1], GUARD_WIT_LAYER_MEDIA_TYPE.to_owned(), None),
             ImageLayer::new(vec![2], GUARD_MODULE_LAYER_MEDIA_TYPE.to_owned(), None),
-            ImageLayer::new(vec![3], GUARD_MANIFEST_LAYER_MEDIA_TYPE.to_owned(), None),
         ]);
 
         let artifact = match PulledGuardArtifact::from_image_data(reference, image) {
@@ -613,8 +612,11 @@ mod tests {
 
         assert_eq!(artifact.config, b"{}".to_vec());
         assert_eq!(artifact.wit.role, GUARD_WIT_LAYER_ROLE);
+        assert_eq!(artifact.wit.data, vec![1]);
         assert_eq!(artifact.module.role, GUARD_MODULE_LAYER_ROLE);
+        assert_eq!(artifact.module.data, vec![2]);
         assert_eq!(artifact.manifest.role, GUARD_MANIFEST_LAYER_ROLE);
+        assert_eq!(artifact.manifest.data, vec![3]);
         assert_eq!(artifact.registry_manifest_digest.as_deref(), Some(DIGEST));
     }
 
@@ -643,14 +645,14 @@ mod tests {
             Err(GuardRegistryError::LayerCount { actual: 2 })
         ));
 
-        let wrong_order = image_data(vec![
-            ImageLayer::new(vec![1], GUARD_MODULE_LAYER_MEDIA_TYPE.to_owned(), None),
-            ImageLayer::new(vec![2], GUARD_WIT_LAYER_MEDIA_TYPE.to_owned(), None),
-            ImageLayer::new(vec![3], GUARD_MANIFEST_LAYER_MEDIA_TYPE.to_owned(), None),
+        let duplicate_layer = image_data(vec![
+            ImageLayer::new(vec![1], GUARD_WIT_LAYER_MEDIA_TYPE.to_owned(), None),
+            ImageLayer::new(vec![2], GUARD_MODULE_LAYER_MEDIA_TYPE.to_owned(), None),
+            ImageLayer::new(vec![3], GUARD_MODULE_LAYER_MEDIA_TYPE.to_owned(), None),
         ]);
         assert!(matches!(
-            PulledGuardArtifact::from_image_data(reference, wrong_order),
-            Err(GuardRegistryError::LayerMediaType { index: 0, .. })
+            PulledGuardArtifact::from_image_data(reference, duplicate_layer),
+            Err(GuardRegistryError::LayerMediaType { index: 2, .. })
         ));
     }
 

@@ -179,6 +179,7 @@ url = "2"
 proptest = "1.10"
 criterion = "0.5"
 tempfile = "3"
+testcontainers = { version = "0.27.3", default-features = false }
 jsonschema = { version = "0.46", default-features = false, features = ["resolve-file"] }
 # M05 async-kernel pivot (Phase 0): pin concurrency primitives + tower feature
 # set in the workspace so member crates can share resolved versions during the
