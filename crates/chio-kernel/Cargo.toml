@@ -105,6 +105,11 @@ harness = false
 name = "replay_proptest"
 path = "tests/replay_proptest.rs"
 
+# M05.P1.T7: dual-track async/sync receipt byte-identity gate.
+[[test]]
+name = "dual_track_receipt_identity"
+path = "tests/dual_track_receipt_identity.rs"
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
