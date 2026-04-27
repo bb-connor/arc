@@ -471,6 +471,9 @@ pub mod wasmtime_backend {
             reason: e.to_string(),
         })?;
 
+        // WIT world pinning (M06.P1.T4) -- fail-closed before instantiation.
+        crate::manifest::verify_wit_world(manifest.wit_world.as_deref())?;
+
         // Signing policy (Phase 1.3) -- fail-closed.
         crate::manifest::verify_guard_signature(wasm_path, &wasm_bytes, manifest)?;
 
@@ -1159,6 +1162,7 @@ pub mod wasmtime_backend {
                         name: guard_spec.name.clone(),
                         version: guard_spec.version.clone(),
                         abi_version: "1".to_string(),
+                        wit_world: Some(crate::manifest::REQUIRED_WIT_WORLD.to_string()),
                         wasm_path: module_path.clone(),
                         wasm_sha256: hex::encode(sha2::Sha256::digest(&bytes)),
                         config: std::collections::HashMap::new(),
