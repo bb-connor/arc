@@ -11,8 +11,8 @@ use std::time::SystemTime;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_tool_call_fabric::{
-    Principal, ProvenanceStamp, ProviderAdapter, ProviderError, ProviderId, ProviderRequest,
-    ProviderResponse, ToolInvocation, ToolResult, VerdictResult,
+    DenyReason, Principal, ProvenanceStamp, ProviderAdapter, ProviderError, ProviderId,
+    ProviderRequest, ProviderResponse, ToolInvocation, ToolResult, VerdictResult,
 };
 use serde_json::{json, Value};
 
@@ -191,19 +191,161 @@ impl ProviderAdapter for OpenAiAdapter {
 
     fn lower<'life0, 'async_trait>(
         &'life0 self,
-        _verdict: VerdictResult,
-        _result: ToolResult,
+        verdict: VerdictResult,
+        result: ToolResult,
     ) -> Pin<Box<dyn Future<Output = Result<ProviderResponse, ProviderError>> + Send + 'async_trait>>
     where
         'life0: 'async_trait,
         Self: 'async_trait,
     {
-        Box::pin(async move {
-            Err(ProviderError::Malformed(
-                "OpenAI ProviderAdapter::lower lands in M07.P2.T3".to_string(),
-            ))
-        })
+        Box::pin(async move { lower_tool_outputs(verdict, result) })
     }
+}
+
+struct PendingToolOutput {
+    call_id: String,
+    output: Option<Value>,
+}
+
+fn lower_tool_outputs(
+    verdict: VerdictResult,
+    result: ToolResult,
+) -> Result<ProviderResponse, ProviderError> {
+    let pending = parse_tool_result(result)?;
+    let tool_outputs = pending
+        .iter()
+        .map(|entry| lower_output_entry(&verdict, entry))
+        .collect::<Result<Vec<_>, _>>()?;
+    let response =
+        canonical_json_bytes(&json!({ "tool_outputs": tool_outputs })).map_err(|error| {
+            ProviderError::Malformed(format!(
+                "OpenAI tool_outputs failed canonical JSON encoding: {error}"
+            ))
+        })?;
+    Ok(ProviderResponse(response))
+}
+
+fn parse_tool_result(result: ToolResult) -> Result<Vec<PendingToolOutput>, ProviderError> {
+    let value: Value = serde_json::from_slice(&result.0).map_err(|error| {
+        ProviderError::Malformed(format!("OpenAI ToolResult was not JSON: {error}"))
+    })?;
+
+    let entries = match &value {
+        Value::Array(values) => values
+            .iter()
+            .map(parse_tool_result_entry)
+            .collect::<Result<Vec<_>, _>>()?,
+        Value::Object(_) => {
+            if let Some(values) = tool_outputs_array(&value) {
+                values
+                    .iter()
+                    .map(parse_tool_result_entry)
+                    .collect::<Result<Vec<_>, _>>()?
+            } else {
+                vec![parse_tool_result_entry(&value)?]
+            }
+        }
+        _ => {
+            return Err(ProviderError::Malformed(
+                "OpenAI ToolResult must be an object, array, or tool_outputs envelope".to_string(),
+            ));
+        }
+    };
+
+    if entries.is_empty() {
+        return Err(ProviderError::Malformed(
+            "OpenAI ToolResult did not contain any tool outputs".to_string(),
+        ));
+    }
+
+    Ok(entries)
+}
+
+fn tool_outputs_array(value: &Value) -> Option<&Vec<Value>> {
+    value
+        .get("tool_outputs")
+        .or_else(|| value.get("outputs"))
+        .and_then(Value::as_array)
+}
+
+fn parse_tool_result_entry(value: &Value) -> Result<PendingToolOutput, ProviderError> {
+    let call_id = value
+        .get("call_id")
+        .or_else(|| value.get("tool_call_id"))
+        .and_then(Value::as_str)
+        .and_then(non_empty)
+        .ok_or_else(|| {
+            ProviderError::Malformed(
+                "OpenAI ToolResult entry was missing non-empty call_id".to_string(),
+            )
+        })?;
+
+    Ok(PendingToolOutput {
+        call_id,
+        output: value.get("output").cloned(),
+    })
+}
+
+fn lower_output_entry(
+    verdict: &VerdictResult,
+    entry: &PendingToolOutput,
+) -> Result<Value, ProviderError> {
+    match verdict {
+        VerdictResult::Allow { .. } => allow_tool_output(entry),
+        VerdictResult::Deny { reason, receipt_id } => {
+            deny_tool_output(entry, reason, &receipt_id.0)
+        }
+    }
+}
+
+fn allow_tool_output(entry: &PendingToolOutput) -> Result<Value, ProviderError> {
+    let output = entry.output.as_ref().ok_or_else(|| {
+        ProviderError::Malformed(format!(
+            "OpenAI ToolResult entry `{}` was missing output for allow verdict",
+            entry.call_id
+        ))
+    })?;
+
+    Ok(json!({
+        "type": "function_call_output",
+        "call_id": entry.call_id,
+        "output": output_string(output)?,
+    }))
+}
+
+fn deny_tool_output(
+    entry: &PendingToolOutput,
+    reason: &DenyReason,
+    receipt_id: &str,
+) -> Result<Value, ProviderError> {
+    let deny_payload = json!({
+        "error": "chio_denied_tool_call",
+        "reason": reason,
+        "receipt_id": receipt_id,
+        "synthetic": true,
+        "verdict": "deny",
+    });
+
+    Ok(json!({
+        "type": "function_call_output",
+        "call_id": entry.call_id,
+        "output": output_string(&deny_payload)?,
+    }))
+}
+
+fn output_string(value: &Value) -> Result<String, ProviderError> {
+    if let Some(text) = value.as_str() {
+        return Ok(text.to_string());
+    }
+
+    let bytes = canonical_json_bytes(value).map_err(|error| {
+        ProviderError::Malformed(format!(
+            "OpenAI tool output failed canonical JSON encoding: {error}"
+        ))
+    })?;
+    String::from_utf8(bytes).map_err(|error| {
+        ProviderError::Malformed(format!("OpenAI tool output was not UTF-8: {error}"))
+    })
 }
 
 struct ParsedPayload {
