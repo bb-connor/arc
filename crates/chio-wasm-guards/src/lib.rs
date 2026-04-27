@@ -53,6 +53,7 @@ pub mod epoch;
 pub mod error;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod host;
+pub mod hot_reload;
 pub mod manifest;
 pub mod placeholders;
 pub mod runtime;
@@ -76,6 +77,7 @@ pub use epoch::EpochId;
 pub use error::WasmGuardError;
 #[cfg(feature = "wasmtime-runtime")]
 pub use host::WasmHostState;
+pub use hot_reload::{Engine, HotReloadError, ReloadBackendFactory};
 pub use manifest::{
     load_signature_sidecar, signature_sidecar_path, signed_module_message, verify_guard_signature,
     verify_signed_module, write_signature_sidecar, GuardManifest, SignedWasmModule,
