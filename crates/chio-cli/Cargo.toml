@@ -72,6 +72,7 @@ rand_core = { workspace = true }
 chio-credit = { path = "../chio-credit" }
 chio-open-market = { path = "../chio-open-market" }
 chio-underwriting = { path = "../chio-underwriting" }
+insta = { version = "1.42", features = ["json", "redactions"] }
 rand_core = { workspace = true }
 tempfile = "3"
 wiremock = "0.6"
