@@ -6,6 +6,7 @@
 
 pub mod cache;
 pub mod oci;
+pub mod offline;
 pub mod publish;
 pub mod pull;
 pub mod verify;
@@ -26,10 +27,18 @@ pub use oci::{
     GUARD_MODULE_LAYER_MEDIA_TYPE, GUARD_MODULE_LAYER_ROLE, GUARD_WIT_LAYER_MEDIA_TYPE,
     GUARD_WIT_LAYER_ROLE,
 };
+pub use offline::{
+    load_guard_with_policy, GuardNetworkState, GuardOfflineLoad, GuardOfflineLoadError,
+    GuardOfflineLoadRequest, GuardOfflineLoadResult,
+};
 pub use publish::{
     GuardArtifactConfig, GuardPublishArtifact, GuardPublishArtifactInput, GuardPublishRef,
     GuardPublishResponse, GUARD_LAYER_ROLE_ANNOTATION, GUARD_OCI_MANIFEST_MEDIA_TYPE,
     GUARD_SIGNER_SUBJECT_ANNOTATION, GUARD_WIT_WORLD, GUARD_WIT_WORLD_ANNOTATION,
 };
 pub use pull::{GuardPullRequest, GuardPullResponse, RESERVED_SIGSTORE_BUNDLE_JSON};
-pub use verify::{expected_identity_from_config, GuardSigstoreVerifier};
+pub use verify::{
+    expected_identity_from_config, verify_dual_mode, GuardLoadEvent, GuardLoadEventResult,
+    GuardLoadSource, GuardSigstoreVerifier, GuardVerificationKind, GuardVerificationReport,
+    GuardVerifiedSignature, CHIO_GUARD_VERIFY_EVENT,
+};
