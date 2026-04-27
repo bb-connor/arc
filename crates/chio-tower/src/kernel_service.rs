@@ -1,13 +1,15 @@
 //! Tower service wrapper for kernel tool-call dispatch.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
+use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::timeout::TimeoutLayer;
-use tower::Service;
+use tower::{Service, ServiceExt};
 use tower_layer::Layer;
 
 /// Tenant identifier carried for tower-side admission layers.
@@ -171,6 +173,89 @@ where
     }
 }
 
+/// Per-tenant concurrency limiter for kernel requests.
+///
+/// Each tenant key gets its own bounded tower concurrency service. Waiting for
+/// capacity in one tenant partition does not consume readiness for another
+/// tenant partition.
+#[derive(Clone, Debug)]
+pub struct TenantConcurrencyLimitLayer {
+    per_tenant_limit: usize,
+}
+
+impl TenantConcurrencyLimitLayer {
+    /// Create a new per-tenant concurrency limit layer.
+    pub fn new(per_tenant_limit: usize) -> Self {
+        Self { per_tenant_limit }
+    }
+}
+
+impl<S> Layer<S> for TenantConcurrencyLimitLayer {
+    type Service = TenantConcurrencyLimitService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        TenantConcurrencyLimitService {
+            inner,
+            per_tenant_limit: self.per_tenant_limit,
+            tenants: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+/// Service emitted by [`TenantConcurrencyLimitLayer`].
+#[derive(Clone, Debug)]
+pub struct TenantConcurrencyLimitService<S> {
+    inner: S,
+    per_tenant_limit: usize,
+    tenants: Arc<Mutex<HashMap<TenantId, ConcurrencyLimit<S>>>>,
+}
+
+impl<S> TenantConcurrencyLimitService<S>
+where
+    S: Clone,
+{
+    fn service_for_tenant(
+        &self,
+        tenant_id: &TenantId,
+    ) -> Result<ConcurrencyLimit<S>, KernelServiceError> {
+        let mut tenants = self.tenants.lock().map_err(|_| {
+            KernelServiceError::Middleware("tenant concurrency limit state poisoned".to_string())
+        })?;
+        let service = tenants
+            .entry(tenant_id.clone())
+            .or_insert_with(|| {
+                ConcurrencyLimitLayer::new(self.per_tenant_limit).layer(self.inner.clone())
+            })
+            .clone();
+        Ok(service)
+    }
+}
+
+impl<S> Service<KernelRequest> for TenantConcurrencyLimitService<S>
+where
+    S: Service<KernelRequest, Error = KernelServiceError> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = KernelServiceError;
+    type Future =
+        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: KernelRequest) -> Self::Future {
+        let service = self.service_for_tenant(&req.tenant_id);
+
+        Box::pin(async move {
+            let mut service = service?;
+            service.ready().await?.call(req).await
+        })
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 struct KernelTimeoutErrorLayer;
 
@@ -221,15 +306,18 @@ fn normalize_timeout_error(error: tower::BoxError) -> KernelServiceError {
     KernelServiceError::Middleware(error.to_string())
 }
 
-/// Build the initial M05 P3 kernel service stack.
+/// Build the M05 P3 kernel service stack.
 ///
-/// Request flow is trace, then timeout, then kernel dispatch. Later P3 tickets
-/// add tenant concurrency, load shedding, and auth prechecks around this stack.
+/// Request flow is trace, then timeout, then per-tenant concurrency, then
+/// kernel dispatch. Later P3 tickets add load shedding and auth prechecks
+/// around this stack.
 pub fn build_layered(
     kernel: Arc<chio_kernel::ChioKernel>,
+    per_tenant_limit: usize,
     request_timeout: Duration,
 ) -> impl Service<KernelRequest, Response = KernelResponse, Error = KernelServiceError> + Clone {
     let service = KernelService::new(kernel);
+    let service = TenantConcurrencyLimitLayer::new(per_tenant_limit).layer(service);
     let service = TimeoutLayer::new(request_timeout).layer(service);
     let service = KernelTimeoutErrorLayer.layer(service);
     KernelTraceLayer.layer(service)
@@ -344,7 +432,7 @@ mod tests {
         let mut kernel = ChioKernel::new(make_config());
         kernel.register_tool_server(Box::new(EchoServer));
         let request = make_kernel_request(&kernel);
-        let mut service = build_layered(Arc::new(kernel), Duration::from_secs(5));
+        let mut service = build_layered(Arc::new(kernel), 16, Duration::from_secs(5));
 
         let response = service
             .ready()
