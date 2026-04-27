@@ -1,0 +1,113 @@
+# release-tagged.yml - Auto-append a row to release_compat_matrix.toml when
+# a new release is published (M04 P3.T5).
+#
+# Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
+# Phase 3 task 5: "Add release-tagged.yml automation that opens a PR adding
+# a row when release-qualification.yml publishes a new tag." This workflow
+# chains off release-qualification.yml: when release-qualification finalizes
+# a new tagged release, this workflow auto-appends a row to
+# tests/replay/release_compat_matrix.toml and opens a PR for human review.
+#
+# Why a PR (not a direct commit)? The bundle_sha256 emitted here is a
+# deterministic placeholder ("pending-${tag}" hashed). A reviewer must:
+#   1. Replace the bundle_sha256 with the real digest emitted by
+#      release-qualification.yml's artifact list.
+#   2. Set supported_until per the ratchet rule (current tag + 5 minor).
+#   3. Decide compat (default "supported"; flip to "best_effort" if the
+#      diff against the previous bundle exceeds threshold).
+# The PR target branch is project/roadmap-04-25-2026 while that line of
+# work is open; once it merges to main the base should be flipped to main.
+
+name: release-tagged
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write       # push the auto-append branch
+  pull-requests: write  # open the PR
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  append-compat-row:
+    name: append-compat-row
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: project/roadmap-04-25-2026
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Compute new entry
+        id: compute
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.release.tag_name }}"
+          released_at="$(date -u +%Y-%m-%d)"
+          bundle_url="https://github.com/${{ github.repository }}/releases/download/${tag}/replay-bundle.tgz"
+          # release-qualification.yml publishes the real digest as a workflow
+          # artifact. Until this workflow learns to fetch that artifact, emit
+          # a deterministic placeholder so the PR diff is reviewable; the
+          # human reviewer replaces it before merging.
+          bundle_sha256="$(printf 'pending-%s' "${tag}" | sha256sum | awk '{print $1}')"
+          {
+            echo "tag=${tag}"
+            echo "released_at=${released_at}"
+            echo "bundle_url=${bundle_url}"
+            echo "bundle_sha256=${bundle_sha256}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Append entry to release_compat_matrix.toml
+        run: |
+          set -euo pipefail
+          tag="${{ steps.compute.outputs.tag }}"
+          released_at="${{ steps.compute.outputs.released_at }}"
+          bundle_url="${{ steps.compute.outputs.bundle_url }}"
+          bundle_sha256="${{ steps.compute.outputs.bundle_sha256 }}"
+          matrix="tests/replay/release_compat_matrix.toml"
+          if [ ! -f "${matrix}" ]; then
+            echo "ERROR: ${matrix} is missing." >&2
+            exit 1
+          fi
+          # Append a fully-populated entry. supported_until is left empty;
+          # the reviewer fills it in per the ratchet rule documented in
+          # docs/replay-compat.md.
+          {
+            printf '\n'
+            printf '[[entry]]\n'
+            printf 'tag = "%s"\n' "${tag}"
+            printf 'released_at = "%s"\n' "${released_at}"
+            printf 'bundle_url = "%s"\n' "${bundle_url}"
+            printf 'bundle_sha256 = "%s"\n' "${bundle_sha256}"
+            printf 'compat = "supported"\n'
+            printf 'supported_until = ""\n'
+            printf 'notes = "auto-appended by release-tagged.yml"\n'
+          } >> "${matrix}"
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          base: project/roadmap-04-25-2026
+          branch: chore/release-tagged-${{ steps.compute.outputs.tag }}
+          title: "chore(replay): append ${{ steps.compute.outputs.tag }} to release_compat_matrix.toml"
+          body: |
+            Auto-appended by `release-tagged.yml` after release ${{ steps.compute.outputs.tag }}.
+
+            Reviewer must:
+            1. Verify the bundle URL is reachable.
+            2. Replace the `bundle_sha256` placeholder with the real digest from
+               `release-qualification.yml`'s artifact list.
+            3. Set `supported_until` per the ratchet rule (current tag + 5 minor).
+            4. Decide `compat` (default `supported`; flip to `best_effort` if
+               the diff against the previous bundle exceeds threshold).
+
+            See `docs/replay-compat.md` for the ratchet rule (last N=5 tags
+            supported; `v3.0` is the strict floor).
+          commit-message: "chore(replay): append ${{ steps.compute.outputs.tag }} entry to release_compat_matrix.toml"
+          labels: replay,release-tagged
