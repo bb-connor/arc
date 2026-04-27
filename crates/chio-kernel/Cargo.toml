@@ -13,7 +13,7 @@ publish = false
 name = "chio_kernel"
 
 [features]
-default = ["legacy-sync"]
+default = []
 legacy-sync = []
 tokio-console-smoke = ["tokio/tracing"]
 
