@@ -877,8 +877,8 @@ pub struct ChioKernel {
     config: KernelConfig,
     guards: Vec<Box<dyn Guard>>,
     post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
-    budget_store: Mutex<Box<dyn BudgetStore>>,
-    revocation_store: Mutex<Box<dyn RevocationStore>>,
+    budget_store: Arc<dyn BudgetStore>,
+    revocation_store: Arc<dyn RevocationStore>,
     capability_authority: Box<dyn CapabilityAuthority>,
     tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
     resource_providers: Vec<Box<dyn ResourceProvider>>,
@@ -886,7 +886,7 @@ pub struct ChioKernel {
     sessions: DashMap<SessionId, Arc<Session>>,
     receipt_log: Mutex<ReceiptLog>,
     child_receipt_log: Mutex<ChildReceiptLog>,
-    receipt_store: Option<Mutex<Box<dyn ReceiptStore>>>,
+    receipt_store: Option<Arc<dyn ReceiptStore>>,
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
     attestation_trust_policy: Option<AttestationTrustPolicy>,
@@ -1271,37 +1271,26 @@ impl ChioKernel {
 
     fn with_budget_store<R>(
         &self,
-        f: impl FnOnce(&mut dyn BudgetStore) -> Result<R, KernelError>,
+        f: impl FnOnce(&dyn BudgetStore) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
-        let mut store = self
-            .budget_store
-            .lock()
-            .map_err(|_| KernelError::Internal("budget store lock poisoned".to_string()))?;
-        f(store.as_mut())
+        f(self.budget_store.as_ref())
     }
 
     fn with_revocation_store<R>(
         &self,
-        f: impl FnOnce(&mut dyn RevocationStore) -> Result<R, KernelError>,
+        f: impl FnOnce(&dyn RevocationStore) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
-        let mut store = self
-            .revocation_store
-            .lock()
-            .map_err(|_| KernelError::Internal("revocation store lock poisoned".to_string()))?;
-        f(store.as_mut())
+        f(self.revocation_store.as_ref())
     }
 
     fn with_receipt_store<R>(
         &self,
-        f: impl FnOnce(&mut dyn ReceiptStore) -> Result<R, KernelError>,
+        f: impl FnOnce(&dyn ReceiptStore) -> Result<R, KernelError>,
     ) -> Result<Option<R>, KernelError> {
         let Some(store) = self.receipt_store.as_ref() else {
             return Ok(None);
         };
-        let mut store = store
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt store lock poisoned".to_string()))?;
-        f(store.as_mut()).map(Some)
+        f(store.as_ref()).map(Some)
     }
 
     pub fn new(config: KernelConfig) -> Self {
@@ -1325,8 +1314,8 @@ impl ChioKernel {
             config,
             guards: Vec::new(),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
-            budget_store: Mutex::new(Box::new(InMemoryBudgetStore::new())),
-            revocation_store: Mutex::new(Box::new(InMemoryRevocationStore::new())),
+            budget_store: Arc::new(InMemoryBudgetStore::new()),
+            revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
@@ -1427,7 +1416,11 @@ impl ChioKernel {
     }
 
     pub fn set_receipt_store(&mut self, receipt_store: Box<dyn ReceiptStore>) {
-        self.receipt_store = Some(Mutex::new(receipt_store));
+        self.set_receipt_store_handle(Arc::from(receipt_store));
+    }
+
+    pub fn set_receipt_store_handle(&mut self, receipt_store: Arc<dyn ReceiptStore>) {
+        self.receipt_store = Some(receipt_store);
     }
 
     pub fn set_payment_adapter(&mut self, payment_adapter: Box<dyn PaymentAdapter>) {
@@ -1446,7 +1439,11 @@ impl ChioKernel {
     }
 
     pub fn set_revocation_store(&mut self, revocation_store: Box<dyn RevocationStore>) {
-        self.revocation_store = Mutex::new(revocation_store);
+        self.set_revocation_store_handle(Arc::from(revocation_store));
+    }
+
+    pub fn set_revocation_store_handle(&mut self, revocation_store: Arc<dyn RevocationStore>) {
+        self.revocation_store = revocation_store;
     }
 
     pub fn set_capability_authority(&mut self, capability_authority: Box<dyn CapabilityAuthority>) {
@@ -1454,7 +1451,11 @@ impl ChioKernel {
     }
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
-        self.budget_store = Mutex::new(budget_store);
+        self.set_budget_store_handle(Arc::from(budget_store));
+    }
+
+    pub fn set_budget_store_handle(&mut self, budget_store: Arc<dyn BudgetStore>) {
+        self.budget_store = budget_store;
     }
 
     pub fn set_post_invocation_pipeline(

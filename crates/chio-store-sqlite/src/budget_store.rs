@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{BudgetEventAuthority, BudgetMutationKind, BudgetMutationRecord};
@@ -7,7 +8,7 @@ use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 pub struct SqliteBudgetStore {
-    connection: Connection,
+    connection: Mutex<Connection>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,26 +148,32 @@ impl SqliteBudgetStore {
         ensure_budget_mutation_event_seq_column(&connection)?;
         initialize_budget_replication_seq(&mut connection)?;
 
-        Ok(Self { connection })
+        Ok(Self {
+            connection: Mutex::new(connection),
+        })
     }
 
-    pub fn upsert_usage(&mut self, record: &BudgetUsageRecord) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    fn connection(&self) -> Result<MutexGuard<'_, Connection>, BudgetStoreError> {
+        self.connection.lock().map_err(|_| {
+            BudgetStoreError::Invariant("sqlite budget store lock poisoned".to_string())
+        })
+    }
+
+    pub fn upsert_usage(&self, record: &BudgetUsageRecord) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         Self::upsert_usage_in_transaction(&transaction, record)?;
         transaction.commit()?;
         Ok(())
     }
 
     pub fn import_snapshot_records(
-        &mut self,
+        &self,
         usages: &[BudgetUsageRecord],
         events: &[BudgetMutationRecord],
     ) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         for usage in usages {
             Self::upsert_usage_in_transaction(&transaction, usage)?;
         }
@@ -229,10 +236,9 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
-    pub fn delete_mutation_event(&mut self, event_id: &str) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    pub fn delete_mutation_event(&self, event_id: &str) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         transaction.execute(
             "DELETE FROM budget_mutation_events WHERE event_id = ?1",
             params![event_id],
@@ -241,10 +247,9 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
-    pub fn delete_hold(&mut self, hold_id: &str) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    pub fn delete_hold(&self, hold_id: &str) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         transaction.execute(
             "DELETE FROM budget_authorization_holds WHERE hold_id = ?1",
             params![hold_id],
@@ -254,24 +259,22 @@ impl SqliteBudgetStore {
     }
 
     pub fn hold_authority(
-        &mut self,
+        &self,
         hold_id: &str,
     ) -> Result<Option<BudgetEventAuthority>, BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         let authority = Self::load_hold(&transaction, hold_id)?.and_then(|hold| hold.authority);
         transaction.rollback()?;
         Ok(authority)
     }
 
     pub fn import_mutation_record(
-        &mut self,
+        &self,
         record: &BudgetMutationRecord,
     ) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         Self::import_mutation_record_in_transaction(&transaction, record)?;
         transaction.commit()?;
         Ok(())
@@ -376,7 +379,8 @@ impl SqliteBudgetStore {
         limit: usize,
         after_seq: Option<u64>,
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT
                 capability_id,
@@ -400,7 +404,8 @@ impl SqliteBudgetStore {
     }
 
     pub fn list_all_usages(&self) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT
                 capability_id,
@@ -423,7 +428,8 @@ impl SqliteBudgetStore {
         limit: usize,
         after_event_seq: u64,
     ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT
                 event_id,
@@ -1216,15 +1222,14 @@ impl SqliteBudgetStore {
     }
 
     pub fn try_increment_with_event_id(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         max_invocations: Option<u32>,
         event_id: Option<&str>,
     ) -> Result<bool, BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         if let Some(allowed) = SqliteBudgetStore::existing_increment_allowed(
             &transaction,
@@ -1337,7 +1342,7 @@ impl SqliteBudgetStore {
 
 impl BudgetStore for SqliteBudgetStore {
     fn try_increment(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         max_invocations: Option<u32>,
@@ -1346,7 +1351,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn try_charge_cost(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         max_invocations: Option<u32>,
@@ -1367,7 +1372,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn try_charge_cost_with_ids(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         max_invocations: Option<u32>,
@@ -1391,7 +1396,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn try_charge_cost_with_ids_and_authority(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         max_invocations: Option<u32>,
@@ -1402,9 +1407,8 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<bool, BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         if let Some(existing_allowed) = SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -1787,7 +1791,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn reverse_charge_cost(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
@@ -1796,7 +1800,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn reverse_charge_cost_with_ids(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
@@ -1814,7 +1818,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn reverse_charge_cost_with_ids_and_authority(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
@@ -1822,9 +1826,8 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -1970,7 +1973,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn reduce_charge_cost(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
@@ -1979,7 +1982,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn reduce_charge_cost_with_ids(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
@@ -1997,7 +2000,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn reduce_charge_cost_with_ids_and_authority(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
@@ -2005,9 +2008,8 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -2150,7 +2152,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn settle_charge_cost(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         exposed_cost_units: u64,
@@ -2167,7 +2169,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn settle_charge_cost_with_ids(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         exposed_cost_units: u64,
@@ -2187,7 +2189,7 @@ impl BudgetStore for SqliteBudgetStore {
     }
 
     fn settle_charge_cost_with_ids_and_authority(
-        &mut self,
+        &self,
         capability_id: &str,
         grant_index: usize,
         exposed_cost_units: u64,
@@ -2202,9 +2204,8 @@ impl BudgetStore for SqliteBudgetStore {
             ));
         }
 
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -2362,7 +2363,8 @@ impl BudgetStore for SqliteBudgetStore {
         limit: usize,
         capability_id: Option<&str>,
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT
                 capability_id,
@@ -2387,7 +2389,7 @@ impl BudgetStore for SqliteBudgetStore {
         capability_id: &str,
         grant_index: usize,
     ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.connection
+        self.connection()?
             .query_row(
                 r#"
                 SELECT
@@ -2414,7 +2416,8 @@ impl BudgetStore for SqliteBudgetStore {
         capability_id: Option<&str>,
         grant_index: Option<usize>,
     ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT
                 event_id,
@@ -3733,8 +3736,8 @@ mod tests {
             )
             .unwrap();
 
-        let transaction = store
-            .connection
+        let mut connection = store.connection().unwrap();
+        let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
         transaction
@@ -3788,8 +3791,8 @@ mod tests {
         assert!(retry.event_seq > rollback.event_seq);
         assert_eq!(retry.authority.as_ref(), Some(&changed));
 
-        let transaction = store
-            .connection
+        let mut connection = store.connection().unwrap();
+        let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
         let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
@@ -3799,8 +3802,8 @@ mod tests {
         assert_eq!(hold.disposition, HoldDisposition::Open);
         drop(transaction);
 
-        let transaction = store
-            .connection
+        let mut connection = store.connection().unwrap();
+        let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
         transaction
@@ -3880,8 +3883,8 @@ mod tests {
         assert_eq!(usage.invocation_count, 1);
         assert_usage_totals(&usage, 0, 0);
 
-        let transaction = store
-            .connection
+        let mut connection = store.connection().unwrap();
+        let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
         let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
