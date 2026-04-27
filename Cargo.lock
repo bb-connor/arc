@@ -2642,6 +2642,8 @@ dependencies = [
 name = "chio-tool-call-fabric"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "chio-core-types",
  "serde",
  "serde_json",
