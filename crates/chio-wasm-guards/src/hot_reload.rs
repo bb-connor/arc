@@ -3,11 +3,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha2::{Digest, Sha256};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 
 use crate::{EpochId, WasmGuard, WasmGuardAbi, WasmGuardError};
@@ -72,6 +72,23 @@ pub struct ReloadTrigger {
     pub source: ReloadTriggerSource,
 }
 
+/// Result from an accepted debounced reload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DebouncedReload {
+    /// Monotonic per-guard reload sequence number.
+    pub reload_seq: u64,
+    /// Published module epoch.
+    pub epoch_id: EpochId,
+}
+
+#[derive(Debug, Default)]
+struct ReloadSlot {
+    last_attempt_at: Option<Instant>,
+    seq: u64,
+    in_flight: bool,
+    pending_module_bytes: Option<Vec<u8>>,
+}
+
 /// Errors returned by the hot-reload engine.
 #[derive(Debug, thiserror::Error)]
 pub enum HotReloadError {
@@ -110,6 +127,20 @@ pub enum HotReloadError {
     /// Reload trigger receiver was closed before the trigger could be sent.
     #[error("reload trigger receiver closed")]
     TriggerReceiverClosed,
+
+    /// The per-guard reload sequence counter is exhausted.
+    #[error("reload sequence counter exhausted for guard {guard_id:?}")]
+    ReloadSequenceExhausted {
+        /// Guard identifier passed to reload.
+        guard_id: String,
+    },
+
+    /// Debounced reload executor lost its pending module bytes.
+    #[error("pending reload module bytes missing for guard {guard_id:?}")]
+    PendingReloadMissing {
+        /// Guard identifier passed to reload.
+        guard_id: String,
+    },
 }
 
 /// Runtime hot-reload engine.
@@ -123,6 +154,7 @@ where
     F: ReloadBackendFactory,
 {
     guards: RwLock<HashMap<String, Arc<WasmGuard>>>,
+    reload_slots: RwLock<HashMap<String, Arc<Mutex<ReloadSlot>>>>,
     backend_factory: F,
 }
 
@@ -135,6 +167,7 @@ where
     pub fn new(backend_factory: F) -> Self {
         Self {
             guards: RwLock::new(HashMap::new()),
+            reload_slots: RwLock::new(HashMap::new()),
             backend_factory,
         }
     }
@@ -189,6 +222,92 @@ where
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
                 guard_id: guard_id.to_string(),
             })
+    }
+
+    fn reload_slot(&self, guard_id: &str) -> Result<Arc<Mutex<ReloadSlot>>, HotReloadError> {
+        if let Some(slot) = self
+            .reload_slots
+            .read()
+            .map_err(|_| HotReloadError::RegistryLockPoisoned)?
+            .get(guard_id)
+            .cloned()
+        {
+            return Ok(slot);
+        }
+
+        let mut slots = self
+            .reload_slots
+            .write()
+            .map_err(|_| HotReloadError::RegistryLockPoisoned)?;
+        Ok(Arc::clone(
+            slots
+                .entry(guard_id.to_string())
+                .or_insert_with(|| Arc::new(Mutex::new(ReloadSlot::default()))),
+        ))
+    }
+
+    /// Return the latest accepted reload sequence for a guard.
+    pub async fn reload_seq(&self, guard_id: &str) -> Result<Option<u64>, HotReloadError> {
+        let Some(slot) = self
+            .reload_slots
+            .read()
+            .map_err(|_| HotReloadError::RegistryLockPoisoned)?
+            .get(guard_id)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let seq = slot.lock().await.seq;
+        Ok(Some(seq))
+    }
+
+    /// Submit a per-guard debounced reload request.
+    ///
+    /// Requests that arrive while another request for the same guard is inside
+    /// the debounce window replace the pending module bytes and return `None`.
+    /// The in-flight executor publishes the latest pending bytes once the
+    /// window closes.
+    pub async fn reload_debounced(
+        &self,
+        guard_id: &str,
+        new_module_bytes: Vec<u8>,
+        debounce: Duration,
+    ) -> Result<Option<DebouncedReload>, HotReloadError> {
+        let slot = self.reload_slot(guard_id)?;
+        {
+            let mut slot_guard = slot.lock().await;
+            slot_guard.last_attempt_at = Some(Instant::now());
+            slot_guard.pending_module_bytes = Some(new_module_bytes);
+            if slot_guard.in_flight {
+                return Ok(None);
+            }
+            slot_guard.in_flight = true;
+            slot_guard.seq = slot_guard.seq.checked_add(1).ok_or_else(|| {
+                HotReloadError::ReloadSequenceExhausted {
+                    guard_id: guard_id.to_string(),
+                }
+            })?;
+        }
+
+        tokio::time::sleep(debounce).await;
+
+        let mut slot_guard = slot.lock().await;
+        let Some(module_bytes) = slot_guard.pending_module_bytes.take() else {
+            slot_guard.in_flight = false;
+            return Err(HotReloadError::PendingReloadMissing {
+                guard_id: guard_id.to_string(),
+            });
+        };
+        let reload_seq = slot_guard.seq;
+        let reload_result = self.reload(guard_id, &module_bytes);
+        slot_guard.last_attempt_at = Some(Instant::now());
+        slot_guard.in_flight = false;
+        let epoch_id = reload_result?;
+
+        Ok(Some(DebouncedReload {
+            reload_seq,
+            epoch_id,
+        }))
     }
 
     /// Watch a guard path and emit reload triggers when it changes.
