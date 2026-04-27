@@ -1,36 +1,29 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{ModelMetadata, ModelSafetyTier};
+use dashmap::DashMap;
 use regex::Regex;
 
 use super::*;
 
-pub(super) fn session_from_map<'a>(
-    sessions: &'a HashMap<SessionId, Session>,
+pub(super) fn session_from_map(
+    sessions: &DashMap<SessionId, Arc<Session>>,
     session_id: &SessionId,
-) -> Result<&'a Session, KernelError> {
+) -> Result<Arc<Session>, KernelError> {
     sessions
         .get(session_id)
-        .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))
-}
-
-pub(super) fn session_mut_from_map<'a>(
-    sessions: &'a mut HashMap<SessionId, Session>,
-    session_id: &SessionId,
-) -> Result<&'a mut Session, KernelError> {
-    sessions
-        .get_mut(session_id)
+        .map(|session| Arc::clone(session.value()))
         .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))
 }
 
 pub(super) fn begin_session_request_in_sessions(
-    sessions: &mut HashMap<SessionId, Session>,
+    sessions: &DashMap<SessionId, Arc<Session>>,
     context: &OperationContext,
     operation_kind: OperationKind,
     cancellable: bool,
 ) -> Result<(), KernelError> {
-    let session = session_mut_from_map(sessions, &context.session_id)?;
+    let session = session_from_map(sessions, &context.session_id)?;
     session.validate_context(context)?;
     session.ensure_operation_allowed(operation_kind)?;
     session.track_request(context, operation_kind, cancellable)?;
@@ -38,7 +31,7 @@ pub(super) fn begin_session_request_in_sessions(
 }
 
 pub(super) fn begin_child_request_in_sessions(
-    sessions: &mut HashMap<SessionId, Session>,
+    sessions: &DashMap<SessionId, Arc<Session>>,
     parent_context: &OperationContext,
     request_id: RequestId,
     operation_kind: OperationKind,
@@ -61,18 +54,18 @@ pub(super) fn begin_child_request_in_sessions(
 }
 
 pub(super) fn complete_session_request_with_terminal_state_in_sessions(
-    sessions: &mut HashMap<SessionId, Session>,
+    sessions: &DashMap<SessionId, Arc<Session>>,
     session_id: &SessionId,
     request_id: &RequestId,
     terminal_state: OperationTerminalState,
 ) -> Result<(), KernelError> {
-    session_mut_from_map(sessions, session_id)?
+    session_from_map(sessions, session_id)?
         .complete_request_with_terminal_state(request_id, terminal_state)?;
     Ok(())
 }
 
 pub(super) fn validate_sampling_request_in_sessions(
-    sessions: &HashMap<SessionId, Session>,
+    sessions: &DashMap<SessionId, Arc<Session>>,
     allow_sampling: bool,
     allow_sampling_tool_use: bool,
     context: &OperationContext,
@@ -123,7 +116,7 @@ pub(super) fn validate_sampling_request_in_sessions(
 }
 
 pub(super) fn validate_elicitation_request_in_sessions(
-    sessions: &HashMap<SessionId, Session>,
+    sessions: &DashMap<SessionId, Arc<Session>>,
     allow_elicitation: bool,
     context: &OperationContext,
     operation: &CreateElicitationOperation,

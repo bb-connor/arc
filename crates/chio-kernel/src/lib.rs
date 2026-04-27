@@ -83,7 +83,7 @@ pub(crate) use receipt_support::*;
 pub(crate) use request_matching::{
     begin_child_request_in_sessions, begin_session_request_in_sessions, check_subject_binding,
     check_time_bounds, complete_session_request_with_terminal_state_in_sessions,
-    nested_child_request_id, resolve_matching_grants, session_from_map, session_mut_from_map,
+    nested_child_request_id, resolve_matching_grants, session_from_map,
     validate_elicitation_request_in_sessions, validate_sampling_request_in_sessions,
 };
 pub use request_matching::{

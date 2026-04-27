@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
+use dashmap::DashMap;
 
 use self::responses::FinalizeToolOutputCostContext;
 use crate::budget_store::{
@@ -882,7 +883,7 @@ pub struct ChioKernel {
     tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
     resource_providers: Vec<Box<dyn ResourceProvider>>,
     prompt_providers: Vec<Box<dyn PromptProvider>>,
-    sessions: RwLock<HashMap<SessionId, Session>>,
+    sessions: DashMap<SessionId, Arc<Session>>,
     receipt_log: Mutex<ReceiptLog>,
     child_receipt_log: Mutex<ChildReceiptLog>,
     receipt_store: Option<Mutex<Box<dyn ReceiptStore>>>,
@@ -1006,7 +1007,7 @@ impl BudgetChargeResult {
 }
 
 struct SessionNestedFlowBridge<'a, C> {
-    sessions: &'a mut HashMap<SessionId, Session>,
+    sessions: &'a DashMap<SessionId, Arc<Session>>,
     child_receipts: &'a mut Vec<ChildRequestReceipt>,
     parent_context: &'a OperationContext,
     allow_sampling: bool,
@@ -1075,7 +1076,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             let roots = self
                 .client
                 .list_roots(self.parent_context, &child_context)?;
-            session_mut_from_map(self.sessions, &child_context.session_id)?
+            session_from_map(self.sessions, &child_context.session_id)?
                 .replace_roots(roots.clone());
             Ok(roots)
         })();
@@ -1084,7 +1085,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             Err(KernelError::RequestCancelled { request_id, .. })
                 if request_id == &child_context.request_id
         ) {
-            session_mut_from_map(self.sessions, &child_context.session_id)?
+            session_from_map(self.sessions, &child_context.session_id)?
                 .request_cancellation(&child_context.request_id)?;
         }
         self.complete_child_request_with_receipt(
@@ -1125,7 +1126,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             Err(KernelError::RequestCancelled { request_id, .. })
                 if request_id == &child_context.request_id
         ) {
-            session_mut_from_map(self.sessions, &child_context.session_id)?
+            session_from_map(self.sessions, &child_context.session_id)?
                 .request_cancellation(&child_context.request_id)?;
         }
         self.complete_child_request_with_receipt(
@@ -1165,7 +1166,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             Err(KernelError::RequestCancelled { request_id, .. })
                 if request_id == &child_context.request_id
         ) {
-            session_mut_from_map(self.sessions, &child_context.session_id)?
+            session_from_map(self.sessions, &child_context.session_id)?
                 .request_cancellation(&child_context.request_id)?;
         }
         self.complete_child_request_with_receipt(
@@ -1212,37 +1213,29 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
 impl ChioKernel {
     fn with_sessions_read<R>(
         &self,
-        f: impl FnOnce(&HashMap<SessionId, Session>) -> Result<R, KernelError>,
+        f: impl FnOnce(&DashMap<SessionId, Arc<Session>>) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
-        let sessions = self
-            .sessions
-            .read()
-            .map_err(|_| KernelError::Internal("session state lock poisoned".to_string()))?;
-        f(&sessions)
+        f(&self.sessions)
     }
 
     fn with_sessions_write<R>(
         &self,
-        f: impl FnOnce(&mut HashMap<SessionId, Session>) -> Result<R, KernelError>,
+        f: impl FnOnce(&DashMap<SessionId, Arc<Session>>) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
-        let mut sessions = self
-            .sessions
-            .write()
-            .map_err(|_| KernelError::Internal("session state lock poisoned".to_string()))?;
-        f(&mut sessions)
+        f(&self.sessions)
     }
 
     fn with_session<R>(
         &self,
         session_id: &SessionId,
-        f: impl FnOnce(&Session) -> Result<R, KernelError>,
+        f: impl FnOnce(&Arc<Session>) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
-        self.with_sessions_read(|sessions| {
-            let session = sessions
-                .get(session_id)
-                .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?;
-            f(session)
-        })
+        let session = self
+            .sessions
+            .get(session_id)
+            .map(|entry| Arc::clone(entry.value()))
+            .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?;
+        f(&session)
     }
 
     /// Phase 1.5: resolve the tenant_id for a given session by walking its
@@ -1271,14 +1264,9 @@ impl ChioKernel {
     fn with_session_mut<R>(
         &self,
         session_id: &SessionId,
-        f: impl FnOnce(&mut Session) -> Result<R, KernelError>,
+        f: impl FnOnce(&Arc<Session>) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
-        self.with_sessions_write(|sessions| {
-            let session = sessions
-                .get_mut(session_id)
-                .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?;
-            f(session)
-        })
+        self.with_session(session_id, f)
     }
 
     fn with_budget_store<R>(
@@ -1343,7 +1331,7 @@ impl ChioKernel {
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
-            sessions: RwLock::new(HashMap::new()),
+            sessions: DashMap::new(),
             receipt_log: Mutex::new(ReceiptLog::new()),
             child_receipt_log: Mutex::new(ChildReceiptLog::new()),
             receipt_store: None,
@@ -3079,12 +3067,8 @@ impl ChioKernel {
                     request.server_id, request.tool_name
                 ))
             })?;
-            let mut sessions = self
-                .sessions
-                .write()
-                .map_err(|_| KernelError::Internal("session state lock poisoned".to_string()))?;
             let mut bridge = SessionNestedFlowBridge {
-                sessions: &mut sessions,
+                sessions: &self.sessions,
                 child_receipts: &mut child_receipts,
                 parent_context,
                 allow_sampling: self.config.allow_sampling,
