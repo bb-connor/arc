@@ -6,10 +6,15 @@
 
 #![forbid(unsafe_code)]
 
+pub mod audit;
 pub mod dedupe;
 pub mod m04_writer;
 pub mod reredact;
 
+pub use audit::{
+    write_tee_bless_audit_entry, BlessAuditError, BlessCapture, BlessFixture, BlessOperator,
+    TeeBlessAuditBody, TeeBlessAuditEntry, TEE_BLESS_CAPABILITY, TEE_BLESS_EVENT,
+};
 pub use dedupe::{dedupe_last_wins, invocation_hash, DedupedFrame};
 pub use m04_writer::{
     scenario_from_dir, validate_m04_scenario_dir, write_m04_fixture, M04ByteSizes,
