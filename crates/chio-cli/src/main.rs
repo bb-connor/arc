@@ -29,6 +29,7 @@ include!("cli/trust_commands.rs");
 include!("cli/session.rs");
 include!("cli/conformance.rs");
 include!("cli/replay.rs");
+include!("cli/replay/reader.rs");
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
