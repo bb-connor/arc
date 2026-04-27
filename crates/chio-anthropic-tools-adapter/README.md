@@ -31,12 +31,42 @@ Default deny applies even with the feature on.
 
 | Ticket | Deliverable                                                                  | Status |
 | ------ | ---------------------------------------------------------------------------- | ------ |
-| T1     | Crate scaffold, API pin, `computer-use` feature, native types, transport trait | this PR |
-| T2     | `ProviderAdapter::lift`/`lower` for batch `messages.create` tool_use blocks  | pending |
-| T3     | SSE streaming with verdict at `content_block_start` for `tool_use`           | pending |
+| T1     | Crate scaffold, API pin, `computer-use` feature, native types, transport trait | landed |
+| T2     | `ProviderAdapter::lift`/`lower` for batch `messages.create` tool_use blocks  | landed |
+| T3     | SSE streaming with verdict at `content_block_start` for `tool_use`           | landed |
 | T4     | `chio-manifest` `server_tools` allowlist gating the beta surface             | pending |
 | T5     | 12 conformance fixtures (incl. 2 server-tool sessions behind the feature)    | pending |
-| T6     | Native-error envelope -> `ProviderError` taxonomy doctest                    | pending |
+| T6     | Native-error envelope -> `ProviderError` taxonomy doctest                    | this PR |
+
+## Adapter-visible error taxonomy
+
+Anthropic documents HTTP errors as JSON envelopes with a top-level
+`error.type` and `error.message`, plus a `request_id`; streaming can also
+surface an `error` event after a 200 response. This crate currently owns the
+mockable transport trait, batch lift/lower, and SSE gate. It does not yet
+ship a real HTTP client, so rows marked `HTTP transport boundary` pin the
+adapter-visible taxonomy that the eventual transport must preserve. Rows
+marked `current adapter path` are emitted by the current lift/lower,
+streaming, or evaluator path.
+
+The table is parsed by `tests/error_taxonomy_doctest.rs`; keep each envelope
+as one valid inline JSON object.
+
+<!-- error-taxonomy:start -->
+| ProviderError class | Native or boundary envelope | Source | Adapter-visible behavior |
+| ------------------- | --------------------------- | ------ | ------------------------ |
+| `ProviderError::RateLimited` | `{"status":429,"headers":{"retry-after-ms":"1000"},"body":{"type":"error","error":{"type":"rate_limit_error","message":"rate limit reached"},"request_id":"req_rate"}}` | HTTP transport boundary | Preserve the retry hint as `retry_after_ms` when the native response carries one. |
+| `ProviderError::ContentPolicy` | `{"status":200,"body":{"type":"message","id":"msg_refusal","role":"assistant","content":[{"type":"text","text":""}],"stop_reason":"refusal"}}` | HTTP transport boundary | Surface provider refusal as content-policy denial rather than a tool execution error. |
+| `ProviderError::BadToolArgs` | `{"type":"tool_use","id":"toolu_bad_args","name":"get_weather","input":"not an object"}` | current adapter path | Fail closed when Anthropic emits a `tool_use.input` that cannot become canonical JSON object arguments. |
+| `ProviderError::Upstream5xx` | `{"status":529,"body":{"type":"error","error":{"type":"overloaded_error","message":"overloaded"},"request_id":"req_overloaded"}}` | HTTP transport boundary | Keep upstream 5xx and overload bodies visible for retry and audit policy. |
+| `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://api.anthropic.com/v1/messages","elapsed_ms":30000}` | HTTP transport boundary | Classify local transport timeout separately from Anthropic 504 `timeout_error` envelopes. |
+| `ProviderError::VerdictBudgetExceeded` | `{"provider":"anthropic","event":"content_block_start","observed_ms":300,"budget_ms":250}` | current adapter path | Preserve the fabric verdict-budget error when the evaluator misses the 250ms gate. |
+| `ProviderError::Malformed` | `{"event":"content_block_delta","data":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}}` | current adapter path | Fail closed for impossible or out-of-order native SSE/message shapes. |
+<!-- error-taxonomy:end -->
+
+`ProviderError::Other` is intentionally absent. Native Anthropic envelopes
+must map to a concrete class above, or fail closed as `Malformed` when the
+shape cannot be trusted.
 
 ## Crate layout
 
