@@ -5,8 +5,8 @@
 #
 # Phase 5 (M01.P5.T5) lands this advisory bot:
 # When a PR touches `spec/schemas/**/*.json`, run `json-schema-diff` for
-# each changed schema (PR base vs. PR head) and post a sticky comment to
-# the PR summarising any breaking changes detected. The job is advisory
+# each changed schema (PR merge-base vs. PR head) and post a sticky comment
+# to the PR summarising any breaking changes detected. The job is advisory
 # only (it does NOT block merge). Per the M01 trajectory ticket
 # `.planning/trajectory/tickets/M01/P5.yml#M01.P5.T5` soft_dep:
 #   "Advisory only until M01+1; flips to blocking once tagged BREAKING:
@@ -20,7 +20,9 @@
 #
 # Comment shape: a single sticky comment with marker
 # `<!-- chio:schema-breaking-change -->` is created/updated on each push,
-# so the PR conversation does not accumulate one comment per push.
+# so the PR conversation does not accumulate one comment per push. On a
+# clean push (no breaking changes), an existing sticky is rewritten to a
+# resolved/all-clear message rather than left in place with stale warnings.
 
 name: schema-breaking-change
 
@@ -37,12 +39,9 @@ concurrency:
   group: schema-breaking-change-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   schema-breaking-change-advisory:
-    name: schema-breaking-change-advisory (json-schema-diff vs base)
+    name: schema-breaking-change-advisory (json-schema-diff vs merge-base)
     # owner: M01
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -67,73 +66,150 @@ jobs:
         # without shape drift.
         run: npm install -g json-schema-diff@^1.0.0
 
-      - name: Compute changed schema files (PR base vs. head)
-        id: changed
+      - name: Compute merge-base for PR diff scope
+        id: mergebase
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          # `git fetch` already retrieved both shas because checkout
-          # used fetch-depth: 0. Restrict to JSON schemas under
-          # spec/schemas to match the workflow's `paths:` filter.
-          changed=$(git diff --name-only --diff-filter=AMR \
-            "${BASE_SHA}" "${HEAD_SHA}" -- 'spec/schemas/**/*.json' \
-            | tr '\n' ' ')
-          echo "files=${changed}" >> "${GITHUB_OUTPUT}"
-          echo "Changed schemas: ${changed:-<none>}"
+          # Resolve the merge-base so we only inspect schema changes the
+          # PR actually authored. Diffing against `BASE_SHA` directly
+          # would also pick up files that moved on the target branch
+          # while the PR was open, leading to false-positive advisories.
+          merge_base=$(git merge-base "${BASE_SHA}" "${HEAD_SHA}")
+          echo "merge_base=${merge_base}" >> "${GITHUB_OUTPUT}"
+          echo "Merge-base: ${merge_base}"
+
+      - name: Compute changed schema files (merge-base vs. head)
+        id: changed
+        env:
+          MERGE_BASE: ${{ steps.mergebase.outputs.merge_base }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # `--name-status` carries rename records (R<score>) so we can
+          # resolve the old path when reading the base blob; without it
+          # `--name-only` would emit only the destination, and rename-only
+          # or rename-plus-edit changes would be silently misclassified
+          # as new schemas.
+          #
+          # The pathspec uses `:(glob)` magic so `**` matches recursively
+          # under `spec/schemas/`; without `:(glob)`, git treats `**` as
+          # a literal path segment and the filter matches nothing.
+          status_file="$(mktemp)"
+          git diff --name-status --diff-filter=AMR \
+            "${MERGE_BASE}" "${HEAD_SHA}" -- ':(glob)spec/schemas/**/*.json' \
+            > "${status_file}"
+          echo "Raw diff name-status:"
+          cat "${status_file}"
+          # Hand the raw status records to the next step; one record per
+          # line in `<status>\t<old>[\t<new>]` form. Use a random delimiter
+          # to avoid heredoc collisions if any path ever contains `EOF`.
+          delim="CHIO_$(openssl rand -hex 8)"
+          {
+            echo "status<<${delim}"
+            cat "${status_file}"
+            echo "${delim}"
+          } >> "${GITHUB_OUTPUT}"
+          if [ -s "${status_file}" ]; then
+            echo "has_changes=1" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_changes=0" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Run json-schema-diff over each changed schema
         id: diff
-        if: steps.changed.outputs.files != ''
+        if: steps.changed.outputs.has_changes == '1'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          MERGE_BASE: ${{ steps.mergebase.outputs.merge_base }}
+          STATUS_RECORDS: ${{ steps.changed.outputs.status }}
         run: |
           set -uo pipefail
           tmpdir=$(mktemp -d)
-          summary_md=""
+          summary_file="${tmpdir}/summary.md"
+          : > "${summary_file}"
           breaking_count=0
-          for f in ${CHANGED_FILES}; do
-            base_blob="${tmpdir}/base-$(echo "${f}" | tr '/' '_')"
-            # If the schema is newly added, there is no base blob to
-            # diff against; skip such files (additions are not breaking
-            # by themselves under json-schema-diff semantics).
-            if ! git show "${BASE_SHA}:${f}" > "${base_blob}" 2>/dev/null; then
-              echo "skip ${f}: not present at base (new schema, non-breaking)"
+          # Walk the name-status records line by line. Each line is
+          # tab-separated: `A\t<path>`, `M\t<path>`, or `R<score>\t<old>\t<new>`.
+          while IFS=$'\t' read -r status old new; do
+            [ -z "${status:-}" ] && continue
+            case "${status}" in
+              R*)
+                base_path="${old}"
+                head_path="${new}"
+                ;;
+              A|M)
+                base_path="${old}"
+                head_path="${old}"
+                ;;
+              *)
+                echo "skip ${status} ${old:-?}: unhandled status"
+                continue
+                ;;
+            esac
+            safe="$(printf '%s' "${head_path}" | tr '/' '_')"
+            base_blob="${tmpdir}/base-${safe}"
+            # `A` (added) records have no base blob to diff against;
+            # additions alone are not breaking under json-schema-diff
+            # semantics, so skip them.
+            if [ "${status}" = "A" ]; then
+              echo "skip ${head_path}: added (non-breaking)"
               continue
             fi
-            report="${tmpdir}/report-$(echo "${f}" | tr '/' '_').json"
+            if ! git show "${MERGE_BASE}:${base_path}" > "${base_blob}" 2>/dev/null; then
+              echo "skip ${head_path}: base blob ${base_path} unreadable"
+              continue
+            fi
+            report="${tmpdir}/report-${safe}.json"
             # `json-schema-diff <source> <destination>` exits 0 when
             # destination is backwards-compatible with source, and 1
             # when destination removes capabilities source allowed.
             # We capture the JSON report regardless of exit status.
-            if json-schema-diff "${base_blob}" "${f}" \
+            if json-schema-diff "${base_blob}" "${head_path}" \
                 > "${report}" 2> "${report}.stderr"; then
-              echo "ok ${f}: no breaking change"
+              echo "ok ${head_path}: no breaking change"
             else
               breaking_count=$((breaking_count + 1))
               # Trim the JSON report so we can embed in PR comments
               # without blowing past the 65535-byte body cap.
               snippet=$(head -c 2000 "${report}" || true)
+              # Append directly with explicit newlines so closing code
+              # fences are not glued to the next list item by command-
+              # substitution stripping trailing newlines.
+              # shellcheck disable=SC2016
               {
-                printf -- '- `%s`: BREAKING. json-schema-diff report excerpt:\n' "${f}"
+                if [ "${status:0:1}" = "R" ]; then
+                  printf -- '- `%s` (renamed from `%s`): BREAKING. json-schema-diff report excerpt:\n' \
+                    "${head_path}" "${base_path}"
+                else
+                  printf -- '- `%s`: BREAKING. json-schema-diff report excerpt:\n' "${head_path}"
+                fi
                 printf -- '```json\n'
                 printf '%s\n' "${snippet}"
                 printf -- '```\n'
-              } > "${tmpdir}/snippet"
-              summary_md="${summary_md}$(cat "${tmpdir}/snippet")"
+                printf '\n'
+              } >> "${summary_file}"
             fi
-          done
+          done < <(printf '%s\n' "${STATUS_RECORDS}")
+
+          echo "breaking_count=${breaking_count}" >> "${GITHUB_OUTPUT}"
+          # Emit the markdown summary with a unique heredoc delimiter so
+          # any literal `EOF` (or our previous `CHIO_DIFF_EOF`) inside
+          # JSON report excerpts cannot terminate the multiline value
+          # early and leak subsequent content as new output keys.
+          delim="CHIO_$(openssl rand -hex 8)"
           {
-            echo "breaking_count=${breaking_count}"
-            echo "summary<<CHIO_DIFF_EOF"
-            printf '%s\n' "${summary_md}"
-            echo "CHIO_DIFF_EOF"
+            echo "summary<<${delim}"
+            cat "${summary_file}"
+            echo "${delim}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Post or update advisory PR comment
-        if: steps.diff.outputs.breaking_count != '' && steps.diff.outputs.breaking_count != '0'
+      - name: Post or update sticky advisory PR comment
+        # Always run when the diff step ran (regardless of breaking_count)
+        # so a clean push rewrites a stale sticky to an all-clear message
+        # rather than leaving the previous warning in place.
+        if: always() && steps.diff.outcome == 'success'
         uses: actions/github-script@v7
         env:
           SUMMARY_MD: ${{ steps.diff.outputs.summary }}
@@ -142,18 +218,25 @@ jobs:
           script: |
             const marker = '<!-- chio:schema-breaking-change -->';
             const summary = process.env.SUMMARY_MD || '';
-            const count = process.env.BREAKING_COUNT || '0';
-            const body = [
-              marker,
-              '## Schema-breaking-change advisory',
-              '',
-              `\`json-schema-diff\` flagged ${count} schema(s) under \`spec/schemas/\` as backwards-incompatible against \`${context.payload.pull_request.base.ref}\`:`,
-              summary,
-              '',
-              'This check is **advisory only** and does not block merge. Per CONTRIBUTING.md (M01+1), tag the PR title with `BREAKING:` to acknowledge an intentional wire-break; the gate flips to blocking once that convention lands.',
-              '',
-              `_Posted by \`${context.workflow}\` workflow run #${context.runId}._`,
-            ].join('\n');
+            const count = parseInt(process.env.BREAKING_COUNT || '0', 10);
+            const baseRef = context.payload.pull_request.base.ref;
+            const lines = [marker, '## Schema-breaking-change advisory', ''];
+            if (count > 0) {
+              lines.push(
+                `\`json-schema-diff\` flagged ${count} schema(s) under \`spec/schemas/\` as backwards-incompatible against \`${baseRef}\`:`,
+                '',
+                summary,
+                'This check is **advisory only** and does not block merge. Per CONTRIBUTING.md (M01+1), tag the PR title with `BREAKING:` to acknowledge an intentional wire-break; the gate flips to blocking once that convention lands.',
+              );
+            } else {
+              lines.push(
+                `\`json-schema-diff\` reports no breaking changes under \`spec/schemas/\` against \`${baseRef}\`.`,
+                '',
+                'This check is **advisory only**.',
+              );
+            }
+            lines.push('', `_Posted by \`${context.workflow}\` workflow run #${context.runId}._`);
+            const body = lines.join('\n');
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const existing = await github.paginate(
@@ -161,6 +244,12 @@ jobs:
               { owner, repo, issue_number, per_page: 100 },
             );
             const prior = existing.find(c => c.body && c.body.includes(marker));
+            // On a clean run with no prior sticky, do nothing: there is
+            // nothing to update and we do not want to spam green PRs.
+            if (!prior && count === 0) {
+              core.info('No breaking changes and no prior sticky comment; nothing to post.');
+              return;
+            }
             if (prior) {
               await github.rest.issues.updateComment({
                 owner, repo, comment_id: prior.id, body,
