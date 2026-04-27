@@ -1,0 +1,8 @@
+# tests/replay/.bless-audit.log
+# Append-only audit log for the M04 replay-gate `--bless` flow.
+# Format (tab-separated, one entry per line, terminated by `\n`):
+#   <iso8601-utc>\t<user_name> <<user_email>>\t<branch>\t<sha>\t<fixture_path>\t<reason>
+# Lines beginning with `#` are reserved as header comments. The CHIO_BLESS
+# gate (see `tests/replay/src/bless.rs`) is the only sanctioned writer.
+# Source-of-truth: `.planning/trajectory/04-deterministic-replay.md`,
+# section "CHIO_BLESS gate logic", clause 7.
