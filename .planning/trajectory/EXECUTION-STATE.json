@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "started_at": "2026-04-25T23:20:18.372Z",
-  "last_checkpoint_at": "2026-04-26T08:15:00Z",
-  "current_wave": "1b-complete-pending-m02-execution",
+  "last_checkpoint_at": "2026-04-27T02:30:00Z",
+  "current_wave": "2a+2b-partial (M01 P4+P5 + M04 P2+P3 closed; M04 P4+ pending; M05/M06/M07/M08/M10 not started)",
   "halt": {
     "halted": false,
     "reason": null,
@@ -11,14 +11,14 @@
   },
   "milestones": {
     "M01": {
-      "status": "MILESTONE COMPLETE through P3 (P4-P5 wave-2 deferred)",
-      "phase": "P3_complete",
+      "status": "MILESTONE COMPLETE (P0+P1+P2+P3+P4+P5 all merged)",
+      "phase": "complete",
       "p0_status": "merged",
       "p1_status": "all 9 merged",
       "p2_status": "all 8 merged",
       "p3_status": "T1-T5 merged + T6 verified-clean (M01.P3.T2 shim covers all 17 adapters; 511 pytest pass)",
-      "p4_status": "not authored (wave 2)",
-      "p5_status": "not authored (wave 2)"
+      "p4_status": "all 6 merged (T1 #118, T2 #122, T3 #131, T4 #127, T5 #130, T6 #124)",
+      "p5_status": "all 5 merged (T1 #125, T2 #137, T3 #132, T4 #134, T5 #136)"
     },
     "M02": {
       "status": "P0+P1+P2+P4 COMPLETE (30/30 tickets merged); P3 (mutation gate flip blocking) is Wave 4 work, deferred",
@@ -42,11 +42,15 @@
       "p3_status": "all 7 merged"
     },
     "M04": {
-      "status": "P1 COMPLETE (T1-T7 all merged); P2-P6 still pending",
-      "phase": "P1_complete",
+      "status": "P1+P2+P3 COMPLETE; P4-P6 still pending",
+      "phase": "P3_complete",
       "owner_branch": null,
       "p1_status": "all 7 merged (T1 PR#78, T2 PR#80, T3 PR#81, T5 PR#82, T4 PR#84, T6 PR#85, T7 PR#86)",
-      "p2_status": "ready (CI gate + bless workflow); next M04 work"
+      "p2_status": "all 6 merged (T1 #119, T2 #120, T3 #123, T4 #121, T5 #126, T6 #128)",
+      "p3_status": "all 6 merged (T1 #129, T2 #133, T3 #138, T4 #139, T5 #140, T6 #135)",
+      "p4_status": "ready (chio replay subcommand); pending dispatch",
+      "p5_status": "ready (replay invariance proptest); pending dispatch",
+      "p6_status": "ready (differential anchored-root verification); pending dispatch"
     },
     "M05": {
       "status": "ticket files authored (P0-P4, 29 tickets)",
