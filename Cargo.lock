@@ -2266,6 +2266,7 @@ dependencies = [
  "chio-market",
  "chio-open-market",
  "chio-store-sqlite",
+ "chio-tool-call-fabric",
  "chio-underwriting",
  "criterion",
  "lru",
