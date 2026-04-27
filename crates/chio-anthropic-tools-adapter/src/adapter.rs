@@ -5,6 +5,9 @@
 //! and lowers kernel verdicts back into Anthropic `tool_result` blocks for
 //! the next user message.
 
+#[path = "streaming.rs"]
+pub mod streaming;
+
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -118,6 +121,14 @@ impl AnthropicAdapter {
         })?;
         guard.clear();
         guard.extend(ids);
+        Ok(())
+    }
+
+    fn push_pending_tool_use_id(&self, id: String) -> Result<(), ProviderError> {
+        let mut guard = self.pending_tool_use_ids.lock().map_err(|_| {
+            ProviderError::Malformed("Anthropic pending tool_use state is unavailable".to_string())
+        })?;
+        guard.push_back(id);
         Ok(())
     }
 
