@@ -29,11 +29,16 @@
 mod error;
 mod evaluator;
 mod identity;
+mod kernel_service;
 mod layer;
 mod service;
 
 pub use error::ChioTowerError;
 pub use evaluator::{ChioEvaluator, EvaluationResult};
 pub use identity::{extract_identity, IdentityExtractor};
+pub use kernel_service::{
+    build_layered, KernelRequest, KernelResponse, KernelService, KernelServiceError,
+    KernelTraceLayer, KernelTraceService, TenantId,
+};
 pub use layer::ChioLayer;
 pub use service::ChioService;
