@@ -1,0 +1,103 @@
+name: demo-pages
+
+# Build and deploy `docs/demo/` to GitHub Pages.
+#
+# Per .planning/trajectory/08-browser-edge-sdk.md "Demo path lock":
+#   - Trigger: push to `main` whose changeset touches docs/demo/** OR any
+#     path that produces a wasm artifact (crates/chio-kernel-browser/**,
+#     sdks/typescript/packages/browser/**).
+#   - Wasm artifact source: download `wasm-artifacts` from the latest
+#     successful `web-sdk.yml` run on `main`, copy the browser dist/web/
+#     output into docs/demo/dist/.
+#   - Deploy via actions/deploy-pages@v4 (pinned major).
+#
+# This workflow is engineering output, not a release artifact. The
+# engineering-output banner on the page itself states this; the workflow's
+# environment URL is purely informational.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/demo/**'
+      - 'crates/chio-kernel-browser/**'
+      - 'sdks/typescript/packages/browser/**'
+      - 'sdks/typescript/scripts/build-wasm.sh'
+      - '.github/workflows/demo-pages.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: demo-pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build docs/demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.3'
+
+      - name: Install workspace deps
+        run: bun install --frozen-lockfile
+
+      # The wasm artifact is produced by the web-sdk.yml workflow. Pull the
+      # latest successful run's `wasm-artifacts` archive and stage the
+      # browser-target output under sdks/typescript/packages/browser/pkg/ so
+      # the demo build resolves `@chio-protocol/browser`.
+      - name: Download wasm-artifacts (latest web-sdk.yml run on main)
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: web-sdk.yml
+          branch: main
+          name: wasm-artifacts
+          path: ./.wasm-artifacts
+          if_no_artifact_found: warn
+
+      - name: Stage browser wasm into pkg/
+        run: |
+          set -eu
+          if [ -d "./.wasm-artifacts/browser/dist/web" ]; then
+            mkdir -p sdks/typescript/packages/browser/pkg
+            cp -R ./.wasm-artifacts/browser/dist/web/. sdks/typescript/packages/browser/pkg/
+            echo "Staged wasm into sdks/typescript/packages/browser/pkg/"
+            ls -la sdks/typescript/packages/browser/pkg
+          else
+            echo "::warning::wasm artifact not found; demo will render banner + 'wasm not built' notice"
+          fi
+
+      - name: Build docs-demo
+        run: bun run --filter docs-demo build
+
+      - name: Add Pages metadata to dist
+        run: |
+          set -eu
+          touch docs/demo/dist/.nojekyll
+          ls -la docs/demo/dist
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/demo/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

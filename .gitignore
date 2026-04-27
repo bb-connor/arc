@@ -85,6 +85,21 @@ tests/conformance/reports/generated/
 # (see xtask/codegen-tools.lock.toml [typescript] block); node_modules is
 # regenerated via `npm ci` inside the script directory.
 sdks/typescript/scripts/node_modules/
+
+# docs-demo build outputs and per-package node_modules
+docs/demo/dist/
+docs/demo/node_modules/
+docs/demo/test-results/
+docs/demo/playwright-report/
+docs/demo/.vite/
+
+# Top-level workspace and TS SDK package node_modules
+/node_modules/
+sdks/typescript/packages/*/node_modules/
+
+# wasm-pack output for the browser SDK (regenerated via build-wasm.sh)
+sdks/typescript/packages/browser/pkg/
+sdks/typescript/packages/browser/dist/
 *.pyc
 *.pyo
 *.pyd
