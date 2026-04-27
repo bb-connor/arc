@@ -1823,6 +1823,8 @@ dependencies = [
  "chio-reputation",
  "chio-siem",
  "chio-store-sqlite",
+ "chio-tee-frame",
+ "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-wasm-guards",
  "chrono",
