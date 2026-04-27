@@ -164,10 +164,11 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
         .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
     }
 
-    if let Some((line, msg, _exit)) = first_error {
-        return Err(CliError::Other(format!(
-            "chio replay traffic: validation failed on line {line}: {msg}"
-        )));
+    if let Some((line, msg, exit)) = first_error {
+        return finish_replay_traffic_failure(
+            exit,
+            format!("chio replay traffic: validation failed on line {line}: {msg}"),
+        );
     }
     Ok(())
 }
@@ -204,17 +205,46 @@ fn cmd_replay_traffic_with_against(
     }
 
     if !diff.ok() {
-        // Drift / error -> non-zero exit via CliError. The canonical
-        // M04 exit-code registry mapping (10 = benign drift, 20 = bad
-        // signature, 30 = parse, 40 = schema, 50 = root mismatch) is
-        // T5 work; T2 surfaces a single CliError so the surface stays
-        // wire-stable.
-        return Err(CliError::Other(format!(
-            "chio replay traffic --against: report has drift/errors ({} drift, {} error)",
-            diff.drifts, diff.errors
-        )));
+        let exit = traffic_diff_exit_code(&diff);
+        return finish_replay_traffic_failure(
+            exit,
+            format!(
+                "chio replay traffic --against: report has drift/errors ({} drift, {} error)",
+                diff.drifts, diff.errors,
+            ),
+        );
     }
     Ok(())
+}
+
+fn traffic_diff_exit_code(diff: &TrafficReplayDiffReport) -> i32 {
+    if let Some(error) = diff.error_outcomes.first() {
+        let detail = error.error.as_str();
+        if detail.contains("ndjson parse error") || detail.contains("ndjson io error") {
+            return EXIT_PARSE_ERROR;
+        }
+        if detail.contains("redaction") {
+            return EXIT_REDACTION_MISMATCH;
+        }
+        if detail.contains("schema") || detail.contains("invocation") {
+            return EXIT_SCHEMA_MISMATCH;
+        }
+        return EXIT_BAD_TENANT_SIG;
+    }
+    if diff.drifts > 0 {
+        return EXIT_VERDICT_DRIFT;
+    }
+    0
+}
+
+#[cfg(not(test))]
+fn finish_replay_traffic_failure(code: i32, _message: String) -> Result<(), CliError> {
+    std::process::exit(code);
+}
+
+#[cfg(test)]
+fn finish_replay_traffic_failure(_code: i32, message: String) -> Result<(), CliError> {
+    Err(CliError::Other(message))
 }
 
 #[cfg(test)]
