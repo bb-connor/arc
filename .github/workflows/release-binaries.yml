@@ -104,10 +104,6 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
-      - name: Install cross (aarch64-linux only)
-        if: matrix.cross == true
-        run: cargo install cross --locked --version 0.2.5
-
       - name: Install cargo-auditable (native)
         # cargo-auditable embeds the workspace dependency graph into the
         # release binary so downstream consumers can later run
@@ -116,26 +112,11 @@ jobs:
         # `[workspace.metadata.cargo-auditable]` block in Cargo.toml for
         # the rationale tied to M09.P2.T1. Native lanes install the tool
         # directly on the runner; the cross lane installs it inside the
-        # cross container via the pre-build hook in the next step.
+        # cross-rs container in the next step (which then runs
+        # `cargo auditable build` from inside the container).
         if: matrix.cross == false
         shell: bash
         run: cargo install cargo-auditable --locked --version 0.7.4
-
-      - name: Configure cross to install cargo-auditable in container
-        # `cross` runs the build in a Docker image that does not bundle
-        # cargo-auditable. The Cross.toml `pre-build` hook installs the
-        # tool into the container before the build so `cross auditable
-        # build` resolves to the same v0.7.4 used on native lanes. The
-        # file is written at CI runtime and is not committed to the repo.
-        if: matrix.cross == true
-        shell: bash
-        run: |
-          cat > Cross.toml <<'EOF'
-          [build]
-          pre-build = [
-              "cargo install cargo-auditable --locked --version 0.7.4",
-          ]
-          EOF
 
       - name: Build (native)
         if: matrix.cross == false
@@ -147,13 +128,47 @@ jobs:
             --target "${{ matrix.target }}"
 
       - name: Build (cross)
+        # cross v0.2.5 does NOT recognise `auditable` as a build
+        # subcommand; in upstream `src/cargo.rs` unknown subcommands map
+        # to `Subcommand::Other`, whose `needs_docker()` returns false,
+        # so the previous `cross auditable build` invocation silently
+        # fell back to the host (cleanup-c11a; PR #43 review threads
+        # r3142892200 / r3142894176). The host lacks the cross-compile
+        # linker + sysroot, so every aarch64-linux release build failed.
+        #
+        # The correct pattern is to drive the cross-rs container image
+        # directly: install `cargo-auditable` inside the container and
+        # then run `cargo auditable build` there. The cross-rs project
+        # publishes pinned-tag images on GHCR (one per target triple);
+        # we pin to the same v0.2.5 the previous `cargo install cross`
+        # step pinned to. Running `cargo auditable build` inside the
+        # container preserves the cargo-auditable dep-graph embedding
+        # (M09.P2.T1) on the cross lane that native lanes get for free.
         if: matrix.cross == true
         shell: bash
+        env:
+          CHIO_TARGET: ${{ matrix.target }}
+          # Pinned to match the previous `cross` host-tool pin. Bumping
+          # this requires re-confirming that the image still ships with
+          # the rust toolchain for ${CHIO_TARGET} pre-installed.
+          CROSS_IMAGE_TAG: "0.2.5"
         run: |
-          cross auditable build --release --locked \
-            --package "${CARGO_PACKAGE}" \
-            --bin "${BINARY_NAME}" \
-            --target "${{ matrix.target }}"
+          set -euo pipefail
+          image="ghcr.io/cross-rs/${CHIO_TARGET}:${CROSS_IMAGE_TAG}"
+          docker pull "${image}"
+          docker run --rm \
+            -v "${PWD}:/project" \
+            -w /project \
+            -e CARGO_TERM_COLOR \
+            "${image}" \
+            bash -lc '
+              set -euo pipefail
+              cargo install cargo-auditable --locked --version 0.7.4
+              cargo auditable build --release --locked \
+                --package "'"${CARGO_PACKAGE}"'" \
+                --bin "'"${BINARY_NAME}"'" \
+                --target "'"${CHIO_TARGET}"'"
+            '
 
       - name: Install syft
         # Pinned to v1.18.1 to match the M09.P2.T2 acceptance gate. The
