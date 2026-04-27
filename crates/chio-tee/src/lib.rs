@@ -9,7 +9,9 @@ pub mod buffer;
 pub mod config;
 pub mod frame;
 pub mod mode;
+pub mod persist;
 pub mod redact;
+pub mod spool;
 pub mod tap;
 
 pub use buffer::RawPayloadBuffer;
@@ -25,10 +27,12 @@ pub use frame::{
 pub use mode::{
     Direction, Mode, ModeInputs, MoteState, ParseModeError, ResolvedMode, Source, TransitionError,
 };
+pub use persist::{PersistedBlob, PersistenceError, TeeBlobPersistence};
 pub use redact::{
     DefaultRedactor, RedactClass, RedactError, RedactPass, RedactedPayload, RedactionManifest,
     RedactionMatch, Redactor, RedactorError, PARANOID_ZERO_MATCH_THRESHOLD,
 };
+pub use spool::{SpoolError, SpooledTraffic, TeeBlobSpool};
 pub use tap::{TapError, TapResult, TrafficTap};
 
 pub const TEE_VERSION: &str = "0.1.0-skeleton";
