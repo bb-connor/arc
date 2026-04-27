@@ -22,6 +22,7 @@
 #![forbid(unsafe_code)]
 
 pub mod provenance;
+pub mod stream;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,7 @@ use std::time::SystemTime;
 use thiserror::Error;
 
 pub use provenance::{sign_provenance, verify_signed_provenance, SignedProvenance};
+pub use stream::{BlockKind, BufferedBlock, StreamError, StreamEvent, StreamPhase};
 
 /// Compatibility marker. The wire-level `provider` field uses the snake-case
 /// serde rendering of [`ProviderId`]; this constant exists so build systems
