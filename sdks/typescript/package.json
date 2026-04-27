@@ -8,6 +8,7 @@
   "workspaces": [
     "packages/ai-sdk",
     "packages/browser",
+    "packages/workers",
     "packages/conformance",
     "packages/elysia",
     "packages/express",
