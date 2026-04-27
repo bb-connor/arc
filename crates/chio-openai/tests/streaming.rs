@@ -22,14 +22,12 @@ fn policy_deny_verdict() -> VerdictResult {
     }
 }
 
-#[test]
-fn buffers_function_call_argument_deltas_until_allow() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
-    let raw = concat!(
+fn tool_call_stream() -> &'static str {
+    concat!(
         "event: response.created\n",
         "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_stream_1\"}}\n\n",
         "event: response.output_item.added\n",
-        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"Chio sync\\\",\\\"duration_minutes\\\":30}\"}}\n\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\"}\n\n",
         "event: response.function_call_arguments.delta\n",
@@ -38,11 +36,15 @@ fn buffers_function_call_argument_deltas_until_allow() {
         "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"Chio sync\\\",\\\"duration_minutes\\\":30}\"}}\n\n",
         "event: response.completed\n",
         "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_stream_1\"}}\n\n",
-    );
+    )
+}
 
+#[test]
+fn buffers_function_call_argument_deltas_until_done_verdict_allows() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
     let mut evaluated = Vec::new();
     let gated = adapter
-        .gate_sse_stream(raw.as_bytes(), |invocation| {
+        .gate_sse_stream(tool_call_stream().as_bytes(), |invocation| {
             evaluated.push(invocation.provenance.request_id.clone());
             Ok(allow_verdict())
         })
@@ -67,6 +69,7 @@ fn buffers_function_call_argument_deltas_until_allow() {
         String::from_utf8(gated.buffered_blocks[0].bytes.clone()).unwrap(),
         "{\"title\":\"Chio sync\",\"duration_minutes\":30}"
     );
+
     let forwarded = String::from_utf8(gated.bytes).unwrap();
     assert!(forwarded.contains("response.created"));
     assert!(forwarded.contains("response.output_item.added"));
@@ -78,20 +81,59 @@ fn buffers_function_call_argument_deltas_until_allow() {
 #[test]
 fn deny_verdict_fails_closed_before_tool_frames_are_released() {
     let adapter = OpenAiAdapter::new("org_chio_demo");
-    let raw = concat!(
-        "event: response.output_item.added\n",
-        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{}\"}}\n\n",
-        "event: response.function_call_arguments.delta\n",
-        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{}\"}\n\n",
-    );
-
+    let mut calls = 0;
     let err = adapter
-        .gate_sse_stream(raw.as_bytes(), |_| Ok(policy_deny_verdict()))
+        .gate_sse_stream(tool_call_stream().as_bytes(), |_| {
+            calls += 1;
+            Ok(policy_deny_verdict())
+        })
         .expect_err("deny verdict should fail closed");
 
+    assert_eq!(calls, 1);
     assert!(matches!(err, ProviderError::Malformed(_)));
-    assert!(err.to_string().contains("denied at output_item.added"));
+    assert!(err.to_string().contains("denied at output_item.done"));
     assert!(err.to_string().contains("deny_calendar"));
+}
+
+#[test]
+fn mismatched_done_arguments_fail_closed_before_verdict() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "event: response.function_call_arguments.delta\n",
+        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\\\"queued\\\"}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"different\\\"}\"}}\n\n",
+    );
+
+    let mut calls = 0;
+    let err = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("mismatched streamed arguments should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::Malformed(_)));
+    assert!(err.to_string().contains("did not match"));
+}
+
+#[test]
+fn verdict_timeout_terminates_before_tool_frames_are_released() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let err = adapter
+        .gate_sse_stream(tool_call_stream().as_bytes(), |_| {
+            Err(ProviderError::VerdictBudgetExceeded {
+                observed_ms: 300,
+                budget_ms: 250,
+            })
+        })
+        .expect_err("timeout should fail closed");
+
+    assert!(matches!(err, ProviderError::VerdictBudgetExceeded { .. }));
+    assert!(err.to_string().contains("verdict latency budget exceeded"));
 }
 
 #[test]
@@ -111,16 +153,18 @@ fn malformed_delta_without_active_tool_call_fails_closed() {
 }
 
 #[test]
-fn malformed_tool_call_arguments_fail_closed() {
+fn malformed_done_tool_call_arguments_fail_closed() {
     let adapter = OpenAiAdapter::new("org_chio_demo");
     let raw = concat!(
         "event: response.output_item.added\n",
-        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_bad_args\",\"name\":\"create_calendar_event\",\"arguments\":\"{not json\"}}\n\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_bad_args\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_bad_args\",\"name\":\"create_calendar_event\",\"arguments\":\"{not json\"}}\n\n",
     );
 
     let err = adapter
         .gate_sse_stream(raw.as_bytes(), |_| Ok(allow_verdict()))
-        .expect_err("invalid start arguments should fail closed");
+        .expect_err("invalid done arguments should fail closed");
 
     assert!(matches!(err, ProviderError::BadToolArgs(_)));
     assert!(err.to_string().contains("arguments"));
