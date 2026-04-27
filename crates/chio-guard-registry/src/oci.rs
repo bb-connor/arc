@@ -26,7 +26,7 @@ pub const GUARD_MODULE_LAYER_ROLE: &str = "wasm";
 /// Annotation role for the manifest layer.
 pub const GUARD_MANIFEST_LAYER_ROLE: &str = "manifest";
 
-const OCI_SCHEME: &str = "oci://";
+pub(crate) const OCI_SCHEME: &str = "oci://";
 const SHA256_PREFIX: &str = "sha256:";
 const SHA256_HEX_LEN: usize = 64;
 
@@ -94,6 +94,14 @@ pub enum GuardRegistryError {
         /// Actual layer count.
         actual: usize,
     },
+
+    /// The publish reference was pinned by digest.
+    #[error("guard publish reference must be tag-addressed, not pinned by digest")]
+    PublishReferencePinnedByDigest,
+
+    /// The artifact config could not be serialized.
+    #[error("failed to serialize guard artifact config: {0}")]
+    ConfigSerialize(#[from] serde_json::Error),
 }
 
 /// A validated `sha256:<hex>` digest.
@@ -194,7 +202,7 @@ impl FromStr for GuardOciRef {
     }
 }
 
-fn has_explicit_registry(reference: &str) -> bool {
+pub(crate) fn has_explicit_registry(reference: &str) -> bool {
     let Some((first_component, _rest)) = reference.split_once('/') else {
         return false;
     };
@@ -217,7 +225,7 @@ pub enum RegistryCredentials {
 }
 
 impl RegistryCredentials {
-    fn to_registry_auth(&self) -> RegistryAuth {
+    pub(crate) fn to_registry_auth(&self) -> RegistryAuth {
         match self {
             Self::Anonymous => RegistryAuth::Anonymous,
             Self::Basic { username, password } => {
@@ -286,7 +294,7 @@ impl GuardRegistryConfig {
 /// OCI registry client for guard artifacts.
 #[derive(Clone)]
 pub struct GuardRegistryClient {
-    client: Client,
+    pub(crate) client: Client,
 }
 
 impl GuardRegistryClient {

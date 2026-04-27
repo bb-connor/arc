@@ -4,6 +4,12 @@ use std::process::Command;
 
 use crate::CliError;
 
+use base64::Engine;
+use chio_guard_registry::{
+    GuardArtifactConfig, GuardPublishArtifact, GuardPublishArtifactInput, GuardPublishRef,
+    GuardRegistryClient, GuardRegistryConfig, RegistryCredentials, GUARD_ARTIFACT_MEDIA_TYPE,
+    GUARD_CONFIG_MEDIA_TYPE, GUARD_WIT_WORLD,
+};
 use chio_wasm_guards::abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 use chio_wasm_guards::manifest::GuardManifest;
 use chio_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
@@ -574,6 +580,96 @@ pub(crate) fn cmd_guard_pack() -> Result<(), CliError> {
     pack_from_dir(Path::new("."))
 }
 
+pub(crate) struct GuardPublishCommand<'a> {
+    pub project_dir: &'a Path,
+    pub reference: &'a str,
+    pub wit_path: &'a Path,
+    pub signer_public_key: Option<&'a str>,
+    pub signer_subject: Option<&'a str>,
+    pub fuel_limit: u64,
+    pub memory_limit_bytes: u64,
+    pub epoch_id_seed: &'a str,
+    pub username: Option<&'a str>,
+    pub password: Option<&'a str>,
+    pub allow_http_registry: Vec<String>,
+}
+
+pub(crate) fn cmd_guard_publish(command: GuardPublishCommand<'_>) -> Result<(), CliError> {
+    let manifest_path = command.project_dir.join("guard-manifest.yaml");
+    let manifest_content = fs::read_to_string(&manifest_path).map_err(|e| {
+        CliError::Other(format!(
+            "failed to read {}: {e}",
+            manifest_path.display()
+        ))
+    })?;
+    let manifest: GuardManifest = serde_yml::from_str(&manifest_content).map_err(|e| {
+        CliError::Other(format!("failed to parse guard-manifest.yaml: {e}"))
+    })?;
+
+    let wit_world = manifest.wit_world.as_deref().unwrap_or(GUARD_WIT_WORLD);
+    if wit_world != GUARD_WIT_WORLD {
+        return Err(CliError::Other(format!(
+            "guard publish requires wit_world {GUARD_WIT_WORLD}, got {wit_world}"
+        )));
+    }
+
+    let wasm_path = command.project_dir.join(Path::new(&manifest.wasm_path));
+    let wasm_bytes = fs::read(&wasm_path).map_err(|e| {
+        CliError::Other(format!("failed to read {}: {e}", wasm_path.display()))
+    })?;
+    let wit_bytes = fs::read(command.wit_path).map_err(|e| {
+        CliError::Other(format!(
+            "failed to read WIT file {}: {e}",
+            command.wit_path.display()
+        ))
+    })?;
+
+    let signer_public_key = resolve_signer_public_key(command.signer_public_key, &manifest)?;
+    let artifact_config = GuardArtifactConfig::new(
+        signer_public_key,
+        command.fuel_limit,
+        command.memory_limit_bytes,
+        command.epoch_id_seed,
+    );
+    let artifact = GuardPublishArtifact::build(GuardPublishArtifactInput {
+        wit: wit_bytes,
+        module: wasm_bytes,
+        manifest: manifest_content.into_bytes(),
+        config: artifact_config,
+        signer_subject: command.signer_subject.map(str::to_owned),
+    })
+    .map_err(|e| CliError::Other(e.to_string()))?;
+
+    let reference = command
+        .reference
+        .parse::<GuardPublishRef>()
+        .map_err(|e| CliError::Other(e.to_string()))?;
+    let credentials = registry_credentials(command.username, command.password);
+    let client = GuardRegistryClient::try_new(GuardRegistryConfig {
+        allow_http_registries: command.allow_http_registry,
+        ..GuardRegistryConfig::default()
+    })
+    .map_err(|e| CliError::Other(e.to_string()))?;
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| CliError::Other(format!("failed to create publish runtime: {e}")))?;
+    let response = runtime
+        .block_on(client.publish_guard_artifact(&reference, artifact, &credentials))
+        .map_err(|e| CliError::Other(e.to_string()))?;
+
+    println!("published guard artifact");
+    println!("reference:         {reference}");
+    println!("artifact_type:     {GUARD_ARTIFACT_MEDIA_TYPE}");
+    println!("config_media_type: {GUARD_CONFIG_MEDIA_TYPE}");
+    println!("config_digest:     {}", response.config_digest);
+    println!("config_url:        {}", response.config_url);
+    println!("manifest_url:      {}", response.manifest_url);
+
+    Ok(())
+}
+
 fn pack_from_dir(project_dir: &Path) -> Result<(), CliError> {
     let manifest_path = project_dir.join("guard-manifest.yaml");
     let manifest_content = fs::read_to_string(&manifest_path).map_err(|e| {
@@ -652,6 +748,40 @@ fn pack_from_dir(project_dir: &Path) -> Result<(), CliError> {
     println!("packed: {archive_name} ({})", format_size(archive_size));
 
     Ok(())
+}
+
+fn resolve_signer_public_key(
+    explicit: Option<&str>,
+    manifest: &GuardManifest,
+) -> Result<String, CliError> {
+    let Some(value) = explicit.or(manifest.signer_public_key.as_deref()) else {
+        return Err(CliError::Other(
+            "guard publish requires --signer-public-key or signer_public_key in guard-manifest.yaml"
+                .to_string(),
+        ));
+    };
+
+    if value.starts_with("ed25519:") {
+        return Ok(value.to_owned());
+    }
+
+    let decoded = hex::decode(value).map_err(|e| {
+        CliError::Other(format!(
+            "signer public key must be ed25519:<base64> or hex-encoded Ed25519 bytes: {e}"
+        ))
+    })?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(decoded);
+    Ok(format!("ed25519:{encoded}"))
+}
+
+fn registry_credentials(username: Option<&str>, password: Option<&str>) -> RegistryCredentials {
+    match (username, password) {
+        (Some(username), Some(password)) => RegistryCredentials::Basic {
+            username: username.to_owned(),
+            password: password.to_owned(),
+        },
+        _ => RegistryCredentials::Anonymous,
+    }
 }
 
 pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Result<(), CliError> {
