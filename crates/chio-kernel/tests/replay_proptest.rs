@@ -27,8 +27,11 @@
 // Plus a third declared property:
 // - `shuffle_independent_receipts_preserves_bytes`
 //
-// All three live under a single `proptest! { ... }` block so the
-// `#![proptest_config(...)]` declaration covers them uniformly.
+// `signing_is_a_function` lives in its own `proptest! { ... }` block with a
+// raised `cases` budget (`SIGNING_FUNCTION_CASES`); the other two share the
+// standard `PROPTEST_BUDGET_CASES` block. Splitting the macro invocations is
+// the only way to per-test-tune the case count, since `proptest!` only
+// honours the `#![proptest_config(...)]` inner attribute at block scope.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -51,6 +54,11 @@ const KERNEL_SEED: [u8; 32] = [
 ];
 
 const PROPTEST_BUDGET_CASES: u32 = 64;
+
+/// Higher case count for `signing_is_a_function`. Signing is the cheapest
+/// property to evaluate (one body, one keypair, no Merkle anchoring) so we
+/// can afford a denser sweep without breaching the 30s CI budget.
+const SIGNING_FUNCTION_CASES: u32 = 256;
 
 fn kernel_keypair() -> Keypair {
     Keypair::from_seed(&KERNEL_SEED)
@@ -106,6 +114,85 @@ fn arbitrary_receipt_tuple() -> impl Strategy<Value = ReceiptTuple> {
             clock,
             nonce,
         })
+}
+
+/// Edge-case payload strategy biased toward boundary shapes that have caused
+/// canonical-bytes regressions in the past: empty maps, all-zero byte vectors,
+/// extreme integer magnitudes, and unicode-free single-character methods.
+fn edge_case_payload() -> impl Strategy<Value = serde_json::Value> {
+    prop_oneof![
+        // Empty payload (no fields).
+        Just(json!({})),
+        // All-zero byte vector at maximum bounded size.
+        Just(json!({
+            "method": "z",
+            "bytes": vec![0u8; 16],
+            "magnitude": 0,
+        })),
+        // Maximum-magnitude i32 (positive and negative).
+        Just(json!({
+            "method": "max",
+            "bytes": Vec::<u8>::new(),
+            "magnitude": i32::MAX,
+        })),
+        Just(json!({
+            "method": "min",
+            "bytes": Vec::<u8>::new(),
+            "magnitude": i32::MIN,
+        })),
+        // Single-element byte vector with the high bit set (canonical-JSON
+        // numeric encoding has previously regressed on values >= 128).
+        Just(json!({
+            "method": "h",
+            "bytes": vec![0xFFu8],
+            "magnitude": 1,
+        })),
+    ]
+}
+
+/// `signing_edge_tuple()`: tuples that exercise boundary conditions of the
+/// signing surface area. The strategy mixes random tuples with a curated set
+/// of edge cases (zero clock, max-u64 clock, empty/min-length nonce,
+/// max-length nonce, and the edge-case payload shapes above).
+fn signing_edge_tuple() -> impl Strategy<Value = ReceiptTuple> {
+    prop_oneof![
+        // 60% of the budget: random tuples (the original strategy).
+        6 => arbitrary_receipt_tuple(),
+        // Zero clock + minimal nonce.
+        1 => (arbitrary_decision(), edge_case_payload(), Just(0u64), "[a-z]{1}").prop_map(
+            |(decision, payload, clock, nonce)| ReceiptTuple { decision, payload, clock, nonce },
+        ),
+        // Max u64 clock + maximum-length nonce.
+        1 => (
+            arbitrary_decision(),
+            edge_case_payload(),
+            Just(u64::MAX),
+            "[a-z0-9]{32}",
+        )
+            .prop_map(|(decision, payload, clock, nonce)| ReceiptTuple {
+                decision,
+                payload,
+                clock,
+                nonce,
+            }),
+        // Boundary clocks: 1, i64::MAX as u64, u64::MAX - 1.
+        1 => (
+            arbitrary_decision(),
+            arbitrary_payload(),
+            prop_oneof![Just(1u64), Just(i64::MAX as u64), Just(u64::MAX - 1)],
+            "[a-z0-9]{8,32}",
+        )
+            .prop_map(|(decision, payload, clock, nonce)| ReceiptTuple {
+                decision,
+                payload,
+                clock,
+                nonce,
+            }),
+        // Edge payloads paired with random clocks/nonces.
+        1 => (arbitrary_decision(), edge_case_payload(), any::<u64>(), "[a-z0-9]{8,32}").prop_map(
+            |(decision, payload, clock, nonce)| ReceiptTuple { decision, payload, clock, nonce },
+        ),
+    ]
 }
 
 /// Build a `ChioReceiptBody` from a tuple. The `nonce` is woven into the
@@ -172,40 +259,97 @@ fn regression_persistence() -> Box<FileFailurePersistence> {
     )))
 }
 
+// Property 1 lives in its own `proptest!` block so we can dial up the case
+// count specifically for `signing_is_a_function` without slowing the other
+// two properties (which build full Merkle trees per case). Signing is the
+// cheapest property to evaluate, so the denser sweep stays well inside the
+// 30s CI budget.
+proptest! {
+    #![proptest_config(ProptestConfig {
+        cases: SIGNING_FUNCTION_CASES,
+        failure_persistence: Some(regression_persistence()),
+        .. ProptestConfig::default()
+    })]
+
+    /// Property 1 (named exit-criterion test):
+    /// signing is a pure function: same canonical body, same signed bytes.
+    /// We sign the same body three times across two independently-derived
+    /// keypair instances and assert byte equality across every pairing.
+    /// The strategy is biased toward edge cases (boundary clocks, empty and
+    /// all-zero payloads, min and max nonce lengths) on top of the random
+    /// `arbitrary_receipt_tuple` baseline.
+    #[test]
+    fn signing_is_a_function(tuple in signing_edge_tuple()) {
+        // Two keypair instances from the same seed must behave identically.
+        // This catches regressions where signer state (e.g. RNG) leaks into
+        // the signature bytes.
+        let kp = kernel_keypair();
+        let kp_twin = kernel_keypair();
+        prop_assert_eq!(kp.public_key(), kp_twin.public_key());
+
+        let body = body_from_tuple(&tuple, &kp);
+
+        // Triple-sign across both keypair instances. Three signatures over
+        // the same body must produce identical bytes; if any pair drifts,
+        // signing is not a pure function of (body, key).
+        let receipt_a = sign_body(&body, &kp);
+        let receipt_b = sign_body(&body, &kp);
+        let receipt_c = sign_body(&body, &kp_twin);
+
+        let bytes_a = canonical_json_bytes(&receipt_a).expect("receipt a canonicalises");
+        let bytes_b = canonical_json_bytes(&receipt_b).expect("receipt b canonicalises");
+        let bytes_c = canonical_json_bytes(&receipt_c).expect("receipt c canonicalises");
+        prop_assert_eq!(&bytes_a, &bytes_b);
+        prop_assert_eq!(&bytes_a, &bytes_c);
+
+        // Raw signature bytes must agree exactly. We compare both the
+        // canonical-JSON encoding of the signature container and the
+        // structural equality of the signature itself, so a bug that
+        // reordered hex chars or changed the encoding would still fail.
+        let sig_a = canonical_json_bytes(&receipt_a.signature)
+            .expect("signature a canonicalises");
+        let sig_b = canonical_json_bytes(&receipt_b.signature)
+            .expect("signature b canonicalises");
+        let sig_c = canonical_json_bytes(&receipt_c.signature)
+            .expect("signature c canonicalises");
+        prop_assert_eq!(&sig_a, &sig_b);
+        prop_assert_eq!(&sig_a, &sig_c);
+
+        // Verification must succeed for every signed copy.
+        prop_assert!(receipt_a.verify_signature().expect("verify a"));
+        prop_assert!(receipt_b.verify_signature().expect("verify b"));
+        prop_assert!(receipt_c.verify_signature().expect("verify c"));
+
+        // Canonical body bytes must round-trip independent of which receipt
+        // we project from: the body is the input to signing and must remain
+        // a fixed point.
+        let body_bytes_a = canonical_body_bytes(&receipt_a.body());
+        let body_bytes_b = canonical_body_bytes(&receipt_b.body());
+        let body_bytes_direct = canonical_body_bytes(&body);
+        prop_assert_eq!(&body_bytes_a, &body_bytes_b);
+        prop_assert_eq!(&body_bytes_a, &body_bytes_direct);
+
+        // The action's parameter hash must verify against its own canonical
+        // bytes. This guards against a regression where signing accepted a
+        // body with a stale `parameter_hash`.
+        prop_assert!(
+            receipt_a
+                .body()
+                .action
+                .verify_hash()
+                .expect("parameter hash verifies")
+        );
+    }
+}
+
+// Properties 2 and 3 share the standard budget: each case builds a full
+// Merkle tree over a batch of receipts, so we keep the case count modest.
 proptest! {
     #![proptest_config(ProptestConfig {
         cases: PROPTEST_BUDGET_CASES,
         failure_persistence: Some(regression_persistence()),
         .. ProptestConfig::default()
     })]
-
-    /// Property 1 (named exit-criterion test):
-    /// signing is a pure function: same canonical body, same signature
-    /// material. We sign the same body twice and assert the resulting
-    /// `ChioReceipt`s are byte-identical when re-canonicalised.
-    #[test]
-    fn signing_is_a_function(tuple in arbitrary_receipt_tuple()) {
-        let kp = kernel_keypair();
-        let body = body_from_tuple(&tuple, &kp);
-
-        let receipt_a = sign_body(&body, &kp);
-        let receipt_b = sign_body(&body, &kp);
-
-        let bytes_a = canonical_json_bytes(&receipt_a).expect("receipt a canonicalises");
-        let bytes_b = canonical_json_bytes(&receipt_b).expect("receipt b canonicalises");
-        prop_assert_eq!(bytes_a, bytes_b);
-
-        // Signature material itself must agree (Ed25519 over canonical body
-        // is deterministic by construction).
-        prop_assert_eq!(
-            canonical_json_bytes(&receipt_a.signature)
-                .expect("signature a canonicalises"),
-            canonical_json_bytes(&receipt_b.signature)
-                .expect("signature b canonicalises"),
-        );
-        prop_assert!(receipt_a.verify_signature().expect("verify a"));
-        prop_assert!(receipt_b.verify_signature().expect("verify b"));
-    }
 
     /// Property 2 (named exit-criterion test):
     /// replaying the receipt log twice yields the same anchored root. We
