@@ -11,6 +11,7 @@ use wasmtime::component::{Component, Linker};
 use wasmtime::{Engine, Store};
 
 use crate::abi::{GuardVerdict, WasmGuardAbi};
+use crate::bundle_store::{BundleStore, InMemoryBundleStore};
 use crate::error::WasmGuardError;
 use crate::host::{
     register_component_host_functions, Guard, GuardRequest, Verdict, WasmHostState,
@@ -30,6 +31,7 @@ pub struct ComponentBackend {
     component: Option<Component>,
     fuel_limit: u64,
     config: HashMap<String, String>,
+    bundle_store: Arc<dyn BundleStore>,
     max_memory_bytes: usize,
     max_module_size: usize,
     last_fuel_consumed: Option<u64>,
@@ -45,6 +47,7 @@ impl ComponentBackend {
             component: None,
             fuel_limit: 1_000_000,
             config: HashMap::new(),
+            bundle_store: Arc::new(InMemoryBundleStore::new()),
             max_memory_bytes: MAX_MEMORY_BYTES,
             max_module_size: 10 * 1024 * 1024,
             last_fuel_consumed: None,
@@ -58,10 +61,18 @@ impl ComponentBackend {
             component: None,
             fuel_limit: 1_000_000,
             config,
+            bundle_store: Arc::new(InMemoryBundleStore::new()),
             max_memory_bytes: MAX_MEMORY_BYTES,
             max_module_size: 10 * 1024 * 1024,
             last_fuel_consumed: None,
         }
+    }
+
+    /// Builder method to set the content bundle store used by host calls.
+    #[must_use]
+    pub fn with_bundle_store(mut self, bundle_store: Arc<dyn BundleStore>) -> Self {
+        self.bundle_store = bundle_store;
+        self
     }
 
     /// Builder method to set custom memory and module size limits.
@@ -99,8 +110,11 @@ impl WasmGuardAbi for ComponentBackend {
             .as_ref()
             .ok_or(WasmGuardError::BackendUnavailable)?;
 
-        let host_state =
-            WasmHostState::with_memory_limit(self.config.clone(), self.max_memory_bytes);
+        let host_state = WasmHostState::with_memory_limit_and_bundle_store(
+            self.config.clone(),
+            self.max_memory_bytes,
+            Arc::clone(&self.bundle_store),
+        );
         let mut store = Store::new(&self.engine, host_state);
         store.limiter(|state| &mut state.limits);
         store

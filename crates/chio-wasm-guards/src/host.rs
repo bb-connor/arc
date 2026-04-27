@@ -8,22 +8,25 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use wasmtime::component::Linker as ComponentLinker;
+use wasmtime::component::{
+    Linker as ComponentLinker, Resource as ComponentResource, ResourceTable, ResourceTableError,
+};
 use wasmtime::{
     Caller, Engine, FuncType, Linker as CoreLinker, StoreLimits, StoreLimitsBuilder, Val, ValType,
 };
 
+use crate::bundle_store::{parse_sha256_digest, BundleStore, InMemoryBundleStore};
 use crate::error::WasmGuardError;
 
 // ---------------------------------------------------------------------------
 // bindgen-generated component bindings
 // ---------------------------------------------------------------------------
 
-/// Placeholder host-side representation for the `policy-context` resource.
-///
-/// M06.P1.T3 wires this to the content-bundle store. Until then every resource
-/// read path traps so guests cannot accidentally receive partial data.
-pub struct BundleHandle;
+/// Host-side representation for the `policy-context` bundle resource.
+#[derive(Debug, Clone)]
+pub struct BundleHandle {
+    sha256: [u8; 32],
+}
 
 pub mod bindings {
     wasmtime::component::bindgen!({
@@ -70,6 +73,10 @@ pub struct WasmHostState {
     pub max_log_entries: usize,
     /// Resource limits for memory and table growth.
     pub limits: StoreLimits,
+    /// Content-addressed policy bundle storage.
+    pub bundle_store: Arc<dyn BundleStore>,
+    /// Host-owned component resource table.
+    pub resources: ResourceTable,
 }
 
 impl WasmHostState {
@@ -83,6 +90,27 @@ impl WasmHostState {
     /// `trap_on_grow_failure(true)` causes `memory.grow` beyond the configured
     /// cap to trap, preserving fail-closed behavior.
     pub fn with_memory_limit(config: HashMap<String, String>, max_memory: usize) -> Self {
+        Self::with_memory_limit_and_bundle_store(
+            config,
+            max_memory,
+            Arc::new(InMemoryBundleStore::new()),
+        )
+    }
+
+    /// Create host state with a custom in-process content bundle store.
+    pub fn with_bundle_store(
+        config: HashMap<String, String>,
+        bundle_store: Arc<dyn BundleStore>,
+    ) -> Self {
+        Self::with_memory_limit_and_bundle_store(config, MAX_MEMORY_BYTES, bundle_store)
+    }
+
+    /// Create host state with custom memory and content bundle limits.
+    pub fn with_memory_limit_and_bundle_store(
+        config: HashMap<String, String>,
+        max_memory: usize,
+        bundle_store: Arc<dyn BundleStore>,
+    ) -> Self {
         let limits = StoreLimitsBuilder::new()
             .memory_size(max_memory)
             .trap_on_grow_failure(true)
@@ -92,6 +120,8 @@ impl WasmHostState {
             logs: Vec::new(),
             max_log_entries: MAX_LOG_ENTRIES,
             limits,
+            bundle_store,
+            resources: ResourceTable::new(),
         }
     }
 
@@ -113,6 +143,43 @@ impl WasmHostState {
             self.logs.push((level as i32, msg));
         }
     }
+
+    fn read_bundle_blob(
+        &self,
+        handle: &BundleHandle,
+        offset: u64,
+        len: u32,
+    ) -> Result<Vec<u8>, String> {
+        let blob = self
+            .bundle_store
+            .fetch_blob(&handle.sha256)
+            .map_err(|e| e.to_string())?;
+        slice_blob(&blob, offset, len)
+    }
+}
+
+fn slice_blob(blob: &[u8], offset: u64, len: u32) -> Result<Vec<u8>, String> {
+    let start =
+        usize::try_from(offset).map_err(|_| "bundle blob offset exceeds host usize".to_string())?;
+    let length =
+        usize::try_from(len).map_err(|_| "bundle blob length exceeds host usize".to_string())?;
+    if start > blob.len() {
+        return Err(format!(
+            "bundle blob offset {offset} is beyond blob length {}",
+            blob.len()
+        ));
+    }
+
+    let end = start.saturating_add(length).min(blob.len());
+    Ok(blob[start..end].to_vec())
+}
+
+fn resource_table_error(err: ResourceTableError) -> wasmtime::Error {
+    wasmtime::Error::msg(format!("bundle handle resource table error: {err}"))
+}
+
+fn resource_table_error_string(err: ResourceTableError) -> String {
+    format!("bundle handle resource table error: {err}")
 }
 
 // ---------------------------------------------------------------------------
@@ -338,13 +405,16 @@ impl bindings::chio::guard::host::Host for WasmHostState {
 
     async fn fetch_blob(
         &mut self,
-        _handle: u32,
-        _offset: u64,
-        _len: u32,
+        handle: u32,
+        offset: u64,
+        len: u32,
     ) -> wasmtime::Result<Result<Vec<u8>, String>> {
-        Err(wasmtime::Error::msg(
-            "policy-context fetch-blob is unavailable until M06.P1.T3",
-        ))
+        let resource = ComponentResource::<BundleHandle>::new_borrow(handle);
+        let handle = match self.resources.get(&resource) {
+            Ok(handle) => handle,
+            Err(err) => return Ok(Err(resource_table_error_string(err))),
+        };
+        Ok(self.read_bundle_blob(handle, offset, len))
     }
 }
 
@@ -353,40 +423,40 @@ impl bindings::chio::guard::types::Host for WasmHostState {}
 impl bindings::chio::guard::policy_context::Host for WasmHostState {}
 
 impl bindings::chio::guard::policy_context::HostBundleHandle for WasmHostState {
-    async fn new(
-        &mut self,
-        _id: String,
-    ) -> wasmtime::Result<wasmtime::component::Resource<BundleHandle>> {
-        Err(wasmtime::Error::msg(
-            "policy-context bundle-handle is unavailable until M06.P1.T3",
-        ))
+    async fn new(&mut self, id: String) -> wasmtime::Result<ComponentResource<BundleHandle>> {
+        let sha256 = parse_sha256_digest(&id).map_err(|e| wasmtime::Error::msg(e.to_string()))?;
+        self.resources
+            .push(BundleHandle { sha256 })
+            .map_err(resource_table_error)
     }
 
     async fn read(
         &mut self,
-        _self_: wasmtime::component::Resource<BundleHandle>,
-        _offset: u64,
-        _len: u32,
+        self_: ComponentResource<BundleHandle>,
+        offset: u64,
+        len: u32,
     ) -> wasmtime::Result<Result<Vec<u8>, String>> {
-        Err(wasmtime::Error::msg(
-            "policy-context bundle-handle reads are unavailable until M06.P1.T3",
-        ))
+        let handle = match self.resources.get(&self_) {
+            Ok(handle) => handle,
+            Err(err) => return Ok(Err(resource_table_error_string(err))),
+        };
+        Ok(self.read_bundle_blob(handle, offset, len))
     }
 
-    async fn close(
-        &mut self,
-        _self_: wasmtime::component::Resource<BundleHandle>,
-    ) -> wasmtime::Result<()> {
-        Err(wasmtime::Error::msg(
-            "policy-context bundle-handle close is unavailable until M06.P1.T3",
-        ))
+    async fn close(&mut self, self_: ComponentResource<BundleHandle>) -> wasmtime::Result<()> {
+        let owned = ComponentResource::<BundleHandle>::new_own(self_.rep());
+        self.resources
+            .delete(owned)
+            .map(|_| ())
+            .map_err(resource_table_error)
     }
 
-    async fn drop(
-        &mut self,
-        _rep: wasmtime::component::Resource<BundleHandle>,
-    ) -> wasmtime::Result<()> {
-        Ok(())
+    async fn drop(&mut self, rep: ComponentResource<BundleHandle>) -> wasmtime::Result<()> {
+        let owned = ComponentResource::<BundleHandle>::new_own(rep.rep());
+        match self.resources.delete(owned) {
+            Ok(_) | Err(ResourceTableError::NotPresent) => Ok(()),
+            Err(err) => Err(resource_table_error(err)),
+        }
     }
 }
 
