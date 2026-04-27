@@ -30,6 +30,7 @@ lru = "0.16.3"
 chio-listing = { path = "../chio-listing" }
 chio-market = { path = "../chio-market" }
 chio-open-market = { path = "../chio-open-market" }
+dashmap = { workspace = true }
 regex = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }

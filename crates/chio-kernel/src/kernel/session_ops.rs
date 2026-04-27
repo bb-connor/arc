@@ -1,4 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+use dashmap::mapref::entry::Entry;
 
 use super::*;
 
@@ -50,13 +53,18 @@ impl ChioKernel {
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
         let session_snapshot = self.with_sessions_write(|sessions| {
-            if sessions.contains_key(&session_id) {
-                return Err(KernelError::SessionAlreadyExists(session_id.clone()));
+            let session = Arc::new(Session::new(
+                session_id.clone(),
+                agent_id,
+                issued_capabilities,
+            ));
+            match sessions.entry(session_id.clone()) {
+                Entry::Occupied(_) => Err(KernelError::SessionAlreadyExists(session_id.clone())),
+                Entry::Vacant(entry) => {
+                    entry.insert(Arc::clone(&session));
+                    Ok(session)
+                }
             }
-            let session = Session::new(session_id.clone(), agent_id, issued_capabilities);
-            let snapshot = session.clone();
-            sessions.insert(session_id.clone(), session);
-            Ok(snapshot)
         })?;
         if let Err(error) = self.persist_session_anchor_snapshot(&session_snapshot, None) {
             self.with_sessions_write(|sessions| {
@@ -90,7 +98,7 @@ impl ChioKernel {
                 session.set_auth_context(auth_context);
                 let supersedes_anchor_id = (session.session_anchor().id() != previous_anchor_id)
                     .then_some(previous_anchor_id);
-                Ok((session.clone(), supersedes_anchor_id))
+                Ok((Arc::clone(session), supersedes_anchor_id))
             })?;
         self.persist_session_anchor_snapshot(&session_snapshot, supersedes_anchor_id.as_deref())
     }
@@ -334,10 +342,14 @@ impl ChioKernel {
     }
 
     /// Inspect an existing session.
-    pub fn session(&self, session_id: &SessionId) -> Option<Session> {
-        self.with_sessions_read(|sessions| Ok(sessions.get(session_id).cloned()))
-            .ok()
-            .flatten()
+    pub fn session(&self, session_id: &SessionId) -> Option<Arc<Session>> {
+        self.with_sessions_read(|sessions| {
+            Ok(sessions
+                .get(session_id)
+                .map(|session| Arc::clone(session.value())))
+        })
+        .ok()
+        .flatten()
     }
 
     pub fn session_count(&self) -> usize {
