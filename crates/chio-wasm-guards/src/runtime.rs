@@ -440,7 +440,8 @@ pub mod wasmtime_backend {
                 Ok(Box::new(backend))
             }
             WasmFormat::Component => {
-                let mut backend = crate::component::ComponentBackend::with_engine(engine);
+                let mut backend =
+                    crate::component::ComponentBackend::with_engine_and_config(engine, config);
                 backend.load_module(wasm_bytes, fuel_limit)?;
                 Ok(Box::new(backend))
             }
@@ -630,8 +631,7 @@ pub mod wasmtime_backend {
             let mut linker: Linker<WasmHostState> = Linker::new(&self.engine);
             register_host_functions(&mut linker)?;
 
-            let instance = linker
-                .instantiate(&mut store, module)
+            let instance = pollster::block_on(linker.instantiate_async(&mut store, module))
                 .map_err(|e| WasmGuardError::Trap(e.to_string()))?;
 
             // Serialize request to JSON
@@ -651,7 +651,7 @@ pub mod wasmtime_backend {
             let request_len: i32 = request_json.len() as i32;
 
             let request_ptr: i32 = if let Some(ref alloc_fn) = chio_alloc_fn {
-                match alloc_fn.call(&mut store, request_len) {
+                match pollster::block_on(alloc_fn.call_async(&mut store, request_len)) {
                     Ok(ptr) => {
                         // Validate returned pointer is in bounds
                         let mem_size = memory.data_size(&store);
@@ -694,25 +694,25 @@ pub mod wasmtime_backend {
                 .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
                 .map_err(|e| WasmGuardError::MissingExport(format!("evaluate: {e}")))?;
 
-            let result = evaluate_fn
-                .call(&mut store, (request_ptr, request_len))
-                .map_err(|e| {
-                    // Check if this was a fuel exhaustion
-                    let msg = e.to_string();
-                    if msg.contains("fuel") {
-                        let consumed = self
-                            .fuel_limit
-                            .saturating_sub(store.get_fuel().unwrap_or(0));
-                        // Record fuel even on exhaustion
-                        self.last_fuel_consumed = Some(consumed);
-                        WasmGuardError::FuelExhausted {
-                            consumed,
-                            limit: self.fuel_limit,
+            let result =
+                pollster::block_on(evaluate_fn.call_async(&mut store, (request_ptr, request_len)))
+                    .map_err(|e| {
+                        // Check if this was a fuel exhaustion
+                        let msg = e.to_string();
+                        if msg.contains("fuel") {
+                            let consumed = self
+                                .fuel_limit
+                                .saturating_sub(store.get_fuel().unwrap_or(0));
+                            // Record fuel even on exhaustion
+                            self.last_fuel_consumed = Some(consumed);
+                            WasmGuardError::FuelExhausted {
+                                consumed,
+                                limit: self.fuel_limit,
+                            }
+                        } else {
+                            WasmGuardError::Trap(msg)
                         }
-                    } else {
-                        WasmGuardError::Trap(msg)
-                    }
-                })?;
+                    })?;
 
             // Track fuel consumed for receipt metadata
             let remaining = store.get_fuel().unwrap_or(0);
@@ -786,7 +786,9 @@ pub mod wasmtime_backend {
         const DENY_BUF_LEN: i32 = 4096;
 
         // Call the guest's chio_deny_reason function
-        let bytes_written = match reason_fn.call(&mut *store, (DENY_BUF_OFFSET, DENY_BUF_LEN)) {
+        let bytes_written = match pollster::block_on(
+            reason_fn.call_async(&mut *store, (DENY_BUF_OFFSET, DENY_BUF_LEN)),
+        ) {
             Ok(n) if n > 0 && n <= DENY_BUF_LEN => n,
             Ok(_) => return None,  // 0 or negative or too large
             Err(_) => return None, // call failed -- no reason
