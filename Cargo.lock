@@ -1706,6 +1706,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-anthropic-tools-adapter"
+version = "0.1.0"
+dependencies = [
+ "chio-tool-call-fabric",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-api-protect"
 version = "0.1.0"
 dependencies = [

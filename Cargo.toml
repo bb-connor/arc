@@ -27,6 +27,7 @@ members = [
     "crates/chio-acp-edge",
     "crates/chio-acp-proxy",
     "crates/chio-ag-ui-proxy",
+    "crates/chio-anthropic-tools-adapter",
     "crates/chio-cross-protocol",
     "crates/chio-envoy-ext-authz",
     "crates/chio-mcp-adapter",
