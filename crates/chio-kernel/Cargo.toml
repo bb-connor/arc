@@ -38,7 +38,56 @@ ureq = { version = "2.10", features = ["json"] }
 
 [dev-dependencies]
 chio-store-sqlite = { path = "../chio-store-sqlite" }
+criterion = { workspace = true }
 proptest = { workspace = true }
+
+[[bench]]
+name = "cap_verify_ed25519"
+harness = false
+
+[[bench]]
+name = "scope_match"
+harness = false
+
+[[bench]]
+name = "time_bound"
+harness = false
+
+[[bench]]
+name = "revocation_lookup"
+harness = false
+
+[[bench]]
+name = "budget_decrement"
+harness = false
+
+[[bench]]
+name = "single_guard"
+harness = false
+
+[[bench]]
+name = "guard_pipeline_5"
+harness = false
+
+[[bench]]
+name = "receipt_sign"
+harness = false
+
+[[bench]]
+name = "receipt_append"
+harness = false
+
+[[bench]]
+name = "session_lookup"
+harness = false
+
+[[bench]]
+name = "dispatch_allow"
+harness = false
+
+[[bench]]
+name = "dispatch_deny"
+harness = false
 
 [lints.clippy]
 unwrap_used = "deny"
