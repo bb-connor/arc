@@ -21,6 +21,7 @@ anthropic_version = "2023-06-01"
 computer_use_beta = "computer-use-2025-01-24"
 
 [dependencies]
+chio-manifest = { path = "../chio-manifest" }
 chio-tool-call-fabric = { path = "../chio-tool-call-fabric" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

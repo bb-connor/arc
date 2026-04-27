@@ -203,6 +203,7 @@ impl ChioOpenAiAdapter {
             description: Some("Chio tools exposed via OpenAI function calling".to_string()),
             version: config.server_version.clone(),
             tools: all_tools,
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: config.public_key.clone(),
         };
@@ -575,6 +576,7 @@ mod tests {
                     latency_hint: None,
                 },
             ],
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: "aabbccdd".to_string(),
         }
@@ -676,6 +678,7 @@ mod tests {
             description: None,
             version: "1.0.0".to_string(),
             tools: vec![],
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: "aabb".to_string(),
         };
@@ -933,6 +936,7 @@ mod tests {
                 has_side_effects: false,
                 latency_hint: None,
             }],
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: "aabb".to_string(),
         };

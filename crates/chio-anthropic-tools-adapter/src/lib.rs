@@ -40,6 +40,7 @@
 #![forbid(unsafe_code)]
 
 pub mod adapter;
+pub mod manifest;
 pub mod native;
 pub mod transport;
 
@@ -51,6 +52,7 @@ use chio_tool_call_fabric::ProviderId;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub use manifest::AnthropicServerToolGate;
 pub use native::{ToolResultBlock, ToolUseBlock};
 pub use transport::{Transport, ANTHROPIC_VERSION, COMPUTER_USE_BETA};
 
@@ -111,6 +113,7 @@ pub struct AnthropicAdapter {
     config: AnthropicAdapterConfig,
     transport: Arc<dyn Transport>,
     pending_tool_use_ids: Arc<Mutex<VecDeque<String>>>,
+    server_tool_gate: AnthropicServerToolGate,
 }
 
 impl AnthropicAdapter {
@@ -124,7 +127,23 @@ impl AnthropicAdapter {
             config,
             transport,
             pending_tool_use_ids: Arc::new(Mutex::new(VecDeque::new())),
+            server_tool_gate: AnthropicServerToolGate::deny_all(),
         }
+    }
+
+    /// Build a new adapter whose server-tool gate is sourced from a validated
+    /// Chio tool manifest.
+    pub fn new_with_manifest(
+        config: AnthropicAdapterConfig,
+        transport: Arc<dyn Transport>,
+        manifest: &chio_manifest::ToolManifest,
+    ) -> Result<Self, AnthropicAdapterError> {
+        Ok(Self {
+            config,
+            transport,
+            pending_tool_use_ids: Arc::new(Mutex::new(VecDeque::new())),
+            server_tool_gate: AnthropicServerToolGate::from_manifest(manifest)?,
+        })
     }
 
     /// Provider identifier for this adapter.
@@ -145,6 +164,11 @@ impl AnthropicAdapter {
     /// Borrow the transport handle (T2/T3 will use this to issue requests).
     pub fn transport(&self) -> &Arc<dyn Transport> {
         &self.transport
+    }
+
+    /// Borrow the manifest-derived server-tool gate.
+    pub fn server_tool_gate(&self) -> &AnthropicServerToolGate {
+        &self.server_tool_gate
     }
 
     /// Whether this build was compiled with the `computer-use` cargo
@@ -179,6 +203,9 @@ pub enum AnthropicAdapterError {
     /// server tools so production never silently exercises beta surfaces.
     #[error("server-tool surface requires the `computer-use` cargo feature")]
     ComputerUseFeatureDisabled,
+    /// Raised when the manifest used to build the server-tool gate is invalid.
+    #[error(transparent)]
+    Manifest(#[from] chio_manifest::ManifestError),
 }
 
 #[cfg(test)]

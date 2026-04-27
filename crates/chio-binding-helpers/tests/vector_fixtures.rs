@@ -660,6 +660,7 @@ fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedTool
                 }),
             })
             .collect(),
+        server_tools: Vec::new(),
         required_permissions: Some(RequiredPermissions {
             read_paths: Some(vec!["/workspace".to_string()]),
             write_paths: Some(vec!["/workspace/output".to_string()]),

@@ -573,6 +573,7 @@ fn sample_manifest() -> ToolManifest {
                 latency_hint: Some(LatencyHint::Slow),
             },
         ],
+        server_tools: Vec::new(),
         required_permissions: None,
         public_key: "abcd".into(),
     }
@@ -605,6 +606,7 @@ fn streaming_manifest() -> ToolManifest {
                 latency_hint: Some(LatencyHint::Slow),
             },
         ],
+        server_tools: Vec::new(),
         required_permissions: None,
         public_key: "stream-abcd".into(),
     }
@@ -898,6 +900,7 @@ fn make_url_required_edge() -> ChioMcpEdge {
                 has_side_effects: false,
                 latency_hint: Some(LatencyHint::Moderate),
             }],
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: "url-abcd".into(),
         }],

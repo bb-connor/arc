@@ -2012,6 +2012,7 @@ dependencies = [
 name = "chio-anthropic-tools-adapter"
 version = "0.1.0"
 dependencies = [
+ "chio-manifest",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",

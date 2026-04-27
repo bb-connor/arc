@@ -78,6 +78,7 @@ impl AnthropicAdapter {
     ) -> Result<ToolInvocation, ProviderError> {
         validate_tool_use_block(block)?;
         ensure_server_tool_feature(&block.name)?;
+        self.server_tool_gate().ensure_tool_allowed(&block.name)?;
         let arguments = canonical_json_bytes(&block.input)?;
 
         Ok(ToolInvocation {
