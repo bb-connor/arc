@@ -1850,6 +1850,7 @@ dependencies = [
  "reqwest 0.13.2",
  "rsa",
  "rusqlite",
+ "semver 1.0.27",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -1865,6 +1866,7 @@ dependencies = [
  "tracing-subscriber",
  "ureq",
  "url",
+ "uuid",
  "wasmparser 0.221.3",
  "wiremock",
 ]

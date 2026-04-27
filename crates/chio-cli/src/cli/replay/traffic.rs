@@ -38,7 +38,15 @@
 /// [`CliError::Other`] carrying the count and the first error
 /// description. The structured-JSON output mode (M10.P2.T4) layers on
 /// top of this surface in a later ticket.
+///
+/// M10.P2.T2: when `--against <policy-ref>` is supplied the dispatcher
+/// routes through [`run_traffic_replay`] instead of the validate-only
+/// pipeline above. Validate-only mode is preserved as the default so
+/// captures can still be smoke-tested without a policy reference.
 fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
+    if let Some(against_str) = args.against.as_deref() {
+        return cmd_replay_traffic_with_against(args, against_str);
+    }
     let pubkey = match args.tenant_pubkey.as_deref() {
         Some(path) => Some(load_tenant_pubkey(path).map_err(|e| {
             CliError::Other(format!("failed to load tenant pubkey: {e}"))
@@ -170,6 +178,91 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
 /// for the parse-fail case.
 const EXIT_PARSE_ERROR: i32 = 30;
 
+/// M10.P2.T2: re-execution arm of `chio replay traffic`.
+///
+/// Parses `against_str` into a [`PolicyRef`], runs
+/// [`run_traffic_replay`], and prints a human or `--json` summary.
+/// Per-frame drift / error surfacing is intentionally summary-only in
+/// T2; the diff renderer in M10.P2.T3 / T4 layers the structured drift
+/// class table on top of this surface.
+fn cmd_replay_traffic_with_against(
+    args: &TrafficArgs,
+    against_str: &str,
+) -> Result<(), CliError> {
+    let against = PolicyRef::parse(against_str)
+        .map_err(|e| CliError::Other(format!("--against parse failed: {e}")))?;
+    let report = run_traffic_replay(args, &against)
+        .map_err(|e| CliError::Other(format!("chio replay traffic --against: {e}")))?;
+
+    let mut stdout = std::io::stdout().lock();
+    if args.json {
+        let serialized = serde_json::to_string(&report)
+            .map_err(|e| CliError::Other(format!("serialize replay report: {e}")))?;
+        writeln!(stdout, "{serialized}")
+            .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+    } else {
+        writeln!(
+            stdout,
+            "chio replay traffic --against {}: {} frame(s), {} match, {} drift, {} error (run_id={})",
+            report.against_label,
+            report.total,
+            report.matches,
+            report.drifts,
+            report.errors,
+            report.run_id,
+        )
+        .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+        for outcome in &report.outcomes {
+            let captured = format!("{:?}", outcome.captured_verdict).to_lowercase();
+            match (&outcome.replay_verdict, &outcome.error) {
+                (Some(replay), None) => {
+                    let replay_str = format!("{replay:?}").to_lowercase();
+                    let drift_marker = if replay == &outcome.captured_verdict {
+                        "ok"
+                    } else {
+                        "DRIFT"
+                    };
+                    writeln!(
+                        stdout,
+                        "  line {:>4} {} captured={captured} replay={replay_str} {}",
+                        outcome.line, drift_marker, outcome.replay_receipt_id,
+                    )
+                    .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+                }
+                (_, Some(err)) => {
+                    writeln!(
+                        stdout,
+                        "  line {:>4} ERROR captured={captured} {} ({err})",
+                        outcome.line, outcome.replay_receipt_id,
+                    )
+                    .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+                }
+                (None, None) => {
+                    writeln!(
+                        stdout,
+                        "  line {:>4} ??? captured={captured} {}",
+                        outcome.line, outcome.replay_receipt_id,
+                    )
+                    .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+                }
+            }
+        }
+    }
+
+    if !report.ok() {
+        // Drift / error -> non-zero exit via CliError. The canonical
+        // M04 exit-code registry mapping (10 = benign drift, 20 = bad
+        // signature, 30 = parse, 40 = schema, 50 = root mismatch) is
+        // T5 work; T2 surfaces a single CliError so the surface stays
+        // wire-stable.
+        return Err(CliError::Other(format!(
+            "chio replay traffic --against: report has drift/errors ({} drift, {} error)",
+            report.drifts, report.errors
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod replay_traffic_tests {
@@ -256,6 +349,8 @@ mod replay_traffic_tests {
             schema: "chio-tee-frame.v1".to_string(),
             tenant_pubkey: Some(pk_path),
             json: true,
+            against: None,
+            run_id: None,
         };
         cmd_replay_traffic(&args).unwrap();
     }
@@ -278,6 +373,8 @@ mod replay_traffic_tests {
             schema: "chio-tee-frame.v1".to_string(),
             tenant_pubkey: Some(pk_path),
             json: true,
+            against: None,
+            run_id: None,
         };
         let err = cmd_replay_traffic(&args).unwrap_err();
         match err {
@@ -305,6 +402,8 @@ mod replay_traffic_tests {
             schema: "chio-tee-frame.v1".to_string(),
             tenant_pubkey: None,
             json: true,
+            against: None,
+            run_id: None,
         };
         cmd_replay_traffic(&args).unwrap();
     }
@@ -320,6 +419,8 @@ mod replay_traffic_tests {
             schema: "chio-tee-frame.v1".to_string(),
             tenant_pubkey: None,
             json: true,
+            against: None,
+            run_id: None,
         };
         let err = cmd_replay_traffic(&args).unwrap_err();
         match err {

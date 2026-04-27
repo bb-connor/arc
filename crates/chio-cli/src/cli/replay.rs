@@ -224,6 +224,38 @@ mod replay_parser_tests {
                         Some(Path::new("/etc/chio/tenant.pub"))
                     );
                     assert!(t.json);
+                    assert!(t.against.is_none());
+                    assert!(t.run_id.is_none());
+                }
+                _ => panic!("expected traffic sub-subcommand"),
+            },
+            _ => panic!("expected replay subcommand"),
+        }
+    }
+
+    #[test]
+    fn replay_parses_traffic_against_and_run_id_flags() {
+        // M10.P2.T2: `--against <policy-ref>` and `--run-id <id>` are
+        // additive optional flags. When both are present the dispatcher
+        // routes through `run_traffic_replay` and namespaces receipt
+        // ids under `replay:<run_id>:<frame_id>`.
+        let cli = Cli::try_parse_from([
+            "chio",
+            "replay",
+            "traffic",
+            "--from",
+            "capture.ndjson",
+            "--against",
+            "path:/etc/chio/policy.yaml",
+            "--run-id",
+            "ci-2026-04-25",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Replay(args) => match args.command.as_ref() {
+                Some(ReplaySubcommand::Traffic(t)) => {
+                    assert_eq!(t.against.as_deref(), Some("path:/etc/chio/policy.yaml"));
+                    assert_eq!(t.run_id.as_deref(), Some("ci-2026-04-25"));
                 }
                 _ => panic!("expected traffic sub-subcommand"),
             },
