@@ -103,7 +103,7 @@ plan is to leave the file structure alone and change types, not to split.
   tower) - LANDED PR #173
 - [x] P0.T3: this audit doc - LANDED PR #<pending>
 - [x] P0.T4: kernel-paths freeze (CODEOWNERS + ruleset + announcement)
-- [ ] P0.T5: cargo-mutants baseline kill rate on chio-kernel
+- [x] P0.T5: cargo-mutants baseline kill rate on chio-kernel
 
 ## Freeze announcement
 
@@ -160,3 +160,24 @@ grow as new async machinery is added.
 | `.await` sites | 3 | grow |
 | `&mut self` on `Session` | 27 | 0 |
 | sync primitives in `ChioKernel` | 10 | 0 |
+
+## cargo-mutants baseline (M05.P0.T5)
+
+Date: 2026-04-27
+Method: `cargo mutants --package chio-kernel`
+Baseline kill rate: TBD (CI run pending)
+Threshold target for M05 P1: >= 80% (no regression from baseline)
+
+The baseline script lives at `scripts/mutants-baseline-kernel.sh` and is
+invoked by `.github/workflows/mutants.yml` for the per-PR mutants-pr lane.
+Locally, the script soft-skips with an install hint when `cargo-mutants`
+is not on PATH; on CI it produces a JSON report at
+`.planning/audits/mutants-baseline-kernel.txt` and prints the kill rate
+as a percentage. The audit doc is updated in-place once the first CI run
+populates the figure (replace the "TBD" line above with the measured
+percentage and the run id).
+
+Subsequent phase re-audits (P1, P2, P3, P4) re-run the script and append
+the new kill rate to the snapshot table; the rate must be monotonically
+non-decreasing relative to this baseline (>= baseline - epsilon, where
+epsilon allows for cargo-mutants per-run nondeterminism on flaky tests).
