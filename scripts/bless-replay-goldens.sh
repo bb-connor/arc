@@ -107,20 +107,47 @@ case "$CURRENT_BRANCH" in
     ;;
 esac
 
-# 4) Compute dirty status. We use 'git status --porcelain' so both staged and
-#    unstaged modifications count, but commits already on the topic branch are
-#    intentionally not considered dirty by this wrapper - the binary's audit
-#    log handles cross-commit coherence.
+# 4) Compute dirty status. We use 'git status --porcelain=v1' so both staged
+#    and unstaged modifications count, but commits already on the topic
+#    branch are intentionally not considered dirty by this wrapper - the
+#    binary's audit log handles cross-commit coherence. Pinning to v1 keeps
+#    the parser stable across git versions and matches the rename-line shape
+#    documented below ("R  old -> new").
 
-PORCELAIN="$(git status --porcelain --untracked-files=normal)"
+PORCELAIN="$(git status --porcelain=v1 --untracked-files=normal)"
 
-# Helper: does the dirty list contain any path matching a given prefix or glob?
-# Uses awk to inspect the path column (everything after the two-char status
-# code); this avoids false positives from rename arrows.
+# Helper: extract every path referenced by porcelain output.
+#
+# Each porcelain line is "XY <path>" or, for renames/copies,
+# "XY <old> -> <new>". For renames we want BOTH paths so the allowlist
+# check cannot be bypassed by renaming a file from inside the allowlist
+# to outside (or vice versa). The previous implementation only captured
+# the first token after the status code, missing the rename destination.
+porcelain_paths() {
+  printf '%s\n' "$PORCELAIN" | awk '
+    NF {
+      # $0 = "XY path...". Drop the leading "XY " (3 chars).
+      rest = substr($0, 4)
+      idx = index(rest, " -> ")
+      if (idx > 0) {
+        # Rename or copy: emit both old and new paths.
+        old = substr(rest, 1, idx - 1)
+        new = substr(rest, idx + 4)
+        print old
+        print new
+      } else {
+        print rest
+      }
+    }
+  ' | sort -u
+}
+
+ALL_DIRTY_PATHS="$(porcelain_paths)"
+
+# Helper: filter the dirty path list down to entries matching $1 (a grep -E
+# regex applied to each path).
 dirty_paths_matching() {
-  # $1 = grep -E pattern applied to the path portion of porcelain output.
-  printf '%s\n' "$PORCELAIN" | awk 'NF{print substr($0,4)}' | \
-    awk '{ for (i=1;i<=NF;i++) print $i }' | sort -u | grep -E "$1" || true
+  printf '%s\n' "$ALL_DIRTY_PATHS" | grep -E "$1" || true
 }
 
 # Replay-source paths whose modification requires a docs/replay-compat.md delta.
@@ -144,19 +171,18 @@ fi
 # 5) Refuse if any *other* path outside the bless allowlist is dirty. This is
 #    a fast-fail superset of the binary-side check; the binary enforces it
 #    again as part of CHIO_BLESS gate logic step 4.
-OUTSIDE_DIRTY="$(printf '%s\n' "$PORCELAIN" | awk 'NF{print substr($0,4)}' \
-  | awk '{print $1}' | sort -u \
-  | grep -Ev "$ALLOW_PATTERN" \
-  | grep -Ev "$SOURCE_PATTERN" || true)"
-
-# When source files are dirty *with* a compat-doc delta, that combination is
-# permitted - but no other outside paths may be dirty.
+#
+# Source paths are excluded from the outside-dirty list ONLY when the bless
+# is paired with a docs/replay-compat.md delta (the SOURCE_DIRTY-with-
+# COMPAT_DIRTY case is gated above). Without that pairing, source paths
+# are themselves "outside the allowlist" and should fail this check.
 if [ -n "$SOURCE_DIRTY" ] && [ -n "$COMPAT_DIRTY" ]; then
-  # Re-compute outside list excluding the (allowed) source paths too.
-  OUTSIDE_DIRTY="$(printf '%s\n' "$PORCELAIN" | awk 'NF{print substr($0,4)}' \
-    | awk '{print $1}' | sort -u \
+  OUTSIDE_DIRTY="$(printf '%s\n' "$ALL_DIRTY_PATHS" \
     | grep -Ev "$ALLOW_PATTERN" \
     | grep -Ev "$SOURCE_PATTERN" || true)"
+else
+  OUTSIDE_DIRTY="$(printf '%s\n' "$ALL_DIRTY_PATHS" \
+    | grep -Ev "$ALLOW_PATTERN" || true)"
 fi
 
 if [ -n "$OUTSIDE_DIRTY" ]; then

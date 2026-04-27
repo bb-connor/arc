@@ -27,6 +27,7 @@
 //! submodule that drives the current `chio-kernel` verifier over a fetched
 //! bundle.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -111,6 +112,12 @@ pub enum LoadError {
     /// `tag` did not match `^v\d+\.\d+(\.\d+)?$`.
     #[error("invalid tag {0:?}: must match v<major>.<minor>(.<patch>)?")]
     InvalidTag(String),
+    /// `supported_until` did not match `^v\d+\.\d+(\.\d+)?$`.
+    #[error("invalid supported_until {0:?}: must match v<major>.<minor>(.<patch>)?")]
+    InvalidSupportedUntil(String),
+    /// Two `[[entry]]` blocks declared the same `tag`.
+    #[error("duplicate tag {0:?}: each release must appear at most once")]
+    DuplicateTag(String),
     /// `bundle_sha256` was not 64 chars of lowercase hex.
     #[error("invalid bundle_sha256 {0:?}: must be 64-char lowercase hex")]
     InvalidSha256(String),
@@ -154,8 +161,16 @@ impl CompatMatrix {
                 actual: self.schema.clone(),
             });
         }
+        // Track seen tags so duplicate `[[entry]]` blocks reject at load
+        // time. A duplicate tag could carry conflicting compat / sha256 /
+        // bundle_url values for a single release, leaving downstream
+        // consumers ambiguous about which row to honour.
+        let mut seen_tags: HashSet<&str> = HashSet::with_capacity(self.entry.len());
         for entry in &self.entry {
             entry.validate()?;
+            if !seen_tags.insert(entry.tag.as_str()) {
+                return Err(LoadError::DuplicateTag(entry.tag.clone()));
+            }
         }
         Ok(())
     }
@@ -174,6 +189,15 @@ impl CompatEntry {
         }
         if !is_valid_date(&self.released_at) {
             return Err(LoadError::InvalidDate(self.released_at.clone()));
+        }
+        // `supported_until` is optional, but when present it must obey the
+        // same `^v\d+\.\d+(\.\d+)?$` shape as `tag`. A bogus value such as
+        // "v3.beta" would otherwise pass through the loader and corrupt
+        // compatibility-window decisions downstream.
+        if let Some(cap) = self.supported_until.as_deref() {
+            if !is_valid_tag(cap) {
+                return Err(LoadError::InvalidSupportedUntil(cap.to_string()));
+            }
         }
         Ok(())
     }
@@ -446,6 +470,65 @@ compat = "supported"
         assert_eq!(m.entry[0].notes, "");
         assert_eq!(m.entry[0].supported_until, None);
         assert_eq!(m.entry[0].compat, CompatLevel::Supported);
+    }
+
+    /// `supported_until` must obey the same tag shape as `tag` itself.
+    /// A value like `"v3.beta"` would otherwise corrupt compatibility-
+    /// window decisions further downstream.
+    #[test]
+    fn rejects_malformed_supported_until() {
+        let bad = VALID_BASE.replace(
+            "supported_until = \"v3.0\"",
+            "supported_until = \"v3.beta\"",
+        );
+        let err =
+            CompatMatrix::from_toml_str(&bad).expect_err("malformed supported_until must reject");
+        assert!(
+            matches!(&err, LoadError::InvalidSupportedUntil(s) if s == "v3.beta"),
+            "expected InvalidSupportedUntil(v3.beta), got {err:?}"
+        );
+    }
+
+    /// `supported_until` without the leading `v` is rejected (mirrors the
+    /// `tag` rule).
+    #[test]
+    fn rejects_supported_until_missing_v_prefix() {
+        let bad = VALID_BASE.replace("supported_until = \"v3.0\"", "supported_until = \"3.0\"");
+        let err =
+            CompatMatrix::from_toml_str(&bad).expect_err("supported_until missing v must reject");
+        assert!(
+            matches!(&err, LoadError::InvalidSupportedUntil(s) if s == "3.0"),
+            "expected InvalidSupportedUntil(3.0), got {err:?}"
+        );
+    }
+
+    /// Two `[[entry]]` blocks sharing the same `tag` must reject at load
+    /// time. Otherwise downstream consumers can disagree about which row
+    /// describes the release (first-match vs all-rows iteration).
+    #[test]
+    fn rejects_duplicate_tag_entries() {
+        let bad = r#"
+schema = "chio.replay.compat/v1"
+
+[[entry]]
+tag = "v1.0"
+released_at = "2025-12-01"
+bundle_url = "https://example.test/v1.0-a.tgz"
+bundle_sha256 = "1111111111111111111111111111111111111111111111111111111111111111"
+compat = "supported"
+
+[[entry]]
+tag = "v1.0"
+released_at = "2025-12-02"
+bundle_url = "https://example.test/v1.0-b.tgz"
+bundle_sha256 = "2222222222222222222222222222222222222222222222222222222222222222"
+compat = "best_effort"
+"#;
+        let err = CompatMatrix::from_toml_str(bad).expect_err("duplicate tag must reject");
+        assert!(
+            matches!(&err, LoadError::DuplicateTag(s) if s == "v1.0"),
+            "expected DuplicateTag(v1.0), got {err:?}"
+        );
     }
 
     /// All three CompatLevel variants round-trip through the snake_case

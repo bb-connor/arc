@@ -108,7 +108,16 @@ fn cross_version_replay_full_matrix() {
             CompatLevel::Supported => match fetch_or_cache(entry) {
                 Ok(bundle) => match reverify_bundle(&bundle, entry) {
                     Ok(report) => {
-                        if !report.root_match || report.receipts_signature_failed > 0 {
+                        // Supported-tier receipts MUST be signed and verify
+                        // cleanly. `receipts_unsigned > 0` covers stub or
+                        // malformed receipts whose signature blocks could
+                        // not be deserialised - left unchecked, those rows
+                        // would silently bypass signature verification and
+                        // defeat the supported-tier guarantee.
+                        if !report.root_match
+                            || report.receipts_signature_failed > 0
+                            || report.receipts_unsigned > 0
+                        {
                             supported_failures.push(format!(
                                 "supported tag {} reverify dirty: root_match={} sig_failed={} \
                                  unsigned={} (recomputed={} bundle={})",
