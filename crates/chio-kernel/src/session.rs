@@ -9,6 +9,7 @@ use chio_core::session::{
     RootDefinition, SessionAnchorReference, SessionAuthContext, SessionId,
 };
 use chio_core::{AgentId, CapabilityToken};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{ToolCallResponse, ToolServerEvent};
 use chio_core::receipt::ChioReceipt;
@@ -363,12 +364,17 @@ pub struct RequestLineageRecord {
     pub terminal_state: Option<OperationTerminalState>,
 }
 
-/// Session host object owned by the kernel.
 #[derive(Debug, Clone)]
+struct SessionInner {
+    state: SessionState,
+}
+
+/// Session host object owned by the kernel.
+#[derive(Debug)]
 pub struct Session {
     id: SessionId,
     agent_id: AgentId,
-    state: SessionState,
+    inner: RwLock<SessionInner>,
     session_anchor: SessionAnchorState,
     auth_context: SessionAuthContext,
     peer_capabilities: PeerCapabilities,
@@ -383,6 +389,29 @@ pub struct Session {
     late_events: VecDeque<LateSessionEvent>,
 }
 
+impl Clone for Session {
+    fn clone(&self) -> Self {
+        let inner = self.read_inner().clone();
+        Self {
+            id: self.id.clone(),
+            agent_id: self.agent_id.clone(),
+            inner: RwLock::new(inner),
+            session_anchor: self.session_anchor.clone(),
+            auth_context: self.auth_context.clone(),
+            peer_capabilities: self.peer_capabilities.clone(),
+            roots: self.roots.clone(),
+            normalized_roots: self.normalized_roots.clone(),
+            issued_capabilities: self.issued_capabilities.clone(),
+            inflight: self.inflight.clone(),
+            subscriptions: self.subscriptions.clone(),
+            terminal: self.terminal.clone(),
+            request_lineage: self.request_lineage.clone(),
+            pending_url_elicitations: self.pending_url_elicitations.clone(),
+            late_events: self.late_events.clone(),
+        }
+    }
+}
+
 impl Session {
     pub fn new(
         id: SessionId,
@@ -394,7 +423,9 @@ impl Session {
         Self {
             id,
             agent_id,
-            state: SessionState::Initializing,
+            inner: RwLock::new(SessionInner {
+                state: SessionState::Initializing,
+            }),
             session_anchor,
             auth_context,
             peer_capabilities: PeerCapabilities::default(),
@@ -410,6 +441,24 @@ impl Session {
         }
     }
 
+    fn read_inner(&self) -> RwLockReadGuard<'_, SessionInner> {
+        loop {
+            if let Ok(inner) = self.inner.try_read() {
+                return inner;
+            }
+            std::thread::yield_now();
+        }
+    }
+
+    fn write_inner(&self) -> RwLockWriteGuard<'_, SessionInner> {
+        loop {
+            if let Ok(inner) = self.inner.try_write() {
+                return inner;
+            }
+            std::thread::yield_now();
+        }
+    }
+
     pub fn id(&self) -> &SessionId {
         &self.id
     }
@@ -419,7 +468,7 @@ impl Session {
     }
 
     pub fn state(&self) -> SessionState {
-        self.state
+        self.read_inner().state
     }
 
     pub fn auth_context(&self) -> &SessionAuthContext {
@@ -575,11 +624,11 @@ impl Session {
         self.roots = roots;
     }
 
-    pub fn activate(&mut self) -> Result<(), SessionError> {
+    pub fn activate(&self) -> Result<(), SessionError> {
         self.transition(SessionState::Ready)
     }
 
-    pub fn begin_draining(&mut self) -> Result<(), SessionError> {
+    pub fn begin_draining(&self) -> Result<(), SessionError> {
         self.transition(SessionState::Draining)
     }
 
@@ -595,7 +644,8 @@ impl Session {
     }
 
     pub fn ensure_operation_allowed(&self, operation: OperationKind) -> Result<(), SessionError> {
-        let allowed = match self.state {
+        let state = self.state();
+        let allowed = match state {
             SessionState::Initializing => matches!(
                 operation,
                 OperationKind::ListCapabilities | OperationKind::Heartbeat
@@ -614,7 +664,7 @@ impl Session {
             Err(SessionError::OperationNotAllowed {
                 session_id: self.id.clone(),
                 operation: operation.as_str(),
-                state: self.state.as_str(),
+                state: state.as_str(),
             })
         }
     }
@@ -713,25 +763,26 @@ impl Session {
         Ok(parent_lineage)
     }
 
-    fn transition(&mut self, next: SessionState) -> Result<(), SessionError> {
-        let valid = match (self.state, next) {
+    fn transition(&self, next: SessionState) -> Result<(), SessionError> {
+        let mut inner = self.write_inner();
+        let valid = match (inner.state, next) {
             (SessionState::Initializing, SessionState::Ready)
             | (SessionState::Initializing, SessionState::Closed)
             | (SessionState::Ready, SessionState::Draining)
             | (SessionState::Ready, SessionState::Closed)
             | (SessionState::Draining, SessionState::Closed) => true,
-            _ if self.state == next => true,
+            _ if inner.state == next => true,
             _ => false,
         };
 
         if !valid {
             return Err(SessionError::InvalidTransition {
-                from: self.state.as_str(),
+                from: inner.state.as_str(),
                 to: next.as_str(),
             });
         }
 
-        self.state = next;
+        inner.state = next;
         Ok(())
     }
 
@@ -830,8 +881,19 @@ mod tests {
     }
 
     #[test]
+    fn lifecycle_transitions_do_not_require_exclusive_session_borrow() {
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let shared = &session;
+
+        shared.activate().unwrap();
+        assert_eq!(shared.state(), SessionState::Ready);
+        shared.begin_draining().unwrap();
+        assert_eq!(shared.state(), SessionState::Draining);
+    }
+
+    #[test]
     fn tool_calls_not_allowed_during_initializing_or_draining() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
 
         let err = session
             .ensure_operation_allowed(OperationKind::ToolCall)
