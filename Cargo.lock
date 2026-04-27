@@ -2639,6 +2639,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-tool-call-fabric"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-tower"
 version = "0.1.0"
 dependencies = [
