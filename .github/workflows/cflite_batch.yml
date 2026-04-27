@@ -107,6 +107,10 @@ jobs:
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # storage-repo is an action input (not a project.yaml field) per
+          # ClusterFuzzLite docs; declares the sibling corpus repo so the
+          # nightly rotation persists corpus across runs.
+          storage-repo: https://github.com/bb-connor/arc-fuzz-corpus
           report-unreproducible-crashes: true
 
       - name: Upload crash reports

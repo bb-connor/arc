@@ -133,7 +133,9 @@ max_days=$(( today_days + 90 ))
 # Parse the TOML using awk. We support exactly the schema documented in
 # fuzz/upstream_skips.toml. The parser emits one line per entry of the
 # form: "target|reason|upstream_issue|sunset". Empty/comment lines and
-# the documented `skips = []` sentinel are ignored.
+# the documented `skips = []` sentinel are ignored. Anything else is
+# rejected as a parse error so typos like `[[skip]]` (singular) cannot
+# silently pass the gate (regression: r3144336375).
 parsed="$(awk '
 BEGIN {
     in_entry = 0
@@ -143,13 +145,37 @@ function emit(   _) {
     if (in_entry) {
         if (target == "" || reason == "" || issue == "" || sunset == "") {
             printf "PARSE_ERROR|missing field in [[skips]] entry near line %d|%s|%s\n", NR, target, sunset
-            exit_code = 2
         } else {
             printf "%s|%s|%s|%s\n", target, reason, issue, sunset
         }
     }
     in_entry = 0
     target = ""; reason = ""; issue = ""; sunset = ""
+}
+# Strip a single inline `#` comment from the right side of a value while
+# respecting double-quoted strings. Without this guard a fragment-bearing
+# URL like "https://example/issues/1#issuecomment-2" loses everything
+# from `#` onward and the closing quote, breaking validation
+# (regression: r3144340128).
+function strip_inline_comment(s,    i, n, c, in_quotes, out, len) {
+    n = length(s)
+    in_quotes = 0
+    out = ""
+    for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1)
+        if (c == "\"") {
+            in_quotes = !in_quotes
+            out = out c
+            continue
+        }
+        if (c == "#" && !in_quotes) {
+            break
+        }
+        out = out c
+    }
+    # Trim trailing whitespace introduced by the comment removal.
+    sub(/[[:space:]]+$/, "", out)
+    return out
 }
 function strip_quotes(s,    n) {
     n = length(s)
@@ -175,14 +201,22 @@ function strip_quotes(s,    n) {
             val = substr(line, eq + 1)
             sub(/[[:space:]]+$/, "", key)
             sub(/^[[:space:]]+/, "", val)
-            sub(/[[:space:]]*#.*$/, "", val)
-            sub(/[[:space:]]+$/, "", val)
+            val = strip_inline_comment(val)
             val = strip_quotes(val)
             if (key == "target") target = val
             else if (key == "reason") reason = val
             else if (key == "upstream_issue") issue = val
             else if (key == "sunset") sunset = val
+            else {
+                printf "PARSE_ERROR|unknown key %q in [[skips]] entry near line %d|%s|%s\n", key, NR, target, sunset
+            }
+        } else {
+            printf "PARSE_ERROR|unparseable line in [[skips]] entry near line %d (%s)|%s|%s\n", NR, line, target, sunset
         }
+    } else {
+        # Any other top-level content is unrecognised. Fail closed so a
+        # typo like `[[skip]]` (singular) cannot pass the sunset gate.
+        printf "PARSE_ERROR|unknown top-level content at line %d (%s)|%s|%s\n", NR, line, target, sunset
     }
 }
 END { emit() }
@@ -196,14 +230,20 @@ if [[ -z "${parsed}" ]]; then
     exit 0
 fi
 
-# Walk parsed entries.
-errors=0
+# Walk parsed entries. We distinguish parse errors (structural failures
+# in the TOML) from policy errors (expired / out-of-bounds skips) so the
+# caller can map them to the documented exit-code contract:
+#   exit 1 = at least one policy violation
+#   exit 2 = at least one structural parse failure
+# (regression: r3144336377 / r3144340129).
+parse_errors=0
+policy_errors=0
 total=0
 while IFS='|' read -r target reason issue sunset; do
     [[ -z "${target}${reason}${issue}${sunset}" ]] && continue
     if [[ "${target}" == "PARSE_ERROR" ]]; then
         err "parse error: ${reason}"
-        errors=$(( errors + 1 ))
+        parse_errors=$(( parse_errors + 1 ))
         continue
     fi
     total=$(( total + 1 ))
@@ -211,28 +251,35 @@ while IFS='|' read -r target reason issue sunset; do
     # Validate upstream_issue URL.
     if ! [[ "${issue}" =~ ^https?://[^[:space:]]+$ ]]; then
         err "skip ${target}: upstream_issue is not an http(s) URL: ${issue}"
-        errors=$(( errors + 1 ))
+        policy_errors=$(( policy_errors + 1 ))
     fi
 
     # Validate sunset shape and bounds.
     sunset_days="$(date_to_days "${sunset}" 2>/dev/null || true)"
     if [[ -z "${sunset_days}" ]]; then
         err "skip ${target}: sunset is not a valid YYYY-MM-DD: ${sunset}"
-        errors=$(( errors + 1 ))
+        policy_errors=$(( policy_errors + 1 ))
         continue
     fi
     if (( sunset_days < today_days )); then
         err "skip ${target}: sunset ${sunset} has expired (today=${TODAY}); remove or re-evaluate per source-doc Phase 2 P2.T4"
-        errors=$(( errors + 1 ))
+        policy_errors=$(( policy_errors + 1 ))
     fi
     if (( sunset_days > max_days )); then
         err "skip ${target}: sunset ${sunset} is more than 90 days out (today=${TODAY}); reduce per house rule (max 90d)"
-        errors=$(( errors + 1 ))
+        policy_errors=$(( policy_errors + 1 ))
     fi
 done <<< "${parsed}"
 
-if (( errors > 0 )); then
-    err "FAIL: ${errors} problem(s) across ${total} skip entr(y/ies) in ${FILE}"
+# Parse errors take precedence over policy errors so callers that
+# distinguish "the file is malformed" from "the file is valid but the
+# skip is expired" get the right signal.
+if (( parse_errors > 0 )); then
+    err "FAIL (parse): ${parse_errors} structural problem(s) in ${FILE}"
+    exit 2
+fi
+if (( policy_errors > 0 )); then
+    err "FAIL: ${policy_errors} problem(s) across ${total} skip entr(y/ies) in ${FILE}"
     exit 1
 fi
 

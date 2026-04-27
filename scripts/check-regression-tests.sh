@@ -103,10 +103,28 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     exit 0
 fi
 
-# Resolve BASE if not given.
+# Resolve BASE if not given. Three cases:
+#   1. PR runs: GITHUB_BASE_REF is set; diff against the merge target.
+#   2. Push runs: prefer the pre-push SHA (GitHub injects it as
+#      `github.event.before`, which surfaces here as GITHUB_EVENT_BEFORE
+#      when the workflow forwards it). Fall back to HEAD~1 so the diff
+#      is against the previous commit on the same branch rather than
+#      `origin/main`, which on a post-push checkout points to HEAD itself
+#      and would always produce an empty diff (regression: r3144325897).
+#   3. Local / unknown: default to origin/main (developer-facing usage).
 if [[ -z "$BASE" ]]; then
     if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
         BASE="origin/${GITHUB_BASE_REF}"
+    elif [[ "${GITHUB_EVENT_NAME:-}" == "push" ]]; then
+        if [[ -n "${GITHUB_EVENT_BEFORE:-}" ]] \
+            && [[ "${GITHUB_EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]] \
+            && git rev-parse --verify --quiet "${GITHUB_EVENT_BEFORE}" >/dev/null 2>&1; then
+            BASE="${GITHUB_EVENT_BEFORE}"
+        elif git rev-parse --verify --quiet "HEAD~1" >/dev/null 2>&1; then
+            BASE="HEAD~1"
+        else
+            BASE="origin/main"
+        fi
     else
         BASE="origin/main"
     fi
@@ -148,10 +166,34 @@ unpaired=0
 echo "check-regression-tests: deleted regression tests detected; checking for paired issue links"
 while IFS= read -r path; do
     [[ -z "$path" ]] && continue
+    # Per-file pairing (regression: r3144325294 / r3144325899). A single
+    # `closes #N` at the top of the PR body must NOT silently approve N
+    # unrelated regression-test deletions; the contract is one paired
+    # reference per deleted file. We require that either the full path
+    # OR the file's basename appears in the search text alongside a
+    # paired issue link. Either form ties the link to this specific
+    # deletion rather than treating any link anywhere in the diff as
+    # a wildcard waiver.
+    base="$(basename "$path")"
+    # Escape regex metacharacters in path/basename for safe substring grep.
+    path_lit_re="$(printf '%s' "$path" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')"
+    base_lit_re="$(printf '%s' "$base" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')"
+    has_link=0
+    has_name=0
     if echo "$SEARCH_TEXT" | grep -iqE "$PAIR_REGEX"; then
+        has_link=1
+    fi
+    if echo "$SEARCH_TEXT" | grep -qE "(${path_lit_re}|${base_lit_re})"; then
+        has_name=1
+    fi
+    if (( has_link == 1 )) && (( has_name == 1 )); then
         echo "  PAIRED   $path"
     else
-        echo "  UNPAIRED $path" >&2
+        if (( has_link == 0 )); then
+            echo "  UNPAIRED $path (no closes/fixes/refs #N or github issue/PR URL)" >&2
+        else
+            echo "  UNPAIRED $path (issue link present but does not name this file; mention the path or basename next to the link)" >&2
+        fi
         unpaired=$((unpaired + 1))
     fi
 done <<< "$DELETED"
@@ -160,14 +202,18 @@ if [[ "$unpaired" -gt 0 ]]; then
     cat >&2 <<EOF
 
 check-regression-tests: $unpaired regression test(s) deleted without a
-paired issue link. Add one of the following to the PR body or a commit
-message in this branch and re-run:
+per-file paired issue link. For each deleted file, the PR body or one
+of the commit messages must contain BOTH:
 
-  closes #<n>            (or fixes / resolves / tracks / refs)
-  https://github.com/<org>/<repo>/issues/<n>
+  1. an issue/PR reference, one of:
+       closes #<n>            (or fixes / resolves / tracks / refs)
+       https://github.com/<org>/<repo>/issues/<n>
+       https://github.com/<org>/<repo>/pull/<n>
+  2. the deleted file's path or basename next to that reference,
+     e.g. "closes #123 (drops crates/foo/tests/regression_<sha>.rs)".
 
 Each deleted regression_*.rs corresponds to a fuzz-found crash. Removing
-it without filing a follow-up issue silently regresses crash coverage.
+it without naming a follow-up issue silently regresses crash coverage.
 EOF
     exit 1
 fi

@@ -73,8 +73,11 @@ Current as of M02 P1 close.
 Notes:
 
 - `cflite_pr.yml` defaults to changed-target sampling per `fuzz/target-map.toml`
-  (1-6 targets per PR). Opt-in `fuzz: full` PR label runs all targets at 120s
-  each (release-cut PRs and trust-boundary edits).
+  (1-6 targets per PR). Opt-in `fuzz: full` PR label promotes the run to a
+  full-corpus sweep at 120s per target (release-cut PRs and trust-boundary
+  edits). The workflow listens to the `labeled` activity type, so adding the
+  label to an already-open PR triggers a fresh run rather than waiting for
+  the next commit.
 - `cflite_batch.yml` rotates one target per night across an 18-day full sweep.
 - `fuzz.yml` is the in-tree `cargo +nightly fuzz` matrix authored in
   M02.P1.T6; it complements rather than replaces ClusterFuzzLite by running
@@ -163,9 +166,11 @@ The CFLite builder image lives under `.clusterfuzzlite/`:
   same change set.
 - `.clusterfuzzlite/project.yaml` -- declares `language: rust`, the primary
   contact, the address+undefined sanitizer pair, the `x86_64` architecture,
-  the `libfuzzer` engine, and the `storage-repo` corpus backend
-  (`bb-connor/arc-fuzz-corpus` sibling private repo; no GCS). The
-  `report_to_oss_fuzz` flag stays `false` until OSS-Fuzz acceptance lands.
+  and the `libfuzzer` engine. The `report_to_oss_fuzz` flag stays `false`
+  until OSS-Fuzz acceptance lands. The corpus `storage-repo` is wired as
+  an action input on the `run_fuzzers` step in `.github/workflows/cflite_pr.yml`
+  and `.github/workflows/cflite_batch.yml` per ClusterFuzzLite's published
+  schema (it is not a `project.yaml` field).
 
 Storage backend: `bb-connor/arc-fuzz-corpus` (sibling private repo). The
 repo is created out-of-band before the first `cflite_batch.yml` run; until
@@ -242,9 +247,12 @@ cargo +nightly fuzz run <target> -- -runs=10000 -max_total_time=60
 ```
 
 Smoke-test only the corpus seeds (no fuzzing, fast feedback during target
-authoring):
+authoring). The `cd fuzz` is required because `fuzz/Cargo.toml` defines
+its own workspace; the root `Cargo.toml` does not include `fuzz`, so
+running this from the repo root will not find the `smoke` test target:
 
 ```bash
+cd fuzz
 cargo test --test smoke <target>_smoke
 ```
 

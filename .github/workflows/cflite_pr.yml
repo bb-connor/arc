@@ -23,6 +23,16 @@ name: cflite_pr
 
 on:
   pull_request:
+    # `labeled` is required so adding the `fuzz: full` label to an
+    # already-open PR triggers a fresh run; without it the opt-in
+    # full-corpus sweep would only fire on the next commit / manual
+    # rerun, which makes the escalation unreliable for the high-risk
+    # PRs it is meant to cover.
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
     paths:
       - "crates/**"
       - "fuzz/**"
@@ -135,6 +145,17 @@ jobs:
               fi
             done
           done
+          # Builder-image fallback: edits under `.clusterfuzzlite/**`
+          # (Dockerfile, build.sh, project.yaml) do not appear in
+          # `fuzz/target-map.toml` triggers, but they can break the
+          # CFLite builder image without any target firing. Force the
+          # full-target inventory when only-builder edits are detected
+          # so the smoke run still exercises every fuzz target through
+          # the new builder image.
+          if grep -qE '^\.clusterfuzzlite/' changed.txt; then
+            echo "builder-image edit detected; firing the full inventory"
+            fired=("${targets[@]}")
+          fi
           printf '%s\n' "${fired[@]}" | sort -u > fired.txt
           fired_count="$(wc -l < fired.txt | tr -d ' ')"
           printf 'fired targets: %s\n' "${fired_count}"
@@ -158,6 +179,10 @@ jobs:
           mode: code-change
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # storage-repo is an action input (not a project.yaml field) per
+          # ClusterFuzzLite docs; declares the sibling corpus repo so PR-time
+          # runs read prior corpus and write back any new coverage.
+          storage-repo: https://github.com/bb-connor/arc-fuzz-corpus
           report-unreproducible-crashes: false
 
       - name: "Run ClusterFuzzLite full-corpus sweep (fuzz-full label)"
@@ -169,6 +194,7 @@ jobs:
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          storage-repo: https://github.com/bb-connor/arc-fuzz-corpus
           report-unreproducible-crashes: false
 
       - name: Upload crash reports

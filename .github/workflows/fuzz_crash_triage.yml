@@ -88,13 +88,31 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p crash-artifacts
-          # Best-effort download; if the upstream lane uploaded nothing
-          # (e.g. cflite-only crash with sarif artifact only), exit 0 and
-          # let the post-step short-circuit cleanly.
-          if ! gh run download "${UPSTREAM_RUN_ID}" --dir crash-artifacts; then
+          # Distinguish "no artifacts uploaded" (an empty list response)
+          # from "download failed" (auth, API, transient network). The
+          # former is a valid no-op; the latter must fail the job so the
+          # crash is not silently dropped. We probe `gh run view` for the
+          # artifact list first; if the run exists and has zero artifacts
+          # we mark no-artifacts=true and short-circuit. Any other gh
+          # failure surfaces as a non-zero exit.
+          artifact_count=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${UPSTREAM_RUN_ID}/artifacts" \
+            --jq '.total_count' 2>/dev/null || echo "ERR")
+          if [ "${artifact_count}" = "ERR" ]; then
+            echo "::error::Failed to query artifacts for upstream run ${UPSTREAM_RUN_ID}; refusing to drop crash signal."
+            exit 1
+          fi
+          if [ "${artifact_count}" = "0" ]; then
             echo "no-artifacts=true" >>"${GITHUB_OUTPUT}"
-            echo "Upstream run ${UPSTREAM_RUN_ID} produced no downloadable artifacts."
+            echo "Upstream run ${UPSTREAM_RUN_ID} uploaded zero artifacts."
             exit 0
+          fi
+          # Real artifacts are present. Download them; any failure here is a
+          # genuine error (auth/network/transient API) and must fail the job
+          # rather than be silently treated as "no artifacts".
+          if ! gh run download "${UPSTREAM_RUN_ID}" --dir crash-artifacts; then
+            echo "::error::gh run download failed for run ${UPSTREAM_RUN_ID} despite ${artifact_count} artifact(s) reported."
+            exit 1
           fi
           # Flatten any artifact-named subdirectories so the find loop below
           # sees crash-* / oom-* / leak-* / timeout-* files at a uniform depth.
@@ -120,26 +138,38 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The upstream lanes name their crash artifacts after the fuzz
-          # target (e.g. `crash-attest_verify`, `cflite-corpus-jwt_vc_verify`),
-          # so the parent directory of each crash file tells us which target
-          # owns it. The list of valid targets matches fuzz/fuzz_targets/.
+          # The upstream lanes name their crash artifacts differently:
+          #   - fuzz.yml:       fuzz-crash-<target>-<run_id>/crash-...
+          #   - cflite_batch:   cflite-batch-<target>-<run_id>/crash-...
+          #   - cflite_pr:      cflite-pr-crashes-<pr>/<target>/crash-...
+          # The cflite_pr layout puts the target in a *nested* directory
+          # rather than the top-level artifact name, so target inference
+          # walks every path component of the crash file (not just the
+          # immediate parent). The list of valid targets matches
+          # fuzz/fuzz_targets/.
           known_targets=$(find fuzz/fuzz_targets -maxdepth 1 -type f -name '*.rs' -printf '%f\n' 2>/dev/null \
             | sed 's/\.rs$//' \
             | sort -u)
 
           while IFS= read -r crash_path; do
             [ -n "${crash_path}" ] || continue
-            artifact_dir=$(dirname "${crash_path}")
-            artifact_name=$(basename "${artifact_dir}")
             target=""
-            for t in ${known_targets}; do
-              case "${artifact_name}" in
-                *"${t}"*) target="${t}"; break;;
-              esac
+            # Walk every directory component of crash_path so the target
+            # can be matched whether it appears in the top-level artifact
+            # name (fuzz / cflite_batch) or a nested subdirectory (cflite_pr).
+            scan_path="${crash_path}"
+            while [ "${scan_path}" != "." ] && [ "${scan_path}" != "/" ]; do
+              component=$(basename "${scan_path}")
+              for t in ${known_targets}; do
+                case "${component}" in
+                  *"${t}"*) target="${t}"; break;;
+                esac
+              done
+              if [ -n "${target}" ]; then break; fi
+              scan_path=$(dirname "${scan_path}")
             done
             if [ -z "${target}" ]; then
-              echo "::warning::Could not infer fuzz target from artifact name '${artifact_name}'; skipping ${crash_path}"
+              echo "::warning::Could not infer fuzz target from path '${crash_path}'; skipping"
               continue
             fi
 
@@ -175,16 +205,20 @@ jobs:
             b64=$(base64 <"${min_path}" | tr -d '\n')
             echo "Crash sha256=${sha256} target=${target}"
 
-            # Dedupe: search existing open fuzz-crash issues for a substring
-            # match on the SHA-256. The issue body always includes the full
-            # hex digest under `### Minimized input SHA-256`, so a substring
-            # search on the first 16 chars is precise enough.
+            # Dedupe: search existing open fuzz-crash issues for a token
+            # match on the SHA-256 prefix. GitHub issue search is
+            # token-based and will not match a 16-char substring inside
+            # the 64-char digest, so we embed the prefix as its own token
+            # in the issue body (`### Crash dedupe token`) and as the
+            # title suffix `[fuzz-crash] <target>: <prefix>`. Both forms
+            # are tokenized by GitHub's indexer so the dedupe search
+            # actually returns hits on a recurrence.
             sha_prefix=$(echo "${sha256}" | cut -c1-16)
             existing=$(gh issue list \
               --repo "${REPO_FULL}" \
               --state open \
               --label "${TRIAGE_LABEL}" \
-              --search "${sha_prefix} in:body" \
+              --search "\"${sha_prefix}\" in:title,body" \
               --json number,title \
               --jq '.[0].number' || true)
 
@@ -207,6 +241,12 @@ jobs:
               printf 'Auto-filed by [fuzz-crash-triage](%s).\n\n' "${UPSTREAM_RUN_URL}"
               printf '### Fuzz target\n%s\n\n' "${target}"
               printf '### Minimized input SHA-256\n%s\n\n' "${sha256}"
+              # Emit the dedupe prefix as its own token so the dedupe
+              # search above (`gh issue list --search`) actually matches
+              # on recurrence; GitHub tokenises on whitespace, so a bare
+              # 16-char prefix inside the 64-char digest is invisible to
+              # search.
+              printf '### Crash dedupe token\n%s\n\n' "${sha_prefix}"
               printf '### Minimized input (base64)\n```\n%s\n```\n\n' "${b64}"
               printf '### Severity\nMedium\n\n'
               printf '### Triage notes\n* Upstream lane: %s\n* Head SHA: %s\n* Branch: %s\n* Event: %s\n\n' \
