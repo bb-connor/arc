@@ -7,7 +7,8 @@
   "type": "module",
   "workspaces": [
     "docs/demo",
-    "sdks/typescript/packages/browser"
+    "sdks/typescript/packages/browser",
+    "sdks/typescript/packages/workers"
   ],
   "engines": {
     "node": ">=20.0.0"
