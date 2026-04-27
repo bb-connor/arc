@@ -8,7 +8,9 @@
 #   2. Read the frozen paths from .planning/trajectory/freezes.yml entry
 #      id=m05-kernel-async-pivot.
 #   3. If the PR touches any frozen path, require the PR title to begin
-#      with the bypass label "[M05]". Any other title fails the check.
+#      with either "[M05]" (in-milestone work) or "[M05-bypass]" (hotfix
+#      path; documented under Bypass log in the audit doc). Any other
+#      title fails the check.
 #   4. Independently, run the trust-boundary classifier and, on PRs that
 #      touch the trust-boundary set, require either trust-boundary/cosmetic
 #      or trust-boundary/substantive on the PR.
@@ -87,9 +89,13 @@ jobs:
 
           if (( touched_frozen == 1 )); then
             if [[ "${PR_TITLE}" == \[M05\]* ]]; then
-              echo "freeze bypass label [M05] present in PR title; allowing"
+              echo "freeze label [M05] present in PR title; allowing in-milestone work"
+            elif [[ "${PR_TITLE}" == \[M05-bypass\]* ]]; then
+              echo "freeze bypass label [M05-bypass] present in PR title; allowing hotfix path"
+              echo "Reminder: hotfix bypass requires @bb-connor review and a Bypass-log entry"
+              echo "in .planning/audits/M05-async-kernel.md."
             else
-              echo "ERROR: PR touches M05-frozen paths but title does not begin with [M05]" >&2
+              echo "ERROR: PR touches M05-frozen paths but title does not begin with [M05] or [M05-bypass]" >&2
               echo "PR title: ${PR_TITLE}" >&2
               echo "Frozen path list: .planning/trajectory/freezes.yml id=m05-kernel-async-pivot" >&2
               exit 1

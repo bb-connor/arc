@@ -102,8 +102,44 @@ plan is to leave the file structure alone and change types, not to split.
 - [x] P0.T2: workspace dep pins (dashmap, arc-swap, loom, parking_lot,
   tower) - LANDED PR #173
 - [x] P0.T3: this audit doc - LANDED PR #<pending>
-- [ ] P0.T4: kernel-paths freeze (CODEOWNERS + ruleset + announcement)
+- [x] P0.T4: kernel-paths freeze (CODEOWNERS + ruleset + announcement)
 - [ ] P0.T5: cargo-mutants baseline kill rate on chio-kernel
+
+## Freeze announcement
+
+- **Date**: 2026-04-27
+- **Freeze id**: `m05-kernel-async-pivot`
+  (.planning/trajectory/freezes.yml)
+- **Frozen paths**:
+  - `crates/chio-kernel/src/kernel/mod.rs`
+  - `crates/chio-kernel/src/session.rs`
+  - `crates/chio-kernel/src/kernel/session_ops.rs` (sibling under same
+    freeze id; tracks the contended Session-on-Kernel call surface)
+- **Duration**: M05 P1 through M05 P3. Released by M05.P4.T3
+  (`feat(m05): release kernel/session freeze` flips
+  `state: active` -> `state: released` and removes the principal-engineer
+  CODEOWNERS overrides).
+- **Review routing**:
+  CODEOWNERS routes the frozen paths to `@bb-connor` (single-owner
+  trajectory; the `M05_FREEZE` slug in `OWNERS.toml` resolves to the
+  same handle). The root `CODEOWNERS` file is generated from
+  `OWNERS.toml` via `scripts/regen-codeowners.sh`; `.github/CODEOWNERS`
+  is a symlink to the root file so server-side gates and the
+  `m05-freeze-guard` workflow read identical content.
+- **Server-side gate**: `.github/workflows/m05-freeze-guard.yml`
+  computes the changed-file set against the merge base, intersects with
+  the `paths:` list of `m05-kernel-async-pivot` in `freezes.yml`, and
+  fails the required check if any frozen path is touched and the PR
+  title does not begin with the bypass label.
+- **Bypass**: hotfix PRs land via a tagged `hotfix/` branch with the
+  PR title prefixed `[M05-bypass]`. The bypass path requires explicit
+  `@bb-connor` review and a documented justification appended to this
+  audit doc under a "Bypass log" section. The same workflow accepts
+  the standard `[M05]` prefix for in-milestone work.
+- **Activation phase**: M05.P0.T4 (`start_phase` in `freezes.yml`).
+  M05.P0.T5 (cargo-mutants baseline) is the only ticket that may
+  re-touch `kernel/mod.rs` or `session.rs` indirectly via a tooling
+  script, and it does not modify those source files.
 
 ## Re-audit cadence
 
