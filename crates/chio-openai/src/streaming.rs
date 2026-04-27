@@ -223,9 +223,8 @@ impl<'a> StreamGate<'a> {
         ensure_streamed_arguments_match(&call, &buffered)?;
 
         let invocation = self.invocation_from_call(&call)?;
-        let verdict = evaluate(&invocation).map_err(|error| {
+        let verdict = evaluate(&invocation).inspect_err(|_error| {
             let _ = self.close_buffering_phase();
-            error
         })?;
         if let Err(error) = ensure_streaming_allow(&call.call_id, &verdict) {
             let _ = self.close_buffering_phase();
