@@ -25,6 +25,21 @@ use chio_core_types::crypto::Keypair;
 use proptest::collection::vec as prop_vec;
 use proptest::prelude::*;
 
+/// Build a `ProptestConfig` whose case count honours the `PROPTEST_CASES`
+/// environment variable used by the CI lanes (`256` for PR, `4096` for
+/// nightly). When the variable is unset or unparseable we fall back to
+/// the local default so cargo test stays fast. Without this helper, a
+/// per-block `ProptestConfig::with_cases(...)` literal would override the
+/// env-var derived default that proptest reads at startup, defeating the
+/// M03.P1.T6 tiered case-count gate.
+fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(default_cases);
+    ProptestConfig::with_cases(cases)
+}
+
 // ----- Strategies -------------------------------------------------------
 
 /// A small alphabet of server identifiers keeps the search space dense
@@ -201,7 +216,7 @@ fn parent_child_grant_strategy() -> BoxedStrategy<(ToolGrant, ToolGrant)> {
 // ----- Invariants -------------------------------------------------------
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
+    #![proptest_config(proptest_config_for_lane(64))]
 
     /// Invariant 1: `s.is_subset_of(&s)` is true for every scope `s`.
     #[test]
@@ -309,7 +324,15 @@ proptest! {
             };
             let link = match DelegationLink::sign(body, &keypairs[i]) {
                 Ok(link) => link,
-                Err(_) => return Ok(()),
+                Err(err) => {
+                    // Signing well-formed inputs should not fail; bubble the
+                    // error as a property-test failure rather than silently
+                    // discarding the case (which proptest treats as a pass
+                    // and would mask canonicalization/signing regressions).
+                    return Err(TestCaseError::fail(format!(
+                        "DelegationLink::sign failed on well-formed link {i}: {err:?}"
+                    )));
+                }
             };
             chain.push(link);
         }

@@ -18,11 +18,12 @@
 //!   evaluator already uses; intersection of a grant with a request is
 //!   modelled as "the matcher reports the grant covers the request".
 //!
-//! Each `proptest!` block is configured with a modest case count
-//! (`ProptestConfig::with_cases(48)`) so the default `cargo test` lane
-//! stays well under one minute. Higher tiers are scheduled in M03.P1.T6.
+//! Each `proptest!` block is configured via `proptest_config_for_lane()`,
+//! which honours `PROPTEST_CASES` from the CI environment (PR-tier 256,
+//! nightly-tier 4096) and falls back to a modest local default of 48 so
+//! the default `cargo test` lane stays well under one minute. Tiering
+//! happens in M03.P1.T6.
 
-use std::collections::BTreeSet;
 use std::ops::Range;
 
 use chio_core_types::capability::{
@@ -35,10 +36,31 @@ use chio_kernel_core::scope::{resolve_matching_grants, MatchedGrant};
 use chio_kernel_core::{FixedClock, Verdict};
 use proptest::prelude::*;
 
+/// Build a `ProptestConfig` whose case count honours the `PROPTEST_CASES`
+/// environment variable used by the CI lanes (`256` for PR, `4096` for
+/// nightly). When the variable is unset or unparseable we fall back to
+/// the local default `48`. Without this helper, a per-block
+/// `ProptestConfig::with_cases(...)` literal would override the env-var
+/// derived default that proptest reads at startup, defeating the M03.P1.T6
+/// tiered case-count gate.
+fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(default_cases);
+    ProptestConfig::with_cases(cases)
+}
+
 // --- pool-based strategies --------------------------------------------------
 
 const SERVER_POOL: &[&str] = &["srv-a", "srv-b", "srv-c", "srv-files", "srv-net"];
-const TOOL_POOL: &[&str] = &["file_read", "file_write", "shell_exec", "http_get", "search"];
+const TOOL_POOL: &[&str] = &[
+    "file_read",
+    "file_write",
+    "shell_exec",
+    "http_get",
+    "search",
+];
 const ARG_POOL: &[&str] = &["alpha", "beta", "gamma"];
 
 fn pool_pick(pool: &[&str], idx: usize) -> String {
@@ -55,11 +77,8 @@ fn arb_pattern_for(pool: &'static [&'static str]) -> impl Strategy<Value = Strin
 }
 
 fn arb_unconstrained_invoke_grant() -> impl Strategy<Value = ToolGrant> {
-    (
-        arb_pattern_for(SERVER_POOL),
-        arb_pattern_for(TOOL_POOL),
-    )
-        .prop_map(|(server_id, tool_name)| ToolGrant {
+    (arb_pattern_for(SERVER_POOL), arb_pattern_for(TOOL_POOL)).prop_map(|(server_id, tool_name)| {
+        ToolGrant {
             server_id,
             tool_name,
             operations: vec![Operation::Invoke],
@@ -68,7 +87,8 @@ fn arb_unconstrained_invoke_grant() -> impl Strategy<Value = ToolGrant> {
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
-        })
+        }
+    })
 }
 
 fn arb_grant_vec(range: Range<usize>) -> impl Strategy<Value = Vec<ToolGrant>> {
@@ -80,9 +100,7 @@ fn arb_arguments() -> impl Strategy<Value = serde_json::Value> {
     // matcher's leaf-key heuristics never pull a `PathPrefix` constraint out
     // of an unrelated string. All grants in this test file are unconstrained
     // anyway, but pinning the shape makes shrinking deterministic.
-    (0usize..ARG_POOL.len()).prop_map(|i| {
-        serde_json::json!({ "value": pool_pick(ARG_POOL, i) })
-    })
+    (0usize..ARG_POOL.len()).prop_map(|i| serde_json::json!({ "value": pool_pick(ARG_POOL, i) }))
 }
 
 // --- capability + request builders ------------------------------------------
@@ -132,7 +150,7 @@ fn pattern_covers(pattern: &str, candidate: &str) -> bool {
 // --- proptest blocks --------------------------------------------------------
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(48))]
+    #![proptest_config(proptest_config_for_lane(48))]
 
     // Invariant 1: evaluate returns Deny when the capability is in a
     // revoked lifecycle state. The portable kernel core never reaches into
@@ -140,6 +158,11 @@ proptest! {
     // does observe: a capability evaluated outside its validity window.
     // The full revocation-store invariant lives with `chio-credentials` and
     // `chio-kernel` (see M03.P1.T4 and M03.P2 lifecycle tickets).
+    //
+    // To avoid a vacuous Deny (out-of-scope requests are denied for an
+    // unrelated reason), we ensure the request matches the first generated
+    // grant by reusing its server/tool when neither pattern is a wildcard.
+    // For wildcard patterns we pick any concrete identifier from the pool.
     #[test]
     fn evaluate_deny_when_capability_revoked(
         grants in arb_grant_vec(1..6),
@@ -149,26 +172,51 @@ proptest! {
     ) {
         let issuer_kp = Keypair::generate();
         let subject_kp = Keypair::generate();
+
+        // Pick a server/tool that the first grant covers, so the verdict
+        // can be attributed to lifecycle expiry rather than a missed match.
+        let first = &grants[0];
+        let server_id = if first.server_id == "*" {
+            pool_pick(SERVER_POOL, server_idx)
+        } else {
+            first.server_id.clone()
+        };
+        let tool_name = if first.tool_name == "*" {
+            pool_pick(TOOL_POOL, tool_idx)
+        } else {
+            first.tool_name.clone()
+        };
+
         let scope = ChioScope { grants, ..ChioScope::default() };
 
         // Build a capability whose validity window has already closed at
         // NOW. This is the portable-core analog of "revoked" - the kernel
         // sees a closed lifecycle window and must fail closed.
-        let Some(capability) = signed_capability(
+        //
+        // Signing failure under deterministic test inputs would indicate a
+        // regression in canonicalization or signing, not a property case
+        // we want to skip; surface it as a test failure.
+        let capability = match signed_capability(
             &issuer_kp,
             &subject_kp,
             scope,
             ISSUED_AT - 100,
             ISSUED_AT - 1,
-        ) else {
-            // Signing failure is unrelated to the invariant; skip the case.
-            return Ok(());
+        ) {
+            Some(capability) => capability,
+            None => {
+                prop_assert!(
+                    false,
+                    "signed_capability returned None on well-formed inputs"
+                );
+                return Ok(());
+            }
         };
 
         let request = build_request(
             &subject_kp,
-            pool_pick(SERVER_POOL, server_idx),
-            pool_pick(TOOL_POOL, tool_idx),
+            server_id,
+            tool_name,
             arguments,
         );
         let clock = FixedClock::new(NOW);
@@ -189,7 +237,7 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(48))]
+    #![proptest_config(proptest_config_for_lane(48))]
 
     // Invariant 2: when evaluate returns Allow, the matched grant's
     // (server, tool) pattern covers the request - i.e. the grant the
@@ -206,14 +254,21 @@ proptest! {
         let subject_kp = Keypair::generate();
         let scope = ChioScope { grants: grants.clone(), ..ChioScope::default() };
 
-        let Some(capability) = signed_capability(
+        let capability = match signed_capability(
             &issuer_kp,
             &subject_kp,
             scope,
             ISSUED_AT,
             VALID_UNTIL,
-        ) else {
-            return Ok(());
+        ) {
+            Some(capability) => capability,
+            None => {
+                prop_assert!(
+                    false,
+                    "signed_capability returned None on well-formed inputs"
+                );
+                return Ok(());
+            }
         };
 
         let server_id = pool_pick(SERVER_POOL, server_idx);
@@ -255,12 +310,17 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(48))]
+    #![proptest_config(proptest_config_for_lane(48))]
 
-    // Invariant 3: the set of matching grants for a request is invariant
-    // under the input grant-list ordering. Ranking may shift by index
-    // (since indices follow the input order), but the underlying set of
-    // matched grant identities is order-independent.
+    // Invariant 3: the multiset of matching grants for a request is
+    // invariant under the input grant-list ordering. Ranking may shift by
+    // index (since indices follow the input order), but the underlying
+    // multiset of matched grant identities is order-independent.
+    //
+    // We compare as a sorted Vec rather than a BTreeSet so duplicates with
+    // identical (server, tool, operations.len()) keys are not silently
+    // deduplicated; using a set would let `[A, A, B, B]` and `[A, B, B, B]`
+    // compare equal even though the underlying multisets differ.
     #[test]
     fn resolve_matching_grants_order_independent(
         grants in arb_grant_vec(0..6),
@@ -282,16 +342,22 @@ proptest! {
         rotated.rotate_left(rotation % len);
         let scope_b = ChioScope { grants: rotated.clone(), ..ChioScope::default() };
 
-        let Ok(matches_a) = resolve_matching_grants(&scope_a, &tool_name, &server_id, &arguments) else {
-            return Ok(());
-        };
-        let Ok(matches_b) = resolve_matching_grants(&scope_b, &tool_name, &server_id, &arguments) else {
-            return Ok(());
-        };
+        // All generated grants are unconstrained, so the matcher must
+        // succeed on both scopes; treating an Err as a passing case would
+        // mask matcher regressions (e.g. ConstraintError leaks).
+        let matches_a = resolve_matching_grants(&scope_a, &tool_name, &server_id, &arguments)
+            .map_err(|err| TestCaseError::fail(
+                format!("resolve_matching_grants(scope_a) failed unexpectedly: {err:?}")
+            ))?;
+        let matches_b = resolve_matching_grants(&scope_b, &tool_name, &server_id, &arguments)
+            .map_err(|err| TestCaseError::fail(
+                format!("resolve_matching_grants(scope_b) failed unexpectedly: {err:?}")
+            ))?;
 
-        // Re-key both match sets by the underlying grant identity (server,
-        // tool, operations) rather than by index, then assert set equality.
-        let key_set_a: BTreeSet<(String, String, usize)> = matches_a
+        // Re-key both match results by the underlying grant identity
+        // (server, tool, operations.len()). Compare as sorted multisets
+        // so per-key multiplicity differences are not hidden.
+        let mut keys_a: Vec<(String, String, usize)> = matches_a
             .iter()
             .map(|matched| (
                 matched.grant.server_id.clone(),
@@ -299,7 +365,7 @@ proptest! {
                 matched.grant.operations.len(),
             ))
             .collect();
-        let key_set_b: BTreeSet<(String, String, usize)> = matches_b
+        let mut keys_b: Vec<(String, String, usize)> = matches_b
             .iter()
             .map(|matched| (
                 matched.grant.server_id.clone(),
@@ -307,14 +373,16 @@ proptest! {
                 matched.grant.operations.len(),
             ))
             .collect();
+        keys_a.sort();
+        keys_b.sort();
 
-        prop_assert_eq!(key_set_a, key_set_b);
+        prop_assert_eq!(keys_a, keys_b);
         prop_assert_eq!(matches_a.len(), matches_b.len());
     }
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(48))]
+    #![proptest_config(proptest_config_for_lane(48))]
 
     // Invariant 4: intersection (matcher) distributes over grant union.
     // `resolve_matching_grants(scope_a + scope_b, request)` must equal
@@ -339,15 +407,14 @@ proptest! {
         union_grants.extend(grants_b.clone());
         let scope_union = ChioScope { grants: union_grants, ..ChioScope::default() };
 
-        let Ok(matches_a) = resolve_matching_grants(&scope_a, &tool_name, &server_id, &arguments) else {
-            return Ok(());
-        };
-        let Ok(matches_b) = resolve_matching_grants(&scope_b, &tool_name, &server_id, &arguments) else {
-            return Ok(());
-        };
-        let Ok(matches_union) = resolve_matching_grants(&scope_union, &tool_name, &server_id, &arguments) else {
-            return Ok(());
-        };
+        // All generated grants are unconstrained, so matcher errors are
+        // unexpected: bubble them as test failures rather than skipping.
+        let matches_a = resolve_matching_grants(&scope_a, &tool_name, &server_id, &arguments)
+            .map_err(|err| TestCaseError::fail(format!("scope_a matcher failed: {err:?}")))?;
+        let matches_b = resolve_matching_grants(&scope_b, &tool_name, &server_id, &arguments)
+            .map_err(|err| TestCaseError::fail(format!("scope_b matcher failed: {err:?}")))?;
+        let matches_union = resolve_matching_grants(&scope_union, &tool_name, &server_id, &arguments)
+            .map_err(|err| TestCaseError::fail(format!("union matcher failed: {err:?}")))?;
 
         // Re-key by grant identity. The union side enumerates over
         // grants_a then grants_b, so multiplicity is preserved on both
@@ -373,7 +440,7 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(48))]
+    #![proptest_config(proptest_config_for_lane(48))]
 
     // Invariant 5: a wildcard scope intersected with a specific scope
     // collapses to the specific scope (wildcards are absorptive). At the
@@ -420,9 +487,10 @@ proptest! {
             ..ChioScope::default()
         };
 
-        let Ok(matches) = resolve_matching_grants(&scope, &tool_name, &server_id, &arguments) else {
-            return Ok(());
-        };
+        let matches = resolve_matching_grants(&scope, &tool_name, &server_id, &arguments)
+            .map_err(|err| TestCaseError::fail(
+                format!("resolve_matching_grants failed unexpectedly: {err:?}")
+            ))?;
 
         prop_assert_eq!(matches.len(), 2);
         // The specific grant (index 1) must come first under the
@@ -439,4 +507,3 @@ proptest! {
         prop_assert_eq!(format!("{}", tail.grant.tool_name), "*".to_string());
     }
 }
-

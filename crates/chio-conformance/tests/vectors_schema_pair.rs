@@ -66,6 +66,19 @@ fn assert_valid_json(path: &Path) -> Value {
     }
 }
 
+/// Non-panicking JSON validator used inside the per-domain loop in
+/// `every_mapping_entry_resolves_to_existing_files`. The loop accumulates
+/// failures across every domain so the operator gets a single batched
+/// report; calling the panicking [`assert_valid_json`] helper in the loop
+/// would short-circuit on the first malformed file and hide failures in
+/// later domains. Returns a human-readable error string on failure.
+fn try_load_json(path: &Path) -> Result<Value, String> {
+    let bytes =
+        fs::read(path).map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+    serde_json::from_slice::<Value>(&bytes)
+        .map_err(|err| format!("failed to parse {} as JSON: {err}", path.display()))
+}
+
 /// The hardcoded domain-to-schema mapping.
 ///
 /// `None` means the domain is a pure algorithmic / in-memory contract with no
@@ -153,7 +166,13 @@ fn every_mapping_entry_resolves_to_existing_files() {
             continue;
         }
         // Validate the vector file parses as JSON before declaring success.
-        let _ = assert_valid_json(&vector_path);
+        // Use the non-panicking variant so a malformed vector file in one
+        // domain does not short-circuit the loop and hide failures in
+        // subsequent domains.
+        if let Err(err) = try_load_json(&vector_path) {
+            failures.push(format!("domain `{domain}` vector: {err}"));
+            continue;
+        }
 
         match schema_rel {
             None => {}
@@ -166,7 +185,9 @@ fn every_mapping_entry_resolves_to_existing_files() {
                     ));
                     continue;
                 }
-                let _ = assert_valid_json(&schema_path);
+                if let Err(err) = try_load_json(&schema_path) {
+                    failures.push(format!("domain `{domain}` schema: {err}"));
+                }
             }
         }
     }
