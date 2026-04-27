@@ -32,6 +32,9 @@ pub use adapter::{
     OpenAiAdapter, OpenAiAdapterConfig as OpenAiProviderAdapterConfig, OPENAI_RESPONSES_API_VERSION,
 };
 
+#[cfg(feature = "provider-adapter")]
+pub mod streaming;
+
 /// Errors produced by the OpenAI adapter.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAiAdapterError {
