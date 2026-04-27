@@ -80,6 +80,36 @@ existing Chat Completions helpers do not need to enable it. The
 crate must build both with and without the feature; the gate-check
 covers both.
 
+## Adapter-visible error taxonomy
+
+OpenAI surfaces request failures as JSON error envelopes with a
+`body.error` object, while tool-call and streaming boundary failures can
+arrive as native Responses API items or deterministic SSE frames. This crate
+currently owns batch lift/lower and SSE gating, but it does not ship a real
+HTTP client. Rows marked `HTTP transport boundary` pin the adapter-visible
+taxonomy that any future transport must preserve. Rows marked `current
+adapter path` are emitted by the current lift/lower, streaming, or evaluator
+path.
+
+The table is parsed by `tests/error_taxonomy_doctest.rs`; keep each envelope
+as one valid inline JSON object.
+
+<!-- error-taxonomy:start -->
+| ProviderError class | Native or boundary envelope | Source | Adapter-visible behavior |
+| ------------------- | --------------------------- | ------ | ------------------------ |
+| `ProviderError::RateLimited` | `{"status":429,"headers":{"retry-after-ms":"1000"},"body":{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached","code":"rate_limit_exceeded","param":null},"request_id":"req_openai_rate"}}` | HTTP transport boundary | Preserve the retry hint as `retry_after_ms` when the OpenAI response carries one. |
+| `ProviderError::ContentPolicy` | `{"status":400,"body":{"error":{"type":"invalid_request_error","message":"Request rejected by content policy","code":"content_policy_violation","param":null},"request_id":"req_openai_policy"}}` | HTTP transport boundary | Surface provider refusal or policy rejection as content-policy denial rather than a tool execution error. |
+| `ProviderError::BadToolArgs` | `{"type":"function_call","call_id":"call_bad_args","name":"get_weather","arguments":"{not json"}` | current adapter path | Fail closed when OpenAI emits function-call arguments that cannot become canonical JSON arguments. |
+| `ProviderError::Upstream5xx` | `{"status":500,"body":{"error":{"type":"server_error","message":"Internal server error","code":"server_error","param":null},"request_id":"req_openai_500"}}` | HTTP transport boundary | Keep upstream 5xx bodies visible for retry and audit policy. |
+| `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://api.openai.com/v1/responses","elapsed_ms":30000}` | HTTP transport boundary | Classify local transport timeout separately from OpenAI 5xx envelopes. |
+| `ProviderError::VerdictBudgetExceeded` | `{"provider":"openai","event":"response.output_item.done","observed_ms":300,"budget_ms":250}` | current adapter path | Preserve the fabric verdict-budget error when the evaluator misses the 250ms gate. |
+| `ProviderError::Malformed` | `{"event":"response.function_call_arguments.delta","data":{"type":"response.function_call_arguments.delta","output_index":0,"call_id":"call_orphan","delta":"{}"}}` | current adapter path | Fail closed for impossible or out-of-order native SSE/Responses shapes. |
+<!-- error-taxonomy:end -->
+
+`ProviderError::Other` is intentionally absent. Native OpenAI envelopes must
+map to a concrete class above, or fail closed as `Malformed` when the shape
+cannot be trusted.
+
 ## Migration path for downstream consumers
 
 | Today (default features)                   | After M07.P2 closes (with `provider-adapter`)             |
@@ -102,8 +132,9 @@ To migrate:
    `streaming` module (available after M07.P2.T4.b).
 
 The existing direct-use APIs remain compiled for one minor release
-after M07 closes; M07.P2.T8 lands `#[deprecated]` markers and the
-matching CHANGELOG entry.
+after M07 closes; M07.P2.T8 lands the matching CHANGELOG entry. Rust
+`#[deprecated]` markers are deferred unless a removal release is scheduled
+separately.
 
 ## Build matrix
 
