@@ -27,6 +27,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
 [features]
 # Default features keep the existing public surface compiling unchanged.
 default = []
@@ -43,6 +46,10 @@ default = []
 #     `StreamPhase` state machine and verdict-at-tool-use-block enforcement.
 # Pinned to OpenAI Responses API snapshot 2026-04-25 (see package.metadata).
 provider-adapter = ["dep:chio-tool-call-fabric"]
+
+[[bench]]
+name = "verdict_latency"
+harness = false
 
 [lints.clippy]
 unwrap_used = "deny"

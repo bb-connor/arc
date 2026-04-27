@@ -42,3 +42,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Replay OpenAI provider fixtures
         run: cargo test -p chio-provider-conformance --features fixtures-openai
+
+  openai-verdict-latency:
+    name: OpenAI verdict latency budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Enforce OpenAI verdict latency budget
+        run: cargo bench -p chio-openai-adapter --features provider-adapter --bench verdict_latency -- --test
