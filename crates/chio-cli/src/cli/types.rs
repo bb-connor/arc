@@ -293,10 +293,11 @@ pub enum ReplaySubcommand {
     /// Validate an NDJSON `chio-tee-frame.v1` capture (schema-version
     /// gate, tenant-sig verifier, M01 invocation validator).
     ///
-    /// This arm is the M10 entrypoint. It does NOT re-execute the
-    /// kernel against a policy; that is M10.P2.T3 work. T1 only lands
-    /// the structural validators so a captured stream can be smoke
-    /// tested before downstream tickets layer the diff renderer on top.
+    /// M10.P2.T1 landed the structural validators; M10.P2.T2 layered
+    /// `--against <policy-ref>` on top so the same capture can be
+    /// re-executed against an alternate policy with namespaced replay
+    /// receipts (`replay:<run_id>:<frame_id>`). The diff renderer for
+    /// the structured drift class is M10.P2.T3 / T4.
     Traffic(TrafficArgs),
 }
 
@@ -330,6 +331,34 @@ pub struct TrafficArgs {
     /// Emit a structured JSON report on stdout instead of human text.
     #[arg(long)]
     pub json: bool,
+
+    /// Re-execute every frame against this policy reference. The flag
+    /// accepts three discriminated shapes (M10.P2.T2):
+    ///
+    /// 1. `<64-lower-hex>` or `sha256:<64-lower-hex>` -- a manifest
+    ///    sha256 digest. Resolution requires the manifest registry,
+    ///    which is downstream work; until then this arm surfaces a
+    ///    structured `NotResolvable` error.
+    /// 2. `<name>@<semver>` or `version:<name>@<semver>` -- a Cargo-style
+    ///    package coordinate. Same as above: structured
+    ///    `NotResolvable` until the package registry lands.
+    /// 3. Any other shape (or `path:<file>`) -- a workspace-local
+    ///    HushSpec / Chio YAML policy file. Fully resolvable in T2.
+    ///
+    /// Replay receipts emitted under this re-execution are namespaced
+    /// `replay:<run_id>:<frame_id>` so they cannot collide with
+    /// production receipts in a shared store. See
+    /// `.planning/trajectory/10-tee-replay-harness.md` line 568.
+    #[arg(long, value_name = "POLICY-REF")]
+    pub against: Option<String>,
+
+    /// Optional caller-supplied replay run-id. When omitted a fresh
+    /// random UUID-v4 is generated per invocation. Useful for
+    /// deterministic fixture generation in tests; format is
+    /// `[A-Za-z0-9_-]+` (token-shaped so the resulting
+    /// `replay:<run_id>:<frame_id>` ids stay grep-friendly).
+    #[arg(long, value_name = "ID")]
+    pub run_id: Option<String>,
 }
 
 /// Conformance harness commands.

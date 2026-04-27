@@ -69,6 +69,8 @@ wasmparser = "0.221"
 flate2 = "1"
 tar = "0.4"
 rand_core = { workspace = true }
+semver = "1"
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 chio-credit = { path = "../chio-credit" }
