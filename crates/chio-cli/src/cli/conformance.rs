@@ -1,8 +1,10 @@
 // Conformance subcommand handlers for the `chio` CLI.
 //
 // This file is included into `main.rs` via `include!` and reuses the
-// shared `use` declarations from `cli/types.rs`. Only the `Run` variant
-// is implemented in M01.P4.T2; `fetch-peers` lands in M01.P4.T4.
+// shared `use` declarations from `cli/types.rs`. The `Run` variant landed
+// in M01.P4.T2; the `FetchPeers` variant landed in M01.P4.T4 and downloads
+// pinned peer-language adapter binaries described by
+// `crates/chio-conformance/peers.lock.toml`.
 
 /// Dispatch entry-point for `chio conformance run`.
 ///
@@ -178,5 +180,160 @@ fn write_human_report(
             CliError::Other(format!("failed to write report to stdout: {error}"))
         })?;
     }
+    Ok(())
+}
+
+/// Path of the canonical lockfile shipped inside the chio-conformance crate.
+/// Resolved relative to the chio-cli binary's source layout so that the
+/// subcommand works from a fresh checkout without extra arguments.
+fn default_peers_lock_path() -> PathBuf {
+    // CARGO_MANIFEST_DIR is defined at compile time for the chio-cli crate.
+    // The lockfile lives in a sibling crate.
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("chio-conformance")
+        .join("peers.lock.toml")
+}
+
+/// Dispatch entry-point for `chio conformance fetch-peers`.
+///
+/// `--check` parses and validates the lockfile only; it never touches the
+/// network. Without `--check`, each entry is downloaded, sha256-verified,
+/// and written under `out/`. The `language` filter, when set, restricts
+/// the loop to entries matching that adapter (`python`, `js`, `go`, `cpp`).
+fn cmd_conformance_fetch_peers(
+    check: bool,
+    out: &Path,
+    language: Option<&str>,
+) -> Result<(), CliError> {
+    let lock_path = default_peers_lock_path();
+    let lock = chio_conformance::PeersLock::load(&lock_path).map_err(|error| {
+        CliError::Other(format!(
+            "failed to load peers lockfile `{}`: {error}",
+            lock_path.display(),
+        ))
+    })?;
+    lock.validate().map_err(|error| {
+        CliError::Other(format!("peers lockfile is invalid: {error}"))
+    })?;
+
+    if let Some(filter) = language {
+        if !chio_conformance::SUPPORTED_LANGUAGES.contains(&filter) {
+            return Err(CliError::Other(format!(
+                "unsupported --language value `{filter}`; expected one of {:?}",
+                chio_conformance::SUPPORTED_LANGUAGES,
+            )));
+        }
+    }
+
+    let entries: Vec<&chio_conformance::PeerEntry> = match language {
+        Some(value) => lock.entries_for_language(value),
+        None => lock.peers.iter().collect(),
+    };
+
+    if check {
+        let mut stdout = std::io::stdout().lock();
+        writeln!(
+            stdout,
+            "peers.lock.toml: {} (schema {})",
+            lock_path.display(),
+            lock.schema,
+        )
+        .map_err(|error| {
+            CliError::Other(format!("failed to write check summary: {error}"))
+        })?;
+        writeln!(
+            stdout,
+            "validated {} entries (filter: {})",
+            entries.len(),
+            language.unwrap_or("<none>"),
+        )
+        .map_err(|error| {
+            CliError::Other(format!("failed to write check summary: {error}"))
+        })?;
+        for entry in &entries {
+            writeln!(
+                stdout,
+                "  - {} {} -> {}",
+                entry.language, entry.target, entry.url,
+            )
+            .map_err(|error| {
+                CliError::Other(format!("failed to write check entry: {error}"))
+            })?;
+        }
+        return Ok(());
+    }
+
+    fs::create_dir_all(out).map_err(|error| {
+        CliError::Other(format!(
+            "failed to create output dir `{}`: {error}",
+            out.display(),
+        ))
+    })?;
+
+    let client = reqwest::blocking::Client::builder()
+        .build()
+        .map_err(|error| {
+            CliError::Other(format!("failed to build http client: {error}"))
+        })?;
+
+    for entry in &entries {
+        download_and_verify(&client, entry, out)?;
+    }
+    Ok(())
+}
+
+fn download_and_verify(
+    client: &reqwest::blocking::Client,
+    entry: &chio_conformance::PeerEntry,
+    out: &Path,
+) -> Result<(), CliError> {
+    let response = client.get(&entry.url).send().map_err(|error| {
+        CliError::Other(format!(
+            "failed to GET `{}` ({}): {error}",
+            entry.url, entry.language,
+        ))
+    })?;
+    if !response.status().is_success() {
+        return Err(CliError::Other(format!(
+            "non-success status {} fetching `{}`",
+            response.status(),
+            entry.url,
+        )));
+    }
+    let bytes = response.bytes().map_err(|error| {
+        CliError::Other(format!(
+            "failed to read body of `{}`: {error}",
+            entry.url,
+        ))
+    })?;
+    let actual = chio_conformance::sha256_hex(&bytes);
+    if actual != entry.sha256 {
+        return Err(CliError::Other(format!(
+            "sha256 mismatch for `{}`: expected {}, got {}",
+            entry.url, entry.sha256, actual,
+        )));
+    }
+
+    // Derive a deterministic filename from the URL's last path segment.
+    let filename = entry
+        .url
+        .rsplit('/')
+        .next()
+        .unwrap_or("peer.bin");
+    let target_dir = out.join(&entry.language).join(&entry.target);
+    fs::create_dir_all(&target_dir).map_err(|error| {
+        CliError::Other(format!(
+            "failed to create `{}`: {error}",
+            target_dir.display(),
+        ))
+    })?;
+    let target_path = target_dir.join(filename);
+    fs::write(&target_path, &bytes).map_err(|error| {
+        CliError::Other(format!(
+            "failed to write `{}`: {error}",
+            target_path.display(),
+        ))
+    })?;
     Ok(())
 }
