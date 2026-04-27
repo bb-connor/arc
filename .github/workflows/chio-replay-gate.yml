@@ -372,6 +372,48 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  differential:
+    # M04 P6.T5 scope: Linux-only Rust plus TypeScript differential gate.
+    #
+    # Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
+    # Phase 6 ("differential anchored-root verification"). The Rust formal
+    # diff-tests harness drives the shared replay fixtures and shells out to
+    # the TypeScript conformance runner so the anchored root bytes and proof
+    # path structures agree across implementations. The direct Bun step keeps
+    # the TypeScript replay/conformance surface named in the exit test visible
+    # as its own CI failure point.
+    name: differential
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Bun toolchain
+        uses: oven-sh/setup-bun@v2
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install TypeScript conformance dependencies
+        run: npm ci --prefix sdks/typescript/packages/conformance
+
+      - name: Run formal anchored-root differential
+        run: cargo test -p chio-formal-diff-tests --test anchored_root
+
+      - name: Run TypeScript replay conformance
+        run: bun test sdks/typescript/packages/conformance/test/replay.spec.ts
+
   cross-version:
     # M04 P3.T5 scope: cross-version receipt-compatibility sanity job.
     # Runs the non-ignored sanity test in tests/replay/tests/cross_version_replay.rs
