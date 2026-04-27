@@ -401,7 +401,9 @@ pub use kernel::{
 // M05.P1.T1: extracted ToolEvaluator trait. See
 // `.planning/trajectory/05-async-kernel-real.md` Phase 1 for the
 // migration sequence (T1 mechanical extraction; T3+ async-native bodies).
-pub use kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
+// M05.P1.T6 freezes the public evaluator surface at the async trait. The
+// blocking implementation remains crate-internal compatibility glue.
+pub use kernel::evaluator::ToolEvaluator;
 
 /// M05.P1.T3: default bounded capacity for the kernel's mpsc-backed
 /// signing-task channel. Re-exported from the crate-private

@@ -161,6 +161,70 @@ grow as new async machinery is added.
 | `&mut self` on `Session` | 27 | 0 |
 | sync primitives in `ChioKernel` | 10 | 0 |
 
+### 2026-04-27 (P1.T6 caller migration and pub-use freeze)
+
+Scope: M05.P1.T6 owned paths only:
+
+- `crates/chio-kernel/src/lib.rs`
+- `crates/chio-cli/**`
+- `crates/chio-mcp-edge/**`
+- `crates/chio-mcp-adapter/**`
+- `crates/chio-a2a-edge/**`
+- `crates/chio-acp-edge/**`
+- `crates/chio-acp-proxy/**`
+- `crates/chio-control-plane/**`
+
+Caller survey:
+
+| Surface | Result |
+|---------|--------|
+| `crates/chio-cli/**` | Test callers now use `ChioKernel::evaluate_tool_call(...).await`; no owned `evaluate_tool_call_blocking(...)` references remain. |
+| `crates/chio-mcp-edge/**` | No deprecated `evaluate_tool_call_blocking(...)` references. One metadata-preserving bridge remains on `evaluate_tool_call_blocking_with_metadata(...)` because the owned public async surface has no metadata-bearing counterpart yet. |
+| `crates/chio-mcp-adapter/**` | No direct deprecated kernel sync evaluator references. |
+| `crates/chio-a2a-edge/**` | No direct deprecated kernel sync evaluator references. |
+| `crates/chio-acp-edge/**` | No direct deprecated kernel sync evaluator references. |
+| `crates/chio-acp-proxy/**` | No direct deprecated kernel sync evaluator references. |
+| `crates/chio-control-plane/**` | No direct deprecated kernel sync evaluator references. |
+
+Reproduction:
+
+```bash
+rg -n "evaluate_tool_call_blocking\(" \
+  crates/chio-cli crates/chio-mcp-edge crates/chio-mcp-adapter \
+  crates/chio-a2a-edge crates/chio-acp-edge crates/chio-acp-proxy \
+  crates/chio-control-plane crates/chio-kernel/src/lib.rs
+# no matches
+
+rg -n "evaluate_tool_call_blocking_with_metadata" \
+  crates/chio-cli crates/chio-mcp-edge crates/chio-mcp-adapter \
+  crates/chio-a2a-edge crates/chio-acp-edge crates/chio-acp-proxy \
+  crates/chio-control-plane crates/chio-kernel/src/lib.rs
+# crates/chio-mcp-edge/src/runtime.rs:166
+```
+
+Public re-export freeze:
+
+- `crates/chio-kernel/src/lib.rs` has 33 public `pub use` groups.
+- Public wildcard re-exports are not present (`rg -n "^pub use .*\*" ...`
+  returns no matches).
+- `ToolEvaluator` remains the public async evaluator extension point.
+- `BlockingToolEvaluator` is no longer re-exported from `chio-kernel`; it
+  remains crate-internal compatibility glue for the release-N `legacy-sync`
+  transition.
+
+Targeted verification before adapted gate:
+
+```bash
+cargo test -p chio-cli configure_revocation_store_survives_restart --quiet
+cargo test -p chio-cli check_command --quiet
+# passed: 1 migrated revocation test, 2 migrated check-command tests
+```
+
+Gate adaptation: the full workspace test suite is deferred to the M05 P1
+sub-wave gate after T7 per `.planning/trajectory/05-async-kernel-real.md`
+Phase 1 finalization. T6 uses the ticket-authorized focused kernel gate plus
+workspace clippy/fmt/diff/em-dash checks.
+
 ## cargo-mutants baseline (M05.P0.T5)
 
 Date: 2026-04-27
