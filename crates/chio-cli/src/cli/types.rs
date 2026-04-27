@@ -516,6 +516,12 @@ enum GuardCommands {
         allow_http_registry: Vec<String>,
     },
 
+    /// Manage the local guard digest blocklist.
+    Blocklist {
+        #[command(subcommand)]
+        command: GuardBlocklistCommands,
+    },
+
     /// Install a .arcguard archive to the guard directory.
     Install {
         /// Path to the .arcguard archive file.
@@ -544,6 +550,15 @@ enum GuardCommands {
     Verify {
         /// Path to the `.wasm` file to verify.
         wasm: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+enum GuardBlocklistCommands {
+    /// Remove a digest from the local guard blocklist.
+    Remove {
+        /// Digest to remove, as sha256:<64-hex> or bare 64-hex.
+        digest: String,
     },
 }
 

@@ -12,6 +12,7 @@ use chio_guard_registry::{
     GUARD_WIT_WORLD,
 };
 use chio_wasm_guards::abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
+use chio_wasm_guards::blocklist::{GuardDigestBlocklist, E_GUARD_DIGEST_BLOCKLISTED};
 use chio_wasm_guards::manifest::GuardManifest;
 use chio_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
 use flate2::read::GzDecoder;
@@ -683,6 +684,17 @@ pub(crate) fn cmd_guard_pull(command: GuardPullCommand<'_>) -> Result<(), CliErr
         .reference
         .parse::<GuardOciRef>()
         .map_err(|e| CliError::Other(e.to_string()))?;
+    let blocklist = GuardDigestBlocklist::from_environment()
+        .map_err(|e| CliError::Other(format!("failed to load guard blocklist: {e}")))?;
+    if blocklist
+        .is_blocklisted(reference.digest().as_str())
+        .map_err(|e| CliError::Other(format!("failed to check guard blocklist: {e}")))?
+    {
+        return Err(CliError::Other(format!(
+            "{E_GUARD_DIGEST_BLOCKLISTED}: guard digest {} is blocklisted",
+            reference.digest()
+        )));
+    }
     let credentials = registry_credentials(command.username, command.password);
     let cache = GuardCache::from_environment().map_err(|e| CliError::Other(e.to_string()))?;
     let client = GuardRegistryClient::try_new(GuardRegistryConfig {

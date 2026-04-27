@@ -14,6 +14,9 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::warn;
 
+use crate::blocklist::{GuardDigestBlocklist, E_GUARD_DIGEST_BLOCKLISTED};
+use crate::incident::{EvalTrace, IncidentWriter, ReloadIncident};
+use crate::runtime::LoadedModule;
 use crate::{EpochId, WasmGuard, WasmGuardAbi, WasmGuardError};
 use crate::{GuardRequest, GuardVerdict};
 
@@ -244,6 +247,124 @@ pub struct DebouncedReload {
     pub epoch_id: EpochId,
 }
 
+/// Watchdog settings for a post-swap guard epoch.
+#[derive(Debug, Clone)]
+pub struct WatchdogConfig {
+    /// Consecutive error-class verdicts required before rollback.
+    pub max_errors: usize,
+    /// Sliding window for consecutive error-class verdicts.
+    pub window: Duration,
+    /// Incident directory writer.
+    pub incident_writer: IncidentWriter,
+}
+
+impl WatchdogConfig {
+    /// Create a watchdog config. M06 defaults use 5 errors in 60 seconds.
+    #[must_use]
+    pub fn new(incident_writer: IncidentWriter) -> Self {
+        Self {
+            max_errors: 5,
+            window: Duration::from_secs(60),
+            incident_writer,
+        }
+    }
+}
+
+/// Post-swap watchdog for one published reload.
+#[derive(Debug)]
+pub struct ReloadWatchdog {
+    guard_id: String,
+    guard: Arc<WasmGuard>,
+    previous_module: Arc<LoadedModule>,
+    reload_seq: u64,
+    epoch_id: EpochId,
+    config: WatchdogConfig,
+    errors: Vec<Instant>,
+    traces: Vec<EvalTrace>,
+    rolled_back: bool,
+}
+
+impl ReloadWatchdog {
+    /// Create a watchdog over an already-published reload.
+    #[must_use]
+    pub fn new(
+        guard_id: impl Into<String>,
+        guard: Arc<WasmGuard>,
+        previous_module: Arc<LoadedModule>,
+        reload_seq: u64,
+        epoch_id: EpochId,
+        config: WatchdogConfig,
+    ) -> Self {
+        Self {
+            guard_id: guard_id.into(),
+            guard,
+            previous_module,
+            reload_seq,
+            epoch_id,
+            config,
+            errors: Vec::new(),
+            traces: Vec::new(),
+            rolled_back: false,
+        }
+    }
+
+    /// Record one error-class verdict and roll back when the threshold trips.
+    pub fn record_error(&mut self, trace: EvalTrace) -> Result<Option<PathBuf>, HotReloadError> {
+        if self.rolled_back {
+            return Ok(None);
+        }
+
+        let now = Instant::now();
+        self.errors.push(now);
+        self.errors
+            .retain(|seen| now.duration_since(*seen) <= self.config.window);
+        self.traces.push(trace);
+        if self.traces.len() > 5 {
+            self.traces.remove(0);
+        }
+
+        if self.errors.len() < self.config.max_errors {
+            return Ok(None);
+        }
+
+        self.guard
+            .restore_loaded_module(Arc::clone(&self.previous_module));
+        self.rolled_back = true;
+        let incident = ReloadIncident {
+            guard_id: self.guard_id.clone(),
+            reload_seq: self.reload_seq,
+            epoch_id: self.epoch_id.get(),
+            reason: format!(
+                "{} error-class verdicts within {:?}",
+                self.errors.len(),
+                self.config.window
+            ),
+            last_5_eval_traces: self.traces.clone(),
+        };
+        let incident_dir = self
+            .config
+            .incident_writer
+            .write_reload_incident(&incident)
+            .map_err(|source| HotReloadError::IncidentWrite { source })?;
+        warn!(
+            event = "chio.guard.reload.rolled_back",
+            guard_id = %self.guard_id,
+            reload_seq = self.reload_seq,
+            epoch_id = self.epoch_id.get(),
+            incident_dir = %incident_dir.display(),
+            "WASM guard reload rolled back"
+        );
+
+        Ok(Some(incident_dir))
+    }
+
+    /// Return true after this watchdog has already rolled back.
+    #[must_use]
+    pub fn rolled_back(&self) -> bool {
+        self.rolled_back
+    }
+}
+
 #[derive(Debug, Default)]
 struct ReloadSlot {
     last_attempt_at: Option<Instant>,
@@ -378,6 +499,31 @@ pub enum HotReloadError {
         /// Actual verdict bytes or error text.
         actual: String,
     },
+
+    /// Replacement digest appears in the persistent blocklist.
+    #[error("{code}: guard digest {digest} is blocklisted")]
+    DigestBlocklisted {
+        /// Structured machine-readable error code.
+        code: &'static str,
+        /// Normalized blocked digest.
+        digest: String,
+    },
+
+    /// Blocklist access failed.
+    #[error("guard digest blocklist failed: {source}")]
+    Blocklist {
+        /// Blocklist error.
+        #[source]
+        source: crate::blocklist::BlocklistError,
+    },
+
+    /// Incident directory write failed.
+    #[error("guard reload incident write failed: {source}")]
+    IncidentWrite {
+        /// Incident writer error.
+        #[source]
+        source: crate::incident::IncidentError,
+    },
 }
 
 /// Runtime hot-reload engine.
@@ -392,6 +538,7 @@ where
 {
     guards: RwLock<HashMap<String, Arc<WasmGuard>>>,
     reload_slots: RwLock<HashMap<String, Arc<Mutex<ReloadSlot>>>>,
+    blocklist: Option<GuardDigestBlocklist>,
     backend_factory: F,
 }
 
@@ -405,8 +552,23 @@ where
         Self {
             guards: RwLock::new(HashMap::new()),
             reload_slots: RwLock::new(HashMap::new()),
+            blocklist: GuardDigestBlocklist::from_environment().ok(),
             backend_factory,
         }
+    }
+
+    /// Override the digest blocklist consulted by reload paths.
+    #[must_use]
+    pub fn with_blocklist(mut self, blocklist: GuardDigestBlocklist) -> Self {
+        self.blocklist = Some(blocklist);
+        self
+    }
+
+    /// Disable digest blocklist checks for tests or offline harnesses.
+    #[must_use]
+    pub fn without_blocklist(mut self) -> Self {
+        self.blocklist = None;
+        self
     }
 
     /// Register a guard by stable guard ID.
@@ -445,6 +607,9 @@ where
                 guard_id: guard_id.to_string(),
             })?;
 
+        let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
+        self.ensure_digest_not_blocklisted(&module_sha256)?;
+
         let backend = self
             .backend_factory
             .build_backend(new_module_bytes)
@@ -452,7 +617,6 @@ where
                 guard_id: guard_id.to_string(),
                 source,
             })?;
-        let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
 
         guard
             .replace_loaded_module(backend, Some(module_sha256))
@@ -481,6 +645,9 @@ where
             .ok_or_else(|| HotReloadError::GuardNotFound {
                 guard_id: guard_id.to_string(),
             })?;
+
+        let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
+        self.ensure_digest_not_blocklisted(&module_sha256)?;
 
         let mut backend = self
             .backend_factory
@@ -532,12 +699,36 @@ where
             }
         }
 
-        let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
         guard
             .replace_loaded_module(backend, Some(module_sha256))
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
                 guard_id: guard_id.to_string(),
             })
+    }
+
+    /// Reload a guard and return a watchdog that can roll back the new epoch.
+    pub fn reload_with_watchdog(
+        &self,
+        guard_id: &str,
+        new_module_bytes: &[u8],
+        reload_seq: u64,
+        config: WatchdogConfig,
+    ) -> Result<ReloadWatchdog, HotReloadError> {
+        let guard = self
+            .guard(guard_id)?
+            .ok_or_else(|| HotReloadError::GuardNotFound {
+                guard_id: guard_id.to_string(),
+            })?;
+        let previous_module = guard.loaded_module();
+        let epoch_id = self.reload(guard_id, new_module_bytes)?;
+        Ok(ReloadWatchdog::new(
+            guard_id,
+            guard,
+            previous_module,
+            reload_seq,
+            epoch_id,
+            config,
+        ))
     }
 
     fn reload_slot(&self, guard_id: &str) -> Result<Arc<Mutex<ReloadSlot>>, HotReloadError> {
@@ -560,6 +751,23 @@ where
                 .entry(guard_id.to_string())
                 .or_insert_with(|| Arc::new(Mutex::new(ReloadSlot::default()))),
         ))
+    }
+
+    fn ensure_digest_not_blocklisted(&self, digest: &str) -> Result<(), HotReloadError> {
+        let Some(blocklist) = &self.blocklist else {
+            return Ok(());
+        };
+        if blocklist
+            .is_blocklisted(digest)
+            .map_err(|source| HotReloadError::Blocklist { source })?
+        {
+            return Err(HotReloadError::DigestBlocklisted {
+                code: E_GUARD_DIGEST_BLOCKLISTED,
+                digest: crate::blocklist::normalize_digest(digest)
+                    .map_err(|source| HotReloadError::Blocklist { source })?,
+            });
+        }
+        Ok(())
     }
 
     /// Return the latest accepted reload sequence for a guard.

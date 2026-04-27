@@ -45,6 +45,7 @@
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 pub mod abi;
+pub mod blocklist;
 pub mod bundle_store;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod component;
@@ -54,6 +55,7 @@ pub mod error;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod host;
 pub mod hot_reload;
+pub mod incident;
 pub mod manifest;
 pub mod placeholders;
 pub mod runtime;
@@ -69,6 +71,9 @@ pub mod wiring;
 pub mod fuzz;
 
 pub use abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
+pub use blocklist::{
+    normalize_digest, BlocklistError, GuardDigestBlocklist, E_GUARD_DIGEST_BLOCKLISTED,
+};
 pub use bundle_store::{BundleError, BundleStore, InMemoryBundleStore};
 #[cfg(feature = "wasmtime-runtime")]
 pub use component::ComponentBackend;
@@ -79,8 +84,10 @@ pub use error::WasmGuardError;
 pub use host::WasmHostState;
 pub use hot_reload::{
     CanaryCorpus, CanaryFixture, DebouncedReload, Engine, HotReloadError, RegistryDigestPoller,
-    ReloadBackendFactory, ReloadTrigger, ReloadTriggerSource, CANARY_FIXTURE_COUNT,
+    ReloadBackendFactory, ReloadTrigger, ReloadTriggerSource, ReloadWatchdog, WatchdogConfig,
+    CANARY_FIXTURE_COUNT,
 };
+pub use incident::{EvalTrace, IncidentError, IncidentWriter, ReloadIncident};
 pub use manifest::{
     load_signature_sidecar, signature_sidecar_path, signed_module_message, verify_guard_signature,
     verify_signed_module, write_signature_sidecar, GuardManifest, SignedWasmModule,

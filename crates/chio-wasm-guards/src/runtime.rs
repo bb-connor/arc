@@ -190,6 +190,17 @@ impl WasmGuard {
         Some(epoch_id)
     }
 
+    /// Restore a previously loaded module snapshot.
+    ///
+    /// Used by the hot-reload watchdog to roll back a published epoch without
+    /// recompiling the prior module.
+    pub fn restore_loaded_module(&self, module: Arc<LoadedModule>) {
+        self.loaded.store(module);
+        if let Ok(mut fuel_lock) = self.last_fuel_consumed.lock() {
+            *fuel_lock = None;
+        }
+    }
+
     /// Returns the fuel consumed during the most recent `evaluate()` call,
     /// or `None` if no evaluation has occurred or the backend does not track
     /// fuel.
