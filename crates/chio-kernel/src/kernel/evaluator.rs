@@ -15,13 +15,16 @@
 //!
 //! ## Migration sequence
 //!
-//! - **T1 (this commit)**: trait shape only, default body wraps the existing
+//! - **T1 (merged)**: trait shape only, default body wraps the existing
 //!   sync entrypoint. Public `ChioKernel::evaluate_tool_call` continues to
-//!   route through `evaluate_tool_call_sync_with_session_roots` exactly as it
-//!   did before; the only structural change is that the routing now passes
-//!   through `BlockingToolEvaluator::default().evaluate(&kernel, request)`.
-//! - **T2**: rename the sync entrypoint to `evaluate_tool_call_sync_inner`
-//!   and mark it `#[doc(hidden)]`. Public surface is the trait method only.
+//!   route through the crate-internal sync helper exactly as it did before;
+//!   the only structural change is that the routing now passes through
+//!   `BlockingToolEvaluator::default().evaluate(&kernel, request)`.
+//! - **T2 (this commit)**: rename the long-form sync entrypoint from
+//!   `evaluate_tool_call_sync_with_session_roots` to
+//!   `evaluate_tool_call_sync_inner` and mark it `#[doc(hidden)]`. The public
+//!   surface remains the trait method (and the `evaluate_tool_call_sync`
+//!   crate-private shim added in T1).
 //! - **T3**: replace [`ToolEvaluator::sign_receipt`]'s default body with an
 //!   mpsc-backed signing task; receipt signing leaves the lock-step path.
 //! - **T4**: replace [`ToolEvaluator::dispatch`]'s default body with a real
@@ -42,10 +45,12 @@ use crate::{KernelError, ToolCallRequest, ToolCallResponse, Verdict};
 /// ## T1 contract
 ///
 /// Implementations are required to preserve the semantics of
-/// `ChioKernel::evaluate_tool_call_sync_with_session_roots`. The default
-/// [`BlockingToolEvaluator`] satisfies this trivially by delegating to that
-/// helper. Custom implementations that diverge from those semantics belong in
-/// later tickets (T3+) under explicit feature flags.
+/// `ChioKernel::evaluate_tool_call_sync_inner` (the doc(hidden) crate-internal
+/// sync helper, renamed from `evaluate_tool_call_sync_with_session_roots` in
+/// T2). The default [`BlockingToolEvaluator`] satisfies this trivially by
+/// delegating to that helper via the `evaluate_tool_call_sync` shim. Custom
+/// implementations that diverge from those semantics belong in later tickets
+/// (T3+) under explicit feature flags.
 ///
 /// ## Step methods
 ///

@@ -1930,26 +1930,27 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_with_session_roots(request, None, None)
+        self.evaluate_tool_call_sync_inner(request, None, None)
     }
 
     /// Crate-private sync entrypoint invoked by the
     /// [`crate::kernel::evaluator::ToolEvaluator`] default
     /// implementation. Wraps the long-form
-    /// `evaluate_tool_call_sync_with_session_roots` so the trait body does
+    /// `evaluate_tool_call_sync_inner` so the trait body does
     /// not need to plumb the `session_filesystem_roots` /
     /// `extra_metadata` parameters; both default to `None` on this path,
     /// matching the previous direct delegation from
     /// `evaluate_tool_call`.
     ///
-    /// T2 will rename the long-form helper to
-    /// `evaluate_tool_call_sync_inner` and mark it `#[doc(hidden)]`; this
-    /// shim exists to keep T1 strictly mechanical.
+    /// T2 renamed the long-form helper from
+    /// `evaluate_tool_call_sync_with_session_roots` to
+    /// `evaluate_tool_call_sync_inner` and marked it `#[doc(hidden)]`; this
+    /// shim continues to expose the crate-internal sync surface.
     pub(crate) fn evaluate_tool_call_sync(
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_with_session_roots(request, None, None)
+        self.evaluate_tool_call_sync_inner(request, None, None)
     }
 
     pub fn evaluate_tool_call_blocking_with_metadata(
@@ -1957,7 +1958,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_with_session_roots(request, None, extra_metadata)
+        self.evaluate_tool_call_sync_inner(request, None, extra_metadata)
     }
 
     pub fn sign_planned_deny_response(
@@ -2232,7 +2233,8 @@ impl ChioKernel {
         }
     }
 
-    fn evaluate_tool_call_sync_with_session_roots(
+    #[doc(hidden)]
+    fn evaluate_tool_call_sync_inner(
         &self,
         request: &ToolCallRequest,
         session_filesystem_roots: Option<&[String]>,
