@@ -12,6 +12,7 @@
 #     paths: gitignore-style globs
 #     starts_at_milestone: when the freeze takes effect
 #     ends_at_milestone: when the freeze releases
+#     start_phase: optional ticket id that activates the freeze (e.g. M05.P0.T4)
 #     state: scheduled | active | released
 #     bypass_label: optional PR label that bypasses (must be approved by review_team)
 
@@ -28,7 +29,8 @@ freezes:
       - "crates/chio-kernel/src/session.rs"
     starts_at_milestone: M05.P1
     ends_at_milestone: M05.P3
-    state: scheduled
+    start_phase: M05.P0.T4
+    state: active
     bypass_label: "[M05]"
 
   - id: rust-toolchain-pin
