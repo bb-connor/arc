@@ -7,9 +7,15 @@
 #![forbid(unsafe_code)]
 
 pub mod dedupe;
+pub mod m04_writer;
 pub mod reredact;
 
 pub use dedupe::{dedupe_last_wins, invocation_hash, DedupedFrame};
+pub use m04_writer::{
+    scenario_from_dir, validate_m04_scenario_dir, write_m04_fixture, M04ByteSizes,
+    M04FixtureSummary, M04Scenario, M04WriterError, CHECKPOINT_FILENAME, RECEIPTS_FILENAME,
+    ROOT_FILENAME,
+};
 pub use reredact::{reredact_default, ReredactedPayload};
 
 /// Errors surfaced by replay corpus normalization helpers.

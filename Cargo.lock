@@ -2227,6 +2227,7 @@ dependencies = [
  "chio-mcp-adapter",
  "chio-open-market",
  "chio-policy",
+ "chio-replay-corpus",
  "chio-reputation",
  "chio-siem",
  "chio-store-sqlite",
@@ -2970,8 +2971,11 @@ dependencies = [
  "chio-core-types",
  "chio-tee",
  "chio-tee-frame",
+ "hex",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
 ]
 
