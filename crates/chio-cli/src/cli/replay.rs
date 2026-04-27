@@ -38,6 +38,10 @@ fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
         ));
     };
 
+    if args.bless {
+        return cmd_replay_bless(args, log);
+    }
+
     let mut stdout = std::io::stdout().lock();
     writeln!(
         stdout,
@@ -113,6 +117,7 @@ mod replay_parser_tests {
                 assert!(args.expect_root.is_none());
                 assert!(!args.json);
                 assert!(!args.bless);
+                assert!(args.into.is_none());
                 assert!(args.command.is_none());
             }
             _ => panic!("expected replay subcommand"),
@@ -163,6 +168,29 @@ mod replay_parser_tests {
         match cli.command {
             Commands::Replay(args) => {
                 assert!(args.bless);
+            }
+            _ => panic!("expected replay subcommand"),
+        }
+    }
+
+    #[test]
+    fn replay_parses_bless_into_flag() {
+        let cli = Cli::try_parse_from([
+            "chio",
+            "replay",
+            "capture.ndjson",
+            "--bless",
+            "--into",
+            "tests/replay/goldens/family/name",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Replay(args) => {
+                assert!(args.bless);
+                assert_eq!(
+                    args.into.as_deref(),
+                    Some(Path::new("tests/replay/goldens/family/name"))
+                );
             }
             _ => panic!("expected replay subcommand"),
         }

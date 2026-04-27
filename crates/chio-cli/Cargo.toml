@@ -33,6 +33,7 @@ chio-listing = { path = "../chio-listing" }
 chio-policy = { path = "../chio-policy" }
 chio-mcp-adapter = { path = "../chio-mcp-adapter" }
 chio-conformance = { path = "../chio-conformance" }
+chio-replay-corpus = { path = "../chio-replay-corpus" }
 chio-reputation = { path = "../chio-reputation" }
 chio-store-sqlite = { path = "../chio-store-sqlite" }
 chio-tee-frame = { path = "../chio-tee-frame" }

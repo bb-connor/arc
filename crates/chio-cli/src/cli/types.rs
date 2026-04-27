@@ -271,11 +271,14 @@ pub struct ReplayArgs {
     #[arg(long)]
     pub json: bool,
 
-    /// (Restricted) Convert `log` into a goldens directory. Requires
-    /// `CHIO_BLESS=1`, `BLESS_REASON`, a feature branch, and an audit log
-    /// entry. The bless gate is fail-closed; see milestone M04 phase 5.
+    /// (Restricted) Convert a TEE capture into a replay fixture directory.
+    /// Requires the local `chio:tee/bless@1` capability gate.
     #[arg(long)]
     pub bless: bool,
+
+    /// Destination fixture directory for `--bless`.
+    #[arg(long, value_name = "FIXTURE-DIR", requires = "bless")]
+    pub into: Option<PathBuf>,
 
     /// Optional M10 sub-subcommand. Currently the only variant is
     /// `traffic`, which validates an NDJSON `chio-tee-frame.v1` capture.

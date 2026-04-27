@@ -41,6 +41,9 @@ include!("cli/replay/receipt_partition.rs");
 include!("cli/replay/execute.rs");
 include!("cli/replay/diff.rs");
 include!("cli/replay/traffic.rs");
+include!("cli/replay/bless/strip.rs");
+include!("cli/replay/bless/m04_layout.rs");
+include!("cli/replay/bless.rs");
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
