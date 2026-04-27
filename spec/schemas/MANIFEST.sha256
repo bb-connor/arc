@@ -8,6 +8,7 @@ b37251380c87eb2f34aea4561da300c9d4ea70d9a79643e609b58091fa12aa77  spec/schemas/c
 95cd25b2a3459ee81024ba2095cf28864c5ec62c3a988b8e699dadcbbd3161b6  spec/schemas/chio-http/v1/session-resume.schema.json
 4e80508a9fc21b8c08647fdeb7ed071ba7f9a9a88dd420fd7269bb58d3104609  spec/schemas/chio-http/v1/stream-frame.schema.json
 6af7535d28313ea3bcbd9445f55ebbfbefa5ba463c7456cf1a8d24e6728d20d4  spec/schemas/chio-http/v1/verdict.schema.json
+c4f1df75ab59613ac228f93e82596901059da755631f35ec3318c22dbde50a34  spec/schemas/chio-tee-frame-v1.json
 79919a3cf6f16b03fa5c44eb00e6a79d7fe3b70b8223cace0dd520ea71179b18  spec/schemas/chio-wire/v1/agent/heartbeat.schema.json
 fb7f0ae9a9819cb1ddc01a36cdbc345c7a146e26f17abf29bdc9ee1bd6d8b25f  spec/schemas/chio-wire/v1/agent/list_capabilities.schema.json
 74c6f29cc16d234945f53a06016593790ecbe59807dc4486cbac165213bac7bf  spec/schemas/chio-wire/v1/agent/tool_call_request.schema.json
