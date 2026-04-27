@@ -243,10 +243,20 @@ enum Commands {
 /// The handler logic for these arguments is implemented incrementally in
 /// tickets M04.P4.T2 through M04.P4.T7. This T1 ticket only wires the
 /// clap parser surface so downstream tickets have a stable seam.
+///
+/// M10.P2.T1 adds the optional `traffic` sub-subcommand below; the
+/// existing positional `<log>` surface is preserved by making `log`
+/// optional (clap routes `chio replay traffic --from foo` to the
+/// sub-subcommand and `chio replay ./receipts/` to the positional log
+/// path). The dispatcher (`cmd_replay`) requires `log` only when no
+/// sub-subcommand is supplied.
 #[derive(clap::Args)]
 pub struct ReplayArgs {
     /// Path to a receipt-log directory or NDJSON stream.
-    pub log: PathBuf,
+    ///
+    /// Required for the legacy M04 surface (`chio replay <log>`); the
+    /// M10 `chio replay traffic` sub-subcommand uses `--from` instead.
+    pub log: Option<PathBuf>,
 
     /// Treat `log` as an M10 tee NDJSON stream. When omitted, the reader
     /// auto-detects the input shape (directory vs. NDJSON file).
@@ -266,6 +276,60 @@ pub struct ReplayArgs {
     /// entry. The bless gate is fail-closed; see milestone M04 phase 5.
     #[arg(long)]
     pub bless: bool,
+
+    /// Optional M10 sub-subcommand. Currently the only variant is
+    /// `traffic`, which validates an NDJSON `chio-tee-frame.v1` capture.
+    #[command(subcommand)]
+    pub command: Option<ReplaySubcommand>,
+}
+
+/// Sub-subcommands under `chio replay`.
+///
+/// Today only `traffic` is exposed (M10.P2.T1). The existing M04 surface
+/// (`chio replay <log>`) is selected when no sub-subcommand is supplied,
+/// preserving the legacy positional argument shape.
+#[derive(clap::Subcommand)]
+pub enum ReplaySubcommand {
+    /// Validate an NDJSON `chio-tee-frame.v1` capture (schema-version
+    /// gate, tenant-sig verifier, M01 invocation validator).
+    ///
+    /// This arm is the M10 entrypoint. It does NOT re-execute the
+    /// kernel against a policy; that is M10.P2.T3 work. T1 only lands
+    /// the structural validators so a captured stream can be smoke
+    /// tested before downstream tickets layer the diff renderer on top.
+    Traffic(TrafficArgs),
+}
+
+/// Arguments for `chio replay traffic`.
+#[derive(clap::Args)]
+pub struct TrafficArgs {
+    /// Path to an NDJSON file containing one `chio-tee-frame.v1` per
+    /// line.
+    #[arg(long, value_name = "NDJSON")]
+    pub from: PathBuf,
+
+    /// Pinned schema name. Defaults to `chio-tee-frame.v1` (the M10
+    /// frame-schema-lock label, see
+    /// `.planning/trajectory/10-tee-replay-harness.md` line 64). The
+    /// on-the-wire `schema_version` field is the literal `"1"`; this
+    /// flag lets callers pin the schema *name* alongside it for
+    /// diagnostic clarity. Frames whose `schema_version` does not
+    /// match the M10 pinned literal are rejected regardless of this
+    /// value.
+    #[arg(long, default_value = "chio-tee-frame.v1")]
+    pub schema: String,
+
+    /// Optional path to an Ed25519 tenant public-key file (32 raw bytes
+    /// or 64 lowercase-hex characters). When supplied, every frame's
+    /// `tenant_sig` is verified against this key; mismatches fail
+    /// closed. When omitted, the verifier is skipped (frames are still
+    /// schema-validated).
+    #[arg(long, value_name = "PATH")]
+    pub tenant_pubkey: Option<PathBuf>,
+
+    /// Emit a structured JSON report on stdout instead of human text.
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// Conformance harness commands.
