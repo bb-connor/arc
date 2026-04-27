@@ -235,3 +235,36 @@ jobs:
           fi
 
           echo "seed-immutable: ${seed} digest matches ${expected} (mode ${mode})"
+
+  cross-version:
+    # M04 P3.T5 scope: cross-version receipt-compatibility sanity job.
+    # Runs the non-ignored sanity test in tests/replay/tests/cross_version_replay.rs
+    # which asserts the release_compat_matrix.toml file parses and contains
+    # at least the floor entries (v0.1.0 + v2.0). The full re-verify suite
+    # (`-- --ignored`) needs live HTTPS to the release CDN and tagged-release
+    # bundles, so it is intentionally not part of the default gate; see the
+    # exit-test note in .planning/trajectory/04-deterministic-replay.md
+    # Phase 3 ("CI job chio-replay-gate / cross-version is green").
+    name: cross-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: replay-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run cross_version_replay (non-ignored sanity)
+        run: cargo test -p chio-replay-gate --test cross_version_replay
