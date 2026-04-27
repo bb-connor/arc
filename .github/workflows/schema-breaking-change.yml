@@ -1,0 +1,172 @@
+# schema-breaking-change.yml - Advisory PR bot for spec/schemas drift.
+#
+# Owned by SEQUENCER per OWNERS.toml; the single job is tagged with
+# `# owner: M01` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
+#
+# Phase 5 (M01.P5.T5) lands this advisory bot:
+# When a PR touches `spec/schemas/**/*.json`, run `json-schema-diff` for
+# each changed schema (PR base vs. PR head) and post a sticky comment to
+# the PR summarising any breaking changes detected. The job is advisory
+# only (it does NOT block merge). Per the M01 trajectory ticket
+# `.planning/trajectory/tickets/M01/P5.yml#M01.P5.T5` soft_dep:
+#   "Advisory only until M01+1; flips to blocking once tagged BREAKING:
+#    convention is documented in CONTRIBUTING.md".
+#
+# Tooling: `json-schema-diff` is the language-agnostic CLI/library
+# published on npm (https://www.npmjs.com/package/json-schema-diff). It
+# emits a JSON report distinguishing additions (non-breaking) from
+# removals/type-narrows (breaking). We pin to a major version with a caret
+# range so security patches flow in without shape drift.
+#
+# Comment shape: a single sticky comment with marker
+# `<!-- chio:schema-breaking-change -->` is created/updated on each push,
+# so the PR conversation does not accumulate one comment per push.
+
+name: schema-breaking-change
+
+on:
+  pull_request:
+    paths:
+      - 'spec/schemas/**/*.json'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: schema-breaking-change-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  schema-breaking-change-advisory:
+    name: schema-breaking-change-advisory (json-schema-diff vs base)
+    # owner: M01
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR head with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install json-schema-diff CLI
+        # `json-schema-diff` is the language-agnostic CLI from npm; the
+        # package's bin is invoked as `json-schema-diff <source> <destination>`
+        # and exits with a non-zero status when a breaking change is
+        # detected (additions of required props, removals, narrowed type
+        # unions, etc.). Pinned to ^1.0.0 so security patches flow in
+        # without shape drift.
+        run: npm install -g json-schema-diff@^1.0.0
+
+      - name: Compute changed schema files (PR base vs. head)
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # `git fetch` already retrieved both shas because checkout
+          # used fetch-depth: 0. Restrict to JSON schemas under
+          # spec/schemas to match the workflow's `paths:` filter.
+          changed=$(git diff --name-only --diff-filter=AMR \
+            "${BASE_SHA}" "${HEAD_SHA}" -- 'spec/schemas/**/*.json' \
+            | tr '\n' ' ')
+          echo "files=${changed}" >> "${GITHUB_OUTPUT}"
+          echo "Changed schemas: ${changed:-<none>}"
+
+      - name: Run json-schema-diff over each changed schema
+        id: diff
+        if: steps.changed.outputs.files != ''
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+        run: |
+          set -uo pipefail
+          tmpdir=$(mktemp -d)
+          summary_md=""
+          breaking_count=0
+          for f in ${CHANGED_FILES}; do
+            base_blob="${tmpdir}/base-$(echo "${f}" | tr '/' '_')"
+            # If the schema is newly added, there is no base blob to
+            # diff against; skip such files (additions are not breaking
+            # by themselves under json-schema-diff semantics).
+            if ! git show "${BASE_SHA}:${f}" > "${base_blob}" 2>/dev/null; then
+              echo "skip ${f}: not present at base (new schema, non-breaking)"
+              continue
+            fi
+            report="${tmpdir}/report-$(echo "${f}" | tr '/' '_').json"
+            # `json-schema-diff <source> <destination>` exits 0 when
+            # destination is backwards-compatible with source, and 1
+            # when destination removes capabilities source allowed.
+            # We capture the JSON report regardless of exit status.
+            if json-schema-diff "${base_blob}" "${f}" \
+                > "${report}" 2> "${report}.stderr"; then
+              echo "ok ${f}: no breaking change"
+            else
+              breaking_count=$((breaking_count + 1))
+              # Trim the JSON report so we can embed in PR comments
+              # without blowing past the 65535-byte body cap.
+              snippet=$(head -c 2000 "${report}" || true)
+              {
+                printf -- '- `%s`: BREAKING. json-schema-diff report excerpt:\n' "${f}"
+                printf -- '```json\n'
+                printf '%s\n' "${snippet}"
+                printf -- '```\n'
+              } > "${tmpdir}/snippet"
+              summary_md="${summary_md}$(cat "${tmpdir}/snippet")"
+            fi
+          done
+          {
+            echo "breaking_count=${breaking_count}"
+            echo "summary<<CHIO_DIFF_EOF"
+            printf '%s\n' "${summary_md}"
+            echo "CHIO_DIFF_EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Post or update advisory PR comment
+        if: steps.diff.outputs.breaking_count != '' && steps.diff.outputs.breaking_count != '0'
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_MD: ${{ steps.diff.outputs.summary }}
+          BREAKING_COUNT: ${{ steps.diff.outputs.breaking_count }}
+        with:
+          script: |
+            const marker = '<!-- chio:schema-breaking-change -->';
+            const summary = process.env.SUMMARY_MD || '';
+            const count = process.env.BREAKING_COUNT || '0';
+            const body = [
+              marker,
+              '## Schema-breaking-change advisory',
+              '',
+              `\`json-schema-diff\` flagged ${count} schema(s) under \`spec/schemas/\` as backwards-incompatible against \`${context.payload.pull_request.base.ref}\`:`,
+              summary,
+              '',
+              'This check is **advisory only** and does not block merge. Per CONTRIBUTING.md (M01+1), tag the PR title with `BREAKING:` to acknowledge an intentional wire-break; the gate flips to blocking once that convention lands.',
+              '',
+              `_Posted by \`${context.workflow}\` workflow run #${context.runId}._`,
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const existing = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 },
+            );
+            const prior = existing.find(c => c.body && c.body.includes(marker));
+            if (prior) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: prior.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
