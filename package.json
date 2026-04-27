@@ -9,7 +9,8 @@
     "docs/demo",
     "sdks/typescript/packages/browser",
     "sdks/typescript/packages/workers",
-    "sdks/typescript/packages/edge"
+    "sdks/typescript/packages/edge",
+    "sdks/typescript/packages/deno"
   ],
   "engines": {
     "node": ">=20.0.0"

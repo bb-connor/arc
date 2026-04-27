@@ -24,6 +24,13 @@
       "name": "@chio-protocol/browser",
       "version": "0.1.0",
     },
+    "sdks/typescript/packages/deno": {
+      "name": "@chio-protocol/deno",
+      "version": "0.1.0",
+      "devDependencies": {
+        "typescript": "~5.7.0",
+      },
+    },
     "sdks/typescript/packages/edge": {
       "name": "@chio-protocol/edge",
       "version": "0.1.0",
@@ -43,6 +50,8 @@
   },
   "packages": {
     "@chio-protocol/browser": ["@chio-protocol/browser@workspace:sdks/typescript/packages/browser"],
+
+    "@chio-protocol/deno": ["@chio-protocol/deno@workspace:sdks/typescript/packages/deno"],
 
     "@chio-protocol/edge": ["@chio-protocol/edge@workspace:sdks/typescript/packages/edge"],
 
