@@ -30,6 +30,7 @@ wasmtime-runtime = ["dep:wasmtime", "dep:wasmparser", "dep:pollster"]
 fuzz = ["dep:arbitrary", "wasmtime-runtime"]
 
 [dependencies]
+arc-swap = { workspace = true }
 chio-kernel = { path = "../chio-kernel" }
 chio-core = { path = "../chio-core" }
 chio-config = { path = "../chio-config" }

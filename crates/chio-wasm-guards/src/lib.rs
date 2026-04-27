@@ -49,6 +49,7 @@ pub mod bundle_store;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod component;
 pub mod config;
+pub mod epoch;
 pub mod error;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod host;
@@ -71,6 +72,7 @@ pub use bundle_store::{BundleError, BundleStore, InMemoryBundleStore};
 #[cfg(feature = "wasmtime-runtime")]
 pub use component::ComponentBackend;
 pub use config::WasmGuardConfig;
+pub use epoch::EpochId;
 pub use error::WasmGuardError;
 #[cfg(feature = "wasmtime-runtime")]
 pub use host::WasmHostState;
@@ -89,6 +91,6 @@ pub use runtime::wasmtime_backend::{
     PolicyCustomGuard, PolicyCustomGuards, PolicyModuleSource, WasmFormat, WasmGuardHandle,
     KNOWN_HOST_FUNCTIONS,
 };
-pub use runtime::{WasmGuard, WasmGuardRuntime};
+pub use runtime::{LoadedModule, WasmGuard, WasmGuardRuntime};
 #[cfg(feature = "wasmtime-runtime")]
 pub use wiring::{build_guard_pipeline, load_wasm_guards};
