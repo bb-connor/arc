@@ -30,6 +30,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = "0.8"
 
+[[bench]]
+name = "verdict_latency"
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

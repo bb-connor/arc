@@ -213,6 +213,33 @@ pub fn anthropic_fixture_paths() -> Result<Vec<PathBuf>, ReplayError> {
     Ok(paths)
 }
 
+/// Return the Bedrock fixture corpus path.
+pub fn bedrock_fixture_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/bedrock")
+}
+
+/// Return all Bedrock NDJSON fixture paths in deterministic order.
+pub fn bedrock_fixture_paths() -> Result<Vec<PathBuf>, ReplayError> {
+    let root = bedrock_fixture_dir();
+    let entries = fs::read_dir(&root).map_err(|source| ReplayError::ReadFixtureDir {
+        path: root.clone(),
+        source,
+    })?;
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|source| ReplayError::ReadFixtureDir {
+            path: root.clone(),
+            source,
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("ndjson") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
 /// Load an NDJSON fixture from disk.
 pub fn load_fixture(path: impl AsRef<Path>) -> Result<ProviderCaptureFixture, ReplayError> {
     let path = path.as_ref().to_path_buf();
@@ -259,6 +286,41 @@ pub fn load_fixture(path: impl AsRef<Path>) -> Result<ProviderCaptureFixture, Re
         fixture_id,
         path,
         records,
+    })
+}
+
+/// Replay a Bedrock fixture through the Bedrock Converse provider adapter.
+#[cfg(feature = "fixtures-bedrock")]
+pub fn replay_bedrock_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, ReplayError> {
+    let fixture = load_fixture(path)?;
+    fixture.ensure_bedrock()?;
+    let captured = fixture.captured_verdicts()?;
+    let principal = fixture.bedrock_principal()?;
+    let adapter = bedrock_adapter(principal)?;
+
+    let (mode, invocations, verdicts) = if fixture.has_bedrock_stream_tool_events() {
+        let (invocations, verdicts) = replay_bedrock_stream(&fixture, &adapter, &captured)?;
+        (ReplayMode::Stream, invocations, verdicts)
+    } else if captured.is_empty() {
+        (ReplayMode::NoToolCall, Vec::new(), Vec::new())
+    } else {
+        let invocations = replay_bedrock_batch(&fixture, &adapter)?;
+        let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
+        (ReplayMode::Batch, invocations, verdicts)
+    };
+
+    assert_replayed_invocations(&fixture, &captured, &invocations)?;
+    assert_replayed_verdicts(&fixture, &captured, &verdicts)?;
+    let lowered_responses = assert_bedrock_lowered_responses(&fixture, &adapter, &captured)?;
+
+    Ok(ReplayOutcome {
+        fixture_id: fixture.fixture_id,
+        path: fixture.path,
+        mode,
+        records: fixture.records.len(),
+        invocations: invocations.len(),
+        verdicts: verdicts.len(),
+        lowered_responses,
     })
 }
 
@@ -334,6 +396,16 @@ pub fn replay_anthropic_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome,
     })
 }
 
+/// Stub that explains which feature is needed for Bedrock replay.
+#[cfg(not(feature = "fixtures-bedrock"))]
+pub fn replay_bedrock_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, ReplayError> {
+    let path = path.as_ref();
+    Err(invalid_fixture(
+        path,
+        "Bedrock replay requires the fixtures-bedrock feature",
+    ))
+}
+
 /// Stub that explains which feature is needed for Anthropic replay.
 #[cfg(not(feature = "fixtures-anthropic"))]
 pub fn replay_anthropic_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, ReplayError> {
@@ -384,6 +456,22 @@ impl ProviderCaptureFixture {
         Err(invalid_fixture(
             &self.path,
             "Anthropic replay received a non-anthropic provider record",
+        ))
+    }
+
+    #[cfg(feature = "fixtures-bedrock")]
+    fn ensure_bedrock(&self) -> Result<(), ReplayError> {
+        if self
+            .records
+            .iter()
+            .all(|record| record.provider == "bedrock")
+        {
+            return Ok(());
+        }
+
+        Err(invalid_fixture(
+            &self.path,
+            "Bedrock replay received a non-bedrock provider record",
         ))
     }
 
@@ -460,6 +548,20 @@ impl ProviderCaptureFixture {
             })
     }
 
+    #[cfg(feature = "fixtures-bedrock")]
+    fn bedrock_principal(&self) -> Result<BedrockFixturePrincipal, ReplayError> {
+        self.records
+            .iter()
+            .filter(|record| record.direction == CaptureDirection::UpstreamRequest)
+            .find_map(|record| bedrock_principal_from_payload(&record.payload))
+            .ok_or_else(|| {
+                invalid_fixture(
+                    &self.path,
+                    "Bedrock fixture did not include deterministic IAM principal headers",
+                )
+            })
+    }
+
     #[cfg(feature = "fixtures-openai")]
     fn has_stream_tool_events(&self) -> bool {
         self.records.iter().any(|record| {
@@ -492,6 +594,22 @@ impl ProviderCaptureFixture {
                     .and_then(|block| block.get("type"))
                     .and_then(Value::as_str)
                     == Some("tool_use")
+        })
+    }
+
+    #[cfg(feature = "fixtures-bedrock")]
+    fn has_bedrock_stream_tool_events(&self) -> bool {
+        self.records.iter().any(|record| {
+            if record.direction != CaptureDirection::UpstreamEvent {
+                return false;
+            }
+
+            record
+                .payload
+                .get("contentBlockStart")
+                .and_then(|start| start.get("start"))
+                .and_then(|start| start.get("toolUse"))
+                .is_some()
         })
     }
 
@@ -531,6 +649,21 @@ impl ProviderCaptureFixture {
             })
             .collect()
     }
+
+    #[cfg(feature = "fixtures-bedrock")]
+    fn lowered_bedrock_tool_result_requests(&self) -> Vec<&CaptureRecord> {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.direction == CaptureDirection::UpstreamRequest
+                    && record
+                        .payload
+                        .get("body")
+                        .and_then(|body| body.get("toolResult"))
+                        .is_some()
+            })
+            .collect()
+    }
 }
 
 #[cfg(feature = "fixtures-openai")]
@@ -558,6 +691,23 @@ fn replay_anthropic_batch(
     let mut invocations = Vec::new();
     for record in fixture.upstream_responses() {
         if anthropic_response_has_no_tool_uses(&record.payload) {
+            continue;
+        }
+
+        let bytes = serde_json::to_vec(&record.payload)?;
+        invocations.extend(adapter.lift_batch(ProviderRequest(bytes))?);
+    }
+    Ok(invocations)
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn replay_bedrock_batch(
+    fixture: &ProviderCaptureFixture,
+    adapter: &chio_bedrock_converse_adapter::BedrockAdapter,
+) -> Result<Vec<ToolInvocation>, ReplayError> {
+    let mut invocations = Vec::new();
+    for record in fixture.upstream_responses() {
+        if bedrock_response_has_no_tool_uses(&record.payload) {
             continue;
         }
 
@@ -621,6 +771,36 @@ fn replay_anthropic_stream(
         return Err(invalid_fixture(
             &fixture.path,
             format!("Anthropic stream replay did not produce invocation {request_id}"),
+        ));
+    }
+
+    Ok((gated.invocations, gated.verdicts))
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn replay_bedrock_stream(
+    fixture: &ProviderCaptureFixture,
+    adapter: &chio_bedrock_converse_adapter::BedrockAdapter,
+    captured: &[CapturedVerdict],
+) -> Result<(Vec<ToolInvocation>, Vec<VerdictResult>), ReplayError> {
+    let mut verdicts_by_id = captured
+        .iter()
+        .map(|entry| (entry.invocation_id.clone(), entry.verdict.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let stream = fixture_bedrock_stream_bytes(fixture)?;
+    let gated = adapter.gate_converse_stream(&stream, |invocation| {
+        let request_id = invocation.provenance.request_id.as_str();
+        verdicts_by_id.remove(request_id).ok_or_else(|| {
+            ProviderError::Malformed(format!(
+                "Bedrock stream replay produced unexpected invocation {request_id}"
+            ))
+        })
+    })?;
+
+    if let Some((request_id, _)) = verdicts_by_id.into_iter().next() {
+        return Err(invalid_fixture(
+            &fixture.path,
+            format!("Bedrock stream replay did not produce invocation {request_id}"),
         ));
     }
 
@@ -778,6 +958,45 @@ fn assert_anthropic_lowered_responses(
     Ok(lowered)
 }
 
+#[cfg(feature = "fixtures-bedrock")]
+fn assert_bedrock_lowered_responses(
+    fixture: &ProviderCaptureFixture,
+    adapter: &chio_bedrock_converse_adapter::BedrockAdapter,
+    captured: &[CapturedVerdict],
+) -> Result<usize, ReplayError> {
+    use chio_tool_call_fabric::ProviderAdapter;
+
+    let lower_verdict = shared_lower_verdict(&fixture.path, captured)?;
+    let mut lowered = 0;
+
+    for record in fixture.lowered_bedrock_tool_result_requests() {
+        let expected_body = record.payload.get("body").ok_or_else(|| {
+            invalid_fixture(
+                &fixture.path,
+                "lowered upstream_request payload was missing body",
+            )
+        })?;
+        let Some(verdict) = lower_verdict.clone() else {
+            return Err(invalid_fixture(
+                &fixture.path,
+                "lowered toolResult request appeared without captured verdict",
+            ));
+        };
+        let result = ToolResult(bedrock_tool_result_payload(&fixture.path, expected_body)?);
+        let response = futures_lite_block_on(adapter.lower(verdict, result))?;
+        let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+
+        assert_canonical_json_eq(
+            format!("{} lowered Bedrock toolResult", fixture.fixture_id),
+            expected_body,
+            &actual_body,
+        )?;
+        lowered += 1;
+    }
+
+    Ok(lowered)
+}
+
 #[cfg(feature = "fixtures-anthropic")]
 fn anthropic_adapter(
     path: &Path,
@@ -857,6 +1076,51 @@ fn anthropic_tool_result_payload(
     }
 }
 
+#[cfg(feature = "fixtures-bedrock")]
+#[derive(Debug, Clone)]
+struct BedrockFixturePrincipal {
+    caller_arn: String,
+    account_id: String,
+    assumed_role_session_arn: Option<String>,
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn bedrock_adapter(
+    principal: BedrockFixturePrincipal,
+) -> Result<chio_bedrock_converse_adapter::BedrockAdapter, ReplayError> {
+    use std::sync::Arc;
+
+    use chio_bedrock_converse_adapter::transport::MockTransport;
+    use chio_bedrock_converse_adapter::{BedrockAdapter, BedrockAdapterConfig};
+
+    let mut config = BedrockAdapterConfig::new(
+        "bedrock-1",
+        "Bedrock Converse",
+        "0.1.0",
+        "deadbeef",
+        principal.caller_arn,
+        principal.account_id,
+    );
+    if let Some(session_arn) = principal.assumed_role_session_arn {
+        config = config.with_assumed_role_session_arn(session_arn);
+    }
+
+    BedrockAdapter::new(config, Arc::new(MockTransport::new())).map_err(|error| {
+        invalid_fixture(
+            Path::new("fixtures/bedrock"),
+            format!("Bedrock conformance adapter failed validation: {error}"),
+        )
+    })
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn bedrock_tool_result_payload(path: &Path, expected_body: &Value) -> Result<Vec<u8>, ReplayError> {
+    let tool_result = expected_body
+        .get("toolResult")
+        .ok_or_else(|| invalid_fixture(path, "Bedrock lowered body was missing toolResult"))?;
+    canonical_json_bytes_for("captured Bedrock toolResult", tool_result).map_err(ReplayError::from)
+}
+
 fn validate_record(path: &Path, record: &CaptureRecord) -> Result<(), ReplayError> {
     if record.schema != CAPTURE_SCHEMA {
         return Err(invalid_fixture(
@@ -904,7 +1168,11 @@ fn captured_deny_reason(path: &Path, payload: &Value) -> Result<DenyReason, Repl
     serde_json::from_value(reason.clone()).map_err(ReplayError::from)
 }
 
-#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
+#[cfg(any(
+    feature = "fixtures-openai",
+    feature = "fixtures-anthropic",
+    feature = "fixtures-bedrock"
+))]
 fn shared_lower_verdict(
     path: &Path,
     captured: &[CapturedVerdict],
@@ -926,12 +1194,64 @@ fn shared_lower_verdict(
     Ok(Some(first))
 }
 
-#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
+#[cfg(any(
+    feature = "fixtures-openai",
+    feature = "fixtures-anthropic",
+    feature = "fixtures-bedrock"
+))]
 fn verdict_kind(verdict: &VerdictResult) -> &'static str {
     match verdict {
         VerdictResult::Allow { .. } => "allow",
         VerdictResult::Deny { .. } => "deny",
     }
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn bedrock_response_has_no_tool_uses(payload: &Value) -> bool {
+    !bedrock_content_blocks(payload).iter().any(|block| {
+        block
+            .get("toolUse")
+            .or_else(|| {
+                if block.get("toolUseId").is_some() && block.get("name").is_some() {
+                    Some(block)
+                } else {
+                    None
+                }
+            })
+            .is_some()
+    })
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn bedrock_content_blocks(value: &Value) -> Vec<&Value> {
+    if let Some(values) = value.as_array() {
+        return values.iter().collect();
+    }
+    let Some(map) = value.as_object() else {
+        return Vec::new();
+    };
+    if map.contains_key("toolUse") {
+        return vec![value];
+    }
+    if let Some(content) = map.get("content").and_then(Value::as_array) {
+        return content.iter().collect();
+    }
+    if let Some(content) = map
+        .get("output")
+        .and_then(|output| output.get("message"))
+        .and_then(|message| message.get("content"))
+        .and_then(Value::as_array)
+    {
+        return content.iter().collect();
+    }
+    if let Some(content) = map
+        .get("message")
+        .and_then(|message| message.get("content"))
+        .and_then(Value::as_array)
+    {
+        return content.iter().collect();
+    }
+    Vec::new()
 }
 
 #[cfg(feature = "fixtures-openai")]
@@ -1034,6 +1354,38 @@ fn anthropic_workspace_id_from_payload(payload: &Value) -> Option<String> {
     })
 }
 
+#[cfg(feature = "fixtures-bedrock")]
+fn bedrock_principal_from_payload(payload: &Value) -> Option<BedrockFixturePrincipal> {
+    let headers = payload.get("headers")?.as_object()?;
+    let caller_arn = headers.iter().find_map(|(key, value)| {
+        if key.eq_ignore_ascii_case("x-chio-bedrock-caller-arn") {
+            header_value(value)
+        } else {
+            None
+        }
+    })?;
+    let account_id = headers.iter().find_map(|(key, value)| {
+        if key.eq_ignore_ascii_case("x-chio-bedrock-account-id") {
+            header_value(value)
+        } else {
+            None
+        }
+    })?;
+    let assumed_role_session_arn = headers.iter().find_map(|(key, value)| {
+        if key.eq_ignore_ascii_case("x-chio-bedrock-assumed-role-session-arn") {
+            header_value(value)
+        } else {
+            None
+        }
+    });
+
+    Some(BedrockFixturePrincipal {
+        caller_arn,
+        account_id,
+        assumed_role_session_arn,
+    })
+}
+
 #[cfg(feature = "fixtures-anthropic")]
 fn is_anthropic_workspace_header(key: &str) -> bool {
     key.eq_ignore_ascii_case("x-chio-anthropic-workspace-id")
@@ -1047,7 +1399,11 @@ fn is_openai_org_header(key: &str) -> bool {
         || key.eq_ignore_ascii_case("x-openai-organization")
 }
 
-#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
+#[cfg(any(
+    feature = "fixtures-openai",
+    feature = "fixtures-anthropic",
+    feature = "fixtures-bedrock"
+))]
 fn header_value(value: &Value) -> Option<String> {
     match value {
         Value::String(value) => non_empty(value),
@@ -1056,7 +1412,11 @@ fn header_value(value: &Value) -> Option<String> {
     }
 }
 
-#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
+#[cfg(any(
+    feature = "fixtures-openai",
+    feature = "fixtures-anthropic",
+    feature = "fixtures-bedrock"
+))]
 fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     if value.is_empty() {
@@ -1064,6 +1424,18 @@ fn non_empty(value: &str) -> Option<String> {
     } else {
         Some(value.to_string())
     }
+}
+
+#[cfg(feature = "fixtures-bedrock")]
+fn fixture_bedrock_stream_bytes(fixture: &ProviderCaptureFixture) -> Result<Vec<u8>, ReplayError> {
+    let events = fixture
+        .records
+        .iter()
+        .filter(|record| record.direction == CaptureDirection::UpstreamEvent)
+        .map(|record| record.payload.clone())
+        .collect::<Vec<_>>();
+
+    serde_json::to_vec(&events).map_err(ReplayError::from)
 }
 
 fn required_field<'a>(
