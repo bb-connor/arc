@@ -2220,6 +2220,7 @@ dependencies = [
  "chio-did",
  "chio-external-guards",
  "chio-federation",
+ "chio-guard-registry",
  "chio-guards",
  "chio-hosted-mcp",
  "chio-kernel",
@@ -2590,6 +2591,9 @@ name = "chio-guard-registry"
 version = "0.1.0"
 dependencies = [
  "oci-distribution",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
 ]
 

@@ -29,6 +29,7 @@ chio-federation = { path = "../chio-federation" }
 chio-hosted-mcp = { path = "../chio-hosted-mcp" }
 chio-kernel = { path = "../chio-kernel" }
 chio-guards = { path = "../chio-guards" }
+chio-guard-registry = { path = "../chio-guard-registry" }
 chio-listing = { path = "../chio-listing" }
 chio-policy = { path = "../chio-policy" }
 chio-mcp-adapter = { path = "../chio-mcp-adapter" }

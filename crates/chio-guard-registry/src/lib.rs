@@ -6,6 +6,7 @@
 //! `chio-attest-verify`.
 
 pub mod oci;
+pub mod publish;
 
 pub use oci::{
     GuardArtifactLayer, GuardOciRef, GuardRegistryClient, GuardRegistryConfig, GuardRegistryError,
@@ -13,4 +14,9 @@ pub use oci::{
     GUARD_CONFIG_MEDIA_TYPE, GUARD_MANIFEST_LAYER_MEDIA_TYPE, GUARD_MANIFEST_LAYER_ROLE,
     GUARD_MODULE_LAYER_MEDIA_TYPE, GUARD_MODULE_LAYER_ROLE, GUARD_WIT_LAYER_MEDIA_TYPE,
     GUARD_WIT_LAYER_ROLE,
+};
+pub use publish::{
+    GuardArtifactConfig, GuardPublishArtifact, GuardPublishArtifactInput, GuardPublishRef,
+    GuardPublishResponse, GUARD_LAYER_ROLE_ANNOTATION, GUARD_OCI_MANIFEST_MEDIA_TYPE,
+    GUARD_SIGNER_SUBJECT_ANNOTATION, GUARD_WIT_WORLD, GUARD_WIT_WORLD_ANNOTATION,
 };

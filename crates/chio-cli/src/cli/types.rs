@@ -464,6 +464,42 @@ enum GuardCommands {
     /// Package a guard project into a distributable .arcguard archive.
     Pack,
 
+    /// Publish a guard project as a three-layer OCI artifact.
+    Publish {
+        /// Guard project directory containing guard-manifest.yaml.
+        project: PathBuf,
+        /// Tag-addressed OCI destination, for example oci://ghcr.io/chio/tool-gate:v1.
+        #[arg(long = "ref")]
+        reference: String,
+        /// WIT file to publish as the first layer.
+        #[arg(long, default_value = "wit/chio-guard/world.wit")]
+        wit: PathBuf,
+        /// Ed25519 signer public key as ed25519:<base64>. If omitted, guard-manifest.yaml is used.
+        #[arg(long)]
+        signer_public_key: Option<String>,
+        /// Optional Sigstore signer subject annotation.
+        #[arg(long)]
+        signer_subject: Option<String>,
+        /// Runtime fuel limit recorded in the config blob.
+        #[arg(long, default_value_t = 5_000_000)]
+        fuel_limit: u64,
+        /// Runtime memory limit in bytes recorded in the config blob.
+        #[arg(long, default_value_t = 16_777_216)]
+        memory_limit_bytes: u64,
+        /// Epoch seed recorded in the config blob.
+        #[arg(long)]
+        epoch_id_seed: String,
+        /// Registry username for HTTP basic auth.
+        #[arg(long)]
+        username: Option<String>,
+        /// Registry password or token for HTTP basic auth.
+        #[arg(long, requires = "username")]
+        password: Option<String>,
+        /// Registry host allowed to use HTTP instead of HTTPS.
+        #[arg(long = "allow-http-registry")]
+        allow_http_registry: Vec<String>,
+    },
+
     /// Install a .arcguard archive to the guard directory.
     Install {
         /// Path to the .arcguard archive file.

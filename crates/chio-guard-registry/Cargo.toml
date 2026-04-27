@@ -13,7 +13,13 @@ name = "chio_guard_registry"
 
 [dependencies]
 oci-distribution = { version = "0.11", default-features = false, features = ["rustls-tls"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"
