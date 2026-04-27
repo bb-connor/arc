@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -14,6 +14,79 @@ use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{ToolCallResponse, ToolServerEvent};
 use chio_core::receipt::ChioReceipt;
+
+fn read_lock<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    loop {
+        if let Ok(value) = lock.try_read() {
+            return value;
+        }
+        std::thread::yield_now();
+    }
+}
+
+fn write_lock<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    loop {
+        if let Ok(value) = lock.try_write() {
+            return value;
+        }
+        std::thread::yield_now();
+    }
+}
+
+#[derive(Debug)]
+struct AppendOnlyState<T> {
+    values: RwLock<Vec<Box<T>>>,
+    current: AtomicU64,
+}
+
+impl<T> AppendOnlyState<T> {
+    fn new(initial: T) -> Self {
+        Self {
+            values: RwLock::new(vec![Box::new(initial)]),
+            current: AtomicU64::new(0),
+        }
+    }
+
+    fn current(&self) -> &T {
+        let value = {
+            let values = read_lock(&self.values);
+            let current = self.current.load(Ordering::Acquire) as usize;
+            let Some(value) = values.get(current) else {
+                panic!("append-only session state index {current} is missing");
+            };
+            &**value as *const T
+        };
+
+        // SAFETY: values are boxed and never removed from the append-only
+        // vector, so the pointee remains stable for the lifetime of self.
+        unsafe { &*value }
+    }
+
+    fn replace(&self, next: T) {
+        self.replace_with(|_| (Some(next), ()));
+    }
+
+    fn replace_with<R>(&self, update: impl FnOnce(&T) -> (Option<T>, R)) -> R {
+        let mut values = write_lock(&self.values);
+        let current = self.current.load(Ordering::Acquire) as usize;
+        let Some(current_value) = values.get(current) else {
+            panic!("append-only session state index {current} is missing");
+        };
+        let (next, result) = update(current_value);
+        if let Some(next) = next {
+            values.push(Box::new(next));
+            self.current
+                .store((values.len() - 1) as u64, Ordering::Release);
+        }
+        result
+    }
+}
+
+impl<T: Clone> Clone for AppendOnlyState<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.current().clone())
+    }
+}
 
 /// Lifecycle state of a logical kernel session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -211,9 +284,29 @@ enum SubscriptionSubject {
 }
 
 /// Registry for session-scoped subscriptions.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub struct SubscriptionRegistry {
-    subscriptions: HashSet<SubscriptionSubject>,
+    subscriptions: RwLock<HashSet<SubscriptionSubject>>,
+    subscription_count: AtomicU64,
+}
+
+impl Clone for SubscriptionRegistry {
+    fn clone(&self) -> Self {
+        let subscriptions = read_lock(&self.subscriptions).clone();
+        Self {
+            subscription_count: AtomicU64::new(subscriptions.len() as u64),
+            subscriptions: RwLock::new(subscriptions),
+        }
+    }
+}
+
+impl Default for SubscriptionRegistry {
+    fn default() -> Self {
+        Self {
+            subscriptions: RwLock::new(HashSet::new()),
+            subscription_count: AtomicU64::new(0),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -236,31 +329,35 @@ struct PendingUrlElicitation {
 }
 
 impl SubscriptionRegistry {
-    pub fn subscribe_resource(&mut self, uri: impl Into<String>) {
-        self.subscriptions
-            .insert(SubscriptionSubject::Resource(uri.into()));
+    pub fn subscribe_resource(&self, uri: impl Into<String>) {
+        let mut subscriptions = write_lock(&self.subscriptions);
+        subscriptions.insert(SubscriptionSubject::Resource(uri.into()));
+        self.subscription_count
+            .store(subscriptions.len() as u64, Ordering::Release);
     }
 
-    pub fn unsubscribe_resource(&mut self, uri: &str) {
-        self.subscriptions
-            .remove(&SubscriptionSubject::Resource(uri.to_string()));
+    pub fn unsubscribe_resource(&self, uri: &str) {
+        let mut subscriptions = write_lock(&self.subscriptions);
+        subscriptions.remove(&SubscriptionSubject::Resource(uri.to_string()));
+        self.subscription_count
+            .store(subscriptions.len() as u64, Ordering::Release);
     }
 
     pub fn contains_resource(&self, uri: &str) -> bool {
-        self.subscriptions
-            .contains(&SubscriptionSubject::Resource(uri.to_string()))
+        read_lock(&self.subscriptions).contains(&SubscriptionSubject::Resource(uri.to_string()))
     }
 
     pub fn len(&self) -> usize {
-        self.subscriptions.len()
+        self.subscription_count.load(Ordering::Acquire) as usize
     }
 
     pub fn is_empty(&self) -> bool {
-        self.subscriptions.is_empty()
+        self.subscription_count.load(Ordering::Acquire) == 0
     }
 
-    pub fn clear(&mut self) {
-        self.subscriptions.clear();
+    pub fn clear(&self) {
+        write_lock(&self.subscriptions).clear();
+        self.subscription_count.store(0, Ordering::Release);
     }
 }
 
@@ -268,13 +365,13 @@ const TERMINAL_HISTORY_LIMIT: usize = 256;
 
 /// Bounded history of terminal request outcomes for a session.
 #[derive(Debug, Clone)]
-pub struct TerminalRegistry {
+struct TerminalRegistryInner {
     states: HashMap<RequestId, OperationTerminalState>,
     order: VecDeque<RequestId>,
     limit: usize,
 }
 
-impl Default for TerminalRegistry {
+impl Default for TerminalRegistryInner {
     fn default() -> Self {
         Self {
             states: HashMap::new(),
@@ -284,34 +381,58 @@ impl Default for TerminalRegistry {
     }
 }
 
-impl TerminalRegistry {
-    pub fn record(&mut self, request_id: RequestId, state: OperationTerminalState) -> bool {
-        match self.states.entry(request_id.clone()) {
-            Entry::Occupied(_) => false,
-            Entry::Vacant(entry) => {
-                self.order.push_back(request_id);
-                entry.insert(state);
+/// Bounded history of terminal request outcomes for a session.
+#[derive(Debug)]
+pub struct TerminalRegistry {
+    inner: AppendOnlyState<TerminalRegistryInner>,
+}
 
-                while self.order.len() > self.limit {
-                    if let Some(oldest) = self.order.pop_front() {
-                        self.states.remove(&oldest);
-                    }
-                }
-                true
-            }
+impl Clone for TerminalRegistry {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
         }
+    }
+}
+
+impl Default for TerminalRegistry {
+    fn default() -> Self {
+        Self {
+            inner: AppendOnlyState::new(TerminalRegistryInner::default()),
+        }
+    }
+}
+
+impl TerminalRegistry {
+    pub fn record(&self, request_id: RequestId, state: OperationTerminalState) -> bool {
+        self.inner.replace_with(|current| {
+            if current.states.contains_key(&request_id) {
+                return (None, false);
+            }
+
+            let mut next = current.clone();
+            next.order.push_back(request_id.clone());
+            next.states.insert(request_id, state);
+
+            while next.order.len() > next.limit {
+                if let Some(oldest) = next.order.pop_front() {
+                    next.states.remove(&oldest);
+                }
+            }
+            (Some(next), true)
+        })
     }
 
     pub fn get(&self, request_id: &RequestId) -> Option<&OperationTerminalState> {
-        self.states.get(request_id)
+        self.inner.current().states.get(request_id)
     }
 
     pub fn len(&self) -> usize {
-        self.states.len()
+        self.inner.current().states.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.states.is_empty()
+        self.inner.current().states.is_empty()
     }
 }
 
@@ -426,24 +547,34 @@ struct SessionInner {
     state: SessionState,
 }
 
+#[derive(Debug, Clone)]
+struct SessionAuthState {
+    auth_context: SessionAuthContext,
+    session_anchor: SessionAnchorState,
+}
+
+#[derive(Debug, Clone)]
+struct SessionRoots {
+    roots: Vec<RootDefinition>,
+    normalized_roots: Vec<NormalizedRoot>,
+}
+
 /// Session host object owned by the kernel.
 #[derive(Debug)]
 pub struct Session {
     id: SessionId,
     agent_id: AgentId,
     inner: RwLock<SessionInner>,
-    session_anchor: SessionAnchorState,
-    auth_context: SessionAuthContext,
-    peer_capabilities: PeerCapabilities,
-    roots: Vec<RootDefinition>,
-    normalized_roots: Vec<NormalizedRoot>,
+    auth_state: AppendOnlyState<SessionAuthState>,
+    peer_capabilities: AppendOnlyState<PeerCapabilities>,
+    roots: AppendOnlyState<SessionRoots>,
     issued_capabilities: Vec<CapabilityToken>,
     inflight: InflightRegistry,
     subscriptions: SubscriptionRegistry,
-    terminal: RwLock<TerminalRegistry>,
+    terminal: TerminalRegistry,
     request_lineage: RwLock<HashMap<RequestId, RequestLineageRecord>>,
-    pending_url_elicitations: HashMap<String, PendingUrlElicitation>,
-    late_events: VecDeque<LateSessionEvent>,
+    pending_url_elicitations: RwLock<HashMap<String, PendingUrlElicitation>>,
+    late_events: RwLock<VecDeque<LateSessionEvent>>,
 }
 
 impl Clone for Session {
@@ -453,18 +584,16 @@ impl Clone for Session {
             id: self.id.clone(),
             agent_id: self.agent_id.clone(),
             inner: RwLock::new(inner),
-            session_anchor: self.session_anchor.clone(),
-            auth_context: self.auth_context.clone(),
+            auth_state: self.auth_state.clone(),
             peer_capabilities: self.peer_capabilities.clone(),
             roots: self.roots.clone(),
-            normalized_roots: self.normalized_roots.clone(),
             issued_capabilities: self.issued_capabilities.clone(),
             inflight: self.inflight.clone(),
             subscriptions: self.subscriptions.clone(),
-            terminal: RwLock::new(self.read_terminal().clone()),
+            terminal: self.terminal.clone(),
             request_lineage: RwLock::new(self.read_request_lineage().clone()),
-            pending_url_elicitations: self.pending_url_elicitations.clone(),
-            late_events: self.late_events.clone(),
+            pending_url_elicitations: RwLock::new(self.read_pending_url_elicitations().clone()),
+            late_events: RwLock::new(self.read_late_events().clone()),
         }
     }
 }
@@ -483,18 +612,22 @@ impl Session {
             inner: RwLock::new(SessionInner {
                 state: SessionState::Initializing,
             }),
-            session_anchor,
-            auth_context,
-            peer_capabilities: PeerCapabilities::default(),
-            roots: Vec::new(),
-            normalized_roots: Vec::new(),
+            auth_state: AppendOnlyState::new(SessionAuthState {
+                auth_context,
+                session_anchor,
+            }),
+            peer_capabilities: AppendOnlyState::new(PeerCapabilities::default()),
+            roots: AppendOnlyState::new(SessionRoots {
+                roots: Vec::new(),
+                normalized_roots: Vec::new(),
+            }),
             issued_capabilities,
             inflight: InflightRegistry::default(),
             subscriptions: SubscriptionRegistry::default(),
-            terminal: RwLock::new(TerminalRegistry::default()),
+            terminal: TerminalRegistry::default(),
             request_lineage: RwLock::new(HashMap::new()),
-            pending_url_elicitations: HashMap::new(),
-            late_events: VecDeque::new(),
+            pending_url_elicitations: RwLock::new(HashMap::new()),
+            late_events: RwLock::new(VecDeque::new()),
         }
     }
 
@@ -516,24 +649,6 @@ impl Session {
         }
     }
 
-    fn read_terminal(&self) -> RwLockReadGuard<'_, TerminalRegistry> {
-        loop {
-            if let Ok(terminal) = self.terminal.try_read() {
-                return terminal;
-            }
-            std::thread::yield_now();
-        }
-    }
-
-    fn write_terminal(&self) -> RwLockWriteGuard<'_, TerminalRegistry> {
-        loop {
-            if let Ok(terminal) = self.terminal.try_write() {
-                return terminal;
-            }
-            std::thread::yield_now();
-        }
-    }
-
     fn read_request_lineage(
         &self,
     ) -> RwLockReadGuard<'_, HashMap<RequestId, RequestLineageRecord>> {
@@ -543,6 +658,26 @@ impl Session {
             }
             std::thread::yield_now();
         }
+    }
+
+    fn read_pending_url_elicitations(
+        &self,
+    ) -> RwLockReadGuard<'_, HashMap<String, PendingUrlElicitation>> {
+        read_lock(&self.pending_url_elicitations)
+    }
+
+    fn write_pending_url_elicitations(
+        &self,
+    ) -> RwLockWriteGuard<'_, HashMap<String, PendingUrlElicitation>> {
+        write_lock(&self.pending_url_elicitations)
+    }
+
+    fn read_late_events(&self) -> RwLockReadGuard<'_, VecDeque<LateSessionEvent>> {
+        read_lock(&self.late_events)
+    }
+
+    fn write_late_events(&self) -> RwLockWriteGuard<'_, VecDeque<LateSessionEvent>> {
+        write_lock(&self.late_events)
     }
 
     fn write_request_lineage(
@@ -569,11 +704,11 @@ impl Session {
     }
 
     pub fn auth_context(&self) -> &SessionAuthContext {
-        &self.auth_context
+        &self.auth_state.current().auth_context
     }
 
     pub fn session_anchor(&self) -> &SessionAnchorState {
-        &self.session_anchor
+        &self.auth_state.current().session_anchor
     }
 
     pub fn request_lineage(&self, request_id: &RequestId) -> Option<RequestLineageRecord> {
@@ -581,7 +716,7 @@ impl Session {
     }
 
     pub fn peer_capabilities(&self) -> &PeerCapabilities {
-        &self.peer_capabilities
+        self.peer_capabilities.current()
     }
 
     pub fn capabilities(&self) -> &[CapabilityToken] {
@@ -589,15 +724,15 @@ impl Session {
     }
 
     pub fn roots(&self) -> &[RootDefinition] {
-        &self.roots
+        &self.roots.current().roots
     }
 
     pub fn normalized_roots(&self) -> &[NormalizedRoot] {
-        &self.normalized_roots
+        &self.roots.current().normalized_roots
     }
 
     pub fn enforceable_filesystem_roots(&self) -> impl Iterator<Item = &NormalizedRoot> {
-        self.normalized_roots
+        self.normalized_roots()
             .iter()
             .filter(|root| root.is_enforceable_filesystem())
     }
@@ -611,22 +746,22 @@ impl Session {
     }
 
     pub fn terminal(&self) -> TerminalRegistry {
-        self.read_terminal().clone()
+        self.terminal.clone()
     }
 
     pub fn register_pending_url_elicitation(
-        &mut self,
+        &self,
         elicitation_id: impl Into<String>,
         related_task_id: Option<String>,
     ) {
-        self.pending_url_elicitations.insert(
+        self.write_pending_url_elicitations().insert(
             elicitation_id.into(),
             PendingUrlElicitation { related_task_id },
         );
     }
 
     pub fn register_required_url_elicitations(
-        &mut self,
+        &self,
         elicitations: &[CreateElicitationOperation],
         related_task_id: Option<&str>,
     ) {
@@ -641,18 +776,21 @@ impl Session {
         }
     }
 
-    pub fn queue_late_event(&mut self, event: LateSessionEvent) {
-        self.late_events.push_back(event);
+    pub fn queue_late_event(&self, event: LateSessionEvent) {
+        self.write_late_events().push_back(event);
     }
 
-    pub fn take_late_events(&mut self) -> Vec<LateSessionEvent> {
-        self.late_events.drain(..).collect()
+    pub fn take_late_events(&self) -> Vec<LateSessionEvent> {
+        self.write_late_events().drain(..).collect()
     }
 
-    pub fn queue_tool_server_event(&mut self, event: ToolServerEvent) {
+    pub fn queue_tool_server_event(&self, event: ToolServerEvent) {
         match event {
             ToolServerEvent::ElicitationCompleted { elicitation_id } => {
-                let Some(pending) = self.pending_url_elicitations.remove(&elicitation_id) else {
+                let Some(pending) = self
+                    .write_pending_url_elicitations()
+                    .remove(&elicitation_id)
+                else {
                     return;
                 };
                 self.queue_late_event(LateSessionEvent::ElicitationCompleted {
@@ -677,8 +815,8 @@ impl Session {
         }
     }
 
-    pub fn queue_elicitation_completion(&mut self, elicitation_id: &str) {
-        let Some(pending) = self.pending_url_elicitations.remove(elicitation_id) else {
+    pub fn queue_elicitation_completion(&self, elicitation_id: &str) {
+        let Some(pending) = self.write_pending_url_elicitations().remove(elicitation_id) else {
             return;
         };
         self.queue_late_event(LateSessionEvent::ElicitationCompleted {
@@ -687,11 +825,11 @@ impl Session {
         });
     }
 
-    pub fn subscribe_resource(&mut self, uri: impl Into<String>) {
+    pub fn subscribe_resource(&self, uri: impl Into<String>) {
         self.subscriptions.subscribe_resource(uri);
     }
 
-    pub fn unsubscribe_resource(&mut self, uri: &str) {
+    pub fn unsubscribe_resource(&self, uri: &str) {
         self.subscriptions.unsubscribe_resource(uri);
     }
 
@@ -699,26 +837,38 @@ impl Session {
         self.subscriptions.contains_resource(uri)
     }
 
-    pub fn set_auth_context(&mut self, auth_context: SessionAuthContext) -> bool {
-        let rotated = self.auth_context != auth_context;
-        if rotated {
-            let next_epoch = self.session_anchor.auth_epoch.saturating_add(1);
-            self.session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
-        }
-        self.auth_context = auth_context;
-        rotated
+    pub fn set_auth_context(&self, auth_context: SessionAuthContext) -> bool {
+        self.auth_state.replace_with(|current| {
+            let rotated = current.auth_context != auth_context;
+            if rotated {
+                let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+                let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+                (
+                    Some(SessionAuthState {
+                        auth_context,
+                        session_anchor,
+                    }),
+                    true,
+                )
+            } else {
+                (None, false)
+            }
+        })
     }
 
-    pub fn set_peer_capabilities(&mut self, peer_capabilities: PeerCapabilities) {
-        self.peer_capabilities = peer_capabilities;
+    pub fn set_peer_capabilities(&self, peer_capabilities: PeerCapabilities) {
+        self.peer_capabilities.replace(peer_capabilities);
     }
 
-    pub fn replace_roots(&mut self, roots: Vec<RootDefinition>) {
-        self.normalized_roots = roots
+    pub fn replace_roots(&self, roots: Vec<RootDefinition>) {
+        let normalized_roots = roots
             .iter()
             .map(RootDefinition::normalize_for_runtime)
             .collect();
-        self.roots = roots;
+        self.roots.replace(SessionRoots {
+            roots,
+            normalized_roots,
+        });
     }
 
     pub fn activate(&self) -> Result<(), SessionError> {
@@ -729,14 +879,16 @@ impl Session {
         self.transition(SessionState::Draining)
     }
 
-    pub fn close(&mut self) -> Result<(), SessionError> {
+    pub fn close(&self) -> Result<(), SessionError> {
         self.transition(SessionState::Closed)?;
         self.inflight.clear();
         self.subscriptions.clear();
-        self.roots.clear();
-        self.normalized_roots.clear();
-        self.pending_url_elicitations.clear();
-        self.late_events.clear();
+        self.roots.replace(SessionRoots {
+            roots: Vec::new(),
+            normalized_roots: Vec::new(),
+        });
+        self.write_pending_url_elicitations().clear();
+        self.write_late_events().clear();
         Ok(())
     }
 
@@ -787,18 +939,15 @@ impl Session {
                 request_id: context.request_id.clone(),
             });
         }
-        self.inflight.track(
-            context,
-            operation_kind,
-            self.session_anchor.id(),
-            cancellable,
-        )?;
+        let session_anchor = self.session_anchor().clone();
+        self.inflight
+            .track(context, operation_kind, session_anchor.id(), cancellable)?;
         request_lineage.insert(
             context.request_id.clone(),
             RequestLineageRecord {
                 request_id: context.request_id.clone(),
-                session_anchor_id: self.session_anchor.id().to_string(),
-                auth_epoch: self.session_anchor.auth_epoch(),
+                session_anchor_id: session_anchor.id().to_string(),
+                auth_epoch: session_anchor.auth_epoch(),
                 parent_request_id: context.parent_request_id.clone(),
                 operation_kind,
                 started_at: current_unix_timestamp(),
@@ -831,7 +980,7 @@ impl Session {
         terminal_state: OperationTerminalState,
     ) {
         let recorded = self
-            .write_terminal()
+            .terminal
             .record(request_id.clone(), terminal_state.clone());
         if recorded {
             if let Some(lineage) = self.write_request_lineage().get_mut(request_id) {
@@ -862,12 +1011,13 @@ impl Session {
                 parent_request_id: parent_request_id.clone(),
             });
         };
-        if parent_lineage.session_anchor_id != self.session_anchor.id() {
+        let current_session_anchor_id = self.session_anchor().id().to_string();
+        if parent_lineage.session_anchor_id != current_session_anchor_id {
             return Err(SessionError::ParentRequestAnchorMismatch {
                 request_id: request_id.clone(),
                 parent_request_id: parent_request_id.clone(),
                 parent_session_anchor_id: parent_inflight.session_anchor_id.clone(),
-                current_session_anchor_id: self.session_anchor.id().to_string(),
+                current_session_anchor_id,
             });
         }
         Ok(parent_lineage)
@@ -966,6 +1116,7 @@ pub enum SessionOperationResponse {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn make_context(request_id: &str) -> OperationContext {
         OperationContext {
@@ -979,7 +1130,7 @@ mod tests {
 
     #[test]
     fn lifecycle_transitions_cover_ready_draining_closed() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
 
         assert_eq!(session.state(), SessionState::Initializing);
         session.activate().unwrap();
@@ -1021,7 +1172,7 @@ mod tests {
 
     #[test]
     fn peer_capabilities_and_roots_are_session_scoped() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
 
         session.set_peer_capabilities(PeerCapabilities {
             supports_progress: false,
@@ -1063,7 +1214,7 @@ mod tests {
 
     #[test]
     fn mixed_roots_preserve_metadata_without_widening_enforceable_set() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         session.replace_roots(vec![
             RootDefinition {
                 uri: "file:///workspace/project/src".to_string(),
@@ -1218,7 +1369,7 @@ mod tests {
 
     #[test]
     fn terminal_registry_keeps_first_terminal_state() {
-        let mut registry = TerminalRegistry::default();
+        let registry = TerminalRegistry::default();
         let request_id = RequestId::new("req-terminal");
         let first_state = OperationTerminalState::Completed;
 
@@ -1306,7 +1457,7 @@ mod tests {
 
     #[test]
     fn resource_subscriptions_are_cleared_on_close() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
 
         session.activate().unwrap();
         session.subscribe_resource("repo://docs/roadmap");
@@ -1321,8 +1472,29 @@ mod tests {
     }
 
     #[test]
+    fn resource_subscriptions_accept_shared_arc_session() {
+        let session = Arc::new(Session::new(
+            SessionId::new("sess-1"),
+            "agent-1".to_string(),
+            Vec::new(),
+        ));
+        let subscriber = Arc::clone(&session);
+        let observer = Arc::clone(&session);
+
+        subscriber.subscribe_resource("repo://docs/roadmap");
+
+        assert!(observer.is_resource_subscribed("repo://docs/roadmap"));
+        assert_eq!(observer.subscriptions().len(), 1);
+
+        subscriber.unsubscribe_resource("repo://docs/roadmap");
+
+        assert!(!observer.is_resource_subscribed("repo://docs/roadmap"));
+        assert!(observer.subscriptions().is_empty());
+    }
+
+    #[test]
     fn session_anchor_rotates_on_auth_context_change() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let initial_anchor = session.session_anchor().clone();
         assert_eq!(
             session.auth_context(),
@@ -1351,7 +1523,7 @@ mod tests {
 
     #[test]
     fn session_anchor_does_not_rotate_when_auth_context_is_unchanged() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let auth_context = SessionAuthContext::streamable_http_static_bearer(
             "static-bearer:abcd1234",
             "cafebabe",
@@ -1367,7 +1539,7 @@ mod tests {
 
     #[test]
     fn child_request_is_rejected_after_parent_anchor_rotation() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         let parent_context = make_context("req-parent");
         let mut child_context = make_context("req-child");
         child_context.parent_request_id = Some(parent_context.request_id.clone());
@@ -1395,7 +1567,7 @@ mod tests {
 
     #[test]
     fn url_elicitation_completions_become_session_late_events() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         session.register_pending_url_elicitation("elicit-1", Some("task-7".to_string()));
 
         session.queue_elicitation_completion("elicit-1");
@@ -1413,7 +1585,7 @@ mod tests {
 
     #[test]
     fn tool_server_events_are_filtered_and_stored_per_session() {
-        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
         session.activate().unwrap();
         session.subscribe_resource("repo://docs/roadmap");
         session.register_pending_url_elicitation("elicit-2", None);
