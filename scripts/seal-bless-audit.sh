@@ -89,12 +89,12 @@ if [ ! -f "$AUDIT_LOG" ]; then
   exit 2
 fi
 
-PENDING_COUNT="$(grep -cF "$PLACEHOLDER" "$AUDIT_LOG" || true)"
+PENDING_COUNT="$(grep -vE '^#' "$AUDIT_LOG" | grep -cF "$PLACEHOLDER" || true)"
 if [ "$PENDING_COUNT" -eq 0 ]; then
-  note "no placeholders to seal in $AUDIT_LOG_RELPATH"
+  note "no placeholders to seal in $AUDIT_LOG_RELPATH (header comments are ignored)"
   exit 0
 fi
-note "$PENDING_COUNT placeholder row(s) to seal"
+note "$PENDING_COUNT placeholder data row(s) to seal (header comments are ignored)"
 
 # Resolve the target SHA. Default to HEAD; accept an explicit short or
 # long SHA as $1.
@@ -110,10 +110,18 @@ note "sealing rows to $SHORT_SHA (full: $FULL_SHA)"
 # write to a temp file and atomically rename.
 TMP="$(mktemp "${AUDIT_LOG}.seal.XXXXXX")"
 trap 'rm -f "$TMP"' EXIT
-# Replace the literal placeholder string. The audit log is tab-separated
-# with the placeholder occupying the entire <sha> column, so a literal
-# string substitution is safe.
+# Replace the literal placeholder string in data rows only. Lines that
+# begin with `#` are header comments (the audit log's documented
+# convention) and may legitimately mention `<commit-sha-pending>` as
+# part of the format documentation; rewriting those would corrupt the
+# header. The audit log is tab-separated with the placeholder
+# occupying the entire <sha> column on data rows, so a literal string
+# substitution is safe.
 awk -v placeholder="$PLACEHOLDER" -v sha="$SHORT_SHA" '
+  /^#/ {
+    print
+    next
+  }
   {
     n = index($0, placeholder)
     while (n > 0) {
