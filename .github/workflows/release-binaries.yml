@@ -544,3 +544,152 @@ jobs:
             release/*.pem
             release/SHA256SUMS
             release/chio.rb
+
+  mutants-gate-flip:
+    # owner: M02
+    # M02.P3.T1 - Auto-flip the cargo-mutants gate from advisory to
+    # blocking on the first post-Phase-3 release. The gate posture is
+    # driven by `releases.toml::[mutants].cycle_end_tag` (read by
+    # `scripts/mutants-gate.sh`): empty -> advisory, non-empty -> blocking.
+    # This job runs after `release` succeeds, reads the current value, and
+    # if it is still empty writes the just-released tag and opens a PR
+    # titled `chore(mutants): activate blocking gate after cycle <tag>`.
+    # The flip therefore lands as a reviewable commit on the roadmap
+    # branch rather than a silent post-release config drift.
+    #
+    # Source-doc anchors:
+    #   .planning/trajectory/02-fuzzing-post-pr13.md
+    #     "Mutation-testing CI shape (Phase 3) > Threshold-enforcement logic"
+    #   .planning/trajectory/decisions.yml
+    #     id=mutation-testing-gate-posture (advisory for one cycle, then blocking)
+    name: Auto-flip mutants gate
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write       # push the auto-flip branch
+      pull-requests: write  # open the PR
+    timeout-minutes: 10
+    steps:
+      - name: Checkout roadmap branch
+        uses: actions/checkout@v4
+        with:
+          ref: project/roadmap-04-25-2026
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Resolve release tag
+        id: tag
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          # Validate tag shape before it flows into shell strings, file
+          # contents, the PR title, and the auto-flip branch name. An
+          # unsanitised tag is a script-injection surface (CWE-94). The
+          # pattern matches the build job's tag validation (line 242).
+          if ! [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::tag '${tag}' does not match vMAJOR.MINOR.PATCH[-prerelease]" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Read current cycle_end_tag
+        id: cycle
+        run: |
+          set -euo pipefail
+          if [ ! -f releases.toml ]; then
+            echo "::error::releases.toml is missing on the roadmap branch" >&2
+            exit 1
+          fi
+          # Pure-bash extractor matching `scripts/mutants-gate.sh` so the
+          # two readers stay drift-free. Tolerates whitespace and quoting
+          # variants: `cycle_end_tag = ""` and `cycle_end_tag="vX.Y.Z"`.
+          current=""
+          while IFS= read -r line; do
+            trimmed="${line#"${line%%[![:space:]]*}"}"
+            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+            case "${trimmed}" in
+              cycle_end_tag*=*)
+                value="${trimmed#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value#\"}"
+                value="${value%\"}"
+                current="${value}"
+                break
+                ;;
+            esac
+          done < releases.toml
+          echo "current=${current}" >> "$GITHUB_OUTPUT"
+          if [ -z "${current}" ]; then
+            echo "should_flip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_flip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write cycle_end_tag
+        if: steps.cycle.outputs.should_flip == 'true'
+        env:
+          NEW_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Replace the `cycle_end_tag = ""` line with the resolved tag.
+          # The pattern is anchored to the empty-string form so a re-run
+          # against an already-flipped file is a no-op even if the
+          # `should_flip` guard above misses (defense in depth).
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          tag = os.environ["NEW_TAG"]
+          path = pathlib.Path("releases.toml")
+          text = path.read_text()
+          pattern = re.compile(r'^(\s*cycle_end_tag\s*=\s*)""\s*$', re.MULTILINE)
+          new_text, count = pattern.subn(rf'\g<1>"{tag}"', text, count=1)
+          if count != 1:
+              raise SystemExit(
+                  f"refusing to flip: expected exactly one empty cycle_end_tag line, found {count}"
+              )
+          path.write_text(new_text)
+          PY
+          echo "Updated releases.toml:"
+          grep -n cycle_end_tag releases.toml
+
+      - name: Open mutants gate flip PR
+        if: steps.cycle.outputs.should_flip == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          base: project/roadmap-04-25-2026
+          branch: chore/mutants-gate-flip-${{ steps.tag.outputs.tag }}
+          title: "chore(mutants): activate blocking gate after cycle ${{ steps.tag.outputs.tag }}"
+          body: |
+            Auto-opened by `release-binaries.yml::mutants-gate-flip` after release ${{ steps.tag.outputs.tag }}.
+
+            This PR writes `${{ steps.tag.outputs.tag }}` into
+            `releases.toml::[mutants].cycle_end_tag`, flipping the
+            cargo-mutants gate (`scripts/mutants-gate.sh`) from advisory
+            to blocking. After merge:
+
+            - `mutants-nightly` exits 1 on a per-crate catch-ratio miss
+              instead of exiting 0.
+            - `mutants-pr` comments switch from `advisory` to `blocking`
+              labels (M02.P3.T2 wires the comment label).
+
+            See `docs/fuzzing/mutants.md` (section "CI lane") and
+            `.planning/trajectory/02-fuzzing-post-pr13.md`
+            ("Mutation-testing CI shape (Phase 3)") for the rationale.
+
+            Override path: clear `cycle_end_tag` in a follow-up PR
+            labelled `mutants-gate-override` with CODEOWNERS approval
+            (M02.P3.T2).
+          commit-message: "chore(mutants): activate blocking gate after cycle ${{ steps.tag.outputs.tag }}"
+          labels: mutants,release
+
+      - name: Skip flip (already activated)
+        if: steps.cycle.outputs.should_flip != 'true'
+        env:
+          CURRENT: ${{ steps.cycle.outputs.current }}
+        run: |
+          printf 'mutants-gate-flip: cycle_end_tag already set to %s; nothing to do\n' "${CURRENT}"

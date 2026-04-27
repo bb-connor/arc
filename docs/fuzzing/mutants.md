@@ -157,10 +157,35 @@ Two jobs:
 
 The lane is **advisory** for one release cycle, then flips to
 **blocking** automatically. The flip is driven by the `cycle_end_tag`
-field in `releases.toml` at the repo root (also written by M02.P2.T2):
-empty -> advisory, non-empty -> blocking. The next release-binaries run
-after Phase 3 merges populates `cycle_end_tag` via
-`chore(mutants): activate blocking gate after cycle <tag>`.
+field in `releases.toml` at the repo root (schema landed in M02.P2.T2):
+empty -> advisory, non-empty -> blocking.
+
+### Auto-flip mechanic (M02.P3.T1)
+
+The first post-Phase-3 release performs the flip without manual edits.
+`.github/workflows/release-binaries.yml` runs a `mutants-gate-flip` job
+after the `release` job succeeds:
+
+1. Checks out the `project/roadmap-04-25-2026` branch and reads the
+   current `cycle_end_tag` value with the same pure-bash extractor as
+   `scripts/mutants-gate.sh` (so the writer and reader cannot drift).
+2. If the value is still empty, writes the just-released tag (e.g.
+   `v0.6.0`) into `releases.toml` via a single-line regex replace
+   guarded against an already-flipped file.
+3. Opens a single PR via `peter-evans/create-pull-request` titled
+   `chore(mutants): activate blocking gate after cycle <tag>` against
+   `project/roadmap-04-25-2026`. Reviewer merge is what activates the
+   blocking posture; the workflow itself never pushes directly to the
+   roadmap branch.
+
+After merge, `scripts/mutants-gate.sh` reads the non-empty
+`cycle_end_tag` and switches `mutants-nightly` from "exit 0 on miss"
+(advisory) to "exit 1 on miss" (blocking). PR comments emitted by
+`mutants-pr` swap their advisory label for a blocking one in M02.P3.T2.
+
+If the workflow re-runs against an older tag (workflow_dispatch, repush,
+etc.) the empty-string regex guard makes the write a no-op, so a single
+release cannot accidentally overwrite a previously activated flip.
 
 ## Triage policy
 
