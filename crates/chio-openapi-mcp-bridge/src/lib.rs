@@ -168,6 +168,7 @@ impl OpenApiMcpBridge {
             )),
             version: config.server_version.clone(),
             tools,
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: config.public_key.clone(),
         };

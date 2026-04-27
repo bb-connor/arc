@@ -24,8 +24,10 @@ auto-bumps. See `.planning/trajectory/07-provider-native-adapters.md`,
 
 The `computer-use` feature alone is not sufficient to enable the
 server-tool surface at runtime. M07.P3.T4 adds a `chio-manifest`
-`server_tools: [...]` allowlist that the adapter consults at lift time.
-Default deny applies even with the feature on.
+`server_tools: [...]` allowlist that the adapter consults at lift time
+through `AnthropicAdapter::new_with_manifest`. Default deny applies even
+with the feature on, including when `AnthropicAdapter::new` is used without
+manifest wiring.
 
 ## M07.P3 ticket sequence
 
@@ -34,9 +36,43 @@ Default deny applies even with the feature on.
 | T1     | Crate scaffold, API pin, `computer-use` feature, native types, transport trait | landed |
 | T2     | `ProviderAdapter::lift`/`lower` for batch `messages.create` tool_use blocks  | landed |
 | T3     | SSE streaming with verdict at `content_block_start` for `tool_use`           | landed |
-| T4     | `chio-manifest` `server_tools` allowlist gating the beta surface             | pending |
+| T4     | `chio-manifest` `server_tools` allowlist gating the beta surface             | landed |
 | T5     | 12 conformance fixtures (incl. 2 server-tool sessions behind the feature)    | pending |
-| T6     | Native-error envelope -> `ProviderError` taxonomy doctest                    | this PR |
+| T6     | Native-error envelope -> `ProviderError` taxonomy doctest                    | landed |
+
+## Server-tool manifest gate
+
+Anthropic server tools are provider-hosted beta surfaces. Chio treats them as
+separate from regular client-hosted tools and fails closed unless both gates
+are open:
+
+1. Build the crate with `--features computer-use`.
+2. Include the matching stable entry in the manifest `server_tools` allowlist:
+
+```json
+{
+  "server_tools": ["computer_use", "bash", "text_editor"]
+}
+```
+
+The adapter maps Anthropic's versioned wire names to the stable manifest
+entries:
+
+| Anthropic wire name        | Manifest entry |
+| -------------------------- | -------------- |
+| `computer_use_20241022`    | `computer_use` |
+| `bash_20241022`            | `bash`         |
+| `text_editor_20241022`     | `text_editor`  |
+
+Unlisted server tools return a `ProviderError::Malformed` before the
+`ToolInvocation` crosses the Chio trust boundary. Regular custom tools are
+not affected by `server_tools` and continue through the normal capability and
+guard path.
+
+This differs from Bedrock Converse. Bedrock tool use is client-defined via
+`toolConfig`; it does not have an Anthropic-managed `bash` server tool, so
+Bedrock bash-like behavior is modeled as a normal customer tool and remains
+outside this allowlist.
 
 ## Adapter-visible error taxonomy
 
@@ -76,20 +112,20 @@ crates/chio-anthropic-tools-adapter/
   README.md          this file
   src/
     lib.rs           AnthropicAdapter, AnthropicAdapterConfig, error type
+    manifest.rs      manifest-derived server-tool allowlist gate
     transport.rs     Transport trait, MockTransport, ANTHROPIC_VERSION pin
     native.rs        ToolUseBlock, ToolResultBlock, server-tool variants
 ```
 
-T2 will add `src/adapter.rs` (batch `lift`/`lower`); T3 will add
-`src/streaming.rs` (SSE state-machine wiring on top of
-`chio-tool-call-fabric::stream`); T4 will add `src/server_tools.rs`
-(allowlist enforcement).
+Batch `lift`/`lower` lives in `src/adapter.rs`, and SSE state-machine wiring
+lives in `src/streaming.rs`.
 
 ## Building
 
 ```bash
 cargo build -p chio-anthropic-tools-adapter
 cargo build -p chio-anthropic-tools-adapter --features computer-use
+cargo test -p chio-anthropic-tools-adapter --features computer-use server_tools
 ```
 
 Both invocations must succeed for T1 to merge (gate-check defined in
@@ -107,7 +143,7 @@ Both invocations must succeed for T1 to merge (gate-check defined in
 
 - Trajectory doc: `.planning/trajectory/07-provider-native-adapters.md`
   Phase 3 (lines 393-420).
-- Ticket spec: `.planning/trajectory/tickets/M07/P3.yml` (T1).
+- Ticket spec: `.planning/trajectory/tickets/M07/P3.yml` (T4).
 - Fabric trait surface: `crates/chio-tool-call-fabric/src/lib.rs`.
 - Conformance harness skeleton: `crates/chio-provider-conformance/`
   (lands in M07.P2).

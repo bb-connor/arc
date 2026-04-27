@@ -263,6 +263,7 @@ impl McpAdapter {
             description: Some("MCP server adapted to Chio protocol".into()),
             version: self.config.server_version.clone(),
             tools,
+            server_tools: Vec::new(),
             required_permissions: None,
             public_key: self.config.public_key.clone(),
         };
