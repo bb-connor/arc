@@ -38,8 +38,8 @@
 // integration tests for the canonical M04 exit codes.
 
 /// Per-frame outcome: replay-receipt id, recomputed verdict, and the
-/// captured (production) verdict from the source frame. The diff
-/// renderer in T4 compares the two to compute drift class.
+/// captured (production) verdict from the source frame. T3 also carries
+/// best-effort guard / reason attribution for grouped diff rendering.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TrafficFrameOutcome {
     /// 1-based source line in the input NDJSON.
@@ -51,13 +51,30 @@ pub struct TrafficFrameOutcome {
     pub replay_receipt_id: String,
     /// Verdict captured by the production tee on the original frame.
     pub captured_verdict: chio_tee_frame::Verdict,
+    /// Best-effort captured guard extracted from the tee deny reason.
+    pub captured_guard: Option<String>,
+    /// Best-effort captured reason extracted from the tee deny reason.
+    pub captured_reason: Option<String>,
     /// Verdict recomputed by re-running the captured invocation against
     /// the supplied policy-ref. `None` when re-execution failed (the
     /// `error` field carries the detail).
     pub replay_verdict: Option<chio_tee_frame::Verdict>,
+    /// Guard recorded on the replay receipt when the replay denied.
+    pub replay_guard: Option<String>,
+    /// Reason recorded on the replay receipt when the replay denied.
+    pub replay_reason: Option<String>,
     /// Optional re-execution error string. Empty when re-execution
     /// produced a verdict.
     pub error: Option<String>,
+}
+
+impl TrafficFrameOutcome {
+    fn decision_matches(&self) -> bool {
+        self.error.is_none()
+            && self.replay_verdict == Some(self.captured_verdict)
+            && self.captured_guard == self.replay_guard
+            && self.captured_reason == self.replay_reason
+    }
 }
 
 /// Aggregate report shape returned by [`run_traffic_replay`]. The diff
@@ -182,22 +199,29 @@ pub fn run_traffic_replay(
                 let replay_id = replay_partition
                     .replay_receipt_id(&frame_id)
                     .map_err(ExecuteError::Partition)?;
-                let captured = record.frame.verdict;
-                let outcome = match recompute_verdict(&mut kernel, &record.frame) {
-                    Ok(replay_verdict) => {
-                        if replay_verdict == captured {
+                let captured_verdict = record.frame.verdict;
+                let (captured_guard, captured_reason) =
+                    captured_guard_reason(&record.frame);
+                let outcome = match recompute_decision(&mut kernel, &record.frame) {
+                    Ok(replay_decision) => {
+                        let outcome = TrafficFrameOutcome {
+                            line: record.line,
+                            frame_id,
+                            replay_receipt_id: replay_id,
+                            captured_verdict,
+                            captured_guard,
+                            captured_reason,
+                            replay_verdict: Some(replay_decision.verdict),
+                            replay_guard: replay_decision.guard,
+                            replay_reason: replay_decision.reason,
+                            error: None,
+                        };
+                        if outcome.decision_matches() {
                             matches = matches.saturating_add(1);
                         } else {
                             drifts = drifts.saturating_add(1);
                         }
-                        TrafficFrameOutcome {
-                            line: record.line,
-                            frame_id,
-                            replay_receipt_id: replay_id,
-                            captured_verdict: captured,
-                            replay_verdict: Some(replay_verdict),
-                            error: None,
-                        }
+                        outcome
                     }
                     Err(err) => {
                         errors = errors.saturating_add(1);
@@ -205,8 +229,12 @@ pub fn run_traffic_replay(
                             line: record.line,
                             frame_id,
                             replay_receipt_id: replay_id,
-                            captured_verdict: captured,
+                            captured_verdict,
+                            captured_guard,
+                            captured_reason,
                             replay_verdict: None,
+                            replay_guard: None,
+                            replay_reason: None,
                             error: Some(err),
                         }
                     }
@@ -229,7 +257,11 @@ pub fn run_traffic_replay(
                     frame_id,
                     replay_receipt_id: replay_id,
                     captured_verdict: chio_tee_frame::Verdict::Deny,
+                    captured_guard: None,
+                    captured_reason: None,
                     replay_verdict: None,
+                    replay_guard: None,
+                    replay_reason: None,
                     error: Some(err.to_string()),
                 });
             }
@@ -251,17 +283,24 @@ pub fn run_traffic_replay(
 /// stable across replay runs.
 const REPLAY_STUB_SERVER_ID: &str = "chio-replay-stub";
 
-/// Recompute the kernel verdict for a single frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReplayDecision {
+    verdict: chio_tee_frame::Verdict,
+    guard: Option<String>,
+    reason: Option<String>,
+}
+
+/// Recompute the kernel decision details for a single frame.
 ///
 /// The captured `frame.invocation` is deserialized into a
 /// `chio_tool_call_fabric::ToolInvocation`, mapped onto a session
 /// operation, and evaluated. The resulting verdict (Allow / Deny /
 /// Rewrite) is mapped back into the [`chio_tee_frame::Verdict`] enum so
 /// the comparison surface stays uniform with the captured verdict.
-fn recompute_verdict(
+fn recompute_decision(
     kernel: &mut ChioKernel,
     frame: &chio_tee_frame::Frame,
-) -> Result<chio_tee_frame::Verdict, String> {
+) -> Result<ReplayDecision, String> {
     use chio_tool_call_fabric::ToolInvocation;
 
     let invocation: ToolInvocation = serde_json::from_value(frame.invocation.clone())
@@ -308,15 +347,65 @@ fn recompute_verdict(
             // the diff renderer flags it as material drift; the richer
             // mapping (Rewrite for guard-rewrites, etc.) lands in T4
             // alongside the structured drift class table.
-            Ok(map_kernel_verdict_to_frame(response.verdict))
+            let verdict = map_kernel_verdict_to_frame(response.verdict);
+            let (guard, reason) = replay_guard_reason(&response.receipt.decision);
+            Ok(ReplayDecision {
+                verdict,
+                guard,
+                reason,
+            })
         }
         Ok(_) => {
             // Non-ToolCall responses fall through as Deny so the diff
             // renderer can flag them as material drift.
-            Ok(chio_tee_frame::Verdict::Deny)
+            Ok(ReplayDecision {
+                verdict: chio_tee_frame::Verdict::Deny,
+                guard: Some("session".to_string()),
+                reason: Some("non-tool-call response".to_string()),
+            })
         }
         Err(e) => Err(format!("kernel evaluate_session_operation: {e}")),
     }
+}
+
+fn replay_guard_reason(
+    decision: &chio_core::receipt::Decision,
+) -> (Option<String>, Option<String>) {
+    match decision {
+        chio_core::receipt::Decision::Deny { reason, guard } => {
+            (Some(guard.clone()), Some(reason.clone()))
+        }
+        chio_core::receipt::Decision::Cancelled { reason }
+        | chio_core::receipt::Decision::Incomplete { reason } => {
+            (None, Some(reason.clone()))
+        }
+        chio_core::receipt::Decision::Allow => (None, None),
+    }
+}
+
+fn captured_guard_reason(
+    frame: &chio_tee_frame::Frame,
+) -> (Option<String>, Option<String>) {
+    if matches!(frame.verdict, chio_tee_frame::Verdict::Allow) {
+        return (None, None);
+    }
+    split_captured_deny_reason(frame.deny_reason.as_deref())
+}
+
+fn split_captured_deny_reason(
+    reason: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    let Some(raw) = reason.map(str::trim).filter(|value| !value.is_empty()) else {
+        return (None, None);
+    };
+    let normalized = raw.strip_prefix("guard:").unwrap_or(raw);
+    if let Some((guard, tail)) = normalized.split_once('.') {
+        return (Some(guard.to_string()), Some(tail.to_string()));
+    }
+    if let Some((guard, tail)) = normalized.split_once(':') {
+        return (Some(guard.to_string()), Some(tail.to_string()));
+    }
+    (None, Some(normalized.to_string()))
 }
 
 /// Coarse-grained mapping from a kernel-level [`chio_kernel::Verdict`] to
@@ -597,7 +686,11 @@ capabilities: {}
             frame_id: "frame-x".to_string(),
             replay_receipt_id: "replay:run-7:frame-x".to_string(),
             captured_verdict: chio_tee_frame::Verdict::Allow,
+            captured_guard: None,
+            captured_reason: None,
             replay_verdict: Some(chio_tee_frame::Verdict::Allow),
+            replay_guard: None,
+            replay_reason: None,
             error: None,
         };
         let v = serde_json::to_value(&outcome).unwrap();
@@ -647,5 +740,13 @@ capabilities: {}
             outcomes: vec![],
         };
         assert!(!report.ok());
+    }
+
+    #[test]
+    fn replay_diff_reason_attribution_splits_guard_reason_codes() {
+        let (guard, reason) =
+            split_captured_deny_reason(Some("guard:pii.email_in_response"));
+        assert_eq!(guard.as_deref(), Some("pii"));
+        assert_eq!(reason.as_deref(), Some("email_in_response"));
     }
 }

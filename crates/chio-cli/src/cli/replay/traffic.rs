@@ -181,10 +181,9 @@ const EXIT_PARSE_ERROR: i32 = 30;
 /// M10.P2.T2: re-execution arm of `chio replay traffic`.
 ///
 /// Parses `against_str` into a [`PolicyRef`], runs
-/// [`run_traffic_replay`], and prints a human or `--json` summary.
-/// Per-frame drift / error surfacing is intentionally summary-only in
-/// T2; the diff renderer in M10.P2.T3 / T4 layers the structured drift
-/// class table on top of this surface.
+/// [`run_traffic_replay`], and prints a human or `--json` grouped diff
+/// report. Human output is the default CLI format; `--json` emits the
+/// stable machine report from `replay/diff/json.rs`.
 fn cmd_replay_traffic_with_against(
     args: &TrafficArgs,
     against_str: &str,
@@ -193,63 +192,18 @@ fn cmd_replay_traffic_with_against(
         .map_err(|e| CliError::Other(format!("--against parse failed: {e}")))?;
     let report = run_traffic_replay(args, &against)
         .map_err(|e| CliError::Other(format!("chio replay traffic --against: {e}")))?;
+    let diff = build_traffic_diff_report(&report);
 
     let mut stdout = std::io::stdout().lock();
     if args.json {
-        let serialized = serde_json::to_string(&report)
-            .map_err(|e| CliError::Other(format!("serialize replay report: {e}")))?;
-        writeln!(stdout, "{serialized}")
+        render_traffic_diff_json(&mut stdout, &diff)
             .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
     } else {
-        writeln!(
-            stdout,
-            "chio replay traffic --against {}: {} frame(s), {} match, {} drift, {} error (run_id={})",
-            report.against_label,
-            report.total,
-            report.matches,
-            report.drifts,
-            report.errors,
-            report.run_id,
-        )
-        .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
-        for outcome in &report.outcomes {
-            let captured = format!("{:?}", outcome.captured_verdict).to_lowercase();
-            match (&outcome.replay_verdict, &outcome.error) {
-                (Some(replay), None) => {
-                    let replay_str = format!("{replay:?}").to_lowercase();
-                    let drift_marker = if replay == &outcome.captured_verdict {
-                        "ok"
-                    } else {
-                        "DRIFT"
-                    };
-                    writeln!(
-                        stdout,
-                        "  line {:>4} {} captured={captured} replay={replay_str} {}",
-                        outcome.line, drift_marker, outcome.replay_receipt_id,
-                    )
-                    .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
-                }
-                (_, Some(err)) => {
-                    writeln!(
-                        stdout,
-                        "  line {:>4} ERROR captured={captured} {} ({err})",
-                        outcome.line, outcome.replay_receipt_id,
-                    )
-                    .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
-                }
-                (None, None) => {
-                    writeln!(
-                        stdout,
-                        "  line {:>4} ??? captured={captured} {}",
-                        outcome.line, outcome.replay_receipt_id,
-                    )
-                    .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
-                }
-            }
-        }
+        render_traffic_diff_human(&mut stdout, &diff)
+            .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
     }
 
-    if !report.ok() {
+    if !diff.ok() {
         // Drift / error -> non-zero exit via CliError. The canonical
         // M04 exit-code registry mapping (10 = benign drift, 20 = bad
         // signature, 30 = parse, 40 = schema, 50 = root mismatch) is
@@ -257,7 +211,7 @@ fn cmd_replay_traffic_with_against(
         // wire-stable.
         return Err(CliError::Other(format!(
             "chio replay traffic --against: report has drift/errors ({} drift, {} error)",
-            report.drifts, report.errors
+            diff.drifts, diff.errors
         )));
     }
     Ok(())

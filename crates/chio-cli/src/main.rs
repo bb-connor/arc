@@ -39,6 +39,7 @@ include!("cli/replay/validate.rs");
 include!("cli/replay/policy_ref.rs");
 include!("cli/replay/receipt_partition.rs");
 include!("cli/replay/execute.rs");
+include!("cli/replay/diff.rs");
 include!("cli/replay/traffic.rs");
 
 #[cfg(test)]
