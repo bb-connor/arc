@@ -7,12 +7,18 @@
 # runner-minutes per rolling 30-day window, leaving 200-minute headroom
 # for everything else on the free tier.
 #
-# This script queries the workflow-run history for the cflite_pr.yml and
-# cflite_batch.yml workflows (M02-owned), sums their billed seconds across
-# the last 30 days, converts to minutes, and exits non-zero when the sum
-# crosses 1,800. The orchestrator runs this on a scheduled cadence and as
-# a step in cflite_batch.yml so the cap acts as a hard halt rather than a
-# soft warning.
+# This script queries the workflow-run history for the cflite_pr.yml,
+# cflite_batch.yml, and fuzz.yml workflows (all M02-owned), sums their
+# billed seconds across the last 30 days, converts to minutes, and exits
+# non-zero when the sum crosses 1,800. The orchestrator runs this on a
+# scheduled cadence and as a step in cflite_batch.yml plus fuzz.yml so the
+# cap acts as a hard halt rather than a soft warning.
+#
+# Cleanup C6: fuzz.yml was previously omitted from the WORKFLOWS array,
+# which meant the native cargo-fuzz scheduled matrix could burn its full
+# nightly 13 * 30 = 390 billed-min without contributing to the cap. The
+# entry below restores the gate's intended coverage of every fuzz lane on
+# the 1,800-min budget.
 #
 # Usage:
 #   scripts/check-fuzz-budget.sh                      # default repo: bb-connor/arc
@@ -31,7 +37,7 @@ set -euo pipefail
 REPO="${1:-bb-connor/arc}"
 CAP_MINUTES="${GH_FUZZ_BUDGET_MINUTES:-1800}"
 WINDOW_DAYS=30
-WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml")
+WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml" "fuzz.yml")
 
 err() { printf '%s\n' "$*" >&2; }
 

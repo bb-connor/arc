@@ -7,13 +7,27 @@
 //! exposes these symbols, and never gets recompiled with libFuzzer
 //! instrumentation.
 //!
-//! The single entry point [`fuzz_jwt_vc_verify`] consumes arbitrary bytes
+//! The entry point [`fuzz_jwt_vc_verify`] consumes arbitrary bytes
 //! and drives them through [`crate::verify_chio_passport_jwt_vc_json`], the
 //! Chio-flavoured JWT-VC trust boundary. The verifier is fail-closed by
 //! construction (every invalid input must surface as
 //! `Err(CredentialError::*)`, never a panic), so this fuzz target exists to
 //! catch parse-path regressions in the compact-JWT decoder, base64url path,
 //! `serde_json` decoder, and downstream schema-shape checks.
+//!
+//! Cleanup C6: arbitrary fuzzer bytes can almost never produce a valid
+//! Ed25519 signature against the fixed-issuer keypair, so the verifier
+//! always returns at the signature-check step before reaching the
+//! payload-shape branch (`vc` typed-claim shape, `cnf.jwk`,
+//! `iat`/`nbf`/`exp` consistency). To get coverage on those paths
+//! WITHOUT producing valid signatures, we additionally drive the same
+//! bytes through `serde_json::from_slice` against the typed envelope and
+//! verification structs ([`ChioPassportJwtVcJsonEnvelope`] and
+//! [`ChioPassportJwtVcJsonVerification`]). Both have `deny_unknown_fields`
+//! semantics on every nested struct, so this exercise hardens the
+//! schema layer that the signature gate would otherwise hide. The
+//! `Result` is discarded on purpose: any panic surfaces as a libFuzzer
+//! crash; `Err(_)` is the fail-closed expected result.
 //!
 //! The issuer keypair is fixed via [`Keypair::from_seed`] with a constant
 //! 32-byte seed, wrapped in a [`OnceLock`] so the keypair is materialised
@@ -26,7 +40,8 @@ use std::sync::OnceLock;
 use chio_core::{Keypair, PublicKey};
 
 use crate::{
-    verify_chio_passport_jwt_vc_json, verify_oid4vp_direct_post_response, Oid4vpDcqlQuery,
+    verify_chio_passport_jwt_vc_json, verify_oid4vp_direct_post_response,
+    ChioPassportJwtVcJsonEnvelope, ChioPassportJwtVcJsonVerification, Oid4vpDcqlQuery,
     Oid4vpRequestObject, Oid4vpRequestedCredential, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
     CHIO_PASSPORT_SD_JWT_VC_TYPE, OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI,
     OID4VP_RESPONSE_MODE_DIRECT_POST_JWT, OID4VP_RESPONSE_TYPE_VP_TOKEN,
@@ -60,12 +75,30 @@ fn issuer_public_key() -> &'static PublicKey {
 /// `Err(CredentialError::*)` (good) or a panic / abort (which libFuzzer
 /// surfaces as a crash). No arbitrary input can produce `Ok(_)` because the
 /// signature check requires a key controlled by the issuer keypair above.
+///
+/// Cleanup C6: arbitrary fuzzer bytes essentially never produce a valid
+/// Ed25519 signature, so the verifier always returns at the
+/// signature-check step before reaching the payload-shape branches
+/// (`vc` typed-claim shape, `cnf.jwk`, `iat`/`nbf`/`exp` consistency).
+/// We therefore additionally drive the same bytes through
+/// `serde_json::from_slice` against the typed envelope and
+/// verification-result structs so the schema layer
+/// (`deny_unknown_fields` plus camelCase rename plus typed
+/// `PortableEd25519Jwk` decode) gets exercised on every iteration.
+/// The `Result`s are discarded; panics are the only fuzz finding.
 pub fn fuzz_jwt_vc_verify(data: &[u8]) {
-    let Ok(compact) = std::str::from_utf8(data) else {
-        return;
-    };
-    // Errors are discarded by design; we are exercising the parse path.
-    let _ = verify_chio_passport_jwt_vc_json(compact, issuer_public_key(), FUZZ_NOW);
+    // Trust-boundary path: compact-JWT string -> verify pipeline.
+    if let Ok(compact) = std::str::from_utf8(data) {
+        let _ = verify_chio_passport_jwt_vc_json(compact, issuer_public_key(), FUZZ_NOW);
+    }
+
+    // Schema-shape paths: typed deserialization for envelope and
+    // verification-result structs. These cover the JWT-VC schema layer
+    // that the signature gate hides on the verify path. Both structs
+    // declare `serde(rename_all = "camelCase")` plus
+    // `deny_unknown_fields` semantics on every nested struct.
+    let _ = serde_json::from_slice::<ChioPassportJwtVcJsonEnvelope>(data);
+    let _ = serde_json::from_slice::<ChioPassportJwtVcJsonVerification>(data);
 }
 
 /// Stable Chio OID4VP verifier identifier used for the fuzz request fixture.

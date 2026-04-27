@@ -1,5 +1,12 @@
 // owned-by: M02 (fuzz lane); shared smoke infra authored under M02.P1.T1.a.
 //
+// Cleanup C6: this integration test treats a missing or empty corpus
+// directory as a hard failure (panic), so we explicitly allow panic-style
+// helpers here. The fuzz crate's workspace lint denies `unwrap`/`expect`
+// in production code; smoke tests are panic-detector scaffolding and the
+// panic IS the signal.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 //! Smoke tests for libFuzzer targets.
 //!
 //! Each fuzz target gets a `<target>_smoke` test that loads its seed corpus
@@ -13,6 +20,12 @@
 //! (T1.a through T8) on top of the existing `attest_verify` target seeded
 //! by M09.P3.T5; each ticket appends a `#[test]` block here referencing the
 //! target's seed directory under `fuzz/corpus/`.
+//!
+//! Cleanup C6: the harness panics if a corpus directory is missing,
+//! unreadable, or empty. Without that floor, a renamed directory or a
+//! typo'd target name would let the smoke test report "1 passed" without
+//! ever feeding a single byte through the fuzz entry point. See
+//! `assert_seed_floor` below.
 //!
 //! Reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 
@@ -28,80 +41,98 @@ fn corpus_dir(name: &str) -> PathBuf {
 }
 
 /// Iterate every readable seed file in `corpus/<target>/` and pass its bytes
-/// to `f`. Missing directories, unreadable entries, and read errors are
-/// silently skipped so the smoke harness mirrors the libFuzzer
-/// best-effort policy: a smoke test is a panic detector, not an integrity
-/// check on the corpus directory itself.
-fn each_seed<F: FnMut(&[u8])>(target: &str, mut f: F) {
+/// to `f`, returning the number of seeds processed.
+///
+/// Cleanup C6: a missing directory, an unreadable directory, or zero
+/// readable seed files all panic. The smoke harness is shared
+/// infrastructure -- a typo in the target name, a renamed corpus
+/// directory, or an accidental `git rm` would otherwise produce a
+/// silent vacuous "1 passed" result. Callers wrap this in
+/// `assert_seed_floor` to enforce the per-target seed-count floor.
+fn each_seed<F: FnMut(&[u8])>(target: &str, mut f: F) -> usize {
     let dir = corpus_dir(target);
-    if !dir.is_dir() {
-        return;
-    }
-    let entries = match fs::read_dir(&dir) {
-        Ok(entries) => entries,
-        Err(_) => return,
-    };
+    assert!(
+        dir.is_dir(),
+        "corpus directory missing for target {target}: {}",
+        dir.display()
+    );
+    let entries = fs::read_dir(&dir)
+        .unwrap_or_else(|err| panic!("read_dir({}) failed: {err}", dir.display()));
+    let mut count: usize = 0;
     for entry in entries {
         let entry = match entry {
             Ok(entry) => entry,
-            Err(_) => continue,
+            Err(err) => panic!("corpus entry error in {}: {err}", dir.display()),
         };
         let path = entry.path();
         if !path.is_file() {
             continue;
         }
-        if let Ok(bytes) = fs::read(&path) {
-            f(&bytes);
-        }
+        let bytes =
+            fs::read(&path).unwrap_or_else(|err| panic!("read({}) failed: {err}", path.display()));
+        f(&bytes);
+        count += 1;
     }
+    count
+}
+
+/// Run `each_seed` and assert at least one seed file was processed.
+/// Centralised so every smoke test gets the floor without each call site
+/// having to spell it out.
+fn assert_seed_floor<F: FnMut(&[u8])>(target: &str, f: F) {
+    let processed = each_seed(target, f);
+    assert!(
+        processed > 0,
+        "smoke test for {target} processed zero seed files; corpus dir is empty (expected at least one .bin under fuzz/corpus/{target}/)"
+    );
 }
 
 #[test]
 fn jwt_vc_verify_smoke() {
     use chio_credentials::fuzz::fuzz_jwt_vc_verify;
-    each_seed("jwt_vc_verify", fuzz_jwt_vc_verify);
+    assert_seed_floor("jwt_vc_verify", fuzz_jwt_vc_verify);
 }
 
 #[test]
 fn oid4vp_presentation_smoke() {
     use chio_credentials::fuzz::fuzz_oid4vp_presentation;
-    each_seed("oid4vp_presentation", fuzz_oid4vp_presentation);
+    assert_seed_floor("oid4vp_presentation", fuzz_oid4vp_presentation);
 }
 
 #[test]
 fn did_resolve_smoke() {
     use chio_did::fuzz::fuzz_did_resolve;
-    each_seed("did_resolve", fuzz_did_resolve);
+    assert_seed_floor("did_resolve", fuzz_did_resolve);
 }
 
 #[test]
 fn anchor_bundle_verify_smoke() {
     use chio_anchor::fuzz::fuzz_anchor_bundle_verify;
-    each_seed("anchor_bundle_verify", fuzz_anchor_bundle_verify);
+    assert_seed_floor("anchor_bundle_verify", fuzz_anchor_bundle_verify);
 }
 
 #[test]
 fn mcp_envelope_decode_smoke() {
     use chio_mcp_edge::fuzz::fuzz_mcp_envelope_decode;
-    each_seed("mcp_envelope_decode", fuzz_mcp_envelope_decode);
+    assert_seed_floor("mcp_envelope_decode", fuzz_mcp_envelope_decode);
 }
 
 #[test]
 fn a2a_envelope_decode_smoke() {
     use chio_a2a_adapter::fuzz::fuzz_a2a_envelope_decode;
-    each_seed("a2a_envelope_decode", fuzz_a2a_envelope_decode);
+    assert_seed_floor("a2a_envelope_decode", fuzz_a2a_envelope_decode);
 }
 
 #[test]
 fn acp_envelope_decode_smoke() {
     use chio_acp_edge::fuzz::fuzz_acp_envelope_decode;
-    each_seed("acp_envelope_decode", fuzz_acp_envelope_decode);
+    assert_seed_floor("acp_envelope_decode", fuzz_acp_envelope_decode);
 }
 
 #[test]
 fn wasm_preinstantiate_validate_smoke() {
     use chio_wasm_guards::fuzz::fuzz_wasm_preinstantiate_validate;
-    each_seed(
+    assert_seed_floor(
         "wasm_preinstantiate_validate",
         fuzz_wasm_preinstantiate_validate,
     );
@@ -110,23 +141,23 @@ fn wasm_preinstantiate_validate_smoke() {
 #[test]
 fn wit_host_call_boundary_smoke() {
     use chio_wasm_guards::fuzz::fuzz_wit_host_call_boundary;
-    each_seed("wit_host_call_boundary", fuzz_wit_host_call_boundary);
+    assert_seed_floor("wit_host_call_boundary", fuzz_wit_host_call_boundary);
 }
 
 #[test]
 fn chio_yaml_parse_smoke() {
     use chio_config::fuzz::fuzz_chio_yaml_parse;
-    each_seed("chio_yaml_parse", fuzz_chio_yaml_parse);
+    assert_seed_floor("chio_yaml_parse", fuzz_chio_yaml_parse);
 }
 
 #[test]
 fn openapi_ingest_smoke() {
     use chio_openapi_mcp_bridge::fuzz::fuzz_openapi_ingest;
-    each_seed("openapi_ingest", fuzz_openapi_ingest);
+    assert_seed_floor("openapi_ingest", fuzz_openapi_ingest);
 }
 
 #[test]
 fn receipt_log_replay_smoke() {
     use chio_kernel_core::fuzz::fuzz_receipt_log_replay;
-    each_seed("receipt_log_replay", fuzz_receipt_log_replay);
+    assert_seed_floor("receipt_log_replay", fuzz_receipt_log_replay);
 }
