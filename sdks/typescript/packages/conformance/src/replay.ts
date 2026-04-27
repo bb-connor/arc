@@ -64,6 +64,8 @@ export interface ReplayRunnerOptions {
   expectedCount?: number;
 }
 
+export type ReplayAnchoredRootTupleList = ReplayAnchoredRootTuple[];
+
 export class ReplayScenarioError extends Error {
   constructor(message: string) {
     super(message);
@@ -175,6 +177,18 @@ export async function runReplayScenarios(
     );
   }
   return scenarios.map((scenario) => runReplayScenario(scenario));
+}
+
+export function anchoredRootTuplesForReplayOutputs(
+  outputs: readonly ReplayScenarioOutput[],
+): ReplayAnchoredRootTupleList {
+  return outputs.map((output) => output.anchoredRoot);
+}
+
+export async function runReplayAnchoredRootTuples(
+  options: ReplayRunnerOptions = {},
+): Promise<ReplayAnchoredRootTupleList> {
+  return anchoredRootTuplesForReplayOutputs(await runReplayScenarios(options));
 }
 
 export function buildReplayReceipt(manifest: ReplayManifest): ReplayReceipt {
