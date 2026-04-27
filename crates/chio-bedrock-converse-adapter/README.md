@@ -19,10 +19,10 @@ an AWS client and does not make network calls in tests or normal builds.
 
 | Ticket | Deliverable                                                               | Status |
 | ------ | ------------------------------------------------------------------------- | ------ |
-| T1     | Crate scaffold, workspace SDK pin, `us-east-1` gate, native types, transport trait | this PR |
-| T2     | `ProviderAdapter::lift`/`lower` for batch `Converse` toolUse/toolResult blocks | pending |
-| T3     | `ConverseStream` buffering with verdict at `contentBlockStart` for `toolUse` | pending |
-| T4     | IAM principal disambiguation via signed `config/iam_principals.toml` and STS bootstrap | pending |
+| T1     | Crate scaffold, workspace SDK pin, `us-east-1` gate, native types, transport trait | done |
+| T2     | `ProviderAdapter::lift`/`lower` for batch `Converse` toolUse/toolResult blocks | done |
+| T3     | `ConverseStream` buffering with verdict at `contentBlockStart` for `toolUse` | done |
+| T4     | IAM principal disambiguation via signed `config/iam_principals.toml` and STS bootstrap | this PR |
 | T5     | 12 Bedrock conformance fixtures and cold-init budget evidence             | pending |
 
 ## Crate layout
@@ -32,9 +32,13 @@ crates/chio-bedrock-converse-adapter/
   Cargo.toml      workspace SDK dependency, pin metadata, lints
   README.md       this file
   src/
+    iam_principals.rs signed IAM mapping loader, STS identity cache
     lib.rs        BedrockAdapter, BedrockAdapterConfig, error type
     native.rs     toolConfig, toolUse, toolResult scaffold types
     transport.rs  Transport trait, MockTransport, region and API pins
+  config/
+    iam_principals.toml          default signed-config path
+    iam_principals.example.toml  operator template
 ```
 
 ## Scope in this scaffold
@@ -44,11 +48,32 @@ operations and rejects any region other than `us-east-1`. Native structs cover
 only the subset needed by later lift/lower work: `toolConfig`, `toolUse`, and
 `toolResult`.
 
-IAM principal resolution is not implemented in T1. The config accepts a
-caller ARN, account id, and optional assumed-role session ARN so provenance
-tests can use the shared `Principal::BedrockIam` shape without requiring AWS
-credentials. M07.P4.T4 adds signed mapping-file loading plus one STS
-`GetCallerIdentity` call per process.
+## IAM Principal Mapping
+
+Production Bedrock initialization should use
+`BedrockAdapter::new_with_signed_iam_principals_config_from_sts`. It performs
+one STS `GetCallerIdentity` call per process, loads
+`config/iam_principals.toml`, verifies the adjacent Sigstore bundle, and then
+resolves the caller to the shared `Principal::BedrockIam` shape.
+
+The required bundle path is the TOML path plus `.sigstore-bundle.json`:
+
+```text
+config/iam_principals.toml
+config/iam_principals.toml.sigstore-bundle.json
+```
+
+The verifier is the shared `chio-attest-verify` `AttestVerifier` surface.
+Operators must pass the expected Sigstore certificate identity and OIDC issuer
+from their deployment policy. Missing config, missing bundle, rejected
+signature, invalid TOML, unsupported schema, and unmapped callers all fail
+closed before tool-use traffic is lifted.
+
+Mapping order matters. The first exact or `*` wildcard match wins. For STS
+assumed-role callers, the adapter preserves the original
+`arn:aws:sts::...:assumed-role/.../...` session ARN in
+`assumed_role_session_arn` and stores the canonical IAM role ARN in
+`caller_arn`; it does not collapse the two fields.
 
 ## Building
 

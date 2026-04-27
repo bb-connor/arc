@@ -22,15 +22,22 @@
 #![forbid(unsafe_code)]
 
 pub mod adapter;
+pub mod iam_principals;
 pub mod native;
 pub mod transport;
 
 use std::sync::Arc;
 
+use chio_attest_verify::{AttestVerifier, ExpectedIdentity};
 use chio_tool_call_fabric::{Principal, ProviderId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub use iam_principals::{
+    AwsStsCallerIdentityProvider, BedrockCallerIdentity, IamPrincipalConfigError,
+    IamPrincipalMapping, IamPrincipalsConfig, ResolvedBedrockPrincipal,
+    DEFAULT_IAM_PRINCIPALS_CONFIG_PATH,
+};
 pub use native::{ToolConfig, ToolResultBlock, ToolResultStatus, ToolSpec, ToolUseBlock};
 pub use transport::{BedrockOperation, Transport, BEDROCK_CONVERSE_API_VERSION, BEDROCK_REGION};
 
@@ -134,6 +141,8 @@ impl BedrockAdapterConfig {
 pub struct BedrockAdapter {
     config: BedrockAdapterConfig,
     transport: Arc<dyn Transport>,
+    principal_owner: Option<String>,
+    matched_iam_principal_pattern: Option<String>,
 }
 
 impl BedrockAdapter {
@@ -149,7 +158,69 @@ impl BedrockAdapter {
                 requested: transport.region().to_string(),
             });
         }
-        Ok(Self { config, transport })
+        Ok(Self {
+            config,
+            transport,
+            principal_owner: None,
+            matched_iam_principal_pattern: None,
+        })
+    }
+
+    /// Build a new adapter by loading a signed IAM principal map and
+    /// resolving the caller identity before any tool traffic can be lifted.
+    pub fn new_with_signed_iam_principals_config(
+        mut config: BedrockAdapterConfig,
+        transport: Arc<dyn Transport>,
+        caller_identity: BedrockCallerIdentity,
+        iam_principals_path: impl AsRef<std::path::Path>,
+        verifier: &dyn AttestVerifier,
+        expected_identity: &ExpectedIdentity,
+    ) -> Result<Self, BedrockAdapterError> {
+        config.validate()?;
+        if transport.region() != BEDROCK_REGION {
+            return Err(BedrockAdapterError::UnsupportedRegion {
+                requested: transport.region().to_string(),
+            });
+        }
+
+        let iam_config = IamPrincipalsConfig::load_signed_from_path(
+            iam_principals_path,
+            verifier,
+            expected_identity,
+        )?;
+        let resolved = iam_config.resolve(&caller_identity)?;
+
+        config.caller_arn = resolved.caller_arn.clone();
+        config.account_id = resolved.account_id.clone();
+        config.assumed_role_session_arn = resolved.assumed_role_session_arn.clone();
+
+        Ok(Self {
+            config,
+            transport,
+            principal_owner: Some(resolved.owner),
+            matched_iam_principal_pattern: Some(resolved.matched_pattern),
+        })
+    }
+
+    /// Resolve STS identity once per process, then initialize from the
+    /// signed IAM principal config.
+    pub async fn new_with_signed_iam_principals_config_from_sts(
+        config: BedrockAdapterConfig,
+        transport: Arc<dyn Transport>,
+        sts_provider: &AwsStsCallerIdentityProvider,
+        iam_principals_path: impl AsRef<std::path::Path>,
+        verifier: &dyn AttestVerifier,
+        expected_identity: &ExpectedIdentity,
+    ) -> Result<Self, BedrockAdapterError> {
+        let caller_identity = sts_provider.get_caller_identity_once().await?;
+        Self::new_with_signed_iam_principals_config(
+            config,
+            transport,
+            caller_identity,
+            iam_principals_path,
+            verifier,
+            expected_identity,
+        )
     }
 
     /// Provider identifier for this adapter.
@@ -177,6 +248,16 @@ impl BedrockAdapter {
         &self.transport
     }
 
+    /// Chio owner/team label resolved from the signed IAM principal map.
+    pub fn principal_owner(&self) -> Option<&str> {
+        self.principal_owner.as_deref()
+    }
+
+    /// Mapping pattern that authorized the configured IAM principal.
+    pub fn matched_iam_principal_pattern(&self) -> Option<&str> {
+        self.matched_iam_principal_pattern.as_deref()
+    }
+
     /// Name of the SDK client type pulled in by the workspace pin.
     ///
     /// This references the SDK crate without constructing a client, so the
@@ -202,6 +283,9 @@ pub enum BedrockAdapterError {
     /// Bubbled up from the transport layer.
     #[error(transparent)]
     Transport(#[from] transport::TransportError),
+    /// Signed IAM principal config loading or resolution failed.
+    #[error(transparent)]
+    IamPrincipals(#[from] iam_principals::IamPrincipalConfigError),
     /// Structured placeholder for lift/lower paths that land in later
     /// tickets.
     #[error("bedrock converse adapter call site is not implemented in T1: {0}")]
