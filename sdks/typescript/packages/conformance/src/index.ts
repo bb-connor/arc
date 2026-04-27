@@ -19,4 +19,17 @@ export {
   verifyContentHash,
   assertVerdictMatch,
 } from "./verify.js";
+export {
+  BROWSER_SUBSET_V1,
+  BROWSER_SUBSET_TAG,
+  selector,
+} from "./browser-subset.js";
+export type {
+  BrowserSubsetCategory,
+  BrowserSubsetSelection,
+  CategorySelection,
+  ConformanceCase,
+  ConformanceCategoryFile,
+  ConformanceManifest,
+} from "./browser-subset.js";
 export * as Schemas from "./_generated/index.js";
