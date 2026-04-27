@@ -7,7 +7,7 @@ use chio_core_types::crypto::Keypair;
 use chio_kernel::ToolCallRequest;
 use chio_tower::{KernelRequest, KernelServiceError, TenantConcurrencyLimitLayer};
 use tokio::sync::Notify;
-use tower::{service_fn, Service, ServiceExt};
+use tower::{service_fn, Service};
 use tower_layer::Layer;
 
 #[derive(Debug)]
@@ -98,7 +98,7 @@ async fn join_call(handle: tokio::task::JoinHandle<Result<(), KernelServiceError
 }
 
 #[tokio::test]
-async fn same_tenant_calls_share_one_concurrency_slot() {
+async fn same_tenant_saturation_returns_overloaded_without_waiting() {
     let recorder = Arc::new(Recorder::new());
     let inner_recorder = Arc::clone(&recorder);
     let inner = service_fn(move |_request: KernelRequest| {
@@ -110,8 +110,6 @@ async fn same_tenant_calls_share_one_concurrency_slot() {
     let mut first_service = service.clone();
     let first = tokio::spawn(async move {
         first_service
-            .ready()
-            .await?
             .call(make_request("req-a-1", "tenant-a"))
             .await
     });
@@ -121,8 +119,6 @@ async fn same_tenant_calls_share_one_concurrency_slot() {
     let mut second_service = service.clone();
     let second = tokio::time::timeout(Duration::from_millis(100), async move {
         second_service
-            .ready()
-            .await?
             .call(make_request("req-a-2", "tenant-a"))
             .await
     })
@@ -133,20 +129,14 @@ async fn same_tenant_calls_share_one_concurrency_slot() {
         Ok(other) => panic!("expected overloaded result, got {other:?}"),
         Err(error) => panic!("overloaded result should not wait: {error}"),
     }
-    assert_eq!(
-        recorder.max_active(),
-        1,
-        "same tenant requests must not exceed the active limit"
-    );
-
-    recorder.release.notify_one();
-    join_call(first).await;
 
     assert_eq!(recorder.max_active(), 1);
+    recorder.release.notify_one();
+    join_call(first).await;
 }
 
 #[tokio::test]
-async fn different_tenants_have_independent_concurrency_slots() {
+async fn different_tenants_are_not_shed_by_each_other() {
     let recorder = Arc::new(Recorder::new());
     let inner_recorder = Arc::clone(&recorder);
     let inner = service_fn(move |_request: KernelRequest| {
@@ -158,8 +148,6 @@ async fn different_tenants_have_independent_concurrency_slots() {
     let mut first_service = service.clone();
     let first = tokio::spawn(async move {
         first_service
-            .ready()
-            .await?
             .call(make_request("req-a-1", "tenant-a"))
             .await
     });
@@ -169,8 +157,6 @@ async fn different_tenants_have_independent_concurrency_slots() {
     let mut second_service = service.clone();
     let second = tokio::spawn(async move {
         second_service
-            .ready()
-            .await?
             .call(make_request("req-b-1", "tenant-b"))
             .await
     });
@@ -180,6 +166,5 @@ async fn different_tenants_have_independent_concurrency_slots() {
 
     join_call(first).await;
     join_call(second).await;
-
     assert_eq!(recorder.max_active(), 2);
 }
