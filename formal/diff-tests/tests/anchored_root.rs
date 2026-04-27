@@ -7,6 +7,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::merkle::{leaf_hash, MerkleTree};
@@ -16,6 +17,27 @@ const EXPECTED_FIXTURE_COUNT: usize = 50;
 const FIXED_CLOCK_EPOCH_MS: u64 = 1_767_225_600_000;
 const CANARY_RECEIPT_ID: &str = "allow_simple/01_basic_capability";
 const CANARY_LEAF_HASH: &str = "0xe4b0ab524d5ed0a97dec2d92d0dceba4d1b8abb551acacfafff9df69a16436bb";
+const HASH_BYTE_LENGTH: usize = 32;
+const HASH_HEX_LENGTH: usize = HASH_BYTE_LENGTH * 2;
+const TYPESCRIPT_ANCHORED_ROOT_SCRIPT: &str = r#"
+try {
+  const fixturesRoot = process.env.CHIO_REPLAY_FIXTURES_ROOT;
+  const expectedCount = Number(process.env.CHIO_REPLAY_EXPECTED_COUNT);
+  if (fixturesRoot == null || fixturesRoot.length === 0) {
+    throw new Error("CHIO_REPLAY_FIXTURES_ROOT must be set");
+  }
+  if (!Number.isSafeInteger(expectedCount) || expectedCount < 1) {
+    throw new Error("CHIO_REPLAY_EXPECTED_COUNT must be a positive safe integer");
+  }
+
+  const { runReplayAnchoredRootTuples } = await import("./src/replay.ts");
+  const tuples = await runReplayAnchoredRootTuples({ fixturesRoot, expectedCount });
+  process.stdout.write(JSON.stringify(tuples));
+} catch (error) {
+  process.stderr.write(error && error.stack ? error.stack : String(error));
+  process.exit(1);
+}
+"#;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AnchoredRootTuple {
@@ -30,6 +52,13 @@ struct InclusionProofTuple {
     tree_size: usize,
     leaf_index: usize,
     audit_path: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProofPath {
+    tree_size: usize,
+    leaf_index: usize,
+    audit_path: Vec<[u8; HASH_BYTE_LENGTH]>,
 }
 
 #[test]
@@ -85,6 +114,59 @@ fn rust_anchored_root_tuples_emit_in_deterministic_order() -> Result<(), String>
 }
 
 #[test]
+fn rust_and_typescript_anchored_root_tuples_match_by_root_bytes_and_proof_structure(
+) -> Result<(), String> {
+    let fixtures_root = workspace_root().join("tests/replay/fixtures");
+    let rust_tuples = emit_anchored_root_tuples_from(&fixtures_root)?;
+    let typescript_tuples = emit_typescript_anchored_root_tuples_from(&fixtures_root)?;
+
+    assert_eq!(
+        typescript_tuples.len(),
+        rust_tuples.len(),
+        "TypeScript and Rust tuple counts must match"
+    );
+
+    for (index, (rust_tuple, typescript_tuple)) in
+        rust_tuples.iter().zip(&typescript_tuples).enumerate()
+    {
+        assert_eq!(
+            typescript_tuple.receipt_id, rust_tuple.receipt_id,
+            "tuple {index} receipt_id differs between TypeScript and Rust"
+        );
+
+        let rust_root = hex_hash_bytes(
+            &rust_tuple.root,
+            &format!("Rust root for {}", rust_tuple.receipt_id),
+        )?;
+        let typescript_root = hex_hash_bytes(
+            &typescript_tuple.root,
+            &format!("TypeScript root for {}", rust_tuple.receipt_id),
+        )?;
+        assert_eq!(
+            typescript_root, rust_root,
+            "Merkle root bytes differ for {}",
+            rust_tuple.receipt_id,
+        );
+
+        let rust_path = proof_path_structure(
+            &rust_tuple.inclusion_proof,
+            &format!("Rust proof for {}", rust_tuple.receipt_id),
+        )?;
+        let typescript_path = proof_path_structure(
+            &typescript_tuple.inclusion_proof,
+            &format!("TypeScript proof for {}", rust_tuple.receipt_id),
+        )?;
+        assert_eq!(
+            typescript_path, rust_path,
+            "inclusion proof path structure differs for {}",
+            rust_tuple.receipt_id,
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn rust_anchored_root_tuples_fail_closed_on_invalid_fixture_root() {
     let result = emit_anchored_root_tuples_from(&workspace_root().join("tests/replay/missing"));
     assert!(
@@ -114,6 +196,42 @@ fn emit_anchored_root_tuples_from(root: &Path) -> Result<Vec<AnchoredRootTuple>,
             build_tuple_from_manifest(&manifest)
         })
         .collect()
+}
+
+fn emit_typescript_anchored_root_tuples_from(
+    root: &Path,
+) -> Result<Vec<AnchoredRootTuple>, String> {
+    let conformance_dir = workspace_root().join("sdks/typescript/packages/conformance");
+    let output = Command::new("bun")
+        .arg("--silent")
+        .arg("--eval")
+        .arg(TYPESCRIPT_ANCHORED_ROOT_SCRIPT)
+        .current_dir(&conformance_dir)
+        .env("CHIO_REPLAY_FIXTURES_ROOT", root.as_os_str())
+        .env(
+            "CHIO_REPLAY_EXPECTED_COUNT",
+            EXPECTED_FIXTURE_COUNT.to_string(),
+        )
+        .output()
+        .map_err(|error| {
+            format!(
+                "spawn TypeScript anchored-root tuple runner in {}: {error}",
+                conformance_dir.display()
+            )
+        })?;
+
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "TypeScript anchored-root tuple runner failed: status={} stdout={} stderr={}",
+            output.status,
+            stdout.trim(),
+            stderr.trim(),
+        ));
+    }
+
+    parse_anchored_root_tuple_list(&output.stdout, "TypeScript anchored-root tuple output")
 }
 
 fn build_tuple_from_manifest(manifest: &Value) -> Result<AnchoredRootTuple, String> {
@@ -157,6 +275,114 @@ fn build_tuple_from_manifest(manifest: &Value) -> Result<AnchoredRootTuple, Stri
         },
         root: root.to_hex_prefixed(),
     })
+}
+
+fn parse_anchored_root_tuple_list(
+    raw: &[u8],
+    context: &str,
+) -> Result<Vec<AnchoredRootTuple>, String> {
+    let value: Value =
+        serde_json::from_slice(raw).map_err(|error| format!("parse {context} as JSON: {error}"))?;
+    let tuples = value
+        .as_array()
+        .ok_or_else(|| format!("{context} must be a JSON array"))?;
+
+    tuples
+        .iter()
+        .enumerate()
+        .map(|(index, tuple)| parse_anchored_root_tuple(tuple, &format!("{context}[{index}]")))
+        .collect()
+}
+
+fn parse_anchored_root_tuple(value: &Value, context: &str) -> Result<AnchoredRootTuple, String> {
+    let proof = value
+        .get("inclusion_proof")
+        .ok_or_else(|| format!("{context} missing inclusion_proof"))?;
+
+    Ok(AnchoredRootTuple {
+        receipt_id: json_string_field(value, "receipt_id", context)?.to_string(),
+        leaf_hash: json_string_field(value, "leaf_hash", context)?.to_string(),
+        inclusion_proof: InclusionProofTuple {
+            tree_size: json_usize_field(proof, "tree_size", context)?,
+            leaf_index: json_usize_field(proof, "leaf_index", context)?,
+            audit_path: json_string_array_field(proof, "audit_path", context)?,
+        },
+        root: json_string_field(value, "root", context)?.to_string(),
+    })
+}
+
+fn json_string_field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|field| !field.is_empty())
+        .ok_or_else(|| format!("{context} missing non-empty string field {key}"))
+}
+
+fn json_usize_field(value: &Value, key: &str, context: &str) -> Result<usize, String> {
+    let raw = value
+        .get(key)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("{context} missing non-negative integer field {key}"))?;
+    usize::try_from(raw)
+        .map_err(|error| format!("{context} field {key} does not fit usize: {error}"))
+}
+
+fn json_string_array_field(value: &Value, key: &str, context: &str) -> Result<Vec<String>, String> {
+    let array = value
+        .get(key)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{context} missing array field {key}"))?;
+
+    array
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            item.as_str()
+                .filter(|field| !field.is_empty())
+                .map(str::to_string)
+                .ok_or_else(|| format!("{context} field {key}[{index}] must be a non-empty string"))
+        })
+        .collect()
+}
+
+fn proof_path_structure(proof: &InclusionProofTuple, context: &str) -> Result<ProofPath, String> {
+    let audit_path = proof
+        .audit_path
+        .iter()
+        .enumerate()
+        .map(|(index, hash)| hex_hash_bytes(hash, &format!("{context} audit_path[{index}]")))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(ProofPath {
+        tree_size: proof.tree_size,
+        leaf_index: proof.leaf_index,
+        audit_path,
+    })
+}
+
+fn hex_hash_bytes(value: &str, context: &str) -> Result<[u8; HASH_BYTE_LENGTH], String> {
+    let hex = value
+        .strip_prefix("0x")
+        .ok_or_else(|| format!("{context} must start with 0x"))?;
+    if hex.len() != HASH_HEX_LENGTH {
+        return Err(format!(
+            "{context} must contain {HASH_HEX_LENGTH} hex chars, found {}",
+            hex.len(),
+        ));
+    }
+
+    let mut out = [0u8; HASH_BYTE_LENGTH];
+    for (index, chunk) in hex.as_bytes().chunks_exact(2).enumerate() {
+        let pair = std::str::from_utf8(chunk).map_err(|error| {
+            format!("{context} contains non-UTF-8 hex at byte {index}: {error}")
+        })?;
+        out[index] = u8::from_str_radix(pair, 16).map_err(|error| {
+            format!("{context} contains invalid hex pair {pair:?} at byte {index}: {error}")
+        })?;
+    }
+
+    Ok(out)
 }
 
 fn enumerate_manifests(root: &Path) -> Result<Vec<PathBuf>, String> {
