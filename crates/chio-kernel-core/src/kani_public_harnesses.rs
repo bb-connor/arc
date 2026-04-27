@@ -670,6 +670,77 @@ fn verify_delegation_chain_step() {
     if child_valid {
         assert!(parent_valid);
     }
+
+    // (5) Bind the synthetic per-axis predicate to runtime subset wiring.
+    // Build two `NormalizedToolGrant`s where every axis is set from the
+    // primitive booleans/values driving `one_step_attenuation_predicate`,
+    // then assert that whenever the predicate accepts the step, the
+    // production `NormalizedToolGrant::is_subset_of` agrees. Without this
+    // step, a regression that inverted, dropped, or mis-projected an
+    // axis in the runtime path (e.g. an accidental `parent.contains(child)`
+    // -> `child.contains(parent)` flip on constraints) would not affect
+    // the synthetic predicate the harness reasons about, and the proof
+    // would still pass.
+    //
+    // We pin server / tool / operations / constraints to a single
+    // identity-covering shape (so the harness stays inside the bounded
+    // search space convention used by the rest of this module's kani
+    // proofs) and let the cap / dpop axes vary symbolically. The
+    // `assume_single_normalized_tool_grant` helper enforces the same
+    // bounds that the existing single-grant kani harnesses assume.
+    let parent_grant = NormalizedToolGrant {
+        server_id: "s".to_string(),
+        tool_name: "r".to_string(),
+        operations: vec![NormalizedOperation::Invoke],
+        constraints: vec![],
+        max_invocations: if parent_has_inv_cap {
+            Some(parent_inv_cap)
+        } else {
+            None
+        },
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: if parent_dpop_required {
+            Some(true)
+        } else {
+            None
+        },
+    };
+    let child_grant = NormalizedToolGrant {
+        server_id: "s".to_string(),
+        tool_name: "r".to_string(),
+        operations: vec![NormalizedOperation::Invoke],
+        constraints: vec![],
+        max_invocations: if child_has_inv_cap {
+            Some(child_inv_cap)
+        } else {
+            None
+        },
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: if child_dpop_required {
+            Some(true)
+        } else {
+            None
+        },
+    };
+
+    // Identity-covered shape: server / tool patterns equal, single Invoke
+    // operation, empty constraints. Under these axes the per-axis
+    // predicate reduces to `inv_ok && dpop_ok`, which the runtime subset
+    // call must agree with.
+    let runtime_subset = child_grant.is_subset_of(&parent_grant);
+    let predicate_under_identity =
+        optional_u32_cap_is_subset(
+            child_has_inv_cap,
+            child_inv_cap,
+            parent_has_inv_cap,
+            parent_inv_cap,
+        ) && required_true_is_preserved(parent_dpop_required, child_dpop_required);
+    assert_eq!(runtime_subset, predicate_under_identity);
+
+    core::mem::forget(parent_grant);
+    core::mem::forget(child_grant);
 }
 
 // NOTE (M03.P2.T3): Receipt sign/verify roundtrip integrity. The runtime

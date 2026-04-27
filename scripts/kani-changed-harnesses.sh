@@ -200,10 +200,13 @@ PY
 CHANGED_LINES=$(printf '%s\n' "$CHANGED_LINES_RAW" | python3 -c "$PARSE_HUNKS_PY")
 
 if [[ -z "$CHANGED_LINES" ]]; then
-  # Pure deletion in the harness source; treat as no functional change.
-  if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "kani-changed-harnesses.sh: only deletions in $HARNESS_SOURCE; nothing to run" >&2
-  fi
+  # Pure deletion in the harness source. We cannot tell from the new-side
+  # line numbers alone whether the deletion removed an `assert!` from a
+  # proof body, dropped a shared helper that multiple proofs depend on, or
+  # was a benign comment trim. Emitting an empty set in this case would
+  # silently skip Kani on a deletion-only harness change and weaken the
+  # required PR signal, so we fall back to the full lanes.pr sweep.
+  emit_full_lane "deletion-only edit in $HARNESS_SOURCE (cannot attribute deletions to a specific harness from new-side line numbers)"
   exit 0
 fi
 
@@ -219,30 +222,125 @@ from pathlib import Path
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
 
-# Find every `#[kani::proof]` attribute and the `fn <name>` that follows.
-# The function's range is from the `#[kani::proof]` line through the
-# line before the next `#[kani::proof]` (or EOF). This is a coarse upper
-# bound that is conservative on purpose: it captures the function body
-# plus any trailing whitespace or comments that belong to that harness.
+# Find every `#[kani::proof]` attribute and the `fn <name>` that follows,
+# plus the closing brace that ends each proof function's body. Helpers
+# (free functions, structs, impl blocks, comments) placed BETWEEN two
+# proofs are conventionally consumed by the FOLLOWING proof, not the
+# preceding one. The previous attribution scheme (each range = proof N
+# start through proof N+1 start - 1) misattributed those helpers to the
+# preceding proof and could silently skip the proof that actually
+# depended on the changed helper.
+#
+# New attribution:
+#   * proof N owns its own function body (proof start through matching
+#     close brace), exactly.
+#   * The gap BETWEEN proof N's close brace and proof N+1's start is
+#     attributed to proof N+1 (the following proof), since that is where
+#     pre-proof helpers conventionally live.
+#   * Anything before the first proof (imports, module-level helpers
+#     consumed by every harness, struct/impl blocks shared across many
+#     proofs) does NOT belong to any single proof; we mark such changes
+#     as `WIDEN` so the caller falls back to the full lane.
+#   * If a proof body cannot be brace-matched (truncated source, foreign
+#     macros), we conservatively widen the lane.
+
 proof = re.compile(r'^\s*#\[kani::proof\]')
 fn_re = re.compile(r'^\s*(?:pub\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)')
 
-starts = []
-for idx, line in enumerate(source, start=1):
-    if proof.match(line):
-        starts.append(idx)
 
+def find_body_end(start_idx):
+    """Return the 1-indexed line number of the `}` that ends the body of
+    the `fn ...` whose `{` opens at or after start_idx, or None if the
+    braces cannot be matched."""
+    depth = 0
+    open_seen = False
+    for j in range(start_idx, len(source) + 1):
+        line = source[j - 1]
+        # Strip line comments and crude string-literal handling. The kani
+        # harness file only uses simple ASCII identifiers and string
+        # literals without raw strings or escaped braces, so character-
+        # level scanning is sufficient.
+        in_str = False
+        escape = False
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if escape:
+                escape = False
+            elif in_str:
+                if ch == '\\':
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '/' and i + 1 < len(line) and line[i + 1] == '/':
+                    break
+                if ch == '"':
+                    in_str = True
+                elif ch == '{':
+                    depth += 1
+                    open_seen = True
+                elif ch == '}':
+                    depth -= 1
+                    if open_seen and depth == 0:
+                        return j
+            i += 1
+    return None
+
+
+# Phase 1: locate every #[kani::proof] and its fn name + body span.
+proofs = []  # (name, attr_line, fn_line, body_end_line)
+i = 0
+while i < len(source):
+    line = source[i]
+    if proof.match(line):
+        attr_line = i + 1
+        # Find the fn line that follows the attribute (skipping any
+        # additional attribute lines).
+        fn_line = None
+        name = None
+        for j in range(i + 1, len(source)):
+            m = fn_re.match(source[j])
+            if m:
+                fn_line = j + 1
+                name = m.group(1)
+                break
+            if not source[j].lstrip().startswith('#'):
+                break
+        if fn_line is None or name is None:
+            print("WIDEN")
+            sys.exit(0)
+        body_end = find_body_end(fn_line)
+        if body_end is None:
+            print("WIDEN")
+            sys.exit(0)
+        proofs.append((name, attr_line, fn_line, body_end))
+        i = body_end
+    else:
+        i += 1
+
+if not proofs:
+    print("WIDEN")
+    sys.exit(0)
+
+# Phase 2: build per-proof attribution ranges.
+#   * Region A: any line strictly before the first proof's attribute is
+#     "shared header" (imports / module-level helpers) and belongs to
+#     every proof; mark as widen-trigger.
+#   * For proof k > 0: the gap between proofs[k-1].body_end+1 and
+#     proofs[k].attr_line-1 is attributed to proof k (the FOLLOWING one).
+#   * Each proof always owns [attr_line, body_end].
 ranges = []  # (name, start_line, end_line)
-for i, start in enumerate(starts):
-    end = starts[i + 1] - 1 if i + 1 < len(starts) else len(source)
-    name = None
-    for j in range(start, end + 1):
-        m = fn_re.match(source[j - 1])
-        if m:
-            name = m.group(1)
-            break
-    if name is not None:
-        ranges.append((name, start, end))
+first_attr = proofs[0][1]
+header_end = first_attr - 1  # 1..header_end belongs to no specific proof.
+
+for k, (name, attr_line, _fn_line, body_end) in enumerate(proofs):
+    if k == 0:
+        start = attr_line
+    else:
+        prev_end = proofs[k - 1][3]
+        start = prev_end + 1
+    ranges.append((name, start, body_end))
 
 changed = set()
 for tok in sys.stdin.read().split():
@@ -254,6 +352,9 @@ for tok in sys.stdin.read().split():
 hits = []
 outside = False
 for ln in sorted(changed):
+    if ln <= header_end:
+        outside = True
+        break
     in_range = False
     for name, start, end in ranges:
         if start <= ln <= end:

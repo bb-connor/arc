@@ -26,6 +26,21 @@ use chio_policy::models::{DefaultAction, HushSpec, MergeStrategy, Rules, ToolAcc
 use chio_policy::{evaluate, Decision, EvaluationAction};
 use proptest::prelude::*;
 
+/// Build a `ProptestConfig` whose case count honours the `PROPTEST_CASES`
+/// environment variable used by the CI lanes (`256` for PR, `4096` for
+/// nightly). When the variable is unset or unparseable we fall back to
+/// the local default so cargo test stays fast. Without this helper, a
+/// per-block `ProptestConfig::with_cases(...)` literal would override the
+/// env-var derived default that proptest reads at startup, defeating the
+/// M03.P1.T6 tiered case-count gate.
+fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(default_cases);
+    ProptestConfig::with_cases(cases)
+}
+
 // ----- Strategies -------------------------------------------------------
 
 const HUSHSPEC_VERSION: &str = "0.1.0";
@@ -169,7 +184,7 @@ fn decision_strategy() -> impl Strategy<Value = Decision> {
 // ----- Invariants -------------------------------------------------------
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
+    #![proptest_config(proptest_config_for_lane(64))]
 
     /// Invariant 1: Policy `extends` chains compose associatively. With the
     /// default DeepMerge strategy, `merge(merge(a, b), c)` equals
@@ -197,13 +212,24 @@ proptest! {
     /// `allow` in successors (deny is absorptive across the chain).
     ///
     /// NOTE: the live `merge` function performs a child-overrides-base
-    /// composition rather than a deny-absorptive fold, so a child policy that
-    /// drops a denying rule can relax the result. The doc-named invariant is
-    /// therefore expressed at the `Decision` algebra level instead, which is
-    /// the level at which the absorption property is meaningful: combine the
-    /// per-policy decisions and assert that any `Deny` forces `Deny`. The
-    /// `evaluate` function provides per-policy decisions used as the
-    /// algebra's input set.
+    /// composition where a child `tool_access` rule wholesale replaces the
+    /// base's (see `merge_rules` in `crates/chio-policy/src/merge.rs`).
+    /// Deny-absorption at the merge level therefore only follows when the
+    /// chain is *itself* deny-preserving (every composed child carries the
+    /// ancestor's block forward). The doc-named invariant is encoded in
+    /// two layers that reinforce each other:
+    ///
+    ///   (a) Decision algebra fold (the algebraic content of the property,
+    ///       independent of any particular merge implementation).
+    ///   (b) A composed policy chain that exercises the live `merge` AND
+    ///       `evaluate` entry points end-to-end: each chain step's child
+    ///       block list is constructed so it includes both the child's
+    ///       deny target and any ancestor deny targets accumulated so far.
+    ///       This is the chain shape a real policy author writes when they
+    ///       want deny-absorption to hold under the live merge semantics
+    ///       (and exactly the one the merge implementation is designed to
+    ///       support). Under this composition, any predecessor Deny must
+    ///       still produce a Deny verdict from `evaluate(merged_spec)`.
     #[test]
     fn deny_overrides_warn_and_allow(
         decisions in proptest::collection::vec(decision_strategy(), 1..=8),
@@ -216,25 +242,62 @@ proptest! {
             prop_assert_ne!(combined, Decision::Deny);
         }
 
-        // Cross-check via a real `evaluate` round trip: build a per-decision
-        // policy that emits exactly that decision for a fixed action, then
-        // assert the combined fold matches `combine_decisions` on the same
-        // inputs. This ties the algebraic statement back to the live
-        // `evaluate` entry point.
+        // (a) Cross-check via per-decision specs evaluated independently:
+        // confirm each per-decision spec emits the requested decision when
+        // evaluated in isolation (so the spec encoding is correct).
+        let target_tool = "mail.send";
         let action = EvaluationAction {
             action_type: "tool_call".to_string(),
-            target: Some("mail.send".to_string()),
+            target: Some(target_tool.to_string()),
             ..EvaluationAction::default()
         };
         let live_decisions: Vec<Decision> = decisions
             .iter()
             .map(|target| {
-                let spec = decision_emitting_spec(*target, "mail.send");
+                let spec = decision_emitting_spec(*target, target_tool);
                 evaluate(&spec, &action).decision
             })
             .collect();
         prop_assert_eq!(live_decisions.clone(), decisions.clone());
         prop_assert_eq!(combine_decisions(&live_decisions), combined);
+
+        // (b) Build a deny-preserving composed policy chain through the
+        // live `merge` function. Walk decisions from oldest (decisions[0])
+        // toward newest (decisions[len-1]); at each step build a child
+        // spec whose block list carries forward every prior Deny's
+        // target alongside the current step's effect, mirroring how a
+        // policy author would author a deny-absorptive chain in HushSpec.
+        // Then merge into the accumulator and evaluate.
+        let mut accumulated_blocks: Vec<String> = Vec::new();
+        let mut accumulated_warns: Vec<String> = Vec::new();
+        let mut chain_iter = decisions.iter();
+        let Some(first) = chain_iter.next() else {
+            prop_assert!(false, "decisions vec was empty after generator");
+            return Ok(());
+        };
+        record_decision_target(&mut accumulated_blocks, &mut accumulated_warns, *first, target_tool);
+        let mut merged = chain_step_spec(&accumulated_blocks, &accumulated_warns);
+
+        for next in chain_iter {
+            record_decision_target(
+                &mut accumulated_blocks,
+                &mut accumulated_warns,
+                *next,
+                target_tool,
+            );
+            let step_spec = chain_step_spec(&accumulated_blocks, &accumulated_warns);
+            merged = merge(&merged, &step_spec);
+        }
+        let merged_decision = evaluate(&merged, &action).decision;
+
+        if any_deny {
+            prop_assert_eq!(
+                merged_decision,
+                Decision::Deny,
+                "deny-preserving chain dropped a predecessor Deny: {:?}",
+                decisions
+            );
+        }
     }
 
     /// Invariant 3: `evaluate(policy, request)` is a pure function of its
@@ -275,6 +338,67 @@ proptest! {
 }
 
 // ----- Helpers ----------------------------------------------------------
+
+/// Record the per-step decision into the accumulated `block` /
+/// `require_confirmation` lists used by `chain_step_spec`. Deny carries the
+/// target into the block list (and removes any prior warn duplicate);
+/// Warn carries it into the require-confirmation list when not already
+/// blocked; Allow is a no-op (the deny-absorption chain does not unblock).
+fn record_decision_target(
+    blocks: &mut Vec<String>,
+    warns: &mut Vec<String>,
+    decision: Decision,
+    target: &str,
+) {
+    match decision {
+        Decision::Deny => {
+            if !blocks.iter().any(|t| t == target) {
+                blocks.push(target.to_string());
+            }
+            warns.retain(|t| t != target);
+        }
+        Decision::Warn => {
+            if !blocks.iter().any(|t| t == target) && !warns.iter().any(|t| t == target) {
+                warns.push(target.to_string());
+            }
+        }
+        Decision::Allow => {}
+    }
+}
+
+/// Build a HushSpec for one step of the deny-preserving composed chain
+/// used by `deny_overrides_warn_and_allow`. The block + require-confirm
+/// lists carry forward across steps so an ancestor `Deny` cannot be
+/// dropped by a later child; this matches the chain shape a policy author
+/// writes when relying on the live `merge` function's child-overrides-base
+/// semantics.
+fn chain_step_spec(blocks: &[String], warns: &[String]) -> HushSpec {
+    let rule = ToolAccessRule {
+        enabled: true,
+        allow: Vec::new(),
+        block: blocks.to_vec(),
+        require_confirmation: warns.to_vec(),
+        default: DefaultAction::Allow,
+        max_args_size: None,
+        require_runtime_assurance_tier: None,
+        prefer_runtime_assurance_tier: None,
+        require_workload_identity: None,
+        prefer_workload_identity: None,
+    };
+    HushSpec {
+        hushspec: HUSHSPEC_VERSION.to_string(),
+        name: None,
+        description: None,
+        extends: None,
+        merge_strategy: Some(MergeStrategy::DeepMerge),
+        rules: Some(Rules {
+            tool_access: Some(rule),
+            ..Rules::default()
+        }),
+        extensions: None,
+        metadata: None,
+    }
+}
 
 /// Build a HushSpec that, when evaluated against a `tool_call` to `target`,
 /// emits the requested decision. Used by `deny_overrides_warn_and_allow` to

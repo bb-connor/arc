@@ -332,12 +332,18 @@ Inventory:
 | `chio-kernel-core` | `crates/chio-kernel-core/tests/dudect/mac_eq.rs`                   | `chio_core_types::crypto::Signature` byte-equality compare (the MAC-eq surface)    |
 | `chio-kernel-core` | `crates/chio-kernel-core/tests/dudect/scope_subset.rs`             | `NormalizedScope::is_subset_of` capability-algebra subset check                    |
 
-Run locally:
+Run locally. Use `--test <binary>` to select a specific dudect harness
+target rather than a positional `TESTNAME` filter; the harnesses are
+`harness = false` test binaries (each provides its own `main` via
+`dudect_bencher::ctbench_main!`), and the positional argument is a
+test-name filter that does not isolate a single binary, so a positional
+form like `... mac_eq` can still execute multiple dudect binaries and
+conflate runtime / output parsing.
 
 ```bash
-cargo test -p chio-credentials --features dudect --release jwt_verify
-cargo test -p chio-kernel-core --features dudect --release mac_eq
-cargo test -p chio-kernel-core --features dudect --release scope_subset
+cargo test -p chio-credentials --features dudect --release --test dudect_jwt_verify
+cargo test -p chio-kernel-core --features dudect --release --test dudect_mac_eq
+cargo test -p chio-kernel-core --features dudect --release --test dudect_scope_subset
 ```
 
 The release-mode build is required: dudect's t-test is sensitive to the

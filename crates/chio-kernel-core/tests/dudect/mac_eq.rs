@@ -103,7 +103,11 @@ fn mac_eq_bench(runner: &mut CtRunner, rng: &mut BenchRng) {
         runner.run_one(class, || {
             // The verdict is always `false` because the inputs differ by
             // construction; we only care about the time the compare takes.
-            let _ = a == b;
+            // Return the comparison result so `run_one`'s `black_box` keeps
+            // the compare in the optimized binary; assigning to `_` would
+            // let `--release` LLVM eliminate the comparison and leave the
+            // harness measuring runner overhead instead of byte equality.
+            a == b
         });
     }
 }
