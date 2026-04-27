@@ -19,7 +19,10 @@
 //! 4. The working tree is clean except for paths under
 //!    `tests/replay/goldens/` and the file `docs/replay-compat.md`.
 //! 5. `stderr` is a TTY (human-attended terminal).
-//! 6. The `CI` env var is unset or `false` (CI cannot bless).
+//! 6. The `CI` env var is unset or set to `false` / `0` / empty
+//!    string (CI cannot bless). Any other non-empty value (including
+//!    `true`, `1`, `yes`, or arbitrary build-system markers) is
+//!    treated as "running under CI" and refused.
 //! 7. The bless writes a one-line audit entry to
 //!    `tests/replay/.bless-audit.log` and the same commit must include
 //!    that audit-log line; the gate refuses if the audit log is dirty
@@ -90,9 +93,10 @@ pub enum BlessGateError {
     #[error("stderr is not a TTY; bless requires a human-attended terminal")]
     StderrNotTty,
 
-    /// Clause 6: `CI=true` is forbidden.
-    #[error("CI env var is set to \"true\"; CI cannot bless")]
-    RunningUnderCi,
+    /// Clause 6: a non-empty / non-falsey `CI` env var is forbidden.
+    /// The contained value is the observed `CI` value for diagnostics.
+    #[error("CI env var is set to {0:?}; CI cannot bless")]
+    RunningUnderCi(String),
 
     /// Clause 7: audit log and goldens must move together.
     ///
@@ -222,9 +226,17 @@ pub fn evaluate_gate(
 ) -> Result<BlessContext, BlessGateError> {
     // Clause 6 first: CI is the loudest refusal and we want to surface
     // it before anything else even if CHIO_BLESS happens to be unset.
+    //
+    // Fail-closed contract: the gate only treats `CI` as "absent" when
+    // the env var is unset, the empty string, or one of the standard
+    // false-y tokens (`false`, `0`, `no`, `off`, case-insensitive). Any
+    // other non-empty value is taken as "running under CI" and refused.
+    // This keeps the gate from passing in CI environments that signal
+    // their presence with `1`, `yes`, `TRUE`, or arbitrary build-system
+    // markers (the original `CI=="true"` check failed open on those).
     if let Some(ci) = env.var("CI") {
-        if ci.eq_ignore_ascii_case("true") {
-            return Err(BlessGateError::RunningUnderCi);
+        if !is_ci_falsey(&ci) {
+            return Err(BlessGateError::RunningUnderCi(ci));
         }
     }
 
@@ -352,6 +364,26 @@ fn branch_is_forbidden(branch: &str) -> bool {
     branch == "main" || branch.starts_with("release/")
 }
 
+/// Return `true` if `value` is one of the falsey tokens that the bless
+/// gate treats as "CI not present".
+///
+/// The accepted falsey tokens are the empty string and (case-insensitive)
+/// `false`, `0`, `no`, `off`. Every other non-empty value, including
+/// `true`, `1`, `yes`, `on`, and arbitrary CI marker strings (e.g. a
+/// build-system name), is treated as "running under CI" and refused.
+/// Whitespace surrounding the value is trimmed before comparison so a
+/// stray leading or trailing space does not flip the classification.
+fn is_ci_falsey(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    matches!(
+        trimmed.to_ascii_lowercase().as_str(),
+        "false" | "0" | "no" | "off"
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Production providers
 // ---------------------------------------------------------------------------
@@ -420,24 +452,71 @@ impl GitProvider for SystemGit {
         //   " M path/to/file"
         //   "?? path/to/untracked"
         //   "R  oldpath -> newpath"
-        // The first two characters are the status code, then a single
-        // space, then the path. For renames we keep the destination.
+        //   "C  oldpath -> newpath"
+        // The first two characters are the status code (X for index, Y
+        // for working tree) followed by a space, then the path. The
+        // ` -> ` arrow is only meaningful on rename (`R`) or copy (`C`)
+        // entries; ordinary modified / added / untracked paths must be
+        // taken verbatim even if their name happens to contain ` -> `
+        // (a literal `evil -> tests/replay/goldens/sneak` modified file
+        // must be reported as the unsplit path so the clause 4 / 7
+        // allowlist logic treats it as out-of-allowlist, not as a
+        // legitimate goldens-tree edit).
         let raw = Self::run(&["status", "--porcelain"])?;
-        let mut out: Vec<String> = Vec::new();
-        for line in raw.lines() {
-            if line.len() < 4 {
-                continue;
-            }
-            let path = &line[3..];
-            // Rename / copy entries: `old -> new`. Keep `new`.
+        Ok(parse_porcelain_paths(&raw))
+    }
+}
+
+/// Parse `git status --porcelain` (v1) output into a list of
+/// working-tree paths.
+///
+/// Hoisted out of [`SystemGit::dirty_paths`] so it can be unit-tested
+/// without forking a `git` subprocess. The rules:
+///
+/// - Lines shorter than the canonical `XY path` shape (3 chars
+///   minimum past the status code) are dropped.
+/// - The two-character status code is inspected to decide whether the
+///   line is a rename / copy entry. Only when either the index status
+///   or the worktree status is `R` (rename) or `C` (copy) is the
+///   ` -> ` arrow split applied; for all other status codes the path
+///   substring is taken verbatim.
+/// - For rename / copy entries the destination (right of ` -> `) is
+///   kept, matching the existing allowlist semantics that target the
+///   committed final path.
+///
+/// Quoted paths (`-z`-style or porcelain v2) are out of scope: this
+/// gate runs in non-bare working trees we control, so the v1 plain
+/// format is sufficient.
+fn parse_porcelain_paths(raw: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in raw.lines() {
+        // Need at least "XY p" (status code + space + 1-char path).
+        if line.len() < 4 {
+            continue;
+        }
+        let bytes = line.as_bytes();
+        // Status code is the first two bytes; path starts after the
+        // single separator space at byte index 2 (so path begins at
+        // byte index 3).
+        let xy = &line[..2];
+        let path = &line[3..];
+        // Rename / copy entries: split on ` -> ` and keep the
+        // destination. Anything else: take the path verbatim.
+        let is_rename_or_copy = bytes[0] == b'R'
+            || bytes[0] == b'C'
+            || xy.as_bytes()[1] == b'R'
+            || xy.as_bytes()[1] == b'C';
+        if is_rename_or_copy {
             if let Some((_, new)) = path.split_once(" -> ") {
                 out.push(new.to_string());
             } else {
                 out.push(path.to_string());
             }
+        } else {
+            out.push(path.to_string());
         }
-        Ok(out)
     }
+    out
 }
 
 /// Real filesystem-write provider used by [`append_audit_line`].
@@ -815,7 +894,10 @@ mod tests {
         let git = StubGit::happy();
         let err = evaluate_gate(&env, &git, true, fixture(), fixed_now())
             .expect_err("must refuse under CI=true");
-        assert!(matches!(err, BlessGateError::RunningUnderCi), "got {err:?}");
+        match err {
+            BlessGateError::RunningUnderCi(v) => assert_eq!(v, "true"),
+            other => panic!("got {other:?}"),
+        }
     }
 
     #[test]
@@ -827,12 +909,74 @@ mod tests {
         let git = StubGit::happy().with_branch("main");
         let err =
             evaluate_gate(&env, &git, false, fixture(), fixed_now()).expect_err("must refuse");
-        assert!(matches!(err, BlessGateError::RunningUnderCi), "got {err:?}");
+        assert!(
+            matches!(err, BlessGateError::RunningUnderCi(_)),
+            "got {err:?}"
+        );
     }
 
     #[test]
     fn clause_6_ci_false_allowed() {
         let env = StubEnv::happy().with("CI", "false");
+        let git = StubGit::happy();
+        let result = evaluate_gate(&env, &git, true, fixture(), fixed_now());
+        assert!(result.is_ok(), "got {result:?}");
+    }
+
+    #[test]
+    fn clause_6_ci_one_refuses() {
+        // The original gate failed open on `CI=1` (a common CI marker
+        // outside the literal `true` convention). The fix treats any
+        // non-falsey value as "running under CI".
+        let env = StubEnv::happy().with("CI", "1");
+        let git = StubGit::happy();
+        let err = evaluate_gate(&env, &git, true, fixture(), fixed_now())
+            .expect_err("must refuse under CI=1");
+        match err {
+            BlessGateError::RunningUnderCi(v) => assert_eq!(v, "1"),
+            other => panic!("got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn clause_6_ci_yes_refuses() {
+        let env = StubEnv::happy().with("CI", "yes");
+        let git = StubGit::happy();
+        let err = evaluate_gate(&env, &git, true, fixture(), fixed_now())
+            .expect_err("must refuse under CI=yes");
+        match err {
+            BlessGateError::RunningUnderCi(v) => assert_eq!(v, "yes"),
+            other => panic!("got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn clause_6_ci_arbitrary_marker_refuses() {
+        // Some CI systems set `CI=GitHubActions` or similar. The gate
+        // must treat any non-falsey marker as CI present.
+        let env = StubEnv::happy().with("CI", "GitHubActions");
+        let git = StubGit::happy();
+        let err = evaluate_gate(&env, &git, true, fixture(), fixed_now())
+            .expect_err("must refuse under CI=GitHubActions");
+        assert!(
+            matches!(err, BlessGateError::RunningUnderCi(_)),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn clause_6_ci_zero_allowed() {
+        let env = StubEnv::happy().with("CI", "0");
+        let git = StubGit::happy();
+        let result = evaluate_gate(&env, &git, true, fixture(), fixed_now());
+        assert!(result.is_ok(), "got {result:?}");
+    }
+
+    #[test]
+    fn clause_6_ci_empty_allowed() {
+        // Some shells set `CI=` (empty) when unsetting; treat the empty
+        // string as "CI unset" rather than a non-falsey marker.
+        let env = StubEnv::happy().with("CI", "");
         let git = StubGit::happy();
         let result = evaluate_gate(&env, &git, true, fixture(), fixed_now());
         assert!(result.is_ok(), "got {result:?}");
@@ -982,6 +1126,86 @@ mod tests {
     // -----------------------------------------------------------------
     // branch_is_forbidden helper.
     // -----------------------------------------------------------------
+
+    // -----------------------------------------------------------------
+    // parse_porcelain_paths helper.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn porcelain_keeps_modified_path_with_arrow_in_name_verbatim() {
+        // Modified files are NOT rename entries; the ` -> ` substring
+        // in the path must be preserved verbatim, not split.
+        let raw = " M evil -> tests/replay/goldens/sneak\n";
+        let got = parse_porcelain_paths(raw);
+        assert_eq!(got, vec!["evil -> tests/replay/goldens/sneak".to_string()]);
+    }
+
+    #[test]
+    fn porcelain_keeps_untracked_path_with_arrow_verbatim() {
+        let raw = "?? evil -> tests/replay/goldens/sneak\n";
+        let got = parse_porcelain_paths(raw);
+        assert_eq!(got, vec!["evil -> tests/replay/goldens/sneak".to_string()]);
+    }
+
+    #[test]
+    fn porcelain_splits_actual_rename_entries() {
+        let raw = "R  oldpath -> tests/replay/goldens/newpath\n";
+        let got = parse_porcelain_paths(raw);
+        assert_eq!(got, vec!["tests/replay/goldens/newpath".to_string()]);
+    }
+
+    #[test]
+    fn porcelain_splits_actual_copy_entries() {
+        let raw = "C  oldpath -> tests/replay/goldens/copy\n";
+        let got = parse_porcelain_paths(raw);
+        assert_eq!(got, vec!["tests/replay/goldens/copy".to_string()]);
+    }
+
+    #[test]
+    fn porcelain_splits_when_worktree_status_is_rename() {
+        // The worktree status (second column) can also be R when the
+        // index is clean but the worktree carries a rename.
+        let raw = " R old -> tests/replay/goldens/new\n";
+        let got = parse_porcelain_paths(raw);
+        assert_eq!(got, vec!["tests/replay/goldens/new".to_string()]);
+    }
+
+    #[test]
+    fn porcelain_classifies_dirty_arrow_path_as_unexpected() {
+        // End-to-end through evaluate_gate: a hostile filename
+        // containing ` -> ` must NOT pass the allowlist.
+        let env = StubEnv::happy();
+        let git = StubGit::happy().with_dirty(&["evil -> tests/replay/goldens/sneak"]);
+        let err = evaluate_gate(&env, &git, true, fixture(), fixed_now())
+            .expect_err("crafted arrow path must NOT pass the allowlist");
+        match err {
+            BlessGateError::DirtyWorkingTree(paths) => {
+                assert!(
+                    paths.contains("evil -> tests/replay/goldens/sneak"),
+                    "got {paths:?}"
+                );
+            }
+            other => panic!("got {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // is_ci_falsey helper.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn ci_falsey_helper_recognises_known_false_tokens() {
+        for v in ["", "  ", "false", "FALSE", "False", "0", "no", "NO", "off"] {
+            assert!(is_ci_falsey(v), "expected {v:?} to be falsey");
+        }
+    }
+
+    #[test]
+    fn ci_falsey_helper_rejects_truthy_tokens() {
+        for v in ["true", "1", "yes", "on", "github", "GitHubActions", "y"] {
+            assert!(!is_ci_falsey(v), "expected {v:?} to be truthy");
+        }
+    }
 
     #[test]
     fn branch_helper_recognises_main_and_release() {

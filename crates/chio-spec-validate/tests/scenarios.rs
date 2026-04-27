@@ -48,10 +48,9 @@ fn known_good_token_validates() {
     let schema = schema_path();
     let doc = good_token();
     let doc_path = PathBuf::from("<inline>");
-    let schema_value: Value = serde_json::from_str(
-        &std::fs::read_to_string(&schema).expect("schema file exists"),
-    )
-    .expect("schema parses");
+    let schema_value: Value =
+        serde_json::from_str(&std::fs::read_to_string(&schema).expect("schema file exists"))
+            .expect("schema parses");
     chio_spec_validate::validate_value(&schema, &schema_value, &doc_path, &doc)
         .expect("good token validates against capability/token schema");
 }
@@ -65,10 +64,9 @@ fn malformed_token_is_rejected() {
         .expect("token is an object")
         .remove("signature");
     let doc_path = PathBuf::from("<inline>");
-    let schema_value: Value = serde_json::from_str(
-        &std::fs::read_to_string(&schema).expect("schema file exists"),
-    )
-    .expect("schema parses");
+    let schema_value: Value =
+        serde_json::from_str(&std::fs::read_to_string(&schema).expect("schema file exists"))
+            .expect("schema parses");
     let err = chio_spec_validate::validate_value(&schema, &schema_value, &doc_path, &doc)
         .expect_err("missing-signature token must violate schema");
     let message = err.to_string();

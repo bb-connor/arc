@@ -39,6 +39,7 @@ use std::path::{Path, PathBuf};
 use chio_replay_gate::byte_compare::{compare_artifacts, ArtifactKind, ByteDiff};
 use chio_replay_gate::driver::ScenarioDriver;
 use chio_replay_gate::fs_iter;
+use chio_replay_gate::golden_format;
 use chio_replay_gate::golden_reader::GoldenLoaded;
 use chio_replay_gate::golden_writer::GoldenSet;
 use serde_json::{json, Value};
@@ -153,13 +154,19 @@ fn all_50_goldens_match_byte_for_byte() {
 /// - `checkpoint = { scenario, clock, issuer }` where `issuer` is the
 ///   verifying-key bytes of the test seed rendered as lowercase hex.
 /// - `root = SHA-256(canonical(receipt) || canonical(checkpoint))`
-///   where `canonical(...)` is `serde_json::to_vec` of a `serde_json`
-///   `Value` (which preserves the keys in their literal order). The
-///   writer's own `GoldenSet::append_receipt` re-canonicalizes the
-///   receipt with sorted keys before disk-writing, so the on-disk
-///   bytes equal the SHA-256 input only when the inline construction
-///   already happens to be sorted (it is: `nonce < scenario < verdict`
-///   for receipts, `clock < issuer < scenario` for checkpoints).
+///   where `canonical(...)` is the workspace-wide RFC 8785 / JCS
+///   serializer in
+///   [`golden_format::canonical_json_bytes`]. Earlier revisions hashed
+///   `serde_json::to_vec(&value)`, which depended on `serde_json`
+///   preserving the literal source-order keys; with the writer now
+///   delegating to the shared canonicaliser the SHA-256 input must
+///   also be the canonical bytes so the hash is well-defined under
+///   any future serde reordering.
+/// - All manifest fields used by the synthesis (`name`,
+///   `expected_verdict`, `clock`) are required-string-typed via
+///   [`require_str`]; an `unwrap_or("unknown")` fallback would mask
+///   malformed manifests as a downstream byte-diff instead of an
+///   upfront actionable error.
 fn write_synthetic_goldens(manifest: &Value, manifest_path: &Path, scenario_dir: &Path) {
     let mut driver = ScenarioDriver::new().unwrap_or_else(|err| {
         panic!(
@@ -169,16 +176,8 @@ fn write_synthetic_goldens(manifest: &Value, manifest_path: &Path, scenario_dir:
     });
 
     let scenario_name = require_str(manifest, "name", manifest_path);
-    let expected_verdict = manifest
-        .get("expected_verdict")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown")
-        .to_string();
-    let clock = manifest
-        .get("clock")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown")
-        .to_string();
+    let expected_verdict = require_str(manifest, "expected_verdict", manifest_path);
+    let clock = require_str(manifest, "clock", manifest_path);
 
     let nonce = driver.next_nonce();
     let nonce_hex = hex::encode(nonce);
@@ -195,9 +194,15 @@ fn write_synthetic_goldens(manifest: &Value, manifest_path: &Path, scenario_dir:
         "issuer": issuer_hex,
     });
 
-    let receipt_bytes = serde_json::to_vec(&receipt).expect("synthetic receipt must serialize");
-    let checkpoint_bytes =
-        serde_json::to_vec(&checkpoint).expect("synthetic checkpoint must serialize");
+    // Canonicalize the receipt and checkpoint via the workspace-wide
+    // RFC 8785 serializer before hashing. This makes the SHA-256
+    // root deterministic under any serde_json key-order policy: the
+    // canonicaliser sorts keys itself rather than relying on
+    // serde_json's preserve-or-not-preserve insertion order.
+    let receipt_bytes =
+        golden_format::canonical_json_bytes(&receipt).expect("synthetic receipt must canonicalize");
+    let checkpoint_bytes = golden_format::canonical_json_bytes(&checkpoint)
+        .expect("synthetic checkpoint must canonicalize");
     let mut hasher = Sha256::new();
     hasher.update(&receipt_bytes);
     hasher.update(&checkpoint_bytes);

@@ -38,7 +38,13 @@ use proptest::prelude::*;
 // --- pool-based strategies --------------------------------------------------
 
 const SERVER_POOL: &[&str] = &["srv-a", "srv-b", "srv-c", "srv-files", "srv-net"];
-const TOOL_POOL: &[&str] = &["file_read", "file_write", "shell_exec", "http_get", "search"];
+const TOOL_POOL: &[&str] = &[
+    "file_read",
+    "file_write",
+    "shell_exec",
+    "http_get",
+    "search",
+];
 const ARG_POOL: &[&str] = &["alpha", "beta", "gamma"];
 
 fn pool_pick(pool: &[&str], idx: usize) -> String {
@@ -55,11 +61,8 @@ fn arb_pattern_for(pool: &'static [&'static str]) -> impl Strategy<Value = Strin
 }
 
 fn arb_unconstrained_invoke_grant() -> impl Strategy<Value = ToolGrant> {
-    (
-        arb_pattern_for(SERVER_POOL),
-        arb_pattern_for(TOOL_POOL),
-    )
-        .prop_map(|(server_id, tool_name)| ToolGrant {
+    (arb_pattern_for(SERVER_POOL), arb_pattern_for(TOOL_POOL)).prop_map(|(server_id, tool_name)| {
+        ToolGrant {
             server_id,
             tool_name,
             operations: vec![Operation::Invoke],
@@ -68,7 +71,8 @@ fn arb_unconstrained_invoke_grant() -> impl Strategy<Value = ToolGrant> {
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
-        })
+        }
+    })
 }
 
 fn arb_grant_vec(range: Range<usize>) -> impl Strategy<Value = Vec<ToolGrant>> {
@@ -80,9 +84,7 @@ fn arb_arguments() -> impl Strategy<Value = serde_json::Value> {
     // matcher's leaf-key heuristics never pull a `PathPrefix` constraint out
     // of an unrelated string. All grants in this test file are unconstrained
     // anyway, but pinning the shape makes shrinking deterministic.
-    (0usize..ARG_POOL.len()).prop_map(|i| {
-        serde_json::json!({ "value": pool_pick(ARG_POOL, i) })
-    })
+    (0usize..ARG_POOL.len()).prop_map(|i| serde_json::json!({ "value": pool_pick(ARG_POOL, i) }))
 }
 
 // --- capability + request builders ------------------------------------------
@@ -439,4 +441,3 @@ proptest! {
         prop_assert_eq!(format!("{}", tail.grant.tool_name), "*".to_string());
     }
 }
-

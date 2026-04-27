@@ -183,11 +183,18 @@ where
 }
 
 /// Sort a slice of paths in place by `LC_ALL=C`-equivalent raw byte
-/// ordering on each path's full string form.
+/// ordering on each path's *normalized* string form.
 ///
 /// Used internally by [`read_dir_sorted`] and [`walk_files_sorted`]
 /// after enumeration so a single comparator implementation governs
-/// every ordering decision.
+/// every ordering decision. Path components are joined with the
+/// forward-slash separator (`/`) before sorting so the byte order of
+/// the resulting key is platform-independent: a Windows host that
+/// would otherwise hand the comparator backslashes (`\\` = 0x5c) and
+/// a POSIX host that hands it forward slashes (`/` = 0x2f) produce
+/// the same total order. Path components themselves are compared by
+/// their raw byte form (Unix) or UTF-8 byte form (non-Unix), matching
+/// `LC_ALL=C` semantics within each component.
 fn sort_paths(paths: &mut [PathBuf]) -> Result<(), FsIterError> {
     // Pre-compute sort keys so we surface any [`FsIterError::NonUtf8Path`]
     // before mutating order, and so each path's key is computed once
@@ -205,24 +212,70 @@ fn sort_paths(paths: &mut [PathBuf]) -> Result<(), FsIterError> {
     Ok(())
 }
 
-/// Produce the raw-byte sort key for a path under `LC_ALL=C` semantics.
+/// Produce the raw-byte sort key for a path under `LC_ALL=C`
+/// semantics, with platform-independent separator normalization.
 ///
-/// On Unix targets the `OsStr` is already `&[u8]` via
-/// `std::os::unix::ffi::OsStrExt::as_bytes`, which is exactly the
-/// representation `LC_ALL=C` sorts by. On non-Unix targets we fall
-/// back to `to_str` and return [`FsIterError::NonUtf8Path`] for any
-/// path that would otherwise need lossy re-encoding.
-#[cfg(unix)]
+/// The key is constructed from `path.components()` so the OS-native
+/// separator (`/` on Unix, `\\` on Windows) is replaced by an
+/// explicit forward-slash join. That keeps `walk_files_sorted` total
+/// order identical across hosts even when two paths differ at a
+/// directory boundary (for example `a/x.json` vs `aA.json` would
+/// otherwise sort differently on Windows because `\\` (0x5c) sorts
+/// after `A` (0x41), inverting the cross-platform total order).
+///
+/// On Unix targets each `Component` is converted to bytes via
+/// `OsStrExt::as_bytes`. On non-Unix targets we go via `to_str` and
+/// return [`FsIterError::NonUtf8Path`] for any component that would
+/// need lossy re-encoding (the M04 corpus is ASCII-only so the
+/// non-Unix UTF-8 fallback is fail-closed in practice).
 fn sort_key(path: &Path) -> Result<Vec<u8>, FsIterError> {
+    use std::path::Component;
+
+    let mut out: Vec<u8> = Vec::with_capacity(path.as_os_str().len());
+    let mut first = true;
+    for component in path.components() {
+        if !first {
+            // Use a single byte separator so the key is bit-stable
+            // across platforms regardless of the host's path
+            // separator. `/` (0x2f) is chosen because it appears in
+            // POSIX paths verbatim already and never appears inside
+            // a path component (POSIX forbids it; Windows treats it
+            // as a separator too).
+            out.push(b'/');
+        }
+        first = false;
+        let raw = component.as_os_str();
+        let comp_bytes = component_bytes(raw, path)?;
+        out.extend_from_slice(&comp_bytes);
+        // A `Component::RootDir` already contributed its bytes (e.g.
+        // "/" on Unix, "\\" on Windows -> normalised to ""); skip the
+        // following separator to avoid emitting "//".
+        if matches!(component, Component::RootDir) {
+            // The next component is the first real entry; do not
+            // prepend a separator before it.
+            first = true;
+        }
+    }
+    Ok(out)
+}
+
+/// Convert a single [`Component`]'s [`OsStr`] into its byte-form key.
+///
+/// Mirrors the platform split used by the previous implementation but
+/// operates per-component so the caller can interleave a fixed-byte
+/// separator. `parent` is only used for diagnostic context in the
+/// non-Unix `NonUtf8Path` error.
+#[cfg(unix)]
+fn component_bytes(raw: &std::ffi::OsStr, _parent: &Path) -> Result<Vec<u8>, FsIterError> {
     use std::os::unix::ffi::OsStrExt;
-    Ok(path.as_os_str().as_bytes().to_vec())
+    Ok(raw.as_bytes().to_vec())
 }
 
 #[cfg(not(unix))]
-fn sort_key(path: &Path) -> Result<Vec<u8>, FsIterError> {
-    match path.to_str() {
+fn component_bytes(raw: &std::ffi::OsStr, parent: &Path) -> Result<Vec<u8>, FsIterError> {
+    match raw.to_str() {
         Some(s) => Ok(s.as_bytes().to_vec()),
-        None => Err(FsIterError::NonUtf8Path(path.to_path_buf())),
+        None => Err(FsIterError::NonUtf8Path(parent.to_path_buf())),
     }
 }
 
@@ -396,6 +449,62 @@ mod tests {
             names,
             vec!["data.json".to_string(), "manifest.json".to_string()],
             "predicate must restrict to .json files in byte order",
+        );
+    }
+
+    #[test]
+    fn sort_key_uses_forward_slash_for_separator_independence() {
+        // The sort key must use a fixed `/` separator (not the OS-native
+        // path separator) so that the total order is identical across
+        // POSIX (where the separator is `/` = 0x2f) and Windows (where
+        // it is `\\` = 0x5c). If the comparator were to fall back to
+        // the OS separator, the relative order of `a/x.json` vs
+        // `aA.json` would flip between platforms because `/` (0x2f)
+        // sorts BEFORE the uppercase letters but `\\` (0x5c) sorts
+        // AFTER them.
+        let path_a = PathBuf::from("a").join("x.json");
+        let path_b = PathBuf::from("aA.json");
+        let key_a = sort_key(&path_a).expect("sort_key must succeed");
+        let key_b = sort_key(&path_b).expect("sort_key must succeed");
+        // `a/x.json` < `aA.json` because '/' (0x2f) < 'A' (0x41) byte-wise.
+        assert!(
+            key_a < key_b,
+            "expected {key_a:?} (a/x.json) < {key_b:?} (aA.json) under separator-normalised sort",
+        );
+        // The key must NOT contain a backslash, regardless of host.
+        assert!(
+            !key_a.contains(&b'\\'),
+            "sort key must use `/` only, got {key_a:?}",
+        );
+    }
+
+    #[test]
+    fn walk_files_sorted_total_order_independent_of_separator() {
+        // End-to-end check on a layout where the boundary character
+        // matters: `a/x.json` must sort before `aA.json` because the
+        // first divergent byte in the normalized key is `/` vs `A`,
+        // and `/` (0x2f) < `A` (0x41). On Windows without
+        // normalisation, `\\` (0x5c) > `A` would have flipped the
+        // order.
+        let td = TempDir::new().unwrap();
+        let dir = td.path();
+        touch(dir, "aA.json");
+        touch(dir, "a/x.json");
+
+        let got = walk_files_sorted(dir, |_| true).unwrap();
+        let rels: Vec<String> = got
+            .iter()
+            .map(|p| {
+                p.strip_prefix(dir)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .collect();
+        assert_eq!(
+            rels,
+            vec!["a/x.json".to_string(), "aA.json".to_string()],
+            "walk_files_sorted total order must be separator-agnostic",
         );
     }
 
