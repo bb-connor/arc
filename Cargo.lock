@@ -2483,8 +2483,10 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-kernel-core",
+ "getrandom 0.3.4",
  "proptest",
  "serde_json",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
