@@ -1,0 +1,17 @@
+# Pinned chio-tee-corpus artifacts. CI refuses to test against any artifact
+# whose computed sha256 differs from the pinned value.
+schema_version = "1"
+
+[[artifacts]]
+name = "openai-responses-shadow-2026-04-25.ndjson.zst"
+release_tag = "tee-corpus-2026-04-25"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size_bytes = 7340032
+min_schema_version = "1"
+
+[[artifacts]]
+name = "anthropic-messages-shadow-2026-04-25.ndjson.zst"
+release_tag = "tee-corpus-2026-04-25"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size_bytes = 6291456
+min_schema_version = "1"

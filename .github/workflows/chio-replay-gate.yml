@@ -104,6 +104,17 @@ jobs:
       - name: Build chio-replay-gate (release)
         run: cargo build -p chio-replay-gate --release
 
+      - name: Pull and verify chio-tee-corpus artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/pull_tee_corpus.py \
+            --pins tests/replay/corpus_pins.toml \
+            --out target/tee-corpus \
+            --verify-sha256 \
+            --verify-manifest-sig
+
       - name: Run replay-gate corpus smoke
         run: cargo test -p chio-replay-gate --release --test corpus_smoke
 
