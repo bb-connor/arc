@@ -302,21 +302,21 @@ jobs:
               }
               # vcpkg expects each (version, port-version) tuple to appear
               # at most once. Re-tagging the same release (e.g. after a
-              # publish-conan retry) would otherwise insert duplicate rows
-              # on every retry.
-              existing_index = next(
-                  (
-                      i
-                      for i, v in enumerate(data["versions"])
-                      if v.get("version") == entry["version"]
+              # publish-conan retry) can leave duplicate rows from earlier
+              # runs; the previous `next(...)` form found only the first
+              # match and left any additional duplicates untouched, so the
+              # file could remain invalid after this step (cleanup-c11d;
+              # PR #109 review thread r3144314472 - P1). Strip every
+              # matching tuple before re-inserting the canonical entry.
+              data["versions"] = [
+                  v
+                  for v in data["versions"]
+                  if not (
+                      v.get("version") == entry["version"]
                       and v.get("port-version") == entry["port-version"]
-                  ),
-                  None,
-              )
-              if existing_index is None:
-                  data["versions"].insert(0, entry)
-              else:
-                  data["versions"][existing_index] = entry
+                  )
+              ]
+              data["versions"].insert(0, entry)
               port_versions_path.write_text(json.dumps(data, indent=2) + "\n")
 
               baseline["default"][port] = {

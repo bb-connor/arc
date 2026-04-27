@@ -232,7 +232,18 @@ This document closes when the M06 P2 PR (the one whose first commit is
 Rekor proof gating`, M06 phase doc Phase 2 task P2.T4) merges and
 satisfies all four conditions:
 
-1. `cargo tree -p chio-guard-registry | grep -q sigstore` returns nothing.
+1. `chio-guard-registry`'s **direct** dependencies do not include
+   `sigstore` or `sigstore-rs`. A bare
+   `cargo tree -p chio-guard-registry | grep sigstore` is **not** a
+   valid gate, because the required `chio-attest-verify` dependency
+   itself depends on `sigstore` (`crates/chio-attest-verify/Cargo.toml`),
+   so the transitive grep would always fire and keep the migration
+   permanently red even when M06 follows the intended architecture
+   (cleanup-c11d; PR #74 review thread r3143034863). Use a
+   direct-dependency check instead, e.g.
+   `cargo tree -p chio-guard-registry --depth 1 | grep -E 'sigstore(-rs)?'`
+   or, equivalently, `awk` on the `[dependencies]` block of
+   `crates/chio-guard-registry/Cargo.toml`.
 2. `rg -n 'use sigstore' crates/chio-wasm-guards crates/chio-guard-registry`
    returns nothing.
 3. `cargo doc -p chio-guard-registry` shows `ExpectedIdentity`,

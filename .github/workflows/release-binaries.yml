@@ -172,18 +172,23 @@ jobs:
 
       - name: Install syft
         # Pinned to v1.18.1 to match the M09.P2.T2 acceptance gate. The
-        # upstream install.sh validates the downloaded checksum against
-        # the tag before extracting, so the bare curl pipe is acceptable
-        # here. Output goes to ${HOME}/.local/bin which the next line
-        # appends to GITHUB_PATH for subsequent steps in the job.
-        # Windows runners use the same script under Git Bash so the
-        # syft.exe lands on PATH for the powershell stage step too.
+        # installer script itself is fetched from the pinned tag rather
+        # than the mutable `main` branch (cleanup-c11d; PR #44 review
+        # threads r3142897955 / r3142898745 - Medium): the previous
+        # `.../syft/main/install.sh` URL meant any upstream change or
+        # compromise of `main` could alter the script's behavior on
+        # every release run, even though the version argument the
+        # script consumed was pinned. The tag-pinned URL closes that
+        # gap. Output goes to ${HOME}/.local/bin which the next line
+        # appends to GITHUB_PATH for subsequent steps. Windows runners
+        # use the same script under Git Bash so syft.exe lands on PATH
+        # for the powershell stage step too.
         shell: bash
         run: |
           set -euo pipefail
           SYFT_VERSION=v1.18.1
           mkdir -p "${HOME}/.local/bin"
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+          curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
             | sh -s -- -b "${HOME}/.local/bin" "${SYFT_VERSION}"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
