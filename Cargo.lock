@@ -1867,8 +1867,10 @@ dependencies = [
  "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 1.0.69",
  "tiny_http",
+ "toml 0.8.23",
 ]
 
 [[package]]

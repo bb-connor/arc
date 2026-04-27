@@ -2245,6 +2245,11 @@ fn main() {
                 scenario.as_deref(),
                 output.as_deref(),
             ),
+            ConformanceCommands::FetchPeers {
+                check,
+                out,
+                language,
+            } => cmd_conformance_fetch_peers(check, &out, language.as_deref()),
         },
     };
 

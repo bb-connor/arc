@@ -220,9 +220,11 @@ enum Commands {
 
 /// Conformance harness commands.
 //
-// NOTE (M01.P4.T2): only the `Run` subcommand is implemented in this PR.
-// The `fetch-peers` subcommand for downloading pinned peer binaries is
-// deferred to M01.P4.T4 (see .planning/trajectory/01-spec-codegen-conformance.md).
+// `Run` (M01.P4.T2): execute the cross-language conformance harness.
+// `FetchPeers` (M01.P4.T4): download pre-built peer-language adapter binaries
+// pinned by `crates/chio-conformance/peers.lock.toml`. External implementers
+// without Python / Node / Go / C++ toolchains can use this to obtain the
+// reference peer binaries.
 #[derive(Subcommand)]
 enum ConformanceCommands {
     /// Execute conformance scenarios against a peer language adapter.
@@ -246,6 +248,22 @@ enum ConformanceCommands {
         /// path; otherwise the report is printed to stdout.
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+
+    /// Download pre-built peer-language adapter binaries pinned in
+    /// `crates/chio-conformance/peers.lock.toml`.
+    FetchPeers {
+        /// Verify the lockfile shape only; do not download anything.
+        #[arg(long)]
+        check: bool,
+
+        /// Output directory for fetched binaries.
+        #[arg(long, default_value = "./.chio-peers")]
+        out: PathBuf,
+
+        /// Optional language filter (`python`, `js`, `go`, `cpp`).
+        #[arg(long)]
+        language: Option<String>,
     },
 }
 
