@@ -186,6 +186,33 @@ pub fn openai_fixture_paths() -> Result<Vec<PathBuf>, ReplayError> {
     Ok(paths)
 }
 
+/// Return the Anthropic fixture corpus path.
+pub fn anthropic_fixture_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/anthropic")
+}
+
+/// Return all Anthropic NDJSON fixture paths in deterministic order.
+pub fn anthropic_fixture_paths() -> Result<Vec<PathBuf>, ReplayError> {
+    let root = anthropic_fixture_dir();
+    let entries = fs::read_dir(&root).map_err(|source| ReplayError::ReadFixtureDir {
+        path: root.clone(),
+        source,
+    })?;
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|source| ReplayError::ReadFixtureDir {
+            path: root.clone(),
+            source,
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("ndjson") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
 /// Load an NDJSON fixture from disk.
 pub fn load_fixture(path: impl AsRef<Path>) -> Result<ProviderCaptureFixture, ReplayError> {
     let path = path.as_ref().to_path_buf();
@@ -272,6 +299,51 @@ pub fn replay_openai_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     })
 }
 
+/// Replay an Anthropic fixture through the Anthropic provider adapter.
+#[cfg(feature = "fixtures-anthropic")]
+pub fn replay_anthropic_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, ReplayError> {
+    let fixture = load_fixture(path)?;
+    fixture.ensure_anthropic()?;
+    let captured = fixture.captured_verdicts()?;
+    let workspace_id = fixture.anthropic_workspace_id()?;
+    let adapter = anthropic_adapter(&fixture.path, workspace_id)?;
+
+    let (mode, invocations, verdicts) = if fixture.has_anthropic_stream_tool_events() {
+        let (invocations, verdicts) = replay_anthropic_stream(&fixture, &adapter, &captured)?;
+        (ReplayMode::Stream, invocations, verdicts)
+    } else if captured.is_empty() {
+        (ReplayMode::NoToolCall, Vec::new(), Vec::new())
+    } else {
+        let invocations = replay_anthropic_batch(&fixture, &adapter)?;
+        let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
+        (ReplayMode::Batch, invocations, verdicts)
+    };
+
+    assert_replayed_invocations(&fixture, &captured, &invocations)?;
+    assert_replayed_verdicts(&fixture, &captured, &verdicts)?;
+    let lowered_responses = assert_anthropic_lowered_responses(&fixture, &adapter, &captured)?;
+
+    Ok(ReplayOutcome {
+        fixture_id: fixture.fixture_id,
+        path: fixture.path,
+        mode,
+        records: fixture.records.len(),
+        invocations: invocations.len(),
+        verdicts: verdicts.len(),
+        lowered_responses,
+    })
+}
+
+/// Stub that explains which feature is needed for Anthropic replay.
+#[cfg(not(feature = "fixtures-anthropic"))]
+pub fn replay_anthropic_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, ReplayError> {
+    let path = path.as_ref();
+    Err(invalid_fixture(
+        path,
+        "Anthropic replay requires the fixtures-anthropic feature",
+    ))
+}
+
 /// Stub that explains which feature is needed for OpenAI replay.
 #[cfg(not(feature = "fixtures-openai"))]
 pub fn replay_openai_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, ReplayError> {
@@ -283,6 +355,7 @@ pub fn replay_openai_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
 }
 
 impl ProviderCaptureFixture {
+    #[cfg(feature = "fixtures-openai")]
     fn ensure_openai(&self) -> Result<(), ReplayError> {
         if self
             .records
@@ -295,6 +368,22 @@ impl ProviderCaptureFixture {
         Err(invalid_fixture(
             &self.path,
             "OpenAI replay received a non-openai provider record",
+        ))
+    }
+
+    #[cfg(feature = "fixtures-anthropic")]
+    fn ensure_anthropic(&self) -> Result<(), ReplayError> {
+        if self
+            .records
+            .iter()
+            .all(|record| record.provider == "anthropic")
+        {
+            return Ok(());
+        }
+
+        Err(invalid_fixture(
+            &self.path,
+            "Anthropic replay received a non-anthropic provider record",
         ))
     }
 
@@ -343,6 +432,7 @@ impl ProviderCaptureFixture {
         })
     }
 
+    #[cfg(feature = "fixtures-openai")]
     fn openai_org_id(&self) -> Result<String, ReplayError> {
         self.records
             .iter()
@@ -356,6 +446,21 @@ impl ProviderCaptureFixture {
             })
     }
 
+    #[cfg(feature = "fixtures-anthropic")]
+    fn anthropic_workspace_id(&self) -> Result<String, ReplayError> {
+        self.records
+            .iter()
+            .filter(|record| record.direction == CaptureDirection::UpstreamRequest)
+            .find_map(|record| anthropic_workspace_id_from_payload(&record.payload))
+            .ok_or_else(|| {
+                invalid_fixture(
+                    &self.path,
+                    "Anthropic fixture did not include a deterministic workspace header",
+                )
+            })
+    }
+
+    #[cfg(feature = "fixtures-openai")]
     fn has_stream_tool_events(&self) -> bool {
         self.records.iter().any(|record| {
             if record.direction != CaptureDirection::UpstreamEvent {
@@ -372,12 +477,31 @@ impl ProviderCaptureFixture {
         })
     }
 
+    #[cfg(feature = "fixtures-anthropic")]
+    fn has_anthropic_stream_tool_events(&self) -> bool {
+        self.records.iter().any(|record| {
+            if record.direction != CaptureDirection::UpstreamEvent {
+                return false;
+            }
+
+            event_name(&record.payload) == Some("content_block_start")
+                && record
+                    .payload
+                    .get("data")
+                    .and_then(|data| data.get("content_block"))
+                    .and_then(|block| block.get("type"))
+                    .and_then(Value::as_str)
+                    == Some("tool_use")
+        })
+    }
+
     fn upstream_responses(&self) -> impl Iterator<Item = &CaptureRecord> {
         self.records
             .iter()
             .filter(|record| record.direction == CaptureDirection::UpstreamResponse)
     }
 
+    #[cfg(feature = "fixtures-openai")]
     fn lowered_tool_output_requests(&self) -> Vec<&CaptureRecord> {
         self.records
             .iter()
@@ -391,6 +515,22 @@ impl ProviderCaptureFixture {
             })
             .collect()
     }
+
+    #[cfg(feature = "fixtures-anthropic")]
+    fn lowered_anthropic_tool_result_requests(&self) -> Vec<&CaptureRecord> {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.direction == CaptureDirection::UpstreamRequest
+                    && record
+                        .payload
+                        .get("body")
+                        .and_then(|body| body.get("type"))
+                        .and_then(Value::as_str)
+                        == Some("tool_result")
+            })
+            .collect()
+    }
 }
 
 #[cfg(feature = "fixtures-openai")]
@@ -401,6 +541,23 @@ fn replay_openai_batch(
     let mut invocations = Vec::new();
     for record in fixture.upstream_responses() {
         if response_has_no_tool_calls(&record.payload) {
+            continue;
+        }
+
+        let bytes = serde_json::to_vec(&record.payload)?;
+        invocations.extend(adapter.lift_batch(ProviderRequest(bytes))?);
+    }
+    Ok(invocations)
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn replay_anthropic_batch(
+    fixture: &ProviderCaptureFixture,
+    adapter: &chio_anthropic_tools_adapter::AnthropicAdapter,
+) -> Result<Vec<ToolInvocation>, ReplayError> {
+    let mut invocations = Vec::new();
+    for record in fixture.upstream_responses() {
+        if anthropic_response_has_no_tool_uses(&record.payload) {
             continue;
         }
 
@@ -434,6 +591,36 @@ fn replay_openai_stream(
         return Err(invalid_fixture(
             &fixture.path,
             format!("OpenAI stream replay did not produce invocation {request_id}"),
+        ));
+    }
+
+    Ok((gated.invocations, gated.verdicts))
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn replay_anthropic_stream(
+    fixture: &ProviderCaptureFixture,
+    adapter: &chio_anthropic_tools_adapter::AnthropicAdapter,
+    captured: &[CapturedVerdict],
+) -> Result<(Vec<ToolInvocation>, Vec<VerdictResult>), ReplayError> {
+    let mut verdicts_by_id = captured
+        .iter()
+        .map(|entry| (entry.invocation_id.clone(), entry.verdict.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let sse = fixture_sse_bytes(fixture)?;
+    let gated = adapter.gate_sse_stream(&sse, |invocation| {
+        let request_id = invocation.provenance.request_id.as_str();
+        verdicts_by_id.remove(request_id).ok_or_else(|| {
+            ProviderError::Malformed(format!(
+                "Anthropic stream replay produced unexpected invocation {request_id}"
+            ))
+        })
+    })?;
+
+    if let Some((request_id, _)) = verdicts_by_id.into_iter().next() {
+        return Err(invalid_fixture(
+            &fixture.path,
+            format!("Anthropic stream replay did not produce invocation {request_id}"),
         ));
     }
 
@@ -548,19 +735,126 @@ fn assert_openai_lowered_responses(
     Ok(lowered)
 }
 
-#[cfg(not(feature = "fixtures-openai"))]
-fn assert_openai_lowered_responses(
+#[cfg(feature = "fixtures-anthropic")]
+fn assert_anthropic_lowered_responses(
     fixture: &ProviderCaptureFixture,
-    _adapter: &(),
-    _captured: &[CapturedVerdict],
+    adapter: &chio_anthropic_tools_adapter::AnthropicAdapter,
+    captured: &[CapturedVerdict],
 ) -> Result<usize, ReplayError> {
-    if !fixture.lowered_tool_output_requests().is_empty() {
-        return Err(invalid_fixture(
+    use chio_tool_call_fabric::ProviderAdapter;
+
+    let lower_verdict = shared_lower_verdict(&fixture.path, captured)?;
+    let mut lowered = 0;
+
+    for record in fixture.lowered_anthropic_tool_result_requests() {
+        let expected_body = record.payload.get("body").ok_or_else(|| {
+            invalid_fixture(
+                &fixture.path,
+                "lowered upstream_request payload was missing body",
+            )
+        })?;
+        let Some(verdict) = lower_verdict.clone() else {
+            return Err(invalid_fixture(
+                &fixture.path,
+                "lowered tool_result request appeared without captured verdict",
+            ));
+        };
+        let result = ToolResult(anthropic_tool_result_payload(
             &fixture.path,
-            "OpenAI lowering requires the fixtures-openai feature",
-        ));
+            expected_body,
+            &verdict,
+        )?);
+        let response = futures_lite_block_on(adapter.lower(verdict, result))?;
+        let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+
+        assert_canonical_json_eq(
+            format!("{} lowered Anthropic tool_result", fixture.fixture_id),
+            expected_body,
+            &actual_body,
+        )?;
+        lowered += 1;
     }
-    Ok(0)
+
+    Ok(lowered)
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn anthropic_adapter(
+    path: &Path,
+    workspace_id: String,
+) -> Result<chio_anthropic_tools_adapter::AnthropicAdapter, ReplayError> {
+    use std::sync::Arc;
+
+    use chio_anthropic_tools_adapter::transport::MockTransport;
+    use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
+
+    let config = AnthropicAdapterConfig::new(
+        "anthropic-1",
+        "Anthropic Messages",
+        "0.1.0",
+        "deadbeef",
+        workspace_id,
+    );
+    AnthropicAdapter::new_with_manifest(
+        config,
+        Arc::new(MockTransport::new()),
+        &anthropic_server_tool_manifest(),
+    )
+    .map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("Anthropic conformance manifest failed validation: {error}"),
+        )
+    })
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
+    use chio_manifest::{
+        LatencyHint, ServerTool, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
+    };
+
+    ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "anthropic-1".into(),
+        name: "Anthropic Messages".to_string(),
+        description: Some("Anthropic conformance replay manifest".to_string()),
+        version: "0.1.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "regular_tool".to_string(),
+            description: "Regular client-hosted conformance tool".to_string(),
+            input_schema: serde_json::json!({"type": "object"}),
+            output_schema: Some(serde_json::json!({"type": "object"})),
+            pricing: None,
+            has_side_effects: false,
+            latency_hint: Some(LatencyHint::Fast),
+        }],
+        server_tools: vec![
+            ServerTool::ComputerUse,
+            ServerTool::Bash,
+            ServerTool::TextEditor,
+        ],
+        required_permissions: None,
+        public_key: "deadbeef".to_string(),
+    }
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn anthropic_tool_result_payload(
+    path: &Path,
+    expected_body: &Value,
+    verdict: &VerdictResult,
+) -> Result<Vec<u8>, ReplayError> {
+    match verdict {
+        VerdictResult::Allow { .. } => {
+            let content = expected_body.get("content").ok_or_else(|| {
+                invalid_fixture(path, "Anthropic allow tool_result was missing content")
+            })?;
+            canonical_json_bytes_for("captured Anthropic tool result content", content)
+                .map_err(ReplayError::from)
+        }
+        VerdictResult::Deny { .. } => Ok(b"{}".to_vec()),
+    }
 }
 
 fn validate_record(path: &Path, record: &CaptureRecord) -> Result<(), ReplayError> {
@@ -610,6 +904,7 @@ fn captured_deny_reason(path: &Path, payload: &Value) -> Result<DenyReason, Repl
     serde_json::from_value(reason.clone()).map_err(ReplayError::from)
 }
 
+#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
 fn shared_lower_verdict(
     path: &Path,
     captured: &[CapturedVerdict],
@@ -631,6 +926,7 @@ fn shared_lower_verdict(
     Ok(Some(first))
 }
 
+#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
 fn verdict_kind(verdict: &VerdictResult) -> &'static str {
     match verdict {
         VerdictResult::Allow { .. } => "allow",
@@ -638,6 +934,7 @@ fn verdict_kind(verdict: &VerdictResult) -> &'static str {
     }
 }
 
+#[cfg(feature = "fixtures-openai")]
 fn response_has_no_tool_calls(payload: &Value) -> bool {
     let output = payload.get("output").and_then(Value::as_array);
     let Some(output) = output else {
@@ -651,6 +948,30 @@ fn response_has_no_tool_calls(payload: &Value) -> bool {
     })
 }
 
+#[cfg(feature = "fixtures-anthropic")]
+fn anthropic_response_has_no_tool_uses(payload: &Value) -> bool {
+    let body = anthropic_message_body(payload);
+    let content = body.get("content").and_then(Value::as_array);
+    let Some(content) = content else {
+        return true;
+    };
+
+    !content.iter().any(|item| {
+        item.get("type")
+            .and_then(Value::as_str)
+            .is_some_and(|value| value == "tool_use")
+    })
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn anthropic_message_body(payload: &Value) -> &Value {
+    ["body", "response", "payload", "message"]
+        .iter()
+        .find_map(|field| payload.get(field).filter(|value| value.is_object()))
+        .unwrap_or(payload)
+}
+
+#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
 fn fixture_sse_bytes(fixture: &ProviderCaptureFixture) -> Result<Vec<u8>, ReplayError> {
     let mut bytes = Vec::new();
 
@@ -676,10 +997,12 @@ fn fixture_sse_bytes(fixture: &ProviderCaptureFixture) -> Result<Vec<u8>, Replay
     Ok(bytes)
 }
 
+#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
 fn event_name(payload: &Value) -> Option<&str> {
     payload.get("event").and_then(Value::as_str)
 }
 
+#[cfg(feature = "fixtures-openai")]
 fn stream_event_item(payload: &Value) -> Option<&Value> {
     payload
         .get("data")
@@ -687,6 +1010,7 @@ fn stream_event_item(payload: &Value) -> Option<&Value> {
         .or_else(|| payload.get("data").and_then(|data| data.get("output_item")))
 }
 
+#[cfg(feature = "fixtures-openai")]
 fn org_id_from_payload(payload: &Value) -> Option<String> {
     let headers = payload.get("headers")?.as_object()?;
     headers.iter().find_map(|(key, value)| {
@@ -698,12 +1022,32 @@ fn org_id_from_payload(payload: &Value) -> Option<String> {
     })
 }
 
+#[cfg(feature = "fixtures-anthropic")]
+fn anthropic_workspace_id_from_payload(payload: &Value) -> Option<String> {
+    let headers = payload.get("headers")?.as_object()?;
+    headers.iter().find_map(|(key, value)| {
+        if is_anthropic_workspace_header(key) {
+            header_value(value)
+        } else {
+            None
+        }
+    })
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn is_anthropic_workspace_header(key: &str) -> bool {
+    key.eq_ignore_ascii_case("x-chio-anthropic-workspace-id")
+        || key.eq_ignore_ascii_case("anthropic-workspace-id")
+}
+
+#[cfg(feature = "fixtures-openai")]
 fn is_openai_org_header(key: &str) -> bool {
     key.eq_ignore_ascii_case("openai-organization")
         || key.eq_ignore_ascii_case("openai-org-id")
         || key.eq_ignore_ascii_case("x-openai-organization")
 }
 
+#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
 fn header_value(value: &Value) -> Option<String> {
     match value {
         Value::String(value) => non_empty(value),
@@ -712,6 +1056,7 @@ fn header_value(value: &Value) -> Option<String> {
     }
 }
 
+#[cfg(any(feature = "fixtures-openai", feature = "fixtures-anthropic"))]
 fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     if value.is_empty() {

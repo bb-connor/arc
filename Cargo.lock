@@ -2957,7 +2957,9 @@ dependencies = [
 name = "chio-provider-conformance"
 version = "0.1.0"
 dependencies = [
+ "chio-anthropic-tools-adapter",
  "chio-core-types",
+ "chio-manifest",
  "chio-openai-adapter",
  "chio-tool-call-fabric",
  "serde",

@@ -10,6 +10,8 @@ publish = false
 
 [dependencies]
 chio-core = { package = "chio-core-types", path = "../chio-core-types" }
+chio-anthropic-tools-adapter = { path = "../chio-anthropic-tools-adapter", features = ["computer-use"], optional = true }
+chio-manifest = { path = "../chio-manifest", optional = true }
 chio-openai = { package = "chio-openai-adapter", path = "../chio-openai", features = ["provider-adapter"], optional = true }
 chio-tool-call-fabric = { path = "../chio-tool-call-fabric" }
 serde = { workspace = true, features = ["derive"] }
@@ -19,7 +21,7 @@ thiserror = { workspace = true }
 [features]
 default = []
 fixtures-openai = ["dep:chio-openai"]
-fixtures-anthropic = []
+fixtures-anthropic = ["dep:chio-anthropic-tools-adapter", "dep:chio-manifest"]
 fixtures-bedrock = []
 
 [lints.clippy]
