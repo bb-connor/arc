@@ -24,6 +24,13 @@
       "name": "@chio-protocol/browser",
       "version": "0.1.0",
     },
+    "sdks/typescript/packages/edge": {
+      "name": "@chio-protocol/edge",
+      "version": "0.1.0",
+      "devDependencies": {
+        "typescript": "~5.7.0",
+      },
+    },
     "sdks/typescript/packages/workers": {
       "name": "@chio-protocol/workers",
       "version": "0.1.0",
@@ -36,6 +43,8 @@
   },
   "packages": {
     "@chio-protocol/browser": ["@chio-protocol/browser@workspace:sdks/typescript/packages/browser"],
+
+    "@chio-protocol/edge": ["@chio-protocol/edge@workspace:sdks/typescript/packages/edge"],
 
     "@chio-protocol/workers": ["@chio-protocol/workers@workspace:sdks/typescript/packages/workers"],
 
