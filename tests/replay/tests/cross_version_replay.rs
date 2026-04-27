@@ -114,15 +114,26 @@ fn cross_version_replay_full_matrix() {
                         // not be deserialised - left unchecked, those rows
                         // would silently bypass signature verification and
                         // defeat the supported-tier guarantee.
+                        //
+                        // `receipts_total == 0` covers an empty bundle: a
+                        // tarball that ships zero receipts would otherwise
+                        // pass every other check vacuously (no signature
+                        // failures, no unsigned receipts, root_match could
+                        // even hold for a zero-byte payload). Supported
+                        // tags must carry at least one receipt; intentional
+                        // zero-receipt fixtures must be downgraded to
+                        // `compat = "best_effort"` in the matrix.
                         if !report.root_match
                             || report.receipts_signature_failed > 0
                             || report.receipts_unsigned > 0
+                            || report.receipts_total == 0
                         {
                             supported_failures.push(format!(
-                                "supported tag {} reverify dirty: root_match={} sig_failed={} \
-                                 unsigned={} (recomputed={} bundle={})",
+                                "supported tag {} reverify dirty: root_match={} total={} \
+                                 sig_failed={} unsigned={} (recomputed={} bundle={})",
                                 entry.tag,
                                 report.root_match,
+                                report.receipts_total,
                                 report.receipts_signature_failed,
                                 report.receipts_unsigned,
                                 report.recomputed_root_hex,

@@ -50,7 +50,10 @@ the binary itself; this wrapper provides a fast-fail user-friendly front
 end before the binary runs.
 
 After a successful bless, commit the goldens, the audit-log delta, and any
-docs/replay-compat.md update in a single commit.
+docs/replay-compat.md update in a single commit. The audit-log <sha> column
+is written as the placeholder `<commit-sha-pending>`; once the bless commit
+(or its squash-merge SHA) is known, run scripts/seal-bless-audit.sh to
+rewrite the placeholder rows to the real SHA on a follow-up commit.
 USAGE
 }
 
@@ -219,3 +222,7 @@ if [ -n "$COMPAT_DIRTY" ]; then
   note "  - docs/replay-compat.md"
 fi
 note "Then push and request CODEOWNERS review on tests/replay/goldens/."
+note ""
+note "Audit-log <sha> rows are recorded as <commit-sha-pending> at bless time;"
+note "after the bless commit lands, run scripts/seal-bless-audit.sh to rewrite"
+note "the placeholder rows to the real SHA on a follow-up commit."

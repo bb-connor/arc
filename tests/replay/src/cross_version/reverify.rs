@@ -97,6 +97,14 @@ pub enum ReverifyError {
     /// tampered with or the producing tag's writer drifted.
     #[error("root.hex is malformed: expected 64 lowercase hex bytes, got {0:?}")]
     MalformedRoot(String),
+    /// A required basename appeared more than once inside the tarball.
+    /// Replay bundles are produced by the gate's writer which emits each
+    /// of the three required files exactly once; a duplicate is treated
+    /// as a structural-integrity failure (a malicious bundle could
+    /// otherwise stage one set of bytes for re-verification while
+    /// shadowing them with a second entry that overwrites the first).
+    #[error("duplicate entry {0} inside bundle archive (required basenames must appear once)")]
+    DuplicateEntry(&'static str),
 }
 
 /// Result of a successful [`reverify_bundle`] call.
@@ -190,6 +198,12 @@ pub fn reverify_bundle(
 /// required goldens by basename. Entries whose basename does not match
 /// one of the three target files are silently ignored (the bundle may
 /// carry release-engineering metadata that is out of scope here).
+///
+/// Required basenames MUST appear exactly once. A duplicate
+/// `receipts.ndjson` / `checkpoint.json` / `root.hex` is rejected via
+/// [`ReverifyError::DuplicateEntry`]; a HashMap-overwrite policy would
+/// let a malicious bundle stage one set of bytes for re-verification
+/// and shadow them with a second entry, defeating the integrity check.
 fn extract_required_entries(path: &Path) -> Result<HashMap<String, Vec<u8>>, ReverifyError> {
     let file = std::fs::File::open(path).map_err(|e| ReverifyError::Archive(e.to_string()))?;
     let decoder = GzDecoder::new(file);
@@ -208,21 +222,30 @@ fn extract_required_entries(path: &Path) -> Result<HashMap<String, Vec<u8>>, Rev
             Some(name) => name.to_string(),
             None => continue,
         };
-        if basename != RECEIPTS_FILENAME
-            && basename != CHECKPOINT_FILENAME
-            && basename != ROOT_FILENAME
-        {
+        // Map the basename back to one of the three required-file
+        // sentinels so the duplicate-entry error uses the same
+        // `&'static str` constant the rest of the module advertises.
+        let required: &'static str = if basename == RECEIPTS_FILENAME {
+            RECEIPTS_FILENAME
+        } else if basename == CHECKPOINT_FILENAME {
+            CHECKPOINT_FILENAME
+        } else if basename == ROOT_FILENAME {
+            ROOT_FILENAME
+        } else {
             continue;
-        }
-        // Per-entry uniqueness: a well-formed bundle holds each file
-        // exactly once. If a tarball duplicates a basename, the last
-        // one wins (consistent with `tar -x` behaviour, fail-loud on
-        // structural-integrity rather than silently merging).
+        };
         let mut buf = Vec::new();
         entry
             .read_to_end(&mut buf)
             .map_err(|e| ReverifyError::Archive(e.to_string()))?;
-        out.insert(basename, buf);
+        // Per-entry uniqueness: a well-formed bundle holds each
+        // required file exactly once. Reject duplicates so a tarball
+        // with two `receipts.ndjson` entries (one benign, one with
+        // tampered bytes) cannot silently overwrite the first.
+        if out.contains_key(required) {
+            return Err(ReverifyError::DuplicateEntry(required));
+        }
+        out.insert(required.to_string(), buf);
     }
     Ok(out)
 }
@@ -678,5 +701,60 @@ mod reverify_tests {
         let report = reverify_bundle(&bundle, &entry).expect("flat layout must reverify");
         assert!(report.root_match);
         assert_eq!(report.receipts_total, 1);
+    }
+
+    /// Bundles MUST contain each required basename exactly once. A
+    /// duplicate `receipts.ndjson` entry (one benign, one with tampered
+    /// bytes) must be rejected up front so the second copy cannot
+    /// silently overwrite the first inside the extractor's HashMap.
+    #[test]
+    fn duplicate_receipts_entry_rejected() {
+        let td = TempDir::new().unwrap();
+        let (receipts, checkpoint, root) = make_stub_golden("dup_receipts");
+        // Second receipts payload carries different bytes than the first
+        // so an overwrite would be observable as a verifier-state shift.
+        let evil_receipts = b"{\"scenario\":\"tampered\",\"verdict\":\"allow\",\"nonce\":\"00\"}\n";
+        let bundle = synthetic_bundle(
+            &td,
+            "v0.1.0",
+            &[
+                (RECEIPTS_FILENAME, &receipts),
+                (CHECKPOINT_FILENAME, &checkpoint),
+                (ROOT_FILENAME, &root),
+                (RECEIPTS_FILENAME, evil_receipts.as_slice()),
+            ],
+        );
+        let entry = entry_for("v0.1.0", CompatLevel::Supported);
+        let err = reverify_bundle(&bundle, &entry).expect_err("duplicate basename must reject");
+        assert!(
+            matches!(err, ReverifyError::DuplicateEntry(name) if name == RECEIPTS_FILENAME),
+            "expected DuplicateEntry(receipts.ndjson), got {err:?}"
+        );
+    }
+
+    /// Same protection for `checkpoint.json` and `root.hex`: a duplicate
+    /// must surface as a structural-integrity error, not a silent
+    /// overwrite.
+    #[test]
+    fn duplicate_root_entry_rejected() {
+        let td = TempDir::new().unwrap();
+        let (receipts, checkpoint, root) = make_stub_golden("dup_root");
+        let evil_root = b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        let bundle = synthetic_bundle(
+            &td,
+            "v0.1.0",
+            &[
+                (RECEIPTS_FILENAME, &receipts),
+                (CHECKPOINT_FILENAME, &checkpoint),
+                (ROOT_FILENAME, &root),
+                (ROOT_FILENAME, evil_root.as_slice()),
+            ],
+        );
+        let entry = entry_for("v0.1.0", CompatLevel::Supported);
+        let err = reverify_bundle(&bundle, &entry).expect_err("duplicate root must reject");
+        assert!(
+            matches!(err, ReverifyError::DuplicateEntry(name) if name == ROOT_FILENAME),
+            "expected DuplicateEntry(root.hex), got {err:?}"
+        );
     }
 }
