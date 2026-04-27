@@ -221,11 +221,17 @@ jobs:
         run: |
           set -euo pipefail
           # Find the newest completed dudect.yml run BEFORE this one.
-          # `gh run list` returns rows newest-first; filter to schedule
-          # and workflow_dispatch events only, drop the current run, take
-          # the next id. Empty string means there is no prior nightly
-          # yet (first run in the lane), in which case the correlate job
-          # records state and exits without firing an alarm.
+          # `gh run list` returns rows newest-first. Filter to:
+          #   - schedule + workflow_dispatch events only (PR-trigger is
+          #     not configured for this lane, but be defensive),
+          #   - status == "completed" so an in-progress / queued / waiting
+          #     run is not picked as the "prior" baseline (which would
+          #     leave us downloading missing artifacts and silently
+          #     skipping the two-consecutive-run correlation),
+          #   - exclude the current run id.
+          # Empty string means there is no prior nightly yet (first run
+          # in the lane), in which case the correlate job records state
+          # and exits without firing an alarm.
           prior=$(gh run list \
             --workflow dudect.yml \
             --limit 25 \
@@ -233,6 +239,7 @@ jobs:
             --jq '
               [.[]
                 | select(.event == "schedule" or .event == "workflow_dispatch")
+                | select(.status == "completed")
                 | select(.databaseId != ${{ github.run_id }})
               ]
               | .[0].databaseId // empty

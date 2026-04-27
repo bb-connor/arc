@@ -33,9 +33,20 @@
 # rather than a soft warning. Mutation runs count against the same
 # envelope as fuzz runs since both share the GitHub-hosted runner pool.
 #
-# continue-on-error is true on every mutation step today; the gate flip
-# from advisory to blocking is driven entirely by releases.toml and is
-# not a workflow edit (M02 P3 atomic task P3.T4).
+# continue-on-error policy:
+#
+#   - mutants-pr lane: continue-on-error is NOT set at job level so the
+#     gate script's exit code can propagate. scripts/mutants-gate.sh
+#     reads releases.toml: cycle_end_tag empty -> exit 0 (advisory),
+#     cycle_end_tag populated -> exit 1 (blocking). Removing the
+#     job-level continue-on-error is what makes the M02 P3 release
+#     boundary actually flip the lane to blocking without a workflow
+#     edit, per atomic task P3.T4.
+#
+#   - mutants-nightly lane: continue-on-error: true stays. The nightly
+#     sweep is dashboard-only - it surfaces survivors via the uploaded
+#     artifact and (eventually) issue-on-budget-breach, but the workflow
+#     run itself never gates a PR merge.
 
 name: mutants
 
@@ -81,7 +92,10 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    continue-on-error: true
+    # continue-on-error is intentionally absent: the lane's advisory-vs-
+    # blocking posture is driven by scripts/mutants-gate.sh (which reads
+    # releases.toml). Setting it here would mask a non-zero gate exit and
+    # silently keep the lane advisory after the release-cycle flip.
     strategy:
       fail-fast: false
       matrix:
@@ -139,28 +153,46 @@ jobs:
             echo "scripts/check-fuzz-budget.sh missing or non-executable; skipping budget check"
           fi
 
-      - name: Run cargo-mutants --in-diff against PR base
-        id: mutate
+      - name: Capture PR diff for --in-diff scoping
+        id: diff
         if: steps.forced.outputs.skip == 'false'
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref || 'project/roadmap-04-25-2026' }}
         run: |
           set -euo pipefail
+          # cargo-mutants --in-diff expects a unified-diff TEXT FILE PATH,
+          # not a git ref. Capture the PR's three-dot diff against the base
+          # ref into a workspace-local file and forward the path.
+          # fetch-depth: 0 in the checkout above guarantees both refs are
+          # present locally for the diff.
+          diff_file="${RUNNER_TEMP}/mutants-pr-${{ matrix.package }}.diff"
+          git fetch --quiet origin "${BASE_REF}"
+          git diff "origin/${BASE_REF}...HEAD" > "${diff_file}"
+          wc -l "${diff_file}" || true
+          echo "diff_file=${diff_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run cargo-mutants --in-diff against PR base
+        id: mutate
+        if: steps.forced.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
           mkdir -p mutants-out/${{ matrix.package }}
           # --in-diff scopes mutation generation to lines changed against
-          # the PR base ref; --no-shuffle keeps reproducibility across
-          # runs; --timeout caps any single mutant under sensible
-          # wall-time per the source-doc CI shape.
+          # the PR base ref. cargo-mutants 25.x reads the supplied path as
+          # a unified-diff text file (not a git ref). --no-shuffle keeps
+          # reproducibility across runs; --timeout caps any single mutant
+          # under sensible wall-time per the source-doc CI shape.
+          mutants_exit=0
           cargo mutants \
             --package "${{ matrix.package }}" \
-            --in-diff "origin/${BASE_REF}" \
+            --in-diff "${{ steps.diff.outputs.diff_file }}" \
             --no-shuffle \
             --timeout 120 \
             --jobs 2 \
             --output mutants-out/${{ matrix.package }} \
             --json \
             || mutants_exit=$?
-          echo "exit=${mutants_exit:-0}" >> "${GITHUB_OUTPUT}"
+          echo "exit=${mutants_exit}" >> "${GITHUB_OUTPUT}"
           ls -la mutants-out/${{ matrix.package }} || true
 
       - name: Apply gate posture (advisory or blocking per releases.toml)
