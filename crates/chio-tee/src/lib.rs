@@ -5,8 +5,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod frame;
 pub mod tap;
 
+pub use frame::{
+    canonicalize as canonicalize_frame, parse as parse_frame, Frame, FrameError, Otel, Provenance,
+    Upstream, UpstreamSystem, Verdict, FRAME_VERSION, SCHEMA_ID, SCHEMA_VERSION,
+};
 pub use tap::{TapError, TapResult, TrafficTap};
 
 pub const TEE_VERSION: &str = "0.1.0-skeleton";
