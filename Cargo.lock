@@ -2050,6 +2050,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-data-guards-redactors-default"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-did"
 version = "0.1.0"
 dependencies = [
