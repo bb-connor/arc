@@ -28,6 +28,7 @@ members = [
     "crates/chio-acp-proxy",
     "crates/chio-ag-ui-proxy",
     "crates/chio-anthropic-tools-adapter",
+    "crates/chio-bedrock-converse-adapter",
     "crates/chio-cross-protocol",
     "crates/chio-envoy-ext-authz",
     "crates/chio-mcp-adapter",
@@ -151,6 +152,7 @@ unwrap_used = "deny"
 expect_used = "deny"
 
 [workspace.dependencies]
+aws-sdk-bedrockruntime = "1.130.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yml = "0.0.12"
