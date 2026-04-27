@@ -144,3 +144,123 @@ jobs:
             exit 1
           fi
           echo "header-stamp-untouched: all generated files carry the canonical 'DO NOT EDIT - regenerate' stamp"
+
+  vectors-byte-stable:
+    name: vectors-byte-stable (freeze-vectors --check)
+    # owner: M01
+    # M01.P5.T3: re-runs `cargo xtask freeze-vectors --check` on every PR so
+    # that a hand-edit to a `tests/bindings/vectors/**/*.json` payload (or to
+    # the MANIFEST.sha256) cannot land without a fresh regeneration. The
+    # xtask exits non-zero with a "stale" message if any committed vector
+    # diverges from its recomputed SHA-256.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      LC_ALL: C
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: spec-drift-vectors-byte-stable
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Verify freeze-vectors are byte-stable
+        run: cargo xtask freeze-vectors --check
+
+      - name: Assert no drift in committed vectors or manifest
+        run: |
+          set -euo pipefail
+          # Defense in depth: if `freeze-vectors --check` passed but a side
+          # effect mutated tests/bindings/vectors/, fail the job rather than
+          # silently absorb the drift. The xtask is supposed to be idempotent
+          # under --check, so this should always be a no-op on green runs.
+          git diff --exit-code tests/bindings/vectors
+
+  schema-coverage:
+    name: schema-coverage (vectors_schema_pair)
+    # owner: M01
+    # M01.P5.T3: runs the M01.P2.T8 vectors_schema_pair test target. The test
+    # asserts every wire schema in spec/schemas/ has at least one paired
+    # vector under tests/bindings/vectors/, and conversely that every vector
+    # references a known schema. This catches schema drift where a new wire
+    # type lands without conformance coverage (or vice versa).
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: spec-drift-schema-coverage
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Run vectors_schema_pair coverage test
+        run: |
+          cargo test -p chio-conformance \
+            --test vectors_schema_pair -- --nocapture
+
+  cross-lang-bytes:
+    name: cross-lang-bytes (canonical_json_diff proptest)
+    # owner: M01
+    # M01.P5.T3: runs the M01.P5.T1 canonical_json_diff proptest, which
+    # property-checks the Rust canonicalizer against RFC 8785 invariants
+    # (key ordering, string escapes, number normalization, etc.). When the
+    # Python and TypeScript SDKs grow first-party byte-equivalence checks
+    # (planned for a follow-up after M01.P3 lanes ship a regenerator with
+    # an assertion harness), invoke them as additional steps in this job;
+    # for now the Rust proptest is the gate.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      LC_ALL: C
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: spec-drift-cross-lang-bytes
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Run canonical_json_diff proptest (RFC 8785 invariants)
+        run: |
+          cargo test -p chio-formal-diff-tests \
+            --test canonical_json_diff
+        # Deferred SDK byte-equivalence invocations.
+        #
+        # Once sdks/python/chio-sdk-python and
+        # sdks/typescript/packages/conformance ship a canonicalize-byte-
+        # equivalence test (paired against the Rust canonicalizer over a
+        # shared corpus), add steps here. The expected shape is:
+        #
+        #   - name: Python canonicalize byte-equivalence
+        #     run: |
+        #       cd sdks/python/chio-sdk-python
+        #       uv run pytest tests/test_canonical_byte_equiv.py
+        #
+        #   - name: TypeScript canonicalize byte-equivalence
+        #     run: |
+        #       cd sdks/typescript/packages/conformance
+        #       npm ci && npm test -- canonical-byte-equiv
+        #
+        # Until those harnesses land, the Rust proptest is the
+        # cross-lang-bytes gate (see PROTOCOL.md
+        # "RFC 8785 canonicalization").
