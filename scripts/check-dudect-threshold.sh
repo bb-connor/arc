@@ -75,13 +75,20 @@ err() { printf '%s\n' "$*" >&2; }
 # Reads <file>, prints the maximum |t|-statistic found across all
 # "max t = <signed-float>" occurrences. Empty output if no t-stats found.
 # Uses awk for the parse + abs + max in one pass; no bc/python dep.
+#
+# Output uses awk's "%.17g" format - the round-trip-safe IEEE-754 double
+# representation. Truncating to "%.4f" here would round borderline values
+# such as 4.49996 up to 4.5000 and produce false FAIL verdicts under the
+# two-consecutive-run rule. The verdict comparison downstream re-parses
+# this value with awk + 0.0, so full precision is preserved end-to-end.
 extract_max_abs_t() {
     local input="$1"
     awk '
         # Match the dudect-bencher 0.7 stdout fragment. The t value is a
         # signed float that may carry a leading + or -; awk + 0.0 coerces
-        # to numeric and handles both.
-        match($0, /max t = [+-]?[0-9]+\.[0-9]+/) {
+        # to numeric and handles both. Allow optional fractional digits so
+        # we accept high-precision lines like "max t = +61.61472".
+        match($0, /max t = [+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/) {
             seg = substr($0, RSTART, RLENGTH)
             sub(/max t = /, "", seg)
             v = seg + 0.0
@@ -90,7 +97,7 @@ extract_max_abs_t() {
             seen = 1
         }
         END {
-            if (seen) printf "%.4f\n", maxv
+            if (seen) printf "%.17g\n", maxv
         }
     ' "$input"
 }
@@ -115,18 +122,55 @@ bench fake_left_right ... : n == +0.004M, max t = +5.7321, max tau = +3.000e-3
 bench fake_left_right ... : n == +0.008M, max t = -2.0000, max tau = +1.500e-3
 SAMPLE
 
+    # Compare numerically rather than as strings: extract_max_abs_t now
+    # emits "%.17g" round-trip precision, which can render a synthetic
+    # 5.7321 as "5.7320999999999998" depending on awk's libc. The parser
+    # contract is "preserve the input value to f64 precision", verified by
+    # an awk numeric equality check rather than a literal string compare.
     local got
     got="$(extract_max_abs_t "${tmp}")"
     local want="5.7321"
 
-    if [[ "${got}" != "${want}" ]]; then
-        err "dry-run self-test FAIL: parser got '${got}', expected '${want}'"
+    if [[ -z "${got}" ]]; then
+        err "dry-run self-test FAIL: parser produced no output"
+        exit 2
+    fi
+
+    local agree
+    agree="$(awk -v a="${got}" -v b="${want}" \
+        'BEGIN { print ((a + 0.0) - (b + 0.0) < 1e-9 && (b + 0.0) - (a + 0.0) < 1e-9) ? "OK" : "MISMATCH" }')"
+
+    if [[ "${agree}" != "OK" ]]; then
+        err "dry-run self-test FAIL: parser got '${got}', expected '${want}' (numeric mismatch)"
         exit 2
     fi
 
     printf 'dudect threshold script dry-run OK (parser max|t|=%s vs synthetic=%s)\n' \
         "${got}" "${want}"
     exit 0
+}
+
+# is_positive_number <string>
+# Returns 0 (true) when the argument parses as a strictly-positive float
+# (1.5, 4.5, 0.001, 1e3 etc.) and 1 (false) otherwise. Used to reject
+# garbage --threshold inputs before they get coerced to 0 by awk + 0.0,
+# which would otherwise misclassify almost every harness output as FAIL
+# and fire spurious sustained-leak issues under the two-run correlation
+# rule.
+is_positive_number() {
+    local s="$1"
+    [[ -n "${s}" ]] || return 1
+    awk -v s="${s}" '
+        BEGIN {
+            # Reject strings that do not match a real-number shape.
+            if (s !~ /^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$/) exit 1
+            # awk + 0.0 coerces empty / non-numeric tail to 0; the regex
+            # above rules that out, so v reflects the parsed magnitude.
+            v = s + 0.0
+            if (v <= 0) exit 1
+            exit 0
+        }
+    '
 }
 
 # verdict <input-file> <threshold>
@@ -190,6 +234,10 @@ main() {
             --threshold)
                 if [[ $# -lt 2 ]]; then
                     err "--threshold requires a numeric argument"
+                    exit 2
+                fi
+                if ! is_positive_number "$2"; then
+                    err "--threshold must be a strictly-positive number; got '$2'"
                     exit 2
                 fi
                 threshold="$2"

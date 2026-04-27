@@ -24,15 +24,29 @@ cargo install cargo-mutants --version '~25' --locked
 
 ## Configuration layout
 
-Two layers, both checked in:
+cargo-mutants 25.x reads its configuration exclusively from the
+workspace-root `.cargo/mutants.toml`. Per-crate `crates/<name>/mutants.toml`
+files are NOT auto-discovered, and even when loaded explicitly via
+`--config` their globs are matched relative to the source-tree root rather
+than the per-crate root. All per-crate scoping is therefore consolidated
+into the single workspace-root file with workspace-rooted globs (e.g.
+`crates/chio-kernel-core/src/evaluate.rs`).
 
 | Path                                         | Role                                                  |
 |----------------------------------------------|-------------------------------------------------------|
-| `.cargo/mutants.toml`                        | Workspace defaults (timeout, minimum timeout, packages, workspace-wide skip list) |
-| `crates/chio-kernel-core/mutants.toml`       | Per-crate `examine_globs` / `exclude_globs` for the kernel-core trust boundary |
-| `crates/chio-policy/mutants.toml`            | Per-crate config for the HushSpec evaluator + compiler |
-| `crates/chio-guards/mutants.toml`            | Per-crate config for the native guard set + pipeline   |
-| `crates/chio-credentials/mutants.toml`       | Per-crate config for JWT VC, SD-JWT, OID4VP verifiers  |
+| `.cargo/mutants.toml`                        | Single source of truth: timeouts, examined trust-boundary modules per crate, workspace-wide skip list |
+
+A second discovery rule constrains the layout: cargo-mutants walks `mod`
+declarations and does NOT expand `include!` macros. Two crates in this
+workspace use `include!`:
+
+- `chio-credentials/src/lib.rs` `include!`s 13 files. Only `trust_tier`
+  and the `cfg`-gated `fuzz` are real `mod`s. Globs are written against
+  `lib.rs` (which carries all of the included source for discovery
+  purposes) plus `trust_tier.rs`.
+- `chio-policy/src/evaluate.rs` `include!`s `evaluate/{context,engine,
+  matchers,outcomes,tests}.rs`. The glob targets `evaluate.rs` itself,
+  not the sub-files.
 
 Workspace-level knobs of note (in `.cargo/mutants.toml`):
 
@@ -45,13 +59,13 @@ Workspace-level knobs of note (in `.cargo/mutants.toml`):
 - `minimum_test_timeout = 60` -- floor in seconds, so the multiplier
   cannot collapse below the cold-cache build time on a CI host.
 
-### Why per-crate `examine_globs`
+### Why narrow `examine_globs`
 
 cargo-mutants generates one or more mutants for every applicable
 expression. Without scoping, that explodes into thousands of
 candidates per crate; most of them in pure-data, logging, or generated
-code where mutation has no semantic value. Each per-crate
-`mutants.toml` narrows the examined source set to the trust-boundary
+code where mutation has no semantic value. The workspace-root
+`examine_globs` narrows the examined source set to the trust-boundary
 modules listed below.
 
 #### `chio-kernel-core`
@@ -95,16 +109,16 @@ integration testing, not mutation).
 
 #### `chio-credentials`
 
-Examined: portable JWT VC verify, SD-JWT VC verify, portable reputation
-credential verify, the OID4VCI issuance flow, the OID4VP presentation
-flow + verifier, presentation construction / verify, presentation
-challenge binding, cross-issuer trust packs, the issuer / trust-anchor
-registry, OID4VCI / OID4VP discovery, artifact normalization, passport
-verifier glue, credential-side policy intersection, and trust-tier
-synthesis.
+Examined: `lib.rs` (which `include!`s the trust-boundary set: portable
+JWT VC verify, SD-JWT VC verify, portable reputation credential verify,
+the OID4VCI issuance flow, the OID4VP presentation flow + verifier,
+presentation construction / verify, presentation challenge binding,
+cross-issuer trust packs, the issuer / trust-anchor registry, OID4VCI /
+OID4VP discovery, artifact normalization, passport verifier glue, and
+credential-side policy intersection) plus the real-`mod` `trust_tier.rs`.
 
-Excluded: `lib.rs` (re-exports + constants) and `fuzz.rs` (libFuzzer
-entry points covered by the M02 P1 lane).
+Excluded: `fuzz.rs` (libFuzzer entry points covered by the M02 P1
+lane).
 
 ## Local-developer workflow
 
@@ -113,8 +127,11 @@ entry points covered by the M02 P1 lane).
 cargo install cargo-mutants --version '~25' --locked
 
 # Run only the mutants generated against changed files in your branch.
-# This is the same invocation the mutants-pr CI job uses.
-cargo mutants --in-diff origin/main
+# `--in-diff` takes a unified-diff text file path, NOT a git ref, so we
+# capture the diff first. This is the same invocation the mutants-pr CI
+# job uses.
+git diff origin/main...HEAD > /tmp/diff.patch
+cargo mutants --in-diff /tmp/diff.patch
 
 # Full sweep on a single crate (slow; budget hours per crate).
 cargo mutants --package chio-kernel-core
@@ -162,10 +179,9 @@ A surviving mutant can be addressed in one of three ways:
 2. **Refactor the code** so the mutant becomes equivalent (no behaviour
    change) and gets pruned by cargo-mutants. Acceptable when the test
    gap is genuinely uninteresting.
-3. **Skip via `exclude_globs`** in the relevant per-crate `mutants.toml`,
+3. **Skip via `exclude_globs`** in the workspace-root `.cargo/mutants.toml`,
    with a comment justifying the skip and a cross-reference to the
-   triage issue. This requires CODEOWNERS sign-off on the crate's
-   `mutants.toml`.
+   triage issue. This requires CODEOWNERS sign-off on `.cargo/mutants.toml`.
 
 ## Cocoverage with the fuzz corpus
 
@@ -214,8 +230,9 @@ This lane closes M02 P2 (T7).
   and Round-2 (NEW) P3.T7 (re-homed to Phase 2 as M02.P2.T7).
 - `.planning/trajectory/tickets/M02/P2.yml` -- atomic ticket spec for this
   lane (T1 = config, T2 = workflow + `releases.toml`, T7 = cocoverage).
-- `.cargo/mutants.toml` -- workspace defaults.
-- `crates/<crate>/mutants.toml` -- per-crate scope.
+- `.cargo/mutants.toml` -- workspace-root config (timeouts + per-crate
+  scoping consolidated into a single file; cargo-mutants 25.x does not
+  load per-crate `mutants.toml`).
 - `releases.toml` -- per-crate budgets and the advisory / blocking flip
   signal (lands with M02.P2.T2).
 - `docs/fuzzing/continuous.md` -- complementary libFuzzer corpus lane.

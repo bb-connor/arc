@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
+# (Backticks inside single-quoted printf strings are intentional Markdown
+# code-span literals for the report.md / log output, not command
+# substitution. Disabling SC2016 file-wide keeps the wall-of-warnings
+# from masking real findings.)
+#
 # mutants-fuzz-cocoverage.sh - replay the libFuzzer corpus against
 # surviving cargo-mutants mutants. Cross-oracle nightly; advisory.
 #
@@ -15,9 +21,29 @@
 #   - The libFuzzer corpus under fuzz/corpus/<target>/ is a different
 #     oracle: accumulated adversarial inputs that exercise paths the
 #     unit suite often does not reach.
-#   - Replaying the corpus against the mutated binary may catch mutants
+#   - Replaying the corpus against the MUTATED binary may catch mutants
 #     that the unit suite missed. Cross-oracle reduction in missed-
 #     mutant count: expected 5-15%.
+#
+# Architecture (the how):
+#
+#   The naive approach - replaying the corpus once against the current
+#   tree - cannot work. cargo-mutants applies each mutation to a TEMP
+#   work tree, runs the test suite there, and then discards it; the
+#   source-tree binary the script can reach has none of those mutations
+#   applied. Replaying against it measures "does the corpus crash the
+#   clean binary" (which should always be no), not the cocoverage signal.
+#
+#   The fix: drive mutant injection per-survivor by re-shelling
+#   `cargo mutants` with `--file <path> --line <start>:<end>` plus a
+#   custom `--test-tool` that runs OUR fuzz-replay against the mutated
+#   tree cargo-mutants prepared. cargo-mutants applies the patch,
+#   builds, invokes our wrapper as the "test", and reverts.
+#   `--test-tool` is documented in cargo-mutants 25.x as the
+#   substitution point for non-`cargo test` workflows. The wrapper's
+#   exit code feeds straight into cargo-mutants' verdict for that
+#   mutant; libFuzzer signalling (crash / leak / assert) is reported
+#   as "caught by fuzz oracle".
 #
 # Always advisory: never fails the calling workflow. Emits a per-
 # package summary.json and a human-readable report.md.
@@ -112,9 +138,11 @@ summary_json="${REPORT_OUT}/summary.json"
 report_md="${REPORT_OUT}/report.md"
 log_file="${REPORT_OUT}/replay.log"
 
-# Best-effort: locate cargo-mutants outcomes.json. Newer cargo-mutants
-# (25.x) writes outcomes.json directly under --output; older layouts
-# nest it under mutants.out/. Probe both.
+: > "${log_file}"
+
+# Best-effort: locate cargo-mutants outcomes.json. cargo-mutants 25.x
+# writes outcomes.json directly under --output; older layouts nest it
+# under mutants.out/. Probe both.
 outcomes_json=""
 for candidate in \
     "${MUTANTS_OUT}/outcomes.json" \
@@ -127,7 +155,7 @@ done
 
 if [[ -z "${outcomes_json}" ]]; then
     printf 'cocoverage: no outcomes.json under %s; emitting empty report (advisory)\n' \
-        "${MUTANTS_OUT}" | tee "${log_file}"
+        "${MUTANTS_OUT}" | tee -a "${log_file}"
     printf '{\n  "package": "%s",\n  "surviving_mutants": 0,\n  "fuzz_replays_attempted": 0,\n  "fuzz_replays_caught": 0,\n  "note": "no cargo-mutants outcomes.json found"\n}\n' \
         "${PACKAGE}" > "${summary_json}"
     {
@@ -199,26 +227,81 @@ map_source_to_fuzz_target() {
     esac
 }
 
-# Walk outcomes.json without depending on jq (jq is not always
-# available on cold runners; bash + grep is enough for the advisory
-# flow). When jq is present we prefer it for a cleaner pass.
+# replay_one_mutant <source_file> <line_start> <target_name>
+#
+# Re-shells cargo-mutants for a single specific mutant location, with
+# our fuzz-replay wrapper as the substituted test command. cargo-mutants
+# prepares a temp tree with the mutation applied, builds it, then
+# invokes the test-tool from the temp tree's working directory; that is
+# the point at which `cargo +nightly fuzz run` sees the MUTATED binary.
+#
+# Returns 0 if the fuzz oracle did NOT signal (mutant survived in fuzz
+# too), 1 if libFuzzer crashed / asserted / leaked (mutant caught), and
+# 124 on per-mutant timeout (treated as "no signal" for accounting).
+replay_one_mutant() {
+    local source_file="$1"
+    local line_start="$2"
+    local target_name="$3"
+
+    local target_corpus="${CORPUS_ROOT}/${target_name}"
+    if [[ ! -d "${target_corpus}" ]]; then
+        printf 'cocoverage: corpus dir missing for target=%s; skipping\n' \
+            "${target_name}" >> "${log_file}"
+        return 0
+    fi
+
+    # Construct a one-shot shell wrapper that cargo-mutants will invoke
+    # as `--test-tool`. Stored in a tempdir so concurrent crates do not
+    # clobber each other's wrappers when this script is run from a
+    # matrix job in parallel.
+    local wrapper_dir
+    wrapper_dir="$(mktemp -d -t cocoverage-XXXXXX)"
+    local wrapper="${wrapper_dir}/test-tool.sh"
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf 'set -euo pipefail\n'
+        printf '# cargo-mutants substituted test-tool. Runs the fuzz target\n'
+        printf '# corpus replay against the MUTATED binary in this work tree.\n'
+        printf 'exec timeout %s cargo +nightly fuzz run %s -- -runs=%s %s\n' \
+            "${PER_MUTANT_BUDGET}" \
+            "${target_name}" \
+            "${FUZZ_RUNS}" \
+            "${target_corpus}"
+    } > "${wrapper}"
+    chmod +x "${wrapper}"
+
+    local replay_status=0
+    cargo mutants \
+        --package "${PACKAGE}" \
+        --file "${source_file}" \
+        --line "${line_start}" \
+        --no-shuffle \
+        --jobs 1 \
+        --test-tool "${wrapper}" \
+        --output "${wrapper_dir}/mutants-out" \
+        >> "${log_file}" 2>&1 \
+        || replay_status=$?
+
+    rm -rf -- "${wrapper_dir}"
+    return "${replay_status}"
+}
+
+# Walk outcomes.json. cargo-mutants 25.x marks survivors with
+# .summary == "MissedMutant" (confirmed in scripts/mutants-comment.sh)
+# and exposes .scenario.mutant.source_file as an OBJECT with a `.path`
+# sub-field; this script previously consumed it as a bare string,
+# producing garbled paths like {"path":"crates/foo/src/lib.rs"}.
 surviving_count=0
 attempted_count=0
 caught_count=0
 mapped_count=0
 unmapped_count=0
-seen_targets=""
-
-: > "${log_file}"
 
 if command -v jq >/dev/null 2>&1; then
-    # Each outcome record carries .scenario.mutant.source_file and
-    # .summary. Survivors are whichever cargo-mutants version classifies
-    # as "MissedMutant" / "Missed" / "missed". Tolerate variants.
-    while IFS=$'\t' read -r source_file outcome_summary; do
-        [[ -z "${source_file}" ]] && continue
+    while IFS=$'\t' read -r source_path line_start outcome_summary; do
+        [[ -z "${source_path}" ]] && continue
         case "${outcome_summary}" in
-            *Missed*|*missed*|*Survived*|*survived*)
+            MissedMutant|missed)
                 ;;
             *)
                 continue
@@ -226,69 +309,64 @@ if command -v jq >/dev/null 2>&1; then
         esac
         surviving_count=$((surviving_count + 1))
 
-        target_name="$(map_source_to_fuzz_target "${source_file}")"
+        target_name="$(map_source_to_fuzz_target "${source_path}")"
         if [[ -z "${target_name}" ]]; then
             unmapped_count=$((unmapped_count + 1))
             printf 'cocoverage: unmapped source=%s; skipping replay\n' \
-                "${source_file}" >> "${log_file}"
+                "${source_path}" >> "${log_file}"
             continue
         fi
         mapped_count=$((mapped_count + 1))
 
-        target_corpus="${CORPUS_ROOT}/${target_name}"
-        if [[ ! -d "${target_corpus}" ]]; then
-            printf 'cocoverage: corpus dir missing for target=%s; skipping\n' \
-                "${target_name}" >> "${log_file}"
-            continue
-        fi
-
-        # Coalesce duplicate target replays: each fuzz target only
-        # needs to be replayed once per surviving mutant *file*, not
-        # per surviving mutant within the same file. The cargo-mutants
-        # workflow replays the mutated binary for that file, and the
-        # libFuzzer corpus is identical across mutants, so re-running
-        # is wasted CI minutes.
-        if [[ "${seen_targets}" == *":${target_name}:"* ]]; then
-            continue
-        fi
-        seen_targets="${seen_targets}:${target_name}:"
+        # Per-mutant replay. We deliberately do NOT deduplicate by
+        # target: two surviving mutants in the same file may exercise
+        # disjoint code paths, and the corpus might catch one but not
+        # the other. Skipping later survivors biases the cocoverage
+        # ratio downward.
         attempted_count=$((attempted_count + 1))
-
-        printf 'cocoverage: replay target=%s (mapped from %s) runs=%s\n' \
-            "${target_name}" "${source_file}" "${FUZZ_RUNS}" \
+        printf 'cocoverage: replay survivor source=%s line=%s -> target=%s runs=%s\n' \
+            "${source_path}" "${line_start}" "${target_name}" "${FUZZ_RUNS}" \
             | tee -a "${log_file}"
 
-        # Replay; the mutated binary is rebuilt by cargo-mutants in its
-        # own work tree. Here we exercise the corpus against the
-        # current source-tree binary, which is the cocoverage signal:
-        # if the corpus + mutated binary diverge from corpus + clean,
-        # we mark the mutant as "caught by fuzz oracle". Always
-        # advisory; never fails the script.
         replay_status=0
-        timeout "${PER_MUTANT_BUDGET}" \
-            cargo +nightly fuzz run "${target_name}" \
-            -- \
-            -runs="${FUZZ_RUNS}" \
-            "${target_corpus}" \
-            >>"${log_file}" 2>&1 \
+        replay_one_mutant "${source_path}" "${line_start}" "${target_name}" \
             || replay_status=$?
 
+        # cargo-mutants returns 0 if the test-tool succeeded against the
+        # mutant (== mutant SURVIVED fuzz too), and non-zero (typically
+        # 1 with "found N mutants missed") when the test-tool failed
+        # against the mutant (== fuzz oracle signalled, mutant CAUGHT).
+        # Per-mutant timeout (124) is treated as "no signal" for the
+        # accounting; the wall-clock cap is recorded in the log.
         if [[ "${replay_status}" -ne 0 && "${replay_status}" -ne 124 ]]; then
-            # Non-timeout non-zero = libFuzzer signalled (crash/leak/
-            # assert), which means the fuzz oracle would have caught
-            # the mutant. Score it.
             caught_count=$((caught_count + 1))
-            printf 'cocoverage: target=%s caught (status=%s)\n' \
+            printf 'cocoverage: target=%s caught (cargo-mutants verdict status=%s)\n' \
                 "${target_name}" "${replay_status}" \
                 | tee -a "${log_file}"
         fi
-    done < <(jq -r '.outcomes[]? | [(.scenario.mutant.source_file // ""), (.summary // "")] | @tsv' "${outcomes_json}" 2>/dev/null || true)
+    done < <(jq -r '
+        .outcomes[]?
+        | [
+            (.scenario.mutant.source_file.path // ""),
+            ((.scenario.mutant.span.start.line // 0) | tostring),
+            (.summary // "")
+        ]
+        | @tsv
+    ' "${outcomes_json}" 2>/dev/null || true)
 else
-    # jq absent: parse outcomes.json line-wise. Best-effort; exact
-    # source_file extraction may miss exotic cargo-mutants schemas, but
-    # the count fields stay valid.
+    # jq absent: parse outcomes.json line-wise as a best-effort survivor
+    # COUNT only. The mutated-binary replay path requires a structured
+    # walk of source_file.path + span.start.line, which is brittle
+    # without jq, so the no-jq branch reports survivors and skips the
+    # cross-oracle phase rather than emit fabricated "caught" numbers.
+    #
+    # The literal substring is `"MissedMutant"` (with the closing quote
+    # AFTER 'Mutant', not after 'Missed') - cargo-mutants emits that
+    # exact tag for surviving mutants. Earlier revisions of this script
+    # searched for `"Missed"` which is never a substring of
+    # `"MissedMutant"` (the next char is 'M', not '"').
     while IFS= read -r line; do
-        if [[ "${line}" == *'"summary"'*'"Missed"'* || "${line}" == *'"summary"'*'"missed"'* ]]; then
+        if [[ "${line}" == *'"summary"'*'"MissedMutant"'* ]]; then
             surviving_count=$((surviving_count + 1))
         fi
     done < "${outcomes_json}"
@@ -320,8 +398,13 @@ fi
     printf '| Mapped to a fuzz target | %s |\n' "${mapped_count}"
     printf '| Unmapped (no replay) | %s |\n' "${unmapped_count}"
     printf '| Fuzz replays attempted | %s |\n' "${attempted_count}"
-    printf '| Fuzz replays caught (libFuzzer signalled) | %s |\n\n' "${caught_count}"
+    printf '| Fuzz replays caught (libFuzzer signalled against mutant) | %s |\n\n' "${caught_count}"
     printf 'Expected cross-oracle reduction band per source doc: **5-15%%**.\n\n'
+    printf 'Each surviving mutant is replayed individually: cargo-mutants\n'
+    printf 'is re-shelled per survivor with `--file` + `--line` and a\n'
+    printf '`--test-tool` wrapper that runs `cargo fuzz run` against the\n'
+    printf 'corpus, so the libFuzzer corpus exercises the mutated binary\n'
+    printf '(not the clean source tree).\n\n'
     printf 'See `replay.log` for per-target detail. Mapping table is in\n'
     printf '`scripts/mutants-fuzz-cocoverage.sh::map_source_to_fuzz_target`.\n'
 } > "${report_md}"
