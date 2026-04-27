@@ -2,8 +2,13 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema git SHA: bc6d298a8492c3d7a1ec0113712a16b91d5b91d1
+// Schema content SHA-256: 6d62b922598e910c6962a2725daf93a7115f1e49ea93ffb92152506f25eb966b
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
+//
+// The Schema content SHA-256 is computed from the lex-sorted schema bytes
+// (not git history) so the stamp is stable across rebases, shallow clones,
+// and committed-but-unindexed edits. The optional '-dirty' suffix marks a
+// regen that picked up uncommitted (working-tree or staged) schema edits.
 //
 // Manual edits will be overwritten by the next regeneration; the
 // M01.P3.T5 spec-drift CI lane runs this script and 'git diff --exit-code'
@@ -41,6 +46,18 @@ const (
 	ProvenanceAttestationBundleStatementsTierVerified ProvenanceAttestationBundleStatementsTier = "verified"
 )
 
+// Defines values for ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind.
+const (
+	ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKindJwtSvid  ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind = "jwt_svid"
+	ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKindUri      ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind = "uri"
+	ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKindX509Svid ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind = "x509_svid"
+)
+
+// Defines values for ProvenanceAttestationBundleStatementsWorkloadIdentityScheme.
+const (
+	ProvenanceAttestationBundleStatementsWorkloadIdentitySchemeSpiffe ProvenanceAttestationBundleStatementsWorkloadIdentityScheme = "spiffe"
+)
+
 // Defines values for ProvenanceVerdictLinkEvidenceClass.
 const (
 	ProvenanceVerdictLinkEvidenceClassAsserted ProvenanceVerdictLinkEvidenceClass = "asserted"
@@ -50,10 +67,10 @@ const (
 
 // Defines values for ProvenanceVerdictLinkVerdict.
 const (
-	Allow      ProvenanceVerdictLinkVerdict = "allow"
-	Cancel     ProvenanceVerdictLinkVerdict = "cancel"
-	Deny       ProvenanceVerdictLinkVerdict = "deny"
-	Incomplete ProvenanceVerdictLinkVerdict = "incomplete"
+	ProvenanceVerdictLinkVerdictAllow      ProvenanceVerdictLinkVerdict = "allow"
+	ProvenanceVerdictLinkVerdictCancel     ProvenanceVerdictLinkVerdict = "cancel"
+	ProvenanceVerdictLinkVerdictDeny       ProvenanceVerdictLinkVerdict = "deny"
+	ProvenanceVerdictLinkVerdictIncomplete ProvenanceVerdictLinkVerdict = "incomplete"
 )
 
 // Defines values for ReceiptRecordAlgorithm.
@@ -72,30 +89,30 @@ const (
 
 // Defines values for TrustControlAttestationTier.
 const (
-	Attested TrustControlAttestationTier = "attested"
-	Basic    TrustControlAttestationTier = "basic"
-	None     TrustControlAttestationTier = "none"
-	Verified TrustControlAttestationTier = "verified"
+	TrustControlAttestationTierAttested TrustControlAttestationTier = "attested"
+	TrustControlAttestationTierBasic    TrustControlAttestationTier = "basic"
+	TrustControlAttestationTierNone     TrustControlAttestationTier = "none"
+	TrustControlAttestationTierVerified TrustControlAttestationTier = "verified"
 )
 
 // Defines values for TrustControlAttestationWorkloadIdentityCredentialKind.
 const (
-	JwtSvid  TrustControlAttestationWorkloadIdentityCredentialKind = "jwt_svid"
-	Uri      TrustControlAttestationWorkloadIdentityCredentialKind = "uri"
-	X509Svid TrustControlAttestationWorkloadIdentityCredentialKind = "x509_svid"
+	TrustControlAttestationWorkloadIdentityCredentialKindJwtSvid  TrustControlAttestationWorkloadIdentityCredentialKind = "jwt_svid"
+	TrustControlAttestationWorkloadIdentityCredentialKindUri      TrustControlAttestationWorkloadIdentityCredentialKind = "uri"
+	TrustControlAttestationWorkloadIdentityCredentialKindX509Svid TrustControlAttestationWorkloadIdentityCredentialKind = "x509_svid"
 )
 
 // Defines values for TrustControlAttestationWorkloadIdentityScheme.
 const (
-	Spiffe TrustControlAttestationWorkloadIdentityScheme = "spiffe"
+	TrustControlAttestationWorkloadIdentitySchemeSpiffe TrustControlAttestationWorkloadIdentityScheme = "spiffe"
 )
 
 // Defines values for TrustControlTerminateReason.
 const (
-	LeaderHandoff    TrustControlTerminateReason = "leader_handoff"
-	OperatorStepdown TrustControlTerminateReason = "operator_stepdown"
-	QuorumLost       TrustControlTerminateReason = "quorum_lost"
-	TermAdvanced     TrustControlTerminateReason = "term_advanced"
+	TrustControlTerminateReasonLeaderHandoff    TrustControlTerminateReason = "leader_handoff"
+	TrustControlTerminateReasonOperatorStepdown TrustControlTerminateReason = "operator_stepdown"
+	TrustControlTerminateReasonQuorumLost       TrustControlTerminateReason = "quorum_lost"
+	TrustControlTerminateReasonTermAdvanced     TrustControlTerminateReason = "term_advanced"
 )
 
 // AgentHeartbeat defines model for AgentHeartbeat.
@@ -221,7 +238,7 @@ type CapabilityRevocation struct {
 	RevokedAt int `json:"revoked_at"`
 }
 
-// CapabilityToken A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens.
+// CapabilityToken A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens. PublicKey serde renders Ed25519 keys as bare 64-character lowercase hex (`PublicKey::to_hex` in `crates/chio-core-types/src/crypto.rs`), and renders FIPS keys with a self-describing prefix (`p256:<130-char hex>` for uncompressed SEC1 P-256, `p384:<194-char hex>` for P-384). Signatures follow the same convention: bare 128-char hex for Ed25519, `p256:<DER hex>` and `p384:<DER hex>` for FIPS algorithms. The grant `$defs` (`toolGrant`, `resourceGrant`, `promptGrant`, `operation`, `monetaryAmount`, `constraint`) are duplicated with `capability/grant.schema.json` because the current Rust codegen pipeline (`typify =0.4.3`) does not support cross-file `$ref`; both copies must be kept byte-identical when either file is edited until the M01 phase 3 codegen split lands.
 type CapabilityToken struct {
 	// Algorithm Signing algorithm envelope hint. Omitted for legacy Ed25519 tokens to preserve byte-for-byte compatibility. Verification dispatches off the signature hex prefix, not this field.
 	Algorithm *CapabilityTokenAlgorithm `json:"algorithm,omitempty"`
@@ -238,16 +255,16 @@ type CapabilityToken struct {
 	// IssuedAt Unix timestamp (seconds) when the token was issued.
 	IssuedAt int `json:"issued_at"`
 
-	// Issuer Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.
+	// Issuer Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).
 	Issuer string `json:"issuer"`
 
 	// Scope What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
 	Scope CapabilityTokenChioScope `json:"scope"`
 
-	// Signature Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).
+	// Signature Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
 	Signature string `json:"signature"`
 
-	// Subject Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).
+	// Subject Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.
 	Subject string `json:"subject"`
 }
 
@@ -272,10 +289,16 @@ type CapabilityTokenDelegationLink struct {
 		Type string `json:"type"`
 	} `json:"attenuations,omitempty"`
 	CapabilityId string `json:"capability_id"`
-	Delegatee    string `json:"delegatee"`
-	Delegator    string `json:"delegator"`
-	Signature    string `json:"signature"`
-	Timestamp    int    `json:"timestamp"`
+
+	// Delegatee Receiving public key. Same encoding as the token-level `issuer`/`subject`.
+	Delegatee string `json:"delegatee"`
+
+	// Delegator Delegating public key. Same encoding as the token-level `issuer`/`subject`.
+	Delegator string `json:"delegator"`
+
+	// Signature Delegation-link signature. Same encoding as the token-level `signature`.
+	Signature string `json:"signature"`
+	Timestamp int    `json:"timestamp"`
 }
 
 // CapabilityTokenMonetaryAmount defines model for CapabilityTokenMonetaryAmount.
@@ -287,19 +310,19 @@ type CapabilityTokenMonetaryAmount struct {
 // CapabilityTokenOperation defines model for CapabilityTokenOperation.
 type CapabilityTokenOperation = interface{}
 
-// CapabilityTokenPromptGrant Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+// CapabilityTokenPromptGrant Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
 type CapabilityTokenPromptGrant struct {
 	Operations []CapabilityTokenOperation `json:"operations"`
 	PromptName string                     `json:"prompt_name"`
 }
 
-// CapabilityTokenResourceGrant Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+// CapabilityTokenResourceGrant Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
 type CapabilityTokenResourceGrant struct {
 	Operations []CapabilityTokenOperation `json:"operations"`
 	UriPattern string                     `json:"uri_pattern"`
 }
 
-// CapabilityTokenToolGrant Authorization to invoke a single tool. Mirrors `ToolGrant`.
+// CapabilityTokenToolGrant Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
 type CapabilityTokenToolGrant struct {
 	Constraints          *[]CapabilityTokenConstraint   `json:"constraints,omitempty"`
 	DpopRequired         *bool                          `json:"dpop_required,omitempty"`
@@ -667,8 +690,11 @@ type ProvenanceAttestationBundle struct {
 	// Issuer Optional identifier of the bundle assembler (kernel, gateway, or trust-control authority). Omitted when the bundle is locally assembled by the receiving kernel.
 	Issuer *string `json:"issuer,omitempty"`
 
-	// Statements Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence`. The struct does not carry `serde(rename_all)`, so per-statement field names are snake_case.
+	// Statements Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence` in `crates/chio-core-types/src/capability.rs` (lines 484-507). The struct does not carry `serde(rename_all)`, so the per-statement scalar fields are snake_case; the embedded `workload_identity` carries `serde(rename_all = camelCase)` so its inner fields are camelCase. Optional fields (`runtime_identity`, `workload_identity`, `claims`) are omitted from the wire when their underlying `Option<...>` is `None`.
 	Statements []struct {
+		// Claims Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`.
+		Claims *interface{} `json:"claims,omitempty"`
+
 		// EvidenceSha256 Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs.
 		EvidenceSha256 string `json:"evidence_sha256"`
 
@@ -678,7 +704,7 @@ type ProvenanceAttestationBundle struct {
 		// IssuedAt Unix timestamp (seconds) when this attestation was issued.
 		IssuedAt int `json:"issued_at"`
 
-		// RuntimeIdentity Optional runtime or workload identifier associated with the evidence.
+		// RuntimeIdentity Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
 		RuntimeIdentity *string `json:"runtime_identity,omitempty"`
 
 		// Schema Schema or format identifier of the upstream attestation statement (for example `azure-maa-jwt`, `aws-nitro-cose-sign1`, `google-confidential-vm-jwt`).
@@ -689,6 +715,24 @@ type ProvenanceAttestationBundle struct {
 
 		// Verifier Attestation verifier or relying party that accepted the evidence.
 		Verifier string `json:"verifier"`
+
+		// WorkloadIdentity Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.
+		WorkloadIdentity *struct {
+			// CredentialKind Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+			CredentialKind ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind `json:"credentialKind"`
+
+			// Path Canonical workload path within the trust domain.
+			Path string `json:"path"`
+
+			// Scheme Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+			Scheme ProvenanceAttestationBundleStatementsWorkloadIdentityScheme `json:"scheme"`
+
+			// TrustDomain Stable trust domain resolved from the identifier.
+			TrustDomain string `json:"trustDomain"`
+
+			// Uri Canonical workload identifier URI.
+			Uri string `json:"uri"`
+		} `json:"workload_identity,omitempty"`
 	} `json:"statements"`
 }
 
@@ -697,6 +741,12 @@ type ProvenanceAttestationBundleEvidenceClass string
 
 // ProvenanceAttestationBundleStatementsTier Normalized assurance tier resolved from the evidence. Mirrors `RuntimeAssuranceTier` in capability.rs (lines 234-240).
 type ProvenanceAttestationBundleStatementsTier string
+
+// ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+type ProvenanceAttestationBundleStatementsWorkloadIdentityCredentialKind string
+
+// ProvenanceAttestationBundleStatementsWorkloadIdentityScheme Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+type ProvenanceAttestationBundleStatementsWorkloadIdentityScheme string
 
 // ProvenanceContext One delegated call-chain context bound into a governed Chio request. The context names the stable `chainId` that identifies the delegated transaction, the upstream `parentRequestId` inside the trusted domain, the optional `parentReceiptId` when the upstream parent receipt is already available, the root `originSubject` that started the chain, and the immediate `delegatorSubject` that handed control to the current subject. Chio binds this shape into governed transactions and promotes it through the provenance evidence classes (`asserted`, `observed`, `verified`) defined in `crates/chio-core-types/src/capability.rs` (`GovernedProvenanceEvidenceClass`, lines 1303-1314). Mirrors the `GovernedCallChainContext` struct in `crates/chio-core-types/src/capability.rs` (lines 952-967). The struct uses `serde(rename_all = camelCase)` so wire field names are camelCase.
 type ProvenanceContext struct {
@@ -734,7 +784,7 @@ type ProvenanceStamp struct {
 	RequestId string `json:"request_id"`
 }
 
-// ProvenanceVerdictLink One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Optional fields preserve the policy `reason` and `guard` when the verdict is not `allow` and the `evidenceClass` Chio resolved when the verdict was rendered. The verdict vocabulary mirrors the HTTP verdict tagged union in `spec/schemas/chio-http/v1/verdict.schema.json` and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.
+// ProvenanceVerdictLink One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Verdict-specific required fields are enforced via `oneOf` so the wire shape stays in lock-step with the HTTP verdict union in `spec/schemas/chio-http/v1/verdict.schema.json`: `deny` requires both `reason` and `guard`; `cancel` and `incomplete` require `reason`; `allow` rejects either. The verdict vocabulary mirrors the HTTP verdict tagged union and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.
 type ProvenanceVerdictLink struct {
 	// ChainId Stable identifier of the governed call chain this verdict ties back to. Matches the `chainId` carried by `provenance/context.schema.json` and `provenance/attestation-bundle.schema.json`.
 	ChainId string `json:"chainId"`
@@ -742,10 +792,10 @@ type ProvenanceVerdictLink struct {
 	// EvidenceClass Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.
 	EvidenceClass *ProvenanceVerdictLinkEvidenceClass `json:"evidenceClass,omitempty"`
 
-	// Guard Optional policy guard identifier that produced a `deny` verdict. Mirrors the `guard` field on the HTTP verdict union. Omitted for non-deny verdicts.
+	// Guard Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.
 	Guard *string `json:"guard,omitempty"`
 
-	// Reason Optional policy reason string. Required by the HTTP verdict union for `deny`, `cancel`, and `incomplete` verdicts. Omitted for `allow`.
+	// Reason Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
 	Reason *string `json:"reason,omitempty"`
 
 	// ReceiptId Optional identifier of the Chio receipt the verdict was committed under. Omitted when the verdict was rendered before any receipt was minted (for example a pre-execution plan denial). When present, the receipt is the canonical artifact for downstream verification.
@@ -759,6 +809,7 @@ type ProvenanceVerdictLink struct {
 
 	// Verdict Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.
 	Verdict ProvenanceVerdictLinkVerdict `json:"verdict"`
+	union   json.RawMessage
 }
 
 // ProvenanceVerdictLinkEvidenceClass Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.
@@ -766,6 +817,26 @@ type ProvenanceVerdictLinkEvidenceClass string
 
 // ProvenanceVerdictLinkVerdict Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.
 type ProvenanceVerdictLinkVerdict string
+
+// ProvenanceVerdictLink0 Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.
+type ProvenanceVerdictLink0 struct {
+	Verdict interface{} `json:"verdict"`
+}
+
+// ProvenanceVerdictLink1 Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.
+type ProvenanceVerdictLink1 struct {
+	Verdict interface{} `json:"verdict"`
+}
+
+// ProvenanceVerdictLink2 Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.
+type ProvenanceVerdictLink2 struct {
+	Verdict interface{} `json:"verdict"`
+}
+
+// ProvenanceVerdictLink3 Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.
+type ProvenanceVerdictLink3 struct {
+	Verdict interface{} `json:"verdict"`
+}
 
 // ReceiptInclusionProof Merkle inclusion proof for a single receipt leaf in a receipt-log Merkle tree. Mirrors the serde shape of `MerkleProof` in `crates/chio-core-types/src/merkle.rs`. The proof allows an auditor, holding only the published Merkle root and the original leaf bytes, to verify that the leaf was included in a tree of the given size at the given position. The audit path is the ordered list of sibling hashes encountered when walking from the leaf up to the root; siblings whose subtree was carried upward without pairing (the right-edge of an unbalanced level) are omitted. M04 deterministic-replay consumes this schema as the contract for golden-bundle inclusion artifacts under `tests/replay/goldens/<family>/<name>/`.
 type ReceiptInclusionProof struct {
@@ -802,7 +873,7 @@ type ReceiptRecord struct {
 	// Id Unique receipt ID. UUIDv7 recommended.
 	Id string `json:"id"`
 
-	// KernelKey Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.
+	// KernelKey Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.
 	KernelKey string `json:"kernel_key"`
 
 	// Metadata Optional receipt metadata for stream/accounting/financial details. Schema-less by design (mirrors `Option<serde_json::Value>`).
@@ -811,7 +882,7 @@ type ReceiptRecord struct {
 	// PolicyHash SHA-256 hash (or symbolic identifier) of the policy that was applied. Mirrors the `String` shape on `ChioReceipt::policy_hash` rather than enforcing a hex pattern, since some deployments embed a symbolic version id (e.g. `policy-bindings-v1`) rather than a raw digest.
 	PolicyHash string `json:"policy_hash"`
 
-	// Signature Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).
+	// Signature Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
 	Signature string `json:"signature"`
 
 	// TenantId Phase 1.5 multi-tenant receipt isolation: tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields. Omitted from the wire when unset so single-tenant receipts remain byte-identical.
@@ -1037,7 +1108,7 @@ type TrustControlHeartbeat struct {
 	ProposedExpiresAt *int `json:"proposedExpiresAt,omitempty"`
 }
 
-// TrustControlLease One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-millisecond expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future.
+// TrustControlLease One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-second expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future. NOTE: `leaseExpiresAt` and `termStartedAt` are unix **seconds** (computed in `cluster_and_reports.rs` lines 1580-1606 as `unix_timestamp_now() + lease_ttl_ms / 1000`), even though `leaseTtlMs` itself is in milliseconds. The asymmetry mirrors the live runtime shape and is preserved on the wire so consumers do not have to re-scale by 1000.
 type TrustControlLease struct {
 	// AuthorityId Stable identifier for the authority that holds the lease. In the current bounded release this equals the leader URL.
 	AuthorityId string `json:"authorityId"`
@@ -1048,13 +1119,13 @@ type TrustControlLease struct {
 	// LeaseEpoch Lease epoch carried alongside `leaseId`. Currently equals `term`; kept distinct on the wire so future epoch bumps within a term remain expressible.
 	LeaseEpoch int `json:"leaseEpoch"`
 
-	// LeaseExpiresAt Unix-millisecond timestamp at which the lease expires if not renewed.
+	// LeaseExpiresAt Unix-second timestamp at which the lease expires if not renewed. Computed as `unix_timestamp_now() + lease_ttl_ms / 1000` in `cluster_and_reports.rs` lines 1580-1606. The unit is seconds (not milliseconds) even though the configured TTL is expressed in milliseconds; downstream consumers MUST treat this field as a unix-second timestamp.
 	LeaseExpiresAt int `json:"leaseExpiresAt"`
 
 	// LeaseId Composite lease identifier in the form `{leaderUrl}#term-{leaseEpoch}`. Authoritative for downstream writes.
 	LeaseId string `json:"leaseId"`
 
-	// LeaseTtlMs Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839).
+	// LeaseTtlMs Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839). NOTE: this field is the only millisecond-denominated quantity in the lease projection; `termStartedAt` and `leaseExpiresAt` are unix seconds.
 	LeaseTtlMs int `json:"leaseTtlMs"`
 
 	// LeaseValid True only when the cluster currently has quorum and `leaseExpiresAt` has not yet passed. Trust-control fails closed and rejects authority-bearing writes when this is false.
@@ -1063,7 +1134,7 @@ type TrustControlLease struct {
 	// Term Cluster election term that minted this lease. Monotonically non-decreasing.
 	Term int `json:"term"`
 
-	// TermStartedAt Optional unix-millisecond timestamp at which the current term began on this leader. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown.
+	// TermStartedAt Optional unix-second timestamp at which the current term began on this leader. Captured via `unix_timestamp_now()` in `cluster_and_reports.rs` line 1603. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown (no quorum or no leader).
 	TermStartedAt *int `json:"termStartedAt,omitempty"`
 }
 
@@ -1978,6 +2049,245 @@ func (t KernelToolCallResponse_Result) MarshalJSON() ([]byte, error) {
 
 func (t *KernelToolCallResponse_Result) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsProvenanceVerdictLink0 returns the union data inside the ProvenanceVerdictLink as a ProvenanceVerdictLink0
+func (t ProvenanceVerdictLink) AsProvenanceVerdictLink0() (ProvenanceVerdictLink0, error) {
+	var body ProvenanceVerdictLink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProvenanceVerdictLink0 overwrites any union data inside the ProvenanceVerdictLink as the provided ProvenanceVerdictLink0
+func (t *ProvenanceVerdictLink) FromProvenanceVerdictLink0(v ProvenanceVerdictLink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProvenanceVerdictLink0 performs a merge with any union data inside the ProvenanceVerdictLink, using the provided ProvenanceVerdictLink0
+func (t *ProvenanceVerdictLink) MergeProvenanceVerdictLink0(v ProvenanceVerdictLink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProvenanceVerdictLink1 returns the union data inside the ProvenanceVerdictLink as a ProvenanceVerdictLink1
+func (t ProvenanceVerdictLink) AsProvenanceVerdictLink1() (ProvenanceVerdictLink1, error) {
+	var body ProvenanceVerdictLink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProvenanceVerdictLink1 overwrites any union data inside the ProvenanceVerdictLink as the provided ProvenanceVerdictLink1
+func (t *ProvenanceVerdictLink) FromProvenanceVerdictLink1(v ProvenanceVerdictLink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProvenanceVerdictLink1 performs a merge with any union data inside the ProvenanceVerdictLink, using the provided ProvenanceVerdictLink1
+func (t *ProvenanceVerdictLink) MergeProvenanceVerdictLink1(v ProvenanceVerdictLink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProvenanceVerdictLink2 returns the union data inside the ProvenanceVerdictLink as a ProvenanceVerdictLink2
+func (t ProvenanceVerdictLink) AsProvenanceVerdictLink2() (ProvenanceVerdictLink2, error) {
+	var body ProvenanceVerdictLink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProvenanceVerdictLink2 overwrites any union data inside the ProvenanceVerdictLink as the provided ProvenanceVerdictLink2
+func (t *ProvenanceVerdictLink) FromProvenanceVerdictLink2(v ProvenanceVerdictLink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProvenanceVerdictLink2 performs a merge with any union data inside the ProvenanceVerdictLink, using the provided ProvenanceVerdictLink2
+func (t *ProvenanceVerdictLink) MergeProvenanceVerdictLink2(v ProvenanceVerdictLink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProvenanceVerdictLink3 returns the union data inside the ProvenanceVerdictLink as a ProvenanceVerdictLink3
+func (t ProvenanceVerdictLink) AsProvenanceVerdictLink3() (ProvenanceVerdictLink3, error) {
+	var body ProvenanceVerdictLink3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProvenanceVerdictLink3 overwrites any union data inside the ProvenanceVerdictLink as the provided ProvenanceVerdictLink3
+func (t *ProvenanceVerdictLink) FromProvenanceVerdictLink3(v ProvenanceVerdictLink3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProvenanceVerdictLink3 performs a merge with any union data inside the ProvenanceVerdictLink, using the provided ProvenanceVerdictLink3
+func (t *ProvenanceVerdictLink) MergeProvenanceVerdictLink3(v ProvenanceVerdictLink3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ProvenanceVerdictLink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["chainId"], err = json.Marshal(t.ChainId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'chainId': %w", err)
+	}
+
+	if t.EvidenceClass != nil {
+		object["evidenceClass"], err = json.Marshal(t.EvidenceClass)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'evidenceClass': %w", err)
+		}
+	}
+
+	if t.Guard != nil {
+		object["guard"], err = json.Marshal(t.Guard)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'guard': %w", err)
+		}
+	}
+
+	if t.Reason != nil {
+		object["reason"], err = json.Marshal(t.Reason)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reason': %w", err)
+		}
+	}
+
+	if t.ReceiptId != nil {
+		object["receiptId"], err = json.Marshal(t.ReceiptId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'receiptId': %w", err)
+		}
+	}
+
+	object["renderedAt"], err = json.Marshal(t.RenderedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'renderedAt': %w", err)
+	}
+
+	object["requestId"], err = json.Marshal(t.RequestId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'requestId': %w", err)
+	}
+
+	object["verdict"], err = json.Marshal(t.Verdict)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'verdict': %w", err)
+	}
+
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *ProvenanceVerdictLink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["chainId"]; found {
+		err = json.Unmarshal(raw, &t.ChainId)
+		if err != nil {
+			return fmt.Errorf("error reading 'chainId': %w", err)
+		}
+	}
+
+	if raw, found := object["evidenceClass"]; found {
+		err = json.Unmarshal(raw, &t.EvidenceClass)
+		if err != nil {
+			return fmt.Errorf("error reading 'evidenceClass': %w", err)
+		}
+	}
+
+	if raw, found := object["guard"]; found {
+		err = json.Unmarshal(raw, &t.Guard)
+		if err != nil {
+			return fmt.Errorf("error reading 'guard': %w", err)
+		}
+	}
+
+	if raw, found := object["reason"]; found {
+		err = json.Unmarshal(raw, &t.Reason)
+		if err != nil {
+			return fmt.Errorf("error reading 'reason': %w", err)
+		}
+	}
+
+	if raw, found := object["receiptId"]; found {
+		err = json.Unmarshal(raw, &t.ReceiptId)
+		if err != nil {
+			return fmt.Errorf("error reading 'receiptId': %w", err)
+		}
+	}
+
+	if raw, found := object["renderedAt"]; found {
+		err = json.Unmarshal(raw, &t.RenderedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'renderedAt': %w", err)
+		}
+	}
+
+	if raw, found := object["requestId"]; found {
+		err = json.Unmarshal(raw, &t.RequestId)
+		if err != nil {
+			return fmt.Errorf("error reading 'requestId': %w", err)
+		}
+	}
+
+	if raw, found := object["verdict"]; found {
+		err = json.Unmarshal(raw, &t.Verdict)
+		if err != nil {
+			return fmt.Errorf("error reading 'verdict': %w", err)
+		}
+	}
+
 	return err
 }
 

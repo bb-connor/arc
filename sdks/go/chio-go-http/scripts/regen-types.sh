@@ -65,18 +65,58 @@ if [[ ! -d "${SCHEMAS_DIR}" ]]; then
   exit 2
 fi
 
-# --- compute the schema git SHA --------------------------------------------
-# Use `git log -1` over the schema subtree so the SHA reflects the latest
-# commit that touched any schema file. Falls back to HEAD when the working
-# tree is dirty for the schemas (the script emits the HEAD SHA with a
-# 'dirty' suffix so reviewers can see the regen drifted off the indexed tree).
+# --- compute the schema content SHA ----------------------------------------
+# Earlier versions of this script ran `git log -1` over the schema subtree
+# so the stamp reflected the latest commit that touched a schema. That made
+# the stamp depend on git history rather than the actual schema bytes:
+#   1. A no-op rebase or commit message edit shifted the SHA without any
+#      schema change, dirtying the regenerated file.
+#   2. Shallow CI clones (where `git log` returns nothing for the subtree)
+#      stamped 'unknown' even when the bytes were correct.
+#   3. Staged-but-unindexed-in-HEAD schema edits were classified as 'clean'
+#      because `git diff` (working-tree vs index) returned 0 for them.
+#
+# We replace that with a content hash of the lex-sorted schema files: the
+# stamp becomes a deterministic function of the bytes feeding into
+# oapi-codegen, regardless of repository state. We additionally check both
+# unstaged (`git diff`) and staged (`git diff --cached`) drift against the
+# committed tree so reviewers see a `-dirty` marker when either is non-zero.
 cd "${WORKSPACE_ROOT}"
-SCHEMA_HEAD_SHA="$(git log -1 --format=%H -- "spec/schemas/chio-wire/v1" 2>/dev/null || echo unknown)"
+SCHEMA_HEAD_SHA="$(
+  python3 - "${SCHEMAS_DIR}" <<'PY'
+import hashlib
+import os
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+hasher = hashlib.sha256()
+files = []
+for parent, _, names in os.walk(root):
+    for name in names:
+        if name.endswith(".schema.json"):
+            files.append(Path(parent) / name)
+files.sort()
+for path in files:
+    rel = path.relative_to(root).as_posix()
+    hasher.update(rel.encode("utf-8"))
+    hasher.update(b"\0")
+    hasher.update(path.read_bytes())
+    hasher.update(b"\0")
+print(hasher.hexdigest())
+PY
+)"
 if [[ -z "${SCHEMA_HEAD_SHA}" ]]; then
   SCHEMA_HEAD_SHA="unknown"
 fi
+
+# Detect drift against the committed tree. Either a working-tree edit or a
+# staged-but-not-committed edit annotates the stamp with '-dirty' so the
+# regenerated header records the divergence.
 SCHEMA_DIRTY=""
 if ! git diff --quiet -- "spec/schemas/chio-wire/v1" 2>/dev/null; then
+  SCHEMA_DIRTY="-dirty"
+elif ! git diff --cached --quiet -- "spec/schemas/chio-wire/v1" 2>/dev/null; then
   SCHEMA_DIRTY="-dirty"
 fi
 SCHEMA_SHA_STAMP="${SCHEMA_HEAD_SHA}${SCHEMA_DIRTY}"
@@ -171,10 +211,15 @@ def rewrite(node, lifts: dict, prefix: str):
                 if len(non_null) == 1 and isinstance(non_null[0], dict):
                     inlined = non_null[0]
                     del node["oneOf"]
-                    # Merge inlined keys into the parent (excluding $schema,
-                    # $id, title which are spec-document level only).
+                    # Merge inlined keys into the parent. The comment used
+                    # to claim `$schema`, `$id`, `title` were dropped, but
+                    # only `$schema` and `$id` were actually skipped, so a
+                    # member's `title` leaked through and overwrote the
+                    # parent's display name in the generated Go field
+                    # comment. Add `title` to the skip-list to match the
+                    # documented intent.
                     for key, value in inlined.items():
-                        if key in ("$schema", "$id"):
+                        if key in ("$schema", "$id", "title"):
                             continue
                         node[key] = value
 
@@ -303,12 +348,30 @@ PY
 # `skip-fmt` member is intentionally omitted so oapi-codegen runs gofmt on
 # its output; we run gofmt again after prepending our header below for
 # safety.
+#
+# `compatibility.always-prefix-enum-values: true` forces oapi-codegen to
+# emit fully-qualified enum constants (`<TypeName><Value>`) rather than
+# bare value names. Without it, single-instance enums like
+# `TrustControlAttestationWorkloadIdentityScheme = ["spiffe"]` materialize
+# as a top-level constant named `Spiffe`, and several distinct enums share
+# bare names that pollute and shadow the package namespace
+# (e.g. `Allow`, `Attested`, `LeaderHandoff`).
+CONFIG_PATH="${WORK_DIR}/oapi-codegen.config.yaml"
+cat > "${CONFIG_PATH}" <<CONFIG_EOF
+package: ${PACKAGE_NAME}
+output: ${RAW_OUTPUT_PATH}
+generate:
+  models: true
+output-options:
+  skip-prune: true
+compatibility:
+  always-prefix-enum-values: true
+CONFIG_EOF
+
 echo "regen-types.sh: invoking oapi-codegen ${OAPI_CODEGEN_VERSION}" >&2
 GOFLAGS="" GOTOOLCHAIN=auto go run \
   "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@${OAPI_CODEGEN_VERSION}" \
-  -generate types,skip-prune \
-  -package "${PACKAGE_NAME}" \
-  -o "${RAW_OUTPUT_PATH}" \
+  -config "${CONFIG_PATH}" \
   "${OPENAPI_PATH}"
 
 if [[ ! -s "${RAW_OUTPUT_PATH}" ]]; then
@@ -326,8 +389,13 @@ cat > "${HEADER_FILE}" <<HEADER_EOF
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema git SHA: ${SCHEMA_SHA_STAMP}
+// Schema content SHA-256: ${SCHEMA_SHA_STAMP}
 // Tool:   oapi-codegen ${OAPI_CODEGEN_VERSION} (see xtask/codegen-tools.lock.toml)
+//
+// The Schema content SHA-256 is computed from the lex-sorted schema bytes
+// (not git history) so the stamp is stable across rebases, shallow clones,
+// and committed-but-unindexed edits. The optional '-dirty' suffix marks a
+// regen that picked up uncommitted (working-tree or staged) schema edits.
 //
 // Manual edits will be overwritten by the next regeneration; the
 // M01.P3.T5 spec-drift CI lane runs this script and 'git diff --exit-code'

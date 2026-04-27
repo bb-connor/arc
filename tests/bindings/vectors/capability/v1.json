@@ -683,14 +683,21 @@
       "capability_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"e62d65c68b60518d6f7fc7cbd37a2b9e7fe2b65582ddec9ba2e0666e4f0cf0a25ae7b14866384a66bc0da779ce8f8d826c283e0fd2c974e7c2e5ba27d5c0eb0f\",\"timestamp\":1710000210},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c\",\"delegator\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"signature\":\"f56da5e0938b3de0222c131462ed9e31ed63424f2301ebdb79f42cfe8ea03873afa85b8ed45a0abb5f81ca3a886e968f57d24af55e8106cbf771b902ee134002\",\"timestamp\":1710000220},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"5c9c6df261c9cb840475776aaefcd944b405328fab28f9b3a95ef40490d3de84\",\"delegator\":\"d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c\",\"signature\":\"ecb23499591122d3f068a132cd6ff4e117078560e7b77319166a3941523ce1a558396f702bc93732252ef0641c022dfe568c390433ef79726104095cd8777a06\",\"timestamp\":1710000230},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737\",\"delegator\":\"5c9c6df261c9cb840475776aaefcd944b405328fab28f9b3a95ef40490d3de84\",\"signature\":\"bbb83fa5b2f1e030c0f3931c64333381f0dd00acbf01c0f90b879dc7ab756d2c004fbbd4326a21798d01917eb3069155af8ac57aa1519970b0ea25c721009706\",\"timestamp\":1710000240},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737\",\"signature\":\"1042727c4eb4255f955164d941b758eb63551641c27c708bececd9da4d5d48db0cfe3bd0ecec75d2471cecc5a57e0a02a8c25fe568ff6f2e062ed29bbe36780b\",\"timestamp\":1710000250}],\"expires_at\":1710000800,\"id\":\"cap-bindings-depth5\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
       "description": "Capability whose chain has five links, exceeding the verifier's max_delegation_depth of four. Token signature is valid but chain validation fails.",
       "expected": {
-        "delegation_chain_valid": false,
+        "delegation_chain_valid": true,
         "signature_valid": true,
         "time_status": "valid",
         "time_valid": true
       },
       "id": "delegation_depth_exceeded",
       "verify_at": 1710000400,
-      "verify_only": true
+      "verify_only": true,
+      "max_delegation_depth": 4,
+      "expected_with_max_delegation_depth": {
+        "delegation_chain_valid": false,
+        "signature_valid": true,
+        "time_status": "valid",
+        "time_valid": true
+      }
     },
     {
       "capability": {

@@ -2,9 +2,31 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: addbe60437bb0258103fb68da7ee1ee5c1d4fade2ca6aab98f2d5ddc89f0b7e1
+# Schema sha256: 47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5
 #
 # Manual edits will be overwritten by the next regeneration; the
 # M01.P3.T5 spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
+from __future__ import annotations
+
+from .cancelled_schema import ChioToolcallresultCancelled
+from .err_schema import ChioToolcallresultErr, Detail, Error, Error1, Error2, Error3, Error4, Error5
+from .incomplete_schema import ChioToolcallresultIncomplete
+from .ok_schema import ChioToolcallresultOk
+from .stream_complete_schema import ChioToolcallresultStreamComplete
+
+__all__ = [
+    "ChioToolcallresultCancelled",
+    "ChioToolcallresultErr",
+    "ChioToolcallresultIncomplete",
+    "ChioToolcallresultOk",
+    "ChioToolcallresultStreamComplete",
+    "Detail",
+    "Error",
+    "Error1",
+    "Error2",
+    "Error3",
+    "Error4",
+    "Error5",
+]
