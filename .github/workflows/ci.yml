@@ -2,22 +2,25 @@ name: CI
 
 # M09.P1.T11: required-check inventory.
 #
-# The following job names should be promoted to required status checks
-# on any branch ruleset configured for main. The actual ruleset is
-# managed out-of-band (gh api .../rulesets) and is not committed here.
-# When adding or renaming a job that should gate merges, update this
-# inventory in the same commit so the ruleset and the workflow stay in
-# lockstep.
+# GitHub branch rulesets match required checks by the **reported check
+# context name** (`name:` field on each job), NOT by job id. The
+# previous inventory listed job ids (`check`, `msrv`) which would
+# silently configure non-existent checks and leave PRs blocked waiting
+# for statuses that never arrive (cleanup-c11c; PR #40 review thread
+# r3142883192). The names below match the `name:` of each gating job
+# verbatim. When adding or renaming a job that should gate merges,
+# update this inventory in the same commit so the ruleset and the
+# workflow stay in lockstep.
 #
-#   required:
-#     - check                           # build, lint, test (workspace lane)
-#     - msrv                            # MSRV workspace lane
-#     - cargo-vet (supply-chain audit)
-#     - cargo-deny (supply-chain bans/advisories/licenses)
-#     - m05-freeze-guard / freeze-guard (in m05-freeze-guard.yml)
+#   required (reported check context names):
+#     - "Build, lint, test"                                  # check job
+#     - "MSRV build and test"                                # msrv job
+#     - "cargo-vet (supply-chain audit)"                     # cargo-vet job
+#     - "cargo-deny (supply-chain bans/advisories/licenses)" # cargo-deny job
+#     - "freeze-guard"                                       # m05-freeze-guard.yml
 #
 #   advisory (do not gate):
-#     - jvm-build, coverage, mutants
+#     - "JVM build", "Coverage", "Mutants"
 
 on:
   push:
@@ -334,6 +337,14 @@ jobs:
         run: cargo deny check advisories
       - name: cargo deny check licenses
         run: cargo deny check licenses
+      - name: cargo deny check sources
+        # Enforces the [sources] block in deny.toml (unknown-registry =
+        # "deny", unknown-git = "deny", explicit allow-registry +
+        # allow-git lists). Without this step a new dependency from an
+        # unapproved registry or git repo passes CI even though the
+        # policy denies it (cleanup-c11c; PR #39 review threads
+        # r3142881621 / r3142881800).
+        run: cargo deny check sources
       - name: cargo deny check bans (advisory)
         continue-on-error: true
         run: cargo deny check bans
