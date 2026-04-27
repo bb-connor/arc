@@ -20,8 +20,17 @@ path = "src/main.rs"
 chrono = { workspace = true, features = ["clock"] }
 ed25519-dalek = { workspace = true }
 hex = { workspace = true }
+# `cross_version::fetch` (M04.P3.T3) downloads release bundles over HTTPS and
+# pins them by sha256. `blocking` keeps the call sites synchronous (the cross-
+# version harness is itself a blocking test driver); `rustls` matches the rest
+# of the workspace and avoids a system-OpenSSL dependency.
+reqwest = { workspace = true, features = ["blocking", "rustls"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# Promoted from dev-dependencies in M04.P3.T3: `cross_version::fetch` uses
+# sha256 at runtime to verify cached + freshly-downloaded bundles against the
+# `bundle_sha256` pin in `release_compat_matrix.toml`.
+sha2 = { workspace = true }
 thiserror = { workspace = true }
 # `toml` is added directly here (not via [workspace.dependencies]) following the
 # precedent from chio-conformance (M02.P4.T4 PR #127). Used by
@@ -30,7 +39,6 @@ toml = "0.8"
 
 [dev-dependencies]
 tempfile = { workspace = true }
-sha2 = { workspace = true }
 
 [[test]]
 name = "corpus_smoke"

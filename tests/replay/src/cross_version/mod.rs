@@ -20,12 +20,16 @@
 //! `window` defaults to 5 (the ratchet floor specified in the source-of-truth
 //! document and the matrix file's leading comment).
 //!
-//! Phase 3 T3 will extend this module with a `fetch` submodule that hits
-//! `bundle_url` and pins by `bundle_sha256`. T4 will add the re-verify path.
+//! Phase 3 T3 extends this module with a [`fetch`] submodule that hits
+//! `bundle_url`, pins the response by `bundle_sha256`, and caches the bundle
+//! on disk under `$CHIO_REPLAY_CACHE_DIR` (default: `$HOME/.cache/chio/
+//! replay-bundles/<tag>/replay-bundle.tgz`). T4 will add the re-verify path.
 
 use std::path::Path;
 
 use serde::Deserialize;
+
+pub mod fetch;
 
 /// Required schema tag at the top of `release_compat_matrix.toml`.
 pub const SCHEMA_TAG: &str = "chio.replay.compat/v1";
