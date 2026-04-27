@@ -1,11 +1,10 @@
 //! OpenAI Responses SSE gating.
 //!
-//! This module lands the M07.P2.T4.a scaffold from
-//! `.planning/trajectory/07-provider-native-adapters.md`: deterministic SSE
-//! parsing, per-tool-call buffering through the shared fabric `StreamPhase`,
-//! and fail-closed handling for malformed stream events. Network subscription
-//! and async verdict plumbing can layer on this transport without changing the
-//! stream safety contract.
+//! This module wires the M07.P2.T4.b OpenAI verdict gate into deterministic
+//! Responses SSE parsing. Tool-call start and argument-delta frames are held
+//! behind the shared fabric `StreamPhase` until `response.output_item.done`
+//! carries the final argument string, the adapter lifts that tool call into a
+//! canonical invocation, and the verdict allows the block.
 
 use chio_tool_call_fabric::{
     BlockKind, BufferedBlock, DenyReason, ProviderError, ProviderRequest, StreamEvent, StreamPhase,
@@ -20,7 +19,7 @@ use crate::adapter::OpenAiAdapter;
 pub struct GatedSseStream {
     /// SSE bytes that are safe to forward downstream.
     pub bytes: Vec<u8>,
-    /// Tool invocations evaluated at `response.output_item.added`.
+    /// Tool invocations evaluated at `response.output_item.done`.
     pub invocations: Vec<ToolInvocation>,
     /// Verdicts returned for each invocation, in stream order.
     pub verdicts: Vec<VerdictResult>,
@@ -57,10 +56,9 @@ impl OpenAiSseTransport {
 impl OpenAiAdapter {
     /// Gate a deterministic OpenAI Responses SSE payload.
     ///
-    /// `evaluate` is called exactly when
-    /// `response.output_item.added` carries a tool-call output item. Returning
-    /// a deny verdict fails closed before bytes for that tool-call block are
-    /// released.
+    /// `evaluate` is called exactly when `response.output_item.done` carries a
+    /// completed tool-call output item. The start frame and all argument deltas
+    /// remain buffered until the verdict allows the block.
     pub fn gate_sse_stream<F>(
         &self,
         raw: &[u8],
@@ -111,9 +109,9 @@ impl<'a> StreamGate<'a> {
         };
 
         match event {
-            "response.output_item.added" => self.start_output_item(frame, evaluate),
+            "response.output_item.added" => self.start_output_item(frame),
             "response.function_call_arguments.delta" => self.argument_delta(frame),
-            "response.output_item.done" => self.finish_output_item(frame),
+            "response.output_item.done" => self.finish_output_item(frame, evaluate),
             "response.completed" => self.close_stream(frame),
             "error" | "response.error" => Err(ProviderError::Malformed(format!(
                 "OpenAI SSE error event: {}",
@@ -126,14 +124,7 @@ impl<'a> StreamGate<'a> {
         }
     }
 
-    fn start_output_item<F>(
-        &mut self,
-        frame: SseFrame,
-        evaluate: &mut F,
-    ) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn start_output_item(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
         if let Some(active) = &self.active {
             return Err(ProviderError::Malformed(format!(
                 "OpenAI output_item.added arrived before tool call {} completed",
@@ -151,26 +142,7 @@ impl<'a> StreamGate<'a> {
             return Ok(());
         }
 
-        let call = response_tool_call_from_item(item)?;
-        let invocation = self
-            .adapter
-            .lift_batch(ProviderRequest(
-                serde_json::to_vec(&json!({ "output": [call.payload] })).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "OpenAI SSE tool-call payload failed JSON encoding: {error}"
-                    ))
-                })?,
-            ))?
-            .into_iter()
-            .next()
-            .ok_or_else(|| {
-                ProviderError::Malformed(
-                    "OpenAI SSE tool-call item did not lift into an invocation".to_string(),
-                )
-            })?;
-        let verdict = evaluate(&invocation)?;
-        ensure_streaming_allow(&call.call_id, &verdict)?;
-
+        let call = response_tool_call_start_from_item(item)?;
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -178,11 +150,10 @@ impl<'a> StreamGate<'a> {
                 kind: BlockKind::ToolCall,
             },
         )?;
-        self.invocations.push(invocation);
-        self.verdicts.push(verdict);
         self.active = Some(ActiveToolBlock::new(
             frame_output_index(data),
             call.call_id,
+            call.name,
             frame,
         ));
         Ok(())
@@ -208,7 +179,14 @@ impl<'a> StreamGate<'a> {
         Ok(())
     }
 
-    fn finish_output_item(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+    fn finish_output_item<F>(
+        &mut self,
+        frame: SseFrame,
+        evaluate: &mut F,
+    ) -> Result<(), ProviderError>
+    where
+        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
+    {
         let data = frame.required_data("response.output_item.done")?;
         let item = data.get("item");
 
@@ -223,13 +201,40 @@ impl<'a> StreamGate<'a> {
             return Ok(());
         };
         active.ensure_match(&frame, "response.output_item.done")?;
+        let item = item.ok_or_else(|| {
+            ProviderError::Malformed(
+                "OpenAI output_item.done for active tool call was missing item".to_string(),
+            )
+        })?;
+        if !is_tool_call_item(item) {
+            return Err(ProviderError::Malformed(format!(
+                "OpenAI output_item.done for active tool call {} was not a tool item",
+                active.call_id
+            )));
+        }
 
         let buffered = self.phase.buffered().cloned().ok_or_else(|| {
             ProviderError::Malformed(
                 "OpenAI SSE state lost the active tool-call buffer".to_string(),
             )
         })?;
+        let call = response_tool_call_from_item(item)?;
+        active.ensure_completed_call_matches(&call)?;
+        ensure_streamed_arguments_match(&call, &buffered)?;
+
+        let invocation = self.invocation_from_call(&call)?;
+        let verdict = evaluate(&invocation).map_err(|error| {
+            let _ = self.close_buffering_phase();
+            error
+        })?;
+        if let Err(error) = ensure_streaming_allow(&call.call_id, &verdict) {
+            let _ = self.close_buffering_phase();
+            return Err(error);
+        }
+
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;
+        self.invocations.push(invocation);
+        self.verdicts.push(verdict);
         self.buffered_blocks.push(buffered);
         active.frames.push(frame);
         for frame in active.frames {
@@ -258,6 +263,34 @@ impl<'a> StreamGate<'a> {
         self.output.extend_from_slice(&frame.raw);
     }
 
+    fn invocation_from_call(
+        &self,
+        call: &ResponseToolCall,
+    ) -> Result<ToolInvocation, ProviderError> {
+        self.adapter
+            .lift_batch(ProviderRequest(
+                serde_json::to_vec(&json!({ "output": [call.payload.clone()] })).map_err(
+                    |error| {
+                        ProviderError::Malformed(format!(
+                            "OpenAI SSE tool-call payload failed JSON encoding: {error}"
+                        ))
+                    },
+                )?,
+            ))?
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                ProviderError::Malformed(
+                    "OpenAI SSE tool-call item did not lift into an invocation".to_string(),
+                )
+            })
+    }
+
+    fn close_buffering_phase(&mut self) -> Result<(), ProviderError> {
+        self.phase = transition(&self.phase, StreamEvent::Close)?;
+        Ok(())
+    }
+
     fn finish(self) -> Result<GatedSseStream, ProviderError> {
         if let Some(active) = self.active {
             return Err(ProviderError::Malformed(format!(
@@ -279,14 +312,21 @@ impl<'a> StreamGate<'a> {
 struct ActiveToolBlock {
     output_index: Option<u64>,
     call_id: String,
+    name: Option<String>,
     frames: Vec<SseFrame>,
 }
 
 impl ActiveToolBlock {
-    fn new(output_index: Option<u64>, call_id: String, first: SseFrame) -> Self {
+    fn new(
+        output_index: Option<u64>,
+        call_id: String,
+        name: Option<String>,
+        first: SseFrame,
+    ) -> Self {
         Self {
             output_index,
             call_id,
+            name,
             frames: vec![first],
         }
     }
@@ -310,37 +350,52 @@ impl ActiveToolBlock {
         }
         Ok(())
     }
+
+    fn ensure_completed_call_matches(&self, call: &ResponseToolCall) -> Result<(), ProviderError> {
+        if call.call_id != self.call_id {
+            return Err(ProviderError::Malformed(format!(
+                "OpenAI output_item.done call_id {} did not match active call_id {}",
+                call.call_id, self.call_id
+            )));
+        }
+        if let Some(name) = &self.name {
+            if call.name != *name {
+                return Err(ProviderError::Malformed(format!(
+                    "OpenAI output_item.done name {} did not match active name {}",
+                    call.name, name
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+struct ResponseToolCallStart {
+    call_id: String,
+    name: Option<String>,
 }
 
 struct ResponseToolCall {
     call_id: String,
+    name: String,
+    arguments: String,
     payload: Value,
 }
 
+fn response_tool_call_start_from_item(
+    item: &Value,
+) -> Result<ResponseToolCallStart, ProviderError> {
+    Ok(ResponseToolCallStart {
+        call_id: tool_call_id(item)?,
+        name: tool_call_name(item),
+    })
+}
+
 fn response_tool_call_from_item(item: &Value) -> Result<ResponseToolCall, ProviderError> {
-    let call_id = item
-        .get("call_id")
-        .or_else(|| item.get("id"))
-        .and_then(Value::as_str)
-        .and_then(non_empty)
-        .ok_or_else(|| {
-            ProviderError::Malformed(
-                "OpenAI SSE tool-call item was missing non-empty call_id".to_string(),
-            )
-        })?;
-    let name = item
-        .get("name")
-        .or_else(|| {
-            item.get("function")
-                .and_then(|function| function.get("name"))
-        })
-        .and_then(Value::as_str)
-        .and_then(non_empty)
-        .ok_or_else(|| {
-            ProviderError::Malformed(
-                "OpenAI SSE tool-call item was missing non-empty name".to_string(),
-            )
-        })?;
+    let call_id = tool_call_id(item)?;
+    let name = tool_call_name(item).ok_or_else(|| {
+        ProviderError::Malformed("OpenAI SSE tool-call item was missing non-empty name".to_string())
+    })?;
     let arguments = item
         .get("arguments")
         .or_else(|| {
@@ -354,6 +409,8 @@ fn response_tool_call_from_item(item: &Value) -> Result<ResponseToolCall, Provid
 
     Ok(ResponseToolCall {
         call_id: call_id.clone(),
+        name: name.clone(),
+        arguments: arguments.clone(),
         payload: json!({
             "arguments": arguments,
             "call_id": call_id,
@@ -361,6 +418,28 @@ fn response_tool_call_from_item(item: &Value) -> Result<ResponseToolCall, Provid
             "type": "function_call",
         }),
     })
+}
+
+fn tool_call_id(item: &Value) -> Result<String, ProviderError> {
+    item.get("call_id")
+        .or_else(|| item.get("id"))
+        .and_then(Value::as_str)
+        .and_then(non_empty)
+        .ok_or_else(|| {
+            ProviderError::Malformed(
+                "OpenAI SSE tool-call item was missing non-empty call_id".to_string(),
+            )
+        })
+}
+
+fn tool_call_name(item: &Value) -> Option<String> {
+    item.get("name")
+        .or_else(|| {
+            item.get("function")
+                .and_then(|function| function.get("name"))
+        })
+        .and_then(Value::as_str)
+        .and_then(non_empty)
 }
 
 fn arguments_string(value: &Value) -> Result<String, ProviderError> {
@@ -540,6 +619,20 @@ fn argument_delta_text(frame: &SseFrame) -> Result<&str, ProviderError> {
         })
 }
 
+fn ensure_streamed_arguments_match(
+    call: &ResponseToolCall,
+    buffered: &BufferedBlock,
+) -> Result<(), ProviderError> {
+    if buffered.bytes.is_empty() || buffered.bytes == call.arguments.as_bytes() {
+        return Ok(());
+    }
+
+    Err(ProviderError::Malformed(format!(
+        "OpenAI streamed argument deltas for tool call `{}` did not match final output_item.done arguments",
+        call.call_id
+    )))
+}
+
 fn ensure_streaming_allow(call_id: &str, verdict: &VerdictResult) -> Result<(), ProviderError> {
     match verdict {
         VerdictResult::Allow { redactions, .. } if redactions.is_empty() => Ok(()),
@@ -547,7 +640,7 @@ fn ensure_streaming_allow(call_id: &str, verdict: &VerdictResult) -> Result<(), 
             "OpenAI streaming tool call `{call_id}` allow verdict requested redactions; fail-closed"
         ))),
         VerdictResult::Deny { reason, receipt_id } => Err(ProviderError::Malformed(format!(
-            "OpenAI streaming tool call `{call_id}` denied at output_item.added: {} (receipt {})",
+            "OpenAI streaming tool call `{call_id}` denied at output_item.done: {} (receipt {})",
             deny_reason_text(reason),
             receipt_id.0
         ))),
