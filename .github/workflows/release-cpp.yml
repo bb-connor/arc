@@ -174,11 +174,13 @@ jobs:
         # storage doesn't reliably persist across separate `conan` invocations
         # in CI; subsequent commands re-prompt for credentials and EOF on
         # closed stdin. The supported non-interactive path is per-remote
-        # env vars, which Conan reads on every command. The remote-name
-        # suffix uses the literal name (with hyphens) as Conan parses it.
+        # env vars, which Conan reads on every command. Per
+        # https://docs.conan.io/2/reference/environment.html the remote
+        # name is uppercased and hyphens are replaced with underscores in
+        # the variable name; "chio-private" -> "CHIO_PRIVATE".
         env:
-          CONAN_LOGIN_USERNAME_chio-private: chio-publisher
-          CONAN_PASSWORD_chio-private: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
+          CONAN_LOGIN_USERNAME_CHIO_PRIVATE: chio-publisher
+          CONAN_PASSWORD_CHIO_PRIVATE: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
         run: |
           set -euo pipefail
           for sdk in chio-cpp chio-cpp-kernel chio-guard-cpp chio-drogon; do
