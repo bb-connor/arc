@@ -1,4 +1,4 @@
-# chio-replay-gate.yml - Deterministic-replay corpus gate (M04 P2.T2).
+# chio-replay-gate.yml - Deterministic-replay corpus gate (M04 P2.T2 + T3).
 #
 # Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
 #   - Phase 2 ("CI gate and bless workflow", lines ~206-244): the workflow
@@ -10,14 +10,21 @@
 #     from blessing. This workflow sets `CHIO_BLESS=0` and the binary
 #     refuses any bless invocation when `CI=true`. There is no
 #     "auto-bless on green" path.
+#   - "Test signing key management" (lines ~550-568): the `seed-immutable`
+#     job below hashes `tests/replay/test-key.seed` on every PR / push and
+#     fails closed if the digest drifts from the checked-in
+#     `tests/replay/test-key.seed.sha256`, or if the seed file is missing
+#     or world-writable. Rotating the seed requires (a) updating the SHA
+#     file, (b) re-blessing the entire corpus, (c) shipping an explicit
+#     `feat!:` commit. Routine PRs cannot change the seed.
 #
-# T2 scope (this commit) is intentionally narrow: a single Linux job named
-# `replay-gate` that builds the chio-replay-gate binary release-mode and
-# exercises the corpus_smoke test. T3 layers a macOS read-only smoke job
-# and the seed-immutable PR guard on top (see
-# .planning/trajectory/tickets/M04/P2.yml id=M04.P2.T3). Determinism canary
-# and goldens-size budget are follow-ons listed in the doc's "New
-# sub-tasks" section.
+# T2 scope seeded a single Linux `replay-gate` job that exercises the
+# corpus_smoke test. T3 (this layer) adds:
+#   - `macos-smoke`: read-only confirmation that the gate does not depend
+#     on Linux-only filesystem semantics (no bless, no goldens write).
+#   - `seed-immutable`: PR / push guard that locks the test signing seed.
+# Determinism canary and goldens-size budget remain follow-ons listed in
+# the doc's "New sub-tasks" section.
 #
 # Determinism contract: `LC_ALL=C` and `LANG=C` are pinned at the workflow
 # level so receipt serialisation, sort orderings, and any locale-sensitive
@@ -112,3 +119,119 @@ jobs:
           else
             echo "golden_byte_equivalence test target not yet present (lands in M04.P2.T5); skipping"
           fi
+
+  macos-smoke:
+    # T3 scope: read-only macOS smoke. The Linux `replay-gate` job is the
+    # required-on-main check; this job exists to surface platform-specific
+    # determinism breakage (filesystem case folding, BSD vs GNU coreutils,
+    # APFS atime quirks) before it hits a contributor's local machine. It
+    # runs the same corpus_smoke test as the Linux job but never blesses
+    # and never builds the full release artifact tree.
+    name: replay-gate (macos read-only)
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install protobuf compiler
+        # Homebrew is preinstalled on macos-latest runners. `brew install`
+        # is a no-op when the formula is already present.
+        run: brew install protobuf
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Confirm CI cannot bless
+        # Mirror the Linux defence in depth: even on a read-only smoke
+        # runner, surface a misconfigured CHIO_BLESS before any test step
+        # runs.
+        run: |
+          set -euo pipefail
+          if [ "${CHIO_BLESS:-0}" != "0" ]; then
+            echo "ERROR: CHIO_BLESS must be 0 in CI; got '${CHIO_BLESS}'" >&2
+            exit 1
+          fi
+          echo "CHIO_BLESS=${CHIO_BLESS} (CI bless ban honoured)"
+
+      - name: Run replay-gate corpus smoke (read-only)
+        # Note: no `--release` build of the gate binary on macOS; the
+        # smoke test target compiles what it needs. The Linux job is the
+        # canonical artifact producer.
+        run: cargo test -p chio-replay-gate --test corpus_smoke
+
+  seed-immutable:
+    # T3 scope: lock `tests/replay/test-key.seed` against routine
+    # mutation. Source-doc anchor:
+    # .planning/trajectory/04-deterministic-replay.md "Test signing key
+    # management" (lines ~550-568). The job fails closed on three classes
+    # of mutation:
+    #   1. seed file missing
+    #   2. seed file world-writable (`stat` mode bit `0o002` set)
+    #   3. sha256(seed) != contents of test-key.seed.sha256
+    # Rotating the seed is intentionally a multi-step ceremony: update
+    # the SHA file, re-bless the corpus, and ship a `feat!:` commit. A
+    # routine PR cannot drift the seed past this guard.
+    name: seed-immutable
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify test signing seed is intact
+        run: |
+          set -euo pipefail
+          seed="tests/replay/test-key.seed"
+          sha_file="tests/replay/test-key.seed.sha256"
+
+          if [ ! -f "${seed}" ]; then
+            echo "ERROR: ${seed} is missing." >&2
+            echo "rotate-seed runbook: see .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
+            exit 1
+          fi
+          if [ ! -f "${sha_file}" ]; then
+            echo "ERROR: ${sha_file} is missing." >&2
+            echo "rotate-seed runbook: see .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
+            exit 1
+          fi
+
+          # Refuse world-writable seeds. `stat -c %a` returns the octal
+          # mode (e.g. `644`); the trailing digit covers the `o` triad.
+          mode="$(stat -c '%a' "${seed}")"
+          other_bits="${mode: -1}"
+          if [ $((other_bits & 2)) -ne 0 ]; then
+            echo "ERROR: ${seed} is world-writable (mode ${mode})." >&2
+            echo "rotate-seed runbook: chmod o-w on the seed and re-push; routine PRs cannot relax permissions." >&2
+            exit 1
+          fi
+
+          # Compute the digest and compare against the checked-in value.
+          # The .sha256 file is a single 64-char hex line, no filename
+          # suffix (deliberately not `sha256sum -c` format so we can keep
+          # the runbook message tight).
+          actual="$(sha256sum "${seed}" | awk '{print $1}')"
+          expected="$(tr -d '[:space:]' < "${sha_file}")"
+
+          if [ "${actual}" != "${expected}" ]; then
+            echo "ERROR: ${seed} digest mismatch." >&2
+            echo "  expected: ${expected}" >&2
+            echo "  actual:   ${actual}" >&2
+            echo "rotate-seed runbook: routine PRs cannot mutate the test signing seed." >&2
+            echo "  To rotate: (a) update tests/replay/test-key.seed.sha256," >&2
+            echo "             (b) re-bless the entire corpus via scripts/bless-replay-goldens.sh," >&2
+            echo "             (c) ship an explicit 'feat!:' commit." >&2
+            echo "  See .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
+            exit 1
+          fi
+
+          echo "seed-immutable: ${seed} digest matches ${expected} (mode ${mode})"
