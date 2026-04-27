@@ -2692,7 +2692,7 @@ impl ChioKernel {
         let tool_started_at = Instant::now();
         let has_monetary = charge_result.is_some();
         let (tool_output, reported_cost) =
-            match self.dispatch_tool_call_with_cost(request, has_monetary) {
+            match self.dispatch_tool_call_with_cost_sync(request, has_monetary) {
                 Ok(result) => result,
                 Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
                     let _ = self.unwind_aborted_monetary_invocation(
@@ -5613,10 +5613,26 @@ impl ChioKernel {
 
     /// Forward the validated request and optionally report actual invocation cost.
     ///
+    /// M05.P1.T4 async-native entrypoint used by `ToolEvaluator::dispatch`.
+    /// The body delegates to the sync helper while the tool-server trait
+    /// remains sync-only, preserving the exact dispatch and cost-accounting
+    /// semantics used by the legacy evaluator. The important boundary is that
+    /// dispatch now has an awaitable ToolEvaluator step, so later phases can
+    /// swap the server invocation mechanism without changing call sites again.
+    pub(crate) async fn dispatch_tool_call_with_cost(
+        &self,
+        request: &ToolCallRequest,
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
+        self.dispatch_tool_call_with_cost_sync(request, has_monetary_grant)
+    }
+
+    /// Forward the validated request and optionally report actual invocation cost.
+    ///
     /// When `has_monetary_grant` is true, calls `invoke_with_cost` so the server
     /// can report the actual cost incurred. For non-monetary grants the standard
     /// dispatch path is used and cost is always None.
-    fn dispatch_tool_call_with_cost(
+    fn dispatch_tool_call_with_cost_sync(
         &self,
         request: &ToolCallRequest,
         has_monetary_grant: bool,

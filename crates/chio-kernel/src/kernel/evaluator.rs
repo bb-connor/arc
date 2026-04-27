@@ -25,7 +25,7 @@
 //!   `evaluate_tool_call_sync_inner` and mark it `#[doc(hidden)]`. The public
 //!   surface remains the trait method (and the `evaluate_tool_call_sync`
 //!   crate-private shim added in T1).
-//! - **T3 (this commit)**: replace [`ToolEvaluator::sign_receipt`]'s default
+//! - **T3 (merged)**: replace [`ToolEvaluator::sign_receipt`]'s default
 //!   body with an mpsc-backed signing task; receipt signing leaves the
 //!   lock-step path. The trait method now accepts a pre-built
 //!   `ChioReceiptBody` and returns a signed `ChioReceipt`, routing through
@@ -33,8 +33,9 @@
 //!   spawned signing task. Receipt bytes are byte-identical to the inline
 //!   `build_and_sign_receipt` path because both delegate to
 //!   `chio_kernel_core::sign_receipt`.
-//! - **T4**: replace [`ToolEvaluator::dispatch`]'s default body with a real
-//!   async dispatch.
+//! - **T4 (this commit)**: replace [`ToolEvaluator::dispatch`]'s default body
+//!   with the async-native dispatch wrapper that preserves monetary cost
+//!   reporting semantics.
 //! - **T5-T7**: deprecate `evaluate_tool_call_blocking`, gate behind
 //!   `legacy-sync` feature flag, byte-identity regression test.
 //!
@@ -43,7 +44,8 @@
 
 use crate::kernel::ChioKernel;
 use crate::{
-    ChioReceipt, ChioReceiptBody, KernelError, ToolCallRequest, ToolCallResponse, Verdict,
+    ChioReceipt, ChioReceiptBody, KernelError, ToolCallRequest, ToolCallResponse,
+    ToolInvocationCost, ToolServerOutput, Verdict,
 };
 
 /// The four logical phases of a tool-call evaluation, surfaced as an
@@ -110,14 +112,20 @@ pub trait ToolEvaluator: Send + Sync {
 
     /// Dispatch the validated request to the appropriate tool server.
     ///
-    /// In T1 the default body routes through [`Self::evaluate`]. T4 will
-    /// replace this with a direct async dispatch path.
+    /// The default body routes through
+    /// [`ChioKernel::dispatch_tool_call_with_cost`], which preserves the
+    /// pre-T4 dispatch order: try streaming first, use `invoke_with_cost`
+    /// only for monetary grants, and report `None` cost for non-monetary
+    /// grants.
     async fn dispatch(
         &self,
         kernel: &ChioKernel,
         request: &ToolCallRequest,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate(kernel, request).await
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
+        kernel
+            .dispatch_tool_call_with_cost(request, has_monetary_grant)
+            .await
     }
 
     /// Sign the receipt for the (allow or deny) outcome of a tool call.
@@ -127,7 +135,7 @@ pub trait ToolEvaluator: Send + Sync {
     /// guard evidence, and policy hash) and returns the signed
     /// [`ChioReceipt`].
     ///
-    /// ## T3 contract (this commit)
+    /// ## T3 contract
     ///
     /// The default body routes through `kernel.sign_receipt_via_channel`,
     /// which submits the body to the kernel's mpsc-backed signing task
