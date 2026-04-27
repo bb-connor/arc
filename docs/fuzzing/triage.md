@@ -2,13 +2,16 @@
 
 When a fuzz crash lands in CI (ClusterFuzzLite, the in-tree `fuzz.yml`
 matrix, or OSS-Fuzz post-acceptance), the crash-to-issue automation in
-`.github/workflows/fuzz_crash_triage.yml` (M02.P4.T1) opens a
-`fuzz-crash`-labelled GitHub issue from the
-`.github/ISSUE_TEMPLATE/fuzz_crash.yml` template with the minimized
-input attached. This runbook tells the human triager how to assess
-severity, dedupe against open issues, promote a useful crash to a
-permanent regression test, and meet the time-to-fix SLOs Chio commits
-to OSS-Fuzz upstream.
+`.github/workflows/fuzz_crash_triage.yml` (M02.P4.T1) downloads the
+crash artifact, minimizes it with `cargo fuzz tmin`, dedupes against
+open `fuzz-crash`-labelled issues by SHA-256 prefix token, and either
+comments on the existing issue or files a new one against the
+`.github/ISSUE_TEMPLATE/fuzz_crash.yml` issue form. The minimized input
+ships in the issue body as a base64 blob plus a reproduce-locally
+snippet. This runbook tells the human triager how to assess severity,
+dedupe against open issues, promote a useful crash to a permanent
+regression test, and meet the time-to-fix SLOs Chio commits to OSS-Fuzz
+upstream.
 
 The runbook is normative for fuzz triagers. Every decision documented
 here is the one Chio expects to defend in a release-audit review.
@@ -61,7 +64,9 @@ The crash demonstrates one of:
   scope is accepted for another).
 
 High crashes route to the owning sub-system maintainer per
-`CODEOWNERS` (M02.P4.T4) and must hit the 14d fix-or-defer SLO.
+`CODEOWNERS` (M02.P4.T4) and must hit the 30d fix-or-defer SLO
+(matches the OSS-Fuzz upstream commitment in
+`.planning/trajectory/02-fuzzing-post-pr13.md` item 10).
 
 ### Medium
 
@@ -144,7 +149,7 @@ application steps" item 10):
 | Severity | Acknowledgement | Fix-or-defer        |
 |----------|-----------------|---------------------|
 | Critical | 24h             | 7d                  |
-| High     | 24h             | 14d                 |
+| High     | 24h             | 30d                 |
 | Medium   | 24h             | 30d                 |
 | Low      | 24h             | next quarterly pass |
 
@@ -217,9 +222,10 @@ defect protected.
 
 Two guards enforce the policy:
 
-- `scripts/check-regression-tests.sh` (M02.P4.T3) runs in
-  `.github/workflows/ci.yml` and fails the build when a committed
-  `regression_<sha>.rs` file is removed without a paired waiver.
+- `scripts/check-regression-tests.sh` (M02.P4.T3) runs from the
+  `check-regression-tests` job in `.github/workflows/ci.yml` and fails
+  the build when a committed `regression_<sha>.rs` file is removed
+  without a paired issue link that names the deleted file.
 - `CODEOWNERS` (M02.P4.T4) requires `@bb-connor` review on any
   diff that touches `tests/regression_*.rs` or
   `crates/*/tests/regression_*.rs`.
