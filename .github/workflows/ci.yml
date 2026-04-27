@@ -213,6 +213,12 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/ci-workspace.sh
 
+      - name: Tokio console smoke
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0 --cfg tokio_unstable"
+        run: cargo test -p chio-kernel --features tokio-console-smoke --test tokio_console_smoke
+
       - name: Portable browser qualification
         env:
           CARGO_BUILD_JOBS: "1"
