@@ -421,7 +421,15 @@ jobs:
     # produces. Verification recipe lives in docs/install/VERIFY.md and
     # cross-references the chio-attest-verify trait surface
     # (crates/chio-attest-verify/README.md, M09.P3.T1).
-    needs: [plan, build]
+    #
+    # Gates on `publish` rather than just `[plan, build]` so the
+    # signed artifacts only attach to the GitHub Release after the
+    # `pypi`-environment-protected publish job has actually succeeded.
+    # The previous `needs: [plan, build]` shape would attach signed
+    # tarballs even when the environment approval was pending or
+    # `twine` failed mid-upload, advertising a release that never
+    # reached PyPI (cleanup-c11b; PR #75 review thread r3143041632).
+    needs: [plan, build, publish]
     # Skip on workflow_dispatch dry runs; only attach on real tag pushes.
     if: needs.plan.outputs.dry_run != 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest

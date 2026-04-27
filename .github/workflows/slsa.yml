@@ -14,11 +14,25 @@
 
 name: slsa
 
+# `workflow_run` does NOT support a `tags:` filter, and `branches:`
+# matches only branch refs. release-binaries.yml's primary path is
+# `push: tags: v*.*.*`, whose triggering ref is `refs/tags/v...` and
+# matches no branch pattern; the previous `branches: [main, ...]`
+# filter therefore silently dropped every tag-driven release and SLSA
+# provenance was never generated for actual releases (cleanup-c11b;
+# PR #46 review thread r3142900224 - High Severity).
+#
+# The replacement triggers on every successful `Release Binaries` run
+# regardless of ref shape. The `collect-digests` job below performs
+# the release-vs-non-release branching by inspecting
+# `github.event.workflow_run.head_branch`; non-tag runs still produce
+# provenance but pass an empty `upload-tag-name`, which the
+# slsa-github-generator workflow treats as a no-op.
+
 on:
   workflow_run:
     workflows: ["Release Binaries"]
     types: [completed]
-    branches: [main, project/roadmap-04-25-2026]
 
 permissions:
   id-token: write
@@ -33,6 +47,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     outputs:
       subjects: ${{ steps.compute.outputs.subjects }}
+      release_tag: ${{ steps.compute.outputs.release_tag }}
     steps:
       - name: Download artifacts from release-binaries.yml
         uses: actions/download-artifact@v4
@@ -41,14 +56,32 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: chio-*
           path: artifacts/
-      - name: Compute base64-encoded subjects
+      - name: Compute base64-encoded subjects and resolve release tag
         id: compute
         shell: bash
+        env:
+          # `head_branch` carries the ref name without the `refs/<kind>/`
+          # prefix. For a `push: tags: v*.*.*` trigger this is the tag
+          # itself (e.g. `v0.1.0`); for `workflow_dispatch` runs it is
+          # the dispatched branch name. Anything matching the release
+          # tag shape is treated as a tag-driven release and emitted
+          # as `release_tag` so the provenance job can pin
+          # `upload-tag-name`. Without that pin slsa-github-generator
+          # v2.1.0 skips the release upload under workflow_run, since
+          # `github.ref` resolves to the default branch rather than
+          # the originating tag (cleanup-c11b; PR #46 thread
+          # r3142898932).
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           cd artifacts
           SUBJECTS=$(find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; | base64 -w0)
           echo "subjects=${SUBJECTS}" >> "${GITHUB_OUTPUT}"
+          if [[ "${HEAD_BRANCH}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "release_tag=${HEAD_BRANCH}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "release_tag=" >> "${GITHUB_OUTPUT}"
+          fi
 
   provenance:
     name: SLSA L2 provenance
@@ -64,3 +97,8 @@ jobs:
       base64-subjects: ${{ needs.collect-digests.outputs.subjects }}
       provenance-name: chio-${{ github.event.workflow_run.head_sha }}.intoto.jsonl
       upload-assets: true
+      # See collect-digests step comment: empty for non-release runs,
+      # populated for tag-driven releases. Pinning the tag is required
+      # under workflow_run because `github.ref` is not the originating
+      # tag.
+      upload-tag-name: ${{ needs.collect-digests.outputs.release_tag }}
