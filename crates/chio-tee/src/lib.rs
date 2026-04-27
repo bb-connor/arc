@@ -5,12 +5,22 @@
 
 #![forbid(unsafe_code)]
 
+pub mod config;
 pub mod frame;
+pub mod mode;
 pub mod tap;
 
+pub use config::{
+    load_env_mode, load_tenant_manifest_mode, load_tenant_manifest_mode_from_str, load_toml_mode,
+    parse_env_mode, parse_toml_mode_from_str, resolve_toml_path, ConfigError, DEFAULT_TOML_PATH,
+    ENV_CONFIG_PATH, ENV_MODE,
+};
 pub use frame::{
     canonicalize as canonicalize_frame, parse as parse_frame, Frame, FrameError, Otel, Provenance,
     Upstream, UpstreamSystem, Verdict, FRAME_VERSION, SCHEMA_ID, SCHEMA_VERSION,
+};
+pub use mode::{
+    Direction, Mode, ModeInputs, MoteState, ParseModeError, ResolvedMode, Source, TransitionError,
 };
 pub use tap::{TapError, TapResult, TrafficTap};
 
