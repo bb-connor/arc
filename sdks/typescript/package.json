@@ -9,6 +9,7 @@
     "packages/ai-sdk",
     "packages/browser",
     "packages/workers",
+    "packages/edge",
     "packages/conformance",
     "packages/elysia",
     "packages/express",

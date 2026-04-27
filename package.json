@@ -8,7 +8,8 @@
   "workspaces": [
     "docs/demo",
     "sdks/typescript/packages/browser",
-    "sdks/typescript/packages/workers"
+    "sdks/typescript/packages/workers",
+    "sdks/typescript/packages/edge"
   ],
   "engines": {
     "node": ">=20.0.0"
