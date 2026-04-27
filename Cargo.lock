@@ -3313,6 +3313,7 @@ name = "chio-wasm-guards"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "arc-swap",
  "chio-config",
  "chio-core",
  "chio-guards",

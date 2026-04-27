@@ -295,7 +295,7 @@ mod tests {
         // The guard was loaded successfully with the manifest config.
         // Config values are passed to the backend constructor (WasmtimeBackend::with_engine_and_config).
         // We verify the guard was created with the correct manifest SHA-256.
-        assert_eq!(guards[0].manifest_sha256(), Some(hash.as_str()));
+        assert_eq!(guards[0].manifest_sha256().as_deref(), Some(hash.as_str()));
     }
 
     // -----------------------------------------------------------------------
