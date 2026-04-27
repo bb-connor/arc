@@ -12,11 +12,13 @@
 #     "auto-bless on green" path.
 #   - "Test signing key management" (lines ~550-568): the `seed-immutable`
 #     job below hashes `tests/replay/test-key.seed` on every PR / push and
-#     fails closed if the digest drifts from the checked-in
-#     `tests/replay/test-key.seed.sha256`, or if the seed file is missing
-#     or world-writable. Rotating the seed requires (a) updating the SHA
-#     file, (b) re-blessing the entire corpus, (c) shipping an explicit
-#     `feat!:` commit. Routine PRs cannot change the seed.
+#     fails closed if the digest drifts from the workflow-pinned
+#     `EXPECTED_SEED_SHA256` baseline (NOT the in-tree `.sha256` file
+#     alone). Rotating the seed requires (a) bumping
+#     `EXPECTED_SEED_SHA256` here in the workflow, (b) updating the
+#     in-tree `.sha256` to match, (c) re-blessing the entire corpus, (d)
+#     shipping an explicit `feat!:` commit. Routine PRs cannot change
+#     the seed.
 #
 # T2 scope seeded a single Linux `replay-gate` job that exercises the
 # corpus_smoke test. T3 (this layer) adds:
@@ -107,18 +109,51 @@ jobs:
 
       - name: Run replay-gate golden byte-equivalence (when goldens land)
         # The golden_byte_equivalence integration test arrives in M04.P2.T5
-        # together with the initial bless of the 50 goldens. Until then the
-        # test target is absent; skip-on-missing keeps the gate green for
-        # the T2 commit while still wiring the invocation. Once T5 lands
-        # this branch becomes the gating assertion (zero diffs vs. blessed
-        # goldens).
+        # together with the initial bless of the 50 goldens. Until then
+        # the test target source file may be absent; skip-on-missing keeps
+        # the gate green for the T2 commit while still wiring the
+        # invocation. Once T5 lands this branch becomes the gating
+        # assertion (zero diffs vs. blessed goldens).
+        #
+        # Fail-closed contract (cleanup-c2): the previous form was
+        #
+        #     if cargo test ... --no-run --quiet 2>/dev/null; then
+        #       cargo test ...
+        #     else
+        #       echo "skipping"
+        #     fi
+        #
+        # which silently swallowed real compile errors in the test target
+        # (or any transitive workspace dependency) by routing them into
+        # the skip branch. The gate failed open. The shape below splits
+        # the two concerns:
+        #
+        #   1. Target-presence probe: a plain file-existence check on the
+        #      test source by Cargo convention
+        #      (`tests/replay/tests/<name>.rs`). This is the only
+        #      legitimate reason to skip, and it cannot be triggered by a
+        #      compile failure.
+        #   2. Compile-then-run: `--no-run` forces a compile without
+        #      execution; we do NOT redirect stderr and we do NOT branch
+        #      on its exit. A non-zero exit here propagates out (set -e)
+        #      and fails the gate. Once compile succeeds we run the
+        #      target unconditionally.
         run: |
           set -euo pipefail
-          if cargo test -p chio-replay-gate --release --test golden_byte_equivalence --no-run --quiet 2>/dev/null; then
-            cargo test -p chio-replay-gate --release --test golden_byte_equivalence
-          else
-            echo "golden_byte_equivalence test target not yet present (lands in M04.P2.T5); skipping"
+
+          target_src="tests/replay/tests/golden_byte_equivalence.rs"
+          if [ ! -f "${target_src}" ]; then
+            echo "golden_byte_equivalence source ${target_src} not present (pre-T5 state); skipping"
+            exit 0
           fi
+
+          # Compile must succeed. A failure here is a real defect (compile
+          # error in golden_byte_equivalence or a transitive workspace
+          # dep), not a missing-target signal, and must fail the gate.
+          cargo test -p chio-replay-gate --release --test golden_byte_equivalence --no-run
+
+          # Compile passed; the target exists and links. Run it.
+          cargo test -p chio-replay-gate --release --test golden_byte_equivalence
 
   macos-smoke:
     # T3 scope: read-only macOS smoke. The Linux `replay-gate` job is the
@@ -171,17 +206,37 @@ jobs:
     # T3 scope: lock `tests/replay/test-key.seed` against routine
     # mutation. Source-doc anchor:
     # .planning/trajectory/04-deterministic-replay.md "Test signing key
-    # management" (lines ~550-568). The job fails closed on three classes
+    # management" (lines ~550-568). The job fails closed on four classes
     # of mutation:
     #   1. seed file missing
     #   2. seed file world-writable (`stat` mode bit `0o002` set)
-    #   3. sha256(seed) != contents of test-key.seed.sha256
-    # Rotating the seed is intentionally a multi-step ceremony: update
-    # the SHA file, re-bless the corpus, and ship a `feat!:` commit. A
-    # routine PR cannot drift the seed past this guard.
+    #   3. sha256(seed) != EXPECTED_SEED_SHA256 (workflow-pinned baseline)
+    #   4. contents of test-key.seed.sha256 != EXPECTED_SEED_SHA256
+    #      (drift between in-tree documentation and workflow baseline)
+    # Rotating the seed is intentionally a multi-step ceremony: bump the
+    # workflow's pinned EXPECTED_SEED_SHA256, update the in-tree
+    # `.sha256` file to match, re-bless the corpus, and ship a `feat!:`
+    # commit. A routine PR cannot drift the seed past this guard.
+    #
+    # Trusted-baseline note (cleanup-c2): an earlier revision of this job
+    # compared sha256(seed) against the in-tree `test-key.seed.sha256`
+    # alone. That gate is bypassable: a single PR can mutate BOTH the
+    # seed and the .sha256 in lockstep and the check passes. The
+    # `EXPECTED_SEED_SHA256` constant below is the workflow's protected
+    # baseline; rotating it forces an explicit, code-reviewed workflow
+    # change separate from any test-fixture edits, which is what the
+    # "feat!:" rotation ceremony actually requires.
     name: seed-immutable
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      # Pinned baseline. Mutating this value is the only way to rotate
+      # the test signing seed; doing so requires editing this workflow,
+      # which is a code-reviewed change distinct from edits to
+      # tests/replay/test-key.seed{,.sha256}. Keep this in sync with
+      # tests/replay/test-key.seed.sha256 only when intentionally
+      # rotating; routine PRs must never touch this constant.
+      EXPECTED_SEED_SHA256: "b32580c7001b8ad7cc9d29d4f8d4faf2ad067db558add9bb7e02bf8f5f9a01af"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -215,26 +270,40 @@ jobs:
             exit 1
           fi
 
-          # Compute the digest and compare against the checked-in value.
+          # Compute the digest and compare against the workflow-pinned
+          # baseline (NOT the in-tree .sha256 alone; see job-level note).
           # The .sha256 file is a single 64-char hex line, no filename
           # suffix (deliberately not `sha256sum -c` format so we can keep
           # the runbook message tight).
           actual="$(sha256sum "${seed}" | awk '{print $1}')"
-          expected="$(tr -d '[:space:]' < "${sha_file}")"
+          documented="$(tr -d '[:space:]' < "${sha_file}")"
+          expected="${EXPECTED_SEED_SHA256}"
 
           if [ "${actual}" != "${expected}" ]; then
-            echo "ERROR: ${seed} digest mismatch." >&2
-            echo "  expected: ${expected}" >&2
-            echo "  actual:   ${actual}" >&2
+            echo "ERROR: ${seed} digest mismatch against workflow-pinned baseline." >&2
+            echo "  workflow-pinned EXPECTED_SEED_SHA256: ${expected}" >&2
+            echo "  actual sha256(${seed}):              ${actual}" >&2
             echo "rotate-seed runbook: routine PRs cannot mutate the test signing seed." >&2
-            echo "  To rotate: (a) update tests/replay/test-key.seed.sha256," >&2
-            echo "             (b) re-bless the entire corpus via scripts/bless-replay-goldens.sh," >&2
-            echo "             (c) ship an explicit 'feat!:' commit." >&2
+            echo "  To rotate (all four steps required):" >&2
+            echo "    (a) bump EXPECTED_SEED_SHA256 in .github/workflows/chio-replay-gate.yml," >&2
+            echo "    (b) update tests/replay/test-key.seed.sha256 to match," >&2
+            echo "    (c) re-bless the entire corpus via scripts/bless-replay-goldens.sh," >&2
+            echo "    (d) ship an explicit 'feat!:' commit." >&2
+            echo "  Bumping (b) without (a) will not pass this gate; that is intentional." >&2
             echo "  See .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
             exit 1
           fi
 
-          echo "seed-immutable: ${seed} digest matches ${expected} (mode ${mode})"
+          if [ "${documented}" != "${expected}" ]; then
+            echo "ERROR: ${sha_file} does not match workflow-pinned baseline." >&2
+            echo "  workflow-pinned EXPECTED_SEED_SHA256: ${expected}" >&2
+            echo "  in-tree ${sha_file}: ${documented}" >&2
+            echo "rotate-seed runbook: the in-tree .sha256 is documentation; the workflow baseline is the trust root." >&2
+            echo "  To resolve, either revert ${sha_file} to ${expected}, or follow the four-step rotation ceremony above." >&2
+            exit 1
+          fi
+
+          echo "seed-immutable: ${seed} digest matches workflow-pinned ${expected} (mode ${mode})"
 
   cross-version:
     # M04 P3.T5 scope: cross-version receipt-compatibility sanity job.
