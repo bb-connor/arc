@@ -2249,7 +2249,13 @@ fn main() {
                 check,
                 out,
                 language,
-            } => cmd_conformance_fetch_peers(check, &out, language.as_deref()),
+                lockfile,
+            } => cmd_conformance_fetch_peers(
+                check,
+                &out,
+                language.as_deref(),
+                lockfile.as_deref(),
+            ),
         },
     };
 

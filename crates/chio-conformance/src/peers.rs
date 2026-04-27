@@ -18,6 +18,9 @@ use serde::Deserialize;
 /// Schema identifier for the v1 peers lockfile.
 pub const PEERS_LOCK_SCHEMA: &str = "chio.conformance.peers/v1";
 
+/// Filename used for the bundled lockfile when published or installed.
+pub const PEERS_LOCK_FILENAME: &str = "peers.lock.toml";
+
 /// Recognised peer-language identifiers. New languages must be added here
 /// and to the conformance harness in lock-step.
 pub const SUPPORTED_LANGUAGES: &[&str] = &["python", "js", "go", "cpp"];
@@ -45,6 +48,19 @@ pub struct PeerEntry {
     pub target: String,
     /// Executable name inside the archive.
     pub binary: String,
+    /// Whether this entry has been published with a real sha256 pin and a
+    /// reachable url. Defaults to `true` so historical entries do not need
+    /// to be edited; placeholder entries (where the M01 release pipeline
+    /// has not yet uploaded a real binary) MUST set `published = false`.
+    /// `chio conformance fetch-peers` SKIPS entries with
+    /// `published = false` rather than failing them with a sha256
+    /// mismatch. See cleanup C5 issue D for the gating contract.
+    #[serde(default = "default_published")]
+    pub published: bool,
+}
+
+fn default_published() -> bool {
+    true
 }
 
 /// Errors surfaced when loading or validating `peers.lock.toml`.
@@ -137,6 +153,26 @@ impl PeersLock {
     pub fn entries_for_language(&self, language: &str) -> Vec<&PeerEntry> {
         self.entries_for(language, "")
     }
+
+    /// Partition entries into `(published, skipped)` based on the
+    /// `published` flag. Cleanup C5 issue D: placeholder entries with
+    /// all-zeros / all-ones sha256 pins must SKIP rather than fail
+    /// `fetch-peers`; the partition lets the caller print a friendly
+    /// "skipping unpublished entry" line per skipped row.
+    pub fn partition_by_published<'a>(
+        entries: &[&'a PeerEntry],
+    ) -> (Vec<&'a PeerEntry>, Vec<&'a PeerEntry>) {
+        let mut published = Vec::new();
+        let mut skipped = Vec::new();
+        for entry in entries {
+            if entry.published {
+                published.push(*entry);
+            } else {
+                skipped.push(*entry);
+            }
+        }
+        (published, skipped)
+    }
 }
 
 impl PeerEntry {
@@ -173,16 +209,76 @@ fn is_lowercase_hex_64(value: &str) -> bool {
             .all(|ch| ch.is_ascii_digit() || ('a'..='f').contains(&ch))
 }
 
+/// Resolve the default `peers.lock.toml` path at runtime.
+///
+/// External consumers obtain `chio` via `cargo install chio-cli` (or build
+/// the chio-conformance crate). The compile-time `CARGO_MANIFEST_DIR` of
+/// either crate is gone after install, so this helper consults a layered
+/// list of candidates so the caller does not have to pass `--lockfile`
+/// for the common cases. Order:
+///
+/// 1. `$CHIO_PEERS_LOCK` (explicit override; honoured first so CI and
+///    sandboxes can pin a vendored copy).
+/// 2. `$XDG_CONFIG_HOME/chio/peers.lock.toml` (XDG default).
+/// 3. `$HOME/.config/chio/peers.lock.toml` (XDG fallback).
+/// 4. `<repo-root>/crates/chio-conformance/peers.lock.toml` (in-repo
+///    default for `cargo run` from a fresh checkout).
+/// 5. `./peers.lock.toml` (cwd-relative; useful for sandboxed CI).
+///
+/// Returns the first candidate that exists. When none exist this returns
+/// the in-repo default (candidate 4) so the error message points users at
+/// the canonical path, mirroring the M04.P3.T3 cache-dir strategy.
+#[must_use]
+pub fn default_peers_lock_path() -> PathBuf {
+    if let Some(path) = std::env::var_os("CHIO_PEERS_LOCK") {
+        return PathBuf::from(path);
+    }
+
+    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+        let candidate = PathBuf::from(xdg).join("chio").join(PEERS_LOCK_FILENAME);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+
+    if let Some(home) = std::env::var_os("HOME") {
+        let candidate = PathBuf::from(home)
+            .join(".config")
+            .join("chio")
+            .join(PEERS_LOCK_FILENAME);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+
+    let in_repo = in_repo_default_lock_path();
+    if in_repo.exists() {
+        return in_repo;
+    }
+
+    let cwd = PathBuf::from(PEERS_LOCK_FILENAME);
+    if cwd.exists() {
+        return cwd;
+    }
+
+    in_repo
+}
+
+/// In-repo default. Resolved relative to the chio-conformance crate at
+/// compile time; only useful when the binary still has the workspace
+/// checkout next to it (i.e. `cargo run --bin chio` from the repo).
+fn in_repo_default_lock_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(PEERS_LOCK_FILENAME)
+}
+
 /// Compute the lowercase hex sha256 digest of `bytes`. Used by the CLI
 /// download path to verify integrity after fetching a release artifact.
+///
+/// Thin re-export of [`chio_core::sha256_hex`]; kept here for callers that
+/// already imported `chio_conformance::sha256_hex`. Cleanup C5 issue E
+/// removed the duplicate implementation.
 pub fn sha256_hex(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(bytes);
-    let mut output = String::with_capacity(64);
-    for byte in digest.iter() {
-        output.push_str(&format!("{byte:02x}"));
-    }
-    output
+    chio_core::sha256_hex(bytes)
 }
 
 #[cfg(test)]
@@ -314,5 +410,63 @@ binary = "chio-js-peer"
             sha256_hex(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
         );
+    }
+
+    #[test]
+    fn published_defaults_to_true() {
+        // Cleanup C5 issue D: omitting `published` keeps the historical
+        // behaviour where every entry is treated as published.
+        let lock = PeersLock::parse_str(VALID).expect("parse");
+        assert!(lock.peers[0].published);
+        assert!(lock.peers[1].published);
+    }
+
+    #[test]
+    fn partition_by_published_separates_skipped_entries() {
+        let raw = r#"
+schema = "chio.conformance.peers/v1"
+
+[[peer]]
+language = "python"
+url = "https://example.com/py.tar.gz"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+target = "x86_64-unknown-linux-gnu"
+binary = "chio-py-peer"
+published = false
+
+[[peer]]
+language = "js"
+url = "https://example.com/js.tar.gz"
+sha256 = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+target = "aarch64-apple-darwin"
+binary = "chio-js-peer"
+published = true
+"#;
+        let lock = PeersLock::parse_str(raw).expect("parse");
+        let all = lock.entries_for("", "");
+        let (published, skipped) = PeersLock::partition_by_published(&all);
+        assert_eq!(published.len(), 1);
+        assert_eq!(skipped.len(), 1);
+        assert_eq!(published[0].language, "js");
+        assert_eq!(skipped[0].language, "python");
+    }
+
+    #[test]
+    fn shipped_lockfile_marks_placeholders_as_unpublished() {
+        // Cleanup C5 issue D: the shipped lockfile carries placeholder
+        // sha256 pins, so every entry MUST be flagged as unpublished
+        // until the M01 release pipeline fills in real values.
+        let manifest_dir =
+            std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set during cargo test");
+        let path = Path::new(&manifest_dir).join("peers.lock.toml");
+        let lock = PeersLock::load(&path).expect("load shipped peers.lock.toml");
+        for (idx, entry) in lock.peers.iter().enumerate() {
+            assert!(
+                !entry.published,
+                "shipped peer[{idx}] ({} / {}) is flagged published but the lockfile carries placeholder pins; flip published=true only when the release pipeline cuts a real binary",
+                entry.language,
+                entry.target,
+            );
+        }
     }
 }

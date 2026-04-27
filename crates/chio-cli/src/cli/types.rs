@@ -264,6 +264,12 @@ enum ConformanceCommands {
         /// Optional language filter (`python`, `js`, `go`, `cpp`).
         #[arg(long)]
         language: Option<String>,
+
+        /// Optional explicit path to `peers.lock.toml`. When omitted the
+        /// CLI consults `$CHIO_PEERS_LOCK`, the XDG config dir, the
+        /// in-repo path, and the cwd in that order. Cleanup C5 issue B.
+        #[arg(long)]
+        lockfile: Option<PathBuf>,
     },
 }
 
