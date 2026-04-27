@@ -13,6 +13,7 @@ members = [
     #
     # Guards & policy
     "crates/chio-data-guards",
+    "crates/chio-data-guards/redactors/default",
     "crates/chio-external-guards",
     "crates/chio-guard-sdk",
     "crates/chio-guard-sdk-macros",
