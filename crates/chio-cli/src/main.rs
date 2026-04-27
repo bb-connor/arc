@@ -33,6 +33,7 @@ include!("cli/replay/reader.rs");
 include!("cli/replay/verify.rs");
 include!("cli/replay/merkle.rs");
 include!("cli/replay/verdict.rs");
+include!("cli/replay/report.rs");
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
