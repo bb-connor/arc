@@ -280,3 +280,32 @@ Subsequent phase re-audits (P1, P2, P3, P4) re-run the script and append
 the new kill rate to the snapshot table; the rate must be monotonically
 non-decreasing relative to this baseline (>= baseline - epsilon, where
 epsilon allows for cargo-mutants per-run nondeterminism on flaky tests).
+
+### 2026-04-27 (P4.T3 release freeze and flamegraph audit)
+
+Scope: M05 exit release check for the kernel/session freeze.
+
+Closure:
+
+- zero `&mut self` methods remain on `Session` in
+  `crates/chio-kernel/src/session.rs`.
+- zero `std::sync::Mutex` and zero `std::sync::RwLock` fields remain in
+  `ChioKernel`; the remaining kernel state uses `ArcSwap`, `DashMap`,
+  atomics, and owned handles.
+- The frozen CODEOWNERS overrides for `kernel/mod.rs`, `session.rs`, and
+  `kernel/session_ops.rs` were removed after M05 P1-P3 completed.
+- `m05-kernel-async-pivot` in `.planning/trajectory/freezes.yml` is now
+  `state: released`.
+- `.planning/audits/M05-flamegraph-dispatch-allow.svg` is attached as
+  the dispatch_allow release audit artifact. The current
+  `dispatch_allow` bench is still the M05 scaffold from P0.T1, so the
+  artifact records the release audit shape of that scaffolded benchmark.
+
+Reproduction:
+
+```bash
+grep -c '&mut self' crates/chio-kernel/src/session.rs
+! rg -n 'std::sync::Mutex|std::sync::RwLock|Mutex<|RwLock<' \
+  crates/chio-kernel/src/kernel/mod.rs
+test -f .planning/audits/M05-flamegraph-dispatch-allow.svg
+```

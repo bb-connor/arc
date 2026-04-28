@@ -30,7 +30,7 @@ freezes:
     starts_at_milestone: M05.P1
     ends_at_milestone: M05.P3
     start_phase: M05.P0.T4
-    state: active
+    state: released
     bypass_label: "[M05]"
 
   - id: rust-toolchain-pin
