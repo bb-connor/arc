@@ -3046,6 +3046,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-otel-receipt-exporter"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "chio-kernel",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "chio-policy"
 version = "0.1.0"
 dependencies = [
