@@ -125,12 +125,5 @@ fuzz/corpus/**                               @bb-connor
 # Ticket: .planning/trajectory/tickets/M02/P3.yml ticket M02.P3.T2.
 releases.toml                                @bb-connor
 
-# ---------- Kernel - the contended crate (FROZEN during M05 P1-P3) ----------
-# These patterns appear last so they override any broader rule above.
-# During the freeze window only [M05]-prefixed PRs may modify these paths;
-# the m05-freeze-guard required check enforces the prefix rule, and
-# @bb-connor reviews every change.
+# ---------- Kernel receipts ----------
 crates/chio-kernel/src/receipt_*.rs          @bb-connor
-crates/chio-kernel/src/kernel/mod.rs         @bb-connor
-crates/chio-kernel/src/kernel/session_ops.rs @bb-connor
-crates/chio-kernel/src/session.rs            @bb-connor
