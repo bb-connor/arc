@@ -2,9 +2,10 @@
 #
 # ClusterFuzzLite build entry point for Chio (formerly ARC).
 #
-# Builds every chio-fuzz target listed below and copies the resulting
+# Builds the chio-fuzz targets listed below and copies each resulting
 # binary into $OUT/<target>, plus a per-target seed corpus zip when one
-# exists under fuzz/corpus/<target>/.
+# exists under fuzz/corpus/<target>/. Set CHIO_CFLITE_TARGET to build a
+# single target for the nightly rotation workflow.
 #
 # Source-of-truth: .planning/trajectory/02-fuzzing-post-pr13.md
 # (ClusterFuzzLite implementation section). Companion docs in
@@ -41,7 +42,23 @@ TARGETS=(
     manifest_roundtrip
 )
 
-for target in "${TARGETS[@]}"; do
+selected_targets=("${TARGETS[@]}")
+if [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
+    found=false
+    for target in "${TARGETS[@]}"; do
+        if [ "$target" = "$CHIO_CFLITE_TARGET" ]; then
+            found=true
+            selected_targets=("$target")
+            break
+        fi
+    done
+    if [ "$found" != "true" ]; then
+        echo "unknown CHIO_CFLITE_TARGET: $CHIO_CFLITE_TARGET" >&2
+        exit 1
+    fi
+fi
+
+for target in "${selected_targets[@]}"; do
     cargo +nightly fuzz build "$target" --release --sanitizer "$SANITIZER"
     cp "target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
 

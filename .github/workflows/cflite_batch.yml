@@ -88,6 +88,10 @@ jobs:
           fi
           if [[ -n "${FORCED_TARGET}" ]]; then
             picked="${FORCED_TARGET}"
+            if ! printf '%s\n' "${targets[@]}" | grep -Fxq -- "${picked}"; then
+              echo "unknown forced fuzz target: ${picked}" >&2
+              exit 1
+            fi
           else
             day_index=$(( $(date -u +%s) / 86400 ))
             picked="${targets[$(( day_index % ${#targets[@]} ))]}"
@@ -101,6 +105,8 @@ jobs:
 
       - name: Run ClusterFuzzLite batch
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        env:
+          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
           fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
