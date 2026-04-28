@@ -3334,6 +3334,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "wasmparser 0.221.3",
  "wasmtime",
  "wat",

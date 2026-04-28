@@ -17,6 +17,10 @@ use wasmtime::{
 
 use crate::bundle_store::{parse_sha256_digest, BundleStore, InMemoryBundleStore};
 use crate::error::WasmGuardError;
+use crate::observability::{
+    guard_fetch_blob_span, guard_host_call_span, HOST_FETCH_BLOB, HOST_GET_CONFIG,
+    HOST_GET_TIME_UNIX_SECS, HOST_LOG,
+};
 
 // ---------------------------------------------------------------------------
 // bindgen-generated component bindings
@@ -26,6 +30,13 @@ use crate::error::WasmGuardError;
 #[derive(Debug, Clone)]
 pub struct BundleHandle {
     sha256: [u8; 32],
+}
+
+impl BundleHandle {
+    #[must_use]
+    pub fn id_hex(&self) -> String {
+        hex::encode(self.sha256)
+    }
 }
 
 pub mod bindings {
@@ -126,6 +137,8 @@ impl WasmHostState {
     }
 
     fn record_log(&mut self, level: u32, msg: String) {
+        let span = guard_host_call_span(HOST_LOG);
+        let _span_guard = span.enter();
         if level > 4 || msg.len() > MAX_LOG_MESSAGE_LEN {
             return;
         }
@@ -155,6 +168,23 @@ impl WasmHostState {
             .fetch_blob(&handle.sha256)
             .map_err(|e| e.to_string())?;
         slice_blob(&blob, offset, len)
+    }
+
+    fn read_bundle_blob_with_spans(
+        &self,
+        handle: &BundleHandle,
+        offset: u64,
+        len: u32,
+    ) -> Result<Vec<u8>, String> {
+        let host_span = guard_host_call_span(HOST_FETCH_BLOB);
+        let _host_guard = host_span.enter();
+        let bundle_id = handle.id_hex();
+        let fetch_span = guard_fetch_blob_span(&bundle_id, 0);
+        let _fetch_guard = fetch_span.enter();
+        let result = self.read_bundle_blob(handle, offset, len);
+        let bytes = result.as_ref().map_or(0, Vec::len) as u64;
+        fetch_span.record("bytes", bytes);
+        result
     }
 }
 
@@ -322,6 +352,8 @@ fn legacy_get_config(
     params: &[Val],
     results: &mut [Val],
 ) -> wasmtime::Result<()> {
+    let span = guard_host_call_span(HOST_GET_CONFIG);
+    let _span_guard = span.enter();
     let key_ptr = match i32_param(params, 0) {
         Some(value) if value >= 0 => value as usize,
         _ => return set_i32_result(results, -1),
@@ -374,6 +406,8 @@ fn legacy_get_time_unix_secs(
     _params: &[Val],
     results: &mut [Val],
 ) -> wasmtime::Result<()> {
+    let span = guard_host_call_span(HOST_GET_TIME_UNIX_SECS);
+    let _span_guard = span.enter();
     let secs = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(duration) => duration.as_secs(),
         Err(_) => 0,
@@ -389,6 +423,8 @@ impl bindings::chio::guard::host::Host for WasmHostState {
     }
 
     async fn get_config(&mut self, key: String) -> wasmtime::Result<Option<String>> {
+        let span = guard_host_call_span(HOST_GET_CONFIG);
+        let _span_guard = span.enter();
         if key.len() > MAX_CONFIG_KEY_LEN {
             return Ok(None);
         }
@@ -396,6 +432,8 @@ impl bindings::chio::guard::host::Host for WasmHostState {
     }
 
     async fn get_time_unix_secs(&mut self) -> wasmtime::Result<u64> {
+        let span = guard_host_call_span(HOST_GET_TIME_UNIX_SECS);
+        let _span_guard = span.enter();
         let secs = match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(duration) => duration.as_secs(),
             Err(_) => 0,
@@ -414,7 +452,7 @@ impl bindings::chio::guard::host::Host for WasmHostState {
             Ok(handle) => handle,
             Err(err) => return Ok(Err(resource_table_error_string(err))),
         };
-        Ok(self.read_bundle_blob(handle, offset, len))
+        Ok(self.read_bundle_blob_with_spans(handle, offset, len))
     }
 }
 
@@ -440,7 +478,7 @@ impl bindings::chio::guard::policy_context::HostBundleHandle for WasmHostState {
             Ok(handle) => handle,
             Err(err) => return Ok(Err(resource_table_error_string(err))),
         };
-        Ok(self.read_bundle_blob(handle, offset, len))
+        Ok(self.read_bundle_blob_with_spans(handle, offset, len))
     }
 
     async fn close(&mut self, self_: ComponentResource<BundleHandle>) -> wasmtime::Result<()> {

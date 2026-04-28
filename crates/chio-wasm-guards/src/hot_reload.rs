@@ -16,6 +16,9 @@ use tracing::warn;
 
 use crate::blocklist::{GuardDigestBlocklist, E_GUARD_DIGEST_BLOCKLISTED};
 use crate::incident::{EvalTrace, IncidentWriter, ReloadIncident};
+use crate::observability::{
+    guard_reload_span, RELOAD_APPLIED, RELOAD_CANARY_FAILED, RELOAD_ROLLED_BACK,
+};
 use crate::runtime::LoadedModule;
 use crate::{EpochId, WasmGuard, WasmGuardAbi, WasmGuardError};
 use crate::{GuardRequest, GuardVerdict};
@@ -346,6 +349,8 @@ impl ReloadWatchdog {
             .incident_writer
             .write_reload_incident(&incident)
             .map_err(|source| HotReloadError::IncidentWrite { source })?;
+        let span = guard_reload_span(RELOAD_ROLLED_BACK, self.reload_seq);
+        let _span_guard = span.enter();
         warn!(
             event = "chio.guard.reload.rolled_back",
             guard_id = %self.guard_id,
@@ -601,6 +606,15 @@ where
         guard_id: &str,
         new_module_bytes: &[u8],
     ) -> Result<EpochId, HotReloadError> {
+        self.reload_with_observability(guard_id, new_module_bytes, None)
+    }
+
+    fn reload_with_observability(
+        &self,
+        guard_id: &str,
+        new_module_bytes: &[u8],
+        reload_seq: Option<u64>,
+    ) -> Result<EpochId, HotReloadError> {
         let guard = self
             .guard(guard_id)?
             .ok_or_else(|| HotReloadError::GuardNotFound {
@@ -618,11 +632,17 @@ where
                 source,
             })?;
 
-        guard
+        let epoch_id = guard
             .replace_loaded_module(backend, Some(module_sha256))
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
                 guard_id: guard_id.to_string(),
-            })
+            })?;
+        if let Some(reload_seq) = reload_seq {
+            guard.record_reload_seq(reload_seq);
+        }
+        let span = guard_reload_span(RELOAD_APPLIED, guard.current_reload_seq());
+        let _span_guard = span.enter();
+        Ok(epoch_id)
     }
 
     /// Verify the replacement module against a frozen canary corpus, then
@@ -662,6 +682,8 @@ where
                 Ok(verdict) => serialize_canary_verdict(&verdict)?,
                 Err(source) => {
                     let actual = format!("error:{source}");
+                    let span = guard_reload_span(RELOAD_CANARY_FAILED, guard.current_reload_seq());
+                    let _span_guard = span.enter();
                     warn!(
                         event = "chio.guard.reload.canary_failed",
                         guard_id,
@@ -681,6 +703,8 @@ where
             };
             if actual != fixture.expected_verdict_bytes() {
                 let actual = String::from_utf8_lossy(&actual).into_owned();
+                let span = guard_reload_span(RELOAD_CANARY_FAILED, guard.current_reload_seq());
+                let _span_guard = span.enter();
                 warn!(
                     event = "chio.guard.reload.canary_failed",
                     guard_id,
@@ -699,11 +723,14 @@ where
             }
         }
 
-        guard
+        let epoch_id = guard
             .replace_loaded_module(backend, Some(module_sha256))
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
                 guard_id: guard_id.to_string(),
-            })
+            })?;
+        let span = guard_reload_span(RELOAD_APPLIED, guard.current_reload_seq());
+        let _span_guard = span.enter();
+        Ok(epoch_id)
     }
 
     /// Reload a guard and return a watchdog that can roll back the new epoch.
@@ -720,7 +747,8 @@ where
                 guard_id: guard_id.to_string(),
             })?;
         let previous_module = guard.loaded_module();
-        let epoch_id = self.reload(guard_id, new_module_bytes)?;
+        let epoch_id =
+            self.reload_with_observability(guard_id, new_module_bytes, Some(reload_seq))?;
         Ok(ReloadWatchdog::new(
             guard_id,
             guard,
@@ -823,7 +851,8 @@ where
             });
         };
         let reload_seq = slot_guard.seq;
-        let reload_result = self.reload(guard_id, &module_bytes);
+        let reload_result =
+            self.reload_with_observability(guard_id, &module_bytes, Some(reload_seq));
         slot_guard.last_attempt_at = Some(Instant::now());
         slot_guard.in_flight = false;
         let epoch_id = reload_result?;

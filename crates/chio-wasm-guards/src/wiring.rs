@@ -89,9 +89,10 @@ pub fn load_wasm_guards(
         // 7. Load module into backend
         backend.load_module(&wasm_bytes, entry.fuel_limit)?;
 
-        // 8. Create WasmGuard with manifest wasm_sha256 for receipt metadata
-        let guard = WasmGuard::new(
+        // 8. Create WasmGuard with manifest metadata for receipts and spans.
+        let guard = WasmGuard::new_with_metadata(
             entry.name.clone(),
+            guard_manifest.version.clone(),
             Box::new(backend),
             entry.advisory,
             Some(guard_manifest.wasm_sha256.clone()),

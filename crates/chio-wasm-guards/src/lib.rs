@@ -57,6 +57,7 @@ pub mod host;
 pub mod hot_reload;
 pub mod incident;
 pub mod manifest;
+pub mod observability;
 pub mod placeholders;
 pub mod runtime;
 #[cfg(feature = "wasmtime-runtime")]
@@ -92,6 +93,14 @@ pub use manifest::{
     load_signature_sidecar, signature_sidecar_path, signed_module_message, verify_guard_signature,
     verify_signed_module, write_signature_sidecar, GuardManifest, SignedWasmModule,
     MANIFEST_FILENAME, SIGNATURE_SUFFIX, SUPPORTED_ABI_VERSIONS,
+};
+pub use observability::{
+    guard_digest_or_unknown, guard_evaluate_span, guard_fetch_blob_span, guard_host_call_span,
+    guard_reload_span, guard_verify_span, DEFAULT_GUARD_VERSION, HOST_FETCH_BLOB, HOST_GET_CONFIG,
+    HOST_GET_TIME_UNIX_SECS, HOST_LOG, RELOAD_APPLIED, RELOAD_CANARY_FAILED, RELOAD_ROLLED_BACK,
+    SPAN_GUARD_EVALUATE, SPAN_GUARD_FETCH_BLOB, SPAN_GUARD_HOST_CALL, SPAN_GUARD_RELOAD,
+    SPAN_GUARD_VERIFY, UNKNOWN_GUARD_DIGEST, VERDICT_ALLOW, VERDICT_DENY, VERDICT_ERROR,
+    VERIFY_MODE_ED25519, VERIFY_RESULT_FAIL, VERIFY_RESULT_OK,
 };
 pub use placeholders::{
     resolve_placeholders, resolve_placeholders_in_json, PlaceholderEnv, PlaceholderError,
