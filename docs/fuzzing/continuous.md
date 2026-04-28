@@ -179,7 +179,8 @@ rotation still passes its crash-search criterion. Keeping corpus storage in
 the GitHub control plane avoids new cloud-billing surfaces and keeps the
 1,800 min/30d cap legible. Cross-repo writes require the repository secret
 `FUZZ_CORPUS_PAT`; `GITHUB_TOKEN` cannot push to the sibling private repo.
-Fork-origin PRs run without corpus storage when that secret is unavailable.
+Fork-origin PRs and batch rotations run without corpus storage when that
+secret is unavailable.
 
 ## OSS-Fuzz application status
 

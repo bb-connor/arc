@@ -10,7 +10,8 @@
 #
 # Storage backend (corpus persistence between rotations):
 # bb-connor/arc-fuzz-corpus sibling private repo, wired as a
-# FUZZ_CORPUS_PAT-backed `storage-repo` action input. No GCS.
+# FUZZ_CORPUS_PAT-backed `storage-repo` action input when the secret is
+# available. No GCS.
 
 name: cflite_batch
 
@@ -103,7 +104,20 @@ jobs:
             echo "cycle_size=${#targets[@]}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Run ClusterFuzzLite batch
+      - name: Detect corpus storage availability
+        id: corpus
+        env:
+          FUZZ_CORPUS_PAT: ${{ secrets.FUZZ_CORPUS_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -n "${FUZZ_CORPUS_PAT}" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Run ClusterFuzzLite batch with corpus storage
+        if: steps.corpus.outputs.enabled == 'true'
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         env:
           CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
@@ -117,6 +131,19 @@ jobs:
           # ClusterFuzzLite docs. The PAT-backed URL is required because
           # GITHUB_TOKEN cannot write the sibling private corpus repo.
           storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
+          report-unreproducible-crashes: true
+
+      - name: Run ClusterFuzzLite batch without corpus storage
+        if: steps.corpus.outputs.enabled != 'true'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        env:
+          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
+        with:
+          language: rust
+          fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
+          mode: batch
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           report-unreproducible-crashes: true
 
       - name: Upload crash reports
