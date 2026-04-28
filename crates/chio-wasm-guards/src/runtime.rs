@@ -14,6 +14,10 @@ use crate::abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 use crate::config::WasmGuardConfig;
 use crate::epoch::EpochId;
 use crate::error::WasmGuardError;
+use crate::observability::{
+    guard_digest_or_unknown, guard_evaluate_span, DEFAULT_GUARD_VERSION, VERDICT_ALLOW,
+    VERDICT_DENY, VERDICT_ERROR,
+};
 
 // ---------------------------------------------------------------------------
 // WasmGuard -- single WASM guard implementing chio_kernel::Guard
@@ -96,10 +100,14 @@ impl std::fmt::Debug for LoadedModule {
 pub struct WasmGuard {
     /// Guard name (from config).
     name: String,
+    /// Guard semantic version from policy or manifest metadata.
+    version: String,
     /// Current loaded module epoch.
     loaded: ArcSwap<LoadedModule>,
     /// Next epoch identifier reserved for future module swaps.
     next_epoch_id: AtomicU64,
+    /// Latest reload sequence observed for this guard.
+    reload_seq: AtomicU64,
     /// Whether this guard is advisory-only (non-blocking).
     advisory: bool,
     /// Fuel consumed during the most recent `evaluate()` call.
@@ -118,14 +126,33 @@ impl WasmGuard {
         advisory: bool,
         manifest_sha256: Option<String>,
     ) -> Self {
+        Self::new_with_metadata(
+            name,
+            DEFAULT_GUARD_VERSION.to_string(),
+            backend,
+            advisory,
+            manifest_sha256,
+        )
+    }
+
+    /// Create a new WASM guard with explicit guard metadata.
+    pub fn new_with_metadata(
+        name: String,
+        version: String,
+        backend: Box<dyn WasmGuardAbi>,
+        advisory: bool,
+        manifest_sha256: Option<String>,
+    ) -> Self {
         Self {
             name,
+            version,
             loaded: ArcSwap::from_pointee(LoadedModule::new(
                 backend,
                 EpochId::INITIAL,
                 manifest_sha256,
             )),
             next_epoch_id: AtomicU64::new(1),
+            reload_seq: AtomicU64::new(0),
             advisory,
             last_fuel_consumed: Mutex::new(None),
         }
@@ -135,6 +162,12 @@ impl WasmGuard {
     #[must_use]
     pub fn is_advisory(&self) -> bool {
         self.advisory
+    }
+
+    /// Returns the guard semantic version attached to tracing metadata.
+    #[must_use]
+    pub fn guard_version(&self) -> &str {
+        &self.version
     }
 
     /// Returns the SHA-256 hex digest of the guard manifest, if set.
@@ -156,6 +189,17 @@ impl WasmGuard {
     #[must_use]
     pub fn current_epoch_id(&self) -> EpochId {
         self.loaded.load().epoch_id()
+    }
+
+    /// Return the latest observed reload sequence for this guard.
+    #[must_use]
+    pub fn current_reload_seq(&self) -> u64 {
+        self.reload_seq.load(Ordering::SeqCst)
+    }
+
+    /// Record the latest reload sequence for evaluation spans.
+    pub fn record_reload_seq(&self, reload_seq: u64) {
+        self.reload_seq.store(reload_seq, Ordering::SeqCst);
     }
 
     /// Reserve and return the next monotonic epoch identifier.
@@ -298,6 +342,7 @@ impl std::fmt::Debug for WasmGuard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WasmGuard")
             .field("name", &self.name)
+            .field("version", &self.version)
             .field("advisory", &self.advisory)
             .finish()
     }
@@ -311,8 +356,23 @@ impl Guard for WasmGuard {
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
         let request = Self::build_request(ctx);
         let loaded = self.loaded.load_full();
+        let span = guard_evaluate_span(
+            &self.name,
+            &self.version,
+            guard_digest_or_unknown(loaded.manifest_sha256()),
+            loaded.epoch_id().get(),
+            self.current_reload_seq(),
+            None,
+        );
+        let _span_guard = span.enter();
 
-        let (result, fuel) = loaded.evaluate(&request)?;
+        let (result, fuel) = match loaded.evaluate(&request) {
+            Ok(value) => value,
+            Err(err) => {
+                span.record("verdict", VERDICT_ERROR);
+                return Err(err);
+            }
+        };
 
         // Store fuel consumed for receipt metadata.
         if let Ok(mut fuel_lock) = self.last_fuel_consumed.lock() {
@@ -321,6 +381,7 @@ impl Guard for WasmGuard {
 
         match result {
             Ok(GuardVerdict::Allow) => {
+                span.record("verdict", VERDICT_ALLOW);
                 debug!(
                     guard = %self.name,
                     epoch_id = loaded.epoch_id().get(),
@@ -330,6 +391,7 @@ impl Guard for WasmGuard {
             }
             Ok(GuardVerdict::Deny { reason }) => {
                 let reason_str = reason.as_deref().unwrap_or("denied by WASM guard");
+                span.record("verdict", VERDICT_DENY);
                 if self.advisory {
                     debug!(
                         guard = %self.name,
@@ -350,6 +412,7 @@ impl Guard for WasmGuard {
             }
             Err(e) => {
                 // Fail closed: any error during WASM execution denies.
+                span.record("verdict", VERDICT_ERROR);
                 warn!(
                     guard = %self.name,
                     epoch_id = loaded.epoch_id().get(),
@@ -604,14 +667,25 @@ pub mod wasmtime_backend {
             reason: e.to_string(),
         })?;
 
-        // WIT world pinning (M06.P1.T4) -- fail-closed before instantiation.
-        crate::manifest::verify_wit_world(manifest.wit_world.as_deref())?;
-
-        // Signing policy (Phase 1.3) -- fail-closed.
-        crate::manifest::verify_guard_signature(wasm_path, &wasm_bytes, manifest)?;
-
-        // Hash attestation from the manifest.
-        crate::manifest::verify_wasm_hash(&wasm_bytes, &manifest.wasm_sha256)?;
+        let verify_span = crate::observability::guard_verify_span(
+            crate::observability::VERIFY_MODE_ED25519,
+            None,
+        );
+        let _verify_guard = verify_span.enter();
+        let verification = (|| {
+            crate::manifest::verify_wit_world(manifest.wit_world.as_deref())?;
+            crate::manifest::verify_guard_signature(wasm_path, &wasm_bytes, manifest)?;
+            crate::manifest::verify_wasm_hash(&wasm_bytes, &manifest.wasm_sha256)
+        })();
+        match verification {
+            Ok(()) => {
+                verify_span.record("result", crate::observability::VERIFY_RESULT_OK);
+            }
+            Err(err) => {
+                verify_span.record("result", crate::observability::VERIFY_RESULT_FAIL);
+                return Err(err);
+            }
+        }
 
         create_backend(engine, &wasm_bytes, fuel_limit, manifest.config.clone())
     }
@@ -1344,8 +1418,9 @@ pub mod wasmtime_backend {
                 .map_err(LoadError::Runtime)?;
 
             let manifest_sha = hex::encode(sha2::Sha256::digest(&wasm_bytes));
-            let guard = WasmGuard::new(
+            let guard = WasmGuard::new_with_metadata(
                 guard_spec.name.clone(),
+                guard_spec.version.clone(),
                 Box::new(backend),
                 guard_spec.advisory,
                 Some(manifest_sha),

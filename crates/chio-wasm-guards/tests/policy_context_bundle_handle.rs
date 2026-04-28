@@ -132,10 +132,10 @@ mod host_resource_tests {
         ))
         .expect("missing blob should not trap");
 
-        assert!(read.is_err());
-        assert!(read
-            .err()
-            .expect("missing blob should produce error text")
-            .contains("bundle blob not found"));
+        let err = match read {
+            Ok(bytes) => panic!("missing blob returned bytes: {bytes:?}"),
+            Err(err) => err,
+        };
+        assert!(err.contains("bundle blob not found"));
     }
 }
