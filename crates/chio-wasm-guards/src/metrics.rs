@@ -1,5 +1,7 @@
 //! Prometheus metric family descriptors for WASM guard observability.
 
+use std::collections::BTreeSet;
+
 use crate::observability::{
     HOST_FETCH_BLOB, HOST_GET_CONFIG, HOST_GET_TIME_UNIX_SECS, HOST_LOG, RELOAD_APPLIED,
     RELOAD_CANARY_FAILED, RELOAD_ROLLED_BACK, VERDICT_ALLOW, VERDICT_DENY, VERDICT_ERROR,
@@ -14,6 +16,9 @@ pub const METRIC_CHIO_GUARD_RELOAD_TOTAL: &str = "chio_guard_reload_total";
 pub const METRIC_CHIO_GUARD_HOST_CALL_DURATION_SECONDS: &str =
     "chio_guard_host_call_duration_seconds";
 pub const METRIC_CHIO_GUARD_MODULE_BYTES: &str = "chio_guard_module_bytes";
+
+pub const MAX_GUARD_METRIC_CARDINALITY: usize = 1024;
+pub const E_GUARD_METRIC_CARDINALITY_EXCEEDED: &str = "E_GUARD_METRIC_CARDINALITY_EXCEEDED";
 
 pub const LABEL_GUARD_ID: &str = "guard_id";
 pub const LABEL_VERDICT: &str = "verdict";
@@ -131,13 +136,73 @@ pub const GUARD_METRIC_FAMILIES: &[MetricFamilyDescriptor] = &[
 #[derive(Debug, Clone)]
 pub struct GuardMetricRegistry {
     families: &'static [MetricFamilyDescriptor],
+    guard_ids: BTreeSet<String>,
+    max_guards: usize,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GuardMetricRegistrationError {
+    code: &'static str,
+    guard_id: String,
+    attempted: usize,
+    limit: usize,
+}
+
+impl GuardMetricRegistrationError {
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        self.code
+    }
+
+    #[must_use]
+    pub fn guard_id(&self) -> &str {
+        &self.guard_id
+    }
+
+    #[must_use]
+    pub fn attempted(&self) -> usize {
+        self.attempted
+    }
+
+    #[must_use]
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
+
+    fn cardinality_exceeded(guard_id: String, attempted: usize, limit: usize) -> Self {
+        Self {
+            code: E_GUARD_METRIC_CARDINALITY_EXCEEDED,
+            guard_id,
+            attempted,
+            limit,
+        }
+    }
+}
+
+impl std::fmt::Display for GuardMetricRegistrationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: registering guard {} would create {} metric guard IDs, limit {}",
+            self.code, self.guard_id, self.attempted, self.limit
+        )
+    }
+}
+
+impl std::error::Error for GuardMetricRegistrationError {}
 
 impl GuardMetricRegistry {
     #[must_use]
     pub fn new() -> Self {
+        Self::with_max_guards(MAX_GUARD_METRIC_CARDINALITY)
+    }
+
+    #[must_use]
+    pub fn with_max_guards(max_guards: usize) -> Self {
         Self {
             families: GUARD_METRIC_FAMILIES,
+            guard_ids: BTreeSet::new(),
+            max_guards,
         }
     }
 
@@ -149,6 +214,47 @@ impl GuardMetricRegistry {
     #[must_use]
     pub fn family(&self, name: &str) -> Option<&'static MetricFamilyDescriptor> {
         self.families.iter().find(|family| family.name == name)
+    }
+
+    #[must_use]
+    pub fn max_guards(&self) -> usize {
+        self.max_guards
+    }
+
+    #[must_use]
+    pub fn registered_guard_count(&self) -> usize {
+        self.guard_ids.len()
+    }
+
+    pub fn register_guard_digest(
+        &mut self,
+        digest: &str,
+    ) -> Result<String, GuardMetricRegistrationError> {
+        let guard_id = guard_id_label_from_digest(digest);
+        self.register_guard_id(guard_id.clone())?;
+        Ok(guard_id)
+    }
+
+    pub fn register_guard_id(
+        &mut self,
+        guard_id: impl Into<String>,
+    ) -> Result<(), GuardMetricRegistrationError> {
+        let guard_id = guard_id.into();
+        if self.guard_ids.contains(&guard_id) {
+            return Ok(());
+        }
+
+        let attempted = self.guard_ids.len() + 1;
+        if attempted > self.max_guards {
+            return Err(GuardMetricRegistrationError::cardinality_exceeded(
+                guard_id,
+                attempted,
+                self.max_guards,
+            ));
+        }
+
+        self.guard_ids.insert(guard_id);
+        Ok(())
     }
 }
 
