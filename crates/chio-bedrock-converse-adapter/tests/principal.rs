@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -57,6 +58,8 @@ impl AttestVerifier for AllowVerifier {
 }
 
 struct DenyVerifier;
+
+static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl AttestVerifier for DenyVerifier {
     fn verify_blob(
@@ -114,8 +117,9 @@ fn temp_dir(name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+    let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
-        "chio-bedrock-principal-{name}-{}-{nanos}",
+        "chio-bedrock-principal-{name}-{}-{nanos}-{counter}",
         std::process::id()
     ));
     fs::create_dir_all(&path).unwrap();

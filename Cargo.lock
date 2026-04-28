@@ -2094,6 +2094,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "ureq 2.12.1",
  "url",
@@ -2776,6 +2777,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 

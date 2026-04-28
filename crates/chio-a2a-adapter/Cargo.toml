@@ -42,6 +42,7 @@ fuzz = ["dep:arbitrary"]
 
 [dev-dependencies]
 rcgen = "0.13"
+tokio = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"
