@@ -6811,6 +6811,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-genai"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "chio-otel-receipt-exporter",
+ "serde_json",
+]
+
+[[package]]
 name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

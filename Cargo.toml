@@ -109,6 +109,7 @@ members = [
     "examples/hello-acp",
     "examples/hello-mcp",
     "examples/hello-tool",
+    "examples/otel-genai",
     #
     # Tests
     "formal/diff-tests",
