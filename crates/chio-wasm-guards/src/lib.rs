@@ -57,6 +57,7 @@ pub mod host;
 pub mod hot_reload;
 pub mod incident;
 pub mod manifest;
+pub mod metrics;
 pub mod observability;
 pub mod placeholders;
 pub mod runtime;
@@ -94,13 +95,23 @@ pub use manifest::{
     verify_signed_module, write_signature_sidecar, GuardManifest, SignedWasmModule,
     MANIFEST_FILENAME, SIGNATURE_SUFFIX, SUPPORTED_ABI_VERSIONS,
 };
+pub use metrics::{
+    epoch_label, guard_id_label_from_digest, register_guard_metric_families, GuardMetricRegistry,
+    MetricFamilyDescriptor, MetricFamilyKind, EVAL_DURATION_BUCKETS_SECONDS, GUARD_METRIC_FAMILIES,
+    HOST_CALL_DURATION_BUCKETS_SECONDS, HOST_FN_LABEL_VALUES, LABEL_EPOCH, LABEL_GUARD_ID,
+    LABEL_HOST_FN, LABEL_OUTCOME, LABEL_REASON_CLASS, LABEL_VERDICT, METRIC_CHIO_GUARD_DENY_TOTAL,
+    METRIC_CHIO_GUARD_EVAL_DURATION_SECONDS, METRIC_CHIO_GUARD_FUEL_CONSUMED_TOTAL,
+    METRIC_CHIO_GUARD_HOST_CALL_DURATION_SECONDS, METRIC_CHIO_GUARD_MODULE_BYTES,
+    METRIC_CHIO_GUARD_RELOAD_TOTAL, METRIC_CHIO_GUARD_VERDICT_TOTAL, REASON_CLASS_LABEL_VALUES,
+    RELOAD_OUTCOME_LABEL_VALUES, VERDICT_LABEL_VALUES,
+};
 pub use observability::{
     guard_digest_or_unknown, guard_evaluate_span, guard_fetch_blob_span, guard_host_call_span,
     guard_reload_span, guard_verify_span, DEFAULT_GUARD_VERSION, HOST_FETCH_BLOB, HOST_GET_CONFIG,
     HOST_GET_TIME_UNIX_SECS, HOST_LOG, RELOAD_APPLIED, RELOAD_CANARY_FAILED, RELOAD_ROLLED_BACK,
     SPAN_GUARD_EVALUATE, SPAN_GUARD_FETCH_BLOB, SPAN_GUARD_HOST_CALL, SPAN_GUARD_RELOAD,
     SPAN_GUARD_VERIFY, UNKNOWN_GUARD_DIGEST, VERDICT_ALLOW, VERDICT_DENY, VERDICT_ERROR,
-    VERIFY_MODE_ED25519, VERIFY_RESULT_FAIL, VERIFY_RESULT_OK,
+    VERDICT_REWRITE, VERIFY_MODE_ED25519, VERIFY_RESULT_FAIL, VERIFY_RESULT_OK,
 };
 pub use placeholders::{
     resolve_placeholders, resolve_placeholders_in_json, PlaceholderEnv, PlaceholderError,
