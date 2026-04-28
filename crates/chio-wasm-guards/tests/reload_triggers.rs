@@ -30,18 +30,20 @@ fn build_backend(_bytes: &[u8]) -> Result<Box<dyn WasmGuardAbi>, WasmGuardError>
     Ok(Box::new(NoopBackend))
 }
 
-#[test]
-fn file_watcher_emits_reload_trigger_for_guard_path() -> TestResult {
+#[tokio::test]
+async fn file_watcher_emits_reload_trigger_for_guard_path() -> TestResult {
     let engine = Engine::new(build_backend);
     let dir = tempfile::tempdir()?;
     let watched_file = dir.path().join("guard.wasm");
     std::fs::write(&watched_file, b"old")?;
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(4);
     let _watcher = engine.watch_guard_path("guard-a", dir.path(), tx)?;
 
     std::fs::write(&watched_file, b"new")?;
 
-    let trigger = rx.recv_timeout(Duration::from_secs(5))?;
+    let trigger = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        .await?
+        .ok_or_else(|| std::io::Error::other("watch trigger channel closed"))?;
     assert_eq!(trigger.guard_id, "guard-a");
     match trigger.source {
         ReloadTriggerSource::FileChanged { path } => {
@@ -59,6 +61,11 @@ fn file_watcher_emits_reload_trigger_for_guard_path() -> TestResult {
                 "unexpected registry trigger digest {digest}"
             ))
             .into());
+        }
+        ReloadTriggerSource::WatcherError { message } => {
+            return Err(
+                std::io::Error::other(format!("unexpected watcher error {message}")).into(),
+            );
         }
     }
     Ok(())
@@ -85,7 +92,7 @@ async fn registry_poll_emits_reload_trigger_when_digest_changes() -> TestResult 
             Ok(guard.pop_front().flatten())
         },
         tx,
-    );
+    )?;
 
     let trigger = tokio::time::timeout(Duration::from_secs(2), rx.recv())
         .await?
@@ -99,5 +106,24 @@ async fn registry_poll_emits_reload_trigger_when_digest_changes() -> TestResult 
             digest: "sha256:new".to_string()
         }
     );
+    Ok(())
+}
+
+#[test]
+fn registry_poll_fails_without_tokio_runtime() -> TestResult {
+    let engine = Engine::new(build_backend);
+    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+    let error = match engine.spawn_registry_poll_task(
+        "guard-a",
+        None,
+        Duration::from_secs(1),
+        |_guard_id: &str| Ok(None),
+        tx,
+    ) {
+        Ok(_handle) => panic!("expected registry polling to fail without a tokio runtime"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(error, HotReloadError::NoTokioRuntime));
     Ok(())
 }

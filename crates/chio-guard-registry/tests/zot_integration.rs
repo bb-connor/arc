@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::fs;
-use std::net::TcpListener;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
@@ -17,7 +16,8 @@ use oci_distribution::secrets::RegistryAuth;
 use oci_distribution::Reference;
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
-use testcontainers::{GenericImage, ImageExt};
+use testcontainers::GenericImage;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Instant};
 
@@ -171,13 +171,12 @@ impl ZotRegistry {
 }
 
 async fn start_zot_registry() -> TestResult<ZotRegistry> {
-    let host_port = reserve_host_port()?;
     let image = GenericImage::new(ZOT_IMAGE, ZOT_TAG)
         .with_exposed_port(ZOT_PORT.tcp())
-        .with_wait_for(WaitFor::seconds(1))
-        .with_mapped_port(host_port, ZOT_PORT.tcp());
+        .with_wait_for(WaitFor::seconds(1));
     let container = image.start().await?;
     let host = container.get_host().await?;
+    let host_port = container.get_host_port_ipv4(ZOT_PORT).await?;
     let registry = format!("{host}:{host_port}");
     wait_for_registry(&container, &registry).await?;
 
@@ -195,8 +194,8 @@ async fn wait_for_registry(
     let mut last_error = None;
 
     while Instant::now() < deadline {
-        match TcpStream::connect(registry).await {
-            Ok(_stream) => return Ok(()),
+        match registry_api_ready(registry).await {
+            Ok(()) => return Ok(()),
             Err(error) => {
                 last_error = Some(error);
                 sleep(Duration::from_millis(250)).await;
@@ -212,16 +211,32 @@ async fn wait_for_registry(
     Err(std::io::Error::new(std::io::ErrorKind::TimedOut, message).into())
 }
 
+async fn registry_api_ready(registry: &str) -> std::io::Result<()> {
+    let mut stream = TcpStream::connect(registry).await?;
+    let request = format!("GET /v2/ HTTP/1.1\r\nHost: {registry}\r\nConnection: close\r\n\r\n");
+    stream.write_all(request.as_bytes()).await?;
+
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).await?;
+    if response.starts_with(b"HTTP/1.1 200")
+        || response.starts_with(b"HTTP/1.1 202")
+        || response.starts_with(b"HTTP/1.1 401")
+    {
+        Ok(())
+    } else {
+        let status = String::from_utf8_lossy(&response[..response.len().min(32)]);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            format!("registry API not ready at {registry}: {status}"),
+        ))
+    }
+}
+
 fn log_text(log_result: Result<Vec<u8>, testcontainers::TestcontainersError>) -> String {
     match log_result {
         Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
         Err(error) => format!("failed to read logs: {error}"),
     }
-}
-
-fn reserve_host_port() -> std::io::Result<u16> {
-    let listener = TcpListener::bind("127.0.0.1:0")?;
-    Ok(listener.local_addr()?.port())
 }
 
 fn guard_artifact() -> Result<GuardPublishArtifact, GuardRegistryError> {

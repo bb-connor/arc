@@ -59,12 +59,10 @@ jobs:
           PROPTEST_CASES: ${{ env.PROPTEST_CASES }}
         run: |
           set -euo pipefail
-          cargo test \
-            -p chio-core-types --test property_capability_algebra \
-            -p chio-kernel-core --test property_evaluate \
-            -p chio-credentials --test property_passport \
-            -p chio-policy --test property_evaluate \
-            -- --nocapture
+          cargo test -p chio-core-types --test property_capability_algebra -- --nocapture
+          cargo test -p chio-kernel-core --test property_evaluate -- --nocapture
+          cargo test -p chio-credentials --test property_passport -- --nocapture
+          cargo test -p chio-policy --test property_evaluate -- --nocapture
 
   # M03.P3.T4: nightly Apalache liveness lane for the RevocationPropagation
   # TLA+ module. Checks the named liveness property RevocationEventuallySeen

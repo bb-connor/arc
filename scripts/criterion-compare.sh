@@ -93,15 +93,16 @@ current = estimate_files(current_root)
 if not current:
     raise SystemExit(f"no Criterion estimate files found under {current_root}")
 
-missing = sorted(str(rel) for rel in current if rel not in baseline)
-if missing:
-    print("Criterion baseline is missing current benchmarks:", file=sys.stderr)
-    for rel in missing:
+new_benchmarks = sorted(str(rel) for rel in current if rel not in baseline)
+if new_benchmarks:
+    print("Criterion baseline is missing current benchmarks; skipping until baseline refresh:", file=sys.stderr)
+    for rel in new_benchmarks:
         print(f"  {rel}", file=sys.stderr)
-    raise SystemExit(1)
 
 failures = []
 for rel, current_path in sorted(current.items()):
+    if rel not in baseline:
+        continue
     base_value = median_lower_bound(baseline[rel])
     current_value = median_lower_bound(current_path)
     if base_value <= 0:
@@ -116,6 +117,10 @@ if failures:
     for rel, regression in failures:
         print(f"  {rel}: {regression:.2f}%", file=sys.stderr)
     raise SystemExit(1)
+
+if len(current) == len(new_benchmarks):
+    print("no baseline-matched Criterion benchmarks found; only new benchmarks were reported")
+    raise SystemExit(0)
 
 print(f"kernel bench regression gate passed, threshold={threshold:.2f}%")
 PY

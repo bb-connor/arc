@@ -100,3 +100,18 @@ fn scrape_renders_histogram_buckets_with_locked_bounds() {
         "chio_guard_host_call_duration_seconds_bucket{guard_id=\"\",host_fn=\"\",le=\"+Inf\"} 0"
     ));
 }
+
+#[test]
+fn scrape_renders_counter_and_gauge_samples() {
+    let body = render_guard_metrics_prometheus();
+
+    for sample in [
+        "chio_guard_fuel_consumed_total{guard_id=\"\"} 0",
+        "chio_guard_verdict_total{guard_id=\"\",verdict=\"\"} 0",
+        "chio_guard_deny_total{guard_id=\"\",reason_class=\"\"} 0",
+        "chio_guard_reload_total{guard_id=\"\",outcome=\"\"} 0",
+        "chio_guard_module_bytes{guard_id=\"\",epoch=\"\"} 0",
+    ] {
+        assert!(body.contains(sample), "missing sample {sample}");
+    }
+}

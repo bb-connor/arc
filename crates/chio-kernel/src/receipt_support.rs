@@ -252,6 +252,7 @@ struct ReceiptProvenanceOtelMetadata {
 
 fn is_w3c_lower_hex_id(value: &str, expected_len: usize) -> bool {
     value.len() == expected_len
+        && value.chars().any(|char| char != '0')
         && value
             .chars()
             .all(|char| matches!(char, '0'..='9' | 'a'..='f'))
@@ -275,6 +276,16 @@ fn receipt_provenance_metadata(
         return Ok(None);
     };
 
+    if provenance
+        .as_object()
+        .and_then(|provenance| provenance.get("supply_chain"))
+        .is_some_and(serde_json::Value::is_null)
+    {
+        return Err(KernelError::ReceiptSigningFailed(
+            "receipt provenance metadata supply_chain must be an object".to_string(),
+        ));
+    }
+
     let provenance: ReceiptProvenanceMetadata = serde_json::from_value(provenance.clone())
         .map_err(|error| {
             KernelError::ReceiptSigningFailed(format!(
@@ -284,13 +295,13 @@ fn receipt_provenance_metadata(
 
     if !is_w3c_trace_id(&provenance.otel.trace_id) {
         return Err(KernelError::ReceiptSigningFailed(format!(
-            "receipt provenance metadata trace_id must be 32 lowercase hex chars, got {:?}",
+            "receipt provenance metadata trace_id must be 32 non-zero lowercase hex chars, got {:?}",
             provenance.otel.trace_id
         )));
     }
     if !is_w3c_span_id(&provenance.otel.span_id) {
         return Err(KernelError::ReceiptSigningFailed(format!(
-            "receipt provenance metadata span_id must be 16 lowercase hex chars, got {:?}",
+            "receipt provenance metadata span_id must be 16 non-zero lowercase hex chars, got {:?}",
             provenance.otel.span_id
         )));
     }

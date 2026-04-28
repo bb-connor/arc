@@ -2859,7 +2859,7 @@ fn initialize_persists_configured_session_auth_context() {
     };
 
     let session = edge.kernel.session(&session_id).expect("session exists");
-    assert_eq!(session.auth_context(), &auth_context);
+    assert_eq!(session.auth_context(), auth_context);
 }
 
 #[test]

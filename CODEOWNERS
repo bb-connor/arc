@@ -1,42 +1,25 @@
 # CODEOWNERS - GENERATED from .planning/trajectory/OWNERS.toml
-# Do not hand-edit. Regenerate with `scripts/regen-codeowners.sh` (Wave 0
-# deliverable). CI fails if this file drifts from OWNERS.toml.
-#
-# Single-owner trajectory: every CODEOWNERS line routes to @bb-connor.
-# When the project staffs up, flip the [teams] block in OWNERS.toml back to
-# team handles and regenerate; the path patterns and freeze ordering below
-# are stable.
+# Do not hand-edit. Regenerate with `scripts/regen-codeowners.sh`.
+# CI fails if this file drifts from OWNERS.toml.
 #
 # Order matters in CODEOWNERS: later patterns take precedence over earlier
-# ones. Frozen paths are listed last so they override any broader pattern.
-
-# ---------- Spec / wire / corpus ----------
+# ones. The generator places frozen entries last so they override any
+# broader pattern.
 spec/schemas/**/*.json                       @bb-connor
 tests/bindings/vectors/**                    @bb-connor
 tests/conformance/**                         @bb-connor
 tests/replay/fixtures/**                     @bb-connor
-
-# ---------- M04 P2.T6 deterministic-replay golden + seed lock ----------
-# Blessed-corpus and signing-seed paths owned by M04. Re-blessing the corpus
-# is gated by CHIO_BLESS in chio-replay-gate.yml; the seed-immutable rule is
-# enforced by the seed-immutable job (any change to test-key.seed,
-# test-key.seed.sha256, or test-key.seed.README fails the replay-gate).
-# Source: .planning/trajectory/04-deterministic-replay.md Phase 2 task 6
-# Source: .planning/trajectory/tickets/M04/P2.yml ticket M04.P2.T6
 tests/replay/goldens/**                      @bb-connor
 tests/replay/test-key.seed                   @bb-connor
 tests/replay/test-key.seed.sha256            @bb-connor
 tests/replay/test-key.seed.README            @bb-connor
-
-# ---------- Algebra and core ----------
+crates/chio-kernel/src/receipt_*.rs          @bb-connor
+crates/chio-kernel-core/**                   @bb-connor
+crates/chio-kernel-browser/**                @bb-connor
 crates/chio-core-types/src/capability*.rs    @bb-connor
 crates/chio-core-types/src/scope*.rs         @bb-connor
 crates/chio-core-types/src/receipt*.rs       @bb-connor
 crates/chio-core-types/src/provenance*.rs    @bb-connor
-crates/chio-kernel-core/**                   @bb-connor
-crates/chio-kernel-browser/**                @bb-connor
-
-# ---------- Tower / WASM / Anchor ----------
 crates/chio-tower/src/middleware/**          @bb-connor
 crates/chio-tower/src/host_call.rs           @bb-connor
 crates/chio-tower/src/adapter.rs             @bb-connor
@@ -46,24 +29,18 @@ crates/chio-wasm-guards/src/hot_reload.rs    @bb-connor
 wit/chio-guard/world.wit                     @bb-connor
 wit/chio-guards-redact/world.wit             @bb-connor
 crates/chio-attest-verify/**                 @bb-connor
-
-# ---------- Tee / replay / providers ----------
 crates/chio-tee/**                           @bb-connor
 crates/chio-tee-frame/**                     @bb-connor
 crates/chio-tool-call-fabric/**              @bb-connor
 crates/chio-openai/**                        @bb-connor
 crates/chio-conformance/**                   @bb-connor
-
-# ---------- SDKs ----------
 sdks/typescript/packages/browser/**          @bb-connor
 sdks/typescript/packages/workers/**          @bb-connor
 sdks/typescript/packages/edge/**             @bb-connor
 sdks/typescript/packages/conformance/src/browser-subset.ts @bb-connor
 sdks/typescript/packages/wire/**             @bb-connor
-sdks/python/**                               @bb-connor
 sdks/python/**/_generated/**                 @bb-connor
-
-# ---------- Formal / fuzz ----------
+sdks/python/**                               @bb-connor
 formal/lean4/**                              @bb-connor
 formal/tla/**                                @bb-connor
 formal/rust-verification/**                  @bb-connor
@@ -71,59 +48,20 @@ fuzz/fuzz_targets/**                         @bb-connor
 fuzz/corpus/**                               @bb-connor
 fuzz/corpora/**                              @bb-connor
 fuzz/target-map.toml                         @bb-connor
-
-# ---------- Cross-cutting (sequencer) ----------
 Cargo.toml                                   @bb-connor
 Cargo.lock                                   @bb-connor
 deny.toml                                    @bb-connor
-rust-toolchain.toml                          @bb-connor
 .github/workflows/ci.yml                     @bb-connor
 CODEOWNERS                                   @bb-connor
 README.md                                    @bb-connor
 AGENTS.md                                    @bb-connor
 CLAUDE.md                                    @bb-connor
 .planning/trajectory/**                      @bb-connor
-
-# ---------- Wave-0 scripts ----------
 scripts/install-orchestrator-tools.sh        @bb-connor
 scripts/check-fuzz-budget.sh                 @bb-connor
 scripts/classify-trust-diff.sh               @bb-connor
-
-# ---------- M02 P4.T4 fuzz/regression-test deletion gate ----------
-# Personal-handle review for accidental regression-test deletion or fuzz
-# corpus tampering. Matches 02-fuzzing-post-pr13.md Phase 4 P4.T4 (CODEOWNERS
-# gate paragraph) and ticket .planning/trajectory/tickets/M02/P4.yml#M02.P4.T4.
-#
-# Gate contract (from ticket gate_check):
-#   grep -qE '^/?crates/\*/tests/regression_\*\.rs.*@bb-connor' CODEOWNERS
-#   grep -qE '^/?tests/regression_\*\.rs.*@bb-connor'           CODEOWNERS
-#   grep -qE '^/?fuzz/corpus/.*@bb-connor'                      CODEOWNERS
-#
-# The regression_*.rs patterns cover both per-crate test dirs (where
-# scripts/promote_fuzz_seed.sh writes M02.P4.T2 outputs) and the legacy
-# repo-root tests/ dir. The fuzz/corpus/ entry duplicates the broader
-# fuzz/corpus/** rule above intentionally so the deletion gate's intent
-# is explicit at this point of the file.
 crates/*/tests/regression_*.rs               @bb-connor
 tests/regression_*.rs                        @bb-connor
 fuzz/corpus/**                               @bb-connor
-
-# ---------- M02 P3.T2 mutants release-cycle gate on releases.toml ----------
-# Personal-handle review on releases.toml so the mutants-gate override path
-# (a PR labelled `mutants-gate-override` that clears cycle_end_tag and
-# re-enters advisory mode for one cycle) cannot land without principal-
-# engineer review. Edits to releases.toml outside the override flow (e.g.
-# the M02.P3.T1 release-binaries auto-flip PR titled
-# `chore(mutants): activate blocking gate after cycle <tag>`) traverse
-# the same gate.
-#
-# Gate contract (from ticket gate_check):
-#   grep -qE '^/?releases\.toml.*@bb-connor' CODEOWNERS
-#
-# Source: .planning/trajectory/02-fuzzing-post-pr13.md
-#   "Mutation-testing CI shape (Phase 3) > Override paragraph"
-# Ticket: .planning/trajectory/tickets/M02/P3.yml ticket M02.P3.T2.
 releases.toml                                @bb-connor
-
-# ---------- Kernel receipts ----------
-crates/chio-kernel/src/receipt_*.rs          @bb-connor
+rust-toolchain.toml                          @bb-connor

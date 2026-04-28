@@ -56,6 +56,7 @@ fn otlp_trace_span_is_signed_and_appended_to_receipt_store() -> Result<(), Box<d
             default_capability_id: "cap-default".to_string(),
             default_tool_server: "srv-default".to_string(),
             default_tool_name: "tool-default".to_string(),
+            tenant_id: Some("tenant-authenticated".to_string()),
         },
     );
     let trace_id = "0123456789abcdef0123456789abcdef";
@@ -84,6 +85,7 @@ fn otlp_trace_span_is_signed_and_appended_to_receipt_store() -> Result<(), Box<d
     assert_eq!(receipt.capability_id, "cap-otel");
     assert_eq!(receipt.tool_server, "srv-otel");
     assert_eq!(receipt.tool_name, "search_web");
+    assert_eq!(receipt.tenant_id.as_deref(), Some("tenant-authenticated"));
     assert!(receipt.verify_signature()?);
 
     let metadata = receipt
@@ -99,6 +101,68 @@ fn otlp_trace_span_is_signed_and_appended_to_receipt_store() -> Result<(), Box<d
         .get(ATTR_GEN_AI_TOOL_CALL_ID)
         .is_none());
     assert_eq!(metadata["otel"]["attributes"]["gen_ai.system"], "openai");
+
+    Ok(())
+}
+
+#[test]
+fn span_tenant_attribute_does_not_set_receipt_tenant() -> Result<(), Box<dyn Error>> {
+    let store = Arc::new(MemoryReceiptStore::default());
+    let sink = ReceiptStoreSink::new(
+        store.clone(),
+        ReceiptStoreSinkConfig::new(Keypair::generate()),
+    );
+    let span = OtlpSpan::new(
+        "0123456789abcdef0123456789abcdef",
+        "0123456789abcdef",
+        "gen_ai.tool.call",
+    )
+    .with_attribute("chio.tenant.id", serde_json::json!("spoofed-tenant"));
+
+    let summary = sink.export_traces(&OtlpGrpcTraceExport::from_spans(vec![span]))?;
+    let receipts = store.receipts()?;
+
+    assert_eq!(summary.appended_receipts, 1);
+    assert_eq!(
+        receipts
+            .first()
+            .and_then(|receipt| receipt.tenant_id.as_deref()),
+        None
+    );
+
+    Ok(())
+}
+
+#[test]
+fn invalid_span_prevents_partial_batch_append() -> Result<(), Box<dyn Error>> {
+    let store = Arc::new(MemoryReceiptStore::default());
+    let sink = ReceiptStoreSink::new(
+        store.clone(),
+        ReceiptStoreSinkConfig::new(Keypair::generate()),
+    );
+    let valid = OtlpSpan::new(
+        "0123456789abcdef0123456789abcdef",
+        "0123456789abcdef",
+        "gen_ai.tool.call",
+    );
+    let invalid = OtlpSpan::new(
+        "00000000000000000000000000000000",
+        "0123456789abcdef",
+        "gen_ai.tool.call",
+    );
+
+    let error = match sink.export_traces(&OtlpGrpcTraceExport::from_spans(vec![valid, invalid])) {
+        Ok(_) => {
+            return Err(std::io::Error::other("invalid batch unexpectedly exported").into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(
+        error.to_string().contains("trace_id"),
+        "unexpected error: {error}"
+    );
+    assert!(store.receipts()?.is_empty());
 
     Ok(())
 }

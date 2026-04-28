@@ -71,8 +71,11 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t frozen < <(yq -r \
-            '.freezes[] | select(.id == "m05-kernel-async-pivot") | .paths[]' \
+            '.freezes[] | select(.id == "m05-kernel-async-pivot" and .state != "released") | .paths[]' \
             .planning/trajectory/freezes.yml)
+          if ((${#frozen[@]} == 0)); then
+            echo "M05 freeze is released or has no active paths"
+          fi
           touched_frozen=0
           while IFS= read -r path; do
             for pat in "${frozen[@]}"; do

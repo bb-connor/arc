@@ -30,6 +30,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OWNERS="${ROOT}/.planning/trajectory/OWNERS.toml"
 CODEOWNERS="${ROOT}/CODEOWNERS"
+GITHUB_CODEOWNERS="${ROOT}/.github/CODEOWNERS"
 
 mode="write"
 case "${1:-}" in
@@ -49,9 +50,10 @@ if [[ ! -f "${OWNERS}" ]]; then
     exit 2
 fi
 
-generated="$(yq -p=toml '
+generated="$(yq -p=toml -oy '
     .teams as $teams
     | .ownership
+    | map(select(.codeowners != false))
     | map(. + {"handles": [.owners[] | $teams[.] // ("@MISSING_TEAM_" + .)] | unique})
     | sort_by((.frozen // false))
     | .[]
@@ -98,7 +100,10 @@ case "${mode}" in
         ;;
     write)
         printf '%s\n' "${new_content}" > "${CODEOWNERS}"
+        mkdir -p "$(dirname "${GITHUB_CODEOWNERS}")"
+        printf '%s\n' "${new_content}" > "${GITHUB_CODEOWNERS}"
         printf 'wrote %s\n' "${CODEOWNERS}"
+        printf 'wrote %s\n' "${GITHUB_CODEOWNERS}"
         ;;
     check)
         if [[ ! -f "${CODEOWNERS}" ]]; then
@@ -109,6 +114,16 @@ case "${mode}" in
         if [[ "${existing}" != "${new_content}" ]]; then
             err "CODEOWNERS drift detected; run scripts/regen-codeowners.sh"
             diff -u <(printf '%s\n' "${existing}") <(printf '%s\n' "${new_content}") || true
+            exit 1
+        fi
+        if [[ ! -f "${GITHUB_CODEOWNERS}" || -L "${GITHUB_CODEOWNERS}" ]]; then
+            err ".github/CODEOWNERS must be a regular file; run scripts/regen-codeowners.sh"
+            exit 1
+        fi
+        github_existing="$(cat "${GITHUB_CODEOWNERS}")"
+        if [[ "${github_existing}" != "${new_content}" ]]; then
+            err ".github/CODEOWNERS drift detected; run scripts/regen-codeowners.sh"
+            diff -u <(printf '%s\n' "${github_existing}") <(printf '%s\n' "${new_content}") || true
             exit 1
         fi
         printf 'CODEOWNERS in sync with OWNERS.toml\n'

@@ -3521,7 +3521,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
             .unwrap()
             .terminal()
             .get(&context.request_id),
-        Some(&OperationTerminalState::Cancelled {
+        Some(OperationTerminalState::Cancelled {
             reason: expected_reason,
         })
     );
@@ -3616,7 +3616,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
             .unwrap()
             .terminal()
             .get(&context.request_id),
-        Some(&OperationTerminalState::Cancelled {
+        Some(OperationTerminalState::Cancelled {
             reason: expected_reason,
         })
     );
@@ -3638,7 +3638,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
             .unwrap()
             .terminal()
             .get(&child_receipt.request_id),
-        Some(&OperationTerminalState::Cancelled {
+        Some(OperationTerminalState::Cancelled {
             reason: "client cancelled nested request".to_string(),
         })
     );
@@ -3698,7 +3698,7 @@ fn session_tool_call_records_incomplete_terminal_state() {
             .unwrap()
             .terminal()
             .get(&context.request_id),
-        Some(&OperationTerminalState::Incomplete {
+        Some(OperationTerminalState::Incomplete {
             reason: expected_reason,
         })
     );
@@ -6655,6 +6655,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
                     "token-parent",
                     Some("https://parent.example".to_string()),
                 ))
+                .0
             );
             Ok(())
         })

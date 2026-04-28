@@ -156,7 +156,11 @@ jobs:
             echo "builder-image edit detected; firing the full inventory"
             fired=("${targets[@]}")
           fi
-          printf '%s\n' "${fired[@]}" | sort -u > fired.txt
+          if ((${#fired[@]} == 0)); then
+            : > fired.txt
+          else
+            printf '%s\n' "${fired[@]}" | sort -u > fired.txt
+          fi
           fired_count="$(wc -l < fired.txt | tr -d ' ')"
           printf 'fired targets: %s\n' "${fired_count}"
           cat fired.txt

@@ -20,6 +20,7 @@ pub struct ReceiptStoreSinkConfig {
     pub default_capability_id: String,
     pub default_tool_server: String,
     pub default_tool_name: String,
+    pub tenant_id: Option<String>,
 }
 
 impl ReceiptStoreSinkConfig {
@@ -30,6 +31,7 @@ impl ReceiptStoreSinkConfig {
             default_capability_id: "otel-ingress".to_string(),
             default_tool_server: "otel-collector".to_string(),
             default_tool_name: "gen_ai.tool.call".to_string(),
+            tenant_id: None,
         }
     }
 }
@@ -66,9 +68,13 @@ impl ReceiptStoreSink {
         &self,
         export: &OtlpGrpcTraceExport,
     ) -> Result<ReceiptStoreSinkSummary, OTelReceiptExportError> {
+        let receipts = export
+            .spans()
+            .map(|span| self.receipt_for_span(span))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let mut summary = ReceiptStoreSinkSummary::default();
-        for span in export.spans() {
-            let receipt = self.receipt_for_span(span)?;
+        for receipt in receipts {
             self.store.append_chio_receipt(&receipt)?;
             summary.accepted_spans += 1;
             summary.appended_receipts += 1;
@@ -124,7 +130,7 @@ impl ReceiptStoreSink {
             evidence: Vec::new(),
             metadata: Some(receipt_metadata(span, &sanitized_attributes)),
             trust_level: TrustLevel::default(),
-            tenant_id: span.attribute_string("chio.tenant.id").map(str::to_string),
+            tenant_id: self.config.tenant_id.clone(),
             kernel_key: self.config.signing_keypair.public_key(),
         };
 
@@ -184,27 +190,28 @@ fn next_receipt_id() -> String {
 }
 
 fn validate_trace_id(value: &str) -> Result<(), OTelReceiptExportError> {
-    if is_lower_hex(value, 32) {
+    if is_nonzero_lower_hex(value, 32) {
         Ok(())
     } else {
         Err(OTelReceiptExportError::InvalidSpan(format!(
-            "trace_id must be 32 lowercase hex chars, got {value:?}"
+            "trace_id must be 32 non-zero lowercase hex chars, got {value:?}"
         )))
     }
 }
 
 fn validate_span_id(value: &str) -> Result<(), OTelReceiptExportError> {
-    if is_lower_hex(value, 16) {
+    if is_nonzero_lower_hex(value, 16) {
         Ok(())
     } else {
         Err(OTelReceiptExportError::InvalidSpan(format!(
-            "span_id must be 16 lowercase hex chars, got {value:?}"
+            "span_id must be 16 non-zero lowercase hex chars, got {value:?}"
         )))
     }
 }
 
-fn is_lower_hex(value: &str, expected_len: usize) -> bool {
+fn is_nonzero_lower_hex(value: &str, expected_len: usize) -> bool {
     value.len() == expected_len
+        && value.chars().any(|char| char != '0')
         && value
             .chars()
             .all(|char| matches!(char, '0'..='9' | 'a'..='f'))

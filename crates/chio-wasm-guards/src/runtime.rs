@@ -37,6 +37,13 @@ pub struct LoadedModule {
     manifest_sha256: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct LastEvaluationEvidence {
+    epoch_id: EpochId,
+    manifest_sha256: Option<String>,
+    fuel_consumed: Option<u64>,
+}
+
 impl LoadedModule {
     /// Create a loaded module epoch from an initialized backend.
     #[must_use]
@@ -95,8 +102,8 @@ impl std::fmt::Debug for LoadedModule {
 /// guard fails closed and returns `Verdict::Deny`.
 ///
 /// Carries optional receipt metadata: `manifest_sha256` (set at construction
-/// from the guard manifest) and `last_fuel_consumed` (updated after each
-/// `evaluate()` call).
+/// from the guard manifest) plus the module epoch used by the most recent
+/// `evaluate()` call.
 pub struct WasmGuard {
     /// Guard name (from config).
     name: String,
@@ -104,14 +111,16 @@ pub struct WasmGuard {
     version: String,
     /// Current loaded module epoch.
     loaded: ArcSwap<LoadedModule>,
+    /// Serializes module swaps with rollback baseline capture.
+    reload_lock: Mutex<()>,
     /// Next epoch identifier reserved for future module swaps.
     next_epoch_id: AtomicU64,
     /// Latest reload sequence observed for this guard.
     reload_seq: AtomicU64,
     /// Whether this guard is advisory-only (non-blocking).
     advisory: bool,
-    /// Fuel consumed during the most recent `evaluate()` call.
-    last_fuel_consumed: Mutex<Option<u64>>,
+    /// Evidence metadata captured from the most recent `evaluate()` call.
+    last_evaluation_evidence: Mutex<Option<LastEvaluationEvidence>>,
 }
 
 impl WasmGuard {
@@ -151,10 +160,11 @@ impl WasmGuard {
                 EpochId::INITIAL,
                 manifest_sha256,
             )),
+            reload_lock: Mutex::new(()),
             next_epoch_id: AtomicU64::new(1),
             reload_seq: AtomicU64::new(0),
             advisory,
-            last_fuel_consumed: Mutex::new(None),
+            last_evaluation_evidence: Mutex::new(None),
         }
     }
 
@@ -222,16 +232,31 @@ impl WasmGuard {
         backend: Box<dyn WasmGuardAbi>,
         manifest_sha256: Option<String>,
     ) -> Option<EpochId> {
+        self.replace_loaded_module_with_previous(backend, manifest_sha256)
+            .map(|(_, epoch_id)| epoch_id)
+    }
+
+    /// Replace the loaded module and return the previous module snapshot.
+    pub fn replace_loaded_module_with_previous(
+        &self,
+        backend: Box<dyn WasmGuardAbi>,
+        manifest_sha256: Option<String>,
+    ) -> Option<(Arc<LoadedModule>, EpochId)> {
+        let _reload_guard = match self.reload_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let previous = self.loaded.load_full();
         let epoch_id = self.reserve_next_epoch_id()?;
         self.loaded.store(Arc::new(LoadedModule::new(
             backend,
             epoch_id,
             manifest_sha256,
         )));
-        if let Ok(mut fuel_lock) = self.last_fuel_consumed.lock() {
-            *fuel_lock = None;
+        if let Ok(mut evidence_lock) = self.last_evaluation_evidence.lock() {
+            *evidence_lock = None;
         }
-        Some(epoch_id)
+        Some((previous, epoch_id))
     }
 
     /// Restore a previously loaded module snapshot.
@@ -239,9 +264,13 @@ impl WasmGuard {
     /// Used by the hot-reload watchdog to roll back a published epoch without
     /// recompiling the prior module.
     pub fn restore_loaded_module(&self, module: Arc<LoadedModule>) {
+        let _reload_guard = match self.reload_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         self.loaded.store(module);
-        if let Ok(mut fuel_lock) = self.last_fuel_consumed.lock() {
-            *fuel_lock = None;
+        if let Ok(mut evidence_lock) = self.last_evaluation_evidence.lock() {
+            *evidence_lock = None;
         }
     }
 
@@ -250,17 +279,29 @@ impl WasmGuard {
     /// fuel.
     #[must_use]
     pub fn last_fuel_consumed(&self) -> Option<u64> {
-        self.last_fuel_consumed.lock().ok().and_then(|guard| *guard)
+        self.last_evaluation_evidence
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().and_then(|evidence| evidence.fuel_consumed))
     }
 
     /// Returns a JSON object containing receipt metadata from the most
     /// recent evaluation: `fuel_consumed` and `manifest_sha256`.
     #[must_use]
     pub fn guard_evidence_metadata(&self) -> serde_json::Value {
+        if let Ok(evidence) = self.last_evaluation_evidence.lock() {
+            if let Some(evidence) = evidence.as_ref() {
+                return serde_json::json!({
+                    "epoch_id": evidence.epoch_id.get(),
+                    "fuel_consumed": evidence.fuel_consumed,
+                    "manifest_sha256": evidence.manifest_sha256,
+                });
+            }
+        }
         let loaded = self.loaded.load();
         serde_json::json!({
             "epoch_id": loaded.epoch_id().get(),
-            "fuel_consumed": self.last_fuel_consumed(),
+            "fuel_consumed": null,
             "manifest_sha256": loaded.manifest_sha256(),
         })
     }
@@ -374,9 +415,12 @@ impl Guard for WasmGuard {
             }
         };
 
-        // Store fuel consumed for receipt metadata.
-        if let Ok(mut fuel_lock) = self.last_fuel_consumed.lock() {
-            *fuel_lock = fuel;
+        if let Ok(mut evidence_lock) = self.last_evaluation_evidence.lock() {
+            *evidence_lock = Some(LastEvaluationEvidence {
+                epoch_id: loaded.epoch_id(),
+                manifest_sha256: loaded.manifest_sha256().map(ToString::to_string),
+                fuel_consumed: fuel,
+            });
         }
 
         match result {
@@ -671,8 +715,8 @@ pub mod wasmtime_backend {
             crate::observability::VERIFY_MODE_ED25519,
             None,
         );
-        let _verify_guard = verify_span.enter();
         let verification = (|| {
+            let _verify_guard = verify_span.enter();
             crate::manifest::verify_wit_world(manifest.wit_world.as_deref())?;
             crate::manifest::verify_guard_signature(wasm_path, &wasm_bytes, manifest)?;
             crate::manifest::verify_wasm_hash(&wasm_bytes, &manifest.wasm_sha256)
@@ -2064,16 +2108,46 @@ pub mod wasmtime_backend {
             assert!(guard.last_fuel_consumed().is_none());
             assert_eq!(guard.manifest_sha256().as_deref(), Some("deadbeef"));
 
-            // After evaluation, use the loaded module snapshot directly.
+            // After evaluation, metadata is captured from the evaluated epoch.
             let req = make_guard_request();
-            {
-                let loaded = guard.loaded_module();
-                let (result, fuel) = loaded.evaluate(&req).unwrap();
-                let _ = result.unwrap();
-                if let Ok(mut fl) = guard.last_fuel_consumed.lock() {
-                    *fl = fuel;
-                }
-            }
+            let issuer = chio_core::crypto::Keypair::generate();
+            let subject = chio_core::crypto::Keypair::generate();
+            let capability = chio_core::capability::CapabilityToken::sign(
+                chio_core::capability::CapabilityTokenBody {
+                    id: "cap-fuel-test".to_string(),
+                    issuer: issuer.public_key(),
+                    subject: subject.public_key(),
+                    scope: chio_core::capability::ChioScope::default(),
+                    issued_at: 0,
+                    expires_at: u64::MAX,
+                    delegation_chain: vec![],
+                },
+                &issuer,
+            )
+            .unwrap();
+            let scope = chio_core::capability::ChioScope::default();
+            let tool_request = chio_kernel::ToolCallRequest {
+                request_id: "req-fuel-test".to_string(),
+                capability,
+                tool_name: req.tool_name.clone(),
+                server_id: req.server_id.clone(),
+                agent_id: req.agent_id.clone(),
+                arguments: req.arguments.clone(),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            };
+            let ctx = chio_kernel::GuardContext {
+                request: &tool_request,
+                scope: &scope,
+                agent_id: &req.agent_id,
+                server_id: &req.server_id,
+                session_filesystem_roots: None,
+                matched_grant_index: None,
+            };
+            let _ = guard.evaluate(&ctx).unwrap();
 
             assert!(guard.last_fuel_consumed().is_some());
             assert!(guard.last_fuel_consumed().unwrap() > 0);

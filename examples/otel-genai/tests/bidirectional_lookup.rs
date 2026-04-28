@@ -57,6 +57,7 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
             default_capability_id: "cap-otel-demo".to_string(),
             default_tool_server: "srv-openai-demo".to_string(),
             default_tool_name: "customer_lookup".to_string(),
+            tenant_id: Some("tenant-demo".to_string()),
         },
     );
     let span = OtlpSpan::new(trace_id, span_id, "gen_ai.tool.call")

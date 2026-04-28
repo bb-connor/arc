@@ -83,6 +83,17 @@ pub trait ToolEvaluator: Send + Sync {
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError>;
 
+    /// Run the full evaluation pipeline with additional receipt metadata.
+    async fn evaluate_with_metadata(
+        &self,
+        kernel: &ChioKernel,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let _ = extra_metadata;
+        self.evaluate(kernel, request).await
+    }
+
     /// Validate the capability token attached to `request`.
     ///
     /// In T1 the default body routes through [`Self::evaluate`] and returns
@@ -195,6 +206,22 @@ impl ToolEvaluator for BlockingToolEvaluator {
                 tokio::task::block_in_place(|| kernel.evaluate_tool_call_sync(request))
             }
             _ => kernel.evaluate_tool_call_sync(request),
+        }
+    }
+
+    async fn evaluate_with_metadata(
+        &self,
+        kernel: &ChioKernel,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(|| {
+                    kernel.evaluate_tool_call_blocking_with_metadata(request, extra_metadata)
+                })
+            }
+            _ => kernel.evaluate_tool_call_blocking_with_metadata(request, extra_metadata),
         }
     }
 }

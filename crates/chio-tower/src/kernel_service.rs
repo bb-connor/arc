@@ -20,6 +20,9 @@ use tower_layer::Layer;
 /// external partition key, such as later per-tenant limits.
 pub type TenantId = String;
 
+/// Default maximum number of tenant limiter buckets retained by a service.
+pub const DEFAULT_MAX_TENANT_CONCURRENCY_BUCKETS: usize = 1024;
+
 /// Tower service that dispatches tool-call requests through a shared kernel.
 #[derive(Clone)]
 pub struct KernelService {
@@ -182,12 +185,22 @@ where
 #[derive(Clone, Debug)]
 pub struct TenantConcurrencyLimitLayer {
     per_tenant_limit: usize,
+    max_tenants: usize,
 }
 
 impl TenantConcurrencyLimitLayer {
     /// Create a new per-tenant concurrency limit layer.
     pub fn new(per_tenant_limit: usize) -> Self {
-        Self { per_tenant_limit }
+        Self {
+            per_tenant_limit,
+            max_tenants: DEFAULT_MAX_TENANT_CONCURRENCY_BUCKETS,
+        }
+    }
+
+    /// Set the maximum number of tenant limiter buckets retained at once.
+    pub fn with_max_tenants(mut self, max_tenants: usize) -> Self {
+        self.max_tenants = max_tenants;
+        self
     }
 }
 
@@ -198,6 +211,7 @@ impl<S> Layer<S> for TenantConcurrencyLimitLayer {
         TenantConcurrencyLimitService {
             inner,
             per_tenant_limit: self.per_tenant_limit,
+            max_tenants: self.max_tenants,
             tenants: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -208,6 +222,7 @@ impl<S> Layer<S> for TenantConcurrencyLimitLayer {
 pub struct TenantConcurrencyLimitService<S> {
     inner: S,
     per_tenant_limit: usize,
+    max_tenants: usize,
     tenants: Arc<Mutex<HashMap<TenantId, TenantBucketService<S>>>>,
 }
 
@@ -224,6 +239,10 @@ where
         let mut tenants = self.tenants.lock().map_err(|_| {
             KernelServiceError::Middleware("tenant concurrency limit state poisoned".to_string())
         })?;
+        if !tenants.contains_key(tenant_id) && tenants.len() >= self.max_tenants {
+            return Err(KernelServiceError::Overloaded);
+        }
+
         let service = tenants
             .entry(tenant_id.clone())
             .or_insert_with(|| {

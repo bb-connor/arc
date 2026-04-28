@@ -104,14 +104,10 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # M02 PR #13 baseline (seven targets).
-          - canonical_json_roundtrip
-          - manifest_decode
-          - receipt_decode
-          - capability_decode
-          - scope_decode
-          - policy_decision_decode
-          - signing_envelope_decode
+          # M02 baseline targets currently present in fuzz/Cargo.toml.
+          - canonical_json
+          - capability_receipt
+          - manifest_roundtrip
           # M09 P3.T5 supply-chain entry (already landed via PR #76).
           - attest_verify
           # M02 P1 expansion (eleven new targets).

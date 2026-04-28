@@ -10,81 +10,59 @@ use chio_core::session::{
     RootDefinition, SessionAnchorReference, SessionAuthContext, SessionId,
 };
 use chio_core::{AgentId, CapabilityToken};
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{ToolCallResponse, ToolServerEvent};
 use chio_core::receipt::ChioReceipt;
 
 fn read_lock<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
-    loop {
-        if let Ok(value) = lock.try_read() {
-            return value;
-        }
-        std::thread::yield_now();
+    match lock.read() {
+        Ok(value) => value,
+        Err(poisoned) => poisoned.into_inner(),
     }
 }
 
 fn write_lock<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
-    loop {
-        if let Ok(value) = lock.try_write() {
-            return value;
-        }
-        std::thread::yield_now();
+    match lock.write() {
+        Ok(value) => value,
+        Err(poisoned) => poisoned.into_inner(),
     }
 }
 
 #[derive(Debug)]
-struct AppendOnlyState<T> {
-    values: RwLock<Vec<Box<T>>>,
-    current: AtomicU64,
+struct SnapshotState<T> {
+    current: RwLock<T>,
 }
 
-impl<T> AppendOnlyState<T> {
+impl<T> SnapshotState<T> {
     fn new(initial: T) -> Self {
         Self {
-            values: RwLock::new(vec![Box::new(initial)]),
-            current: AtomicU64::new(0),
+            current: RwLock::new(initial),
         }
     }
 
-    fn current(&self) -> &T {
-        let value = {
-            let values = read_lock(&self.values);
-            let current = self.current.load(Ordering::Acquire) as usize;
-            let Some(value) = values.get(current) else {
-                panic!("append-only session state index {current} is missing");
-            };
-            &**value as *const T
-        };
-
-        // SAFETY: values are boxed and never removed from the append-only
-        // vector, so the pointee remains stable for the lifetime of self.
-        unsafe { &*value }
+    fn with_current<R>(&self, read: impl FnOnce(&T) -> R) -> R {
+        let current = read_lock(&self.current);
+        read(&current)
     }
 
     fn replace(&self, next: T) {
-        self.replace_with(|_| (Some(next), ()));
+        *write_lock(&self.current) = next;
     }
 
     fn replace_with<R>(&self, update: impl FnOnce(&T) -> (Option<T>, R)) -> R {
-        let mut values = write_lock(&self.values);
-        let current = self.current.load(Ordering::Acquire) as usize;
-        let Some(current_value) = values.get(current) else {
-            panic!("append-only session state index {current} is missing");
-        };
-        let (next, result) = update(current_value);
+        let mut current = write_lock(&self.current);
+        let (next, result) = update(&current);
         if let Some(next) = next {
-            values.push(Box::new(next));
-            self.current
-                .store((values.len() - 1) as u64, Ordering::Release);
+            *current = next;
         }
         result
     }
 }
 
-impl<T: Clone> Clone for AppendOnlyState<T> {
+impl<T: Clone> Clone for SnapshotState<T> {
     fn clone(&self) -> Self {
-        Self::new(self.current().clone())
+        Self::new(self.with_current(Clone::clone))
     }
 }
 
@@ -172,21 +150,11 @@ impl Default for InflightRegistry {
 
 impl InflightRegistry {
     fn read_requests(&self) -> RwLockReadGuard<'_, HashMap<RequestId, InflightRequest>> {
-        loop {
-            if let Ok(requests) = self.requests.try_read() {
-                return requests;
-            }
-            std::thread::yield_now();
-        }
+        read_lock(&self.requests)
     }
 
     fn write_requests(&self) -> RwLockWriteGuard<'_, HashMap<RequestId, InflightRequest>> {
-        loop {
-            if let Ok(requests) = self.requests.try_write() {
-                return requests;
-            }
-            std::thread::yield_now();
-        }
+        write_lock(&self.requests)
     }
 
     pub fn track(
@@ -197,6 +165,37 @@ impl InflightRegistry {
         cancellable: bool,
     ) -> Result<(), SessionError> {
         let mut requests = self.write_requests();
+        if requests.contains_key(&context.request_id) {
+            return Err(SessionError::DuplicateInflightRequest {
+                request_id: context.request_id.clone(),
+            });
+        }
+
+        requests.insert(
+            context.request_id.clone(),
+            InflightRequest {
+                request_id: context.request_id.clone(),
+                parent_request_id: context.parent_request_id.clone(),
+                operation_kind,
+                session_anchor_id: session_anchor_id.to_string(),
+                started_at: Instant::now(),
+                progress_token: context.progress_token.clone(),
+                cancellation_requested: false,
+                cancellable,
+            },
+        );
+        self.active_count.fetch_add(1, Ordering::AcqRel);
+        Ok(())
+    }
+
+    fn track_locked(
+        &self,
+        requests: &mut HashMap<RequestId, InflightRequest>,
+        context: &OperationContext,
+        operation_kind: OperationKind,
+        session_anchor_id: &str,
+        cancellable: bool,
+    ) -> Result<(), SessionError> {
         if requests.contains_key(&context.request_id) {
             return Err(SessionError::DuplicateInflightRequest {
                 request_id: context.request_id.clone(),
@@ -384,7 +383,7 @@ impl Default for TerminalRegistryInner {
 /// Bounded history of terminal request outcomes for a session.
 #[derive(Debug)]
 pub struct TerminalRegistry {
-    inner: AppendOnlyState<TerminalRegistryInner>,
+    inner: SnapshotState<TerminalRegistryInner>,
 }
 
 impl Clone for TerminalRegistry {
@@ -398,7 +397,7 @@ impl Clone for TerminalRegistry {
 impl Default for TerminalRegistry {
     fn default() -> Self {
         Self {
-            inner: AppendOnlyState::new(TerminalRegistryInner::default()),
+            inner: SnapshotState::new(TerminalRegistryInner::default()),
         }
     }
 }
@@ -423,16 +422,17 @@ impl TerminalRegistry {
         })
     }
 
-    pub fn get(&self, request_id: &RequestId) -> Option<&OperationTerminalState> {
-        self.inner.current().states.get(request_id)
+    pub fn get(&self, request_id: &RequestId) -> Option<OperationTerminalState> {
+        self.inner
+            .with_current(|current| current.states.get(request_id).cloned())
     }
 
     pub fn len(&self) -> usize {
-        self.inner.current().states.len()
+        self.inner.with_current(|current| current.states.len())
     }
 
     pub fn is_empty(&self) -> bool {
-        self.inner.current().states.is_empty()
+        self.inner.with_current(|current| current.states.is_empty())
     }
 }
 
@@ -559,15 +559,29 @@ struct SessionRoots {
     normalized_roots: Vec<NormalizedRoot>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SessionAnchorSnapshot {
+    pub session_id: SessionId,
+    pub agent_id: AgentId,
+    pub auth_context: SessionAuthContext,
+    pub session_anchor: SessionAnchorState,
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionRequestStart {
+    pub session: SessionAnchorSnapshot,
+    pub lineage: RequestLineageRecord,
+}
+
 /// Session host object owned by the kernel.
 #[derive(Debug)]
 pub struct Session {
     id: SessionId,
     agent_id: AgentId,
     inner: RwLock<SessionInner>,
-    auth_state: AppendOnlyState<SessionAuthState>,
-    peer_capabilities: AppendOnlyState<PeerCapabilities>,
-    roots: AppendOnlyState<SessionRoots>,
+    auth_state: SnapshotState<SessionAuthState>,
+    peer_capabilities: SnapshotState<PeerCapabilities>,
+    roots: SnapshotState<SessionRoots>,
     issued_capabilities: Vec<CapabilityToken>,
     inflight: InflightRegistry,
     subscriptions: SubscriptionRegistry,
@@ -575,6 +589,51 @@ pub struct Session {
     request_lineage: RwLock<HashMap<RequestId, RequestLineageRecord>>,
     pending_url_elicitations: RwLock<HashMap<String, PendingUrlElicitation>>,
     late_events: RwLock<VecDeque<LateSessionEvent>>,
+}
+
+fn operation_allowed_for_state(state: SessionState, operation: OperationKind) -> bool {
+    match state {
+        SessionState::Initializing => matches!(
+            operation,
+            OperationKind::ListCapabilities | OperationKind::Heartbeat
+        ),
+        SessionState::Ready => true,
+        SessionState::Draining => matches!(
+            operation,
+            OperationKind::ListCapabilities | OperationKind::Heartbeat
+        ),
+        SessionState::Closed => false,
+    }
+}
+
+fn validate_parent_request_lineage_locked(
+    request_id: &RequestId,
+    parent_request_id: &RequestId,
+    requests: &HashMap<RequestId, InflightRequest>,
+    request_lineage: &HashMap<RequestId, RequestLineageRecord>,
+    current_session_anchor_id: &str,
+) -> Result<RequestLineageRecord, SessionError> {
+    let Some(parent_inflight) = requests.get(parent_request_id) else {
+        return Err(SessionError::ParentRequestNotInflight {
+            request_id: request_id.clone(),
+            parent_request_id: parent_request_id.clone(),
+        });
+    };
+    let Some(parent_lineage) = request_lineage.get(parent_request_id).cloned() else {
+        return Err(SessionError::ParentRequestNotInflight {
+            request_id: request_id.clone(),
+            parent_request_id: parent_request_id.clone(),
+        });
+    };
+    if parent_lineage.session_anchor_id != current_session_anchor_id {
+        return Err(SessionError::ParentRequestAnchorMismatch {
+            request_id: request_id.clone(),
+            parent_request_id: parent_request_id.clone(),
+            parent_session_anchor_id: parent_inflight.session_anchor_id.clone(),
+            current_session_anchor_id: current_session_anchor_id.to_string(),
+        });
+    }
+    Ok(parent_lineage)
 }
 
 impl Clone for Session {
@@ -612,12 +671,12 @@ impl Session {
             inner: RwLock::new(SessionInner {
                 state: SessionState::Initializing,
             }),
-            auth_state: AppendOnlyState::new(SessionAuthState {
+            auth_state: SnapshotState::new(SessionAuthState {
                 auth_context,
                 session_anchor,
             }),
-            peer_capabilities: AppendOnlyState::new(PeerCapabilities::default()),
-            roots: AppendOnlyState::new(SessionRoots {
+            peer_capabilities: SnapshotState::new(PeerCapabilities::default()),
+            roots: SnapshotState::new(SessionRoots {
                 roots: Vec::new(),
                 normalized_roots: Vec::new(),
             }),
@@ -632,32 +691,17 @@ impl Session {
     }
 
     fn read_inner(&self) -> RwLockReadGuard<'_, SessionInner> {
-        loop {
-            if let Ok(inner) = self.inner.try_read() {
-                return inner;
-            }
-            std::thread::yield_now();
-        }
+        read_lock(&self.inner)
     }
 
     fn write_inner(&self) -> RwLockWriteGuard<'_, SessionInner> {
-        loop {
-            if let Ok(inner) = self.inner.try_write() {
-                return inner;
-            }
-            std::thread::yield_now();
-        }
+        write_lock(&self.inner)
     }
 
     fn read_request_lineage(
         &self,
     ) -> RwLockReadGuard<'_, HashMap<RequestId, RequestLineageRecord>> {
-        loop {
-            if let Ok(request_lineage) = self.request_lineage.try_read() {
-                return request_lineage;
-            }
-            std::thread::yield_now();
-        }
+        read_lock(&self.request_lineage)
     }
 
     fn read_pending_url_elicitations(
@@ -683,12 +727,7 @@ impl Session {
     fn write_request_lineage(
         &self,
     ) -> RwLockWriteGuard<'_, HashMap<RequestId, RequestLineageRecord>> {
-        loop {
-            if let Ok(request_lineage) = self.request_lineage.try_write() {
-                return request_lineage;
-            }
-            std::thread::yield_now();
-        }
+        write_lock(&self.request_lineage)
     }
 
     pub fn id(&self) -> &SessionId {
@@ -703,38 +742,56 @@ impl Session {
         self.read_inner().state
     }
 
-    pub fn auth_context(&self) -> &SessionAuthContext {
-        &self.auth_state.current().auth_context
+    pub fn auth_context(&self) -> SessionAuthContext {
+        self.auth_state
+            .with_current(|current| current.auth_context.clone())
     }
 
-    pub fn session_anchor(&self) -> &SessionAnchorState {
-        &self.auth_state.current().session_anchor
+    pub fn session_anchor(&self) -> SessionAnchorState {
+        self.auth_state
+            .with_current(|current| current.session_anchor.clone())
+    }
+
+    pub fn session_anchor_snapshot(&self) -> SessionAnchorSnapshot {
+        self.auth_state
+            .with_current(|current| SessionAnchorSnapshot {
+                session_id: self.id.clone(),
+                agent_id: self.agent_id.clone(),
+                auth_context: current.auth_context.clone(),
+                session_anchor: current.session_anchor.clone(),
+            })
     }
 
     pub fn request_lineage(&self, request_id: &RequestId) -> Option<RequestLineageRecord> {
         self.read_request_lineage().get(request_id).cloned()
     }
 
-    pub fn peer_capabilities(&self) -> &PeerCapabilities {
-        self.peer_capabilities.current()
+    pub fn peer_capabilities(&self) -> PeerCapabilities {
+        self.peer_capabilities.with_current(Clone::clone)
     }
 
     pub fn capabilities(&self) -> &[CapabilityToken] {
         &self.issued_capabilities
     }
 
-    pub fn roots(&self) -> &[RootDefinition] {
-        &self.roots.current().roots
+    pub fn roots(&self) -> Vec<RootDefinition> {
+        self.roots.with_current(|current| current.roots.clone())
     }
 
-    pub fn normalized_roots(&self) -> &[NormalizedRoot] {
-        &self.roots.current().normalized_roots
+    pub fn normalized_roots(&self) -> Vec<NormalizedRoot> {
+        self.roots
+            .with_current(|current| current.normalized_roots.clone())
     }
 
-    pub fn enforceable_filesystem_roots(&self) -> impl Iterator<Item = &NormalizedRoot> {
-        self.normalized_roots()
-            .iter()
-            .filter(|root| root.is_enforceable_filesystem())
+    pub fn enforceable_filesystem_roots(&self) -> Vec<NormalizedRoot> {
+        self.roots.with_current(|current| {
+            current
+                .normalized_roots
+                .iter()
+                .filter(|root| root.is_enforceable_filesystem())
+                .cloned()
+                .collect()
+        })
     }
 
     pub fn inflight(&self) -> &InflightRegistry {
@@ -837,21 +894,41 @@ impl Session {
         self.subscriptions.contains_resource(uri)
     }
 
-    pub fn set_auth_context(&self, auth_context: SessionAuthContext) -> bool {
+    pub fn set_auth_context(
+        &self,
+        auth_context: SessionAuthContext,
+    ) -> (bool, SessionAnchorSnapshot) {
         self.auth_state.replace_with(|current| {
             let rotated = current.auth_context != auth_context;
             if rotated {
                 let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
                 let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+                let snapshot = SessionAnchorSnapshot {
+                    session_id: self.id.clone(),
+                    agent_id: self.agent_id.clone(),
+                    auth_context: auth_context.clone(),
+                    session_anchor: session_anchor.clone(),
+                };
                 (
                     Some(SessionAuthState {
                         auth_context,
                         session_anchor,
                     }),
-                    true,
+                    (true, snapshot),
                 )
             } else {
-                (None, false)
+                (
+                    None,
+                    (
+                        false,
+                        SessionAnchorSnapshot {
+                            session_id: self.id.clone(),
+                            agent_id: self.agent_id.clone(),
+                            auth_context: current.auth_context.clone(),
+                            session_anchor: current.session_anchor.clone(),
+                        },
+                    ),
+                )
             }
         })
     }
@@ -883,6 +960,18 @@ impl Session {
         self.transition(SessionState::Closed)?;
         self.inflight.clear();
         self.subscriptions.clear();
+        self.auth_state.replace_with(|current| {
+            let auth_context = SessionAuthContext::in_process_anonymous();
+            let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+            let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+            (
+                Some(SessionAuthState {
+                    auth_context,
+                    session_anchor,
+                }),
+                (),
+            )
+        });
         self.roots.replace(SessionRoots {
             roots: Vec::new(),
             normalized_roots: Vec::new(),
@@ -894,18 +983,7 @@ impl Session {
 
     pub fn ensure_operation_allowed(&self, operation: OperationKind) -> Result<(), SessionError> {
         let state = self.state();
-        let allowed = match state {
-            SessionState::Initializing => matches!(
-                operation,
-                OperationKind::ListCapabilities | OperationKind::Heartbeat
-            ),
-            SessionState::Ready => true,
-            SessionState::Draining => matches!(
-                operation,
-                OperationKind::ListCapabilities | OperationKind::Heartbeat
-            ),
-            SessionState::Closed => false,
-        };
+        let allowed = operation_allowed_for_state(state, operation);
 
         if allowed {
             Ok(())
@@ -923,38 +1001,69 @@ impl Session {
         context: &OperationContext,
         operation_kind: OperationKind,
         cancellable: bool,
-    ) -> Result<(), SessionError> {
+    ) -> Result<SessionRequestStart, SessionError> {
         self.validate_context(context)?;
-        if let Some(parent_request_id) = &context.parent_request_id {
-            self.validate_parent_request_lineage(&context.request_id, parent_request_id)?;
-        }
-        let mut request_lineage = self.write_request_lineage();
-        if self.inflight.get(&context.request_id).is_some() {
-            return Err(SessionError::DuplicateInflightRequest {
-                request_id: context.request_id.clone(),
+
+        let inner = self.read_inner();
+        let state = inner.state;
+        if !operation_allowed_for_state(state, operation_kind) {
+            return Err(SessionError::OperationNotAllowed {
+                session_id: self.id.clone(),
+                operation: operation_kind.as_str(),
+                state: state.as_str(),
             });
         }
-        if request_lineage.contains_key(&context.request_id) {
-            return Err(SessionError::DuplicateRequestLineage {
+
+        self.auth_state.with_current(|auth_state| {
+            let session_snapshot = SessionAnchorSnapshot {
+                session_id: self.id.clone(),
+                agent_id: self.agent_id.clone(),
+                auth_context: auth_state.auth_context.clone(),
+                session_anchor: auth_state.session_anchor.clone(),
+            };
+            let mut requests = self.inflight.write_requests();
+            let mut request_lineage = self.write_request_lineage();
+            if requests.contains_key(&context.request_id) {
+                return Err(SessionError::DuplicateInflightRequest {
+                    request_id: context.request_id.clone(),
+                });
+            }
+            if let Some(parent_request_id) = &context.parent_request_id {
+                validate_parent_request_lineage_locked(
+                    &context.request_id,
+                    parent_request_id,
+                    &requests,
+                    &request_lineage,
+                    auth_state.session_anchor.id(),
+                )?;
+            }
+            if request_lineage.contains_key(&context.request_id) {
+                return Err(SessionError::DuplicateRequestLineage {
+                    request_id: context.request_id.clone(),
+                });
+            }
+            self.inflight.track_locked(
+                &mut requests,
+                context,
+                operation_kind,
+                auth_state.session_anchor.id(),
+                cancellable,
+            )?;
+            let lineage = RequestLineageRecord {
                 request_id: context.request_id.clone(),
-            });
-        }
-        let session_anchor = self.session_anchor().clone();
-        self.inflight
-            .track(context, operation_kind, session_anchor.id(), cancellable)?;
-        request_lineage.insert(
-            context.request_id.clone(),
-            RequestLineageRecord {
-                request_id: context.request_id.clone(),
-                session_anchor_id: session_anchor.id().to_string(),
-                auth_epoch: session_anchor.auth_epoch(),
+                session_anchor_id: auth_state.session_anchor.id().to_string(),
+                auth_epoch: auth_state.session_anchor.auth_epoch(),
                 parent_request_id: context.parent_request_id.clone(),
                 operation_kind,
                 started_at: current_unix_timestamp(),
                 terminal_state: None,
-            },
-        );
-        Ok(())
+            };
+            request_lineage.insert(context.request_id.clone(), lineage.clone());
+            Ok(SessionRequestStart {
+                session: session_snapshot,
+                lineage,
+            })
+        })
     }
 
     pub fn complete_request(
@@ -998,29 +1107,17 @@ impl Session {
         request_id: &RequestId,
         parent_request_id: &RequestId,
     ) -> Result<RequestLineageRecord, SessionError> {
-        let Some(parent_inflight) = self.inflight.get(parent_request_id) else {
-            return Err(SessionError::ParentRequestNotInflight {
-                request_id: request_id.clone(),
-                parent_request_id: parent_request_id.clone(),
-            });
-        };
-        let Some(parent_lineage) = self.read_request_lineage().get(parent_request_id).cloned()
-        else {
-            return Err(SessionError::ParentRequestNotInflight {
-                request_id: request_id.clone(),
-                parent_request_id: parent_request_id.clone(),
-            });
-        };
-        let current_session_anchor_id = self.session_anchor().id().to_string();
-        if parent_lineage.session_anchor_id != current_session_anchor_id {
-            return Err(SessionError::ParentRequestAnchorMismatch {
-                request_id: request_id.clone(),
-                parent_request_id: parent_request_id.clone(),
-                parent_session_anchor_id: parent_inflight.session_anchor_id.clone(),
-                current_session_anchor_id,
-            });
-        }
-        Ok(parent_lineage)
+        self.auth_state.with_current(|auth_state| {
+            let requests = self.inflight.read_requests();
+            let request_lineage = self.read_request_lineage();
+            validate_parent_request_lineage_locked(
+                request_id,
+                parent_request_id,
+                &requests,
+                &request_lineage,
+                auth_state.session_anchor.id(),
+            )
+        })
     }
 
     fn transition(&self, next: SessionState) -> Result<(), SessionError> {
@@ -1205,7 +1302,7 @@ mod tests {
                 ..
             } if normalized_path == "/workspace/project"
         ));
-        assert_eq!(session.enforceable_filesystem_roots().count(), 1);
+        assert_eq!(session.enforceable_filesystem_roots().len(), 1);
 
         session.close().unwrap();
         assert!(session.roots().is_empty());
@@ -1247,7 +1344,7 @@ mod tests {
             NormalizedRoot::UnenforceableFileSystem { ref reason, .. }
                 if reason == "non_local_file_authority"
         ));
-        assert_eq!(session.enforceable_filesystem_roots().count(), 1);
+        assert_eq!(session.enforceable_filesystem_roots().len(), 1);
     }
 
     #[test]
@@ -1268,7 +1365,7 @@ mod tests {
         assert!(session.inflight().is_empty());
         assert_eq!(
             session.terminal().get(&context.request_id),
-            Some(&OperationTerminalState::Completed)
+            Some(OperationTerminalState::Completed)
         );
     }
 
@@ -1361,7 +1458,7 @@ mod tests {
         assert!(session.inflight().is_empty());
         assert_eq!(
             session.terminal().get(&context.request_id),
-            Some(&OperationTerminalState::Cancelled {
+            Some(OperationTerminalState::Cancelled {
                 reason: "cancelled by client".to_string(),
             })
         );
@@ -1382,7 +1479,7 @@ mod tests {
         ));
 
         assert_eq!(registry.len(), 1);
-        assert_eq!(registry.get(&request_id), Some(&first_state));
+        assert_eq!(registry.get(&request_id), Some(first_state));
     }
 
     #[test]
@@ -1405,7 +1502,7 @@ mod tests {
         assert!(shared.inflight().is_empty());
         assert_eq!(
             shared.terminal().get(&context.request_id),
-            Some(&terminal_state)
+            Some(terminal_state.clone())
         );
         let lineage = shared.request_lineage(&context.request_id).unwrap();
         assert_eq!(lineage.terminal_state, Some(terminal_state));
@@ -1429,7 +1526,7 @@ mod tests {
         assert!(shared.inflight().is_empty());
         assert_eq!(
             shared.terminal().get(&context.request_id),
-            Some(&OperationTerminalState::Completed)
+            Some(OperationTerminalState::Completed)
         );
     }
 
@@ -1498,14 +1595,15 @@ mod tests {
         let initial_anchor = session.session_anchor().clone();
         assert_eq!(
             session.auth_context(),
-            &SessionAuthContext::in_process_anonymous()
+            SessionAuthContext::in_process_anonymous()
         );
 
-        let rotated = session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
-            "static-bearer:abcd1234",
-            "cafebabe",
-            Some("http://localhost:3000".to_string()),
-        ));
+        let (rotated, _) =
+            session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+                "static-bearer:abcd1234",
+                "cafebabe",
+                Some("http://localhost:3000".to_string()),
+            ));
 
         assert!(rotated);
         assert!(session.auth_context().is_authenticated());
@@ -1530,11 +1628,11 @@ mod tests {
             Some("http://localhost:3000".to_string()),
         );
 
-        assert!(session.set_auth_context(auth_context.clone()));
+        assert!(session.set_auth_context(auth_context.clone()).0);
         let rotated_anchor = session.session_anchor().clone();
-        assert!(!session.set_auth_context(auth_context));
+        assert!(!session.set_auth_context(auth_context).0);
 
-        assert_eq!(session.session_anchor(), &rotated_anchor);
+        assert_eq!(session.session_anchor(), rotated_anchor);
     }
 
     #[test]
@@ -1549,11 +1647,13 @@ mod tests {
             .track_request(&parent_context, OperationKind::ToolCall, true)
             .unwrap();
         assert!(
-            session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
-                "static-bearer:abcd1234",
-                "cafebabe",
-                Some("http://localhost:3000".to_string()),
-            ))
+            session
+                .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+                    "static-bearer:abcd1234",
+                    "cafebabe",
+                    Some("http://localhost:3000".to_string()),
+                ))
+                .0
         );
 
         let err = session

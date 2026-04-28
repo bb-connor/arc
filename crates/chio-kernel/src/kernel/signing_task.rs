@@ -53,8 +53,10 @@
 //! smaller capacity to exercise backpressure deterministically via
 //! [`SigningTaskHandle::with_capacity`].
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
+use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{debug, warn};
@@ -152,6 +154,9 @@ pub(crate) struct SigningTaskHandle {
     /// Configured channel capacity. Exposed for diagnostics and to give
     /// the M05.P4.T4 crash-recovery test a stable knob to assert against.
     capacity: usize,
+
+    /// Set once shutdown is requested, including pre-spawn shutdown.
+    closed: AtomicBool,
 }
 
 impl SigningTaskHandle {
@@ -175,6 +180,7 @@ impl SigningTaskHandle {
             inner: OnceLock::new(),
             keypair,
             capacity,
+            closed: AtomicBool::new(false),
         }
     }
 
@@ -182,14 +188,23 @@ impl SigningTaskHandle {
     /// resulting [`SigningTaskInner`]. Idempotent: every caller after
     /// the first observes the existing task without spawning.
     ///
-    /// MUST be called from within an active tokio runtime.
-    fn ensure_spawned(&self) -> &SigningTaskInner {
+    fn ensure_spawned(&self) -> Result<&SigningTaskInner, KernelError> {
+        if self.closed.load(Ordering::Acquire) {
+            return Err(KernelError::Internal(
+                "receipt signing task already shut down".to_string(),
+            ));
+        }
         if let Some(inner) = self.inner.get() {
-            return inner;
+            return Ok(inner);
         }
 
+        let handle = Handle::try_current().map_err(|_| {
+            KernelError::Internal(
+                "receipt signing task requires an active tokio runtime".to_string(),
+            )
+        })?;
         let (sender, receiver) = mpsc::channel::<SignRequest>(self.capacity);
-        let join = tokio::spawn(run_signing_task(self.keypair.clone(), receiver));
+        let join = handle.spawn(run_signing_task(self.keypair.clone(), receiver));
         let candidate = SigningTaskInner {
             sender: Mutex::new(Some(sender)),
             join: Mutex::new(Some(join)),
@@ -202,17 +217,15 @@ impl SigningTaskHandle {
         // lost JoinHandle is detached, which is safe because the task
         // body short-circuits on a closed channel.
         match self.inner.set(candidate) {
-            Ok(()) => {
-                // Safe: just stored.
-                #[allow(clippy::unwrap_used)]
-                self.inner.get().unwrap()
-            }
+            Ok(()) => self.inner.get().ok_or_else(|| {
+                KernelError::Internal("receipt signing task failed to initialize".to_string())
+            }),
             Err(_orphan) => {
                 // _orphan drops here: its sender mutex drops, channel
                 // closes, orphan task exits.
-                // Safe: the winning thread has populated the cell.
-                #[allow(clippy::unwrap_used)]
-                self.inner.get().unwrap()
+                self.inner.get().ok_or_else(|| {
+                    KernelError::Internal("receipt signing task failed to initialize".to_string())
+                })
             }
         }
     }
@@ -224,7 +237,7 @@ impl SigningTaskHandle {
     /// signing failed. Producers wait on bounded backpressure, never on
     /// a mutex.
     pub(crate) async fn sign(&self, body: ChioReceiptBody) -> Result<ChioReceipt, KernelError> {
-        let inner = self.ensure_spawned();
+        let inner = self.ensure_spawned()?;
         let sender = inner.sender_clone().ok_or_else(|| {
             KernelError::Internal("receipt signing task already shut down".to_string())
         })?;
@@ -266,7 +279,10 @@ impl SigningTaskHandle {
         &self,
         body: ChioReceiptBody,
     ) -> Result<oneshot::Receiver<Result<ChioReceipt, KernelError>>, ChioReceiptBody> {
-        let inner = self.ensure_spawned();
+        let inner = match self.ensure_spawned() {
+            Ok(inner) => inner,
+            Err(_) => return Err(body),
+        };
         let Some(sender) = inner.sender_clone() else {
             return Err(body);
         };
@@ -340,9 +356,10 @@ impl SigningTaskHandle {
     /// sender / join slots empty and return immediately. Safe to call
     /// before the task has been spawned (no-op).
     pub(crate) async fn shutdown(&self) {
+        self.closed.store(true, Ordering::Release);
         let Some(inner) = self.inner.get() else {
             // Task was never spawned (no signing happened on this
-            // kernel); nothing to drain.
+            // kernel); closed is still latched so later signing fails.
             return;
         };
 

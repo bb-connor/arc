@@ -130,11 +130,22 @@ pub fn render_guard_metrics_prometheus() -> String {
         output.push(' ');
         output.push_str(family.kind.as_str());
         output.push('\n');
-        if family.kind == PrometheusMetricKind::Histogram {
-            render_histogram_family(&mut output, family);
+        match family.kind {
+            PrometheusMetricKind::Counter | PrometheusMetricKind::Gauge => {
+                render_scalar_family(&mut output, family);
+            }
+            PrometheusMetricKind::Histogram => {
+                render_histogram_family(&mut output, family);
+            }
         }
     }
     output
+}
+
+fn render_scalar_family(output: &mut String, family: &GuardMetricFamily) {
+    output.push_str(family.name);
+    output.push_str(&render_empty_labels(family.labels));
+    output.push_str(" 0\n");
 }
 
 fn render_histogram_family(output: &mut String, family: &GuardMetricFamily) {
