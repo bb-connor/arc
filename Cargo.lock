@@ -2583,6 +2583,7 @@ dependencies = [
  "chio-core-types",
  "chio-guards",
  "chio-kernel",
+ "chio-wasm-guards",
  "serde_json",
  "tokio",
 ]
