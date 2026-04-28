@@ -1,0 +1,9 @@
+{
+  "arguments": {
+    "content": "x",
+    "path": "/tmp/chio-fuzz/out.txt"
+  },
+  "expected_action": "mcp_tool",
+  "expected_verdict": "deny",
+  "tool_name": "raw_file_write"
+}

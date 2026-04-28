@@ -1,0 +1,89 @@
+{
+  "description": "Manifest signature is valid, but the embedded public_key field is not a parseable Ed25519 key.",
+  "expected": {
+    "embedded_public_key_matches_signer": false,
+    "embedded_public_key_valid": false,
+    "signature_valid": true,
+    "structure_valid": true
+  },
+  "id": "invalid_embedded_public_key",
+  "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"not-a-public-key\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_write\",\"has_side_effects\":true,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"moderate\",\"name\":\"file_write\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+  "signed_manifest": {
+    "manifest": {
+      "description": "Manifest vector for bindings-core SDK fixtures",
+      "name": "Bindings Demo",
+      "public_key": "not-a-public-key",
+      "required_permissions": {
+        "environment_variables": [
+          "CHIO_ENV"
+        ],
+        "network_hosts": [
+          "api.example.com"
+        ],
+        "read_paths": [
+          "/workspace"
+        ],
+        "write_paths": [
+          "/workspace/output"
+        ]
+      },
+      "schema": "chio.manifest.v1",
+      "server_id": "srv-bindings-demo",
+      "tools": [
+        {
+          "description": "Tool definition for file_read",
+          "has_side_effects": false,
+          "input_schema": {
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "latency_hint": "fast",
+          "name": "file_read",
+          "output_schema": {
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        },
+        {
+          "description": "Tool definition for file_write",
+          "has_side_effects": true,
+          "input_schema": {
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "latency_hint": "moderate",
+          "name": "file_write",
+          "output_schema": {
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "version": "1.0.0"
+    },
+    "signature": "13c63c4d613f7c6fc0a4af73d805fe570faf0a75018f4bda0000b23daaed552a5ced79423bad5fa32288fe277a705a2890f0c917d6c32ec81453016ad0316a05",
+    "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+  }
+}

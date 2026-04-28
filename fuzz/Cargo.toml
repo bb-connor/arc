@@ -43,12 +43,16 @@ chio-acp-edge = { path = "../crates/chio-acp-edge", features = ["fuzz"] }
 chio-anchor = { path = "../crates/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-config = { path = "../crates/chio-config", features = ["fuzz"] }
+chio-core = { path = "../crates/chio-core" }
 # M02.P2.T6: typed canonical-JSON deserialization targets need
 # `CapabilityToken` / `ChioReceipt` (chio-core-types) and `ToolManifest`
 # (chio-manifest). No `fuzz` feature on either crate; both are pure-serde
 # Deserialize surfaces, so the fuzz harness drives `serde_json::from_slice`
 # directly.
 chio-core-types = { path = "../crates/chio-core-types" }
+chio-data-guards = { path = "../crates/chio-data-guards" }
+chio-guards = { path = "../crates/chio-guards" }
+chio-kernel = { path = "../crates/chio-kernel" }
 chio-manifest = { path = "../crates/chio-manifest" }
 chio-credentials = { path = "../crates/chio-credentials", features = ["fuzz"] }
 chio-did = { path = "../crates/chio-did", features = ["fuzz"] }
@@ -56,6 +60,7 @@ chio-kernel-core = { path = "../crates/chio-kernel-core", features = ["fuzz"] }
 chio-mcp-adapter = { path = "../crates/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/chio-mcp-edge", features = ["fuzz"] }
 chio-openapi-mcp-bridge = { path = "../crates/chio-openapi-mcp-bridge", features = ["fuzz"] }
+chio-policy = { path = "../crates/chio-policy" }
 chio-wasm-guards = { path = "../crates/chio-wasm-guards", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
 # `arbitrary` is pulled in directly by libFuzzer harnesses that take
@@ -260,6 +265,38 @@ bench = false
 [[bin]]
 name = "manifest_roundtrip"
 path = "fuzz_targets/manifest_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+# Main-branch fuzz targets preserved while resolving the roadmap merge.
+# These keep the existing `fuzz_*` binary names so their seed corpus
+# directories under `fuzz/corpus/fuzz_*` continue to line up with
+# cargo-fuzz defaults.
+[[bin]]
+name = "fuzz_policy_parse_compile"
+path = "fuzz_targets/policy_parse_compile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_sql_parser"
+path = "fuzz_targets/sql_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_merkle_checkpoint"
+path = "fuzz_targets/merkle_checkpoint.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_tool_action"
+path = "fuzz_targets/tool_action.rs"
 test = false
 doc = false
 bench = false

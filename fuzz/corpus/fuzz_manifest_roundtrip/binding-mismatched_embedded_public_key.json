@@ -1,0 +1,64 @@
+{
+  "description": "Manifest is signed correctly, but the manifest.public_key field does not match the signer key carried alongside the signature.",
+  "expected": {
+    "embedded_public_key_matches_signer": false,
+    "embedded_public_key_valid": true,
+    "signature_valid": true,
+    "structure_valid": true
+  },
+  "id": "mismatched_embedded_public_key",
+  "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+  "signed_manifest": {
+    "manifest": {
+      "description": "Manifest vector for bindings-core SDK fixtures",
+      "name": "Bindings Demo",
+      "public_key": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
+      "required_permissions": {
+        "environment_variables": [
+          "CHIO_ENV"
+        ],
+        "network_hosts": [
+          "api.example.com"
+        ],
+        "read_paths": [
+          "/workspace"
+        ],
+        "write_paths": [
+          "/workspace/output"
+        ]
+      },
+      "schema": "chio.manifest.v1",
+      "server_id": "srv-bindings-demo",
+      "tools": [
+        {
+          "description": "Tool definition for file_read",
+          "has_side_effects": false,
+          "input_schema": {
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "latency_hint": "fast",
+          "name": "file_read",
+          "output_schema": {
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "version": "1.0.0"
+    },
+    "signature": "8607011a3f0415f90a85a9cbe94f575b6b5125f362dd225cb717766ac372f84b9ebff8a4632dc091a653172c65c379e8c14a163b4669286e3448601ac2a4ef0b",
+    "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+  }
+}

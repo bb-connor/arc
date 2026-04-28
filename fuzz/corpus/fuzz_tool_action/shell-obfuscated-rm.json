@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "command": "rm -r'f' /"
+  },
+  "expected_action": "shell_command",
+  "expected_verdict": "deny",
+  "tool_name": "bash"
+}

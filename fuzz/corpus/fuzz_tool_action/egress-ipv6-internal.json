@@ -1,0 +1,8 @@
+{
+  "arguments": {
+    "url": "http://[fd00::1]/admin"
+  },
+  "expected_action": "network_egress",
+  "expected_verdict": "deny",
+  "tool_name": "http_request"
+}
