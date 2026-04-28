@@ -191,7 +191,7 @@ jobs:
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
-          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
           mode: code-change
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -206,7 +206,7 @@ jobs:
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
-          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
           mode: code-change
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -217,7 +217,7 @@ jobs:
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
-          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -229,7 +229,7 @@ jobs:
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
-          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}

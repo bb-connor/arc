@@ -123,7 +123,7 @@ jobs:
           CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
-          fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
+          fuzz-seconds: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -140,7 +140,7 @@ jobs:
           CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
-          fuzz-time: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
+          fuzz-seconds: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
