@@ -15,6 +15,7 @@ name = "chio_kernel"
 [features]
 default = []
 legacy-sync = []
+otel = ["dep:opentelemetry-semantic-conventions"]
 tokio-console-smoke = ["tokio/tracing"]
 
 [dependencies]
@@ -39,6 +40,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+opentelemetry-semantic-conventions = { workspace = true, optional = true }
 rusqlite = { workspace = true }
 chio-underwriting = { path = "../chio-underwriting" }
 uuid = { workspace = true, features = ["v7"] }

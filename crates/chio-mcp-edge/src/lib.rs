@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 
 mod runtime;
 
+#[cfg(feature = "otel")]
+pub mod otel;
+
 pub use runtime::{
     execute_bridge_mcp_tool_call_async, BridgeMcpToolCall, BridgeMcpToolCallRequest, ChioMcpEdge,
     McpEdgeConfig, McpExposedTool, McpTargetExecutor,

@@ -2816,6 +2816,7 @@ dependencies = [
  "dashmap",
  "loom",
  "lru",
+ "opentelemetry-semantic-conventions",
  "proptest",
  "regex",
  "rusqlite",
@@ -6770,6 +6771,12 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84b29a9f89f1a954936d5aa92f19b2feec3c8f3971d3e96206640db7f9706ae3"
 
 [[package]]
 name = "opentimestamps"
