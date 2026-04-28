@@ -1,36 +1,12 @@
 // Replay subcommand handler for the `chio` CLI.
-//
-// This file is included into `main.rs` via `include!` and reuses the shared
-// `use` declarations from `cli/types.rs`. The clap parser surface landed in
-// M04.P4.T1; the handler logic (log reader, signature re-verify, Merkle root
-// recompute, divergence reporting, JSON output, bless gate) is implemented
-// incrementally in M04.P4.T2 through M04.P4.T7. Until those tickets land the
-// handler returns a stub message and exits cleanly so the parser surface can
-// be tooled and gated end-to-end without depending on unimplemented logic.
-//
-// Reference: `.planning/trajectory/04-deterministic-replay.md` Phase 4 and
-// the "chio replay subcommand surface" section of that document.
 
 /// Dispatch entry-point for `chio replay`.
-///
-/// For T1 this prints a stub notice describing which downstream ticket owns
-/// the missing logic, then exits with status 0 so the parser surface alone
-/// can be exercised by gate checks (`chio replay --help | grep expect-root`).
-/// Subsequent tickets replace the stub body with the real reader, verifier,
-/// Merkle recompute, divergence reporter, and bless gate.
-///
-/// M10.P2.T1 hook: when the optional `traffic` sub-subcommand is supplied
-/// the dispatch routes through [`cmd_replay_traffic`], leaving the M04
-/// stub body below untouched. The legacy `chio replay <log>` surface is
-/// preserved verbatim.
 fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
     if let Some(ReplaySubcommand::Traffic(traffic)) = args.command.as_ref() {
         return cmd_replay_traffic(traffic);
     }
 
-    // Legacy M04 surface requires the positional `log` path. Emit a
-    // structured CliError when it is absent so the help text guides the
-    // caller toward either supplying a path or the `traffic` arm.
+    // Legacy surface requires the positional `log` path.
     let Some(log) = args.log.as_ref() else {
         return Err(CliError::Other(
             "chio replay requires a positional <log> path or the `traffic` sub-subcommand"
@@ -42,61 +18,468 @@ fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
         return cmd_replay_bless(args, log);
     }
 
+    cmd_replay_legacy(args, log)
+}
+
+/// Legacy `chio replay <log>` arm. Builds a [`ReplayReport`], renders it
+/// (single-line JSON when `--json` is set, short human summary otherwise),
+/// and on divergence returns through [`finish_replay_failure`] so the binary
+/// exits with the canonical 0/10/20/30/40/50 code.
+fn cmd_replay_legacy(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
+    let report = run_legacy_replay(log, args.expect_root.as_deref(), args.from_tee)?;
+
     let mut stdout = std::io::stdout().lock();
-    writeln!(
-        stdout,
-        "chio replay: parser surface only (M04.P4.T1)",
+    if args.json {
+        render_json(&mut stdout, &report)
+            .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+    } else {
+        render_replay_human(&mut stdout, &report)
+            .map_err(|e| CliError::Other(format!("write stdout: {e}")))?;
+    }
+
+    if report.exit_code == 0 {
+        return Ok(());
+    }
+    let detail = report
+        .first_divergence
+        .as_ref()
+        .and_then(|d| d.detail.clone())
+        .unwrap_or_else(|| "replay diverged".to_string());
+    finish_replay_failure(
+        report.exit_code,
+        format!("chio replay: {detail}"),
     )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
+}
+
+/// Run the legacy receipt-log replay pipeline against `log` and produce a
+/// [`ReplayReport`]. The pipeline is fail-closed and stops at the first
+/// divergence; subsequent receipts are not folded into the synthetic root.
+fn run_legacy_replay(
+    log: &Path,
+    expect_root: Option<&str>,
+    from_tee: bool,
+) -> Result<ReplayReport, CliError> {
+    let log_path = log.display().to_string();
+    let expected_root = expect_root.map(|s| s.to_string());
+
+    if from_tee {
+        return run_legacy_replay_from_tee(log, &log_path, expected_root);
+    }
+
+    let reader = ReceiptLogReader::open(log).map_err(|e| {
+        CliError::Other(format!(
+            "failed to open receipt log {}: {e}",
+            log.display()
+        ))
     })?;
+    let iter = match reader.iter() {
+        Ok(it) => it,
+        Err(ReadError::MalformedJson { line, detail, .. }) => {
+            // The reader buffers the whole file before yielding, so a malformed
+            // line surfaces here at iter()-creation time. `receipt_index` is
+            // pinned to 0 (the iter never started); the real position lives in
+            // the `line` field of `detail`.
+            let divergence = Divergence {
+                kind: DivergenceKind::ParseError,
+                receipt_index: 0,
+                receipt_id: None,
+                json_pointer: None,
+                byte_offset: None,
+                expected: None,
+                observed: None,
+                detail: Some(format!("malformed JSON at line {line}: {detail}")),
+            };
+            return Ok(ReplayReport::diverged(
+                log_path,
+                0,
+                MerkleAccumulator::new().finalize_hex(),
+                expected_root,
+                divergence,
+                exit_code_for(DivergenceKind::ParseError),
+            ));
+        }
+        Err(ReadError::Empty(p)) => {
+            return Err(CliError::Other(format!(
+                "empty receipt log: {}",
+                p.display(),
+            )));
+        }
+        Err(ReadError::Io(e)) => {
+            return Err(CliError::Other(format!(
+                "io error while reading receipt log: {e}",
+            )));
+        }
+    };
+
+    let mut acc = MerkleAccumulator::new();
+    let mut receipts_checked: usize = 0;
+
+    for (index, item) in iter.enumerate() {
+        let value = match item {
+            Ok(v) => v,
+            Err(ReadError::MalformedJson { line, detail, .. }) => {
+                let divergence = Divergence {
+                    kind: DivergenceKind::ParseError,
+                    receipt_index: index,
+                    receipt_id: None,
+                    json_pointer: None,
+                    byte_offset: None,
+                    expected: None,
+                    observed: None,
+                    detail: Some(format!("malformed JSON at line {line}: {detail}")),
+                };
+                return Ok(ReplayReport::diverged(
+                    log_path,
+                    receipts_checked,
+                    acc.finalize_hex(),
+                    expected_root,
+                    divergence,
+                    exit_code_for(DivergenceKind::ParseError),
+                ));
+            }
+            Err(ReadError::Empty(p)) => {
+                return Err(CliError::Other(format!(
+                    "empty receipt log: {}",
+                    p.display(),
+                )));
+            }
+            Err(ReadError::Io(e)) => {
+                return Err(CliError::Other(format!(
+                    "io error while reading receipt log: {e}",
+                )));
+            }
+        };
+
+        if let Err(err) = check_receipt_schema(&value) {
+            let divergence = match err {
+                ReceiptGateError::SchemaMismatch { observed } => Divergence {
+                    kind: DivergenceKind::SchemaMismatch,
+                    receipt_index: index,
+                    receipt_id: receipt_id_from_value(&value),
+                    json_pointer: Some("/schema_version".to_string()),
+                    byte_offset: None,
+                    expected: Some(SUPPORTED_RECEIPT_SCHEMA.to_string()),
+                    observed: Some(observed),
+                    detail: Some(
+                        "receipt schema_version is unsupported by this build"
+                            .to_string(),
+                    ),
+                },
+                ReceiptGateError::RedactionMismatch { .. } => {
+                    return Err(CliError::Other(
+                        "schema gate produced a redaction error".to_string(),
+                    ));
+                }
+            };
+            return Ok(ReplayReport::diverged(
+                log_path,
+                receipts_checked,
+                acc.finalize_hex(),
+                expected_root,
+                divergence,
+                exit_code_for(DivergenceKind::SchemaMismatch),
+            ));
+        }
+
+        if let Err(err) = check_receipt_redaction(&value) {
+            let divergence = match err {
+                ReceiptGateError::RedactionMismatch { observed } => Divergence {
+                    kind: DivergenceKind::RedactionMismatch,
+                    receipt_index: index,
+                    receipt_id: receipt_id_from_value(&value),
+                    json_pointer: Some("/metadata/redaction_pass_id".to_string()),
+                    byte_offset: None,
+                    expected: Some(SUPPORTED_RECEIPT_REDACTION_PASS_ID.to_string()),
+                    observed: Some(observed),
+                    detail: Some(
+                        "receipt redaction_pass_id is unavailable in this build"
+                            .to_string(),
+                    ),
+                },
+                ReceiptGateError::SchemaMismatch { .. } => {
+                    return Err(CliError::Other(
+                        "redaction gate produced a schema error".to_string(),
+                    ));
+                }
+            };
+            return Ok(ReplayReport::diverged(
+                log_path,
+                receipts_checked,
+                acc.finalize_hex(),
+                expected_root,
+                divergence,
+                exit_code_for(DivergenceKind::RedactionMismatch),
+            ));
+        }
+
+        let receipt: chio_core::receipt::ChioReceipt = match serde_json::from_value(value.clone())
+        {
+            Ok(r) => r,
+            Err(error) => {
+                let divergence = Divergence {
+                    kind: DivergenceKind::ParseError,
+                    receipt_index: index,
+                    receipt_id: receipt_id_from_value(&value),
+                    json_pointer: None,
+                    byte_offset: None,
+                    expected: None,
+                    observed: None,
+                    detail: Some(format!("malformed receipt JSON: {error}")),
+                };
+                return Ok(ReplayReport::diverged(
+                    log_path,
+                    receipts_checked,
+                    acc.finalize_hex(),
+                    expected_root,
+                    divergence,
+                    exit_code_for(DivergenceKind::ParseError),
+                ));
+            }
+        };
+
+        let outcome = verify_receipt(&value);
+        if !outcome.ok {
+            let signer = if outcome.signer_key_hex.is_empty() {
+                "unknown".to_string()
+            } else {
+                format!("ed25519:{}", outcome.signer_key_hex)
+            };
+            let error = outcome.error.unwrap_or_else(|| "unknown error".to_string());
+            let divergence = Divergence {
+                kind: DivergenceKind::SignatureMismatch,
+                receipt_index: index,
+                receipt_id: Some(receipt.id.clone()),
+                json_pointer: None,
+                byte_offset: None,
+                expected: None,
+                observed: None,
+                detail: Some(format!("signer={signer} {error}")),
+            };
+            return Ok(ReplayReport::diverged(
+                log_path,
+                receipts_checked,
+                acc.finalize_hex(),
+                expected_root,
+                divergence,
+                exit_code_for(DivergenceKind::SignatureMismatch),
+            ));
+        }
+
+        match rederive_verdict(&receipt) {
+            Ok(_) => {}
+            Err(VerdictError::Drift {
+                receipt_id,
+                stored,
+                current,
+            }) => {
+                let divergence = Divergence {
+                    kind: DivergenceKind::VerdictDrift,
+                    receipt_index: index,
+                    receipt_id: Some(receipt_id),
+                    json_pointer: Some("/decision/verdict".to_string()),
+                    byte_offset: None,
+                    expected: Some(stored),
+                    observed: Some(current),
+                    detail: Some("stored verdict differs from current build".to_string()),
+                };
+                return Ok(ReplayReport::diverged(
+                    log_path,
+                    receipts_checked,
+                    acc.finalize_hex(),
+                    expected_root,
+                    divergence,
+                    exit_code_for(DivergenceKind::VerdictDrift),
+                ));
+            }
+            Err(other) => {
+                return Err(CliError::Other(format!("verdict re-derive failed: {other}")));
+            }
+        }
+
+        let canonical = chio_core::canonical::canonical_json_bytes(&receipt).map_err(|e| {
+            CliError::Other(format!("canonicalize receipt {}: {e}", receipt.id))
+        })?;
+        acc.append(&canonical);
+        receipts_checked = receipts_checked.saturating_add(1);
+    }
+
+    let computed_root = acc.finalize_hex();
+    if let Some(expected) = expected_root.as_deref() {
+        if !expected.eq_ignore_ascii_case(&computed_root) {
+            let divergence = Divergence {
+                kind: DivergenceKind::MerkleMismatch,
+                receipt_index: receipts_checked,
+                receipt_id: None,
+                json_pointer: None,
+                byte_offset: None,
+                expected: Some(expected.to_string()),
+                observed: Some(computed_root.clone()),
+                detail: Some("recomputed root does not match --expect-root".to_string()),
+            };
+            return Ok(ReplayReport::diverged(
+                log_path,
+                receipts_checked,
+                computed_root,
+                expected_root,
+                divergence,
+                exit_code_for(DivergenceKind::MerkleMismatch),
+            ));
+        }
+    }
+
+    Ok(ReplayReport::clean(
+        log_path,
+        receipts_checked,
+        computed_root,
+        expected_root,
+    ))
+}
+
+/// `--from-tee` arm. Reads `<log>` as an NDJSON capture of
+/// `chio-tee-frame.v1` frames, runs `validate_frame` on each, and folds
+/// canonical frame bytes into the synthetic root. Verdict drift (exit 10)
+/// under `--from-tee` is out of scope for this surface; only the four
+/// non-drift divergence shapes (parse / schema / redaction / signature)
+/// can fire here.
+fn run_legacy_replay_from_tee(
+    log: &Path,
+    log_path: &str,
+    expected_root: Option<String>,
+) -> Result<ReplayReport, CliError> {
+    let iter = open_ndjson(log).map_err(|e| {
+        CliError::Other(format!(
+            "failed to open tee capture {}: {e}",
+            log.display()
+        ))
+    })?;
+
+    let mut acc = MerkleAccumulator::new();
+    let mut receipts_checked: usize = 0;
+
+    for (index, item) in iter.enumerate() {
+        match item {
+            Ok(record) => {
+                if let Err(err) = validate_frame(&record.frame, "chio-tee-frame.v1", None) {
+                    let kind = match err.exit_code() {
+                        EXIT_BAD_TENANT_SIG => DivergenceKind::SignatureMismatch,
+                        EXIT_REDACTION_MISMATCH => DivergenceKind::RedactionMismatch,
+                        _ => DivergenceKind::SchemaMismatch,
+                    };
+                    let divergence = Divergence {
+                        kind,
+                        receipt_index: index,
+                        receipt_id: Some(record.frame.event_id.clone()),
+                        json_pointer: None,
+                        byte_offset: None,
+                        expected: None,
+                        observed: None,
+                        detail: Some(err.to_string()),
+                    };
+                    return Ok(ReplayReport::diverged(
+                        log_path.to_string(),
+                        receipts_checked,
+                        acc.finalize_hex(),
+                        expected_root,
+                        divergence,
+                        exit_code_for(kind),
+                    ));
+                }
+                let canonical =
+                    chio_core::canonical::canonical_json_bytes(&record.frame).map_err(|e| {
+                        CliError::Other(format!(
+                            "canonicalize frame at line {}: {e}",
+                            record.line,
+                        ))
+                    })?;
+                acc.append(&canonical);
+                receipts_checked = receipts_checked.saturating_add(1);
+            }
+            Err(err) => {
+                let divergence = Divergence {
+                    kind: DivergenceKind::ParseError,
+                    receipt_index: index,
+                    receipt_id: None,
+                    json_pointer: None,
+                    byte_offset: None,
+                    expected: None,
+                    observed: None,
+                    detail: Some(err.to_string()),
+                };
+                return Ok(ReplayReport::diverged(
+                    log_path.to_string(),
+                    receipts_checked,
+                    acc.finalize_hex(),
+                    expected_root,
+                    divergence,
+                    exit_code_for(DivergenceKind::ParseError),
+                ));
+            }
+        }
+    }
+
+    let computed_root = acc.finalize_hex();
+    if let Some(expected) = expected_root.as_deref() {
+        if !expected.eq_ignore_ascii_case(&computed_root) {
+            let divergence = Divergence {
+                kind: DivergenceKind::MerkleMismatch,
+                receipt_index: receipts_checked,
+                receipt_id: None,
+                json_pointer: None,
+                byte_offset: None,
+                expected: Some(expected.to_string()),
+                observed: Some(computed_root.clone()),
+                detail: Some("recomputed root does not match --expect-root".to_string()),
+            };
+            return Ok(ReplayReport::diverged(
+                log_path.to_string(),
+                receipts_checked,
+                computed_root,
+                expected_root,
+                divergence,
+                exit_code_for(DivergenceKind::MerkleMismatch),
+            ));
+        }
+    }
+
+    Ok(ReplayReport::clean(
+        log_path.to_string(),
+        receipts_checked,
+        computed_root,
+        expected_root,
+    ))
+}
+
+/// Best-effort attribution of a receipt id from the raw value, used for
+/// error reports when the receipt could not be deserialized.
+fn receipt_id_from_value(value: &serde_json::Value) -> Option<String> {
+    value.get("id").and_then(|v| v.as_str()).map(str::to_string)
+}
+
+/// Render `report` as a short human-readable summary on `writer`.
+fn render_replay_human<W: std::io::Write>(
+    writer: &mut W,
+    report: &ReplayReport,
+) -> std::io::Result<()> {
     writeln!(
-        stdout,
-        "  log:           {}",
-        log.display(),
-    )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
-    })?;
-    writeln!(
-        stdout,
-        "  from_tee:      {}",
-        args.from_tee,
-    )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
-    })?;
-    writeln!(
-        stdout,
-        "  expect_root:   {}",
-        args.expect_root.as_deref().unwrap_or("<none>"),
-    )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
-    })?;
-    writeln!(
-        stdout,
-        "  json:          {}",
-        args.json,
-    )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
-    })?;
-    writeln!(
-        stdout,
-        "  bless:         {}",
-        args.bless,
-    )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
-    })?;
-    writeln!(
-        stdout,
-        "TODO: implement reader/verify/merkle/report in M04.P4.T2 through M04.P4.T7",
-    )
-    .map_err(|error| {
-        CliError::Other(format!("failed to write replay stub notice: {error}"))
-    })?;
+        writer,
+        "chio replay: {} receipts, root={}",
+        report.receipts_checked, report.computed_root,
+    )?;
+    if let Some(expected) = report.expected_root.as_deref() {
+        writeln!(writer, "  expected_root={expected}")?;
+    }
+    if let Some(divergence) = report.first_divergence.as_ref() {
+        writeln!(
+            writer,
+            "  first_divergence: kind={:?} index={} exit={}",
+            divergence.kind, divergence.receipt_index, report.exit_code,
+        )?;
+        if let Some(detail) = divergence.detail.as_deref() {
+            writeln!(writer, "    detail: {detail}")?;
+        }
+    } else {
+        writeln!(writer, "  ok")?;
+    }
     Ok(())
 }
 
@@ -198,10 +581,6 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_traffic_subcommand() {
-        // M10.P2.T1: `chio replay traffic --from <ndjson>` is additive
-        // alongside the legacy positional surface. The positional `log`
-        // is absent in this shape and the `Traffic` variant carries the
-        // structured arguments.
         let cli = Cli::try_parse_from([
             "chio",
             "replay",
@@ -263,10 +642,6 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_traffic_against_and_run_id_flags() {
-        // M10.P2.T2: `--against <policy-ref>` and `--run-id <id>` are
-        // additive optional flags. When both are present the dispatcher
-        // routes through `run_traffic_replay` and namespaces receipt
-        // ids under `replay:<run_id>:<frame_id>`.
         let cli = Cli::try_parse_from([
             "chio",
             "replay",

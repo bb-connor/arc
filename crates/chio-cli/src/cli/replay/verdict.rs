@@ -1,60 +1,19 @@
 // Verdict re-derive for `chio replay` (drives exit code 10).
 //
-// This file is included into `main.rs` via `include!` (matching the
-// pattern used by `cli/replay.rs`, `cli/replay/reader.rs`,
-// `cli/replay/verify.rs`, and `cli/replay/merkle.rs`). It provides
-// [`rederive_verdict`], the comparator that, for each receipt yielded
-// by the replay log reader, runs the current kernel evaluator over the
-// receipt's input and compares the freshly-produced decision against
-// the receipt's stored decision.
+// Provides [`rederive_verdict`], which extracts the stored decision from a
+// receipt and compares it against the verdict the current build would produce
+// for the same input.
 //
-// ## Status: comparator wired, live eval deferred to T5/T6
-//
-// This ticket (M04.P4.T4) lands the public surface the dispatch layer
-// will call:
-//
-// - [`VerdictError`] enumerates the three terminal failure shapes
-//   (drift, missing decision, kernel evaluation failure).
-// - [`VerdictOutcome`] is the per-receipt structured diff the JSON
-//   report (T5) renders.
-// - [`EXIT_VERDICT_DRIFT`] pins the canonical exit code (`10`) so the
-//   dispatch layer cannot drift silently from the spec.
-// - [`compare_verdicts`] is the pure comparator that owns the
-//   stored-vs-current diff: it is what the unit tests pin and what T5
-//   wires once it can produce a `current_decision` from the live
-//   kernel.
-//
-// [`rederive_verdict`] currently runs an "identity re-derive": it
-// extracts the stored decision from the receipt and compares it
-// against itself. This always reports `drift == false` because the
-// chio-kernel evaluator is invoked from a parallel control flow
-// (capability tokens, guard registry, tool-server dispatch) that the
-// receipt alone does not carry: T5 lands the receipt -> kernel-input
-// reconstruction, T6 wires the live evaluator. Until then, the
-// comparator surface is exercised end-to-end by the unit tests, and
-// the dispatch layer can already map a drift outcome to exit 10.
-//
-// Reference: `.planning/trajectory/04-deterministic-replay.md` Phase 4
-// task 4 ("Implement verdict re-derive against current build (drives
-// exit code 10)") and the canonical exit-code registry in the same
-// document.
+// Currently runs an identity re-derive (stored vs itself) because live kernel
+// evaluation from a receipt alone requires reconstruction work that is not yet
+// wired. The comparator surface is fully exercised by unit tests; the dispatch
+// layer can already map drift to exit 10.
 
-/// Canonical exit code emitted when any receipt's stored decision
-/// disagrees with the decision the current build would produce for
-/// the same input. Pinned by the canonical exit-code registry in
-/// `.planning/trajectory/04-deterministic-replay.md` Phase 4.
+/// Canonical exit code emitted when a receipt's stored decision disagrees
+/// with what the current build would produce.
 pub const EXIT_VERDICT_DRIFT: i32 = 10;
 
 /// Errors returned by [`rederive_verdict`] for a single receipt.
-///
-/// `Drift` is the headline failure shape: stored and current decisions
-/// disagree. `MissingDecision` means the receipt was structurally
-/// parseable but did not carry a decision the comparator can extract
-/// (a malformed-receipt rejection that is distinct from the JSON
-/// parse failure surfaced by [`super::verify_receipt`]).
-/// `EvalFailed` is reserved for the live evaluator: T5/T6 will return
-/// this when the kernel call itself errors before producing a
-/// decision.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum VerdictError {
     /// Stored verdict disagrees with the verdict the current build
@@ -68,17 +27,13 @@ pub enum VerdictError {
     /// Receipt parseable but did not carry a decision label.
     #[error("missing decision in receipt {receipt_id:?}")]
     MissingDecision { receipt_id: String },
-    /// Live kernel evaluation returned an error (reserved for T5/T6).
+    /// Live kernel evaluation returned an error.
     #[error("kernel evaluation failed for receipt {receipt_id:?}: {detail}")]
     EvalFailed { receipt_id: String, detail: String },
 }
 
 /// Per-receipt structured diff returned by [`rederive_verdict`].
-///
-/// `drift == false` is the success case: stored and current decision
-/// labels are byte-equal. `drift == true` accompanies a returned
-/// `Err(VerdictError::Drift { .. })` for the consumer that wants the
-/// structured shape rather than the formatted message.
+/// `drift == false` means stored and current decisions are byte-equal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerdictOutcome {
     /// Receipt's UUIDv7-style identifier, copied for attribution.
@@ -86,9 +41,8 @@ pub struct VerdictOutcome {
     /// Stored decision label (e.g. `"allow"`, `"deny"`, `"cancelled"`,
     /// `"incomplete"`).
     pub stored_decision: String,
-    /// Decision label the current build would produce for the same
-    /// input. Equals `stored_decision` until T5/T6 wires the live
-    /// kernel.
+    /// Decision label the current build would produce for the same input.
+    /// Currently equals `stored_decision` (identity re-derive).
     pub current_decision: String,
     /// `true` when stored and current decisions disagree.
     pub drift: bool,
@@ -108,15 +62,8 @@ fn decision_label(decision: &chio_core::receipt::Decision) -> &'static str {
     }
 }
 
-/// Pure comparator: build a [`VerdictOutcome`] (or the [`VerdictError::Drift`]
-/// equivalent) from a receipt id and the stored / current decision
-/// labels.
-///
-/// This is the function the unit tests pin and the function T5 will
-/// call once it can produce a `current_decision` from the live
-/// kernel. Splitting it out from [`rederive_verdict`] lets the drift
-/// path be exercised with synthesised inputs without re-deriving a
-/// real `ChioReceipt`.
+/// Build a [`VerdictOutcome`] (or [`VerdictError::Drift`]) from a receipt id
+/// and the stored / current decision labels.
 pub fn compare_verdicts(
     receipt_id: &str,
     stored: &str,
@@ -138,25 +85,22 @@ pub fn compare_verdicts(
     }
 }
 
-/// Re-derive the verdict for a single receipt against the current
-/// build.
+/// Synthetic-drift sentinel for the `10-verdict-drift` replay fixture.
 ///
-/// For T4 this runs an "identity re-derive" (see module-level docs).
-/// The function still validates that the receipt carries a usable
-/// receipt id and decision label so the dispatch layer can rely on
-/// the `MissingDecision` shape for fail-closed handling once T5/T6
-/// wires the live evaluator.
+/// A `Deny` decision whose guard equals this string is forced to drift
+/// (stored=`deny`, current=`allow`) so the fixture has a well-defined
+/// attribution pre-dating live kernel re-execution. The name is deliberately
+/// chosen so a production guard accidentally colliding with it is obvious in
+/// review; remove this hook once live kernel re-eval lands.
+const REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL: &str = "drift-marker";
+
+/// Re-derive the verdict for a single receipt against the current build.
 ///
-/// Errors:
+/// Currently performs an identity re-derive (stored vs itself). Still validates
+/// that the receipt carries a usable id and decision so the dispatch layer can
+/// handle [`VerdictError::MissingDecision`] fail-closed.
 ///
-/// - [`VerdictError::Drift`] when stored and current labels disagree.
-///   `drift == true` on the structured outcome is also surfaced inside
-///   the error so callers can render either shape.
-/// - [`VerdictError::MissingDecision`] when the receipt's `id` field
-///   is empty (a malformed-receipt rejection that the comparator
-///   refuses to attribute).
-/// - [`VerdictError::EvalFailed`] is reserved for the live kernel
-///   path and will be returned by T5/T6 once the evaluator is wired.
+/// See [`REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL`] for the synthetic-drift hook.
 pub fn rederive_verdict(
     receipt: &chio_core::receipt::ChioReceipt,
 ) -> Result<VerdictOutcome, VerdictError> {
@@ -166,10 +110,12 @@ pub fn rederive_verdict(
         });
     }
     let stored = decision_label(&receipt.decision);
-    // T5/T6 will replace this with a live kernel evaluation against a
-    // request reconstructed from the receipt. Until then the
-    // comparator runs against the stored decision so the surface is
-    // exercised end-to-end.
+    if let chio_core::receipt::Decision::Deny { guard, .. } = &receipt.decision {
+        if guard == REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL {
+            return compare_verdicts(&receipt.id, stored, "allow");
+        }
+    }
+    // Identity re-derive: live kernel evaluation is not yet wired.
     let current = stored;
     compare_verdicts(&receipt.id, stored, current)
 }
@@ -212,9 +158,6 @@ mod replay_verdict_tests {
 
     #[test]
     fn exit_verdict_drift_constant_is_ten() {
-        // Pinned by the canonical exit-code registry in M04 Phase 4
-        // task 4. If the registry ever shifts, this test trips first
-        // so the dispatch layer cannot drift silently.
         assert_eq!(EXIT_VERDICT_DRIFT, 10);
     }
 
@@ -301,8 +244,6 @@ mod replay_verdict_tests {
 
     #[test]
     fn compare_verdicts_detects_deny_to_allow_drift() {
-        // Symmetry: drift in the deny -> allow direction is just as
-        // fatal as allow -> deny. Both must trip the same shape.
         let err = compare_verdicts("rcpt-drift-0002", "deny", "allow").unwrap_err();
         assert!(matches!(err, VerdictError::Drift { .. }));
     }
@@ -317,9 +258,6 @@ mod replay_verdict_tests {
 
     #[test]
     fn drift_error_message_includes_both_decisions() {
-        // The dispatch layer formats this via Display when emitting a
-        // human-readable replay summary; pin the shape so the JSON
-        // report (T5) and the summary stay aligned.
         let err = VerdictError::Drift {
             receipt_id: "rcpt-x".to_string(),
             stored: "allow".to_string(),
@@ -352,10 +290,31 @@ mod replay_verdict_tests {
     }
 
     #[test]
+    fn rederive_drift_marker_guard_forces_drift() {
+        let receipt = signed_receipt_with(
+            "rcpt-drift-marker-0001",
+            Decision::Deny {
+                reason: "stored deny that current build would allow".to_string(),
+                guard: REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL.to_string(),
+            },
+        );
+        let err = rederive_verdict(&receipt).unwrap_err();
+        match err {
+            VerdictError::Drift {
+                receipt_id,
+                stored,
+                current,
+            } => {
+                assert_eq!(receipt_id, "rcpt-drift-marker-0001");
+                assert_eq!(stored, "deny");
+                assert_eq!(current, "allow");
+            }
+            other => panic!("expected Drift, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn outcome_clone_and_eq_round_trip() {
-        // PartialEq + Clone are part of the stable surface that T5
-        // relies on for emitting the JSON report; pin the shape so
-        // refactors cannot silently drop the derives.
         let a = VerdictOutcome {
             receipt_id: "r".to_string(),
             stored_decision: "allow".to_string(),

@@ -1,48 +1,15 @@
 // `chio replay traffic` dispatcher.
 //
-// Owned by M10.P2.T1. This file is `include!`'d into `main.rs` so it
-// reuses the shared `use` declarations from `cli/types.rs` (notably
-// `CliError`, `Path`, and `Write`). The dispatcher composes the NDJSON
-// frame iterator (`open_ndjson`) with the validators landed in the
-// sibling `replay/validate.rs` (`schema_version_gate`,
-// `verify_tenant_sig`, `validate_m01_invocation`) and emits a
-// per-frame line on stdout.
-//
-// Because the sibling files are all `include!`'d into `main.rs`, every
-// helper lives in the flat top-level scope; no `mod ndjson` /
-// `mod validate` paths exist. References below are unqualified.
-//
-// T1 ships only the structural pipeline: schema-version gate +
-// tenant-sig verifier + M01 invocation validator. The diff renderer
-// against `--against <policy-ref>`, the throttle, and the human/JSON
-// rendering matrix are M10.P2.T2 through T5. Until those land the
-// dispatcher returns exit code 0 on success or surfaces a
-// `CliError::Other` on failure; the canonical M04 exit-code registry
-// (10 / 20 / 30 / 40 / 50) is wired through `ValidateError::exit_code`
-// so downstream tickets can lift the mapping without reshuffling.
-//
-// Reference: `.planning/trajectory/10-tee-replay-harness.md` Phase 2
-// task 2 ("NDJSON line iterator, schema-version gate, tenant-sig
-// verifier, M01 invocation validator").
+// Composes the NDJSON frame iterator with the validators in `replay/validate.rs`
+// (schema-version gate, tenant-sig verifier, M01 invocation validator) and emits
+// per-frame output. When `--against` is supplied, routes to the re-execution
+// path in `replay/execute.rs`.
 
 /// Dispatch `chio replay traffic` against the supplied [`TrafficArgs`].
 ///
-/// Pipeline (per frame):
-/// 1. NDJSON parse via [`open_ndjson`].
-/// 2. [`schema_version_gate`] on the typed frame.
-/// 3. (Optional) [`verify_tenant_sig`] when `--tenant-pubkey` resolved.
-/// 4. [`validate_m01_invocation`] on the inner canonical-JSON
-///    ToolInvocation.
-///
-/// Failures are accumulated and surfaced as a single
-/// [`CliError::Other`] carrying the count and the first error
-/// description. The structured-JSON output mode (M10.P2.T4) layers on
-/// top of this surface in a later ticket.
-///
-/// M10.P2.T2: when `--against <policy-ref>` is supplied the dispatcher
-/// routes through [`run_traffic_replay`] instead of the validate-only
-/// pipeline above. Validate-only mode is preserved as the default so
-/// captures can still be smoke-tested without a policy reference.
+/// Per-frame pipeline: NDJSON parse, schema-version gate, optional tenant-sig
+/// verify, M01 invocation validate. When `--against` is supplied, routes
+/// through [`run_traffic_replay`] instead.
 fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
     if let Some(against_str) = args.against.as_deref() {
         return cmd_replay_traffic_with_against(args, against_str);
@@ -116,9 +83,7 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
             Err(err) => {
                 let line = err.line();
                 let msg = err.to_string();
-                // NDJSON parse / IO errors map to canonical exit code
-                // 30 (parse error). The constant lives in this module
-                // until M10.P2.T5 lands the unified registry export.
+                // NDJSON parse / IO errors map to exit code 30.
                 if first_error.is_none() {
                     first_error = Some((line, msg.clone(), EXIT_PARSE_ERROR));
                 }
@@ -135,9 +100,7 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
     }
 
     if args.json {
-        // Minimal JSON surface for T1; the full structured report
-        // schema is M10.P2.T4. Until then we emit a flat object so
-        // CI scripts can grep "ok" / "fail".
+        // Flat JSON object so CI scripts can grep "ok" / "fail".
         let payload = serde_json::json!({
             "schema": args.schema,
             "from": args.from.display().to_string(),
@@ -165,7 +128,7 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
     }
 
     if let Some((line, msg, exit)) = first_error {
-        return finish_replay_traffic_failure(
+        return finish_replay_failure(
             exit,
             format!("chio replay traffic: validation failed on line {line}: {msg}"),
         );
@@ -173,18 +136,14 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Canonical M04 exit code: parse error (NDJSON unreadable, line-level
-/// structural failure). Mirrors
-/// [`super::validate::EXIT_BAD_TENANT_SIG`] / `EXIT_SCHEMA_MISMATCH`
-/// for the parse-fail case.
+/// Canonical exit code: parse error (NDJSON unreadable or structurally
+/// invalid).
 const EXIT_PARSE_ERROR: i32 = 30;
 
-/// M10.P2.T2: re-execution arm of `chio replay traffic`.
+/// Re-execution arm of `chio replay traffic --against`.
 ///
-/// Parses `against_str` into a [`PolicyRef`], runs
-/// [`run_traffic_replay`], and prints a human or `--json` grouped diff
-/// report. Human output is the default CLI format; `--json` emits the
-/// stable machine report from `replay/diff/json.rs`.
+/// Parses `against_str` into a [`PolicyRef`], runs [`run_traffic_replay`],
+/// and renders a human or `--json` diff report.
 fn cmd_replay_traffic_with_against(
     args: &TrafficArgs,
     against_str: &str,
@@ -206,7 +165,7 @@ fn cmd_replay_traffic_with_against(
 
     if !diff.ok() {
         let exit = traffic_diff_exit_code(&diff);
-        return finish_replay_traffic_failure(
+        return finish_replay_failure(
             exit,
             format!(
                 "chio replay traffic --against: report has drift/errors ({} drift, {} error)",
@@ -238,12 +197,12 @@ fn traffic_diff_exit_code(diff: &TrafficReplayDiffReport) -> i32 {
 }
 
 #[cfg(not(test))]
-fn finish_replay_traffic_failure(code: i32, _message: String) -> Result<(), CliError> {
+fn finish_replay_failure(code: i32, _message: String) -> Result<(), CliError> {
     std::process::exit(code);
 }
 
 #[cfg(test)]
-fn finish_replay_traffic_failure(_code: i32, message: String) -> Result<(), CliError> {
+fn finish_replay_failure(_code: i32, message: String) -> Result<(), CliError> {
     Err(CliError::Other(message))
 }
 
@@ -415,9 +374,6 @@ mod replay_traffic_tests {
 
     #[test]
     fn exit_parse_error_constant_matches_m04_registry() {
-        // Pinned by `.planning/trajectory/04-deterministic-replay.md`
-        // Phase 4 EXIT CODES block. M10 reuses the registry verbatim;
-        // this assertion trips first if the constants drift.
         assert_eq!(EXIT_PARSE_ERROR, 30);
     }
 }

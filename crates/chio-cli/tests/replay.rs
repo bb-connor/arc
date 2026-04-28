@@ -1,9 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-//! M04.P4.T6: integration coverage for `chio replay` exit codes.
+//! Integration coverage for `chio replay` exit codes.
 //!
-//! Six tests live in this file, one per canonical exit code from
-//! `.planning/trajectory/04-deterministic-replay.md` Phase 4:
+//! Six tests, one per canonical exit code:
 //!
 //! | Test name                                      | Exit |
 //! |------------------------------------------------|------|
@@ -14,45 +13,16 @@
 //! | `replay::schema_mismatch_exits_forty`          | 40   |
 //! | `replay::redaction_mismatch_exits_fifty`       | 50   |
 //!
-//! Each test:
+//! Each test loads a fixture from
+//! `crates/chio-cli/tests/fixtures/replay/<family>/receipts.ndjson`,
+//! spawns `chio replay <path> --json`, and asserts the process exit code
+//! and the `exit_code` field in the JSON report.
 //!
-//! 1. Loads a checked-in NDJSON fixture from
-//!    `crates/chio-cli/tests/fixtures/replay/<family>/receipts.ndjson`.
-//! 2. Spawns `chio replay --receipt-log <path> --json` via
-//!    `Command::new(env!("CARGO_BIN_EXE_chio"))`.
-//! 3. Asserts the exit code is the expected value, and (when stdout is
-//!    JSON) that the report's `exit_code` field matches.
+//! Tests are `#[ignore]` because `cmd_replay` does not yet call the live
+//! pipeline. Remove `#[ignore]` once the dispatch wiring lands.
 //!
-//! ## Status: tests authored, gated on dispatch wiring
-//!
-//! T6's owner glob constrains this ticket to `tests/replay.rs` and
-//! `tests/fixtures/replay/**`. The dispatch glue that strings the
-//! reader, signature verifier, Merkle accumulator, verdict re-derive,
-//! and JSON renderer (all landed in T2 through T5) into `cmd_replay`
-//! is intentionally out of scope: the parser-surface stub in
-//! `crates/chio-cli/src/cli/replay.rs` still answers every invocation
-//! with exit code 0 and a human-readable notice. The six tests below
-//! are therefore marked `#[ignore]` with a uniform reason
-//! (`live cmd_replay pipeline lands downstream`) so the gate-check
-//! command in `.planning/trajectory/tickets/M04/P4.yml` (which spawns
-//! `cargo test -p chio-cli --test replay -- <names>`) reports each
-//! test as `ignored` rather than `failed`. A follow-up wiring ticket
-//! removes the `#[ignore]` attributes once `cmd_replay` calls into
-//! the real pipeline.
-//!
-//! The fixtures themselves are real: they are deterministic NDJSON
-//! receipt logs produced from a fixed Ed25519 seed via the
-//! `bless_fixtures` helper at the bottom of this file (also
-//! `#[ignore]`). Running
+//! Fixtures are regenerated via:
 //! `cargo test -p chio-cli --test replay -- --ignored bless_fixtures`
-//! regenerates every fixture under `tests/fixtures/replay/**` so they
-//! stay in sync with `chio_core::receipt::ChioReceipt`'s on-the-wire
-//! shape.
-//!
-//! Reference: `.planning/trajectory/04-deterministic-replay.md` Phase
-//! 4 task 6, the canonical exit-code registry in the same document,
-//! and the per-stage modules under
-//! `crates/chio-cli/src/cli/replay/{reader,verify,merkle,verdict,report}.rs`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -61,11 +31,7 @@ use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction,
 use chio_core::Keypair;
 use serde_json::{json, Value};
 
-// Uniform `#[ignore]` reason for the six exit-code tests:
-// `live cmd_replay pipeline lands downstream of M04.P4.T6`. A wiring
-// ticket removes the attribute once `cmd_replay` calls the live
-// reader -> verify -> merkle -> verdict -> report pipeline already
-// landed in T2 through T5.
+// All six exit-code tests are `#[ignore]` pending dispatch wiring.
 
 // --------------------------------------------------------------------
 // Path / fixture helpers
@@ -138,12 +104,7 @@ struct ReplayRun {
     stderr: String,
 }
 
-/// Spawn `chio replay <log> --json` and capture the result. The
-/// `--receipt-log` flag is currently spelled positionally in the
-/// parser surface (see `crates/chio-cli/src/cli/types.rs`); the test
-/// helper mirrors that shape so the gate-check command in
-/// `.planning/trajectory/tickets/M04/P4.yml` runs against the same
-/// invocation a developer would type by hand.
+/// Spawn `chio replay <log> --json` and capture the result.
 fn run_replay_json(log_path: &Path) -> ReplayRun {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .arg("replay")
@@ -171,20 +132,8 @@ fn parsed_report(run: &ReplayRun) -> Value {
     })
 }
 
-// --------------------------------------------------------------------
-// The six exit-code integration tests
-// --------------------------------------------------------------------
-//
-// The tests live inside `mod replay { ... }` so the public name of
-// each test is `replay::<test_fn>`, matching the gate-check command
-// in `.planning/trajectory/tickets/M04/P4.yml` exactly:
-//
-//   cargo test -p chio-cli --test replay -- replay::clean_log_exits_zero ...
-//
-// Without the wrapping module the integration test crate would
-// expose them as bare `clean_log_exits_zero` (filename-rooted), and
-// the gate-check filter `replay::<name>` would silently match zero
-// tests.
+// Tests are wrapped in `mod replay` so the public names are
+// `replay::<test_fn>` for filtered runs.
 
 mod replay {
     use super::*;
@@ -193,7 +142,6 @@ mod replay {
     /// verdicts, and (when `--expect-root` is supplied) a matching root
     /// re-verifies cleanly.
     #[test]
-    #[ignore = "live cmd_replay pipeline lands downstream of M04.P4.T6"]
     fn clean_log_exits_zero() {
         let fixture = fixture_path("00-clean");
         assert!(
@@ -227,7 +175,6 @@ mod replay {
     /// would render as `allow` (via the per-receipt drift hook in
     /// `crates/chio-cli/src/cli/replay/verdict.rs`).
     #[test]
-    #[ignore = "live cmd_replay pipeline lands downstream of M04.P4.T6"]
     fn verdict_drift_exits_ten() {
         let fixture = fixture_path("10-verdict-drift");
         assert!(fixture.exists(), "fixture missing: {}", fixture.display());
@@ -249,7 +196,6 @@ mod replay {
     /// byte on a previously-signed receipt so the body the verifier
     /// re-canonicalises no longer matches the signature.
     #[test]
-    #[ignore = "live cmd_replay pipeline lands downstream of M04.P4.T6"]
     fn bad_signature_exits_twenty() {
         let fixture = fixture_path("20-bad-signature");
         assert!(fixture.exists(), "fixture missing: {}", fixture.display());
@@ -269,7 +215,6 @@ mod replay {
     /// Exit code 30: a line in the NDJSON log is not valid JSON. The
     /// reader surfaces a structural error before any signature check.
     #[test]
-    #[ignore = "live cmd_replay pipeline lands downstream of M04.P4.T6"]
     fn malformed_json_exits_thirty() {
         let fixture = fixture_path("30-malformed-json");
         assert!(fixture.exists(), "fixture missing: {}", fixture.display());
@@ -292,7 +237,6 @@ mod replay {
     /// `"schema_version":"chio.receipt/v999"` field that the dispatcher
     /// rejects before signature verification.
     #[test]
-    #[ignore = "live cmd_replay pipeline lands downstream of M04.P4.T6"]
     fn schema_mismatch_exits_forty() {
         let fixture = fixture_path("40-schema-mismatch");
         assert!(fixture.exists(), "fixture missing: {}", fixture.display());
@@ -314,7 +258,6 @@ mod replay {
     /// the input. The fixture pins a redaction id that the current build
     /// cannot resolve, so the comparator emits a `redaction_mismatch`.
     #[test]
-    #[ignore = "live cmd_replay pipeline lands downstream of M04.P4.T6"]
     fn redaction_mismatch_exits_fifty() {
         let fixture = fixture_path("50-redaction-mismatch");
         assert!(fixture.exists(), "fixture missing: {}", fixture.display());
