@@ -3736,28 +3736,30 @@ mod tests {
             )
             .unwrap();
 
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        transaction
-            .execute(
-                "DELETE FROM budget_mutation_events WHERE event_id = ?1",
-                params![event_id],
+        {
+            let mut connection = store.connection().unwrap();
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            transaction
+                .execute(
+                    "DELETE FROM budget_mutation_events WHERE event_id = ?1",
+                    params![event_id],
+                )
+                .unwrap();
+            SqliteBudgetStore::upsert_hold(
+                &transaction,
+                hold_id,
+                "cap-orphan",
+                0,
+                75,
+                75,
+                HoldDisposition::Open,
+                Some(&initial),
             )
             .unwrap();
-        SqliteBudgetStore::upsert_hold(
-            &transaction,
-            hold_id,
-            "cap-orphan",
-            0,
-            75,
-            75,
-            HoldDisposition::Open,
-            Some(&initial),
-        )
-        .unwrap();
-        transaction.commit().unwrap();
+            transaction.commit().unwrap();
+        }
 
         assert!(store
             .try_charge_cost_with_ids_and_authority(
@@ -3791,28 +3793,31 @@ mod tests {
         assert!(retry.event_seq > rollback.event_seq);
         assert_eq!(retry.authority.as_ref(), Some(&changed));
 
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
-            .unwrap()
-            .expect("retry open hold");
-        assert_eq!(hold.remaining_exposure_units, 75);
-        assert_eq!(hold.disposition, HoldDisposition::Open);
-        drop(transaction);
+        {
+            let mut connection = store.connection().unwrap();
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+                .unwrap()
+                .expect("retry open hold");
+            assert_eq!(hold.remaining_exposure_units, 75);
+            assert_eq!(hold.disposition, HoldDisposition::Open);
+        }
 
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        transaction
-            .execute(
-                "DELETE FROM budget_mutation_events WHERE event_id = ?1",
-                params![event_id],
-            )
-            .unwrap();
-        transaction.commit().unwrap();
+        {
+            let mut connection = store.connection().unwrap();
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            transaction
+                .execute(
+                    "DELETE FROM budget_mutation_events WHERE event_id = ?1",
+                    params![event_id],
+                )
+                .unwrap();
+            transaction.commit().unwrap();
+        }
 
         assert!(store
             .try_charge_cost_with_ids_and_authority(
@@ -3883,16 +3888,17 @@ mod tests {
         assert_eq!(usage.invocation_count, 1);
         assert_usage_totals(&usage, 0, 0);
 
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
-            .unwrap()
-            .expect("released hold state");
-        assert_eq!(hold.remaining_exposure_units, 0);
-        assert_eq!(hold.disposition, HoldDisposition::Released);
-        drop(transaction);
+        {
+            let mut connection = store.connection().unwrap();
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+                .unwrap()
+                .expect("released hold state");
+            assert_eq!(hold.remaining_exposure_units, 0);
+            assert_eq!(hold.disposition, HoldDisposition::Released);
+        }
 
         let events = store
             .list_mutation_events(10, Some("cap-import"), Some(0))

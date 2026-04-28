@@ -525,7 +525,7 @@ fn sync_peer_revocations(
     let Some(path) = state.config.revocation_db_path.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteRevocationStore::open(path)?;
+    let store = SqliteRevocationStore::open(path)?;
     let mut applied = 0u64;
     loop {
         let cursor = peer_revocation_cursor(state, peer_url);
@@ -564,7 +564,7 @@ fn sync_peer_tool_receipts(
     let Some(path) = state.config.receipt_db_path.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteReceiptStore::open(path)?;
+    let store = SqliteReceiptStore::open(path)?;
     let mut applied = 0u64;
     loop {
         let after_seq = peer_tool_seq(state, peer_url);
@@ -595,7 +595,7 @@ fn sync_peer_child_receipts(
     let Some(path) = state.config.receipt_db_path.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteReceiptStore::open(path)?;
+    let store = SqliteReceiptStore::open(path)?;
     let mut applied = 0u64;
     loop {
         let after_seq = peer_child_seq(state, peer_url);
@@ -956,7 +956,7 @@ fn rollback_budget_authorize_exposure(
     payload: &TryChargeCostRequest,
     authority: Option<&BudgetEventAuthority>,
 ) -> Result<(), BudgetStoreError> {
-    let mut store = open_budget_store(&state.config).map_err(|response| {
+    let store = open_budget_store(&state.config).map_err(|response| {
         BudgetStoreError::Invariant(format!(
             "failed to reopen budget store for compensation: {}",
             response.status()
@@ -1738,7 +1738,7 @@ fn apply_cluster_snapshot(
     }
 
     if let Some(path) = state.config.revocation_db_path.as_deref() {
-        let mut store = SqliteRevocationStore::open(path)?;
+        let store = SqliteRevocationStore::open(path)?;
         for record in &revocations {
             store.upsert_revocation(&RevocationRecord {
                 capability_id: record.capability_id.clone(),
@@ -1766,7 +1766,7 @@ fn apply_cluster_snapshot(
 
     let mut budget_cursor = None;
     if let Some(path) = state.config.budget_db_path.as_deref() {
-        let mut store = SqliteBudgetStore::open(path)?;
+        let store = SqliteBudgetStore::open(path)?;
         let usage_records = budgets
             .iter()
             .map(budget_usage_record_from_view)

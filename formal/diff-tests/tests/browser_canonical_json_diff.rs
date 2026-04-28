@@ -145,6 +145,13 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
     use std::path::Path;
     use std::process::Command;
 
+    if !wasm_c_toolchain_available()? {
+        eprintln!(
+            "skipping wasm-bindgen differential test because the host C compiler cannot target wasm32-unknown-unknown"
+        );
+        return Ok(());
+    }
+
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let (mode, mut args) = if chrome_and_driver_major_match() {
         (
@@ -172,6 +179,40 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
     }
 
     Ok(())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn wasm_c_toolchain_available() -> Result<bool, String> {
+    use std::fs;
+    use std::process::{Command, Stdio};
+
+    let cc = std::env::var("CC_wasm32_unknown_unknown")
+        .or_else(|_| std::env::var("TARGET_CC"))
+        .or_else(|_| std::env::var("CC"))
+        .unwrap_or_else(|_| "clang".to_string());
+    let dir = std::env::temp_dir().join(format!("chio-wasm-cc-check-{}", std::process::id()));
+    fs::create_dir_all(&dir).map_err(|error| format!("create wasm cc check dir: {error}"))?;
+    let source = dir.join("check.c");
+    let object = dir.join("check.o");
+    fs::write(&source, "int chio_wasm_cc_check(void) { return 0; }\n")
+        .map_err(|error| format!("write wasm cc check source: {error}"))?;
+
+    let status = Command::new(&cc)
+        .arg("--target=wasm32-unknown-unknown")
+        .arg("-c")
+        .arg(&source)
+        .arg("-o")
+        .arg(&object)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|error| format!("spawn wasm C compiler `{cc}`: {error}"))?;
+
+    let _ = fs::remove_file(&source);
+    let _ = fs::remove_file(&object);
+    let _ = fs::remove_dir(&dir);
+
+    Ok(status.success())
 }
 
 #[cfg(not(target_arch = "wasm32"))]

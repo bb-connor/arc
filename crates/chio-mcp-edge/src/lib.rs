@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 mod runtime;
 
 pub use runtime::{
-    BridgeMcpToolCall, BridgeMcpToolCallRequest, ChioMcpEdge, McpEdgeConfig, McpExposedTool,
-    McpTargetExecutor,
+    execute_bridge_mcp_tool_call_async, BridgeMcpToolCall, BridgeMcpToolCallRequest, ChioMcpEdge,
+    McpEdgeConfig, McpExposedTool, McpTargetExecutor,
 };
 
 /// libFuzzer entry-point module for `chio-mcp-edge`.

@@ -1985,6 +1985,21 @@ impl ChioKernel {
         BlockingToolEvaluator.evaluate(self, request).await
     }
 
+    pub async fn evaluate_tool_call_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(|| {
+                    self.evaluate_tool_call_sync_inner(request, None, extra_metadata)
+                })
+            }
+            _ => self.evaluate_tool_call_sync_inner(request, None, extra_metadata),
+        }
+    }
+
     #[cfg(feature = "legacy-sync")]
     #[deprecated(
         since = "0.1.0",
