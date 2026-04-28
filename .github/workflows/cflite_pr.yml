@@ -99,6 +99,18 @@ jobs:
           chmod +x "${HOME}/.local/bin/yq"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
+      - name: Detect corpus storage availability
+        id: corpus
+        env:
+          FUZZ_CORPUS_PAT: ${{ secrets.FUZZ_CORPUS_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -n "${FUZZ_CORPUS_PAT}" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Detect fuzz-full label
         id: mode
         env:
@@ -174,8 +186,8 @@ jobs:
         run: |
           echo "no fuzz target triggered by this diff; PR smoke is a no-op"
 
-      - name: Run ClusterFuzzLite changed-target sampling
-        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
+      - name: Run ClusterFuzzLite changed-target sampling with corpus storage
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0' && steps.corpus.outputs.enabled == 'true'
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
@@ -189,8 +201,19 @@ jobs:
           storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
           report-unreproducible-crashes: false
 
-      - name: "Run ClusterFuzzLite full-corpus sweep (fuzz-full label)"
-        if: steps.mode.outputs.full == 'true'
+      - name: Run ClusterFuzzLite changed-target sampling without corpus storage
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0' && steps.corpus.outputs.enabled != 'true'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          language: rust
+          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          mode: code-change
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          report-unreproducible-crashes: false
+
+      - name: "Run ClusterFuzzLite full-corpus sweep with corpus storage (fuzz-full label)"
+        if: steps.mode.outputs.full == 'true' && steps.corpus.outputs.enabled == 'true'
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
           language: rust
@@ -199,6 +222,17 @@ jobs:
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
           storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
+          report-unreproducible-crashes: false
+
+      - name: "Run ClusterFuzzLite full-corpus sweep without corpus storage (fuzz-full label)"
+        if: steps.mode.outputs.full == 'true' && steps.corpus.outputs.enabled != 'true'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          language: rust
+          fuzz-time: ${{ steps.mode.outputs.fuzz_seconds }}
+          mode: batch
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           report-unreproducible-crashes: false
 
       - name: Upload crash reports
