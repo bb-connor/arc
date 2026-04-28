@@ -76,9 +76,62 @@ jobs:
         run: |
           cargo bench -p chio-kernel -- --noplot --sample-size 100
 
+      - name: Locate Criterion outputs
+        id: criterion
+        shell: bash
+        env:
+          BASELINE_TARGET_DIR: ${{ runner.temp }}/chio-bench-baseline-target
+          BASELINE_WORKTREE: ${{ runner.temp }}/chio-bench-baseline
+          CURRENT_TARGET_DIR: ${{ runner.temp }}/chio-bench-current-target
+          CURRENT_WORKTREE: ${{ runner.temp }}/chio-bench-current
+        run: |
+          set -euo pipefail
+
+          resolve_criterion_dir() {
+            local label="$1"
+            shift
+            local dirs_file
+            dirs_file="$(mktemp)"
+            (
+              for root in "$@"; do
+                if [ -d "$root" ]; then
+                  find "$root" -type d -name criterion -prune -print
+                fi
+              done | while IFS= read -r dir; do
+                if find "$dir" -type f -path '*/new/estimates.json' -print -quit | grep -q .; then
+                  printf '%s\n' "$dir"
+                fi
+              done | sort -u
+            ) > "$dirs_file"
+
+            local count
+            count="$(wc -l < "$dirs_file" | tr -d ' ')"
+
+            case "$count" in
+              0)
+                echo "::error::no Criterion estimates found for ${label}" >&2
+                rm -f "$dirs_file"
+                exit 1
+                ;;
+              1)
+                printf '%s=%s\n' "$label" "$(sed -n '1p' "$dirs_file")" >> "$GITHUB_OUTPUT"
+                rm -f "$dirs_file"
+                ;;
+              *)
+                echo "::error::multiple Criterion roots found for ${label}" >&2
+                cat "$dirs_file" >&2
+                rm -f "$dirs_file"
+                exit 1
+                ;;
+            esac
+          }
+
+          resolve_criterion_dir baseline "$BASELINE_TARGET_DIR" "$BASELINE_WORKTREE"
+          resolve_criterion_dir current "$CURRENT_TARGET_DIR" "$CURRENT_WORKTREE"
+
       - name: Required kernel bench regression gate
         run: |
           bash scripts/criterion-compare.sh \
-            --baseline "$RUNNER_TEMP/chio-bench-baseline-target/criterion" \
-            --current "$RUNNER_TEMP/chio-bench-current-target/criterion" \
+            --baseline "${{ steps.criterion.outputs.baseline }}" \
+            --current "${{ steps.criterion.outputs.current }}" \
             --threshold-percent 10

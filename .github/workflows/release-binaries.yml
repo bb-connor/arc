@@ -171,6 +171,7 @@ jobs:
             '
 
       - name: Install syft
+        if: runner.os != 'Windows'
         # Pinned to v1.18.1 to match the M09.P2.T2 acceptance gate. The
         # installer script itself is fetched from the pinned tag rather
         # than the mutable `main` branch (cleanup-c11d; PR #44 review
@@ -180,9 +181,7 @@ jobs:
         # every release run, even though the version argument the
         # script consumed was pinned. The tag-pinned URL closes that
         # gap. Output goes to ${HOME}/.local/bin which the next line
-        # appends to GITHUB_PATH for subsequent steps. Windows runners
-        # use the same script under Git Bash so syft.exe lands on PATH
-        # for the powershell stage step too.
+        # appends to GITHUB_PATH for subsequent steps.
         shell: bash
         run: |
           set -euo pipefail
@@ -192,7 +191,22 @@ jobs:
             | sh -s -- -b "${HOME}/.local/bin" "${SYFT_VERSION}"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
+      - name: Install syft (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $syftVersion = "1.18.1"
+          $asset = "syft_${syftVersion}_windows_amd64.zip"
+          $url = "https://github.com/anchore/syft/releases/download/v$syftVersion/$asset"
+          $archive = Join-Path $env:RUNNER_TEMP $asset
+          $installDir = Join-Path $env:USERPROFILE ".local\bin"
+          New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $installDir -Force
+          $installDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Emit CycloneDX 1.6 SBOM
+        if: runner.os != 'Windows'
         # Generates a CycloneDX 1.6 JSON SBOM for the just-built chio
         # binary. The binary already carries the cargo-auditable dep
         # graph (see M09.P2.T1); syft adds an external, machine-readable
@@ -213,6 +227,25 @@ jobs:
             "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}"
           jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"' \
             "${out_file}" > /dev/null
+
+      - name: Emit CycloneDX 1.6 SBOM (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          CHIO_TARGET: ${{ matrix.target }}
+        run: |
+          New-Item -ItemType Directory -Path "out/sbom" -Force | Out-Null
+          $outFile = "out/sbom/chio-$env:CHIO_TARGET.cyclonedx.json"
+          $binary = "target/$env:CHIO_TARGET/release/$env:BINARY_NAME$env:CHIO_BIN_SUFFIX"
+          syft --config infra/sbom/syft.yaml `
+            -o "cyclonedx-json@1.6=$outFile" `
+            "$binary"
+          $sbom = Get-Content -Raw $outFile | ConvertFrom-Json
+          if ($sbom.bomFormat -ne "CycloneDX" -or $sbom.specVersion -ne "1.6") {
+            Write-Error "Syft did not emit CycloneDX 1.6 SBOM at $outFile"
+            exit 1
+          }
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
