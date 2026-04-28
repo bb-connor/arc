@@ -149,7 +149,10 @@ jobs:
           # fuzz/fuzz_targets/.
           known_targets=$(find fuzz/fuzz_targets -maxdepth 1 -type f -name '*.rs' -printf '%f\n' 2>/dev/null \
             | sed 's/\.rs$//' \
-            | sort -u)
+            | sort -u \
+            | awk '{ print length, $0 }' \
+            | sort -rn -k1,1 -k2,2 \
+            | cut -d' ' -f2-)
 
           while IFS= read -r crash_path; do
             [ -n "${crash_path}" ] || continue
@@ -162,7 +165,10 @@ jobs:
               component=$(basename "${scan_path}")
               for t in ${known_targets}; do
                 case "${component}" in
-                  *"${t}"*) target="${t}"; break;;
+                  "${t}"|"fuzz-crash-${t}"|"fuzz-crash-${t}-"*|"cflite-batch-${t}"|"cflite-batch-${t}-"*)
+                    target="${t}"
+                    break
+                    ;;
                 esac
               done
               if [ -n "${target}" ]; then break; fi
