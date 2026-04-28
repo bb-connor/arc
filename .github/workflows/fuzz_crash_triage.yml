@@ -154,6 +154,15 @@ jobs:
             | sort -rn -k1,1 -k2,2 \
             | cut -d' ' -f2-)
 
+          strip_numeric_suffix() {
+            local candidate="$1"
+            if [[ "${candidate}" =~ ^(.+)-[0-9]+$ ]]; then
+              printf '%s\n' "${BASH_REMATCH[1]}"
+            else
+              printf '%s\n' "${candidate}"
+            fi
+          }
+
           while IFS= read -r crash_path; do
             [ -n "${crash_path}" ] || continue
             target=""
@@ -168,14 +177,34 @@ jobs:
                   "${t}"|"fuzz-crash-${t}"|"fuzz-crash-${t}-"*|"cflite-batch-${t}"|"cflite-batch-${t}-"*)
                     target="${t}"
                     break
-                    ;;
+                  ;;
                 esac
               done
+              if [ -z "${target}" ]; then
+                case "${component}" in
+                  fuzz-crash-*)
+                    target=$(strip_numeric_suffix "${component#fuzz-crash-}")
+                    ;;
+                  cflite-batch-*)
+                    target=$(strip_numeric_suffix "${component#cflite-batch-}")
+                    ;;
+                  *)
+                    parent_component=$(basename "$(dirname "${scan_path}")")
+                    case "${parent_component}" in
+                      cflite-pr-crashes-*) target="${component}";;
+                    esac
+                    ;;
+                esac
+              fi
               if [ -n "${target}" ]; then break; fi
               scan_path=$(dirname "${scan_path}")
             done
             if [ -z "${target}" ]; then
               echo "::warning::Could not infer fuzz target from path '${crash_path}'; skipping"
+              continue
+            fi
+            if [[ ! "${target}" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]; then
+              echo "::warning::Inferred invalid fuzz target '${target}' from path '${crash_path}'; skipping"
               continue
             fi
 
@@ -280,18 +309,13 @@ jobs:
       - name: Comment on upstream PR (if any)
         if: ${{ steps.download.outputs.no-artifacts != 'true' && github.event.workflow_run.event == 'pull_request' }}
         env:
-          UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          UPSTREAM_PULL_REQUESTS: ${{ toJson(github.event.workflow_run.pull_requests) }}
           UPSTREAM_RUN_URL: ${{ github.event.workflow_run.html_url }}
           REPO_FULL: ${{ github.repository }}
         run: |
           set -euo pipefail
-          # Locate the PR whose head SHA matches the upstream run.
-          pr_number=$(gh pr list \
-            --repo "${REPO_FULL}" \
-            --state open \
-            --search "${UPSTREAM_HEAD_SHA}" \
-            --json number \
-            --jq '.[0].number' || true)
-          if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
+          pr_numbers=$(printf '%s' "${UPSTREAM_PULL_REQUESTS}" | jq -r '.[]?.number // empty')
+          while IFS= read -r pr_number; do
+            [ -n "${pr_number}" ] || continue
             gh pr comment "${pr_number}" --repo "${REPO_FULL}" --body "fuzz-crash-triage processed crashes from [this run](${UPSTREAM_RUN_URL}). Open issues with the \`fuzz-crash\` label for details."
-          fi
+          done <<<"${pr_numbers}"
