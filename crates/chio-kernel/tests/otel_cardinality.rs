@@ -4,9 +4,11 @@ use std::collections::BTreeSet;
 
 use chio_kernel::otel::{
     attribute_cardinality, build_gen_ai_tool_call_span, is_locked_attribute, AttributeCardinality,
-    GenAiToolCallSpanInput, ATTRIBUTE_VALUE_MAX_CHARS, ATTR_CHIO_RECEIPT_ID, ATTR_GEN_AI_SYSTEM,
-    ATTR_GEN_AI_TOOL_CALL_ID, FINISH_REASONS_MAX_CHARS, GEN_AI_TOOL_CALL_LOCKED_ATTRIBUTES,
-    GEN_AI_TOOL_CALL_OPERATION_NAME, GEN_AI_TOOL_CALL_SPAN_NAME, OTEL_SEMCONV_SCHEMA_URL,
+    GenAiToolCallSpanInput, ATTRIBUTE_VALUE_MAX_CHARS, ATTR_CHIO_RECEIPT_ID,
+    ATTR_GEN_AI_RESPONSE_FINISH_REASONS, ATTR_GEN_AI_SYSTEM, ATTR_GEN_AI_TOOL_CALL_ID,
+    ATTR_GEN_AI_USAGE_INPUT_TOKENS, ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, FINISH_REASONS_MAX_CHARS,
+    GEN_AI_TOOL_CALL_LOCKED_ATTRIBUTES, GEN_AI_TOOL_CALL_OPERATION_NAME,
+    GEN_AI_TOOL_CALL_SPAN_NAME, OTEL_SEMCONV_SCHEMA_URL,
 };
 use proptest::prelude::*;
 
@@ -73,18 +75,37 @@ proptest! {
 
         for attribute in span.attributes {
             prop_assert!(is_locked_attribute(attribute.key));
-            let limit = if attribute.key == "gen_ai.response.finish_reasons" {
-                FINISH_REASONS_MAX_CHARS
-            } else {
-                ATTRIBUTE_VALUE_MAX_CHARS
-            };
-            prop_assert!(
-                attribute.value.chars().count() <= limit,
-                "{} exceeded limit {} with {} chars",
-                attribute.key,
-                limit,
-                attribute.value.chars().count()
-            );
+            match &attribute.value {
+                serde_json::Value::String(value) => {
+                    prop_assert!(
+                        value.chars().count() <= ATTRIBUTE_VALUE_MAX_CHARS,
+                        "{} exceeded limit {} with {} chars",
+                        attribute.key,
+                        ATTRIBUTE_VALUE_MAX_CHARS,
+                        value.chars().count()
+                    );
+                }
+                serde_json::Value::Array(values) => {
+                    prop_assert_eq!(attribute.key, ATTR_GEN_AI_RESPONSE_FINISH_REASONS);
+                    for value in values {
+                        let value = value.as_str().unwrap_or_default();
+                        prop_assert!(
+                            value.chars().count() <= FINISH_REASONS_MAX_CHARS,
+                            "{} exceeded limit {} with {} chars",
+                            attribute.key,
+                            FINISH_REASONS_MAX_CHARS,
+                            value.chars().count()
+                        );
+                    }
+                }
+                serde_json::Value::Number(_) => {
+                    prop_assert!(
+                        attribute.key == ATTR_GEN_AI_USAGE_INPUT_TOKENS
+                            || attribute.key == ATTR_GEN_AI_USAGE_OUTPUT_TOKENS
+                    );
+                }
+                other => prop_assert!(false, "unexpected value type for {}: {other:?}", attribute.key),
+            }
         }
     }
 }
@@ -102,5 +123,13 @@ fn high_cardinality_keys_are_restricted_to_ids() {
     assert_eq!(
         attribute_cardinality(ATTR_GEN_AI_SYSTEM),
         Some(AttributeCardinality::Low)
+    );
+    assert_eq!(
+        attribute_cardinality(ATTR_GEN_AI_USAGE_INPUT_TOKENS),
+        Some(AttributeCardinality::Bounded)
+    );
+    assert_eq!(
+        attribute_cardinality(ATTR_GEN_AI_USAGE_OUTPUT_TOKENS),
+        Some(AttributeCardinality::Bounded)
     );
 }

@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use dashmap::mapref::entry::Entry;
 
+use crate::session::{SessionAnchorSnapshot, SessionRequestStart};
+
 use super::*;
 
 static GLOBAL_SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -52,7 +54,7 @@ impl ChioKernel {
         bump_session_counter_from_id(&session_id);
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
-        let session_snapshot = self.with_sessions_write(|sessions| {
+        let session = self.with_sessions_write(|sessions| {
             let session = Arc::new(Session::new(
                 session_id.clone(),
                 agent_id,
@@ -66,6 +68,7 @@ impl ChioKernel {
                 }
             }
         })?;
+        let session_snapshot = session.session_anchor_snapshot();
         if let Err(error) = self.persist_session_anchor_snapshot(&session_snapshot, None) {
             self.with_sessions_write(|sessions| {
                 sessions.remove(&session_id);
@@ -95,10 +98,9 @@ impl ChioKernel {
         let (session_snapshot, supersedes_anchor_id) =
             self.with_session_mut(session_id, |session| {
                 let previous_anchor_id = session.session_anchor().id().to_string();
-                session.set_auth_context(auth_context);
-                let supersedes_anchor_id = (session.session_anchor().id() != previous_anchor_id)
-                    .then_some(previous_anchor_id);
-                Ok((Arc::clone(session), supersedes_anchor_id))
+                let (rotated, session_snapshot) = session.set_auth_context(auth_context);
+                let supersedes_anchor_id = rotated.then_some(previous_anchor_id);
+                Ok((session_snapshot, supersedes_anchor_id))
             })?;
         self.persist_session_anchor_snapshot(&session_snapshot, supersedes_anchor_id.as_deref())
     }
@@ -132,9 +134,7 @@ impl ChioKernel {
         &self,
         session_id: &SessionId,
     ) -> Result<Vec<NormalizedRoot>, KernelError> {
-        self.with_session(session_id, |session| {
-            Ok(session.normalized_roots().to_vec())
-        })
+        self.with_session(session_id, |session| Ok(session.normalized_roots()))
     }
 
     /// Return only the enforceable filesystem root paths for a session.
@@ -145,8 +145,8 @@ impl ChioKernel {
         self.with_session(session_id, |session| {
             Ok(session
                 .enforceable_filesystem_roots()
-                .filter_map(NormalizedRoot::normalized_filesystem_path)
-                .map(str::to_string)
+                .into_iter()
+                .filter_map(|root| root.normalized_filesystem_path().map(str::to_string))
                 .collect())
         })
     }
@@ -158,8 +158,8 @@ impl ChioKernel {
         self.with_session(session_id, |session| {
             Ok(session
                 .enforceable_filesystem_roots()
-                .filter_map(NormalizedRoot::normalized_filesystem_path)
-                .map(str::to_string)
+                .into_iter()
+                .filter_map(|root| root.normalized_filesystem_path().map(str::to_string))
                 .collect())
         })
     }
@@ -342,11 +342,11 @@ impl ChioKernel {
     }
 
     /// Inspect an existing session.
-    pub fn session(&self, session_id: &SessionId) -> Option<Arc<Session>> {
+    pub fn session(&self, session_id: &SessionId) -> Option<Session> {
         self.with_sessions_read(|sessions| {
             Ok(sessions
                 .get(session_id)
-                .map(|session| Arc::clone(session.value())))
+                .map(|session| session.value().as_ref().clone()))
         })
         .ok()
         .flatten()
@@ -372,13 +372,10 @@ impl ChioKernel {
         operation_kind: OperationKind,
         cancellable: bool,
     ) -> Result<(), KernelError> {
-        self.with_sessions_write(|sessions| {
+        let start = self.with_sessions_write(|sessions| {
             begin_session_request_in_sessions(sessions, context, operation_kind, cancellable)
         })?;
-        let session_snapshot = self
-            .session(&context.session_id)
-            .ok_or_else(|| KernelError::UnknownSession(context.session_id.clone()))?;
-        self.persist_request_lineage_snapshot(&session_snapshot, &context.request_id)
+        self.persist_request_lineage_snapshot(&start)
     }
 
     /// Construct and register a child request under an existing parent request.
@@ -390,7 +387,7 @@ impl ChioKernel {
         progress_token: Option<ProgressToken>,
         cancellable: bool,
     ) -> Result<OperationContext, KernelError> {
-        let child_context = self.with_sessions_write(|sessions| {
+        let (child_context, start) = self.with_sessions_write(|sessions| {
             begin_child_request_in_sessions(
                 sessions,
                 parent_context,
@@ -400,10 +397,7 @@ impl ChioKernel {
                 cancellable,
             )
         })?;
-        let session_snapshot = self
-            .session(&child_context.session_id)
-            .ok_or_else(|| KernelError::UnknownSession(child_context.session_id.clone()))?;
-        self.persist_request_lineage_snapshot(&session_snapshot, &child_context.request_id)?;
+        self.persist_request_lineage_snapshot(&start)?;
         Ok(child_context)
     }
 
@@ -437,20 +431,20 @@ impl ChioKernel {
         })
     }
 
-    pub(crate) fn signed_session_anchor_for_session(
+    fn signed_session_anchor_for_snapshot(
         &self,
-        session: &Session,
+        snapshot: &SessionAnchorSnapshot,
     ) -> Result<chio_core::session::SessionAnchor, KernelError> {
         let body = chio_core::session::SessionAnchorBody::new(
-            session.session_anchor().id().to_string(),
+            snapshot.session_anchor.id().to_string(),
             chio_core::session::SessionAnchorContext::new(
-                session.id().clone(),
-                session.agent_id().to_string(),
-                session.auth_context().clone(),
-                chio_core::session::SessionProofBinding::from_auth_context(session.auth_context()),
+                snapshot.session_id.clone(),
+                snapshot.agent_id.clone(),
+                snapshot.auth_context.clone(),
+                chio_core::session::SessionProofBinding::from_auth_context(&snapshot.auth_context),
             ),
-            session.session_anchor().auth_epoch(),
-            session.session_anchor().issued_at(),
+            snapshot.session_anchor.auth_epoch(),
+            snapshot.session_anchor.issued_at(),
             self.config.keypair.public_key(),
         )
         .map_err(|error| {
@@ -464,16 +458,16 @@ impl ChioKernel {
 
     fn persist_session_anchor_snapshot(
         &self,
-        session: &Session,
+        session: &SessionAnchorSnapshot,
         supersedes_anchor_id: Option<&str>,
     ) -> Result<(), KernelError> {
-        let anchor = self.signed_session_anchor_for_session(session)?;
+        let anchor = self.signed_session_anchor_for_snapshot(session)?;
         let anchor_json = serde_json::to_value(&anchor).map_err(|error| {
             KernelError::Internal(format!("failed to serialize session anchor: {error}"))
         })?;
         self.with_receipt_store(|store| {
             Ok(store.record_session_anchor(
-                session.id().as_str(),
+                session.session_id.as_str(),
                 &anchor.id,
                 &anchor.auth_context_hash,
                 anchor.issued_at,
@@ -486,14 +480,10 @@ impl ChioKernel {
 
     fn persist_request_lineage_snapshot(
         &self,
-        session: &Session,
-        request_id: &RequestId,
+        start: &SessionRequestStart,
     ) -> Result<(), KernelError> {
-        let Some(local_lineage) = session.request_lineage(request_id) else {
-            return Ok(());
-        };
-
-        let anchor = self.signed_session_anchor_for_session(session)?;
+        let local_lineage = &start.lineage;
+        let anchor = self.signed_session_anchor_for_snapshot(&start.session)?;
         let anchor_reference = anchor.reference().map_err(|error| {
             KernelError::Internal(format!(
                 "failed to derive session anchor reference: {error}"
@@ -519,7 +509,7 @@ impl ChioKernel {
         })?;
         self.with_receipt_store(|store| {
             Ok(store.record_request_lineage(
-                session.id().as_str(),
+                start.session.session_id.as_str(),
                 local_lineage.request_id.as_str(),
                 local_lineage
                     .parent_request_id
@@ -710,8 +700,7 @@ impl ChioKernel {
                 let roots = self
                     .session(&context.session_id)
                     .ok_or_else(|| KernelError::UnknownSession(context.session_id.clone()))?
-                    .roots()
-                    .to_vec();
+                    .roots();
                 Ok(SessionOperationResponse::RootList { roots })
             }
             SessionOperation::ListResources => {

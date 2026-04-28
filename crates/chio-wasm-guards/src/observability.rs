@@ -65,7 +65,13 @@ pub fn guard_host_call_span(host_name: &str) -> Span {
 
 #[must_use]
 pub fn guard_fetch_blob_span(bundle_id: &str, bytes: u64) -> Span {
-    tracing::info_span!("chio.guard.fetch_blob", bundle.id = %bundle_id, bytes = bytes)
+    let span = tracing::info_span!(
+        "chio.guard.fetch_blob",
+        bundle.id = %bundle_id,
+        bytes = field::Empty
+    );
+    span.record("bytes", bytes);
+    span
 }
 
 #[must_use]

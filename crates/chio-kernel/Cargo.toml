@@ -13,7 +13,7 @@ publish = false
 name = "chio_kernel"
 
 [features]
-default = []
+default = ["legacy-sync"]
 legacy-sync = []
 otel = ["dep:opentelemetry-semantic-conventions"]
 tokio-console-smoke = ["tokio/tracing"]

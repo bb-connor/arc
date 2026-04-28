@@ -119,6 +119,10 @@ fn renders_guard_and_epoch_labels() {
         guard_id_label_from_digest("abcdef1234567890fedcba"),
         "abcdef123456"
     );
+    assert_eq!(
+        guard_id_label_from_digest("sha256:abcdef1234567890fedcba"),
+        "abcdef123456"
+    );
     assert_eq!(guard_id_label_from_digest("short"), "short");
     assert_eq!(epoch_label(42), "42");
 }

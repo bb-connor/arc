@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tokio::runtime::Handle;
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::warn;
@@ -161,7 +162,10 @@ struct CanaryFixtureFile {
 #[serde(tag = "decision", rename_all = "snake_case")]
 enum CanaryExpectedVerdict {
     Allow,
-    Deny { reason: Option<String> },
+    Deny {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
 }
 
 impl From<&GuardVerdict> for CanaryExpectedVerdict {
@@ -188,6 +192,16 @@ pub trait ReloadBackendFactory: Send + Sync + 'static {
         &self,
         new_module_bytes: &[u8],
     ) -> Result<Box<dyn WasmGuardAbi>, WasmGuardError>;
+
+    /// Build a backend for a specific guard ID.
+    fn build_backend_for_guard(
+        &self,
+        guard_id: &str,
+        new_module_bytes: &[u8],
+    ) -> Result<Box<dyn WasmGuardAbi>, WasmGuardError> {
+        let _ = guard_id;
+        self.build_backend(new_module_bytes)
+    }
 }
 
 impl<F> ReloadBackendFactory for F
@@ -229,6 +243,11 @@ pub enum ReloadTriggerSource {
     RegistryDigestChanged {
         /// New digest returned by the registry poller.
         digest: String,
+    },
+    /// The file watcher reported an error.
+    WatcherError {
+        /// Human-readable watcher error.
+        message: String,
     },
 }
 
@@ -363,6 +382,12 @@ impl ReloadWatchdog {
         Ok(Some(incident_dir))
     }
 
+    /// Record a successful evaluation and reset the consecutive error streak.
+    pub fn record_success(&mut self) {
+        self.errors.clear();
+        self.traces.clear();
+    }
+
     /// Return true after this watchdog has already rolled back.
     #[must_use]
     pub fn rolled_back(&self) -> bool {
@@ -372,10 +397,35 @@ impl ReloadWatchdog {
 
 #[derive(Debug, Default)]
 struct ReloadSlot {
-    last_attempt_at: Option<Instant>,
     seq: u64,
     in_flight: bool,
     pending_module_bytes: Option<Vec<u8>>,
+}
+
+struct ReloadInFlightReset {
+    slot: Arc<Mutex<ReloadSlot>>,
+    armed: bool,
+}
+
+impl ReloadInFlightReset {
+    fn new(slot: Arc<Mutex<ReloadSlot>>) -> Self {
+        Self { slot, armed: true }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for ReloadInFlightReset {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        if let Ok(mut slot) = self.slot.try_lock() {
+            slot.in_flight = false;
+        }
+    }
 }
 
 /// Errors returned by the hot-reload engine.
@@ -416,6 +466,10 @@ pub enum HotReloadError {
     /// Reload trigger receiver was closed before the trigger could be sent.
     #[error("reload trigger receiver closed")]
     TriggerReceiverClosed,
+
+    /// Registry polling was requested without an active Tokio runtime.
+    #[error("registry reload poll task requires an active tokio runtime")]
+    NoTokioRuntime,
 
     /// The per-guard reload sequence counter is exhausted.
     #[error("reload sequence counter exhausted for guard {guard_id:?}")]
@@ -522,6 +576,13 @@ pub enum HotReloadError {
         source: crate::blocklist::BlocklistError,
     },
 
+    /// A guard ID was registered more than once.
+    #[error("guard {guard_id:?} is already registered")]
+    DuplicateGuard {
+        /// Duplicate guard identifier.
+        guard_id: String,
+    },
+
     /// Incident directory write failed.
     #[error("guard reload incident write failed: {source}")]
     IncidentWrite {
@@ -557,7 +618,7 @@ where
         Self {
             guards: RwLock::new(HashMap::new()),
             reload_slots: RwLock::new(HashMap::new()),
-            blocklist: GuardDigestBlocklist::from_environment().ok(),
+            blocklist: Some(default_blocklist()),
             backend_factory,
         }
     }
@@ -583,10 +644,15 @@ where
         guard: WasmGuard,
     ) -> Result<Arc<WasmGuard>, HotReloadError> {
         let guard = Arc::new(guard);
-        self.guards
+        let guard_id = guard_id.into();
+        let mut guards = self
+            .guards
             .write()
-            .map_err(|_| HotReloadError::RegistryLockPoisoned)?
-            .insert(guard_id.into(), Arc::clone(&guard));
+            .map_err(|_| HotReloadError::RegistryLockPoisoned)?;
+        if guards.contains_key(&guard_id) {
+            return Err(HotReloadError::DuplicateGuard { guard_id });
+        }
+        guards.insert(guard_id, Arc::clone(&guard));
         Ok(guard)
     }
 
@@ -626,7 +692,7 @@ where
 
         let backend = self
             .backend_factory
-            .build_backend(new_module_bytes)
+            .build_backend_for_guard(guard_id, new_module_bytes)
             .map_err(|source| HotReloadError::ReplacementLoad {
                 guard_id: guard_id.to_string(),
                 source,
@@ -637,9 +703,7 @@ where
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
                 guard_id: guard_id.to_string(),
             })?;
-        if let Some(reload_seq) = reload_seq {
-            guard.record_reload_seq(reload_seq);
-        }
+        guard.record_reload_seq(reload_seq.unwrap_or(0));
         let span = guard_reload_span(RELOAD_APPLIED, guard.current_reload_seq());
         let _span_guard = span.enter();
         Ok(epoch_id)
@@ -669,16 +733,16 @@ where
         let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
         self.ensure_digest_not_blocklisted(&module_sha256)?;
 
-        let mut backend = self
+        let mut canary_backend = self
             .backend_factory
-            .build_backend(new_module_bytes)
+            .build_backend_for_guard(guard_id, new_module_bytes)
             .map_err(|source| HotReloadError::ReplacementLoad {
                 guard_id: guard_id.to_string(),
                 source,
             })?;
 
         for fixture in corpus.fixtures() {
-            let actual = match backend.evaluate(fixture.request()) {
+            let actual = match canary_backend.evaluate(fixture.request()) {
                 Ok(verdict) => serialize_canary_verdict(&verdict)?,
                 Err(source) => {
                     let actual = format!("error:{source}");
@@ -723,6 +787,14 @@ where
             }
         }
 
+        let backend = self
+            .backend_factory
+            .build_backend_for_guard(guard_id, new_module_bytes)
+            .map_err(|source| HotReloadError::ReplacementLoad {
+                guard_id: guard_id.to_string(),
+                source,
+            })?;
+
         let epoch_id = guard
             .replace_loaded_module(backend, Some(module_sha256))
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
@@ -746,9 +818,23 @@ where
             .ok_or_else(|| HotReloadError::GuardNotFound {
                 guard_id: guard_id.to_string(),
             })?;
-        let previous_module = guard.loaded_module();
-        let epoch_id =
-            self.reload_with_observability(guard_id, new_module_bytes, Some(reload_seq))?;
+        let module_sha256 = hex::encode(Sha256::digest(new_module_bytes));
+        self.ensure_digest_not_blocklisted(&module_sha256)?;
+        let backend = self
+            .backend_factory
+            .build_backend_for_guard(guard_id, new_module_bytes)
+            .map_err(|source| HotReloadError::ReplacementLoad {
+                guard_id: guard_id.to_string(),
+                source,
+            })?;
+        let (previous_module, epoch_id) = guard
+            .replace_loaded_module_with_previous(backend, Some(module_sha256))
+            .ok_or_else(|| HotReloadError::EpochCounterExhausted {
+                guard_id: guard_id.to_string(),
+            })?;
+        guard.record_reload_seq(reload_seq);
+        let span = guard_reload_span(RELOAD_APPLIED, guard.current_reload_seq());
+        let _span_guard = span.enter();
         Ok(ReloadWatchdog::new(
             guard_id,
             guard,
@@ -825,10 +911,14 @@ where
         new_module_bytes: Vec<u8>,
         debounce: Duration,
     ) -> Result<Option<DebouncedReload>, HotReloadError> {
+        let _guard = self
+            .guard(guard_id)?
+            .ok_or_else(|| HotReloadError::GuardNotFound {
+                guard_id: guard_id.to_string(),
+            })?;
         let slot = self.reload_slot(guard_id)?;
         {
             let mut slot_guard = slot.lock().await;
-            slot_guard.last_attempt_at = Some(Instant::now());
             slot_guard.pending_module_bytes = Some(new_module_bytes);
             if slot_guard.in_flight {
                 return Ok(None);
@@ -841,11 +931,13 @@ where
             })?;
         }
 
+        let mut in_flight_reset = ReloadInFlightReset::new(Arc::clone(&slot));
         tokio::time::sleep(debounce).await;
 
         let mut slot_guard = slot.lock().await;
         let Some(module_bytes) = slot_guard.pending_module_bytes.take() else {
             slot_guard.in_flight = false;
+            in_flight_reset.disarm();
             return Err(HotReloadError::PendingReloadMissing {
                 guard_id: guard_id.to_string(),
             });
@@ -853,8 +945,8 @@ where
         let reload_seq = slot_guard.seq;
         let reload_result =
             self.reload_with_observability(guard_id, &module_bytes, Some(reload_seq));
-        slot_guard.last_attempt_at = Some(Instant::now());
         slot_guard.in_flight = false;
+        in_flight_reset.disarm();
         let epoch_id = reload_result?;
 
         Ok(Some(DebouncedReload {
@@ -868,15 +960,24 @@ where
         &self,
         guard_id: impl Into<String>,
         path: impl AsRef<Path>,
-        trigger_tx: std::sync::mpsc::Sender<ReloadTrigger>,
+        trigger_tx: mpsc::Sender<ReloadTrigger>,
     ) -> Result<RecommendedWatcher, HotReloadError> {
         let guard_id = guard_id.into();
         let watched_path = path.as_ref().to_path_buf();
         let fallback_path = watched_path.clone();
         let mut watcher =
             notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
-                let Ok(event) = result else {
-                    return;
+                let event = match result {
+                    Ok(event) => event,
+                    Err(error) => {
+                        let _ = trigger_tx.try_send(ReloadTrigger {
+                            guard_id: guard_id.clone(),
+                            source: ReloadTriggerSource::WatcherError {
+                                message: error.to_string(),
+                            },
+                        });
+                        return;
+                    }
                 };
                 if !is_reload_file_event(&event.kind) {
                     return;
@@ -886,7 +987,7 @@ where
                     .first()
                     .cloned()
                     .unwrap_or_else(|| fallback_path.clone());
-                let _ = trigger_tx.send(ReloadTrigger {
+                let _ = trigger_tx.try_send(ReloadTrigger {
                     guard_id: guard_id.clone(),
                     source: ReloadTriggerSource::FileChanged { path },
                 });
@@ -906,12 +1007,13 @@ where
         interval: Duration,
         mut poller: P,
         trigger_tx: mpsc::Sender<ReloadTrigger>,
-    ) -> JoinHandle<Result<(), HotReloadError>>
+    ) -> Result<JoinHandle<Result<(), HotReloadError>>, HotReloadError>
     where
         P: RegistryDigestPoller,
     {
         let guard_id = guard_id.into();
-        tokio::spawn(async move {
+        let handle = Handle::try_current().map_err(|_| HotReloadError::NoTokioRuntime)?;
+        Ok(handle.spawn(async move {
             let mut last_digest = initial_digest;
             let mut interval = tokio::time::interval(interval);
             loop {
@@ -933,7 +1035,7 @@ where
                     .await
                     .map_err(|_| HotReloadError::TriggerReceiverClosed)?;
             }
-        })
+        }))
     }
 }
 
@@ -942,6 +1044,12 @@ fn is_reload_file_event(kind: &EventKind) -> bool {
         kind,
         EventKind::Any | EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
     )
+}
+
+fn default_blocklist() -> GuardDigestBlocklist {
+    GuardDigestBlocklist::from_environment().unwrap_or_else(|_| {
+        GuardDigestBlocklist::from_state_home(std::env::temp_dir().join("chio-guard-state"))
+    })
 }
 
 fn read_to_string(path: &Path) -> Result<String, HotReloadError> {

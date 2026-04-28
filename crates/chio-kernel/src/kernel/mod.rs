@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use arc_swap::ArcSwap;
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
@@ -879,14 +879,15 @@ pub struct ChioKernel {
     guards: Vec<Box<dyn Guard>>,
     post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     budget_store: Arc<dyn BudgetStore>,
+    budget_store_lock: Mutex<()>,
     revocation_store: Arc<dyn RevocationStore>,
     capability_authority: Box<dyn CapabilityAuthority>,
     tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
     resource_providers: Vec<Box<dyn ResourceProvider>>,
     prompt_providers: Vec<Box<dyn PromptProvider>>,
     sessions: DashMap<SessionId, Arc<Session>>,
-    receipt_log: ArcSwap<ReceiptLog>,
-    child_receipt_log: ArcSwap<ChildReceiptLog>,
+    receipt_log: Mutex<ReceiptLog>,
+    child_receipt_log: Mutex<ChildReceiptLog>,
     receipt_store: Option<Arc<dyn ReceiptStore>>,
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
@@ -1056,7 +1057,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
     }
 
     fn list_roots(&mut self) -> Result<Vec<RootDefinition>, KernelError> {
-        let child_context = begin_child_request_in_sessions(
+        let (child_context, _start) = begin_child_request_in_sessions(
             self.sessions,
             self.parent_context,
             nested_child_request_id(&self.parent_context.request_id, "roots"),
@@ -1101,7 +1102,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
         &mut self,
         operation: CreateMessageOperation,
     ) -> Result<CreateMessageResult, KernelError> {
-        let child_context = begin_child_request_in_sessions(
+        let (child_context, _start) = begin_child_request_in_sessions(
             self.sessions,
             self.parent_context,
             nested_child_request_id(&self.parent_context.request_id, "sample"),
@@ -1142,7 +1143,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
         &mut self,
         operation: CreateElicitationOperation,
     ) -> Result<CreateElicitationResult, KernelError> {
-        let child_context = begin_child_request_in_sessions(
+        let (child_context, _start) = begin_child_request_in_sessions(
             self.sessions,
             self.parent_context,
             nested_child_request_id(&self.parent_context.request_id, "elicit"),
@@ -1255,7 +1256,8 @@ impl ChioKernel {
     ) -> Option<String> {
         let id = session_id?;
         self.with_session(id, |session| {
-            Ok(extract_tenant_id_from_auth_context(session.auth_context()))
+            let auth_context = session.auth_context();
+            Ok(extract_tenant_id_from_auth_context(&auth_context))
         })
         .ok()
         .flatten()
@@ -1273,6 +1275,10 @@ impl ChioKernel {
         &self,
         f: impl FnOnce(&dyn BudgetStore) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
+        let _guard = match self.budget_store_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         f(self.budget_store.as_ref())
     }
 
@@ -1315,14 +1321,15 @@ impl ChioKernel {
             guards: Vec::new(),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
+            budget_store_lock: Mutex::new(()),
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
             sessions: DashMap::new(),
-            receipt_log: ArcSwap::from_pointee(ReceiptLog::new()),
-            child_receipt_log: ArcSwap::from_pointee(ChildReceiptLog::new()),
+            receipt_log: Mutex::new(ReceiptLog::new()),
+            child_receipt_log: Mutex::new(ChildReceiptLog::new()),
             receipt_store: None,
             payment_adapter: None,
             price_oracle: None,
@@ -1990,14 +1997,10 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        match tokio::runtime::Handle::try_current() {
-            Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
-                tokio::task::block_in_place(|| {
-                    self.evaluate_tool_call_sync_inner(request, None, extra_metadata)
-                })
-            }
-            _ => self.evaluate_tool_call_sync_inner(request, None, extra_metadata),
-        }
+        use crate::kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
+        BlockingToolEvaluator
+            .evaluate_with_metadata(self, request, extra_metadata)
+            .await
     }
 
     #[cfg(feature = "legacy-sync")]
@@ -3251,11 +3254,17 @@ impl ChioKernel {
 
     /// Read-only access to the receipt log.
     pub fn receipt_log(&self) -> ReceiptLog {
-        self.receipt_log.load_full().as_ref().clone()
+        match self.receipt_log.lock() {
+            Ok(log) => log.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
     }
 
     pub fn child_receipt_log(&self) -> ChildReceiptLog {
-        self.child_receipt_log.load_full().as_ref().clone()
+        match self.child_receipt_log.lock() {
+            Ok(log) => log.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
     }
 
     pub fn guard_count(&self) -> usize {
@@ -5392,20 +5401,69 @@ impl ChioKernel {
     }
 
     fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
-        let receipt_log = self.receipt_log.load();
-        let chio_receipt_match = receipt_log
-            .receipts()
-            .iter()
-            .any(|receipt| receipt.id == receipt_id);
+        let chio_receipt_match = match self.receipt_log.lock() {
+            Ok(log) => log
+                .receipts()
+                .iter()
+                .any(|receipt| receipt.id == receipt_id),
+            Err(poisoned) => poisoned
+                .into_inner()
+                .receipts()
+                .iter()
+                .any(|receipt| receipt.id == receipt_id),
+        };
         if chio_receipt_match {
             return true;
         }
 
-        let child_receipt_log = self.child_receipt_log.load();
-        child_receipt_log
-            .receipts()
-            .iter()
-            .any(|receipt| receipt.id == receipt_id)
+        match self.child_receipt_log.lock() {
+            Ok(log) => log
+                .receipts()
+                .iter()
+                .any(|receipt| receipt.id == receipt_id),
+            Err(poisoned) => poisoned
+                .into_inner()
+                .receipts()
+                .iter()
+                .any(|receipt| receipt.id == receipt_id),
+        }
+    }
+
+    fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
+        let tool_match = match self.receipt_log.lock() {
+            Ok(log) => log
+                .receipts()
+                .iter()
+                .find(|receipt| receipt.id == receipt_id)
+                .cloned()
+                .map(LocalReceiptArtifact::Tool),
+            Err(poisoned) => poisoned
+                .into_inner()
+                .receipts()
+                .iter()
+                .find(|receipt| receipt.id == receipt_id)
+                .cloned()
+                .map(LocalReceiptArtifact::Tool),
+        };
+        if tool_match.is_some() {
+            return tool_match;
+        }
+
+        match self.child_receipt_log.lock() {
+            Ok(log) => log
+                .receipts()
+                .iter()
+                .find(|receipt| receipt.id == receipt_id)
+                .cloned()
+                .map(LocalReceiptArtifact::Child),
+            Err(poisoned) => poisoned
+                .into_inner()
+                .receipts()
+                .iter()
+                .find(|receipt| receipt.id == receipt_id)
+                .cloned()
+                .map(LocalReceiptArtifact::Child),
+        }
     }
 
     fn is_trusted_governed_continuation_signer(&self, signer: &chio_core::PublicKey) -> bool {
@@ -5424,27 +5482,6 @@ impl ChioKernel {
             .trusted_public_keys()
             .into_iter()
             .any(|candidate| candidate == *signer)
-    }
-
-    fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
-        let receipt_log = self.receipt_log.load();
-        let tool_match = receipt_log
-            .receipts()
-            .iter()
-            .find(|receipt| receipt.id == receipt_id)
-            .cloned()
-            .map(LocalReceiptArtifact::Tool);
-        if tool_match.is_some() {
-            return tool_match;
-        }
-
-        let child_receipt_log = self.child_receipt_log.load();
-        child_receipt_log
-            .receipts()
-            .iter()
-            .find(|receipt| receipt.id == receipt_id)
-            .cloned()
-            .map(LocalReceiptArtifact::Child)
     }
 
     fn unwind_aborted_monetary_invocation(
@@ -5655,19 +5692,17 @@ impl ChioKernel {
     }
 
     pub(crate) fn append_chio_receipt_to_local_log(&self, receipt: ChioReceipt) {
-        self.receipt_log.rcu(|log| {
-            let mut next = log.as_ref().clone();
-            next.append(receipt.clone());
-            next
-        });
+        match self.receipt_log.lock() {
+            Ok(mut log) => log.append(receipt),
+            Err(poisoned) => poisoned.into_inner().append(receipt),
+        }
     }
 
     fn append_child_receipt_to_local_log(&self, receipt: ChildRequestReceipt) {
-        self.child_receipt_log.rcu(|log| {
-            let mut next = log.as_ref().clone();
-            next.append(receipt.clone());
-            next
-        });
+        match self.child_receipt_log.lock() {
+            Ok(mut log) => log.append(receipt),
+            Err(poisoned) => poisoned.into_inner().append(receipt),
+        }
     }
 }
 

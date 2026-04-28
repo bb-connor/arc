@@ -59,7 +59,7 @@
             "uid": "${DS_JAEGER}"
           },
           "query": "$trace_id",
-          "queryType": "traceID",
+          "queryType": "search",
           "refId": "A",
           "service": "$service_name",
           "tags": [

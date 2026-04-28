@@ -97,7 +97,7 @@ pub enum AttributeCardinality {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OtelAttribute {
     pub key: &'static str,
-    pub value: String,
+    pub value: serde_json::Value,
 }
 
 /// OTel-compatible GenAI tool-call span representation.
@@ -149,26 +149,17 @@ pub fn build_gen_ai_tool_call_span(input: GenAiToolCallSpanInput<'_>) -> GenAiTo
     );
     push_attr(&mut attributes, ATTR_GEN_AI_TOOL_NAME, input.tool_name);
     if !input.finish_reasons.is_empty() {
-        push_attr_with_limit(
+        push_string_array_attr(
             &mut attributes,
             ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
-            &input.finish_reasons.join(","),
-            FINISH_REASONS_MAX_CHARS,
+            input.finish_reasons,
         );
     }
     if let Some(tokens) = input.usage_input_tokens {
-        push_attr(
-            &mut attributes,
-            ATTR_GEN_AI_USAGE_INPUT_TOKENS,
-            &tokens.to_string(),
-        );
+        push_u64_attr(&mut attributes, ATTR_GEN_AI_USAGE_INPUT_TOKENS, tokens);
     }
     if let Some(tokens) = input.usage_output_tokens {
-        push_attr(
-            &mut attributes,
-            ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
-            &tokens.to_string(),
-        );
+        push_u64_attr(&mut attributes, ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, tokens);
     }
     if let Some(receipt_id) = input.chio_receipt_id {
         push_attr(&mut attributes, ATTR_CHIO_RECEIPT_ID, receipt_id);
@@ -192,13 +183,13 @@ pub fn build_gen_ai_tool_call_span(input: GenAiToolCallSpanInput<'_>) -> GenAiTo
 
 pub fn attribute_cardinality(key: &str) -> Option<AttributeCardinality> {
     match key {
-        ATTR_GEN_AI_SYSTEM
-        | ATTR_GEN_AI_OPERATION_NAME
-        | ATTR_GEN_AI_RESPONSE_FINISH_REASONS
-        | ATTR_GEN_AI_USAGE_INPUT_TOKENS
-        | ATTR_GEN_AI_USAGE_OUTPUT_TOKENS => Some(AttributeCardinality::Low),
+        ATTR_GEN_AI_SYSTEM | ATTR_GEN_AI_OPERATION_NAME | ATTR_GEN_AI_RESPONSE_FINISH_REASONS => {
+            Some(AttributeCardinality::Low)
+        }
         ATTR_GEN_AI_REQUEST_MODEL
         | ATTR_GEN_AI_TOOL_NAME
+        | ATTR_GEN_AI_USAGE_INPUT_TOKENS
+        | ATTR_GEN_AI_USAGE_OUTPUT_TOKENS
         | ATTR_CHIO_KERNEL_ID
         | ATTR_CHIO_SERVER_ID
         | ATTR_CHIO_AGENT_ID => Some(AttributeCardinality::Bounded),
@@ -223,7 +214,28 @@ fn push_attr_with_limit(
 ) {
     attributes.push(OtelAttribute {
         key,
-        value: truncate_chars(value, max_chars),
+        value: serde_json::Value::String(truncate_chars(value, max_chars)),
+    });
+}
+
+fn push_string_array_attr(attributes: &mut Vec<OtelAttribute>, key: &'static str, values: &[&str]) {
+    attributes.push(OtelAttribute {
+        key,
+        value: serde_json::Value::Array(
+            values
+                .iter()
+                .map(|value| {
+                    serde_json::Value::String(truncate_chars(value, FINISH_REASONS_MAX_CHARS))
+                })
+                .collect(),
+        ),
+    });
+}
+
+fn push_u64_attr(attributes: &mut Vec<OtelAttribute>, key: &'static str, value: u64) {
+    attributes.push(OtelAttribute {
+        key,
+        value: serde_json::Value::Number(serde_json::Number::from(value)),
     });
 }
 

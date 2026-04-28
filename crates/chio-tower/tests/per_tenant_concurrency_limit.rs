@@ -183,3 +183,34 @@ async fn different_tenants_have_independent_concurrency_slots() {
 
     assert_eq!(recorder.max_active(), 2);
 }
+
+#[tokio::test]
+async fn new_tenants_are_rejected_after_bucket_cap() {
+    let inner = service_fn(|_request: KernelRequest| async { Ok::<_, KernelServiceError>(()) });
+    let service = TenantConcurrencyLimitLayer::new(1)
+        .with_max_tenants(1)
+        .layer(inner);
+
+    let mut first_service = service.clone();
+    first_service
+        .ready()
+        .await
+        .unwrap_or_else(|error| panic!("first service not ready: {error}"))
+        .call(make_request("req-a-1", "tenant-a"))
+        .await
+        .unwrap_or_else(|error| panic!("first tenant failed: {error}"));
+
+    let mut second_service = service.clone();
+    let error = match second_service
+        .ready()
+        .await
+        .unwrap_or_else(|error| panic!("second service not ready: {error}"))
+        .call(make_request("req-b-1", "tenant-b"))
+        .await
+    {
+        Ok(()) => panic!("second tenant should be rejected after bucket cap"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(error, KernelServiceError::Overloaded));
+}

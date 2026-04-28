@@ -271,7 +271,12 @@ pub fn register_guard_metric_families() -> GuardMetricRegistry {
 
 #[must_use]
 pub fn guard_id_label_from_digest(digest: &str) -> String {
-    digest.chars().take(12).collect()
+    digest
+        .strip_prefix("sha256:")
+        .unwrap_or(digest)
+        .chars()
+        .take(12)
+        .collect()
 }
 
 #[must_use]

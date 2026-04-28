@@ -43,7 +43,7 @@ TARGETS=(
 
 for target in "${TARGETS[@]}"; do
     cargo +nightly fuzz build "$target" --release --sanitizer "$SANITIZER"
-    cp "../target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
+    cp "target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
 
     # Pack the per-target seed corpus when one exists in-tree.
     if [ -d "corpus/$target" ] && [ -n "$(ls -A "corpus/$target" 2>/dev/null)" ]; then

@@ -101,7 +101,7 @@ fn make_context_request(index: usize) -> TestResult<ToolCallRequest> {
     })
 }
 
-fn evaluate_guard(guard: &WasmGuard, index: usize) -> TestResult<Verdict> {
+fn evaluate_guard(guard: &WasmGuard, index: usize) -> TestResult<(usize, Verdict)> {
     let request = make_context_request(index)?;
     let scope = ChioScope::default();
     let agent_id = "agent-1".to_string();
@@ -114,7 +114,7 @@ fn evaluate_guard(guard: &WasmGuard, index: usize) -> TestResult<Verdict> {
         session_filesystem_roots: None,
         matched_grant_index: None,
     };
-    Ok(guard.evaluate(&ctx)?)
+    Ok((index, guard.evaluate(&ctx)?))
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -137,11 +137,18 @@ async fn hot_reload_under_100rps_drops_no_requests() -> TestResult {
     let reload_epoch = reload.await??;
     let mut allow = 0_usize;
     let mut deny = 0_usize;
+    let mut outcomes = Vec::new();
     while let Some(outcome) = tasks.join_next().await {
         match outcome?? {
-            Verdict::Allow => allow += 1,
-            Verdict::Deny => deny += 1,
-            Verdict::PendingApproval => {
+            (index, Verdict::Allow) => {
+                allow += 1;
+                outcomes.push((index, Verdict::Allow));
+            }
+            (index, Verdict::Deny) => {
+                deny += 1;
+                outcomes.push((index, Verdict::Deny));
+            }
+            (_, Verdict::PendingApproval) => {
                 return Err(std::io::Error::other(
                     "unexpected pending approval verdict during reload",
                 )
@@ -153,6 +160,23 @@ async fn hot_reload_under_100rps_drops_no_requests() -> TestResult {
     assert_eq!(allow + deny, 100, "all scheduled requests must complete");
     assert!(allow > 0, "expected at least one pre-reload allow verdict");
     assert!(deny > 0, "expected at least one post-reload deny verdict");
+    outcomes.sort_by_key(|(index, _)| *index);
+    let first_deny = outcomes
+        .iter()
+        .position(|(_, verdict)| matches!(verdict, Verdict::Deny))
+        .ok_or_else(|| std::io::Error::other("missing post-reload deny boundary"))?;
+    assert!(
+        outcomes[..first_deny]
+            .iter()
+            .all(|(_, verdict)| matches!(verdict, Verdict::Allow)),
+        "pre-boundary requests must all use the initial allow epoch"
+    );
+    assert!(
+        outcomes[first_deny..]
+            .iter()
+            .all(|(_, verdict)| matches!(verdict, Verdict::Deny)),
+        "post-boundary requests must all use the reloaded deny epoch"
+    );
     assert_eq!(guard.current_epoch_id(), reload_epoch);
     Ok(())
 }

@@ -150,12 +150,80 @@ fn receipt_records_w3c_otel_trace_and_span_ids() -> Result<(), Box<dyn Error>> {
     let schema: serde_json::Value = serde_json::from_str(&schema)?;
     assert_eq!(
         schema["properties"]["otel"]["properties"]["trace_id"]["pattern"],
-        "^[0-9a-f]{32}$"
+        "^(?!0{32}$)[0-9a-f]{32}$"
     );
     assert_eq!(
         schema["properties"]["otel"]["properties"]["span_id"]["pattern"],
-        "^[0-9a-f]{16}$"
+        "^(?!0{16}$)[0-9a-f]{16}$"
     );
+
+    Ok(())
+}
+
+#[test]
+fn receipt_rejects_all_zero_otel_ids() -> Result<(), Box<dyn Error>> {
+    let (kernel, capability) = kernel_and_capability()?;
+    let request = make_request("req-provenance-zero-otel", &capability);
+
+    let error = match kernel.evaluate_tool_call_blocking_with_metadata(
+        &request,
+        Some(serde_json::json!({
+            "provenance": {
+                "otel": {
+                    "trace_id": "00000000000000000000000000000000",
+                    "span_id": "0123456789abcdef"
+                }
+            }
+        })),
+    ) {
+        Ok(_) => {
+            return Err(
+                std::io::Error::other("zero trace id unexpectedly produced a response").into(),
+            );
+        }
+        Err(error) => error,
+    };
+
+    assert!(
+        error.to_string().contains("trace_id"),
+        "unexpected error: {error}"
+    );
+    assert_eq!(kernel.receipt_log().len(), 0);
+
+    Ok(())
+}
+
+#[test]
+fn receipt_rejects_null_supply_chain() -> Result<(), Box<dyn Error>> {
+    let (kernel, capability) = kernel_and_capability()?;
+    let request = make_request("req-provenance-null-supply-chain", &capability);
+
+    let error = match kernel.evaluate_tool_call_blocking_with_metadata(
+        &request,
+        Some(serde_json::json!({
+            "provenance": {
+                "otel": {
+                    "trace_id": "0123456789abcdef0123456789abcdef",
+                    "span_id": "0123456789abcdef"
+                },
+                "supply_chain": null
+            }
+        })),
+    ) {
+        Ok(_) => {
+            return Err(std::io::Error::other(
+                "null supply_chain unexpectedly produced a response",
+            )
+            .into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(
+        error.to_string().contains("supply_chain"),
+        "unexpected error: {error}"
+    );
+    assert_eq!(kernel.receipt_log().len(), 0);
 
     Ok(())
 }

@@ -126,7 +126,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by (from_verdict, to_verdict) (count_over_time({service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | tenant_id=~\"$tenant_id\" | policy_ref=~\"$policy_ref\" | receipt_id=~\"$receipt_id\" [$__interval]))",
+          "expr": "sum by (from_verdict, to_verdict) (count_over_time({service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | chio_tenant_id=~\"$tenant_id\" | chio_policy_ref=~\"$policy_ref\" | chio_receipt_id=~\"$receipt_id\" [$__interval]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -217,7 +217,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by (reason_delta) (count_over_time({service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | tenant_id=~\"$tenant_id\" | policy_ref=~\"$policy_ref\" | receipt_id=~\"$receipt_id\" [$__interval]))",
+          "expr": "sum by (reason_delta) (count_over_time({service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | chio_tenant_id=~\"$tenant_id\" | chio_policy_ref=~\"$policy_ref\" | chio_receipt_id=~\"$receipt_id\" [$__interval]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -278,7 +278,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "topk(100, sum by (receipt_id, run_id, policy_ref, from_verdict, to_verdict, reason_delta, guard_delta) (count_over_time({service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | tenant_id=~\"$tenant_id\" | policy_ref=~\"$policy_ref\" | receipt_id=~\"$receipt_id\" [$__range])))",
+          "expr": "topk(100, sum by (chio_receipt_id, chio_replay_run_id, chio_policy_ref, from_verdict, to_verdict, reason_delta, guard_delta) (count_over_time({service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | chio_tenant_id=~\"$tenant_id\" | chio_policy_ref=~\"$policy_ref\" | chio_receipt_id=~\"$receipt_id\" [$__range])))",
           "queryType": "instant",
           "refId": "A"
         }
@@ -301,10 +301,10 @@
             "renameByName": {
               "from_verdict": "from verdict",
               "guard_delta": "guard delta",
-              "policy_ref": "policy ref",
+              "chio_policy_ref": "policy ref",
               "reason_delta": "reason delta",
-              "receipt_id": "receipt id",
-              "run_id": "run id",
+              "chio_receipt_id": "receipt id",
+              "chio_replay_run_id": "run id",
               "to_verdict": "to verdict"
             }
           }
@@ -341,7 +341,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "{service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | tenant_id=~\"$tenant_id\" | policy_ref=~\"$policy_ref\" | receipt_id=~\"$receipt_id\"",
+          "expr": "{service_name=\"chio-replay\"} | json | event=\"verdict_drift\" | chio_tenant_id=~\"$tenant_id\" | chio_policy_ref=~\"$policy_ref\" | chio_receipt_id=~\"$receipt_id\"",
           "queryType": "range",
           "refId": "A"
         }

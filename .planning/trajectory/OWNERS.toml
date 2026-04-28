@@ -81,21 +81,20 @@ notes  = "Public-seed warning README; coupled to test-key.seed"
 [[ownership]]
 glob   = "crates/chio-kernel/src/kernel/mod.rs"
 owners = ["M05"]
-frozen = true
-frozen_until_milestone = "M05"
-notes  = "FROZEN during M05 P1-P3; single-owner enforcement via branch-ruleset path restriction (only [M05]-prefixed PRs may modify; @bb-connor reviews)"
+codeowners = false
+notes  = "M05 freeze released after P3; normal ownership remains with @bb-connor"
 
 [[ownership]]
 glob   = "crates/chio-kernel/src/session.rs"
 owners = ["M05"]
-frozen = true
-frozen_until_milestone = "M05"
+codeowners = false
+notes  = "M05 freeze released after P3; normal ownership remains with @bb-connor"
 
 [[ownership]]
 glob   = "crates/chio-kernel/src/kernel/session_ops.rs"
 owners = ["M05"]
-frozen = true
-frozen_until_milestone = "M05"
+codeowners = false
+notes  = "M05 freeze released after P3; normal ownership remains with @bb-connor"
 
 [[ownership]]
 glob   = "crates/chio-kernel/src/receipt_*.rs"
@@ -249,6 +248,11 @@ glob   = "fuzz/fuzz_targets/**"
 owners = ["M02"]
 
 [[ownership]]
+glob   = "fuzz/corpus/**"
+owners = ["M02"]
+notes  = "Crash-triage corpus gate from M02.P4.T4"
+
+[[ownership]]
 glob   = "fuzz/corpora/**"
 owners = ["M02"]
 notes  = "Seeded from M01 vectors"
@@ -321,6 +325,23 @@ notes  = "PLANNED-NEW; lands in M02 P0/P1"
 glob   = "scripts/classify-trust-diff.sh"
 owners = ["SEQUENCER"]
 notes  = "PLANNED-NEW; lands in Wave 0 alongside trust-boundary policy enforcement"
+
+# ---------- M02 P4.T4 regression-test deletion gate ----------
+
+[[ownership]]
+glob   = "crates/*/tests/regression_*.rs"
+owners = ["M02"]
+notes  = "Crash-triage regression deletion gate from M02.P4.T4"
+
+[[ownership]]
+glob   = "tests/regression_*.rs"
+owners = ["M02"]
+notes  = "Crash-triage regression deletion gate from M02.P4.T4"
+
+[[ownership]]
+glob   = "fuzz/corpus/**"
+owners = ["M02"]
+notes  = "Intentional duplicate for the explicit M02.P4.T4 corpus deletion gate"
 
 # ---------- M02 P3.T2 mutants release-cycle gate ----------
 

@@ -5,6 +5,8 @@ use chio_core::capability::{ModelMetadata, ModelSafetyTier};
 use dashmap::DashMap;
 use regex::Regex;
 
+use crate::session::SessionRequestStart;
+
 use super::*;
 
 pub(super) fn session_from_map(
@@ -22,12 +24,9 @@ pub(super) fn begin_session_request_in_sessions(
     context: &OperationContext,
     operation_kind: OperationKind,
     cancellable: bool,
-) -> Result<(), KernelError> {
+) -> Result<SessionRequestStart, KernelError> {
     let session = session_from_map(sessions, &context.session_id)?;
-    session.validate_context(context)?;
-    session.ensure_operation_allowed(operation_kind)?;
-    session.track_request(context, operation_kind, cancellable)?;
-    Ok(())
+    Ok(session.track_request(context, operation_kind, cancellable)?)
 }
 
 pub(super) fn begin_child_request_in_sessions(
@@ -37,10 +36,9 @@ pub(super) fn begin_child_request_in_sessions(
     operation_kind: OperationKind,
     progress_token: Option<ProgressToken>,
     cancellable: bool,
-) -> Result<OperationContext, KernelError> {
+) -> Result<(OperationContext, SessionRequestStart), KernelError> {
     let parent_session = session_from_map(sessions, &parent_context.session_id)?;
     parent_session.validate_context(parent_context)?;
-    parent_session.validate_parent_request_lineage(&request_id, &parent_context.request_id)?;
 
     let child_context = OperationContext {
         session_id: parent_context.session_id.clone(),
@@ -49,8 +47,9 @@ pub(super) fn begin_child_request_in_sessions(
         parent_request_id: Some(parent_context.request_id.clone()),
         progress_token,
     };
-    begin_session_request_in_sessions(sessions, &child_context, operation_kind, cancellable)?;
-    Ok(child_context)
+    let start =
+        begin_session_request_in_sessions(sessions, &child_context, operation_kind, cancellable)?;
+    Ok((child_context, start))
 }
 
 pub(super) fn complete_session_request_with_terminal_state_in_sessions(

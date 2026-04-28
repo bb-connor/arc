@@ -204,9 +204,32 @@ pub fn execute_bridge_mcp_tool_call(
                 handle.block_on(execute_bridge_mcp_tool_call_async(kernel, request))
             })
         }
-        Ok(_) => Err(AdapterError::KernelRuntime(
-            "execute_bridge_mcp_tool_call cannot block a current-thread tokio runtime; use execute_bridge_mcp_tool_call_async".to_string(),
-        )),
+        Ok(_) => {
+            let kernel_request = ToolCallRequest {
+                request_id: request.request_id.clone(),
+                capability: request.capability.clone(),
+                tool_name: request.tool_name.clone(),
+                server_id: request.server_id.clone(),
+                agent_id: request.agent_id.clone(),
+                arguments: request.arguments.clone(),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: request.model_metadata.clone(),
+                federated_origin_kernel_id: None,
+            };
+            let response = kernel
+                .evaluate_tool_call_blocking_with_metadata(
+                    &kernel_request,
+                    request.route_selection_metadata.clone(),
+                )
+                .map_err(|error| AdapterError::KernelRuntime(error.to_string()))?;
+            bridge_mcp_tool_call_from_response(
+                response,
+                &request.request_id,
+                request.peer_supports_chio_tool_streaming,
+            )
+        }
         Err(_) => {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()

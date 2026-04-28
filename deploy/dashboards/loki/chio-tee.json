@@ -117,7 +117,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by (verdict) (count_over_time({service_name=~\"chio-tee|chio-replay|chio-otel-receipt-exporter\"} | json | chio_tenant_id=~\"$tenant_id\" | chio_receipt_id=~\"$receipt_id\" | chio_verdict=~\"$verdict\" [$__interval]))",
+          "expr": "sum by (chio_verdict) (count_over_time({service_name=~\"chio-tee|chio-replay|chio-otel-receipt-exporter\"} | json | chio_tenant_id=~\"$tenant_id\" | chio_receipt_id=~\"$receipt_id\" | chio_verdict=~\"$verdict\" [$__interval]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -214,7 +214,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by (tee_mode, verdict) (count_over_time({service_name=\"chio-tee\"} | json | chio_tenant_id=~\"$tenant_id\" | chio_receipt_id=~\"$receipt_id\" | chio_tee_mode=~\"$tee_mode\" | chio_verdict=~\"$verdict\" [$__interval]))",
+          "expr": "sum by (chio_tee_mode, chio_verdict) (count_over_time({service_name=\"chio-tee\"} | json | chio_tenant_id=~\"$tenant_id\" | chio_receipt_id=~\"$receipt_id\" | chio_tee_mode=~\"$tee_mode\" | chio_verdict=~\"$verdict\" [$__interval]))",
           "queryType": "range",
           "refId": "A"
         }
