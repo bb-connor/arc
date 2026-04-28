@@ -70,6 +70,7 @@ members = [
     #
     # Observability & ops
     "crates/chio-metering",
+    "crates/chio-otel-receipt-exporter",
     "crates/chio-siem",
     #
     # Control plane & storage
