@@ -897,10 +897,11 @@ impl Session {
     pub fn set_auth_context(
         &self,
         auth_context: SessionAuthContext,
-    ) -> (bool, SessionAnchorSnapshot) {
+    ) -> (bool, SessionAnchorSnapshot, Option<String>) {
         self.auth_state.replace_with(|current| {
             let rotated = current.auth_context != auth_context;
             if rotated {
+                let previous_anchor_id = current.session_anchor.id().to_string();
                 let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
                 let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
                 let snapshot = SessionAnchorSnapshot {
@@ -914,7 +915,7 @@ impl Session {
                         auth_context,
                         session_anchor,
                     }),
-                    (true, snapshot),
+                    (true, snapshot, Some(previous_anchor_id)),
                 )
             } else {
                 (
@@ -927,6 +928,7 @@ impl Session {
                             auth_context: current.auth_context.clone(),
                             session_anchor: current.session_anchor.clone(),
                         },
+                        None,
                     ),
                 )
             }
@@ -1598,7 +1600,7 @@ mod tests {
             SessionAuthContext::in_process_anonymous()
         );
 
-        let (rotated, _) =
+        let (rotated, _snapshot, supersedes_anchor_id) =
             session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
                 "static-bearer:abcd1234",
                 "cafebabe",
@@ -1606,6 +1608,7 @@ mod tests {
             ));
 
         assert!(rotated);
+        assert_eq!(supersedes_anchor_id.as_deref(), Some(initial_anchor.id()));
         assert!(session.auth_context().is_authenticated());
         assert_eq!(
             session.auth_context().principal(),
@@ -1627,10 +1630,16 @@ mod tests {
             "cafebabe",
             Some("http://localhost:3000".to_string()),
         );
+        let initial_anchor = session.session_anchor().clone();
 
-        assert!(session.set_auth_context(auth_context.clone()).0);
+        let (rotated, _snapshot, supersedes_anchor_id) =
+            session.set_auth_context(auth_context.clone());
+        assert!(rotated);
+        assert_eq!(supersedes_anchor_id.as_deref(), Some(initial_anchor.id()));
         let rotated_anchor = session.session_anchor().clone();
-        assert!(!session.set_auth_context(auth_context).0);
+        let (rotated, _snapshot, supersedes_anchor_id) = session.set_auth_context(auth_context);
+        assert!(!rotated);
+        assert_eq!(supersedes_anchor_id, None);
 
         assert_eq!(session.session_anchor(), rotated_anchor);
     }

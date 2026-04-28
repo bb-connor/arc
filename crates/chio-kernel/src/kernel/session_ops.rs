@@ -97,9 +97,8 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let (session_snapshot, supersedes_anchor_id) =
             self.with_session_mut(session_id, |session| {
-                let previous_anchor_id = session.session_anchor().id().to_string();
-                let (rotated, session_snapshot) = session.set_auth_context(auth_context);
-                let supersedes_anchor_id = rotated.then_some(previous_anchor_id);
+                let (_rotated, session_snapshot, supersedes_anchor_id) =
+                    session.set_auth_context(auth_context);
                 Ok((session_snapshot, supersedes_anchor_id))
             })?;
         self.persist_session_anchor_snapshot(&session_snapshot, supersedes_anchor_id.as_deref())
