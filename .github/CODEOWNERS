@@ -62,6 +62,5 @@ scripts/check-fuzz-budget.sh                 @bb-connor
 scripts/classify-trust-diff.sh               @bb-connor
 crates/*/tests/regression_*.rs               @bb-connor
 tests/regression_*.rs                        @bb-connor
-fuzz/corpus/**                               @bb-connor
 releases.toml                                @bb-connor
 rust-toolchain.toml                          @bb-connor

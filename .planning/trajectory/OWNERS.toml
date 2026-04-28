@@ -338,11 +338,6 @@ glob   = "tests/regression_*.rs"
 owners = ["M02"]
 notes  = "Crash-triage regression deletion gate from M02.P4.T4"
 
-[[ownership]]
-glob   = "fuzz/corpus/**"
-owners = ["M02"]
-notes  = "Intentional duplicate for the explicit M02.P4.T4 corpus deletion gate"
-
 # ---------- M02 P3.T2 mutants release-cycle gate ----------
 
 [[ownership]]
