@@ -1,19 +1,11 @@
-# spec-drift.yml - Codegen drift gates for the M01 spec/codegen pipeline.
+# spec-drift.yml - Codegen drift gates.
 #
-# Owned by SEQUENCER per OWNERS.toml; individual jobs are tagged with
-# `# owner: M01` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
-#
-# Phase 3 (M01.P3.T5) lands two jobs here:
-#   - codegen-no-diff: runs `make codegen-check`, which invokes
-#     `cargo xtask codegen --lang {rust,python,ts,go} --check` and fails if
-#     any committed `_generated/` bytes drift from a fresh regeneration.
+# Jobs:
+#   - codegen-no-diff: runs `make codegen-check` and fails if any committed
+#     `_generated/` bytes drift from a fresh regeneration.
 #   - header-stamp-untouched: greps every generated file for the canonical
-#     "DO NOT EDIT - regenerate via ..." header and fails if any generated
-#     file is missing it (catches a hand-edit that wiped the stamp).
-#
-# Phase 5 (M01.P5) extends this file with vectors-byte-stable,
-# schema-coverage, and cross-lang-bytes jobs per
-# .planning/trajectory/01-spec-codegen-conformance.md.
+#     "DO NOT EDIT - regenerate via ..." header; fails if any file is missing it.
+#   - vectors-byte-stable, schema-coverage, cross-lang-bytes: conformance gates.
 
 name: spec-drift
 
@@ -168,11 +160,9 @@ jobs:
   vectors-byte-stable:
     name: vectors-byte-stable (freeze-vectors --check)
     # owner: M01
-    # M01.P5.T3: re-runs `cargo xtask freeze-vectors --check` on every PR so
-    # that a hand-edit to a `tests/bindings/vectors/**/*.json` payload (or to
-    # the MANIFEST.sha256) cannot land without a fresh regeneration. The
-    # xtask exits non-zero with a "stale" message if any committed vector
-    # diverges from its recomputed SHA-256.
+    # Re-runs `cargo xtask freeze-vectors --check` on every PR so a hand-edit
+    # to a vector payload or MANIFEST.sha256 cannot land without a fresh
+    # regeneration.
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -221,11 +211,9 @@ jobs:
   schema-coverage:
     name: schema-coverage (vectors_schema_pair)
     # owner: M01
-    # M01.P5.T3: runs the M01.P2.T8 vectors_schema_pair test target. The test
-    # asserts every wire schema in spec/schemas/ has at least one paired
-    # vector under tests/bindings/vectors/, and conversely that every vector
-    # references a known schema. This catches schema drift where a new wire
-    # type lands without conformance coverage (or vice versa).
+    # Runs the vectors_schema_pair test: asserts every wire schema in
+    # spec/schemas/ has at least one paired vector under tests/bindings/vectors/,
+    # and conversely that every vector references a known schema.
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -250,13 +238,10 @@ jobs:
   cross-lang-bytes:
     name: cross-lang-bytes (canonical_json_diff proptest)
     # owner: M01
-    # M01.P5.T3: runs the M01.P5.T1 canonical_json_diff proptest, which
-    # property-checks the Rust canonicalizer against RFC 8785 invariants
-    # (key ordering, string escapes, number normalization, etc.). When the
-    # Python and TypeScript SDKs grow first-party byte-equivalence checks
-    # (planned for a follow-up after M01.P3 lanes ship a regenerator with
-    # an assertion harness), invoke them as additional steps in this job;
-    # for now the Rust proptest is the gate.
+    # Runs the canonical_json_diff proptest, which property-checks the Rust
+    # canonicalizer against RFC 8785 invariants (key ordering, string escapes,
+    # number normalization). The Rust proptest is the gate until Python and
+    # TypeScript SDKs ship first-party byte-equivalence checks.
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:

@@ -1,10 +1,4 @@
-# dudect.yml - Nightly timing-leak harness lane (M02-owned).
-#
-# Source-doc anchors: .planning/trajectory/02-fuzzing-post-pr13.md
-#   - Phase 3 atomic task P3.T6 ("Add dudect.yml nightly workflow with
-#     two-consecutive-run pass rule (t < 4.5)").
-#   - "Timing-leak (dudect) harness" section + "false-positive on noisy
-#     host" risk note.
+# dudect.yml - Nightly timing-leak harness lane.
 #
 # Two-consecutive-run pass rule:
 #
@@ -306,7 +300,7 @@ jobs:
             # format string contains backticks that are Markdown code
             # spans for the issue body, not command substitution.
             # shellcheck disable=SC2016
-            body=$(printf 'The nightly dudect lane recorded a Welch t-statistic at or above the 4.5 leak threshold for harness `%s` in TWO consecutive runs. Per the two-consecutive-run pass rule (M02.P2.T4), this correlation is no longer dismissable as runner noise and warrants investigation.\n\n- Current run: https://github.com/%s/actions/runs/%s\n- Prior run:   https://github.com/%s/actions/runs/%s\n\nArtifacts `dudect-nightly-%s-<run_id>` carry the raw `%s.out` (full `cargo test` stdout including the dudect "max t" lines) and the per-run `%s.verdict` strings.\n\nSource-doc anchor: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 3 P3.T6 - "Timing-leak (dudect) harness" + the false-positive risk note.\n' \
+            body=$(printf 'The nightly dudect lane recorded a Welch t-statistic at or above the 4.5 leak threshold for harness `%s` in TWO consecutive runs. This correlation is no longer dismissable as runner noise and warrants investigation.\n\n- Current run: https://github.com/%s/actions/runs/%s\n- Prior run:   https://github.com/%s/actions/runs/%s\n\nArtifacts `dudect-nightly-%s-<run_id>` carry the raw `%s.out` (full `cargo test` stdout including the dudect "max t" lines) and the per-run `%s.verdict` strings.\n' \
               "${harness}" \
               "${GH_REPO}" "${cur_run_id}" \
               "${GH_REPO}" "${prior_run_id}" \

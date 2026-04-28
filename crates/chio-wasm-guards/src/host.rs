@@ -43,7 +43,6 @@ pub mod bindings {
     wasmtime::component::bindgen!({
         path: "../../wit/chio-guard",
         world: "guard",
-        // async = true is required by M06.P1.T2; macro syntax uses `async: true`.
         async: true,
         trappable_imports: true,
         with: {

@@ -1,8 +1,7 @@
 //! In-process content bundle storage for WASM guard policy context.
 //!
-//! M06.P1.T3 keeps this deliberately local to `chio-wasm-guards`: OCI-backed
-//! content bundles land later in M06.P2, while this phase needs a host-owned
-//! store that the `policy-context::bundle-handle` resource can read from.
+//! Deliberately local to `chio-wasm-guards`: the `policy-context::bundle-handle`
+//! resource reads from this host-owned store.
 
 use std::collections::HashMap;
 
@@ -23,7 +22,7 @@ pub enum BundleError {
     MissingBlob { sha256: String },
 }
 
-/// Minimal in-memory bundle store for M06.P1.
+/// Minimal in-memory bundle store.
 #[derive(Debug, Default, Clone)]
 pub struct InMemoryBundleStore {
     blobs: HashMap<[u8; 32], Vec<u8>>,

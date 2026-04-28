@@ -1,4 +1,4 @@
-//! Tests for M06.P1.T3 policy-context bundle handles and blob lookup.
+//! Tests for policy-context bundle handles and blob lookup.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 

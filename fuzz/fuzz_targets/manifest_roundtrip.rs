@@ -1,31 +1,4 @@
-// owned-by: M02 (fuzz lane); target authored under M02.P2.T6.
-//
-//! libFuzzer harness for the `chio-manifest::ToolManifest` canonical-JSON
-//! deserialization trust boundary plus a decode -> serialize -> decode
-//! roundtrip invariant.
-//!
-//! `ToolManifest` deserializes with `serde(deny_unknown_fields)` across
-//! every nested struct, so any structural drift between the wire format
-//! and the Rust types surfaces as `Err(serde_json::Error)`. The
-//! roundtrip arm asserts a BYTE-level invariant on the second-pass
-//! re-serialization: once a manifest is decoded and re-encoded, the
-//! `decode -> encode` cycle on those bytes MUST emit the exact same
-//! bytes a second time. That catches nondeterministic serialization
-//! (object-key reorderings, whitespace drift, optional-field round-trip
-//! anomalies) that a `serde_json::Value`-level structural compare
-//! would silently mask.
-//!
-//! Cleanup C6: previously the assertion compared two reparsed
-//! `serde_json::Value`s, which forgives wire-format drift as long as
-//! the abstract object-set is equal. The new assertion is on raw
-//! bytes; structural equality is kept as a pre-check so a benign
-//! `serde_json` fmt drift surfaces with a clear panic message rather
-//! than a raw byte diff.
-//!
-//! The structure-aware canonical-JSON mutator is wired in via
-//! [`libfuzzer_sys::fuzz_mutator!`].
-//!
-//! Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
+//! Trust-boundary fuzz target for `chio-manifest::ToolManifest` canonical-JSON deserialization and byte-stable roundtrip.
 
 #![no_main]
 

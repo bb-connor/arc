@@ -1,19 +1,10 @@
 name: demo-pages
 
-# Build and deploy `docs/demo/` to GitHub Pages.
+# Build and deploy docs/demo/ to GitHub Pages.
 #
-# Per .planning/trajectory/08-browser-edge-sdk.md "Demo path lock":
-#   - Trigger: push to `main` whose changeset touches docs/demo/** OR any
-#     path that produces a wasm artifact (crates/chio-kernel-browser/**,
-#     sdks/typescript/packages/browser/**).
-#   - Wasm artifact source: download `wasm-artifacts` from the latest
-#     successful `web-sdk.yml` run on `main`, copy the browser dist/web/
-#     output into docs/demo/dist/.
-#   - Deploy via actions/deploy-pages@v4 (pinned major).
-#
-# This workflow is engineering output, not a release artifact. The
-# engineering-output banner on the page itself states this; the workflow's
-# environment URL is purely informational.
+# Triggers on push to main touching docs/demo/** or wasm-producing paths.
+# Downloads wasm-artifacts from the latest successful web-sdk.yml run on main,
+# copies the browser dist/web/ output into docs/demo/dist/, then deploys.
 
 on:
   push:

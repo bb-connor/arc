@@ -1,9 +1,9 @@
-//! Integration test for the M05.P4.T4 receipt-signer crash path.
+//! Integration test for the receipt-signer crash path.
 //!
 //! The graceful shutdown path is covered by `receipt_signing_async.rs`.
-//! This file models a harder runtime loss: the signing task is aborted
-//! after a request is queued, then queued and future producers must fail
-//! closed inside a short deadline rather than hanging on the channel.
+//! This file models a harder runtime loss: the signing task is aborted after
+//! a request is queued; subsequent producers must fail closed inside a short
+//! deadline rather than hanging on the channel.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 

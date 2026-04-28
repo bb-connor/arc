@@ -1,22 +1,19 @@
 //! Policy merge / evaluate property invariants for `chio-policy`.
 //!
-//! Four named invariants from `.planning/trajectory/03-capability-algebra-properties.md`
-//! lines 84-87. Each appears as the EXACT function name required by the
-//! ticket contract (M03.P1.T5). Names must not be renamed.
+//! Four named invariants (names must not be renamed):
+//! - `merge_associative_for_extends`
+//! - `deny_overrides_warn_and_allow`
+//! - `decision_deterministic_for_fixed_input`
+//! - `empty_extends_chain_is_identity_under_merge`
 //!
-//! Proptest config: 64 cases per invariant.
-//!
-//! Live-API notes vs the trajectory doc:
-//! - `Policy` in the doc maps to `HushSpec` in the live crate. The merge entry
-//!   point is the free function `chio_policy::merge::merge(base, child)`. The
-//!   evaluate entry point is `chio_policy::evaluate::evaluate(spec, action)`.
-//!   The decision enum is `chio_policy::Decision { Allow, Warn, Deny }`.
-//! - `merge` performs a child-overrides-base composition (with three
-//!   strategies: Replace, Merge, DeepMerge). It is NOT a deny-absorptive
-//!   fold across an extends chain by construction; a child policy that drops
-//!   a denying rule will silently relax the result. See
-//!   `deny_overrides_warn_and_allow` below for how this invariant is
-//!   expressed at the Decision algebra level instead.
+//! Live-API notes:
+//! - `Policy` maps to `HushSpec`. Merge entry point:
+//!   `chio_policy::merge::merge(base, child)`. Evaluate entry point:
+//!   `chio_policy::evaluate::evaluate(spec, action)`. Decision enum:
+//!   `chio_policy::Decision { Allow, Warn, Deny }`.
+//! - `merge` performs a child-overrides-base composition (Replace, Merge,
+//!   DeepMerge). It is NOT a deny-absorptive fold; a child policy that drops
+//!   a denying rule will silently relax the result.
 
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
@@ -31,8 +28,7 @@ use proptest::prelude::*;
 /// nightly). When the variable is unset or unparseable we fall back to
 /// the local default so cargo test stays fast. Without this helper, a
 /// per-block `ProptestConfig::with_cases(...)` literal would override the
-/// env-var derived default that proptest reads at startup, defeating the
-/// M03.P1.T6 tiered case-count gate.
+/// env-var derived default that proptest reads at startup.
 fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
     let cases = std::env::var("PROPTEST_CASES")
         .ok()

@@ -2,7 +2,7 @@ name: Release Binaries
 
 # A successful run of this workflow triggers .github/workflows/slsa.yml
 # (workflow_run), which downloads the chio-<target> archive artifacts
-# and emits a SLSA L2 provenance attestation per release (M09.P2.T3).
+# and emits a SLSA L2 provenance attestation per release.
 
 on:
   push:
@@ -29,11 +29,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     # `id-token: write` is required so `cosign sign-blob --yes` can
     # exchange the GitHub-issued OIDC token for a short-lived Fulcio
-    # signing certificate (M09.P3.T3). `contents: read` is the workflow
-    # default and stays explicit per principle of least privilege; the
-    # per-job grant overrides the workflow-level `contents: read` only
-    # for this matrix job, leaving the `release` job's `contents: write`
-    # untouched.
+    # signing certificate. Per principle of least privilege, the per-job
+    # grant overrides the workflow-level `contents: read` only for this
+    # matrix job.
     permissions:
       contents: read
       id-token: write
@@ -105,15 +103,10 @@ jobs:
           key: release-${{ matrix.target }}
 
       - name: Install cargo-auditable (native)
-        # cargo-auditable embeds the workspace dependency graph into the
-        # release binary so downstream consumers can later run
-        # `cargo audit -f <binary>` to read the manifest and scan for
-        # known vulnerabilities without needing the source tree. See the
-        # `[workspace.metadata.cargo-auditable]` block in Cargo.toml for
-        # the rationale tied to M09.P2.T1. Native lanes install the tool
-        # directly on the runner; the cross lane installs it inside the
-        # cross-rs container in the next step (which then runs
-        # `cargo auditable build` from inside the container).
+        # Embeds the workspace dependency graph into the release binary so
+        # downstream consumers can run `cargo audit -f <binary>` to scan for
+        # known vulnerabilities without the source tree. Native lanes install
+        # the tool directly; the cross lane installs it inside the container.
         if: matrix.cross == false
         shell: bash
         run: cargo install cargo-auditable --locked --version 0.7.4
@@ -142,8 +135,8 @@ jobs:
         # publishes pinned-tag images on GHCR (one per target triple);
         # we pin to the same v0.2.5 the previous `cargo install cross`
         # step pinned to. Running `cargo auditable build` inside the
-        # container preserves the cargo-auditable dep-graph embedding
-        # (M09.P2.T1) on the cross lane that native lanes get for free.
+        # container preserves the cargo-auditable dep-graph embedding on the
+        # cross lane that native lanes get for free.
         if: matrix.cross == true
         shell: bash
         env:
@@ -172,16 +165,8 @@ jobs:
 
       - name: Install syft
         if: runner.os != 'Windows'
-        # Pinned to v1.18.1 to match the M09.P2.T2 acceptance gate. The
-        # installer script itself is fetched from the pinned tag rather
-        # than the mutable `main` branch (cleanup-c11d; PR #44 review
-        # threads r3142897955 / r3142898745 - Medium): the previous
-        # `.../syft/main/install.sh` URL meant any upstream change or
-        # compromise of `main` could alter the script's behavior on
-        # every release run, even though the version argument the
-        # script consumed was pinned. The tag-pinned URL closes that
-        # gap. Output goes to ${HOME}/.local/bin which the next line
-        # appends to GITHUB_PATH for subsequent steps.
+        # Pinned to v1.18.1. Installer is fetched from the pinned tag (not
+        # mutable `main`) so upstream changes cannot silently alter behavior.
         shell: bash
         run: |
           set -euo pipefail
@@ -207,13 +192,9 @@ jobs:
 
       - name: Emit CycloneDX 1.6 SBOM
         if: runner.os != 'Windows'
-        # Generates a CycloneDX 1.6 JSON SBOM for the just-built chio
-        # binary. The binary already carries the cargo-auditable dep
-        # graph (see M09.P2.T1); syft adds an external, machine-readable
-        # SBOM so downstream consumers have a standards-based artifact
-        # without needing to parse the embedded auditable section.
-        # The jq assertion fails the job loudly if syft ever changes its
-        # default schema version or the config file is mis-loaded.
+        # Generates a CycloneDX 1.6 JSON SBOM. The binary already carries the
+        # cargo-auditable dep graph; syft adds a standards-based external SBOM.
+        # The jq assertion fails loudly if syft changes its default schema version.
         shell: bash
         env:
           CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
@@ -319,21 +300,12 @@ jobs:
             [System.Text.Encoding]::ASCII
           )
 
-      # owner: M09
-      # M09.P3.T3 - Sigstore keyless cosign signing of every release
-      # archive (`.tar.gz` on linux/macOS, `.zip` on windows). Signing
-      # happens on the same runner that staged the archive, mirroring
-      # the "sign where the artifact was just produced" pattern from
-      # M09.P3.T2 (sidecar-image.yml). The OIDC token minted by
-      # `id-token: write` (declared at the job level above) is what
-      # `cosign sign-blob --yes` exchanges with Fulcio for a short-lived
-      # signing certificate; no long-lived signing key is held in repo
-      # secrets. The `.sig` and `.pem` siblings travel with the archive
-      # through `upload-artifact` and the final `softprops/action-gh-release`
-      # step so consumers can run the `cosign verify-blob` recipe in
-      # `docs/install/PUBLISHING.md` (section "Release-binaries archive
-      # signing"). The trait surface for in-tree programmatic verification
-      # is `chio_attest_verify::AttestVerifier` (M09.P3.T1).
+      # Sigstore keyless cosign signing of every release archive. Signing
+      # happens on the same runner that staged the archive. The OIDC token
+      # from `id-token: write` is exchanged with Fulcio for a short-lived
+      # certificate; no long-lived key is held in secrets. `.sig` and `.pem`
+      # siblings travel with the archive and allow consumers to run the
+      # `cosign verify-blob` recipe in `docs/install/PUBLISHING.md`.
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.7.0
         with:
@@ -473,13 +445,8 @@ jobs:
           # `fail_on_unmatched_files: true`, so missing per-archive files
           # would fail every release.
           find artifacts -type f -name "*.sha256" -exec cp {} release/ \;
-          # owner: M09
-          # M09.P3.T3 - Carry the cosign sign-blob siblings (`.sig` and
-          # `.pem`) into `release/` alongside the archives so the final
-          # `softprops/action-gh-release` step attaches them. The build
-          # job ran `cosign sign-blob` on each runner immediately after
-          # staging; without this copy the signatures would only live as
-          # GitHub Actions build artifacts and never reach consumers.
+          # Carry the cosign sign-blob siblings (`.sig` and `.pem`) into
+          # `release/` so the `softprops/action-gh-release` step attaches them.
           find artifacts -type f \( -name "*.sig" -o -name "*.pem" \) -exec cp {} release/ \;
           find release -type f -name "*.sha256" -exec perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' {} +
           # Concatenate the per-archive .sha256 files into the combined
@@ -567,7 +534,7 @@ jobs:
             echo
             echo "### Verify"
             echo
-            echo "Every archive has a matching \`.sha256\` file (combined \`SHA256SUMS\` is attached) and a Sigstore keyless signature pair (\`.sig\` + \`.pem\`) produced by \`cosign sign-blob\` (M09.P3.T3)."
+            echo "Every archive has a matching \`.sha256\` file (combined \`SHA256SUMS\` is attached) and a Sigstore keyless signature pair (\`.sig\` + \`.pem\`) produced by \`cosign sign-blob\`."
             echo
             echo '```bash'
             echo "shasum -a 256 -c SHA256SUMS"
@@ -593,12 +560,9 @@ jobs:
           body_path: release/NOTES.md
           draft: false
           fail_on_unmatched_files: true
-          # `*.sig` and `*.pem` are the cosign sign-blob siblings emitted
-          # by the build job (M09.P3.T3); without them in this list the
-          # release would publish only the archives and consumers could
-          # not run the `cosign verify-blob` recipe in
-          # `docs/install/PUBLISHING.md` (section "Release-binaries
-          # archive signing").
+          # `*.sig` and `*.pem` are the cosign sign-blob siblings; without them
+          # consumers could not run the `cosign verify-blob` recipe in
+          # `docs/install/PUBLISHING.md`.
           files: |
             release/*.tar.gz
             release/*.zip
@@ -609,22 +573,11 @@ jobs:
             release/chio.rb
 
   mutants-gate-flip:
-    # owner: M02
-    # M02.P3.T1 - Auto-flip the cargo-mutants gate from advisory to
-    # blocking on the first post-Phase-3 release. The gate posture is
-    # driven by `releases.toml::[mutants].cycle_end_tag` (read by
-    # `scripts/mutants-gate.sh`): empty -> advisory, non-empty -> blocking.
-    # This job runs after `release` succeeds, reads the current value, and
-    # if it is still empty writes the just-released tag and opens a PR
-    # titled `chore(mutants): activate blocking gate after cycle <tag>`.
-    # The flip therefore lands as a reviewable commit on the roadmap
-    # branch rather than a silent post-release config drift.
-    #
-    # Source-doc anchors:
-    #   .planning/trajectory/02-fuzzing-post-pr13.md
-    #     "Mutation-testing CI shape (Phase 3) > Threshold-enforcement logic"
-    #   .planning/trajectory/decisions.yml
-    #     id=mutation-testing-gate-posture (advisory for one cycle, then blocking)
+    # Auto-flip the cargo-mutants gate from advisory to blocking on the first
+    # post-merge release. The gate posture is driven by
+    # `releases.toml::[mutants].cycle_end_tag`: empty -> advisory,
+    # non-empty -> blocking. Runs after `release` succeeds; if cycle_end_tag
+    # is still empty, writes the just-released tag and opens a PR.
     name: Auto-flip mutants gate
     needs: release
     runs-on: ubuntu-latest
@@ -733,18 +686,13 @@ jobs:
             cargo-mutants gate (`scripts/mutants-gate.sh`) from advisory
             to blocking. After merge:
 
-            - `mutants-nightly` exits 1 on a per-crate catch-ratio miss
-              instead of exiting 0.
-            - `mutants-pr` comments switch from `advisory` to `blocking`
-              labels (M02.P3.T2 wires the comment label).
+            - `mutants-nightly` exits 1 on a per-crate catch-ratio miss.
+            - `mutants-pr` comments switch from `advisory` to `blocking` labels.
 
-            See `docs/fuzzing/mutants.md` (section "CI lane") and
-            `.planning/trajectory/02-fuzzing-post-pr13.md`
-            ("Mutation-testing CI shape (Phase 3)") for the rationale.
+            See `docs/fuzzing/mutants.md` (section "CI lane") for rationale.
 
             Override path: clear `cycle_end_tag` in a follow-up PR
-            labelled `mutants-gate-override` with CODEOWNERS approval
-            (M02.P3.T2).
+            labelled `mutants-gate-override` with CODEOWNERS approval.
           commit-message: "chore(mutants): activate blocking gate after cycle ${{ steps.tag.outputs.tag }}"
           labels: mutants,release
 

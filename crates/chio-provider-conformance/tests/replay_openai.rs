@@ -11,7 +11,7 @@ fn replays_all_openai_fixtures_with_canonical_byte_assertions() {
     assert_eq!(
         paths.len(),
         12,
-        "M07.P2.T5 OpenAI corpus must contain exactly 12 NDJSON fixtures"
+        "OpenAI corpus must contain exactly 12 NDJSON fixtures"
     );
 
     let mut total_invocations = 0;

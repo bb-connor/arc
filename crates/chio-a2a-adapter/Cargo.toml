@@ -26,18 +26,14 @@ ureq = { version = "2.10", features = ["json"] }
 webpki-roots = "0.26"
 # `arbitrary` is gated behind the `fuzz` feature so production builds stay
 # free of fuzz instrumentation. Pulled in by `fuzz/fuzz_targets/a2a_envelope_decode.rs`
-# (M02.P1.T3.b) via `chio-a2a-adapter = { features = ["fuzz"] }`.
+# via `chio-a2a-adapter = { features = ["fuzz"] }`.
 arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [features]
 # Enables `chio_a2a_adapter::fuzz`, the libFuzzer entry-point module driving
-# the per-envelope fan-out trust boundary (SSE stream split into events,
-# every event run through both the JSON-RPC envelope decoder and the
-# stream-response validator). Off by default; turned on only by the
-# `chio-fuzz` standalone workspace at `../../fuzz` (see
-# `fuzz/fuzz_targets/a2a_envelope_decode.rs`, M02.P1.T3.b). Production
-# builds of `chio-a2a-adapter` never pull in `arbitrary` and never expose
-# `fuzz` symbols.
+# the per-envelope fan-out trust boundary. Off by default; turned on only by
+# the `chio-fuzz` standalone workspace at `../../fuzz`. Production builds of
+# `chio-a2a-adapter` never pull in `arbitrary` and never expose `fuzz` symbols.
 fuzz = ["dep:arbitrary"]
 
 [dev-dependencies]

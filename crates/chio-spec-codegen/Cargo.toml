@@ -16,9 +16,8 @@ path = "src/lib.rs"
 name = "chio-spec-codegen"
 path = "src/main.rs"
 
-# typify =0.4.3 is pinned per .planning/trajectory/decisions.yml
-# (codegen-toolchain-per-language) and the M01.P3 phase header.
-# See xtask/codegen-tools.lock.toml for the cross-language pin set.
+# typify =0.4.3 is pinned; see xtask/codegen-tools.lock.toml for the
+# cross-language pin set.
 [dependencies]
 typify = "=0.4.3"
 schemars = "0.8"

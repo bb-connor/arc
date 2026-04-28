@@ -1,40 +1,20 @@
 // Frame validation pipeline for `chio replay traffic`.
 //
-// Owned by M10.P2.T1. This module composes three independent passes
-// applied to every `chio_tee_frame::Frame` yielded by
-// [`super::ndjson::FrameIter`]:
+// Four independent passes applied to every frame:
+// 1. Schema-version gate: rejects unknown `schema_version`.
+// 2. Tenant-sig verifier: Ed25519 over canonical JSON of all fields
+//    except `tenant_sig`.
+// 3. Redaction-pass gate: rejects frames whose redaction pass this build
+//    cannot replay.
+// 4. M01 invocation validator: proves `frame.invocation` is RFC 8785
+//    canonical by round-tripping through `ToolInvocation`.
 //
-// 1. **Schema-version gate**: rejects frames whose `schema_version`
-//    does not match the M10 pinned literal (`"1"`); rejects frames whose
-//    full schema invariants would not survive
-//    [`chio_tee_frame::validate`].
-// 2. **Tenant-sig verifier**: verifies the embedded
-//    `tenant_sig: ed25519:<base64>` against an Ed25519 public key over
-//    the RFC 8785 canonical-JSON encoding of the frame body
-//    (everything except `tenant_sig`).
-// 3. **Redaction-pass availability gate**: rejects frames captured with a
-//    redaction pass this binary cannot re-run or compare.
-// 4. **M01 invocation validator**: deserializes the opaque
-//    `invocation` JSON value into a `chio_tool_call_fabric::ToolInvocation`
-//    and asserts that re-canonicalizing the round-tripped value
-//    produces byte-identical bytes (a cheap canonical-JSON proof that
-//    the M01 ToolInvocation schema holds).
-//
-// Every pass is fail-closed and returns a structured error mapped to
-// the canonical M04 exit code registry (20 / 30 / 40 / 50). See
-// `.planning/trajectory/04-deterministic-replay.md` "EXIT CODES".
-//
-// Reference: `.planning/trajectory/10-tee-replay-harness.md` Phase 2
-// task 2 ("NDJSON line iterator, schema-version gate, tenant-sig
-// verifier, M01 invocation validator").
+// All passes fail-closed; errors map to canonical exit codes 20/30/40/50.
 
 use base64::Engine;
 
 /// Canonical exit code: schema mismatch (`schema_version` unknown or
-/// `invocation` fails M01 validation). Mirrors
-/// `crate::cli::replay::verify::EXIT_BAD_SIGNATURE` for the bad-sig
-/// case; this constant pins exit-code 40 for the schema/invocation
-/// gates so the dispatch layer cannot drift silently.
+/// `invocation` fails validation).
 pub const EXIT_SCHEMA_MISMATCH: i32 = 40;
 
 /// Canonical exit code: tenant-sig verification failed.
@@ -76,7 +56,7 @@ pub enum ValidateError {
 }
 
 impl ValidateError {
-    /// Map this error to the canonical M04 exit-code registry.
+    /// Map this error to the canonical exit code.
     pub fn exit_code(&self) -> i32 {
         match self {
             Self::SchemaVersion(_) | Self::Schema(_) | Self::Invocation(_) => EXIT_SCHEMA_MISMATCH,
@@ -88,15 +68,8 @@ impl ValidateError {
 
 /// Schema-version gate.
 ///
-/// `expected_schema_name` must equal the M10 pinned name
-/// (`"chio-tee-frame.v1"`); the on-the-wire `schema_version` field must
-/// equal the literal pinned by [`chio_tee_frame::SCHEMA_VERSION`]
-/// (`"1"`). The caller-supplied name is validated for diagnostic
-/// clarity so an operator who pins `--schema chio-tee-frame.v2` against
-/// a v1 binary trips loudly.
-///
-/// Returns `Ok(())` when both checks pass and the full
-/// [`chio_tee_frame::validate`] schema invariants hold.
+/// Rejects frames whose schema name or wire `schema_version` does not match
+/// the pinned literals, then runs [`chio_tee_frame::validate`].
 pub fn schema_version_gate(
     frame: &chio_tee_frame::Frame,
     expected_schema_name: &str,
@@ -120,10 +93,7 @@ pub fn schema_version_gate(
 }
 
 /// Build the byte slice the tenant-sig commits to: canonical JSON of
-/// every frame field *except* `tenant_sig`. Matches the schema-locked
-/// invariant in `.planning/trajectory/10-tee-replay-harness.md` line
-/// 205 ("Ed25519 signature over the canonical-JSON encoding of all
-/// other fields").
+/// every frame field except `tenant_sig`.
 pub fn signing_payload(frame: &chio_tee_frame::Frame) -> Result<Vec<u8>, ValidateError> {
     let mut value = serde_json::to_value(frame)
         .map_err(|e| ValidateError::TenantSig(format!("serialize frame: {e}")))?;
@@ -220,15 +190,9 @@ pub fn load_tenant_pubkey(path: &std::path::Path) -> Result<[u8; 32], ValidateEr
     )))
 }
 
-/// M01 invocation validator.
-///
-/// Asserts that `frame.invocation` deserializes into a
-/// `chio_tool_call_fabric::ToolInvocation` and that re-canonicalizing
-/// the round-tripped value produces byte-identical RFC 8785 bytes.
-/// This is a cheap proof that the inner JSON conforms to the M01
-/// canonical-JSON ToolInvocation contract: a non-canonical encoding
-/// (key reordering, redundant escapes, non-shortest numbers, etc.)
-/// returns [`ValidateError::Invocation`].
+/// Assert that `frame.invocation` deserializes into a
+/// `chio_tool_call_fabric::ToolInvocation` and that re-canonicalizing the
+/// round-tripped value produces byte-identical RFC 8785 bytes.
 pub fn validate_m01_invocation(frame: &chio_tee_frame::Frame) -> Result<(), ValidateError> {
     let invocation: chio_tool_call_fabric::ToolInvocation =
         serde_json::from_value(frame.invocation.clone())
@@ -254,10 +218,8 @@ pub fn validate_m01_invocation(frame: &chio_tee_frame::Frame) -> Result<(), Vali
 
 /// Redaction-pass availability gate.
 ///
-/// M04 reserves exit code 50 for captures whose recorded redaction pass is
-/// unavailable or whose re-run manifest differs. The current traffic runner
-/// has one in-tree deterministic redactor identity, so an unknown
-/// `redaction_pass_id` fails closed before replay continues.
+/// Fails closed for captures whose `redaction_pass_id` this build cannot
+/// replay (exit code 50).
 pub fn validate_redaction_pass(frame: &chio_tee_frame::Frame) -> Result<(), ValidateError> {
     if frame.redaction_pass_id == SUPPORTED_REDACTION_PASS_ID {
         return Ok(());
@@ -268,12 +230,7 @@ pub fn validate_redaction_pass(frame: &chio_tee_frame::Frame) -> Result<(), Vali
     )))
 }
 
-/// Aggregate report shape suitable for human and `--json` rendering.
-///
-/// T1 ships the structural validators; the dispatcher in
-/// `cli/replay.rs` composes them per frame. Downstream tickets
-/// (M10.P2.T2 and later) layer the diff renderer and exit-code
-/// orchestrator on top of this surface.
+/// Per-frame validation report suitable for human and `--json` rendering.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrameValidation {
     /// 1-based source line.
@@ -308,12 +265,8 @@ impl FrameValidation {
     }
 }
 
-/// Run the full schema-version + (optional) tenant-sig +
-/// M01-invocation pipeline against a single frame.
-///
-/// `tenant_pubkey` is `None` when the operator did not supply
-/// `--tenant-pubkey`; the verifier is then skipped. The other two
-/// passes are mandatory.
+/// Run the full validation pipeline against a single frame.
+/// Skips tenant-sig verification when `tenant_pubkey` is `None`.
 pub fn validate_frame(
     frame: &chio_tee_frame::Frame,
     expected_schema_name: &str,
@@ -530,9 +483,6 @@ mod replay_validate_tests {
 
     #[test]
     fn exit_code_constants_match_m04_registry() {
-        // Pinned by the canonical exit-code registry in M04 Phase 4.
-        // If the registry shifts, this test trips first so the
-        // dispatch layer cannot drift silently.
         assert_eq!(EXIT_SCHEMA_MISMATCH, 40);
         assert_eq!(EXIT_BAD_TENANT_SIG, 20);
         assert_eq!(EXIT_REDACTION_MISMATCH, 50);

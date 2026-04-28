@@ -5,11 +5,8 @@
 # replay-relevant source paths (chio-core / chio-core-types / chio-kernel
 # receipt_support) without an accompanying delta in docs/replay-compat.md.
 # The deeper gate logic (CHIO_BLESS=1, BLESS_REASON, branch checks, audit log,
-# TTY+CI checks) lives in tests/replay/src/bless.rs (see M04.P2.T1). This
-# script is a fast-fail wrapper that catches misuse before the binary runs.
-#
-# Spec: .planning/trajectory/04-deterministic-replay.md (Phase 2 task 4 +
-# CHIO_BLESS gate logic section).
+# TTY+CI checks) lives in tests/replay/src/bless.rs. This script is a
+# fast-fail wrapper that catches misuse before the binary runs.
 #
 # Usage:
 #   BLESS_REASON="rationale" scripts/bless-replay-goldens.sh

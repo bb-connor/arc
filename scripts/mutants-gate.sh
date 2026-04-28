@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 # mutants-gate.sh - Decide advisory or blocking posture for cargo-mutants.
 #
-# Source-doc anchor:
-#   .planning/trajectory/02-fuzzing-post-pr13.md
-#   "Mutation-testing CI shape (Phase 3)" -> advisory/blocking flip via
-#   releases.toml. Decision lock: id=mutation-testing-gate-posture
-#   (advisory for one release cycle after M02 P3 merges, blocking
-#   thereafter; flip event is the next release tag).
-#
 # Reads releases.toml at the repository root:
 #
 #   [mutants]
@@ -30,8 +23,8 @@
 #   MUTANTS_EXIT        : exit code from the cargo-mutants step
 #                         (0 = clean, non-zero = survivors).
 #   MUTANTS_GATE_OVERRIDE_REASON
-#                       : optional escape hatch (M02.P3.T2). When set to a
-#                         non-empty string, a blocking-fail verdict is
+#                       : optional escape hatch. When set to a non-empty
+#                         string, a blocking-fail verdict is
 #                         downgraded to a loud advisory pass: the script
 #                         emits a `WARN mutants-gate-override` line on
 #                         stderr, appends an audit row to
@@ -108,10 +101,8 @@ if [[ -z "${cycle_end_tag}" ]]; then
     exit 0
 fi
 
-# Blocking posture: cycle_end_tag is set. The cargo-mutants step exit
-# code is the survivors signal; M02 P3's P3.T4 will replace this with a
-# per-crate catch-ratio threshold check against outcomes.json under
-# OUTPUT_DIR. Until then, any non-zero upstream exit fails the gate.
+# Blocking posture: cycle_end_tag is set. Any non-zero upstream exit fails
+# the gate.
 if [[ "${EXIT_CODE}" == "0" ]]; then
     printf 'mutants-gate: package=%s exit=0 posture=blocking verdict=pass (cycle_end_tag=%s)\n' \
         "${PACKAGE}" "${cycle_end_tag}"
@@ -124,13 +115,13 @@ if [[ -n "${OUTPUT_DIR}" && -d "${OUTPUT_DIR}" ]]; then
     printf 'mutants-gate: see %s for outcomes.json detail\n' "${OUTPUT_DIR}" >&2
 fi
 
-# M02.P3.T2 escape hatch: MUTANTS_GATE_OVERRIDE_REASON downgrades a blocking
-# fail to a loud advisory pass and appends an audit row. The corresponding
-# permanent path is a PR labelled `mutants-gate-override` that clears
-# cycle_end_tag in releases.toml; CODEOWNERS gates that PR on principal
-# engineer review. The env-var path here exists for in-flight CI runs
-# where waiting on a CODEOWNERS-reviewed PR is not feasible (e.g. a
-# release-train hot-fix). Either path leaves an audit trail.
+# MUTANTS_GATE_OVERRIDE_REASON downgrades a blocking fail to a loud advisory
+# pass and appends an audit row. The corresponding permanent path is a PR
+# labelled `mutants-gate-override` that clears cycle_end_tag in
+# releases.toml; CODEOWNERS gates that PR on principal engineer review. The
+# env-var path here exists for in-flight CI runs where waiting on a
+# CODEOWNERS-reviewed PR is not feasible (e.g. a release-train hot-fix).
+# Either path leaves an audit trail.
 if [[ -n "${OVERRIDE_REASON}" ]]; then
     audit_log="${repo_root}/docs/fuzzing/mutants-overrides.log"
     timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

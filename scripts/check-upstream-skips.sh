@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # check-upstream-skips.sh - Sunset gate for fuzz/upstream_skips.toml.
 #
-# Reference: .planning/trajectory/02-fuzzing-post-pr13.md Phase 2 P2.T4.
-# Ticket:    M02.P4.T8.
-#
 # Why this exists
 # ---------------
 # Fuzz targets occasionally trip on instability in upstream deps
@@ -262,7 +259,7 @@ while IFS='|' read -r target reason issue sunset; do
         continue
     fi
     if (( sunset_days < today_days )); then
-        err "skip ${target}: sunset ${sunset} has expired (today=${TODAY}); remove or re-evaluate per source-doc Phase 2 P2.T4"
+        err "skip ${target}: sunset ${sunset} has expired (today=${TODAY}); remove or re-evaluate"
         policy_errors=$(( policy_errors + 1 ))
     fi
     if (( sunset_days > max_days )); then

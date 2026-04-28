@@ -1,6 +1,6 @@
-//! Re-verify cross-version replay bundles against the current kernel (M04.P3.T4).
+//! Re-verify cross-version replay bundles against the current kernel.
 //!
-//! The [`fetch`](super::fetch) layer (T3) downloads a tagged release's
+//! The [`fetch`](super::fetch) layer downloads a tagged release's
 //! `replay-bundle.tgz` and pins it on disk by sha256. This module reads
 //! that cached archive, extracts the three goldens
 //! (`receipts.ndjson` / `checkpoint.json` / `root.hex`), and re-runs the

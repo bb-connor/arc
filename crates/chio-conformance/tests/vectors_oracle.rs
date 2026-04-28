@@ -1,12 +1,9 @@
-//! Cross-language vector oracle (M01.P2.T1).
+//! Cross-language vector oracle.
 //!
 //! Walks the canonical-JSON corpus under `tests/bindings/vectors/<subtree>/v1.json`
 //! and validates that the in-tree Rust canonicalizer (the source of truth for the
 //! wire format) reproduces the recorded `canonical_json` byte-for-byte from the
-//! supplied `input_json`. Downstream tickets (P2.T6 and friends) will extend
-//! this oracle to cover the manifest, hashing, signing, receipt, and capability
-//! subtrees; for the first commit the canonical subtree is sufficient because
-//! every other domain's vectors carry an embedded canonical-JSON column.
+//! supplied `input_json`.
 //!
 //! The fail-closed contract: any drift between the encoder and the corpus is a
 //! build break. Re-canonicalizing the input must produce exactly the recorded
@@ -94,7 +91,7 @@ fn canonical_corpus_round_trips_through_rust_encoder() {
 
     assert!(
         cases.len() >= 20,
-        "canonical corpus must hold at least 20 cases (M01.P2.T1 target); found {} in {}",
+        "canonical corpus must hold at least 20 cases; found {} in {}",
         cases.len(),
         path.display()
     );

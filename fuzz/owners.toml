@@ -11,12 +11,6 @@
 #   crate = workspace member that owns regression tests for this target
 #   path  = filesystem path to the owning crate's directory
 #
-# Source: .planning/trajectory/02-fuzzing-post-pr13.md Phase 4 P4.T2
-# (Crash-triage automation > Regression-test promotion path).
-#
-# Cross-doc: proptest mode in promote_fuzz_seed.sh opens a sibling M03
-# invariant under crates/<owner>/tests/property_*.rs; M03 owns the
-# oracle/property surface that consumes the promoted seed.
 
 [targets.attest_verify]
 crate = "chio-attest-verify"

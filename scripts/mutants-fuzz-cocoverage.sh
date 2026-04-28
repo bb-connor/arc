@@ -8,11 +8,6 @@
 # mutants-fuzz-cocoverage.sh - replay the libFuzzer corpus against
 # surviving cargo-mutants mutants. Cross-oracle nightly; advisory.
 #
-# Source-doc anchors:
-#   - .planning/trajectory/02-fuzzing-post-pr13.md Round-2 (NEW) P3.T7
-#     re-homed to Phase 2.
-#   - .planning/trajectory/tickets/M02/P2.yml id=M02.P2.T7.
-#
 # Cross-oracle insight (the why):
 #
 #   - cargo-mutants flags a "surviving mutant" when the unit suite
@@ -260,8 +255,7 @@ replay_one_mutant() {
     {
         printf '#!/usr/bin/env bash\n'
         printf 'set -euo pipefail\n'
-        printf '# cargo-mutants substituted test-tool. Runs the fuzz target\n'
-        printf '# corpus replay against the MUTATED binary in this work tree.\n'
+        printf '# Runs the fuzz target corpus replay against the MUTATED binary.\n'
         printf 'exec timeout %s cargo +nightly fuzz run %s -- -runs=%s %s\n' \
             "${PER_MUTANT_BUDGET}" \
             "${target_name}" \
@@ -399,7 +393,7 @@ fi
     printf '| Unmapped (no replay) | %s |\n' "${unmapped_count}"
     printf '| Fuzz replays attempted | %s |\n' "${attempted_count}"
     printf '| Fuzz replays caught (libFuzzer signalled against mutant) | %s |\n\n' "${caught_count}"
-    printf 'Expected cross-oracle reduction band per source doc: **5-15%%**.\n\n'
+    printf 'Expected cross-oracle reduction band: **5-15%%**.\n\n'
     printf 'Each surviving mutant is replayed individually: cargo-mutants\n'
     printf 'is re-shelled per survivor with `--file` + `--line` and a\n'
     printf '`--test-tool` wrapper that runs `cargo fuzz run` against the\n'

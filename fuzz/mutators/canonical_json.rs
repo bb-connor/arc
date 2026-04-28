@@ -1,68 +1,15 @@
-// owned-by: M02 (fuzz lane); structure-aware mutator authored under M02.P2.T6.
-//
-//! Structure-aware canonical-JSON mutator for libFuzzer.
+//! Structure-aware canonical-JSON mutator for libFuzzer (RFC 8785 key-sorted output).
 //!
-//! # Why
+//! Produces shape-valid canonical JSON so the fuzzer budget explores the
+//! decode -> canonicalize -> typed-validate pipeline rather than failing at
+//! the parse stage. Wired into targets via `libfuzzer_sys::fuzz_mutator!`,
+//! which exports the C symbol `LLVMFuzzerCustomMutator`.
 //!
-//! Random byte mutations on a libFuzzer corpus targeting a canonical-JSON
-//! decoder almost always fail at the JSON parse stage before reaching the
-//! canonicalization (sorted-keys / no-whitespace / RFC 8785) layer or the
-//! downstream typed deserializer. That wastes CPU-seconds of fuzzer time
-//! producing inputs the SUT rejects in O(1). This mutator runs ahead of
-//! libFuzzer's default mutator and produces inputs that are SHAPE-VALID
-//! canonical JSON, so the fuzzer spends its budget exploring the actual
-//! decode -> canonicalize -> typed-validate pipeline.
-//!
-//! # libFuzzer extension point
-//!
-//! libFuzzer supports a user-supplied mutator function exported as the C
-//! symbol `LLVMFuzzerCustomMutator`. The `libfuzzer-sys` crate exposes
-//! that symbol via the [`libfuzzer_sys::fuzz_mutator!`] macro: each fuzz
-//! target that opts in declares a `fuzz_mutator!` block alongside its
-//! `fuzz_target!` block, and libfuzzer-sys generates the
-//! `#[export_name = "LLVMFuzzerCustomMutator"]` shim that calls the
-//! Rust closure for every iteration. The four canonical-JSON-decoding
-//! fuzz targets (`canonical_json`, `capability_receipt`,
-//! `manifest_roundtrip`, `mcp_envelope_decode`) all wire this module's
-//! [`canonical_json_mutate`] into that macro.
-//!
-//! The gate for M02.P2.T6 grep-checks this file for the literal string
-//! `LLVMFuzzerCustomMutator` so the wiring is auditable from the source
-//! tree without having to inspect generated symbols.
-//!
-//! # Mutation menu
-//!
-//! On each call we parse `data[..size]` as `serde_json::Value`. If the
-//! parse fails we return `size` unchanged and let libFuzzer's default
-//! mutator handle the byte-level work (the next iteration may parse). On
-//! success we pick ONE structure-preserving mutation by `seed`:
-//!
-//! 1. Add a key to a nested object.
-//! 2. Remove a key from a nested object.
-//! 3. Swap two array elements.
-//! 4. Replace a string value with an interesting boundary string.
-//! 5. Replace a number with an interesting boundary value
-//!    (`0`, `-1`, `i64::MAX`, `u64::MAX`, `f64::INFINITY`-like, etc).
-//! 6. Insert a duplicate key (challenges canonical-JSON last-wins semantics).
-//! 7. Replace a UTF-8 string with a near-invalid one (control chars,
-//!    surrogate-edge code points, BOM, padded whitespace).
-//!
-//! After the mutation we re-canonicalize the value via
-//! `serde_json::to_vec` (which writes sorted-key output in stable order
-//! when the object was built from sorted iteration) and copy back into
-//! `data` if it fits. If the canonicalized bytes exceed `max_size` we
-//! REJECT the mutation (return `size` unchanged) rather than truncating,
-//! because a truncated suffix of valid JSON is almost always invalid
-//! JSON; emitting it would seed the corpus with a parse-failure entry
-//! that bypasses every downstream structure-aware mutation pass on the
-//! next iteration. The mutator is stateless across calls and
-//! deterministic in `seed` so libFuzzer's reproducibility guarantees
-//! hold.
-//!
-//! # Source
-//!
-//! Round-2 (NEW) P2.T6 entry in
-//! `.planning/trajectory/02-fuzzing-post-pr13.md`.
+//! Mutations (one per call, chosen by `seed`): add/remove object key, swap
+//! array elements, replace string/number with boundary value, insert
+//! near-duplicate key, replace string with edge-UTF-8. On parse failure
+//! returns `size` unchanged. Oversized mutations are rejected rather than
+//! truncated (truncation produces invalid JSON and poisons the corpus).
 
 #![allow(clippy::cast_possible_truncation)]
 
@@ -70,23 +17,6 @@ use core::cmp::min;
 
 use serde_json::{Map, Number, Value};
 
-/// Per-iteration custom mutator entry point wired into libFuzzer via
-/// [`libfuzzer_sys::fuzz_mutator!`]. The macro generates the
-/// `#[export_name = "LLVMFuzzerCustomMutator"]` shim that calls this
-/// function with libFuzzer's working buffer.
-///
-/// Contract (from the libFuzzer C API):
-///
-/// - `data` is a writable buffer of length `max_size`.
-/// - `data[..size]` is the current input candidate.
-/// - The function MUST write the new candidate into `data[..ret]` and
-///   return `ret`, where `ret <= max_size`.
-/// - The function MUST be deterministic in `seed`.
-///
-/// On parse failure we return `size` unchanged and rely on libFuzzer's
-/// default mutator (it runs the random-byte mutator path in that case
-/// when wired with [`libfuzzer_sys::fuzzer_mutate`]; this implementation
-/// keeps it simple and lets the next iteration roll the dice again).
 #[must_use]
 pub fn canonical_json_mutate(data: &mut [u8], size: usize, max_size: usize, seed: u32) -> usize {
     if size == 0 || size > data.len() || max_size == 0 {
@@ -118,24 +48,6 @@ pub fn canonical_json_mutate(data: &mut [u8], size: usize, max_size: usize, seed
     bytes.len()
 }
 
-/// Apply ONE structure-preserving mutation to `value`, chosen by `seed`.
-///
-/// All branches return a structurally valid `serde_json::Value`; the
-/// caller re-canonicalizes the result. Mutations that target a nested
-/// path (object / array) descend along a deterministic walk derived from
-/// `seed` so the same `(value, seed)` pair always produces the same
-/// mutation (libFuzzer reproducibility requirement).
-///
-/// Cleanup C6: previously every mutation primitive read `seed` directly
-/// for BOTH the mutation choice (`seed % 8`) and the descent depth
-/// (`seed % 4`) and the curated-table index. With that aliasing every
-/// mutation type was permanently locked to a small subset of depths and
-/// table entries, which collapsed the structure-aware search space. We
-/// now decorrelate the per-axis sub-seeds via cheap mixing constants
-/// (Knuth's golden-ratio multiplier and SplitMix64-style finalizers) so
-/// the choice axis, the depth axis, and the table-index axis evolve
-/// independently as `seed` walks. The mixing is pure arithmetic on `u32`
-/// so reproducibility is preserved.
 fn mutate_value(mut value: Value, seed: u32) -> Value {
     let choice = mix_choice(seed) % 8;
     match choice {
@@ -153,10 +65,9 @@ fn mutate_value(mut value: Value, seed: u32) -> Value {
     value
 }
 
-/// Cheap u32 finalizer derived from MurmurHash3's fmix32. Used to
-/// decorrelate the mutation-choice axis from the depth and table-index
-/// axes. `seed` is the libFuzzer-supplied value; the output is purely a
-/// function of the input so reproducibility holds.
+// MurmurHash3-derived finalizer. Decorrelates the mutation-choice axis
+// from depth and table-index axes so adjacent seeds don't lock to the
+// same mutation type + depth combination.
 #[inline]
 fn mix_choice(seed: u32) -> u32 {
     let mut x = seed;
@@ -168,9 +79,7 @@ fn mix_choice(seed: u32) -> u32 {
     x
 }
 
-/// Independent depth axis. Different constants from `mix_choice` so the
-/// chosen mutation primitive does not statically lock to a specific
-/// descent depth.
+// Independent depth axis - different constants from `mix_choice`.
 #[inline]
 fn mix_depth(seed: u32) -> u32 {
     let mut x = seed.wrapping_add(0x9e37_79b9);
@@ -182,9 +91,7 @@ fn mix_depth(seed: u32) -> u32 {
     x
 }
 
-/// Independent table-index axis for the curated string / number tables.
-/// Different constants again so the same mutation type called with
-/// adjacent `seed` values walks different table entries.
+// Independent table-index axis - different constants again.
 #[inline]
 fn mix_index(seed: u32) -> u32 {
     let mut x = seed.wrapping_add(0xbb67_ae85);
@@ -196,12 +103,8 @@ fn mix_index(seed: u32) -> u32 {
     x
 }
 
-/// Return a canonicalized clone of `value` with object keys
-/// lexicographically sorted. `serde_json::to_vec` on a `Map` walks keys
-/// in their stored order, which `serde_json` keeps as insertion order;
-/// rebuilding every nested map in sorted order is the cheapest way to
-/// guarantee canonical-shape output without pulling in a JCS-aware
-/// serializer here.
+// `serde_json::to_vec` walks keys in insertion order; rebuild every nested
+// map in sorted order to guarantee canonical output without a JCS serializer.
 fn canonicalize_value(value: Value) -> Value {
     match value {
         Value::Object(map) => {
@@ -307,12 +210,6 @@ fn replace_with_edge_utf8(value: &mut Value, seed: u32) {
 
 // ---- Walker helpers ----
 
-/// Deterministically descend into `value` and return the first nested
-/// `Map` reachable by following array index 0 / first-object-entry per
-/// level. The mutation lands at depth `mix_depth(seed) % 4` (or
-/// shallower if the value is not that deep). Cleanup C6: depth is
-/// derived from a decorrelated sub-seed so it does not statically lock
-/// to the mutation choice.
 fn pick_object_mut(value: &mut Value, seed: u32) -> Option<&mut Map<String, Value>> {
     let depth = (mix_depth(seed) as usize) % 4;
     let mut current = value;
@@ -343,8 +240,6 @@ fn pick_object_mut(value: &mut Value, seed: u32) -> Option<&mut Map<String, Valu
 }
 
 fn pick_array_mut(value: &mut Value, seed: u32) -> Option<&mut Vec<Value>> {
-    // Cleanup C6: depth axis decorrelated from the choice axis (see
-    // `pick_object_mut`).
     let depth = (mix_depth(seed) as usize) % 4;
     let mut current = value;
     for _ in 0..depth {
@@ -485,10 +380,7 @@ fn interesting_numbers() -> [Number; 10] {
     ]
 }
 
-// `INTERESTING_NUMBERS` cannot be a `const` because `Number::from_f64`
-// is not a const fn; we materialize it once at first use via the
-// `OnceLock` below. The mutator hot path reads it via the `_get()`
-// accessor, which after warmup is a single atomic load.
+// `Number::from_f64` is not const, so materialize once via OnceLock.
 use std::sync::OnceLock;
 static INTERESTING_NUMBERS_CELL: OnceLock<[Number; 10]> = OnceLock::new();
 fn interesting_numbers_table() -> &'static [Number; 10] {

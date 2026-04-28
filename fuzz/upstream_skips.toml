@@ -5,9 +5,7 @@
 # Chio bugs, add a temporary skip with a sunset date (max 90 days from
 # the day the entry lands). Once the sunset passes,
 # scripts/check-upstream-skips.sh fails CI until the entry is removed
-# and the issue is re-evaluated. This is the "force re-evaluation"
-# half of the false-positive mitigation called out in
-# .planning/trajectory/02-fuzzing-post-pr13.md Phase 2 P2.T4.
+# and the issue is re-evaluated (expired entries fail CI).
 #
 # Schema (per [[skips]] entry):
 #   target         = "<fuzz target name from fuzz/fuzz_targets/>"
@@ -32,7 +30,5 @@
 #   - sunset must be within 90 days of today (no long-lived skips)
 #   - upstream_issue must be an http(s):// URL
 
-# No active skips at M02 P4 close (initial seed). Wave 4 mutation-gate
-# work and the wider Wave 2-4 fuzz expansion may add real entries; this
-# table is intentionally empty so CI passes the sunset gate today.
+# No active skips. Table is intentionally empty.
 skips = []

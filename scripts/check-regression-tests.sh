@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # scripts/check-regression-tests.sh
 #
-# Regression-test deletion guard (M02.P4.T3).
-#
-# Detects deletion of fuzz-promoted regression tests under either
-# tests/regression_*.rs (legacy layout) or crates/*/tests/regression_*.rs
-# (current layout, written by scripts/promote_fuzz_seed.sh in T2).
-# Fails CI when any such file disappears between BASE..HEAD without a
-# paired issue link in the PR body or merge commit message.
+# Regression-test deletion guard. Detects deletion of fuzz-promoted regression
+# tests under either tests/regression_*.rs (legacy layout) or
+# crates/*/tests/regression_*.rs (current layout). Fails CI when any such
+# file disappears between BASE..HEAD without a paired issue link in the PR
+# body or merge commit message.
 #
 # Mechanism:
 #   1. git diff --diff-filter=D --name-only $BASE..$HEAD
@@ -28,10 +26,7 @@
 #   --base REF   base ref (default: origin/main, or $GITHUB_BASE_REF)
 #   --head REF   head ref (default: HEAD)
 #   --help       show this help and exit 0
-#
-# Source-doc anchor:
-#   .planning/trajectory/02-fuzzing-post-pr13.md
-#     Phase 4 P4.T3 + Crash-triage automation > CODEOWNERS gate paragraph
+
 
 set -euo pipefail
 
@@ -110,7 +105,7 @@ fi
 #      when the workflow forwards it). Fall back to HEAD~1 so the diff
 #      is against the previous commit on the same branch rather than
 #      `origin/main`, which on a post-push checkout points to HEAD itself
-#      and would always produce an empty diff (regression: r3144325897).
+#      and would always produce an empty diff.
 #   3. Local / unknown: default to origin/main (developer-facing usage).
 if [[ -z "$BASE" ]]; then
     if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
@@ -166,10 +161,10 @@ unpaired=0
 echo "check-regression-tests: deleted regression tests detected; checking for paired issue links"
 while IFS= read -r path; do
     [[ -z "$path" ]] && continue
-    # Per-file pairing (regression: r3144325294 / r3144325899). A single
-    # `closes #N` at the top of the PR body must NOT silently approve N
-    # unrelated regression-test deletions; the contract is one paired
-    # reference per deleted file. We require that either the full path
+    # Per-file pairing: a single `closes #N` at the top of the PR body must
+    # NOT silently approve N unrelated regression-test deletions; the contract
+    # is one paired reference per deleted file. We require that either the
+    # full path
     # OR the file's basename appears in the search text alongside a
     # paired issue link. Either form ties the link to this specific
     # deletion rather than treating any link anywhere in the diff as

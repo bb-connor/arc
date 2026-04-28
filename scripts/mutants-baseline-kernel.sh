@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 # mutants-baseline-kernel.sh - Run cargo-mutants baseline on chio-kernel.
 #
-# Source-doc anchor:
-#   .planning/audits/M05-async-kernel.md
-#   "cargo-mutants baseline (M05.P0.T5)" - establishes the kill rate
-#   before M05 P1 starts moving methods off `&mut self`. The audit doc
-#   tracks the rate so subsequent phases (P1-P4) do not regress.
-#
 # Behavior:
 #   - If cargo-mutants is not installed locally, soft-skip with exit 0
 #     and emit an install hint. CI runs the baseline on a beefy runner

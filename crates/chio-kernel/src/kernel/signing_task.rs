@@ -1,38 +1,28 @@
-//! Mpsc-backed receipt signing task (M05.P1.T3).
+//! Mpsc-backed receipt signing task.
 //!
 //! ## Why this exists
 //!
-//! Pre-T3 the kernel signed receipts inline on the evaluate critical path,
-//! holding the synchronous `build_and_sign_receipt` step inside the same
-//! call stack that was already running guard pipelines, store mutations,
-//! and (eventually) tool dispatch. Under load that funnel pinned a worker
-//! thread per concurrent evaluate call.
+//! The kernel previously signed receipts inline on the evaluate critical path,
+//! holding the synchronous `build_and_sign_receipt` step inside the same call
+//! stack that was already running guard pipelines and store mutations. Under
+//! load that funnel pinned a worker thread per concurrent evaluate call.
 //!
-//! T3 introduces a single signing task that owns a clone of the kernel
-//! signing keypair and pulls signing requests from a bounded
-//! [`tokio::sync::mpsc`] channel. Producers `.await` on a oneshot reply
-//! channel rather than on a mutex; backpressure surfaces naturally when
-//! the bounded queue fills.
+//! A single signing task now owns a clone of the kernel signing keypair and
+//! pulls signing requests from a bounded [`tokio::sync::mpsc`] channel.
+//! Producers `.await` on a oneshot reply channel rather than on a mutex;
+//! backpressure surfaces naturally when the bounded queue fills.
 //!
-//! ## Boundaries (what T3 does NOT do)
-//!
-//! - T3 does NOT remove the existing synchronous `build_and_sign_receipt`
-//!   helper in `kernel/responses.rs`. Internal call sites (deny-receipt
-//!   builders, child-receipt builders, federation cosign hook) keep their
-//!   inline path until later phase work routes them through the channel.
-//! - T3 does NOT change receipt body construction, tenant-scope handling,
-//!   or the canonical-JSON signing pipeline. The mpsc path delegates to
-//!   the same `chio_kernel_core::sign_receipt` portable helper that the
-//!   sync path uses, so receipt bytes are byte-identical across the two.
-//! - T3 does NOT touch the receipt-store append path. Persistence stays
-//!   inline; only the signature step crosses the channel.
+//! The existing synchronous `build_and_sign_receipt` helper in
+//! `kernel/responses.rs` is unchanged. Internal call sites (deny-receipt
+//! builders, child-receipt builders, federation cosign hook) keep their inline
+//! path. The mpsc path delegates to the same `chio_kernel_core::sign_receipt`
+//! portable helper, so receipt bytes are byte-identical across the two paths.
+//! Persistence stays inline; only the signature step crosses the channel.
 //!
 //! ## Crash recovery contract
 //!
-//! Per the milestone doc, full crash-recovery integration tests land in
-//! M05.P4.T4 (`tests/signer_crash.rs`). T3 lays the channel and handle
-//! shape so that test harness has something to reach into; this module
-//! only guarantees:
+//! Integration tests in `tests/signer_crash.rs` cover crash recovery. This
+//! module only guarantees:
 //!
 //! - The signing task runs until the last [`SigningTaskHandle`] sender
 //!   is dropped, at which point the channel closes and the task returns.
@@ -151,8 +141,7 @@ pub(crate) struct SigningTaskHandle {
     /// the call site.
     keypair: Keypair,
 
-    /// Configured channel capacity. Exposed for diagnostics and to give
-    /// the M05.P4.T4 crash-recovery test a stable knob to assert against.
+    /// Configured channel capacity. Exposed for diagnostics and tests.
     capacity: usize,
 
     /// Set once shutdown is requested, including pre-spawn shutdown.
@@ -266,8 +255,8 @@ impl SigningTaskHandle {
     /// (the body is returned so the caller can retry without
     /// reconstructing it). The returned future still `.await`s on the
     /// oneshot reply when the send succeeds. Used by tests that want to
-    /// assert backpressure behaviour deterministically and by future
-    /// crash-recovery harnesses (M05.P4.T4).
+    /// assert backpressure behaviour deterministically and by
+    /// crash-recovery harnesses.
     ///
     /// The Err-variant carries the full receipt body (~544 bytes today)
     /// because retry-on-backpressure callers want the body back without
@@ -313,11 +302,10 @@ impl SigningTaskHandle {
 
     /// Abort the spawned task and close the canonical sender.
     ///
-    /// This is intentionally crate-private: it exists for the M05.P4.T4
-    /// crash-recovery integration test, which needs to model a hard
-    /// task loss rather than a graceful [`Self::shutdown`]. Producers
-    /// that were queued observe a dropped reply channel, and producers
-    /// that arrive afterward observe a closed signing task.
+    /// Intentionally crate-private: exists for crash-recovery integration
+    /// tests that need to model a hard task loss rather than a graceful
+    /// [`Self::shutdown`]. Producers that were queued observe a dropped reply
+    /// channel; producers that arrive afterward observe a closed signing task.
     #[allow(dead_code)]
     pub(crate) fn abort_for_crash_recovery_test(&self) {
         let Some(inner) = self.inner.get() else {

@@ -367,15 +367,15 @@ fn public_sign_receipt_accepts_matching_kernel_key() {
     core::mem::forget(backend);
 }
 
-// NOTE (M03.P2.T1): The verified-core surface does not currently expose a public
-// `intersect(a, b)` operator over scopes; intersection is only modelled
-// transitively via `is_subset_of`/`resolve_matching_grants`. Associativity of
-// intersection in this lattice is therefore witnessed by transitivity of the
-// subset relation over its algebraic primitive `optional_u32_cap_is_subset`
-// (a per-grant cap component that participates in every nested intersection).
-// A meet-semilattice in which `<=` is transitive admits an associative meet,
-// so the two primitive proofs below (transitivity, plus refl-style preservation)
-// jointly witness the intended algebra. Reframe once a public `intersect` lands.
+// The verified-core surface does not currently expose a public `intersect(a, b)`
+// operator over scopes; intersection is only modelled transitively via
+// `is_subset_of`/`resolve_matching_grants`. Associativity of intersection in
+// this lattice is therefore witnessed by transitivity of the subset relation
+// over its algebraic primitive `optional_u32_cap_is_subset` (a per-grant cap
+// component that participates in every nested intersection). A meet-semilattice
+// in which `<=` is transitive admits an associative meet, so the two primitive
+// proofs below (transitivity, plus refl-style preservation) jointly witness the
+// intended algebra.
 #[kani::proof]
 fn verify_scope_intersection_associative() {
     let a_has = kani::any::<bool>();
@@ -423,8 +423,8 @@ fn verify_revocation_predicate_idempotent() {
     assert_eq!(mirrored_first, token_revoked);
 }
 
-// NOTE (M03.P2.T2): Single-step delegation attenuation has two algebraic
-// pillars in Chio: (a) `scope(c') is_subset_of scope(c)` and
+// Single-step delegation attenuation has two algebraic pillars in Chio:
+// (a) `scope(c') is_subset_of scope(c)` and
 // (b) `expires_at(c') <= expires_at(c)`. The runtime predicate
 // `validate_attenuation` is exactly `child.is_subset_of(parent)` over
 // `ChioScope`, which decomposes per-grant into the same primitive predicates
@@ -743,45 +743,31 @@ fn verify_delegation_chain_step() {
     core::mem::forget(child_grant);
 }
 
-// NOTE (M03.P2.T3): Receipt sign/verify roundtrip integrity. The runtime
-// path `sign_receipt -> ChioReceipt::verify_signature` ultimately calls
-// `PublicKey::verify_canonical(body, signature)`, which canonicalizes
-// `body` via RFC 8785 (serde_json) and then dispatches to ed25519-dalek
-// (or ECDSA on P-256/P-384). Both halves are intractable for symbolic
-// execution: the canonical-JSON encoder pulls in heap-allocating string
-// manipulation, and the curve arithmetic dwarfs Kani's unwind budget.
-// `crates/chio-kernel-core/src/receipts.rs` already documents this and
-// gates the production path behind `#[cfg(not(kani))]`.
+// Receipt sign/verify roundtrip integrity. The runtime path
+// `sign_receipt -> ChioReceipt::verify_signature` ultimately calls
+// `PublicKey::verify_canonical(body, signature)`, which canonicalizes `body`
+// via RFC 8785 (serde_json) and then dispatches to ed25519-dalek (or ECDSA
+// on P-256/P-384). Both halves are intractable for symbolic execution: the
+// canonical-JSON encoder pulls in heap-allocating string manipulation, and
+// the curve arithmetic dwarfs Kani's unwind budget.
+// `crates/chio-kernel-core/src/receipts.rs` already documents this and gates
+// the production path behind `#[cfg(not(kani))]`.
 //
-// Following the pattern established by T1 (intersection associativity
-// witnessed via the cap-subset primitive) and T2 (delegation attenuation
-// witnessed via the per-axis primitives), we capture the algebraic
-// content the property requires at the level of the smallest model that
-// preserves it. Every sound digital signature scheme (Ed25519, ECDSA on
-// any curve, BLS, Schnorr) has the same observable algebra: a signature
-// produced over (signing_key, message) verifies under (verifying_key,
-// message) iff `verifying_key` is paired with `signing_key` AND
-// `message` matches the bytes that were signed. Tampering with the key,
-// the message, or the signature breaks at least one of those equalities
-// and `verify` must return false.
-//
-// The model below witnesses exactly this algebra. `signer_id` stands
-// in for the signing keypair's public identity (= public key bytes in
-// the runtime), `message_class` stands in for the canonical-JSON byte
-// sequence of the receipt body (its equivalence class under RFC 8785),
-// and `signature` carries a bound copy of both. We bound every axis to
-// `u8` to match the rest of this module; no new size constants are
-// introduced. The "tamper" branch we designate as load-bearing is the
-// message-class arm (i.e. mutating the receipt body), because that is
-// what an audit log replay attack would do; the key-tamper and
-// signature-tamper arms are supporting witnesses that the model is not
-// secretly ignoring those axes. Composition with
-// `public_sign_receipt_rejects_kernel_key_mismatch_before_signing`
-// (already in this module) discharges the orthogonal property that
-// `kernel_key` in the body must match the backend before a signature
-// is even issued, so the (key, message, signature) triple this model
-// reasons about is the same triple that survives the runtime's
-// pre-sign guard.
+// We capture the algebraic content at the level of the smallest model that
+// preserves it. Every sound digital signature scheme has the same observable
+// algebra: a signature produced over (signing_key, message) verifies under
+// (verifying_key, message) iff `verifying_key` is paired with `signing_key`
+// AND `message` matches the bytes that were signed. The model below witnesses
+// exactly this algebra. `signer_id` stands in for the signing keypair's
+// public identity (= public key bytes in the runtime), `message_class` stands
+// in for the canonical-JSON byte sequence of the receipt body (its equivalence
+// class under RFC 8785), and `signature` carries a bound copy of both. The
+// message-class tamper arm is load-bearing because that is what an audit log
+// replay attack would do; key-tamper and signature-tamper arms are supporting
+// witnesses. Composition with
+// `public_sign_receipt_rejects_kernel_key_mismatch_before_signing` discharges
+// the orthogonal property that `kernel_key` in the body must match the backend
+// before a signature is even issued.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ModelSignature {
@@ -877,37 +863,22 @@ fn verify_receipt_roundtrip() {
     assert_eq!(honest, resigned);
 }
 
-// NOTE (M03.P2.T4): Budget overflow never partial-commits. The runtime
-// branch in `crates/chio-kernel/src/budget_store.rs` (around line 1035 at
-// pin time) computes `current_total.checked_add(cost_units).ok_or_else(
-// || BudgetStoreError::Overflow(...))?` BEFORE any mutation of
-// `self.counts` / `entry.invocation_count` / `entry.total_cost_exposed`,
-// and returns `Err(...)` via `?`. The same pattern repeats for
-// `total_cost_exposed.checked_add(cost_units)` a few lines below. The
-// algebraic content of "no partial commit on overflow" therefore reduces
-// to two pure properties of a checked, cap-bounded additive update:
+// Budget overflow never partial-commits. The runtime branch in
+// `crates/chio-kernel/src/budget_store.rs` computes
+// `current_total.checked_add(cost_units).ok_or_else(...)?` BEFORE any
+// mutation of the count rows. The algebraic content reduces to two pure
+// properties of a checked, cap-bounded additive update:
 //
 //   (a) if `current.checked_add(delta).is_none()`, the operation MUST
 //       fail closed and the post-state MUST equal the pre-state;
 //   (b) on success, the post-state MUST satisfy `new_state <= cap`.
 //
 // We model the operation as a free function over `u64` axes and lift the
-// "state" to a single scalar (the same shape the runtime exposes
-// per-row: `total_cost_exposed`, `total_cost_realized_spend`,
-// `invocation_count`). The function returns `Result<u64, BudgetError>`
-// without ever mutating its caller's state, which is the strongest
-// expression of "no partial commit": the only way the caller's state
-// changes is by pattern-matching `Ok(new)` and assigning it.
-//
-// Bound axes: matching the rest of this module, every "small" axis is a
-// u8 promoted to u64 (so `current + delta` stays well below u64::MAX in
-// the bulk of the search space). The overflow arm is *vacuous* under
-// pure u8 bounds (max sum 510), so we add a second axis that pins
-// `current = u64::MAX - tail` for a small symbolic `tail`, and lets
-// `delta` range freely as `u64::from(any::<u8>())`. This forces Kani
-// to enumerate concrete (current, delta) pairs that DO overflow, so
-// branch (a) is non-vacuous. No new constants are introduced beyond the
-// existing `u8 -> u64` promotion idiom.
+// "state" to a single scalar (the same shape the runtime exposes per-row).
+// The overflow arm is vacuous under pure u8 bounds (max sum 510), so we
+// add a second axis that pins `current = u64::MAX - tail` for a small
+// symbolic `tail`, forcing Kani to enumerate concrete (current, delta) pairs
+// that DO overflow so branch (a) is non-vacuous.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ModelBudgetError {

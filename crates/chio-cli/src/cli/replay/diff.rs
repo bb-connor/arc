@@ -1,13 +1,6 @@
 // Diff renderer for `chio replay traffic --against`.
-//
-// Owned by M10.P2.T3. The renderer consumes the replay report from
-// M10.P2.T2 and groups material changes by drift class:
-// allow/deny flip, guard delta, and reason delta. Human output remains
-// the default CLI format; `--json` emits the machine-readable shape
-// rendered by `diff/json.rs`.
-//
-// Reference: `.planning/trajectory/10-tee-replay-harness.md` Phase 2
-// task 3 ("Implement diff renderer grouped by drift class").
+// Groups material changes by drift class: allow/deny flip, guard delta,
+// and reason delta. Human output is the default; `--json` uses `diff/json.rs`.
 
 mod replay_diff_json {
     use super::*;
@@ -25,7 +18,7 @@ pub use replay_diff_json::{render_traffic_diff_json, render_traffic_diff_json_st
 /// Stable schema identifier for `chio replay traffic --against --json`.
 pub const TRAFFIC_DIFF_SCHEMA_ID: &str = "chio.replay.traffic-diff/v1";
 
-/// Primary drift classes required by M10.P2.T3.
+/// Primary drift classes.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]

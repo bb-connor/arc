@@ -1,21 +1,7 @@
-// NDJSON iterator over a tee-capture stream for `chio replay traffic`.
-//
-// Owned by M10.P2.T1. This module lands the line-buffered NDJSON
-// iterator that yields strongly-typed `chio_tee_frame::Frame` records
-// from a `Read`-able input. Malformed lines surface as
-// [`NdjsonError`] without panicking, matching the workspace
-// `unwrap_used = "deny"` lint and the fail-closed invariant from
-// `.planning/trajectory/10-tee-replay-harness.md` Phase 2 task 2.
-//
-// The iterator is intentionally narrow: it does not perform schema
-// validation, signature verification, or M01 invocation validation.
-// Those passes live in `cli/replay/validate.rs` so each stage owns one
-// concern and the canonical exit-code mapping (M04 0/10/20/30/40/50)
-// stays auditable.
-//
-// Reference: `.planning/trajectory/10-tee-replay-harness.md` Phase 2
-// "NDJSON line iterator, schema-version gate, tenant-sig verifier, M01
-// invocation validator".
+// Line-buffered NDJSON iterator for `chio replay traffic`.
+// Yields strongly-typed `chio_tee_frame::Frame` records; malformed lines
+// surface as [`NdjsonError`] without panicking. Schema validation and
+// signature verification are layered on top in `cli/replay/validate.rs`.
 
 /// Default capacity of the per-line buffer (8 KiB). NDJSON lines are
 /// expected to fit comfortably; pathologically long lines cause the

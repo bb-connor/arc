@@ -1,17 +1,12 @@
 //! Five named proptest invariants for the portable kernel `evaluate` surface.
 //!
-//! These cover the M03 capability-algebra ticket M03.P1.T3. Each invariant
-//! corresponds verbatim to a name in
-//! `.planning/trajectory/03-capability-algebra-properties.md` lines 75-79.
-//!
-//! Notes on doc-vs-live API:
+//! Notes on the API:
 //!
 //! - `chio-kernel-core::evaluate` does not perform stateful revocation
 //!   lookup (that lives in `chio-kernel`). The portable core models the
 //!   "revoked lifecycle" property of invariant 1 via the lifecycle
 //!   information it does see: a capability whose validity window has
-//!   closed (`expires_at <= now`) is denied. `chio-credentials` covers the
-//!   true revocation-store path in its own invariant suite (M03.P1.T4).
+//!   closed (`expires_at <= now`) is denied.
 //! - The portable kernel does not expose public `union` or `intersect`
 //!   operators on `ChioScope`. Invariants 4 and 5 are therefore expressed
 //!   through `resolve_matching_grants`, which is the public matcher the
@@ -21,8 +16,7 @@
 //! Each `proptest!` block is configured via `proptest_config_for_lane()`,
 //! which honours `PROPTEST_CASES` from the CI environment (PR-tier 256,
 //! nightly-tier 4096) and falls back to a modest local default of 48 so
-//! the default `cargo test` lane stays well under one minute. Tiering
-//! happens in M03.P1.T6.
+//! the default `cargo test` lane stays well under one minute.
 
 use std::ops::Range;
 
@@ -41,8 +35,8 @@ use proptest::prelude::*;
 /// nightly). When the variable is unset or unparseable we fall back to
 /// the local default `48`. Without this helper, a per-block
 /// `ProptestConfig::with_cases(...)` literal would override the env-var
-/// derived default that proptest reads at startup, defeating the M03.P1.T6
-/// tiered case-count gate.
+/// derived default that proptest reads at startup, defeating the tiered
+/// case-count gate.
 fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
     let cases = std::env::var("PROPTEST_CASES")
         .ok()
@@ -156,8 +150,6 @@ proptest! {
     // revoked lifecycle state. The portable kernel core never reaches into
     // a revocation store, so we model "revoked" via the lifecycle signal it
     // does observe: a capability evaluated outside its validity window.
-    // The full revocation-store invariant lives with `chio-credentials` and
-    // `chio-kernel` (see M03.P1.T4 and M03.P2 lifecycle tickets).
     //
     // To avoid a vacuous Deny (out-of-scope requests are denied for an
     // unrelated reason), we ensure the request matches the first generated

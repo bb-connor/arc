@@ -30,19 +30,16 @@
 //!   mod.rs            (placeholder; not pulled into lib.rs yet)
 //! ```
 //!
-//! The single-file emission is intentional for the M01.P3.T1 scaffold: it
-//! gives downstream tickets one well-known file to wire into `lib.rs` (gated
-//! behind a feature flag) without having to discover per-group modules. T2-T6
-//! and later milestones can split the file once the `no_std + alloc` story
-//! for the generated types is settled.
+//! The single-file emission keeps downstream consumers pointing at one
+//! well-known file. The file can be split into per-group modules once the
+//! `no_std + alloc` story for the generated types is settled.
 //!
 //! # Header policy
 //!
 //! Every regenerated file begins with [`GENERATED_HEADER`]. The companion
 //! `crates/chio-core-types/tests/_generated_check.rs` integration test scans
 //! every `*.rs` file under `_generated/` and fails the build if any file is
-//! missing the header. This is the substrate for the M01.P3.T5
-//! `header-stamp-untouched` CI lane.
+//! missing the header.
 //!
 //! # Determinism
 //!
@@ -194,9 +191,7 @@ pub fn codegen_rust(schemas_dir: &Path, out_dir: &Path) -> Result<()> {
         "{GENERATED_HEADER}\n\
          //! Placeholder module for the chio-wire/v1 generated types.\n\
          //!\n\
-         //! This file is intentionally empty until a follow-up ticket wires\n\
-         //! `chio_wire_v1.rs` into `crates/chio-core-types/src/lib.rs` behind\n\
-         //! a feature flag. The header above is required by\n\
+         //! This file is intentionally empty; the header is required by\n\
          //! `crates/chio-core-types/tests/_generated_check.rs`.\n"
     );
     let mod_path = out_dir.join(MOD_FILE);

@@ -1,39 +1,15 @@
 // Policy-reference parser and resolver for `chio replay traffic --against`.
 //
-// Owned by M10.P2.T2. This file is `include!`'d into `main.rs`; it
-// reuses the shared `use` declarations from `cli/types.rs` (notably
-// `Path`, `PathBuf`). All sibling helpers in this directory live at
-// the same flat top-level scope, so references below are unqualified.
-//
-// The `--against` flag accepts three discriminated shapes (see
-// `.planning/trajectory/10-tee-replay-harness.md` Phase 2 task 3 and
-// the soft-deps note in `.planning/trajectory/tickets/M10/P2.yml`):
-//
-// 1. **Manifest hash**: a 64-character lower-hex sha256 digest, optionally
-//    prefixed with `sha256:` for clarity. The hash addresses a content-pinned
-//    policy manifest. T2 ships the discriminator and a deterministic
-//    NotResolvable error path; full registry-backed resolution lands when
-//    the manifest registry crate is wired up downstream.
-// 2. **Package version**: the `<name>@<semver>` shape (e.g.
-//    `chio-policy@1.4.0`). Cargo-style; the dispatcher pulls bytes from
-//    the package registry. T2 ships parse + a deterministic
-//    NotResolvable error so the surface can be tooled before the registry
-//    integration lands.
-// 3. **Workspace path**: an absolute or relative filesystem path to a
-//    HushSpec / Chio YAML policy file. This is the only fully resolvable
-//    shape in T2 because it requires no out-of-tree state; tests and
-//    integration use this arm exclusively.
-//
-// The parse function discriminates by shape (no flag-style prefix is
-// required for the path arm), with optional `sha256:` / `version:` /
-// `path:` prefixes for explicit disambiguation.
-//
-// Reference: `.planning/trajectory/10-tee-replay-harness.md` Phase 2 task
-// 3 (verbatim: "Implement re-execution against `--against <policy-ref>`
-// (manifest hash, package version, or workspace path)").
+// Three discriminated shapes:
+// 1. Manifest hash: 64-char lower-hex sha256 (optionally prefixed `sha256:`).
+//    Resolution requires the manifest registry; surfaces NotResolvable until
+//    that registry lands.
+// 2. Package version: `<name>@<semver>` (e.g. `chio-policy@1.4.0`).
+//    Same: NotResolvable until the package registry is wired.
+// 3. Workspace path: absolute or relative filesystem path to a YAML policy.
+//    Fully resolvable now.
 
-/// Parsed and discriminated policy reference. The variants correspond
-/// 1:1 to the soft-deps clause in the M10.P2.T2 ticket.
+/// Parsed and discriminated policy reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyRef {
     /// 32-byte sha256 digest of a policy manifest (lower-hex on the wire).
@@ -58,18 +34,14 @@ pub enum PolicyRefError {
     #[error("workspace policy path failed to load: {0}")]
     Load(String),
 
-    /// Manifest-hash and package-version arms cannot resolve in T2
-    /// because the registry integration is downstream work. The error
-    /// is structured so callers can degrade gracefully and fall back to
-    /// the workspace-path arm.
+    /// Manifest-hash and package-version arms require registry integration
+    /// that is not yet wired. Callers can fall back to the workspace-path arm.
     #[error("policy-ref shape not yet resolvable in chio-cli: {0}")]
     NotResolvable(String),
 }
 
-/// Resolved-policy summary. The [`PolicyRef::load_workspace_policy`]
-/// helper returns the full materialized [`policy::LoadedPolicy`] so the
-/// kernel-builder in `replay/execute.rs` can assemble a kernel; this
-/// shape is the lighter-weight summary used by reports.
+/// Resolved-policy summary used by reports. For the full materialized
+/// [`policy::LoadedPolicy`] use [`PolicyRef::load_workspace_policy`].
 #[derive(Debug, Clone)]
 pub struct ResolvedPolicy {
     /// Path on disk the policy was loaded from, when applicable. `None`
@@ -170,11 +142,9 @@ impl PolicyRef {
 
     /// Resolve the policy reference into a [`ResolvedPolicy`] summary.
     ///
-    /// In T2 only the [`Self::WorkspacePath`] arm fully resolves; the
-    /// other two arms surface [`PolicyRefError::NotResolvable`] so the
-    /// dispatcher can degrade gracefully or recommend a workspace-path
-    /// fallback. Downstream tickets wire the manifest registry and the
-    /// package registry without changing this surface.
+    /// Only the [`Self::WorkspacePath`] arm fully resolves; the other two
+    /// surface [`PolicyRefError::NotResolvable`] until registry integration
+    /// lands.
     pub fn resolve(&self) -> Result<ResolvedPolicy, PolicyRefError> {
         match self {
             Self::WorkspacePath(path) => {
@@ -205,9 +175,7 @@ impl PolicyRef {
     }
 
     /// Resolve the workspace-path arm into a fully materialized
-    /// [`policy::LoadedPolicy`]. The kernel-builder in `replay/execute.rs`
-    /// needs the materialized policy (not just the identity) so this
-    /// loader is split from the lighter-weight [`Self::resolve`] summary.
+    /// [`policy::LoadedPolicy`].
     pub fn load_workspace_policy(&self) -> Result<policy::LoadedPolicy, PolicyRefError> {
         match self {
             Self::WorkspacePath(path) => load_policy(path).map_err(|e| {

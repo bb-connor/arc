@@ -12,10 +12,8 @@ publish = false
 [lib]
 name = "chio_anthropic_tools_adapter"
 
-# Pinned upstream API version. Bumping this is a deliberate PR with a fixture
-# re-record (see .planning/trajectory/07-provider-native-adapters.md, "Pinned
-# upstream API versions"). The same string is exposed at
-# `crate::transport::ANTHROPIC_VERSION` and printed in `README.md`.
+# Pinned upstream API version. Bumping requires a deliberate PR with a fixture
+# re-record. The same string is exposed at `crate::transport::ANTHROPIC_VERSION`.
 [package.metadata.chio]
 anthropic_version = "2023-06-01"
 computer_use_beta = "computer-use-2025-01-24"
@@ -29,12 +27,9 @@ thiserror = { workspace = true }
 
 [features]
 # Off by default. Enabling `computer-use` unlocks the Anthropic server-tool
-# variants (`computer_use_20241022`, `bash_20241022`, `text_editor_20241022`)
-# inside `crate::native` and stamps the `anthropic-beta:
-# computer-use-2025-01-24` header onto outgoing requests in T2/T3 work. M07
-# milestone doc (lines 50, 399-402, 470) requires that the default build
-# excludes the beta surface; the feature must be combined with an explicit
-# `chio-manifest` `server_tools` allowlist (gated separately in T4).
+# variants and stamps the `anthropic-beta: computer-use-2025-01-24` header onto
+# outgoing requests. Default builds exclude the beta surface; the feature must
+# be combined with an explicit `chio-manifest` `server_tools` allowlist.
 computer-use = []
 
 [lints.clippy]

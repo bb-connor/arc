@@ -1,13 +1,8 @@
 //! Streaming state machine for the tool-call fabric.
 //!
-//! The fabric mediates provider streams (OpenAI SSE, Anthropic event-stream,
-//! Bedrock `ConverseStream`) at the tool-use block boundary: events are
-//! buffered while the kernel resolves a verdict for the enclosing block, then
-//! flushed once the verdict allows or dropped if it denies. See
-//! `.planning/trajectory/07-provider-native-adapters.md` Phase 1 task 3 and the
-//! "Streaming verdict semantics" section for the behavioral contract.
-//!
-//! This module ships the bare state-machine scaffold for that contract:
+//! Mediates provider streams (OpenAI SSE, Anthropic event-stream, Bedrock
+//! `ConverseStream`) at the tool-use block boundary: events are buffered while
+//! the kernel resolves a verdict, then flushed on allow or dropped on deny.
 //!
 //! - [`StreamPhase`] is the finite-state enum every adapter drives.
 //! - [`BufferedBlock`] is the per-block buffer carried while the phase is
@@ -16,10 +11,6 @@
 //!   result, plain text, or some other provider construct.
 //! - [`StreamEvent`] enumerates the inputs that drive transitions.
 //! - [`StreamError`] reports invalid transitions.
-//!
-//! Phase 1 of M07 ships transitions only; provider-specific wiring (SSE
-//! parsing, kernel verdict calls, synthetic deny emission) lands in the
-//! per-provider adapters.
 
 use std::fmt;
 

@@ -1,44 +1,20 @@
-# chio-replay-gate.yml - Deterministic-replay corpus gate (M04 P2.T2 + T3).
+# chio-replay-gate.yml - Deterministic-replay corpus gate.
 #
-# Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
-#   - Phase 2 ("CI gate and bless workflow", lines ~206-244): the workflow
-#     runs the chio-replay-gate corpus on every PR and on push to main /
-#     project/* branches; the `--bless` path is the only way to update
-#     goldens and is gated programmatically by `tests/replay/src/bless.rs`
-#     (M04.P2.T1).
-#   - "CHIO_BLESS gate logic" (lines ~474-503): CI is explicitly banned
-#     from blessing. This workflow sets `CHIO_BLESS=0` and the binary
-#     refuses any bless invocation when `CI=true`. There is no
-#     "auto-bless on green" path.
-#   - "Test signing key management" (lines ~550-568): the `seed-immutable`
-#     job below hashes `tests/replay/test-key.seed` on every PR / push and
-#     fails closed if the digest drifts from the workflow-pinned
-#     `EXPECTED_SEED_SHA256` baseline (NOT the in-tree `.sha256` file
-#     alone). Rotating the seed requires (a) bumping
-#     `EXPECTED_SEED_SHA256` here in the workflow, (b) updating the
-#     in-tree `.sha256` to match, (c) re-blessing the entire corpus, (d)
-#     shipping an explicit `feat!:` commit. Routine PRs cannot change
-#     the seed.
+# Runs the chio-replay-gate corpus on every PR and on push to main /
+# project/* branches. The `--bless` path is the only way to update goldens;
+# CI is banned from blessing (CHIO_BLESS=0 is enforced here and in the binary).
 #
-# T2 scope seeded a single Linux `replay-gate` job that exercises the
-# corpus_smoke test. T3 (this layer) adds:
-#   - `macos-smoke`: read-only confirmation that the gate does not depend
-#     on Linux-only filesystem semantics (no bless, no goldens write).
-#   - `seed-immutable`: PR / push guard that locks the test signing seed.
-# Determinism canary and goldens-size budget remain follow-ons listed in
-# the doc's "New sub-tasks" section.
+# Determinism contract: LC_ALL=C and LANG=C are pinned so receipt serialisation
+# and sort orderings are reproducible. CARGO_INCREMENTAL=0 prevents incremental
+# codegen from contributing host-specific state to the receipts the gate compares.
 #
-# Determinism contract: `LC_ALL=C` and `LANG=C` are pinned at the workflow
-# level so receipt serialisation, sort orderings, and any locale-sensitive
-# output are reproducible across the Linux runner. `CARGO_INCREMENTAL=0`
-# pins out incremental codegen so the build contributes no host-specific
-# state to the receipts the gate compares.
+# The `seed-immutable` job locks tests/replay/test-key.seed. Rotating the seed
+# requires (a) bumping EXPECTED_SEED_SHA256 in this workflow, (b) updating the
+# in-tree .sha256 to match, (c) re-blessing the entire corpus, (d) shipping an
+# explicit `feat!:` commit. Routine PRs cannot change the seed.
 #
-# Required-on-main: the `replay-gate / replay-gate (linux)` check should be
-# promoted to a required status check on the branch ruleset for `main`
-# alongside the existing `check`, `msrv`, and freeze-guard required checks
-# (see ci.yml's required-check inventory). The ruleset itself is managed
-# out-of-band; this workflow is the producer of the check.
+# Required-on-main: `replay-gate / replay-gate (linux)` should be added to the
+# branch ruleset for `main`. The ruleset is managed out-of-band.
 
 name: chio-replay-gate
 
@@ -58,9 +34,7 @@ permissions:
 
 env:
   # Determinism pins: receipt byte-equivalence depends on a stable locale
-  # (string sort orders, number formatting) and a non-incremental codegen
-  # path. CHIO_BLESS=0 is the CI bless ban from
-  # .planning/trajectory/04-deterministic-replay.md "CHIO_BLESS gate logic".
+  # (string sort orders, number formatting) and a non-incremental codegen path.
   LC_ALL: C
   LANG: C
   CHIO_BLESS: "0"
@@ -119,14 +93,11 @@ jobs:
         run: cargo test -p chio-replay-gate --release --test corpus_smoke
 
       - name: Run replay-gate golden byte-equivalence (when goldens land)
-        # The golden_byte_equivalence integration test arrives in M04.P2.T5
-        # together with the initial bless of the 50 goldens. Until then
-        # the test target source file may be absent; skip-on-missing keeps
-        # the gate green for the T2 commit while still wiring the
-        # invocation. Once T5 lands this branch becomes the gating
-        # assertion (zero diffs vs. blessed goldens).
+        # The golden_byte_equivalence source file may be absent until the
+        # initial bless lands; skip-on-missing keeps the gate green while
+        # still wiring the invocation.
         #
-        # Fail-closed contract (cleanup-c2): the previous form was
+        # Fail-closed contract: the previous form was
         #
         #     if cargo test ... --no-run --quiet 2>/dev/null; then
         #       cargo test ...
@@ -167,12 +138,10 @@ jobs:
           cargo test -p chio-replay-gate --release --test golden_byte_equivalence
 
   macos-smoke:
-    # T3 scope: read-only macOS smoke. The Linux `replay-gate` job is the
-    # required-on-main check; this job exists to surface platform-specific
+    # Read-only macOS smoke. The Linux `replay-gate` job is the
+    # required-on-main check; this job surfaces platform-specific
     # determinism breakage (filesystem case folding, BSD vs GNU coreutils,
-    # APFS atime quirks) before it hits a contributor's local machine. It
-    # runs the same corpus_smoke test as the Linux job but never blesses
-    # and never builds the full release artifact tree.
+    # APFS atime quirks) before it hits a contributor's local machine.
     name: replay-gate (macos read-only)
     runs-on: macos-latest
     timeout-minutes: 15
@@ -214,29 +183,12 @@ jobs:
         run: cargo test -p chio-replay-gate --test corpus_smoke
 
   seed-immutable:
-    # T3 scope: lock `tests/replay/test-key.seed` against routine
-    # mutation. Source-doc anchor:
-    # .planning/trajectory/04-deterministic-replay.md "Test signing key
-    # management" (lines ~550-568). The job fails closed on four classes
-    # of mutation:
-    #   1. seed file missing
-    #   2. seed file world-writable (`stat` mode bit `0o002` set)
-    #   3. sha256(seed) != EXPECTED_SEED_SHA256 (workflow-pinned baseline)
-    #   4. contents of test-key.seed.sha256 != EXPECTED_SEED_SHA256
-    #      (drift between in-tree documentation and workflow baseline)
-    # Rotating the seed is intentionally a multi-step ceremony: bump the
-    # workflow's pinned EXPECTED_SEED_SHA256, update the in-tree
-    # `.sha256` file to match, re-bless the corpus, and ship a `feat!:`
-    # commit. A routine PR cannot drift the seed past this guard.
-    #
-    # Trusted-baseline note (cleanup-c2): an earlier revision of this job
-    # compared sha256(seed) against the in-tree `test-key.seed.sha256`
-    # alone. That gate is bypassable: a single PR can mutate BOTH the
-    # seed and the .sha256 in lockstep and the check passes. The
-    # `EXPECTED_SEED_SHA256` constant below is the workflow's protected
-    # baseline; rotating it forces an explicit, code-reviewed workflow
-    # change separate from any test-fixture edits, which is what the
-    # "feat!:" rotation ceremony actually requires.
+    # Locks tests/replay/test-key.seed against routine mutation.
+    # Fails closed on: seed missing, seed world-writable, sha256(seed) !=
+    # EXPECTED_SEED_SHA256, or .sha256 file != EXPECTED_SEED_SHA256.
+    # Rotating the seed requires bumping EXPECTED_SEED_SHA256 here,
+    # updating the in-tree .sha256, re-blessing the corpus, and shipping
+    # an explicit `feat!:` commit.
     name: seed-immutable
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -262,12 +214,12 @@ jobs:
 
           if [ ! -f "${seed}" ]; then
             echo "ERROR: ${seed} is missing." >&2
-            echo "rotate-seed runbook: see .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
+            echo "rotate-seed runbook: see docs/replay.md 'Test signing key management'." >&2
             exit 1
           fi
           if [ ! -f "${sha_file}" ]; then
             echo "ERROR: ${sha_file} is missing." >&2
-            echo "rotate-seed runbook: see .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
+            echo "rotate-seed runbook: see docs/replay.md 'Test signing key management'." >&2
             exit 1
           fi
 
@@ -301,7 +253,6 @@ jobs:
             echo "    (c) re-bless the entire corpus via scripts/bless-replay-goldens.sh," >&2
             echo "    (d) ship an explicit 'feat!:' commit." >&2
             echo "  Bumping (b) without (a) will not pass this gate; that is intentional." >&2
-            echo "  See .planning/trajectory/04-deterministic-replay.md 'Test signing key management'." >&2
             exit 1
           fi
 
@@ -310,32 +261,24 @@ jobs:
             echo "  workflow-pinned EXPECTED_SEED_SHA256: ${expected}" >&2
             echo "  in-tree ${sha_file}: ${documented}" >&2
             echo "rotate-seed runbook: the in-tree .sha256 is documentation; the workflow baseline is the trust root." >&2
-            echo "  To resolve, either revert ${sha_file} to ${expected}, or follow the four-step rotation ceremony above." >&2
+            echo "  To resolve, revert ${sha_file} to ${expected} or follow the four-step rotation ceremony above." >&2
             exit 1
           fi
 
           echo "seed-immutable: ${seed} digest matches workflow-pinned ${expected} (mode ${mode})"
 
   proptest:
-    # M04 P5.T1 scope: property-based replay-invariance suite.
-    #
-    # Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
-    # Phase 5 ("property-based replay invariance"). Three properties run
-    # against arbitrary `(decision, payload, clock, nonce)` receipt tuples:
-    #   - signing_is_a_function (named exit-criterion test)
-    #   - replay_root_is_idempotent (named exit-criterion test)
+    # Property-based replay-invariance suite. Three properties run against
+    # arbitrary (decision, payload, clock, nonce) receipt tuples:
+    #   - signing_is_a_function
+    #   - replay_root_is_idempotent
     #   - shuffle_independent_receipts_preserves_bytes
     #
-    # Budget: 30 seconds wall-clock for the proptest harness itself. The
-    # job-level timeout-minutes covers runner setup and compilation only;
-    # the test execution step below uses `timeout 30s` as the enforceable
-    # budget signal. PROPTEST_MAX_GLOBAL_REJECTS is set so the strategy's
-    # `prop_filter` constraints (unique-nonce batches) cannot exhaust the
-    # global rejection budget under shrink.
-    #
-    # Failed shrinks persist under tests/replay/proptest-regressions/ via
-    # FileFailurePersistence::Direct; CI uploads that directory as an
-    # artifact so contributors can replay the seed locally.
+    # Budget: 30s wall-clock enforced via `timeout 30s` in the run step.
+    # PROPTEST_MAX_GLOBAL_REJECTS guards against rejection-budget exhaustion
+    # under shrink (unique-nonce batch strategy).
+    # Failed shrinks persist under tests/replay/proptest-regressions/ and
+    # are uploaded as artifacts so contributors can replay locally.
     name: proptest
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -384,15 +327,10 @@ jobs:
           retention-days: 30
 
   differential:
-    # M04 P6.T5 scope: Linux-only Rust plus TypeScript differential gate.
-    #
-    # Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
-    # Phase 6 ("differential anchored-root verification"). The Rust formal
-    # diff-tests harness drives the shared replay fixtures and shells out to
-    # the TypeScript conformance runner so the anchored root bytes and proof
-    # path structures agree across implementations. The direct Bun step keeps
-    # the TypeScript replay/conformance surface named in the exit test visible
-    # as its own CI failure point.
+    # Linux-only Rust + TypeScript differential gate. The Rust formal
+    # diff-tests harness drives shared replay fixtures and shells out to the
+    # TypeScript conformance runner so anchored root bytes and proof path
+    # structures agree across implementations.
     name: differential
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -426,14 +364,11 @@ jobs:
         run: bun test sdks/typescript/packages/conformance/test/replay.spec.ts
 
   cross-version:
-    # M04 P3.T5 scope: cross-version receipt-compatibility sanity job.
-    # Runs the non-ignored sanity test in tests/replay/tests/cross_version_replay.rs
-    # which asserts the release_compat_matrix.toml file parses and contains
-    # at least the floor entries (v0.1.0 + v2.0). The full re-verify suite
-    # (`-- --ignored`) needs live HTTPS to the release CDN and tagged-release
-    # bundles, so it is intentionally not part of the default gate; see the
-    # exit-test note in .planning/trajectory/04-deterministic-replay.md
-    # Phase 3 ("CI job chio-replay-gate / cross-version is green").
+    # Cross-version receipt-compatibility sanity job. Runs the non-ignored
+    # test in tests/replay/tests/cross_version_replay.rs, which asserts
+    # release_compat_matrix.toml parses and contains at least the floor entries.
+    # The full re-verify suite (--ignored) requires live HTTPS to the release
+    # CDN and is intentionally not part of the default gate.
     name: cross-version
     runs-on: ubuntu-latest
     timeout-minutes: 30

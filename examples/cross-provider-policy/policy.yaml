@@ -1,6 +1,6 @@
 hushspec: "0.1.0"
 name: cross-provider-policy-demo
-description: Dry-run policy used by M07.P4.T6 to prove equivalent tool verdicts across native provider adapters.
+description: Dry-run policy proving equivalent tool verdicts across native provider adapters.
 
 rules:
   tool_access:

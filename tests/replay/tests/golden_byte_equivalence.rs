@@ -1,33 +1,20 @@
-//! Phase-2 exit test for the M04 replay-gate corpus.
+//! Golden byte-equivalence test for the replay-gate corpus.
 //!
-//! For each of the 50 scenarios under `tests/replay/fixtures/`, this
-//! test reproduces the synthesis flow that the initial bless used
-//! (driver + canonical-JSON receipt / checkpoint + SHA-256 synthetic
-//! root) in a `TempDir`, then loads those bytes back as raw `Vec<u8>`
-//! via [`chio_replay_gate::golden_reader::GoldenLoaded`]. It then loads
-//! the on-disk blessed goldens under
-//! `tests/replay/goldens/<family>/<scenario>/` the same way and diffs
-//! the two snapshots byte-for-byte through
-//! [`chio_replay_gate::byte_compare::compare_artifacts`]. The gate fails
-//! fast on any non-empty diff list with a structured per-artifact
-//! report (kind, lengths, first divergent offset, leading 32-byte
-//! windows from each side).
+//! For each of the 50 scenarios under `tests/replay/fixtures/`, this test
+//! reproduces the synthesis flow that the initial bless used (driver +
+//! canonical-JSON receipt / checkpoint + SHA-256 synthetic root) in a
+//! `TempDir`, then loads those bytes back as raw `Vec<u8>` and diffs them
+//! byte-for-byte against the on-disk blessed goldens.
 //!
-//! The synthesis recipe MUST stay byte-identical with the bless flow
-//! (`tests/replay/examples/bless_initial.rs` at bless-time, the
-//! `--bless` flag in subsequent tickets). Any change here is a
-//! re-bless event: see `docs/replay-compat.md` and the
-//! `CHIO_BLESS` rules in
-//! `.planning/trajectory/04-deterministic-replay.md`.
+//! The synthesis recipe MUST stay byte-identical with the bless flow. Any
+//! change here is a re-bless event: see `docs/replay-compat.md` and the
+//! `CHIO_BLESS` rules.
 //!
 //! # Determinism guarantees this test exercises
 //!
-//! - `LC_ALL=C` directory-listing order via
-//!   [`fs_iter::walk_files_sorted`] so the corpus enumerates identically
-//!   across HFS+/APFS, ext4, and NTFS hosts.
+//! - `LC_ALL=C` directory-listing order via [`fs_iter::walk_files_sorted`].
 //! - Fixed clock + counter-only nonce + Ed25519 deterministic-by-spec
-//!   signing via [`ScenarioDriver`] (the receipt/checkpoint/root triple
-//!   is therefore a pure function of the manifest).
+//!   signing via [`ScenarioDriver`].
 //! - Canonical-JSON object-key sort and LF-only NDJSON terminator
 //!   guaranteed by the writer in [`golden_writer::GoldenSet`].
 
@@ -47,7 +34,7 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 /// Total fixture count expected under `tests/replay/fixtures/` and
-/// `tests/replay/goldens/`. Source-of-truth: M04 P1 corpus breakdown.
+/// `tests/replay/goldens/`.
 const EXPECTED_FIXTURE_COUNT: usize = 50;
 
 #[test]
@@ -58,8 +45,7 @@ fn all_50_goldens_match_byte_for_byte() {
 
     assert!(
         goldens_root.is_dir(),
-        "goldens root {} does not exist; run the bless flow first \
-         (M04.P2.T5 commits the initial 50 goldens)",
+        "goldens root {} does not exist; run the bless flow first",
         goldens_root.display(),
     );
 
@@ -146,27 +132,16 @@ fn all_50_goldens_match_byte_for_byte() {
 
 /// Reproduce the bless-time synthesis recipe into `scenario_dir`.
 ///
-/// MUST stay in sync with the recipe used by the bless flow. Today:
+/// MUST stay in sync with the recipe used by the bless flow:
 ///
 /// - `receipt = { scenario, verdict, nonce }` where `nonce` is the
-///   first call to `ScenarioDriver::next_nonce()` rendered as
-///   lowercase hex.
+///   first call to `ScenarioDriver::next_nonce()` rendered as lowercase hex.
 /// - `checkpoint = { scenario, clock, issuer }` where `issuer` is the
 ///   verifying-key bytes of the test seed rendered as lowercase hex.
-/// - `root = SHA-256(canonical(receipt) || canonical(checkpoint))`
-///   where `canonical(...)` is the workspace-wide RFC 8785 / JCS
-///   serializer in
-///   [`golden_format::canonical_json_bytes`]. Earlier revisions hashed
-///   `serde_json::to_vec(&value)`, which depended on `serde_json`
-///   preserving the literal source-order keys; with the writer now
-///   delegating to the shared canonicaliser the SHA-256 input must
-///   also be the canonical bytes so the hash is well-defined under
-///   any future serde reordering.
-/// - All manifest fields used by the synthesis (`name`,
-///   `expected_verdict`, `clock`) are required-string-typed via
-///   [`require_str`]; an `unwrap_or("unknown")` fallback would mask
-///   malformed manifests as a downstream byte-diff instead of an
-///   upfront actionable error.
+/// - `root = SHA-256(canonical(receipt) || canonical(checkpoint))` via
+///   [`golden_format::canonical_json_bytes`].
+/// - All manifest fields used by the synthesis (`name`, `expected_verdict`,
+///   `clock`) are required-string-typed via [`require_str`].
 fn write_synthetic_goldens(manifest: &Value, manifest_path: &Path, scenario_dir: &Path) {
     let mut driver = ScenarioDriver::new().unwrap_or_else(|err| {
         panic!(

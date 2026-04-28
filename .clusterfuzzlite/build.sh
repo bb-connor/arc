@@ -7,14 +7,11 @@
 # exists under fuzz/corpus/<target>/. Set CHIO_CFLITE_TARGET to build a
 # single target for the nightly rotation workflow.
 #
-# Source-of-truth: .planning/trajectory/02-fuzzing-post-pr13.md
-# (ClusterFuzzLite implementation section). Companion docs in
-# docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
+# Companion docs in docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
 #
-# This script is the CFLite-side mirror of infra/oss-fuzz/build.sh
-# (M02.P2.T5). The two scripts MUST enumerate the same target set;
-# the OSS-Fuzz copy is the source-of-truth, so any new fuzz target
-# lands in BOTH files in the same change set.
+# This script mirrors infra/oss-fuzz/build.sh. The two scripts MUST enumerate
+# the same target set; the OSS-Fuzz copy is the source-of-truth, so any new
+# fuzz target lands in BOTH files in the same change set.
 
 set -euo pipefail
 

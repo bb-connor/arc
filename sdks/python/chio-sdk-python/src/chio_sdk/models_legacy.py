@@ -1,7 +1,7 @@
 # chio-deprecation: this hand-typed module is preserved for one release
 # cycle so adapter authors can grep for unported usage. New code should
 # import the generated Pydantic models from `chio_sdk._generated` (produced
-# by `cargo xtask codegen --lang python`). Tracking M01.P3.T2 -> M01+1.
+# by `cargo xtask codegen --lang python`).
 """Hand-typed Python models mirroring Chio core Rust types (LEGACY).
 
 The 17 framework adapters under sdks/python/chio-* re-export from

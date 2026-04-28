@@ -1,39 +1,11 @@
 // Replay-receipt partitioning and namespacing for `chio replay traffic --against`.
 //
-// Owned by M10.P2.T2. This file is `include!`'d into `main.rs` and reuses
-// the shared `use` declarations from `cli/types.rs`.
-//
-// Two collision-mitigation primitives live here:
-//
-// 1. **Replay receipt id namespace.** Live (production) receipts use the
-//    bare receipt ids the kernel emits. Replay-mode receipts MUST be
-//    prefixed `replay:<run_id>:<frame_id>` so they cannot collide with
-//    production receipts in a shared store. The contract is pinned by
-//    `.planning/trajectory/10-tee-replay-harness.md` line 568:
-//
-//    > Mitigation: replay receipts use a namespaced prefix
-//    > `replay:<run_id>:<frame_id>` and live in a logical partition flagged
-//    > `replay`; the CLI refuses to write replay receipts into a
-//    > production-flagged store and refuses to write production receipts
-//    > into a replay-flagged store. The bidirectional refusal is enforced
-//    > at the `chio-store-sqlite` layer.
-//
-// 2. **Bidirectional partition refusal.** [`StorePartition`] is a typed
-//    wrapper around a store handle whose runtime kind is one of
-//    `Production` or `Replay { run_id }`. The wrapper rejects mismatched
-//    writes at the chio-cli layer.
-//
-//    NOTE on scope: the M10.P2.T2 ticket flags the bidirectional refusal
-//    "ideally enforced at the `chio-store-sqlite` layer". The
-//    `chio-store-sqlite` crate today does not expose a partition flag
-//    (no `partition` column, no constructor switch), and modifying that
-//    crate is out of `owner_glob` for this ticket. Per the ticket
-//    deviation policy, we enforce partition refusal inline in the
-//    chio-cli replay code path here; the store-layer enforcement is a
-//    follow-up tracked under the M10.P2.T2 PR body.
-//
-// Reference: `.planning/trajectory/10-tee-replay-harness.md` line 568
-// (verbatim above).
+// Two collision-mitigation primitives:
+// 1. Replay receipt ids are prefixed `replay:<run_id>:<frame_id>` so they
+//    cannot collide with production receipts.
+// 2. [`StorePartition`] enforces bidirectional refusal: production writes
+//    are rejected from replay partitions and vice versa. This enforcement
+//    lives at the chio-cli layer; store-layer enforcement is follow-up work.
 
 /// Logical partition flag enforced at the chio-cli layer.
 ///
@@ -61,8 +33,7 @@ pub enum StorePartition {
 #[derive(Debug, thiserror::Error)]
 pub enum PartitionError {
     /// A production-flagged caller tried to write into a replay-flagged
-    /// store, or vice versa. The error is the bidirectional refusal
-    /// pinned by line 568 of the M10 milestone doc.
+    /// store, or vice versa.
     #[error("partition mismatch: store is {store}, write requested {requested}")]
     Mismatch { store: &'static str, requested: &'static str },
 
@@ -282,8 +253,6 @@ mod replay_receipt_partition_tests {
     #[test]
     fn replay_refuses_production_writes_bidirectionally() {
         // Reverse direction: replay store + production write -> error.
-        // This is the second half of the bidirectional refusal pinned by
-        // milestone doc line 568.
         let replay = StorePartition::replay_with_random_run_id();
         let prod = StorePartition::Production;
         let err = replay.ensure_compatible_with(&prod).unwrap_err();
@@ -351,8 +320,6 @@ mod replay_receipt_partition_tests {
     #[test]
     fn replay_receipt_id_format_matches_milestone_doc_line_568() {
         // Pinned literal: "replay:<run_id>:<frame_id>".
-        // Tripping this test means the namespace prefix has drifted
-        // away from the M10 spec.
         let id = replay_receipt_id("run-x", "frame-y");
         assert_eq!(id, "replay:run-x:frame-y");
         assert!(id.starts_with("replay:"));

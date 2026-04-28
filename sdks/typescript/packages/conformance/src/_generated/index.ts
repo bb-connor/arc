@@ -3,11 +3,11 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 185d2435c9b253aacfbd7587e0f4b770ae659c20bbd39453eb15e124f2032aae
+// Schema SHA: 5e70f903a487ad522a1a3c448e0f9f91aacc910269b201e6efd5617d0a07e542
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
-// spec/schemas/chio-wire/v1/ changes. The M01.P3.T5 spec-drift CI lane
+// spec/schemas/chio-wire/v1/ changes. The spec-drift CI lane
 // asserts byte-equality of this entire file via `--check` mode.
 
 /* eslint-disable */
@@ -193,7 +193,7 @@ export namespace Capability_Token {
   export type Operation = "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate";
 
   /**
-   * A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens.
+   * A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens. PublicKey serde renders Ed25519 keys as bare 64-character lowercase hex (`PublicKey::to_hex` in `crates/chio-core-types/src/crypto.rs`), and renders FIPS keys with a self-describing prefix (`p256:<130-char hex>` for uncompressed SEC1 P-256, `p384:<194-char hex>` for P-384). Signatures follow the same convention: bare 128-char hex for Ed25519, `p256:<DER hex>` and `p384:<DER hex>` for FIPS algorithms. The grant `$defs` (`toolGrant`, `resourceGrant`, `promptGrant`, `operation`, `monetaryAmount`, `constraint`) are duplicated with `capability/grant.schema.json` because the current Rust codegen pipeline (`typify =0.4.3`) does not support cross-file `$ref`; both copies must be kept byte-identical when either file is edited until the M01 phase 3 codegen split lands.
    */
   export interface ChioCapabilityToken {
     /**
@@ -201,11 +201,11 @@ export namespace Capability_Token {
      */
     id: string;
     /**
-     * Hex-encoded public key of the Capability Authority (or delegating agent) that issued this token.
+     * Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).
      */
     issuer: string;
     /**
-     * Hex-encoded public key of the agent this capability is bound to (DPoP sender constraint).
+     * Public key of the agent this capability is bound to (DPoP sender constraint). Same encoding as `issuer`.
      */
     subject: string;
     scope: ChioScope;
@@ -226,7 +226,7 @@ export namespace Capability_Token {
      */
     algorithm?: "ed25519" | "p256" | "p384";
     /**
-     * Hex-encoded signature over the canonical JSON of the token body. Length depends on the signing algorithm (Ed25519 = 128 hex chars, P-256 = 96+, P-384 = 144+).
+     * Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
      */
     signature: string;
   }
@@ -239,7 +239,7 @@ export namespace Capability_Token {
     prompt_grants?: PromptGrant[];
   }
   /**
-   * Authorization to invoke a single tool. Mirrors `ToolGrant`.
+   * Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
    */
   export interface ToolGrant {
     server_id: string;
@@ -265,7 +265,7 @@ export namespace Capability_Token {
     currency: string;
   }
   /**
-   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
    */
   export interface ResourceGrant {
     uri_pattern: string;
@@ -275,7 +275,7 @@ export namespace Capability_Token {
     operations: [Operation, ...Operation[]];
   }
   /**
-   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
    */
   export interface PromptGrant {
     prompt_name: string;
@@ -289,12 +289,21 @@ export namespace Capability_Token {
    */
   export interface DelegationLink {
     capability_id: string;
+    /**
+     * Delegating public key. Same encoding as the token-level `issuer`/`subject`.
+     */
     delegator: string;
+    /**
+     * Receiving public key. Same encoding as the token-level `issuer`/`subject`.
+     */
     delegatee: string;
     attenuations?: {
       type: string;
     }[];
     timestamp: number;
+    /**
+     * Delegation-link signature. Same encoding as the token-level `signature`.
+     */
     signature: string;
   }
 }
@@ -642,7 +651,7 @@ export namespace Kernel_ToolCallResponse {
 // Source: spec/schemas/chio-wire/v1/provenance/attestation-bundle.schema.json
 export namespace Provenance_AttestationBundle {
   /**
-   * One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. The bundle names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class that Chio resolved across the bundle as a whole, the unix-second `assembledAt` timestamp at which the bundle was assembled, and the ordered list of normalized runtime attestation evidence statements inside `statements`. Each statement mirrors the `RuntimeAttestationEvidence` shape in `crates/chio-core-types/src/capability.rs` (lines 484-507) and is identical in structure to `chio-wire/v1/trust-control/attestation.schema.json`; this schema references that family by inlining the same required field set rather than by `$ref` until the codegen pipeline lands in M01 phase 3. NOTE: there is no live `AttestationBundle` Rust struct on this branch; the bundle is drafted from `.planning/trajectory/01-spec-codegen-conformance.md` (Cross-doc references) plus the M09 supply-chain attestation milestone, which consumes this shape in its phase 3 attestation-verify path. The dedicated Rust struct is expected to land alongside M09 P3 and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the convention used by the `GovernedCallChainContext` shape that this bundle binds to (`crates/chio-core-types/src/capability.rs` lines 952-967, `serde(rename_all = camelCase)`).
+   * One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. Names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class Chio resolved across the bundle, the unix-second `assembledAt` timestamp, and the ordered list of normalized statements. Each statement mirrors the `RuntimeAttestationEvidence` shape and is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json`; the family is inlined rather than `$ref`'d. Field names are camelCase to match `GovernedCallChainContext`.
    */
   export interface ChioProvenanceAttestationBundle {
     /**
@@ -658,7 +667,7 @@ export namespace Provenance_AttestationBundle {
      */
     assembledAt: number;
     /**
-     * Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence`. The struct does not carry `serde(rename_all)`, so per-statement field names are snake_case.
+     * Ordered list of normalized runtime attestation evidence statements. Each statement is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json` and mirrors `RuntimeAttestationEvidence` in `crates/chio-core-types/src/capability.rs` (lines 484-507). The struct does not carry `serde(rename_all)`, so the per-statement scalar fields are snake_case; the embedded `workload_identity` carries `serde(rename_all = camelCase)` so its inner fields are camelCase. Optional fields (`runtime_identity`, `workload_identity`, `claims`) are omitted from the wire when their underlying `Option<...>` is `None`.
      *
      * @minItems 1
      */
@@ -689,9 +698,40 @@ export namespace Provenance_AttestationBundle {
          */
         evidence_sha256: string;
         /**
-         * Optional runtime or workload identifier associated with the evidence.
+         * Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
          */
         runtime_identity?: string;
+        /**
+         * Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.
+         */
+        workload_identity?: {
+          /**
+           * Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+           */
+          scheme: "spiffe";
+          /**
+           * Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+           */
+          credentialKind: "uri" | "x509_svid" | "jwt_svid";
+          /**
+           * Canonical workload identifier URI.
+           */
+          uri: string;
+          /**
+           * Stable trust domain resolved from the identifier.
+           */
+          trustDomain: string;
+          /**
+           * Canonical workload path within the trust domain.
+           */
+          path: string;
+        };
+        /**
+         * Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`.
+         */
+        claims?: {
+          [k: string]: unknown;
+        };
       },
       ...{
         /**
@@ -719,9 +759,40 @@ export namespace Provenance_AttestationBundle {
          */
         evidence_sha256: string;
         /**
-         * Optional runtime or workload identifier associated with the evidence.
+         * Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
          */
         runtime_identity?: string;
+        /**
+         * Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in capability.rs (lines 290-304) which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/workload_identity`.
+         */
+        workload_identity?: {
+          /**
+           * Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` (lines 273-278).
+           */
+          scheme: "spiffe";
+          /**
+           * Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` (lines 280-288) which uses `serde(rename_all = snake_case)`.
+           */
+          credentialKind: "uri" | "x509_svid" | "jwt_svid";
+          /**
+           * Canonical workload identifier URI.
+           */
+          uri: string;
+          /**
+           * Stable trust domain resolved from the identifier.
+           */
+          trustDomain: string;
+          /**
+           * Canonical workload path within the trust domain.
+           */
+          path: string;
+        };
+        /**
+         * Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims. Identical in shape to `chio-wire/v1/trust-control/attestation.schema.json#/properties/claims`.
+         */
+        claims?: {
+          [k: string]: unknown;
+        };
       }[]
     ];
     /**
@@ -765,7 +836,7 @@ export namespace Provenance_Context {
 // Source: spec/schemas/chio-wire/v1/provenance/stamp.schema.json
 export namespace Provenance_Stamp {
   /**
-   * One provenance stamp attached by a Chio provider adapter to every tool-call response that traverses the M07 tool-call fabric. The stamp names the upstream `provider` adapter that handled the call, the upstream `request_id` returned by that provider, the wire `api_version` of the upstream provider API, the `principal` Chio resolved as the calling subject, and the unix-second `received_at` timestamp at which the provider returned the response to Chio. The shape is owned by milestone M07 (provider-native adapters); milestone M01 ships only the wire form. Per `.planning/trajectory/01-spec-codegen-conformance.md` (Cross-doc references, M07 row), the canonical field set is `provider`, `request_id`, `api_version`, `principal`, `received_at`. NOTE: there is no live `ProvenanceStamp` Rust struct on this branch; M07's `chio-tool-call-fabric` crate consumes this schema as its trait surface and materializes the matching Rust type at that time. Field names are snake_case to match the convention used by the existing `RuntimeAttestationEvidence` provenance-adjacent shape in `crates/chio-core-types/src/capability.rs` (lines 484-507).
+   * One provenance stamp attached by a Chio provider adapter to every tool-call response. Names the upstream `provider`, the upstream `request_id`, the wire `api_version`, the `principal` Chio resolved as the calling subject, and the unix-second `received_at` timestamp. Field names are snake_case to match `RuntimeAttestationEvidence`.
    */
   export interface ChioProvenanceStamp {
     /**
@@ -795,9 +866,9 @@ export namespace Provenance_Stamp {
 // Source: spec/schemas/chio-wire/v1/provenance/verdict-link.schema.json
 export namespace Provenance_VerdictLink {
   /**
-   * One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Optional fields preserve the policy `reason` and `guard` when the verdict is not `allow` and the `evidenceClass` Chio resolved when the verdict was rendered. The verdict vocabulary mirrors the HTTP verdict tagged union in `spec/schemas/chio-http/v1/verdict.schema.json` and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.
+   * One link binding a Chio policy verdict to the provenance graph. The link names the `verdict` decision that Chio's policy engine returned (`allow`, `deny`, `cancel`, `incomplete`), the `requestId` and optional `receiptId` the verdict applies to, and the `chainId` that ties the verdict back to a delegated call-chain context. Verdict-specific required fields are enforced via `oneOf` so the wire shape stays in lock-step with the HTTP verdict union in `spec/schemas/chio-http/v1/verdict.schema.json`: `deny` requires both `reason` and `guard`; `cancel` and `incomplete` require `reason`; `allow` rejects either. The verdict vocabulary mirrors the HTTP verdict tagged union and the per-step verdict family `StepVerdictKind` in `crates/chio-core-types/src/plan.rs` (lines 110-138). NOTE: there is no live `VerdictLink` Rust struct on this branch; the link is drafted as the wire form of the verdict-to-provenance edge that M07's tool-call fabric and the M01 receipt-record schema reference indirectly today. The dedicated Rust struct is expected to land alongside the M07 phase that wires the tool-call fabric to the provenance graph and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the `GovernedCallChainContext` family this link binds to.
    */
-  export interface ChioProvenanceVerdictLink {
+  export type ChioProvenanceVerdictLink = {
     /**
      * Policy verdict decision Chio returned for the bound request. Vocabulary matches `spec/schemas/chio-http/v1/verdict.schema.json` and `StepVerdictKind` (Allowed, Denied) plus the cancel and incomplete terminal states defined under `spec/schemas/chio-wire/v1/result/`.
      */
@@ -819,17 +890,42 @@ export namespace Provenance_VerdictLink {
      */
     renderedAt: number;
     /**
-     * Optional policy reason string. Required by the HTTP verdict union for `deny`, `cancel`, and `incomplete` verdicts. Omitted for `allow`.
+     * Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
      */
     reason?: string;
     /**
-     * Optional policy guard identifier that produced a `deny` verdict. Mirrors the `guard` field on the HTTP verdict union. Omitted for non-deny verdicts.
+     * Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.
      */
     guard?: string;
     /**
      * Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.
      */
     evidenceClass?: "asserted" | "observed" | "verified";
+  } & (Allow | Deny | Cancel | Incomplete);
+
+  /**
+   * Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.
+   */
+  export interface Allow {
+    verdict: "allow";
+  }
+  /**
+   * Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.
+   */
+  export interface Deny {
+    verdict: "deny";
+  }
+  /**
+   * Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.
+   */
+  export interface Cancel {
+    verdict: "cancel";
+  }
+  /**
+   * Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.
+   */
+  export interface Incomplete {
+    verdict: "incomplete";
   }
 }
 
@@ -944,7 +1040,7 @@ export namespace Receipt_Record {
      */
     tenant_id?: string;
     /**
-     * Kernel public key (for verification without out-of-band lookup). Bare 64-hex string for Ed25519, or `p256:<hex>` / `p384:<hex>` for FIPS algorithms.
+     * Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/chio-core-types/src/crypto.rs`.
      */
     kernel_key: string;
     /**
@@ -952,7 +1048,7 @@ export namespace Receipt_Record {
      */
     algorithm?: "ed25519" | "p256" | "p384";
     /**
-     * Hex-encoded signature over the canonical JSON of the receipt body. Length depends on the signing algorithm (Ed25519 = 128 hex chars; P-256 / P-384 use a self-describing `<algo>:<hex>` prefix).
+     * Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
      */
     signature: string;
   }
@@ -1165,7 +1261,7 @@ export namespace TrustControl_Heartbeat {
 // Source: spec/schemas/chio-wire/v1/trust-control/lease.schema.json
 export namespace TrustControl_Lease {
   /**
-   * One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-millisecond expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future.
+   * One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-second expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future. NOTE: `leaseExpiresAt` and `termStartedAt` are unix **seconds** (computed in `cluster_and_reports.rs` lines 1580-1606 as `unix_timestamp_now() + lease_ttl_ms / 1000`), even though `leaseTtlMs` itself is in milliseconds. The asymmetry mirrors the live runtime shape and is preserved on the wire so consumers do not have to re-scale by 1000.
    */
   export interface ChioTrustControlAuthorityLease {
     /**
@@ -1189,15 +1285,15 @@ export namespace TrustControl_Lease {
      */
     leaseEpoch: number;
     /**
-     * Optional unix-millisecond timestamp at which the current term began on this leader. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown.
+     * Optional unix-second timestamp at which the current term began on this leader. Captured via `unix_timestamp_now()` in `cluster_and_reports.rs` line 1603. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown (no quorum or no leader).
      */
     termStartedAt?: number;
     /**
-     * Unix-millisecond timestamp at which the lease expires if not renewed.
+     * Unix-second timestamp at which the lease expires if not renewed. Computed as `unix_timestamp_now() + lease_ttl_ms / 1000` in `cluster_and_reports.rs` lines 1580-1606. The unit is seconds (not milliseconds) even though the configured TTL is expressed in milliseconds; downstream consumers MUST treat this field as a unix-second timestamp.
      */
     leaseExpiresAt: number;
     /**
-     * Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839).
+     * Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839). NOTE: this field is the only millisecond-denominated quantity in the lease projection; `termStartedAt` and `leaseExpiresAt` are unix seconds.
      */
     leaseTtlMs: number;
     /**

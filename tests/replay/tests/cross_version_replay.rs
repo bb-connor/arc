@@ -1,4 +1,4 @@
-//! Cross-version replay integration test (M04 P3 T4).
+//! Cross-version replay integration test.
 //!
 //! Drives the full release-compat matrix end-to-end:
 //!
@@ -52,7 +52,7 @@ fn matrix_loads_and_has_at_least_two_entries() {
     };
     assert!(
         matrix.entry.len() >= 2,
-        "expected at least the v0.1.0 + v2.0 entries authored in T1, got {} entry(ies)",
+        "expected at least 2 matrix entries, got {}",
         matrix.entry.len()
     );
     // Sanity-check the schema tag is the one the loader's strict
@@ -77,17 +77,10 @@ fn matrix_loads_and_has_at_least_two_entries() {
 
 /// Live full-matrix run. Skipped by default; opts in via `--ignored`.
 ///
-/// The test is intentionally written so that:
-///
 /// - `Supported` entries MUST reverify cleanly.
 /// - `BestEffort` entries are run for telemetry only; failures are
 ///   logged but do not fail the test.
 /// - `Broken` entries are skipped explicitly.
-///
-/// At time of writing (M04.P3.T4), no released bundles exist yet, so
-/// every entry is `BestEffort` and the run is expected to log fetch
-/// failures only. Once the first `v3.0` ratchet entry lands, the
-/// supported branch becomes load-bearing.
 #[ignore]
 #[test]
 fn cross_version_replay_full_matrix() {

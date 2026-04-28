@@ -1,18 +1,17 @@
 //! Capability algebra property invariants for `chio-core-types`.
 //!
-//! Five named invariants from `.planning/trajectory/03-capability-algebra-properties.md`
-//! lines 70-74. Each appears as the EXACT function name required by the
-//! ticket contract (M03.P1.T2). Names must not be renamed.
+//! Five named invariants (names must not be renamed):
+//! - `scope_subset_reflexive`
+//! - `scope_subset_transitive_normalized`
+//! - `tool_grant_subset_implies_scope_subset`
+//! - `validate_attenuation_monotonic_under_chain_extension`
+//! - `delegation_depth_bounded_by_root`
 //!
-//! Proptest config: 64 cases per invariant. CI tiering happens in M03.P1.T6.
-//!
-//! Live-API notes vs the trajectory doc:
-//! - `Scope` in the doc maps to `ChioScope` in the live crate. Method name
-//!   `is_subset_of` is identical.
-//! - The doc references `root.max_delegation_depth()`. The live crate has no
-//!   such accessor. The equivalent root-side bound is the
-//!   `max_depth: Option<u32>` parameter to `validate_delegation_chain`.
-//!   Invariant 5 is encoded against that parameter (see NOTE on the test).
+//! Live-API notes:
+//! - `Scope` maps to `ChioScope` in the live crate. Method name `is_subset_of`
+//!   is identical.
+//! - The equivalent root-side depth bound is the `max_depth: Option<u32>`
+//!   parameter to `validate_delegation_chain`.
 
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
@@ -30,8 +29,7 @@ use proptest::prelude::*;
 /// nightly). When the variable is unset or unparseable we fall back to
 /// the local default so cargo test stays fast. Without this helper, a
 /// per-block `ProptestConfig::with_cases(...)` literal would override the
-/// env-var derived default that proptest reads at startup, defeating the
-/// M03.P1.T6 tiered case-count gate.
+/// env-var derived default that proptest reads at startup.
 fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
     let cases = std::env::var("PROPTEST_CASES")
         .ok()

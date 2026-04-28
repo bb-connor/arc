@@ -10,7 +10,5 @@
 
 //! Placeholder module for the chio-wire/v1 generated types.
 //!
-//! This file is intentionally empty until a follow-up ticket wires
-//! `chio_wire_v1.rs` into `crates/chio-core-types/src/lib.rs` behind
-//! a feature flag. The header above is required by
+//! This file is intentionally empty; the header is required by
 //! `crates/chio-core-types/tests/_generated_check.rs`.

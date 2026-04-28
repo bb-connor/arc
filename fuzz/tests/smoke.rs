@@ -1,33 +1,16 @@
-// owned-by: M02 (fuzz lane); shared smoke infra authored under M02.P1.T1.a.
-//
-// Cleanup C6: this integration test treats a missing or empty corpus
-// directory as a hard failure (panic), so we explicitly allow panic-style
-// helpers here. The fuzz crate's workspace lint denies `unwrap`/`expect`
-// in production code; smoke tests are panic-detector scaffolding and the
-// panic IS the signal.
+// Smoke tests treat a missing or empty corpus directory as a hard failure;
+// `unwrap`/`expect` allowed here because the panic IS the test signal.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 //! Smoke tests for libFuzzer targets.
 //!
-//! Each fuzz target gets a `<target>_smoke` test that loads its seed corpus
-//! and exercises the corresponding `fuzz_*` entry point. This catches
-//! panics introduced by upstream changes between scheduled fuzz-lane runs:
-//! the smoke test runs under the standard `cargo test` lane, which is much
-//! faster (and more frequently triggered) than the dedicated `cargo fuzz`
-//! campaigns.
+//! Each target gets a `<target>_smoke` test that loads its seed corpus and
+//! exercises the corresponding entry point, catching panics introduced by
+//! upstream changes between scheduled fuzz campaigns.
 //!
-//! Targets are added incrementally. M02 P1 lands eleven new targets
-//! (T1.a through T8) on top of the existing `attest_verify` target seeded
-//! by M09.P3.T5; each ticket appends a `#[test]` block here referencing the
-//! target's seed directory under `fuzz/corpus/`.
-//!
-//! Cleanup C6: the harness panics if a corpus directory is missing,
-//! unreadable, or empty. Without that floor, a renamed directory or a
-//! typo'd target name would let the smoke test report "1 passed" without
-//! ever feeding a single byte through the fuzz entry point. See
-//! `assert_seed_floor` below.
-//!
-//! Reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+//! The harness panics if a corpus directory is missing, unreadable, or empty
+//! - a renamed directory or typo'd target name would otherwise produce a
+//! silent vacuous pass without feeding any bytes through the entry point.
 
 use std::fs;
 use std::path::PathBuf;
@@ -40,15 +23,6 @@ fn corpus_dir(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Iterate every readable seed file in `corpus/<target>/` and pass its bytes
-/// to `f`, returning the number of seeds processed.
-///
-/// Cleanup C6: a missing directory, an unreadable directory, or zero
-/// readable seed files all panic. The smoke harness is shared
-/// infrastructure -- a typo in the target name, a renamed corpus
-/// directory, or an accidental `git rm` would otherwise produce a
-/// silent vacuous "1 passed" result. Callers wrap this in
-/// `assert_seed_floor` to enforce the per-target seed-count floor.
 fn each_seed<F: FnMut(&[u8])>(target: &str, mut f: F) -> usize {
     let dir = corpus_dir(target);
     assert!(
@@ -76,9 +50,6 @@ fn each_seed<F: FnMut(&[u8])>(target: &str, mut f: F) -> usize {
     count
 }
 
-/// Run `each_seed` and assert at least one seed file was processed.
-/// Centralised so every smoke test gets the floor without each call site
-/// having to spell it out.
 fn assert_seed_floor<F: FnMut(&[u8])>(target: &str, f: F) {
     let processed = each_seed(target, f);
     assert!(

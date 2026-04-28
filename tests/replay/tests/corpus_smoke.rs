@@ -1,41 +1,24 @@
-//! Phase-1 exit test: enumerate every fixture manifest, drive it
-//! through a no-op scenario runner, and verify each one produces a
-//! non-empty goldens tree without panicking.
-//!
-//! Phase-2 will bless the goldens and turn this into a byte-equivalence
-//! assertion. T6 only proves the corpus enumerates and the per-scenario
-//! plumbing executes; it does NOT yet prove byte-for-byte equality
-//! against blessed goldens.
+//! Corpus smoke test: enumerate every fixture manifest, drive it through a
+//! no-op scenario runner, and verify each one produces a non-empty goldens
+//! tree without panicking.
 //!
 //! # Invariants asserted here
 //!
 //! - Exactly 50 `.json` manifests live under `tests/replay/fixtures/`.
-//! - Per-family counts match the source-of-truth (M04.P1) numbers:
-//!   `allow_simple=8`, `allow_with_delegation=6`, `allow_metered=5`,
-//!   `deny_expired=5`, `deny_scope_mismatch=6`, `deny_revoked=4`,
-//!   `guard_rewrite=6`, `replay_attack=4`, `tampered_signature=3`,
-//!   `tampered_canonical_json=3`.
+//! - Per-family counts match expected numbers.
 //! - The `fixed_nonce_seed_index` values across all 50 manifests form
-//!   the contiguous set `0..50` (no duplicates, no gaps), so each
-//!   scenario gets a globally-unique deterministic nonce slot.
+//!   the contiguous set `0..50` (no duplicates, no gaps).
 //! - Every manifest exposes the required keys (`schema_version`,
 //!   `name`, `family`, `expected_verdict`, `fixed_nonce_seed_index`).
 //! - For every manifest, a fresh `ScenarioDriver` plus a synthetic
 //!   `GoldenSet` round-trip writes one receipt + checkpoint + 32-byte
-//!   root to disk and reports byte sizes consistent with the writer's
-//!   on-disk invariants (root.hex == 64 bytes, checkpoint > 0, receipts
-//!   > 0).
+//!   root to disk with sizes consistent with the writer's invariants
+//!   (root.hex == 64 bytes, checkpoint > 0, receipts > 0).
 //!
-//! Recursion strategy (T7): delegate to
-//! [`chio_replay_gate::fs_iter::walk_files_sorted`] so this test and
-//! any future Scenario-loader code share a single canonical
-//! `LC_ALL=C`-equivalent byte-order enumerator. Symbolic links are
-//! filtered out fail-closed during recursion.
-//!
-//! Synthetic root strategy: SHA-256 of the canonical-JSON receipt bytes
-//! concatenated with the canonical-JSON checkpoint bytes. The SHA-256
-//! crate is already a workspace dep (used by other anchor / settle
-//! crates), so this adds zero new external dependencies.
+//! Recursion delegates to [`chio_replay_gate::fs_iter::walk_files_sorted`]
+//! so this test and any future Scenario-loader code share a single canonical
+//! `LC_ALL=C`-equivalent byte-order enumerator. Symbolic links are filtered
+//! out fail-closed during recursion.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -53,10 +36,8 @@ use tempfile::TempDir;
 /// Total fixture count expected under `tests/replay/fixtures/`.
 const EXPECTED_FIXTURE_COUNT: usize = 50;
 
-/// Per-family fixture counts, taken from the source-of-truth document
-/// `.planning/trajectory/04-deterministic-replay.md` Phase 1 corpus
-/// breakdown. Sorted alphabetically by family name to match the on-disk
-/// directory listing order.
+/// Per-family fixture counts. Sorted alphabetically by family name to match
+/// the on-disk directory listing order.
 const EXPECTED_FAMILY_COUNTS: &[(&str, usize)] = &[
     ("allow_metered", 5),
     ("allow_simple", 8),
@@ -101,7 +82,7 @@ fn all_50_fixtures_load_and_run() {
     let expected_map: BTreeMap<&str, usize> = EXPECTED_FAMILY_COUNTS.iter().copied().collect();
     assert_eq!(
         family_counts, expected_map,
-        "per-family fixture counts diverge from source-of-truth (M04.P1)",
+        "per-family fixture counts diverge from expected",
     );
     println!("per-family fixture counts: {family_counts:?}");
 
@@ -214,9 +195,8 @@ fn all_50_fixtures_load_and_run() {
     );
 }
 
-/// Run a single scenario through a fresh `ScenarioDriver` plus
-/// `GoldenSet`. Synthetic receipts / checkpoint / root only: T6 proves
-/// the plumbing executes, T7+ wires the real kernel through.
+/// Run a single scenario through a fresh `ScenarioDriver` plus `GoldenSet`.
+/// Synthetic receipts / checkpoint / root only.
 fn run_scenario(manifest: &Value, manifest_path: &Path, scenario_dir: &Path) -> GoldenSetSummary {
     let mut driver = ScenarioDriver::new().unwrap_or_else(|err| {
         panic!(

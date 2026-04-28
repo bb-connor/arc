@@ -1,18 +1,15 @@
-//! Proptest invariants for the Agent Passport lifecycle (M03.P1.T4).
+//! Proptest invariants for the Agent Passport lifecycle.
 //!
-//! Four named lifecycle invariants from
-//! `.planning/trajectory/03-capability-algebra-properties.md` (line 80-83):
+//! Four named lifecycle invariants (names must not be renamed):
 //!
 //! 1. `passport_verify_idempotent_on_well_formed`
 //! 2. `revoked_lifecycle_entry_never_verifies`
 //! 3. `lifecycle_state_transitions_monotone`
 //! 4. `passport_signature_breaks_under_any_subject_mutation`
 //!
-//! NOTE: the live API uses `verify_agent_passport` (not `verify_passport`) and
-//! the lifecycle enum variants are `Active, Stale, Superseded, Revoked,
-//! NotFound` rather than the doc-named `Issued`. We treat `Active` as the
-//! "issued/usable" state, `Revoked` as the doc-named `Revoked`, and order the
-//! intermediate states by operational severity (see `severity` below).
+//! The lifecycle enum variants are `Active, Stale, Superseded, Revoked,
+//! NotFound`. `Active` is the "issued/usable" state; states are ordered by
+//! operational severity (see `severity` below).
 
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
@@ -36,8 +33,7 @@ use proptest::prelude::*;
 /// nightly). When the variable is unset or unparseable we fall back to
 /// the local default so cargo test stays fast. Without this helper, a
 /// per-block `ProptestConfig::with_cases(...)` literal would override the
-/// env-var derived default that proptest reads at startup, defeating the
-/// M03.P1.T6 tiered case-count gate.
+/// env-var derived default that proptest reads at startup.
 fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
     let cases = std::env::var("PROPTEST_CASES")
         .ok()

@@ -1,8 +1,4 @@
-//! M10.P1.T4 mode resolver precedence tests.
-//!
-//! Source-of-truth: `.planning/trajectory/10-tee-replay-harness.md` lines
-//! 42-62. The named test [`env_overrides_toml_overrides_manifest`] is the
-//! ticket gate check.
+//! Mode resolver precedence tests.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -38,12 +34,12 @@ fn inputs_from_strs(env: Option<&str>, toml: Option<&str>, tenant: Option<&str>)
     }
 }
 
-/// Gate-check (named in the ticket YAML and in `10-tee-replay-harness.md`):
+/// Verify three-layer priority: env overrides TOML overrides tenant manifest.
 ///
-/// > builds a tenant manifest that requests `enforce`, a TOML config that
-/// > requests `shadow`, and an env var that sets `verdict-only`. The resolved
-/// > mode MUST be `verdict-only`. The test then unsets the env var and
-/// > asserts `shadow`. The test then deletes the TOML and asserts `enforce`.
+/// Builds a tenant manifest that requests `enforce`, a TOML config that
+/// requests `shadow`, and an env var that sets `verdict-only`. The resolved
+/// mode must be `verdict-only`. Removing the env layer yields `shadow`;
+/// removing both env and TOML yields `enforce`.
 #[test]
 fn env_overrides_toml_overrides_manifest() {
     let manifest_toml = "[tenant.tee]\nmode = \"enforce\"\n";

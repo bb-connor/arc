@@ -1,15 +1,5 @@
-# owned-by: M02 (fuzz lane); current entries layered by M09.P3.T5.
-#
 # Standalone Cargo workspace so libFuzzer / nightly requirements do not
-# leak into the main stable/MSRV workspace lanes. M02's PR #13 layers the
-# seven baseline targets enumerated in `fuzz/target-map.toml` on top of
-# this file; later tickets layer their target-specific `[[bin]]` entries
-# alongside their `fuzz_target!` definitions.
-#
-# Reference: `.planning/trajectory/02-fuzzing-post-pr13.md`
-# (continuous fuzzing path) and
-# `.planning/trajectory/09-supply-chain-attestation.md`
-# Phase 3 task 5 (this entry: `attest_verify`).
+# leak into the main stable/MSRV workspace lanes.
 
 [package]
 name = "chio-fuzz"
@@ -21,11 +11,8 @@ license = "Apache-2.0"
 [package.metadata]
 cargo-fuzz = true
 
-# M02.P2.T6: expose the structure-aware canonical-JSON mutator at
-# `fuzz/mutators/canonical_json.rs` to the four canonical-JSON-decoding
-# `[[bin]]` targets below. The library indirection lets each binary do
-# `use chio_fuzz::canonical_json::canonical_json_mutate;` instead of
-# replicating the mutator behind a `#[path = ...]` `mod` per binary.
+# Expose the structure-aware canonical-JSON mutator to the
+# canonical-JSON-decoding `[[bin]]` targets below via library indirection.
 [lib]
 name = "chio_fuzz"
 path = "src/lib.rs"
@@ -44,9 +31,7 @@ chio-anchor = { path = "../crates/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/chio-attest-verify" }
 chio-config = { path = "../crates/chio-config", features = ["fuzz"] }
 chio-core = { path = "../crates/chio-core" }
-# M02.P2.T6: typed canonical-JSON deserialization targets need
-# `CapabilityToken` / `ChioReceipt` (chio-core-types) and `ToolManifest`
-# (chio-manifest). No `fuzz` feature on either crate; both are pure-serde
+# No `fuzz` feature on chio-core-types or chio-manifest; both are pure-serde
 # Deserialize surfaces, so the fuzz harness drives `serde_json::from_slice`
 # directly.
 chio-core-types = { path = "../crates/chio-core-types" }
@@ -63,14 +48,9 @@ chio-openapi-mcp-bridge = { path = "../crates/chio-openapi-mcp-bridge", features
 chio-policy = { path = "../crates/chio-policy" }
 chio-wasm-guards = { path = "../crates/chio-wasm-guards", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
-# `arbitrary` is pulled in directly by libFuzzer harnesses that take
-# structured input; the `derive` feature lets per-target structs annotate
-# `#[derive(Arbitrary)]` when they need typed views on the byte stream.
+# `derive` feature lets per-target structs use `#[derive(Arbitrary)]`.
 arbitrary = { version = "1", features = ["derive"] }
-# M02.P2.T6: `serde_json` powers the canonical-JSON mutator parse /
-# serialize loop and the typed-deser fuzz targets. Pinned to the same
-# 1.x line consumed by chio-core-types / chio-manifest so the workspace
-# resolves a single major version.
+# Pinned to the same 1.x line consumed by chio-core-types / chio-manifest.
 serde_json = "1"
 
 # `unwrap_used`/`expect_used` denied so fuzz targets cannot mask panics
@@ -80,10 +60,6 @@ serde_json = "1"
 unwrap_used = "deny"
 expect_used = "deny"
 
-# M02.P1.T3.b: Chio A2A adapter SSE-decode + per-envelope fan-out trust
-# boundary (parse_sse_stream + JSON-RPC envelope unwrap + stream-response
-# validator).
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "a2a_envelope_decode"
 path = "fuzz_targets/a2a_envelope_decode.rs"
@@ -91,9 +67,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T3.c: Chio ACP edge envelope decode plus handle_jsonrpc dispatch
-# trust boundary (NDJSON-framed JSON-RPC envelopes -> ChioAcpEdge::handle_jsonrpc).
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "acp_envelope_decode"
 path = "fuzz_targets/acp_envelope_decode.rs"
@@ -101,9 +74,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T2: Chio anchor proof-bundle / checkpoint-publication-records
-# trust boundary.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "anchor_bundle_verify"
 path = "fuzz_targets/anchor_bundle_verify.rs"
@@ -118,11 +88,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T5.a: Chio chio-config YAML loader trust boundary
-# (`loader::load_from_str`: env-var interpolation -> serde_yml deserialize
-# with `deny_unknown_fields` -> post-deserialization validation).
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
-# (trust-boundary fuzz target #10).
 [[bin]]
 name = "chio_yaml_parse"
 path = "fuzz_targets/chio_yaml_parse.rs"
@@ -130,8 +95,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T1.c: Chio DID resolve trust boundary.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "did_resolve"
 path = "fuzz_targets/did_resolve.rs"
@@ -139,8 +102,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T1.a: Chio JWT-VC verify trust boundary.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "jwt_vc_verify"
 path = "fuzz_targets/jwt_vc_verify.rs"
@@ -148,9 +109,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T3.a: Chio MCP envelope decode plus evaluator dispatch trust
-# boundary (decode-then-evaluator pipeline).
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "mcp_envelope_decode"
 path = "fuzz_targets/mcp_envelope_decode.rs"
@@ -158,8 +116,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T1.b: Chio OID4VP direct_post.jwt response verify trust boundary.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "oid4vp_presentation"
 path = "fuzz_targets/oid4vp_presentation.rs"
@@ -167,12 +123,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T5.b: Chio OpenAPI-MCP bridge spec-ingest trust boundary
-# (`OpenApiMcpBridge::from_spec`: JSON/YAML auto-detect parse plus
-# OpenAPI 3.x version validation plus manifest generation plus
-# `validate_manifest`).
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
-# (trust-boundary fuzz target #11).
 [[bin]]
 name = "openapi_ingest"
 path = "fuzz_targets/openapi_ingest.rs"
@@ -180,14 +130,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T8: Chio kernel-core receipt-log replay trust boundary
-# (`fuzz_receipt_log_replay`: NDJSON receipt-log decode -> per-receipt
-# `ChioReceipt::verify_signature` -> chain-invariant traversal). Round-2
-# add per `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1
-# lines 379-385: catches reordered / corrupted-chain bugs that
-# `merkle_checkpoint` cannot, since the merkle root only commits to leaf
-# hashes and not to the canonical-bytes-equal-the-leaf invariant nor to
-# cross-receipt timestamp / signer consistency.
 [[bin]]
 name = "receipt_log_replay"
 path = "fuzz_targets/receipt_log_replay.rs"
@@ -195,14 +137,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T4.a: Chio WASM guards preinstantiate-validate trust boundary
-# (`ComponentBackend::load_module` plus `WasmtimeBackend::load_module` plus
-# `detect_wasm_format`). Hardens the parse / validate pipeline that runs
-# BEFORE instantiation against malformed or malicious `.wasm` bytes. M09
-# P3's signed-module branch is `cfg(feature = "attest_verify")`-gated and
-# exercises the same `load_module` entry point post-signature check; T4.a
-# focuses on the unsigned validation path.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "wasm_preinstantiate_validate"
 path = "fuzz_targets/wasm_preinstantiate_validate.rs"
@@ -210,15 +144,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P1.T4.b: Chio WASM guards WIT host-call boundary deserialization
-# trust boundary. Drives arbitrary bytes through the serde surfaces that
-# materialize guest-supplied / guest-emitted payloads into Rust structs:
-# `GuardRequest` (host-to-guest WIT request envelope) and
-# `GuestDenyResponse` (canonical guest-to-host `chio_deny_reason` payload,
-# the actual deser site at runtime.rs `read_structured_deny_reason`).
-# `GuardVerdict` is intentionally excluded -- it crosses the WIT boundary
-# as an `i32` return code, not a serialized struct.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
 [[bin]]
 name = "wit_host_call_boundary"
 path = "fuzz_targets/wit_host_call_boundary.rs"
@@ -226,14 +151,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P2.T6: structure-aware canonical-JSON mutator self-driver.
-# Wraps `chio_fuzz::canonical_json::canonical_json_mutate` in a libFuzzer
-# binary so the mutator itself gets fuzzed (parse / mutate / re-serialize
-# loop) and so cargo-fuzz can build it as a smoke check that the
-# mutator wiring compiles. Surviving inputs (no panic in the mutator) are
-# the win; the body deliberately just round-trips through `serde_json::Value`
-# so the mutator drives 100% of the work.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
 [[bin]]
 name = "canonical_json"
 path = "fuzz_targets/canonical_json.rs"
@@ -241,14 +158,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P2.T6: typed `chio-core-types` canonical-JSON deserialization
-# target. Drives `serde_json::from_slice::<CapabilityToken>` and
-# `serde_json::from_slice::<ChioReceipt>` (the two signed canonical-JSON
-# trust-boundary types under chio-core-types) and, on parse success,
-# the receipt-side `ChioReceipt::verify_signature` path. Wired to the
-# canonical-JSON custom mutator so the fuzzer spends its budget
-# exploring the structured shape after the parse stage.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
 [[bin]]
 name = "capability_receipt"
 path = "fuzz_targets/capability_receipt.rs"
@@ -256,12 +165,6 @@ test = false
 doc = false
 bench = false
 
-# M02.P2.T6: `chio-manifest::ToolManifest` canonical-JSON
-# deserialization-plus-roundtrip target. Drives
-# `serde_json::from_slice::<ToolManifest>` and, on success, asserts a
-# decode -> serialize -> decode -> equal-canonical-bytes invariant.
-# Wired to the canonical-JSON custom mutator.
-# Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
 [[bin]]
 name = "manifest_roundtrip"
 path = "fuzz_targets/manifest_roundtrip.rs"

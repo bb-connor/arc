@@ -1,16 +1,16 @@
-//! Cross-language receipt-encoding differential test (M01.P5.T2).
+//! Cross-language receipt-encoding differential test.
 //!
-//! The intent: prove that the Rust receipt encoder produces byte-identical
-//! canonical JSON to the Python and TypeScript SDK encoders for the same
-//! receipt body. The protocol contract is that all three languages MUST emit
-//! the same canonical bytes so that the kernel signature attaches to a single
-//! agreed-upon byte string.
+//! Proves that the Rust receipt encoder produces byte-identical canonical JSON
+//! to the Python and TypeScript SDK encoders for the same receipt body. The
+//! protocol contract is that all three languages MUST emit the same canonical
+//! bytes so that the kernel signature attaches to a single agreed-upon byte
+//! string.
 //!
 //! ## Strategy: vectors as cross-language oracle (default)
 //!
 //! Rather than spawning live Python and Node subprocesses (which would tie
-//! the test to a specific local toolchain), this harness uses the M01.P2.T5
-//! receipt vector corpus at `tests/bindings/vectors/receipt/v1.json` as the
+//! the test to a specific local toolchain), this harness uses the receipt
+//! vector corpus at `tests/bindings/vectors/receipt/v1.json` as the
 //! cross-language oracle. The corpus was produced by the Rust binding-helpers
 //! generator and is exercised in lockstep by:
 //!
@@ -99,7 +99,7 @@ fn rust_canonical_receipt_body_matches_blessed_vector_bytes() {
     let cases = fixture["cases"].as_array().expect("cases array");
     assert!(
         cases.len() >= 20,
-        "M01.P2.T5 expects at least 20 receipt vectors; found {}",
+        "expected at least 20 receipt vectors; found {}",
         cases.len()
     );
 

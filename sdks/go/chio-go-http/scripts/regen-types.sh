@@ -3,7 +3,7 @@
 # regen-types.sh - regenerate sdks/go/chio-go-http/types.go from
 # spec/schemas/chio-wire/v1/**/*.schema.json via oapi-codegen v2.4.1.
 #
-# This is the M01.P3.T4 checked-in regen pattern: Go uses a committed
+# Go uses a committed
 # generated file rather than a live `cargo xtask codegen --lang go` pipeline.
 # `cargo xtask codegen --lang go` shells out to this script (see
 # xtask/src/main.rs::run_codegen). With `--check`, the xtask additionally
@@ -22,7 +22,7 @@
 #   sdks/go/chio-go-http/types.go (header-stamped, deterministic).
 #
 # Hard requirements:
-#   - go on PATH (any 1.21+; verified on 1.25 in M01.P3.T4).
+#   - go on PATH (any 1.21+).
 #   - python3 on PATH (stdlib only; used to translate JSON Schema 2020-12 ->
 #     OpenAPI 3.0 components.schemas, which oapi-codegen accepts).
 #   - git on PATH (used to embed the schema git SHA in the file header).
@@ -398,7 +398,7 @@ cat > "${HEADER_FILE}" <<HEADER_EOF
 // regen that picked up uncommitted (working-tree or staged) schema edits.
 //
 // Manual edits will be overwritten by the next regeneration; the
-// M01.P3.T5 spec-drift CI lane runs this script and 'git diff --exit-code'
+// spec-drift CI lane runs this script and 'git diff --exit-code'
 // to enforce that this file matches the committed bytes.
 
 HEADER_EOF

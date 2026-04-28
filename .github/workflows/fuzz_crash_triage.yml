@@ -1,13 +1,8 @@
-# fuzz_crash_triage.yml - Crash-to-issue automation (M02 P4 T1).
+# fuzz_crash_triage.yml - Crash-to-issue automation.
 #
-# Source of truth: .planning/trajectory/02-fuzzing-post-pr13.md, Phase 4 P4.T1
-# (Crash-triage automation section). Decision lock:
-# .planning/trajectory/decisions.yml id=continuous-fuzzing-path.
-#
-# This workflow runs after the three fuzz lanes (fuzz.yml,
-# cflite_pr.yml, cflite_batch.yml) finish. When the upstream conclusion is
-# `failure` (libFuzzer exited non-zero, i.e. a crash was found and the artifact
-# uploaded), this workflow:
+# Runs after the three fuzz lanes (fuzz.yml, cflite_pr.yml, cflite_batch.yml).
+# When the upstream conclusion is `failure` (libFuzzer exited non-zero, i.e. a
+# crash was found and the artifact uploaded), this workflow:
 #
 #   1. Downloads the crash artifacts from the failed run via `gh run download`.
 #   2. For each crash file, runs `cargo fuzz tmin <target> <crash-input>`

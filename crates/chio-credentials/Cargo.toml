@@ -24,14 +24,13 @@ rand_core = { workspace = true, features = ["getrandom"] }
 sha2 = { workspace = true }
 # `arbitrary` is gated behind the `fuzz` feature so production builds stay
 # free of fuzz instrumentation. Pulled in by `fuzz/fuzz_targets/jwt_vc_verify.rs`
-# (M02.P1.T1.a) via `chio-credentials = { features = ["fuzz"] }`.
+# via `chio-credentials = { features = ["fuzz"] }`.
 arbitrary = { version = "1", features = ["derive"], optional = true }
 # `dudect-bencher` is gated behind the `dudect` feature so default builds
 # (and `cargo test` without `--features dudect`) never pull it in. Used by
-# the timing-leak harness at `tests/dudect/jwt_verify.rs` (M02.P2.T3) which
-# is wired as a `harness = false` test binary below. The harness statistically
-# detects data-dependent timing in `verify_chio_passport_jwt_vc_json`.
-# Reference: `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 3 P3.T5.
+# the timing-leak harness at `tests/dudect/jwt_verify.rs`, which
+# statistically detects data-dependent timing in
+# `verify_chio_passport_jwt_vc_json`.
 dudect-bencher = { version = "0.7", optional = true }
 
 [features]
@@ -42,16 +41,15 @@ fuzz = ["dep:arbitrary"]
 # Off by default so `cargo test -p chio-credentials` stays fast and
 # deterministic; the dudect lane is opt-in via
 # `cargo test -p chio-credentials --features dudect --release jwt_verify`.
-# CI lane: `.github/workflows/dudect.yml` (M02.P2.T4).
 dudect = ["dep:dudect-bencher"]
 
 [dev-dependencies]
 proptest = { workspace = true }
 
-# Timing-leak dudect harness (M02.P2.T3). `harness = false` so the test
-# binary's `main` is provided by `dudect_bencher::ctbench_main!`. Gated
-# behind the `dudect` feature so default `cargo test` does not try to
-# compile it (the source is `#![cfg(feature = "dudect")]`).
+# Timing-leak dudect harness. `harness = false` so the test binary's `main`
+# is provided by `dudect_bencher::ctbench_main!`. Gated behind the `dudect`
+# feature so default `cargo test` does not try to compile it (the source is
+# `#![cfg(feature = "dudect")]`).
 [[test]]
 name = "dudect_jwt_verify"
 path = "tests/dudect/jwt_verify.rs"

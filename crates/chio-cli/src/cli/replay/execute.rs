@@ -1,45 +1,18 @@
 // Re-execution dispatcher for `chio replay traffic --against <policy-ref>`.
 //
-// Owned by M10.P2.T2. This file is `include!`'d into `main.rs` and reuses
-// the shared `use` declarations from `cli/types.rs`. Sibling modules
-// (`policy_ref`, `receipt_partition`, `validate`, `ndjson`) are also
-// `include!`'d at the top level, so all references below are unqualified.
-//
-// Pipeline invariants (per `.planning/trajectory/10-tee-replay-harness.md`
-// Phase 2 task 3):
-//
-// 1. Resolve the supplied [`PolicyRef`] into a materialized
-//    [`policy::LoadedPolicy`] (workspace-path arm only in T2; the
-//    manifest-hash and package-version arms surface
-//    [`PolicyRefError::NotResolvable`] until the registry crates land).
-// 2. Build a fresh [`ChioKernel`] under that policy and a fresh
-//    ephemeral keypair so re-execution does not contaminate any
-//    long-lived production state.
-// 3. Allocate a fresh [`StorePartition::Replay`] (random or
-//    user-supplied run-id). The dispatcher type-fences this against the
-//    production partition: the same kernel cannot accept production
-//    writes inside the replay run; the inverse (replay writes against a
-//    production-flagged store) is also refused. See
-//    `receipt_partition.rs` for the bidirectional refusal contract
-//    pinned by milestone-doc line 568.
-// 4. For each frame in the NDJSON capture, validate the frame
-//    structurally (schema-version + invocation), evaluate the
-//    `chio_tool_call_fabric::ToolInvocation` against the kernel, and
-//    record a structured per-frame [`TrafficFrameOutcome`] under the
-//    namespaced receipt id `replay:<run_id>:<frame_id>`.
-// 5. Aggregate the outcomes into a [`TrafficReplayReport`]. The diff renderer
-//    in M10.P2.T3 / T4 walks this report; T2 only ships the structural
-//    surface plus tests.
-//
-// The kernel-level evaluation is intentionally narrow: T2 produces a
-// recomputed verdict per frame, not a full kernel-state replay (the
-// receipt-store wiring stays kernel-default; no on-disk persistence is
-// triggered). T4 layers the diff renderer on top; T5 lands the
-// integration tests for the canonical M04 exit codes.
+// Pipeline:
+// 1. Resolve the [`PolicyRef`] into a materialized [`policy::LoadedPolicy`]
+//    (workspace-path only; manifest-hash and package-version arms surface
+//    [`PolicyRefError::NotResolvable`] until registry crates land).
+// 2. Build a fresh ephemeral [`ChioKernel`] under that policy.
+// 3. Allocate a fresh [`StorePartition::Replay`]. The dispatcher type-fences
+//    this against the production partition; see `receipt_partition.rs`.
+// 4. Per NDJSON frame: validate structure, evaluate against the kernel, record
+//    a [`TrafficFrameOutcome`] under `replay:<run_id>:<frame_id>`.
+// 5. Aggregate into a [`TrafficReplayReport`] for the diff renderer.
 
 /// Per-frame outcome: replay-receipt id, recomputed verdict, and the
-/// captured (production) verdict from the source frame. T3 also carries
-/// best-effort guard / reason attribution for grouped diff rendering.
+/// captured verdict from the source frame, plus guard/reason attribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TrafficFrameOutcome {
     /// 1-based source line in the input NDJSON.
@@ -77,9 +50,7 @@ impl TrafficFrameOutcome {
     }
 }
 
-/// Aggregate report shape returned by [`run_traffic_replay`]. The diff
-/// renderer in M10.P2.T3 / T4 consumes this surface; T2 only emits the
-/// structural fields.
+/// Aggregate report returned by [`run_traffic_replay`].
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TrafficReplayReport {
     /// Run-id of the replay partition (mirrors `<run_id>` in receipt
@@ -87,17 +58,15 @@ pub struct TrafficReplayReport {
     /// for some reason; T2 always allocates a replay partition so this
     /// is non-empty in practice.
     pub run_id: String,
-    /// `--against` argument verbatim, for log round-tripping.
+    /// `--against` argument verbatim.
     pub against_label: String,
-    /// Total NDJSON lines processed (excluding skipped blank lines).
+    /// Total NDJSON lines processed (excluding blank lines).
     pub total: u64,
     /// Frames whose recomputed verdict matched the captured verdict.
     pub matches: u64,
-    /// Frames whose recomputed verdict differed from the captured
-    /// verdict ("drift").
+    /// Frames whose recomputed verdict differed from the captured verdict.
     pub drifts: u64,
-    /// Frames where re-execution failed (e.g. the kernel could not
-    /// evaluate the captured invocation against the new policy).
+    /// Frames where re-execution failed.
     pub errors: u64,
     /// Per-frame outcomes in source order.
     pub outcomes: Vec<TrafficFrameOutcome>,
@@ -145,17 +114,13 @@ pub fn run_traffic_replay(
     args: &TrafficArgs,
     against: &PolicyRef,
 ) -> Result<TrafficReplayReport, ExecuteError> {
-    // 1. Resolve the policy-ref. T2 only supports the workspace-path arm
-    //    fully; the others surface NotResolvable from inside resolve().
+    // 1. Resolve the policy-ref.
     let _resolved = against.resolve()?;
     let loaded_policy = against.load_workspace_policy()?;
     let against_label = against.label();
 
     // 2. Allocate a fresh replay partition so receipt ids are
-    //    namespace-isolated from production. The dispatcher always
-    //    allocates a Replay variant; ReplayPartition::new fences this
-    //    at the type level. When the caller supplied `--run-id` the
-    //    deterministic constructor is used; otherwise a fresh UUID-v4.
+    //    namespace-isolated from production.
     let store_partition = match args.run_id.as_deref() {
         Some(id) => StorePartition::replay_with_run_id(id)?,
         None => StorePartition::replay_with_random_run_id(),
@@ -163,14 +128,13 @@ pub fn run_traffic_replay(
     let replay_partition = ReplayPartition::new(&store_partition)?;
     let run_id = replay_partition.run_id().to_string();
 
-    // 3. Bidirectional refusal sanity check: a production-flagged
-    //    request against this replay partition must error. Trip-wire
-    //    only; we do not actually run a production write here.
+    // 3. Sanity-check the bidirectional refusal: a production-flagged
+    //    write against this replay partition must error.
     debug_assert!(store_partition
         .ensure_compatible_with(&StorePartition::Production)
         .is_err());
 
-    // 4. Build the ephemeral kernel under the resolved policy.
+    // 4. Build the ephemeral kernel.
     let kernel_kp = chio_core::crypto::Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
     // Register a stub tool server so capability evaluation has a
@@ -179,7 +143,7 @@ pub fn run_traffic_replay(
         id: REPLAY_STUB_SERVER_ID.to_string(),
     }));
 
-    // 5. Iterate the NDJSON stream and recompute verdicts.
+    // 5. Iterate the NDJSON stream.
     let iter = open_ndjson(&args.from).map_err(|e| ExecuteError::Capture {
         path: args.from.display().to_string(),
         source: e,
@@ -290,13 +254,7 @@ struct ReplayDecision {
     reason: Option<String>,
 }
 
-/// Recompute the kernel decision details for a single frame.
-///
-/// The captured `frame.invocation` is deserialized into a
-/// `chio_tool_call_fabric::ToolInvocation`, mapped onto a session
-/// operation, and evaluated. The resulting verdict (Allow / Deny /
-/// Rewrite) is mapped back into the [`chio_tee_frame::Verdict`] enum so
-/// the comparison surface stays uniform with the captured verdict.
+/// Recompute the kernel decision for a single frame.
 fn recompute_decision(
     kernel: &mut ChioKernel,
     frame: &chio_tee_frame::Frame,
@@ -306,7 +264,7 @@ fn recompute_decision(
     let invocation: ToolInvocation = serde_json::from_value(frame.invocation.clone())
         .map_err(|e| format!("frame.invocation does not deserialize: {e}"))?;
 
-    // The captured `arguments` field is canonical-JSON bytes (M01).
+    // The captured `arguments` field is canonical-JSON bytes.
     // Parse them into a serde_json::Value for the kernel surface.
     let arguments: serde_json::Value = serde_json::from_slice(&invocation.arguments)
         .map_err(|e| format!("invocation.arguments not valid JSON: {e}"))?;
@@ -341,12 +299,8 @@ fn recompute_decision(
 
     match kernel.evaluate_session_operation(&context, &operation) {
         Ok(SessionOperationResponse::ToolCall(response)) => {
-            // Map the kernel's `Verdict` (Allow / Deny / PendingApproval)
-            // onto the wire-level `chio_tee_frame::Verdict` (Allow / Deny
-            // / Rewrite). PendingApproval is treated as Deny in T2 so
-            // the diff renderer flags it as material drift; the richer
-            // mapping (Rewrite for guard-rewrites, etc.) lands in T4
-            // alongside the structured drift class table.
+            // PendingApproval is mapped to Deny so the diff renderer flags
+            // it as material drift.
             let verdict = map_kernel_verdict_to_frame(response.verdict);
             let (guard, reason) = replay_guard_reason(&response.receipt.decision);
             Ok(ReplayDecision {
@@ -408,10 +362,8 @@ fn split_captured_deny_reason(
     (None, Some(normalized.to_string()))
 }
 
-/// Coarse-grained mapping from a kernel-level [`chio_kernel::Verdict`] to
-/// the wire-level [`chio_tee_frame::Verdict`] enum. This is intentionally
-/// simple in T2; the diff renderer in T4 layers the structured drift
-/// class (allow-flip, guard-delta, reason-delta) on top of this.
+/// Map a kernel-level [`chio_kernel::Verdict`] to the wire-level
+/// [`chio_tee_frame::Verdict`].
 fn map_kernel_verdict_to_frame(verdict: chio_kernel::Verdict) -> chio_tee_frame::Verdict {
     match verdict {
         chio_kernel::Verdict::Allow => chio_tee_frame::Verdict::Allow,
@@ -630,7 +582,7 @@ capabilities: {}
             against: None,
             run_id: None,
         };
-        // Manifest-hash arm is NotResolvable in T2.
+        // Manifest-hash arm is not yet resolvable.
         let hash_str = "ab".repeat(32);
         let against = PolicyRef::parse(&hash_str).unwrap();
         let err = run_traffic_replay(&args, &against).unwrap_err();
@@ -665,11 +617,8 @@ capabilities: {}
 
     #[test]
     fn run_traffic_replay_partition_fences_production_writes() {
-        // The dispatcher always allocates a Replay partition. Verify
-        // the bidirectional refusal trip-wire holds: a Production
-        // partition cannot be ensured-compatible with the dispatcher's
-        // Replay partition. This is the type-level dual of the M10
-        // milestone-doc line 568 contract.
+        // Verify the bidirectional refusal: a Production partition cannot
+        // be ensured-compatible with a Replay partition.
         let store = StorePartition::replay_with_random_run_id();
         let err = store
             .ensure_compatible_with(&StorePartition::Production)

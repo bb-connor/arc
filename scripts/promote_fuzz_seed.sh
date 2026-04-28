@@ -2,9 +2,6 @@
 # scripts/promote_fuzz_seed.sh - graduate a fuzz seed into a permanent
 # regression test under the owning crate.
 #
-# Source: .planning/trajectory/02-fuzzing-post-pr13.md Phase 4 P4.T2
-# (Crash-triage automation > Regression-test promotion path).
-#
 # Reads fuzz/owners.toml to find the owning crate for the named fuzz
 # target, computes sha256 of the input seed, then either:
 #
@@ -19,11 +16,7 @@
 #   --mode proptest   Writes the same regression test plus a paired
 #                     proptest property when the owner crate has proptest
 #                     in [dev-dependencies]. When proptest is missing,
-#                     emits the plain regression test and prints a warning
-#                     so the test compiles in every owner crate (the
-#                     proptest macro is not gated by feature flags here,
-#                     so requiring proptest dev-dep blocks promotion in
-#                     crates that have not opted in).
+#                     emits the plain regression test and prints a warning.
 #
 # In both modes the seed is moved into fuzz/corpus/<target>/<sha>.bin so
 # future fuzz runs continue exercising it. Re-promoting a seed whose
@@ -46,8 +39,8 @@ Promotes a fuzz seed into a permanent regression test:
     crates/<owner>/tests/regression_<target>_<sha16>.rs.
   - In proptest mode: writes the same regression test plus a paired
     proptest property when the owner crate has proptest in
-    [dev-dependencies] (cross-doc with M03 oracle ownership). When
-    proptest is missing, falls back to the plain regression and warns.
+    [dev-dependencies]. When proptest is missing, falls back to the
+    plain regression and warns.
   - Moves the seed file into fuzz/corpus/<target>/<sha>.bin so future
     fuzz runs continue exercising it. Re-promoting a seed that already
     lives at the canonical corpus path is a no-op rather than a delete.
@@ -58,8 +51,6 @@ Args:
   --mode MODE       libfuzzer|proptest
   --severity LEVEL  Critical|High|Medium|Low (default Medium)
   --help            show this help
-
-Source: .planning/trajectory/02-fuzzing-post-pr13.md Phase 4 P4.T2.
 EOF
 }
 
@@ -222,7 +213,6 @@ case "$MODE" in
         OUT="$TESTS_DIR/regression_${TARGET_IDENT}_${SHA16}.rs"
         cat >"$OUT" <<EOF
 // Auto-generated regression test from fuzz/$TARGET seed $SHA.
-// Source: scripts/promote_fuzz_seed.sh (M02.P4.T2).
 // Severity: $SEVERITY.
 //
 // This test invokes the libfuzzer wrapper for '$TARGET' directly with the
@@ -249,9 +239,7 @@ EOF
         if (( HAS_PROPTEST )); then
             cat >"$OUT" <<EOF
 // Auto-generated regression + proptest property from fuzz/$TARGET seed $SHA.
-// Source: scripts/promote_fuzz_seed.sh (M02.P4.T2).
 // Severity: $SEVERITY.
-// Cross-doc: M03 owns the oracle/invariant surface this property targets.
 //
 // The seed is stored at fuzz/corpus/$TARGET/$SHA.bin and pins the
 // promoted crash as a regression input alongside the proptest strategy.
@@ -271,10 +259,8 @@ fn regression_${TARGET_IDENT}_${SHA16}() {
 proptest! {
     #[test]
     fn property_${TARGET_IDENT}_${SHA16}(input in proptest::collection::vec(any::<u8>(), 0..4096)) {
-        // TODO(promote_fuzz_seed): tighten this strategy to the M03
-        // invariant for '$TARGET'. Today it asserts the wrapper does not
-        // panic on randomly generated inputs of bounded length, which is
-        // the same contract the fuzz wrapper holds.
+        // Asserts the fuzz wrapper does not panic on randomly generated
+        // inputs of bounded length.
         ${FUZZ_FN}(&input);
     }
 }
@@ -283,9 +269,7 @@ EOF
             echo "promote_fuzz_seed.sh: WARNING: ${OWNER_CRATE} has no proptest dev-dep; falling back to a plain #[test] regression (proptest mode requested)" >&2
             cat >"$OUT" <<EOF
 // Auto-generated regression test from fuzz/$TARGET seed $SHA.
-// Source: scripts/promote_fuzz_seed.sh (M02.P4.T2).
 // Severity: $SEVERITY.
-// Cross-doc: M03 owns the oracle/invariant surface this property targets.
 //
 // NOTE: --mode proptest was requested, but ${OWNER_CRATE} does not declare
 // 'proptest' in [dev-dependencies], so the script emitted a plain #[test]

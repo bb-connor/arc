@@ -1,19 +1,8 @@
 // Receipt-log reader for `chio replay`.
 //
-// This file is included into `main.rs` via `include!` (see the conformance
-// and replay subcommand modules for the same pattern). It provides
-// `ReceiptLogReader`, an auto-detecting reader that accepts either:
-//
-// - a single NDJSON file (each line is one JSON receipt), or
-// - a directory containing `*.json` and `*.ndjson` files in lexical order.
-//
-// Each `*.ndjson` file is parsed line-by-line; each `*.json` file is parsed
-// as a single JSON receipt. The reader yields `serde_json::Value`s; receipt
-// signature verification, Merkle recompute, divergence reporting, and the
-// `--bless` gate live in M04.P4.T3 through M04.P4.T7.
-//
-// Reference: `.planning/trajectory/04-deterministic-replay.md` Phase 4 task 2
-// and the "chio replay subcommand surface" section of that document.
+// Auto-detects whether the input is a single NDJSON file or a directory of
+// `*.json`/`*.ndjson` files. Yields `serde_json::Value` receipts; signature
+// verification and divergence reporting are layered on top.
 
 /// Errors returned by [`ReceiptLogReader`] while opening or iterating.
 #[derive(Debug, thiserror::Error)]

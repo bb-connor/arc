@@ -130,7 +130,7 @@ impl GenAiToolCallSpan {
     }
 }
 
-/// Build a span with only the locked M10.P3.T1 attribute set.
+/// Build a span with the locked attribute set.
 pub fn build_gen_ai_tool_call_span(input: GenAiToolCallSpanInput<'_>) -> GenAiToolCallSpan {
     let mut attributes = Vec::with_capacity(GEN_AI_TOOL_CALL_LOCKED_ATTRIBUTES.len());
     push_attr(&mut attributes, ATTR_GEN_AI_SYSTEM, input.system);

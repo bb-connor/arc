@@ -15,7 +15,7 @@ fn replays_all_anthropic_fixtures_with_canonical_byte_assertions() {
     assert_eq!(
         paths.len(),
         12,
-        "M07.P3.T5 Anthropic corpus must contain exactly 12 NDJSON fixtures"
+        "Anthropic corpus must contain exactly 12 NDJSON fixtures"
     );
 
     let mut total_invocations = 0;

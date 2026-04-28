@@ -1,8 +1,5 @@
 //! Timing-leak dudect harness for JWT VC signature verification.
 //!
-//! Source-doc anchor: `.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 3 atomic task P3.T5 + the "Timing-leak (dudect) harness" section.
-//!
 //! Gated behind the `dudect` Cargo feature so default `cargo test -p
 //! chio-credentials` is unaffected; opt in via:
 //!
@@ -30,9 +27,8 @@
 //! has a data-dependent timing leak that an off-path attacker could exploit
 //! to learn something about why a candidate JWT was rejected.
 //!
-//! The CI lane `.github/workflows/dudect.yml` (M02.P2.T4) wires this
-//! harness into nightly + PR-time runs with the two-consecutive-runs
-//! `t < 4.5` pass rule.
+//! The CI lane `.github/workflows/dudect.yml` wires this harness into
+//! nightly + PR-time runs with the two-consecutive-runs `t < 4.5` pass rule.
 
 #![cfg(feature = "dudect")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]

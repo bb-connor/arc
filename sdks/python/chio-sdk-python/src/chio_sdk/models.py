@@ -7,15 +7,6 @@
 # generated module is also re-exported as ``chio_sdk.models.generated`` so
 # new consumers can opt in to the schema-derived types directly.
 #
-# Lifecycle (M01.P3.T2 -> M01+1):
-#   * Today: ``models.py`` re-exports the hand-typed legacy classes
-#     (verbatim, with their ``classmethod`` factory helpers and subset
-#     algebra preserved).
-#   * After M01+1: callers migrate to ``chio_sdk._generated`` and the legacy
-#     module is deleted. The header on every ``_generated/*.py`` file makes
-#     the regeneration entry point obvious; ``models_legacy.py`` carries a
-#     matching deprecation banner.
-#
 # House rules: no em dashes (U+2014); use `-` or parentheses.
 """Typed Python models mirroring Chio core Rust types.
 
@@ -68,7 +59,7 @@ __all__ = [
     # Schema pin (re-exported from `_generated`)
     "SCHEMA_SHA256",
     "generated",
-    # Legacy hand-typed surface (preserved one cycle past M01.P3.T2)
+    # Legacy hand-typed surface
     "Attenuation",
     "AuthMethod",
     "CallerIdentity",

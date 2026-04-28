@@ -1,12 +1,4 @@
 # nightly.yml - Long-running QA jobs that the PR lane skips.
-#
-# Owned by SEQUENCER per OWNERS.toml; individual jobs are tagged with
-# `# owner: M0X` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
-# Today this file has two M03 lanes: the nightly proptest re-run with the
-# higher case count (PROPTEST_CASES=4096 vs the PR-tier 256), and the
-# Apalache liveness lane (RevocationEventuallySeen, length=24) landed by
-# M03.P3.T4. M02's long-fuzz lane will follow when its scheduling ticket
-# fires.
 
 name: nightly
 
@@ -22,15 +14,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # M03.P1.T6: nightly-tier proptest case count. Eighteen named
-  # invariants across chio-core-types, chio-kernel-core, chio-credentials,
-  # chio-policy run with this case count. The PR-tier (256) lives in
-  # ci.yml; the gap between the two tiers is what surfaces shrink-friendly
-  # algebra-bug seams that low-case-count PR runs miss.
+  # Nightly-tier proptest case count; the PR-tier (256) lives in ci.yml.
   PROPTEST_CASES: "4096"
-  # M03.P2.T6: pinned cargo-kani version for the nightly Kani lane.
-  # Must agree with CHIO_KANI_VERSION in ci.yml; the two values are
-  # the source of truth for kani-verifier installs in this repo.
+  # Pinned cargo-kani version; must agree with CHIO_KANI_VERSION in ci.yml.
   CHIO_KANI_VERSION: 0.67.0
 
 concurrency:
@@ -64,14 +50,9 @@ jobs:
           cargo test -p chio-credentials --test property_passport -- --nocapture
           cargo test -p chio-policy --test property_evaluate -- --nocapture
 
-  # M03.P3.T4: nightly Apalache liveness lane for the RevocationPropagation
-  # TLA+ module. Checks the named liveness property RevocationEventuallySeen
-  # (weak fairness on Propagate; see formal/tla/RevocationPropagation.tla
-  # M03.P3.T3) at length=24 against MCRevocationPropagation.cfg
-  # (PROCS=4, CAPS=8). Counterexample triage runs through
-  # formal/issue-templates/liveness-counterexample.md per the
-  # `Liveness lane` section of
-  # .planning/trajectory/03-capability-algebra-properties.md.
+  # Nightly Apalache liveness lane for the RevocationPropagation TLA+ module.
+  # Checks RevocationEventuallySeen (weak fairness on Propagate) at length=24
+  # against MCRevocationPropagation.cfg (PROCS=4, CAPS=8).
   formal-tla-liveness:
     name: formal-tla-liveness (apalache liveness)
     # owner: M03
@@ -109,9 +90,8 @@ jobs:
         # leads-to operator `~>` in formal/tla/RevocationPropagation.tla),
         # so it is supplied to Apalache via `--temporal=` and NOT `--inv=`.
         # `--inv=` is reserved for state invariants and would either error
-        # out or silently mischeck the property. The original M03.P3.T4
-        # invocation used `--inv=`; this was corrected in [cleanup-c9]
-        # after PR #66 review (comments r3142998135 and r3142998192).
+        # out or silently mischeck the property. An earlier invocation used
+        # `--inv=`; this was corrected after PR #66 review.
         run: |
           set -euo pipefail
           apalache-mc check \
@@ -120,14 +100,10 @@ jobs:
             --config=formal/tla/MCRevocationPropagation.cfg \
             formal/tla/RevocationPropagation.tla
 
-  # M03.P2.T6: nightly Kani lane that runs the union of `lanes.pr` and
-  # `lanes.nightly_only` from formal/rust-verification/kani-public-harnesses.toml.
-  # The PR job (kani-public-pr in ci.yml) only runs `lanes.pr`; nightly
-  # runs everything so that any harness moved into `lanes.nightly_only`
-  # (currently empty after T6's wall-clock sweep) still gets daily
-  # coverage. Each harness is invoked with the same flags as the PR
-  # lane: `cargo kani -p chio-kernel-core --lib --harness <h>
-  # --default-unwind 8 --no-unwinding-checks`.
+  # Nightly Kani lane: runs the union of `lanes.pr` and `lanes.nightly_only`
+  # from formal/rust-verification/kani-public-harnesses.toml. The PR job
+  # (kani-public-pr in ci.yml) only runs `lanes.pr`; nightly runs everything
+  # so harnesses in `lanes.nightly_only` still get daily coverage.
   kani-public-nightly:
     name: kani-public-nightly (lanes.pr + lanes.nightly_only)
     # owner: M03

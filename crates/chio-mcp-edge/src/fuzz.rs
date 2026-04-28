@@ -1,42 +1,29 @@
-// owned-by: M02 (fuzz lane); module authored under M02.P1.T3.a.
-//
 //! libFuzzer entry-point module for `chio-mcp-edge`.
 //!
-//! Authored under M02.P1.T3.a (`.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 1, trust-boundary fuzz target #5). This module is gated behind the
-//! `fuzz` Cargo feature so it only compiles into the standalone `chio-fuzz`
-//! workspace at `../../fuzz`. The production build of `chio-mcp-edge` never
-//! pulls in `arbitrary`, never exposes these symbols, and never gets
-//! recompiled with libFuzzer instrumentation.
+//! Gated behind the `fuzz` Cargo feature so it only compiles into the standalone
+//! `chio-fuzz` workspace at `../../fuzz`. Production builds never pull in
+//! `arbitrary`, never expose these symbols, and never get recompiled with
+//! libFuzzer instrumentation.
 //!
-//! The single entry point [`fuzz_mcp_envelope_decode`] is the canonical
-//! "decode -> evaluator dispatch" trust-boundary pipeline for the MCP edge:
+//! [`fuzz_mcp_envelope_decode`] is the canonical "decode -> evaluator dispatch"
+//! trust-boundary pipeline for the MCP edge:
 //!
-//! 1. **Decode stage.** Bytes are interpreted as a newline-delimited
-//!    JSON-RPC stream (the same wire format the
-//!    `chio_mcp_adapter::transport::StdioMcpTransport` reader thread
-//!    consumes). Each non-empty trimmed line is fed to
-//!    `serde_json::from_str::<serde_json::Value>` to produce a
-//!    JSON-RPC envelope.
-//! 2. **Evaluator dispatch stage.** Successfully decoded envelopes are
-//!    forwarded to [`ChioMcpEdge::handle_jsonrpc`], the JSON-RPC method
-//!    dispatcher that routes `initialize`, `tools/list`, `tools/call`,
-//!    notifications, and the rest of the MCP method namespace through the
-//!    edge's capability evaluator and kernel-backed tool plumbing.
+//! 1. **Decode stage.** Bytes are interpreted as a newline-delimited JSON-RPC
+//!    stream. Each non-empty trimmed line is fed to
+//!    `serde_json::from_str::<serde_json::Value>` to produce a JSON-RPC envelope.
+//! 2. **Evaluator dispatch stage.** Successfully decoded envelopes are forwarded
+//!    to [`ChioMcpEdge::handle_jsonrpc`], which routes `initialize`, `tools/list`,
+//!    `tools/call`, notifications, and the rest of the MCP method namespace through
+//!    the edge's capability evaluator and kernel-backed tool plumbing.
 //!
-//! The decode-then-dispatch combination is what catches bugs that pure
-//! structural-parse fuzzing would miss: it exercises both the JSON parser
-//! and the downstream method-dispatch state machine on the same byte
-//! stream.
+//! The decode-then-dispatch combination catches bugs that pure structural-parse
+//! fuzzing would miss: it exercises both the JSON parser and the downstream
+//! method-dispatch state machine on the same byte stream.
 //!
-//! The kernel and edge fixtures are deterministic. The kernel keypair is
-//! derived from a fixed 32-byte seed via [`Keypair::from_seed`], and the
-//! edge is rebuilt fresh on every iteration so libFuzzer-injected sequences
-//! cannot poison cross-iteration state. No upstream tool servers are
-//! registered; the evaluator is exercised against an empty capability set
-//! so arbitrary inputs reach the JSON-RPC method dispatcher and surface as
-//! either an `Err` JSON-RPC response or a notification ack rather than a
-//! panic.
+//! The kernel and edge fixtures are deterministic. The kernel keypair is derived
+//! from a fixed 32-byte seed via [`Keypair::from_seed`], and the edge is rebuilt
+//! fresh on every iteration so libFuzzer-injected sequences cannot poison
+//! cross-iteration state.
 
 use std::sync::OnceLock;
 
@@ -123,19 +110,12 @@ fn make_edge() -> Option<ChioMcpEdge> {
 /// non-empty trimmed line is parsed with `serde_json::from_str` and, on
 /// success, forwarded to [`ChioMcpEdge::handle_jsonrpc`] against a fresh
 /// per-iteration edge fixture. Errors and method-not-found responses are
-/// silently consumed: the trust-boundary contract guarantees the only
-/// outcomes are an `Err`-shaped JSON-RPC response (good), an `Ok`-shaped
-/// JSON-RPC response (also good - the edge ran the full evaluator path),
-/// `None` for a notification (good), or a panic / abort (which libFuzzer
-/// reports as a crash). No arbitrary byte stream can produce a meaningful
-/// successful response because the agent has no capabilities and no tool
-/// manifests are registered, so every dispatched request hits an
-/// authorisation / not-found edge.
+/// silently consumed: the only outcomes are an `Err`-shaped JSON-RPC response
+/// (good), an `Ok`-shaped JSON-RPC response (good), `None` for a notification
+/// (good), or a panic / abort (which libFuzzer reports as a crash).
 ///
 /// The fixture is rebuilt fresh on every iteration so libFuzzer-injected
-/// sequences cannot poison cross-iteration kernel or session state. This
-/// matches the fail-closed contract: a malformed message on iteration N
-/// must not affect iteration N+1.
+/// sequences cannot poison cross-iteration kernel or session state.
 pub fn fuzz_mcp_envelope_decode(data: &[u8]) {
     use std::io::BufRead;
 

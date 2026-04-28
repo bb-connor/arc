@@ -78,9 +78,7 @@ pub use trust_tier::{
 };
 
 // libFuzzer entry-point module, enabled only when the `fuzz` feature is
-// turned on by the standalone `chio-fuzz` workspace at `../../fuzz`. Authored
-// under M02.P1.T1.a; reference: `.planning/trajectory/02-fuzzing-post-pr13.md`
-// Phase 1.
+// turned on by the standalone `chio-fuzz` workspace at `../../fuzz`.
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 

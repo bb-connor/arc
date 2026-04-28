@@ -1,32 +1,12 @@
-# mutants-fuzz-cocoverage.yml - cross-oracle nightly (M02-owned).
+# mutants-fuzz-cocoverage.yml - Cross-oracle nightly.
 #
-# Source-doc anchors:
-#   - .planning/trajectory/02-fuzzing-post-pr13.md
-#     Round-2 (NEW) P3.T7 re-homed to Phase 2 alongside the rest of the
-#     mutation-scaffold work. Nightly only; never runs on the PR lane.
-#   - .planning/trajectory/tickets/M02/P2.yml id=M02.P2.T7.
+# Cross-oracle insight: cargo-mutants surviving mutants represent test gaps.
+# The libFuzzer corpus under fuzz/corpus/<target>/ exercises code paths the
+# unit suite does not reach. Replaying the fuzz corpus against each surviving
+# mutant lets the two oracles cover one another.
+# Always advisory; never fails the workflow.
 #
-# What this lane does (the cross-oracle insight):
-#
-#   - cargo-mutants produces a "surviving mutant" when the unit test
-#     suite fails to distinguish the original binary from the mutated
-#     binary. Surviving mutants represent test gaps.
-#   - The libFuzzer corpus shipped under fuzz/corpus/<target>/ is a
-#     DIFFERENT oracle. It is the accumulated set of inputs libFuzzer
-#     has explored across the M02 P1 + P2 lanes; many of them exercise
-#     code paths the unit suite does not reach.
-#   - Replaying the fuzz corpus against each surviving mutant lets the
-#     two oracles cover one another. Mutants the unit suite missed but
-#     which produce divergent libFuzzer behaviour show up here.
-#
-# Expected effect: 5-15% reduction in missed-mutant count plus an
-# audit-ready cross-oracle story for the M02 release-qualification
-# package. Always advisory; never fails the workflow.
-#
-# Schedule note: cron sits at 05:45 UTC, after mutants-nightly at 05:00
-# (mutants.yml) and after the fuzz nightly at 03:23 (fuzz.yml). This
-# avoids over-subscribing the GitHub-hosted runner pool against the
-# shared 1,800 min/30d envelope.
+# Schedule: 05:45 UTC, after mutants-nightly (05:00) and fuzz nightly (03:23).
 
 name: mutants-fuzz-cocoverage
 

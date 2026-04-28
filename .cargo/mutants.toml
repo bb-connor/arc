@@ -1,9 +1,6 @@
-# cargo-mutants workspace config (M02 P2)
+# cargo-mutants workspace config
 #
-# Anchored to .planning/trajectory/02-fuzzing-post-pr13.md
-# - "Mutation-testing approach" (phase 3 deliverable)
-# - "Mutation-testing CI shape (Phase 3)"
-# - Decision 12: cargo-mutants pinned at 25.x; do not float.
+# Decision 12: cargo-mutants pinned at 25.x; do not float.
 #
 # THIS IS THE ONLY mutants.toml CARGO-MUTANTS LOADS.
 # cargo-mutants 25.x reads its configuration exclusively from the workspace-root
@@ -29,7 +26,7 @@
 #   `evaluate.rs` for policy) which carries all of the included source
 #   for cargo-mutants discovery purposes.
 #
-# CI lane: .github/workflows/mutants.yml (lands in M02.P2.T2)
+# CI lane: .github/workflows/mutants.yml
 #   - mutants-pr      : runs `cargo mutants --in-diff <diff-file>` on PRs
 #   - mutants-nightly : full sweep on a 4-hour-per-crate budget
 #
@@ -142,7 +139,7 @@ examine_globs = [
 
 # Workspace-wide skip list. Pure plumbing, generated code, test/bench
 # scaffolding, formal-methods harnesses (Aeneas / Kani), platform clock /
-# rng adapters, and libFuzzer entry points (covered by the M02 P1 lane).
+# rng adapters, and libFuzzer entry points.
 exclude_globs = [
     "**/tests.rs",
     "**/test_*.rs",

@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
-# check-proptest-coverage.sh - Gate the eighteen named M03 P1 invariants.
+# check-proptest-coverage.sh - Gate the eighteen named capability-algebra invariants.
 #
-# The capability-algebra milestone landed eighteen named proptest
-# functions distributed 5/5/4/4 across chio-core-types,
-# chio-kernel-core, chio-credentials, and chio-policy. The gate confirms
-# every name is still present in the corresponding test file. A missing
-# or renamed name is a regression: the rename loses load-bearing
-# property coverage even when the file still compiles and the remaining
-# tests pass. The CI `verify` lane wires this gate as required.
-#
-# Source of truth for the name set:
-#   .planning/trajectory/03-capability-algebra-properties.md Phase 1
-#   (Named invariants by full Rust path)
+# Confirms every named proptest function is still present in the corresponding
+# test file. A missing or renamed function is a regression: the rename loses
+# load-bearing property coverage even when the file still compiles and the
+# remaining tests pass. The CI `verify` lane wires this gate as required.
 #
 # Usage:
 #   scripts/check-proptest-coverage.sh
@@ -75,7 +68,6 @@ if (( ${#missing[@]} > 0 )); then
         err "  ${m}"
     done
     err ""
-    err "Source of truth: .planning/trajectory/03-capability-algebra-properties.md Phase 1"
     err "If a rename is genuinely needed, edit the truth list in this script in the"
     err "same PR; do not silently rename the test fn."
     exit 1

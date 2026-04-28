@@ -1,52 +1,14 @@
-// Incremental Merkle / synthetic-root accumulator for `chio replay`.
+// Incremental synthetic-root accumulator for `chio replay`.
 //
-// This file is included into `main.rs` via `include!` (matching the
-// pattern used by `cli/replay.rs`, `cli/replay/reader.rs`, and
-// `cli/replay/verify.rs`). It provides [`MerkleAccumulator`], a
-// streaming SHA-256 builder that folds receipts in append order and
-// emits a 32-byte root on [`MerkleAccumulator::finalize`].
-//
-// ## Derivation
-//
-// The replay corpus's "synthetic root" (sometimes called the Merkle
-// root for symmetry with the doc) is defined in
-// `tests/replay/src/cross_version/reverify.rs::recompute_root_hex` and
-// in `tests/replay/tests/corpus_smoke.rs::run_scenario` as:
-//
-// ```text
-// SHA-256(receipt_canonical_bytes_0
-//      || receipt_canonical_bytes_1
-//      || ...
-//      || receipt_canonical_bytes_{n-1})
-// ```
-//
-// where each `receipt_canonical_bytes_i` is the RFC 8785 / JCS encoding
-// of the i-th receipt as produced by
-// [`chio_core::canonical::canonicalize`]. The corpus_smoke driver folds
-// the per-scenario `checkpoint_bytes` in *after* the receipt bytes
-// before finalizing; that final fold is the consumer's responsibility,
-// the accumulator covers the per-receipt streaming portion of the
-// derivation.
-//
-// The accumulator is "incremental" in two senses:
-//
-// 1. It feeds bytes into the hasher one receipt at a time, so the
-//    replay command can stream a million-receipt log without
-//    materializing the full byte vector.
-// 2. The output is bit-identical to a one-shot
-//    `Sha256::digest(concat(all bytes))` over the same input sequence,
-//    which the unit tests pin so any future refactor cannot drift.
-//
-// Reference: `.planning/trajectory/04-deterministic-replay.md` Phase 4
-// task 3 ("Implement signature re-verify and incremental Merkle root
-// recompute") and the byte-level convention in
-// `tests/replay/src/cross_version/reverify.rs`.
+// Computes SHA-256(receipt_canonical_bytes_0 || ... || receipt_canonical_bytes_n-1)
+// in streaming fashion, matching the derivation in
+// `tests/replay/src/cross_version/reverify.rs`. The output is bit-identical to
+// a one-shot digest over the same concatenated input.
 
 use sha2::{Digest, Sha256};
 
 /// Length, in bytes, of the synthetic root produced by
-/// [`MerkleAccumulator::finalize`]. Matches `ROOT_LEN` from
-/// `tests/replay/src/golden_format.rs`.
+/// [`MerkleAccumulator::finalize`].
 pub const ROOT_LEN: usize = 32;
 
 /// Streaming SHA-256 accumulator for the replay-corpus synthetic root.
@@ -108,9 +70,7 @@ impl MerkleAccumulator {
         root
     }
 
-    /// Convenience: finalize and return the lowercase-hex encoding of
-    /// the root, matching the on-disk shape of `root.hex` documented in
-    /// `tests/replay/src/golden_format.rs` (`ROOT_HEX_LEN == 64`).
+    /// Finalize and return the lowercase-hex encoding of the root (64 chars).
     #[must_use]
     pub fn finalize_hex(self) -> String {
         hex::encode(self.finalize())

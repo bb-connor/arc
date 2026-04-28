@@ -1,7 +1,4 @@
-//! Integration tests for the streaming state machine.
-//!
-//! Covers the transition table in
-//! `.planning/trajectory/07-provider-native-adapters.md` Phase 1 task 3:
+//! Integration tests for the streaming state machine transitions:
 //!
 //! - Idle -> Buffering on `StartBlock`
 //! - Buffering -> Buffering on `AppendBytes`
@@ -10,9 +7,6 @@
 //! - Invalid transitions return errors (e.g., `AppendBytes` in `Idle`)
 //! - Multiple blocks in sequence: Idle -> Buffering -> Emitting -> Buffering
 //!   -> Emitting -> Closed
-//!
-//! These tests exercise transitions only; provider-specific wiring lands in
-//! later phases.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

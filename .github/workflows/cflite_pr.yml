@@ -1,23 +1,15 @@
-# cflite_pr.yml - ClusterFuzzLite PR smoke (M02-owned).
+# cflite_pr.yml - ClusterFuzzLite PR smoke.
 #
-# Reference: .planning/trajectory/02-fuzzing-post-pr13.md.
-# Decision lock: .planning/trajectory/decisions.yml id=continuous-fuzzing-path.
+# Default mode is changed-target sampling. Diffs the PR against its
+# merge base, looks up which fuzz targets each changed source-path glob in
+# fuzz/target-map.toml triggers, and runs only those targets at 60 seconds
+# each. Budget-capped against the 2,000 min/month free tier.
 #
-# Default mode is changed-target sampling. We diff the PR against its
-# merge base, look up which fuzz targets each changed source-path glob in
-# fuzz/target-map.toml triggers, and run only those targets at 60 seconds
-# each. Heavy targets are bounded by the global fuzz-budget cap so a busy
-# week of PRs cannot burn through the public-repo 2,000 min/month free
-# tier.
-#
-# Opt-in PR label `fuzz: full` switches the run from changed-target
-# sampling to a full-corpus sweep at 120 seconds per target (release-cut
-# PRs and trust-boundary edits). The label decision is honored only if the
-# trailing-30d budget check still passes; the budget script is the hard
-# halt.
+# Opt-in PR label `fuzz: full` switches the run to a full-corpus sweep at
+# 120 seconds per target. The label is honored only if the trailing-30d
+# budget check passes; the budget script is the hard halt.
 #
 # Required check name: cflite_pr / changed-target-sampling
-# (advisory until M02 P1 lands; promoted to required at the M02 P1 wave gate)
 
 name: cflite_pr
 

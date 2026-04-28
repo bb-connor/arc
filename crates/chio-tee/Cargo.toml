@@ -29,12 +29,10 @@ chio-store-sqlite = { path = "../chio-store-sqlite" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-# M10.P1.T4: mode resolver + SIGUSR1 hot-toggle.
 arc-swap = { workspace = true }
 toml = "0.8"
-# M10.P1.T6: zeroize-on-drop raw-payload buffers. Pinned to 1.8.x; the
-# derive feature provides the `Zeroize` + `ZeroizeOnDrop` derives used by
-# `RawPayloadBuffer` in `src/buffer.rs`.
+# Pinned to 1.8.x; the derive feature provides the `Zeroize` + `ZeroizeOnDrop`
+# derives used by `RawPayloadBuffer` in `src/buffer.rs`.
 zeroize = { version = "1.8", features = ["derive"] }
 
 [target.'cfg(unix)'.dependencies]

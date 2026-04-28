@@ -1,4 +1,4 @@
-//! Bundle fetch + sha256-pinned cache for tagged release artifacts (M04.P3.T3).
+//! Bundle fetch + sha256-pinned cache for tagged release artifacts.
 //!
 //! The cross-version harness re-verifies receipts produced by historical
 //! tagged releases. Bundles named in `release_compat_matrix.toml` are
@@ -30,7 +30,7 @@
 //!    a HOME, e.g. some sandboxed runners).
 //!
 //! The harness deliberately avoids the `dirs` crate to keep `tests/replay`'s
-//! transitive surface small (M09 supply-chain footprint).
+//! transitive surface small.
 //!
 //! # Network access in tests
 //!

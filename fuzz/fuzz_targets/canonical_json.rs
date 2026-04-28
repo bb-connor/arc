@@ -1,19 +1,4 @@
-// owned-by: M02 (fuzz lane); target authored under M02.P2.T6.
-//
-//! libFuzzer self-driver for the structure-aware canonical-JSON mutator.
-//!
-//! The fuzz target body is intentionally minimal: it round-trips bytes
-//! through `serde_json::from_slice::<serde_json::Value>` so the only
-//! interesting work happens inside
-//! [`chio_fuzz::canonical_json::canonical_json_mutate`], wired in below
-//! via [`libfuzzer_sys::fuzz_mutator!`]. This target's purpose is two-fold:
-//!
-//! 1. Exercise the mutator itself end-to-end (parse, mutate, serialize,
-//!    re-parse). Any panic inside the mutator surfaces here.
-//! 2. Provide cargo-fuzz with a buildable target that proves the
-//!    mutator-plus-target wiring compiles (gate-required).
-//!
-//! Source: `.planning/trajectory/02-fuzzing-post-pr13.md` Round-2 P2.T6.
+//! Trust-boundary fuzz target: structure-aware canonical-JSON mutator self-driver.
 
 #![no_main]
 

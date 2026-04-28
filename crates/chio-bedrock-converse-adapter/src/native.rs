@@ -1,10 +1,4 @@
-//! Bedrock Converse native wire-shaped types.
-//!
-//! These structs model the subset of Bedrock Runtime Converse payloads that
-//! M07.P4.T1 scopes for later lift/lower work: `toolConfig`, `toolUse`, and
-//! `toolResult`. They intentionally use `serde_json::Value` for JSON schema,
-//! input, and output fields so the scaffold does not pull execution semantics
-//! ahead of the batch and streaming tickets.
+//! Bedrock Converse native wire-shaped types: `toolConfig`, `toolUse`, and `toolResult`.
 
 use serde::{Deserialize, Serialize};
 
@@ -105,8 +99,7 @@ pub enum ToolResultStatus {
 pub struct ToolResultBlock {
     /// Identifier from the matching [`ToolUseBlock::tool_use_id`].
     pub tool_use_id: String,
-    /// Content returned to Bedrock. T2 fills this from canonical tool output
-    /// or a structured deny reason.
+    /// Content returned to Bedrock.
     pub content: serde_json::Value,
     /// Success or error status for the result.
     pub status: ToolResultStatus,

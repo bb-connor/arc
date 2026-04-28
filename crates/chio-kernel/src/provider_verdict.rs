@@ -1,21 +1,11 @@
 //! Provider-fabric verdict shim.
 //!
-//! M07.P1.T4 wires the provider-agnostic [`chio_tool_call_fabric`] crate into
-//! the kernel via a thin conversion layer. The shim is intentionally minimal:
-//! it does not introduce new policy work and it does not duplicate the MCP
-//! verdict pipeline. Instead, it lifts a [`ToolInvocation`] into a kernel
+//! Wires the provider-agnostic [`chio_tool_call_fabric`] crate into the kernel
+//! via a thin conversion layer. Lifts a [`ToolInvocation`] into a kernel
 //! [`ToolCallRequest`] (when paired with the surrounding capability context)
 //! and lowers a kernel [`ToolCallResponse`] into a fabric [`VerdictResult`].
-//!
-//! The Phase-1 contract is structural: M07 Phase 2 (`crates/chio-openai/`)
-//! and Phase 3 (`crates/chio-anthropic-tools-adapter/`) will drive concrete
-//! provider traffic through this surface once their adapters land. Until then
-//! the shim's job is to (a) prove the type-level wiring compiles against the
-//! kernel's existing MCP path, and (b) give later phases a single conversion
-//! point so the fabric vocabulary never leaks into the kernel's internals.
-//!
-//! Reference: `.planning/trajectory/07-provider-native-adapters.md` Phase 1
-//! task 4.
+//! The shim is a single conversion point so the fabric vocabulary never leaks
+//! into the kernel's internals.
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_tool_call_fabric::{DenyReason, ProviderId, ReceiptId, ToolInvocation, VerdictResult};
@@ -86,8 +76,7 @@ pub fn build_tool_call_request(
 ///   so callers fail-closed if they ignore the approval channel; phases that
 ///   plumb HITL across the fabric will replace this branch.
 ///
-/// Redactions are always empty in Phase 1; later phases will route data-
-/// guard redaction lists through this mapping.
+/// Redactions are always empty; data-guard redaction lists are not yet wired.
 #[must_use]
 pub fn verdict_result_from_response(
     invocation: &ToolInvocation,
@@ -117,10 +106,9 @@ pub fn verdict_result_from_response(
 /// The kernel's deny pathway encodes its rationale as a free-form
 /// [`ToolCallResponse::reason`] string. We surface this as
 /// [`DenyReason::PolicyDeny`] with the kernel's reason as the `rule_id`,
-/// preserving information for auditors without inventing a richer mapping
-/// the kernel does not expose. Specialized variants (`CapabilityExpired`,
-/// `BudgetExceeded`, etc.) require kernel-side classification work outside
-/// this ticket's scope; M07 Phase 2 will add the structured taxonomy.
+/// preserving information for auditors without inventing a richer mapping.
+/// Specialized variants (`CapabilityExpired`, `BudgetExceeded`, etc.) require
+/// kernel-side classification work; the structured taxonomy is not yet wired.
 fn classify_deny_reason(_invocation: &ToolInvocation, response: &ToolCallResponse) -> DenyReason {
     let detail = response
         .reason
@@ -162,10 +150,8 @@ impl crate::ChioKernel {
     /// kernel response into a fabric verdict via
     /// [`verdict_result_from_response`].
     ///
-    /// Phase 1 of M07 lands this as the only kernel-side fabric integration
-    /// point. Adapters in Phases 2-4 (`crates/chio-openai/`, the new
-    /// Anthropic and Bedrock crates) call this method with an invocation
-    /// they have already lifted from the upstream wire format and a
+    /// The kernel-side fabric integration point. Adapters call this method
+    /// with an invocation already lifted from the upstream wire format and a
     /// capability token resolved from their authentication path.
     pub fn verdict_for_provider_invocation(
         &self,

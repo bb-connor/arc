@@ -1,41 +1,31 @@
 # Workspace-wide cargo-deny configuration.
-# Source of truth: .planning/trajectory/09-supply-chain-attestation.md (Phase 1).
 # Changes to this file require CODEOWNERS review.
 
 [graph]
 all-features = true
 no-default-features = false
 
-# NOTE: the verbatim Phase 1 block in 09-supply-chain-attestation.md
-# included an [output] feedback-level = "error" key that no cargo-deny in
-# the ^0.16 band accepts (only feature-depth is recognized under [output]
-# in 0.16.x). Dropped the [output] block here to make the config parse;
-# the orchestrator should amend the milestone doc in a follow-up so the
-# trajectory remains the single source of truth.
+# NOTE: [output] feedback-level = "error" is not accepted in cargo-deny ^0.16;
+# the [output] block was dropped to keep the config parseable.
 
-# NOTE: cargo-deny PR #611 also removed `unmaintained` and `notice` from
-# [advisories] (severity is now implicit; everything except yanked is "deny"
-# unless ignored). The verbatim Phase 1 block had both keys; dropped here
-# to make the config parse. Same trajectory-doc amendment applies.
+# NOTE: cargo-deny PR #611 removed `unmaintained` and `notice` from
+# [advisories] (severity is now implicit). Both keys were dropped here
+# to keep the config parseable.
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-# SMELL NOTE: the ignore list below exceeds the ~6-entry "soft cap" we
-# normally enforce. The excess is structural: the advisory db carries
-# 15 separate wasmtime CVEs against the single 29.0.1 pin we ship, plus
+# The ignore list exceeds the ~6-entry soft cap for structural reasons: the
+# advisory db carries 15 separate wasmtime CVEs against the single 29.0.1 pin,
 # 4 rustls-webpki CVEs against a single 0.103.9 pin, plus 5 unmaintained
-# advisories. Each cluster collapses to one upstream-dep bump. The bumps
-# themselves are out of scope for M09.P1 (deny-policy seeding) and are
-# tracked as M09.P2 follow-up tickets:
+# advisories. Each cluster collapses to one upstream-dep bump:
 #   - bump wasmtime 29.0.1 -> >=43.0.1 (clears all RUSTSEC-2025/2026 wasmtime)
 #   - bump rustls-webpki 0.103.9 -> >=0.103.10 (clears RUSTSEC-2026-0049/0098/0099/0104)
 #   - migrate off rustls-pemfile, bincode 1, fxhash, paste, serde_yml
 #   - bump rsa to clear RUSTSEC-2023-0071 (Marvin) once an upstream fix lands
-# When those bump tickets close, prune the corresponding entries here so
-# the ignore list shrinks back below the soft cap.
+# Prune the corresponding entries here when those bumps land.
 ignore = [
-    # --- wasmtime 29.0.1 cluster: all clear via bump to >=43.0.1 (M09.P2). ---
+    # --- wasmtime 29.0.1 cluster: all clear via bump to >=43.0.1. ---
     # Host panic via WASIp1 fd_renumber (wasmtime). Fix: wasmtime >=24.0.1.
     "RUSTSEC-2025-0046",
     # Unsound API access to a Wasm shared linear memory (wasmtime). Fix: >=29.0.2.
@@ -69,7 +59,7 @@ ignore = [
     # aarch64 Cranelift sandbox-escape via miscompiled guest heap access (wasmtime). Fix: >=36.0.7.
     "RUSTSEC-2026-0096",
 
-    # --- rustls-webpki 0.103.9 cluster: all clear via bump to >=0.103.10 (M09.P2). ---
+    # --- rustls-webpki 0.103.9 cluster: all clear via bump to >=0.103.10. ---
     # CRLs not considered authoritative by Distribution Point (faulty match). Fix: >=0.103.10.
     "RUSTSEC-2026-0049",
     # Name constraints for URI names incorrectly accepted (rustls-webpki). Fix: >=0.103.10.
@@ -79,7 +69,7 @@ ignore = [
     # Reachable panic in CRL parsing (rustls-webpki). Fix: >=0.103.10.
     "RUSTSEC-2026-0104",
 
-    # --- unmaintained / unsound clusters: each requires a dep migration (M09.P2). ---
+    # --- unmaintained / unsound clusters: each requires a dep migration. ---
     # bincode 1.3.3 unmaintained (RUSTSEC-2025-0141). Pulled by uniffi 0.28.x build deps;
     # only used in chio-kernel-mobile codegen, not at runtime. Migrate uniffi or accept.
     "RUSTSEC-2025-0141",
@@ -105,11 +95,9 @@ ignore = [
     "RUSTSEC-2023-0071",
 ]
 
-# NOTE: the verbatim Phase 1 block had unlicensed/copyleft/allow-osi-fsf-free/default
-# keys removed in cargo-deny per https://github.com/EmbarkStudios/cargo-deny/pull/611.
-# The 0.16 schema enforces an explicit allow-list only; unlisted licenses are denied
-# by default, copyleft licenses must be explicitly allowed (none are here), and
-# OSI/FSF status is no longer a config concern. Schema deviation logged in commit body.
+# NOTE: cargo-deny 0.16 enforces an explicit allow-list only; unlisted licenses
+# are denied by default. The `unlicensed`, `copyleft`, `allow-osi-fsf-free`, and
+# `default` keys from prior config were removed (cargo-deny PR #611).
 [licenses]
 confidence-threshold = 0.93
 # Workspace-wide allow-list. Strictly permissive: no GPL / AGPL / LGPL /

@@ -1,9 +1,5 @@
-// owned-by: M09
-//
-//! Single source of truth for Sigstore verification across the chio
-//! workspace. M09 (release archives), M06 (WASM guard signing), and M02
-//! (fuzz target for the verifier) all consume this crate; no other crate
-//! is permitted to call `sigstore-rs` directly.
+//! Single source of truth for Sigstore verification across the chio workspace.
+//! No other crate is permitted to call `sigstore-rs` directly.
 //!
 //! # Trust boundary
 //!
@@ -104,13 +100,9 @@ pub enum AttestError {
     Malformed(String),
 }
 
-/// The single trait every chio component implements against. Production
-/// uses [`SigstoreVerifier`] (the only impl in this crate); M02's fuzz
-/// harness will implement a `LoopbackVerifier` that exercises decoder
-/// paths without hitting the network.
+/// The single trait every chio component implements against.
 pub trait AttestVerifier: Send + Sync {
-    /// Verify a detached blob signature. Used by M09 for release-archive
-    /// verification and by `chio-attest-verify`'s consumer recipe.
+    /// Verify a detached blob signature.
     fn verify_blob(
         &self,
         artifact: &Path,
@@ -119,8 +111,7 @@ pub trait AttestVerifier: Send + Sync {
         expected: &ExpectedIdentity,
     ) -> Result<VerifiedAttestation, AttestError>;
 
-    /// Verify an in-memory blob. Used by M06 when a WASM guard arrives
-    /// over a network stream and is not yet on disk.
+    /// Verify an in-memory blob.
     fn verify_bytes(
         &self,
         artifact: &[u8],
@@ -130,8 +121,7 @@ pub trait AttestVerifier: Send + Sync {
     ) -> Result<VerifiedAttestation, AttestError>;
 
     /// Verify a Sigstore bundle (a single self-describing JSON blob that
-    /// inlines the cert, signature, and Rekor entry). Used by M06 for
-    /// `sigstore-bundle.json` in the OCI cache layout.
+    /// inlines the cert, signature, and Rekor entry).
     fn verify_bundle(
         &self,
         artifact: &[u8],

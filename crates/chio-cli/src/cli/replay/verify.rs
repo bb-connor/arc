@@ -1,53 +1,18 @@
 // Receipt signature re-verifier for `chio replay`.
 //
-// This file is included into `main.rs` via `include!` (matching the
-// pattern used by `cli/replay.rs` and `cli/replay/reader.rs`). It
-// provides [`verify_receipt`], a thin wrapper over
-// [`chio_core::receipt::ChioReceipt::verify_signature`], that returns a
-// [`VerifyOutcome`] describing whether the embedded signature
-// re-verifies against the receipt's `kernel_key`.
-//
-// The replay command calls this once per receipt yielded by the log
-// reader. Per the canonical exit-code registry (M04 Phase 4 task 3 of
-// `.planning/trajectory/04-deterministic-replay.md`):
-//
-// - `ok == true`  -> contributes nothing to the exit verdict.
-// - `ok == false` -> drives exit code `20` (bad signature) once any
-//   downstream divergence reporter (M04.P4.T4 / T5) wires the verdict
-//   bus. T3 owns the per-receipt result; the orchestration is layered
-//   on top by later tickets.
-//
-// `VerifyOutcome::error` carries a human-readable note for the malformed
-// JSON / missing-fields case so the JSON report (T5) can surface
-// failures without re-walking the receipt.
-//
-// Reference: `.planning/trajectory/04-deterministic-replay.md` Phase 4
-// task 3 ("Implement signature re-verify and incremental Merkle root
-// recompute") and the "chio replay subcommand surface" section.
+// Provides [`verify_receipt`]: verifies the embedded Ed25519 signature on a
+// receipt against its `kernel_key`. Called once per receipt from the log
+// reader. `ok == false` drives exit code 20.
 
 /// Canonical exit code emitted when any receipt fails signature
-/// re-verification. Surfaced as a constant so the dispatch layer (T4)
-/// can map a `VerifyOutcome { ok: false, .. }` to the documented exit
-/// without hard-coding the magic number twice.
+/// re-verification.
 pub const EXIT_BAD_SIGNATURE: i32 = 20;
 
 /// Per-receipt outcome from [`verify_receipt`].
 ///
-/// Three terminal shapes:
-///
-/// - `ok == true` and `error.is_none()`: the receipt deserialized
-///   successfully and its signature verified against the embedded
-///   `kernel_key`.
-/// - `ok == false` and `error.is_some()`: the receipt was structurally
-///   parseable but either failed signature verification (`error =
-///   "signature mismatch"`) or hit a kernel-side verifier error
-///   (`error = <error.to_string()>`). The signer key is still surfaced
-///   when present so the divergence report (T5) can attribute the
-///   failure.
-/// - `ok == false` and `signer_key_hex == ""`: the input was not a
-///   well-formed `ChioReceipt`. `error` carries the deserialization
-///   failure text. This shape contributes to the malformed-JSON exit
-///   (`30`) at the dispatch layer rather than to bad-signature.
+/// `ok == true`: signature verified. `ok == false` with `signer_key_hex`
+/// present: verification failed. `ok == false` with `signer_key_hex == ""`:
+/// receipt could not be deserialized (maps to exit 30, not 20).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifyOutcome {
     /// Whether the embedded signature verified against the embedded
@@ -64,17 +29,8 @@ pub struct VerifyOutcome {
 
 /// Re-verify the embedded signature on a single receipt.
 ///
-/// `value` is a `serde_json::Value` previously yielded by the replay
-/// log reader. The function deserializes it into a
-/// [`chio_core::receipt::ChioReceipt`], extracts the kernel key for
-/// attribution, and calls
-/// [`ChioReceipt::verify_signature`](chio_core::receipt::ChioReceipt::verify_signature).
-///
-/// The function never returns a `Result`: every failure mode is captured
-/// inside the [`VerifyOutcome`] so callers can drive exit-code policy
-/// off the outcome shape rather than bubbling errors. This matches the
-/// "fail-closed but never panic mid-stream" invariant the replay
-/// command relies on for stable JSON-report output.
+/// Never returns `Err`; all failure modes are captured in [`VerifyOutcome`]
+/// so callers can drive exit-code policy off the outcome shape.
 pub fn verify_receipt(value: &serde_json::Value) -> VerifyOutcome {
     let receipt: chio_core::receipt::ChioReceipt = match serde_json::from_value(value.clone()) {
         Ok(r) => r,
@@ -195,9 +151,6 @@ mod replay_verify_tests {
 
     #[test]
     fn exit_bad_signature_constant_is_twenty() {
-        // Pinned by the canonical exit-code registry in M04 Phase 4 task
-        // 3. If the registry ever shifts, this test trips first so the
-        // dispatch layer (T4) cannot drift silently.
         assert_eq!(EXIT_BAD_SIGNATURE, 20);
     }
 }

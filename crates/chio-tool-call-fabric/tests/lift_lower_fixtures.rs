@@ -1,27 +1,15 @@
 //! Canonical-JSON round-trip fixtures for the lift / lower contract.
 //!
-//! Source-doc anchor:
-//! `.planning/trajectory/07-provider-native-adapters.md`, Phase 1 task 6:
-//! "Land `crates/chio-tool-call-fabric/fixtures/lift_lower/` with 9 minimal
-//! canonical-JSON round-trip fixtures (3 per provider) so adapters in later
-//! phases have a known-good shape to assert against before recording live
-//! sessions."
-//!
 //! Each fixture under `fixtures/lift_lower/<provider>/<name>.json` is a single
-//! canonical-JSON encoding (RFC 8785 / JCS) of a [`ToolInvocation`]. The
-//! test below walks every provider directory, parses each fixture, re-encodes
-//! it through `canonical_json_bytes`, and asserts byte-for-byte equality
-//! against the file contents. That is the structural lift-then-lower contract
-//! M07's later-phase adapters will assert against once they wire native
-//! provider transports: an adapter's `lift` must produce a `ToolInvocation`
-//! whose canonical encoding equals the wire fixture, and its `lower` consumer
-//! must accept the same canonical bytes. See Phase 2/3/4 fixture matrices for
-//! the full streaming/error corpora that build on this minimal shape.
+//! canonical-JSON encoding (RFC 8785 / JCS) of a [`ToolInvocation`]. The test
+//! walks every provider directory, parses each fixture, re-encodes it through
+//! `canonical_json_bytes`, and asserts byte-for-byte equality. An adapter's
+//! `lift` must produce a `ToolInvocation` whose canonical encoding equals the
+//! wire fixture; its `lower` consumer must accept the same canonical bytes.
 //!
 //! Re-record protocol: set `CHIO_BLESS_LIFT_LOWER=1` and re-run this test to
 //! regenerate the fixture files from the in-source builders below. The default
 //! mode never writes; CI keeps the fixtures pinned by failing on byte drift.
-//! This mirrors the M04 `CHIO_BLESS` gate (see `chio replay --bless`).
 //!
 //! House rules:
 //! - No em dashes (U+2014) anywhere in code, comments, or rendered output.

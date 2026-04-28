@@ -1,8 +1,5 @@
 //! Timing-leak dudect harness for MAC (signature byte) equality compare.
 //!
-//! Source-doc anchor: `.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 3 atomic task P3.T5 + the "Timing-leak (dudect) harness" section.
-//!
 //! Gated behind the `dudect` Cargo feature so default `cargo test -p
 //! chio-kernel-core` is unaffected; opt in via:
 //!
@@ -33,7 +30,7 @@
 //! If the runtime distributions are statistically distinguishable
 //! (Welch's t > 4.5 in two consecutive runs), the compare path is a
 //! variable-time short-circuit. The CI lane `.github/workflows/dudect.yml`
-//! (M02.P2.T4) wires this harness into nightly + PR-time runs with the
+//! wires this harness into nightly + PR-time runs with the
 //! two-consecutive-runs `t < 4.5` pass rule.
 //!
 //! # Why the trust-boundary surface, not the wrapper

@@ -1,66 +1,33 @@
-# mutants.yml - cargo-mutants advisory lane (M02-owned).
+# mutants.yml - cargo-mutants advisory lane.
 #
-# Source-doc anchors: .planning/trajectory/02-fuzzing-post-pr13.md
-#   - "Phase 3 - Mutation testing and timing harness" atomic tasks P3.T2-T4
-#   - "Mutation-testing CI shape (Phase 3)"
-# Decision lock: .planning/trajectory/decisions.yml
-#   id=mutation-testing-gate-posture (advisory for one release cycle, then
-#   blocking; flip event is the next release tagged after M02 P3 merges).
-#
-# Two jobs ship in this file:
-#
+# Two jobs:
 #   mutants-pr      - pull_request trigger; runs `cargo mutants --in-diff`
 #                     against the PR base ref, four crates in parallel,
-#                     posts a Markdown summary as a PR comment via
-#                     scripts/mutants-comment.sh, and consults
-#                     scripts/mutants-gate.sh for advisory-vs-blocking
-#                     posture (always exits 0 today; the M02 P3 release
-#                     boundary will populate releases.toml's cycle_end_tag
-#                     and flip the gate to blocking automatically).
-#                     Wall budget: <= 30 min per crate (advisory).
+#                     posts a Markdown summary via scripts/mutants-comment.sh,
+#                     and consults scripts/mutants-gate.sh for advisory-vs-blocking
+#                     posture (driven by releases.toml cycle_end_tag).
+#                     Wall budget: <= 30 min per crate.
 #
-#   mutants-nightly - schedule trigger (05:00 UTC); full-workspace sweep
-#                     across the same four crates with no --in-diff scope.
-#                     Wall budget: <= 4 h per crate per the source doc;
-#                     enforced via timeout-minutes plus cargo-mutants
-#                     --timeout. Uploads mutants.out/ as a workflow
-#                     artifact for triage; gate posture from the same
-#                     scripts/mutants-gate.sh helper.
+#   mutants-nightly - schedule trigger (05:00 UTC); full-workspace sweep with
+#                     no --in-diff scope. Wall budget: <= 4 h per crate.
+#                     Uploads mutants.out/ as a workflow artifact.
 #
-# Both jobs respect the 1,800 GHA runner-min/30d cap shared with the
-# native and ClusterFuzzLite fuzz lanes; scripts/check-fuzz-budget.sh is
-# invoked first when GH_TOKEN is available so the cap acts as a hard halt
-# rather than a soft warning. Mutation runs count against the same
-# envelope as fuzz runs since both share the GitHub-hosted runner pool.
+# Both jobs share the 1,800 GHA runner-min/30d cap with the fuzz lanes;
+# scripts/check-fuzz-budget.sh is invoked first so the cap acts as a hard halt.
 #
 # continue-on-error policy:
+#   - mutants-pr: NOT set, so the gate script's exit code propagates.
+#     scripts/mutants-gate.sh reads releases.toml: cycle_end_tag empty ->
+#     advisory (exit 0); cycle_end_tag populated -> blocking (exit 1).
+#   - mutants-nightly: continue-on-error: true. Dashboard-only; never
+#     gates a PR merge.
 #
-#   - mutants-pr lane: continue-on-error is NOT set at job level so the
-#     gate script's exit code can propagate. scripts/mutants-gate.sh
-#     reads releases.toml: cycle_end_tag empty -> exit 0 (advisory),
-#     cycle_end_tag populated -> exit 1 (blocking). Removing the
-#     job-level continue-on-error is what makes the M02 P3 release
-#     boundary actually flip the lane to blocking without a workflow
-#     edit, per atomic task P3.T4.
-#
-#   - mutants-nightly lane: continue-on-error: true stays. The nightly
-#     sweep is dashboard-only - it surfaces survivors via the uploaded
-#     artifact and (eventually) issue-on-budget-breach, but the workflow
-#     run itself never gates a PR merge.
-#
-# Override paths (M02.P3.T2):
-#
-#   1. Label-based (preferred): a PR labelled `mutants-gate-override`
-#      clears cycle_end_tag in releases.toml and re-enters advisory mode
-#      for one cycle. CODEOWNERS routes releases.toml to @bb-connor so
-#      the override cannot land without principal-engineer review.
-#
-#   2. Env-var escape hatch (single CI run): set
-#      MUTANTS_GATE_OVERRIDE_REASON=<reason> on the run; the gate
-#      script downgrades a blocking-fail to a loud advisory pass and
-#      appends a row to docs/fuzzing/mutants-overrides.log. Use only
-#      when a label-based PR is not feasible (e.g. release-train
-#      hot-fix). See docs/fuzzing/mutants.md "Override paths".
+# Override paths:
+#   1. Label-based (preferred): PR labelled `mutants-gate-override` clears
+#      cycle_end_tag in releases.toml (CODEOWNERS review required).
+#   2. Env-var escape hatch: set MUTANTS_GATE_OVERRIDE_REASON=<reason>; the
+#      gate script downgrades a blocking-fail to a loud advisory pass. See
+#      docs/fuzzing/mutants.md "Override paths".
 
 name: mutants
 
@@ -215,14 +182,9 @@ jobs:
           MUTANTS_PACKAGE: ${{ matrix.package }}
           MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
           MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
-          # M02.P3.T2 escape hatch: forward the env-var override from the
-          # repository variable MUTANTS_GATE_OVERRIDE_REASON when set.
-          # Empty by default; setting the variable downgrades a blocking
-          # fail to a loud advisory pass and appends an audit row to
-          # docs/fuzzing/mutants-overrides.log. The label-based override
-          # path (`mutants-gate-override` PR clearing cycle_end_tag with
-          # CODEOWNERS review on releases.toml) is the preferred path;
-          # this env-var is for in-flight CI runs only.
+          # Env-var override (single CI run). Setting this variable downgrades
+          # a blocking-fail to a loud advisory pass. Label-based override is
+          # preferred; this env-var is for in-flight CI runs only.
           MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
@@ -342,10 +304,9 @@ jobs:
           MUTANTS_PACKAGE: ${{ matrix.package }}
           MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
           MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
-          # M02.P3.T2 escape hatch (see header comment). Forward the
-          # `mutants-gate-override` env-var when the repository variable
-          # is set; the gate script then audits and downgrades a
-          # blocking-fail to advisory-pass for this run only.
+          # Env-var override (nightly). Forward when the repository variable
+          # is set; the gate script downgrades a blocking-fail to advisory-pass
+          # for this run only.
           MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |

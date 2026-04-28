@@ -1,30 +1,14 @@
 // Conformance subcommand handlers for the `chio` CLI.
-//
-// This file is included into `main.rs` via `include!` and reuses the
-// shared `use` declarations from `cli/types.rs`. The `Run` variant landed
-// in M01.P4.T2; the `FetchPeers` variant landed in M01.P4.T4 and downloads
-// pinned peer-language adapter binaries described by
-// `crates/chio-conformance/peers.lock.toml`.
 
 /// Dispatch entry-point for `chio conformance run`.
-///
-/// Builds default `ConformanceRunOptions`, applies the `--peer` selector,
-/// invokes the harness, then emits a summary in either human or JSON shape.
-/// The artifact files written under `tests/conformance/results/generated/`
-/// already match the on-disk format consumed by `tests/conformance/reports/`;
-/// the JSON report emitted here is the same shape as the `peer_result_files`
-/// pointers plus a small envelope describing the run.
 fn cmd_conformance_run(
     peer: &str,
     report: Option<&str>,
     scenario: Option<&str>,
     output: Option<&Path>,
 ) -> Result<(), CliError> {
-    // Cleanup C5 issue C: reject unknown `--report` values BEFORE running
-    // the conformance harness. Previously the validation lived after
-    // `run_conformance_harness`, so a `--report typo` invocation forced
-    // users to wait through the full live run before receiving the
-    // "unsupported value" error.
+    // Reject unknown `--report` values before running the harness so callers
+    // don't wait through a full live run before receiving the error.
     let json_report = parse_report_format(report)?;
 
     let mut options = chio_conformance::default_run_options();
@@ -51,10 +35,9 @@ fn cmd_conformance_run(
     }
 }
 
-/// Validate the `--report` flag value at clap-parse time (well, at the
-/// start of the dispatch handler) so that users do not have to wait
-/// through a live harness run before learning that they typed
-/// `--report invalid`. Returns whether the report should be JSON-shaped.
+/// Validate `--report` early so users do not wait through a live harness run
+/// before learning they typed an invalid value. Returns whether the report
+/// should be JSON-shaped.
 fn parse_report_format(report: Option<&str>) -> Result<bool, CliError> {
     match report {
         None => Ok(false),
@@ -202,14 +185,12 @@ fn write_human_report(
     Ok(())
 }
 
-/// HTTP timeout for peer-binary downloads. Cleanup C5 issue F: the
-/// blocking reqwest client previously had no timeout, so a stalled mirror
-/// could hang the CLI indefinitely.
+/// HTTP timeout for peer-binary downloads. Without a timeout a stalled mirror
+/// can hang the CLI indefinitely.
 const FETCH_PEERS_HTTP_TIMEOUT_SECS: u64 = 120;
 
 /// Resolve the path to `peers.lock.toml`, honouring the `--lockfile`
-/// override first and falling back to the layered runtime resolver in
-/// chio-conformance. Cleanup C5 issue B.
+/// override first and falling back to the layered runtime resolver.
 fn resolve_peers_lock_path(explicit: Option<&Path>) -> PathBuf {
     if let Some(path) = explicit {
         return path.to_path_buf();
@@ -219,13 +200,11 @@ fn resolve_peers_lock_path(explicit: Option<&Path>) -> PathBuf {
 
 /// Dispatch entry-point for `chio conformance fetch-peers`.
 ///
-/// `--check` parses and validates the lockfile only; it never touches the
-/// network. Without `--check`, each published entry is downloaded,
-/// sha256-verified, and extracted under `out/`. The `language` filter,
-/// when set, restricts the loop to entries matching that adapter
-/// (`python`, `js`, `go`, `cpp`). Entries flagged `published = false`
-/// (cleanup C5 issue D) are SKIPPED with a clear message rather than
-/// failing the run with a sha256 mismatch.
+/// `--check` validates the lockfile without touching the network. Without
+/// `--check`, each published entry is downloaded, sha256-verified, and
+/// extracted under `out/`. The `language` filter restricts the loop to
+/// entries matching that adapter. Entries flagged `published = false` are
+/// skipped with a clear message.
 fn cmd_conformance_fetch_peers(
     check: bool,
     out: &Path,
@@ -302,8 +281,8 @@ fn cmd_conformance_fetch_peers(
         ))
     })?;
 
-    // Cleanup C5 issue F: bound the HTTP client timeout so a stalled
-    // release-asset mirror cannot hang the CLI indefinitely.
+    // Bound the HTTP client timeout so a stalled release-asset mirror
+    // cannot hang the CLI indefinitely.
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(FETCH_PEERS_HTTP_TIMEOUT_SECS))
         .build()
@@ -369,10 +348,8 @@ fn download_and_verify(
         .rsplit('/')
         .next()
         .unwrap_or("peer.bin");
-    // Cleanup C5 issue F: bundles land under
-    // `<out>/<language>-<target>/` so consumers find the extracted
-    // binary at a stable path (matches the docs in
-    // `docs/conformance.md`).
+    // Bundles land under `<out>/<language>-<target>/` so consumers find
+    // the extracted binary at a stable path.
     let extract_dir = out.join(format!("{}-{}", entry.language, entry.target));
     fs::create_dir_all(&extract_dir).map_err(|error| {
         CliError::Other(format!(
@@ -392,11 +369,9 @@ fn download_and_verify(
     Ok(())
 }
 
-/// Cleanup C5 issue F: extract `.tar.gz` (or `.tgz`) bundles into the
-/// per-target directory so that the binary is usable without the user
-/// running `tar` themselves. `.zip` is recognised by extension but
-/// not yet implemented; the M01 release pipeline emits `.tar.gz` for all
-/// platforms today, so the missing branch is logged but not fatal.
+/// Extract `.tar.gz` (or `.tgz`) bundles into the per-target directory.
+/// `.zip` is recognised by extension but not yet implemented; unknown archive
+/// formats are preserved on disk with a warning rather than failing fatally.
 fn extract_archive(archive: &Path, dest: &Path, source_url: &str) -> Result<(), CliError> {
     let lower = archive
         .file_name()
@@ -423,7 +398,7 @@ fn extract_archive(archive: &Path, dest: &Path, source_url: &str) -> Result<(), 
         Ok(())
     } else if lower.ends_with(".zip") {
         Err(CliError::Other(format!(
-            "zip archives are not yet supported (got `{}` from `{source_url}`); the M01 release pipeline emits .tar.gz for every target",
+            "zip archives are not yet supported (got `{}` from `{source_url}`)",
             archive.display(),
         )))
     } else {

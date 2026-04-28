@@ -15,7 +15,7 @@ fn replays_all_bedrock_fixtures_with_canonical_byte_assertions() {
     assert_eq!(
         paths.len(),
         12,
-        "M07.P4.T5 Bedrock corpus must contain exactly 12 NDJSON fixtures"
+        "Bedrock corpus must contain exactly 12 NDJSON fixtures"
     );
 
     let mut total_invocations = 0;

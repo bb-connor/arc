@@ -6,8 +6,6 @@
 # .github/workflows/release-binaries.yml; the per-target chio binary
 # path is supplied as a positional argument so this file stays
 # matrix-agnostic.
-#
-# Refs M09.P2.T2.
 
 # CycloneDX 1.6 JSON. Syft accepts the schema version as a suffix on
 # the format identifier; without it, syft picks its current default

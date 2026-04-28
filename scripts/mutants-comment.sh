@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 # mutants-comment.sh - Post a cargo-mutants summary as a PR comment.
 #
-# Source-doc anchor:
-#   .planning/trajectory/02-fuzzing-post-pr13.md
-#   "Mutation-testing CI shape (Phase 3)" -> "Comment-bot output format"
-#
 # Invoked from .github/workflows/mutants.yml mutants-pr job. Reads
 # cargo-mutants JSON output (outcomes.json) under the supplied output
 # dir, formats a Markdown summary, and posts it via `gh pr comment`.
@@ -112,8 +108,8 @@ body="${header}
 Top 5 missed mutants:
 ${top_missed_block}
 
-Lane is **advisory** until \`releases.toml\` populates \`cycle_end_tag\`
-(see M02 P3 atomic task P3.T4). Triage policy:
+Lane is **advisory** until \`releases.toml\` populates \`cycle_end_tag\`.
+Triage policy:
 \`docs/fuzzing/mutants.md\`."
 
 gh pr comment "${PR_NUMBER}" --body "${body}"

@@ -1,16 +1,9 @@
 # schema-breaking-change.yml - Advisory PR bot for spec/schemas drift.
 #
-# Owned by SEQUENCER per OWNERS.toml; the single job is tagged with
-# `# owner: M01` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
-#
-# Phase 5 (M01.P5.T5) lands this advisory bot:
-# When a PR touches `spec/schemas/**/*.json`, run `json-schema-diff` for
-# each changed schema (PR merge-base vs. PR head) and post a sticky comment
-# to the PR summarising any breaking changes detected. The job is advisory
-# only (it does NOT block merge). Per the M01 trajectory ticket
-# `.planning/trajectory/tickets/M01/P5.yml#M01.P5.T5` soft_dep:
-#   "Advisory only until M01+1; flips to blocking once tagged BREAKING:
-#    convention is documented in CONTRIBUTING.md".
+# When a PR touches `spec/schemas/**/*.json`, runs `json-schema-diff` for
+# each changed schema (PR merge-base vs. PR head) and posts a sticky comment
+# summarising any breaking changes detected. Advisory only (does NOT block
+# merge) until the BREAKING: title convention is enforced in CONTRIBUTING.md.
 #
 # Tooling: `json-schema-diff` is the language-agnostic CLI/library
 # published on npm (https://www.npmjs.com/package/json-schema-diff). It
@@ -226,7 +219,7 @@ jobs:
                 `\`json-schema-diff\` flagged ${count} schema(s) under \`spec/schemas/\` as backwards-incompatible against \`${baseRef}\`:`,
                 '',
                 summary,
-                'This check is **advisory only** and does not block merge. Per CONTRIBUTING.md (M01+1), tag the PR title with `BREAKING:` to acknowledge an intentional wire-break; the gate flips to blocking once that convention lands.',
+                'This check is **advisory only** and does not block merge. Tag the PR title with `BREAKING:` to acknowledge an intentional wire-break; the gate flips to blocking once that convention lands in CONTRIBUTING.md.',
               );
             } else {
               lines.push(

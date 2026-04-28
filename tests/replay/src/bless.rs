@@ -1,4 +1,4 @@
-//! CHIO_BLESS gate logic for the M04 replay-gate `--bless` flow.
+//! CHIO_BLESS gate logic for the replay-gate `--bless` flow.
 //!
 //! `--bless` is the only sanctioned way to overwrite a blessed golden
 //! under `tests/replay/goldens/**`. The flow is fail-closed: every one
@@ -8,9 +8,7 @@
 //! branch protection on the PR side and is therefore not part of the
 //! in-process gate.
 //!
-//! The seven programmatic clauses (see
-//! `.planning/trajectory/04-deterministic-replay.md`, "CHIO_BLESS gate
-//! logic" section):
+//! The seven programmatic clauses:
 //!
 //! 1. `CHIO_BLESS=1` is set in the environment.
 //! 2. `BLESS_REASON` is set and non-empty (recorded in the audit
@@ -33,11 +31,6 @@
 //! clause is unit-testable in isolation. Production code wires the
 //! real providers in [`evaluate_gate_real`]; tests construct the
 //! [`StubEnv`] / [`StubGit`] / [`StubFs`] doubles below.
-//!
-//! T1 (this commit) lands the gate-evaluation function plus per-clause
-//! tests. The CLI `--bless` flag is wired up in a later ticket
-//! (M04.P2.T4 wrapper script and the binary handler that consumes
-//! this module).
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -743,12 +736,10 @@ mod tests {
             Err(e) => panic!("expected Ok, got {e:?}"),
         };
         assert_eq!(ctx.branch, "wave/W2/m04/p2.t1-bless-gate-logic");
-        // SHA column is intentionally the pending-bless placeholder;
-        // the actual commit SHA is filled in by the post-bless sealing
-        // step (see `scripts/seal-bless-audit.sh` and
-        // `PENDING_SHA_MARKER`). The stub git provider's
-        // `head_sha` is still consulted (so a broken repo surfaces
-        // here), but its value is not propagated into the audit
+        // SHA column is the pending-bless placeholder; the actual commit SHA
+        // is filled in by `scripts/seal-bless-audit.sh`. The stub git
+        // provider's `head_sha` is still consulted (so a broken repo
+        // surfaces here), but its value is not propagated into the audit
         // context.
         assert_eq!(ctx.sha, PENDING_SHA_MARKER);
         assert_eq!(ctx.user_name, "Jane Tester");
@@ -1059,8 +1050,7 @@ mod tests {
         let fs = StubFs::new();
         let ctx = BlessContext {
             branch: "wave/W2/m04/p2.t1-bless-gate-logic".to_string(),
-            // Real bless flow stores the placeholder; this test pins
-            // the literal SHA to keep field-parsing assertions tight.
+            // This test pins a literal SHA to keep field-parsing assertions tight.
             sha: "deadbeefcafebabe1234567890abcdef12345678".to_string(),
             user_name: "Jane Tester".to_string(),
             user_email: "jane@example.com".to_string(),

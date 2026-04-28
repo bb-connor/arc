@@ -1,9 +1,8 @@
 /*
  * docs/demo banner-snapshot Playwright test.
  *
- * Per .planning/trajectory/08-browser-edge-sdk.md "Demo path lock", the
- * engineering-output banner MUST be present and visible without scrolling on
- * a 1080p viewport. This test serves the built `dist/` directory via
+ * The engineering-output banner MUST be present and visible without scrolling
+ * on a 1080p viewport. This test serves the built `dist/` directory via
  * Playwright's webServer, asserts the banner DOM contract, and verifies that
  * the banner is positioned within the first 1080 viewport pixels.
  *

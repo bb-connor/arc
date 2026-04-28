@@ -41,9 +41,7 @@
 //! schema-derived Rust types under `crates/chio-core-types/src/_generated/`
 //! by invoking `chio_spec_codegen::codegen_rust`. With `--check` it renders
 //! the codegen to memory and exits non-zero if the bytes disagree with the
-//! on-disk file (used by the M01.P3.T5 spec-drift CI lane). Subsequent
-//! tickets (M01.P3.T2-T4) extend the dispatcher with `--lang python`,
-//! `--lang ts`, and `--lang go`.
+//! on-disk file (used by the spec-drift CI lane).
 //!
 //! `codegen --lang go` is a thinner shim than the Rust target because Go
 //! follows a checked-in regen pattern (Wave 1 decision, see
@@ -52,7 +50,7 @@
 //! schemas into a single OpenAPI 3.0 document and feeds them to
 //! `oapi-codegen v2.4.1`, writing to `sdks/go/chio-go-http/types.go`. With
 //! `--check` the xtask additionally runs `git diff --exit-code` against the
-//! generated file so the M01.P3.T5 CI lane catches drift between the
+//! generated file so the spec-drift CI lane catches drift between the
 //! committed bytes and a fresh regeneration.
 //!
 //! `codegen --lang ts [--check]` regenerates the schema-derived TypeScript
@@ -1046,7 +1044,7 @@ fn ts_header(schema_sha: &str) -> String {
     header.push_str("//\n");
     header.push_str("// The schema-sha above is sha256 of `<rel-path>\\0<bytes>\\0` for every\n");
     header.push_str("// schema in lex order. It changes whenever any schema under\n");
-    header.push_str("// spec/schemas/chio-wire/v1/ changes. The M01.P3.T5 spec-drift CI lane\n");
+    header.push_str("// spec/schemas/chio-wire/v1/ changes. The spec-drift CI lane\n");
     header.push_str("// asserts byte-equality of this entire file via `--check` mode.\n");
     header.push('\n');
     header.push_str("/* eslint-disable */\n");
@@ -1392,7 +1390,7 @@ fn build_python_file_header(schema_digest: &str) -> String {
          # Schema sha256: {schema_digest}\n\
          #\n\
          # Manual edits will be overwritten by the next regeneration; the\n\
-         # M01.P3.T5 spec-drift CI lane enforces this header on every file\n\
+         # spec-drift CI lane enforces this header on every file\n\
          # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.\n"
     )
 }
@@ -1438,7 +1436,7 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
          Re-exports every subpackage so callers can write\n\
          ``from chio_sdk._generated import CapabilityToken`` without knowing the\n\
          per-subpackage layout. The SCHEMA_SHA256 constant pins the schema set\n\
-         this build was generated from; the M01.P3.T5 spec-drift CI lane reads\n\
+         this build was generated from; the spec-drift CI lane reads\n\
          it to detect tampering.\n\
          \"\"\"\n\
          \n\
@@ -1527,7 +1525,7 @@ fn rewrite_python_subpackage_inits(
 
         // Rewrite the subpackage __init__.py with explicit imports per
         // module and a deterministic __all__. The header is preserved so
-        // the M01.P3.T5 spec-drift CI lane's per-file header check still
+        // the spec-drift CI lane's per-file header check still
         // passes.
         let init_path = subdir.join(PYTHON_INIT_FILE);
         let mut body = header.clone();

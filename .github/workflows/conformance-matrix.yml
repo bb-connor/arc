@@ -1,30 +1,14 @@
 # conformance-matrix.yml - Nightly conformance and vector-freshness gates.
 #
-# Owned by SEQUENCER per OWNERS.toml; individual jobs are tagged with
-# `# owner: M01` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
-#
-# Phase 5 (M01.P5.T4) lands two nightly jobs here:
+# Two nightly jobs:
 #   - vectors-byte-stable: re-runs `cargo xtask freeze-vectors --check`
-#     nightly (the same drift gate spec-drift.yml enforces per-PR; the
-#     nightly cadence catches any vector regenerated outside a PR or any
-#     drift introduced by a tooling update that lands without re-blessing
-#     the manifest).
+#     to catch vector drift introduced outside a PR.
 #   - external-consumer-smoke: simulates the published-crate consumer flow
-#     on a fresh runner, per .planning/trajectory/01-spec-codegen-conformance.md
-#     Phase 4 exit-test ("Smoke job in `.github/workflows/conformance-matrix.yml`
-#     named `external-consumer-smoke` runs this on a fresh runner.")
-#     The flow is `cargo install` of `chio-conformance` (path install today
-#     because the crate is not yet on crates.io; the comment below tracks
-#     the swap to `cargo install chio-conformance` once `cargo publish`
-#     fires), `chio conformance fetch-peers --check`, and a JSON-report
-#     scenario run against the python peer.
+#     on a fresh runner (`cargo install chio-conformance`, fetch-peers --check,
+#     JSON-report scenario run against the python peer).
 #
-# Alarm policy (per Phase 5 "Observability / staleness alarm" paragraph):
-# 1 failed nightly opens an issue on the repo; 3 consecutive failures page
-# the protocol owner. The `notify-on-failure` job below opens a GitHub
-# issue tagged `alarm:conformance-matrix` on any job failure; the human
-# protocol owner watches the issue label for repeated firings until the
-# dedicated paging integration lands.
+# Alarm policy: 1 failed nightly opens an issue tagged `alarm:conformance-matrix`;
+# 3 consecutive failures page the protocol owner.
 
 name: conformance-matrix
 
@@ -98,12 +82,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Install chio-conformance (path install)
-        # NOTE(M01.P5.T4): once `cargo publish` lands chio-conformance on
-        # crates.io, swap this for the canonical published-crate flow:
+        # Once chio-conformance is on crates.io, swap for:
         #   cargo install chio-conformance --version <pin>
-        # The path install is what `docs/conformance.md` calls out as the
-        # in-repo fallback; we exercise it nightly to keep the published
-        # flow's CI shape ready for the publish-day swap.
         run: cargo install --path crates/chio-conformance --locked
 
       - name: Install chio CLI (provides `chio conformance` subcommands)
@@ -150,12 +130,9 @@ jobs:
               `Run: ${runUrl}`,
               `Triggered: ${context.payload.schedule || 'schedule'}`,
               ``,
-              `Per .planning/trajectory/01-spec-codegen-conformance.md Phase 5`,
-              `"Observability / staleness alarm" the alarm policy is:`,
-              `1 failed nightly opens this issue; 3 consecutive failures`,
-              `page the protocol owner. Check whether prior alarm issues`,
-              `under label \`alarm:conformance-matrix\` are still open to`,
-              `assess paging threshold.`,
+              `Alarm policy: 1 failed nightly opens this issue; 3 consecutive failures`,
+              `page the protocol owner. Check prior alarm issues under`,
+              `label \`alarm:conformance-matrix\` to assess paging threshold.`,
             ].join('\n');
             await github.rest.issues.create({
               owner: context.repo.owner,

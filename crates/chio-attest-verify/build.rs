@@ -1,15 +1,6 @@
-// owned-by: M09
-//
 // Build-time check that the embedded Sigstore TUF root materials exist on
-// disk under `sigstore-root/`. We do NOT fetch over the network at build
-// time: the canonical reproducibility story is to ship the trust root in
-// tree and refresh it via the quarterly CODEOWNERS-reviewed re-bake job
-// described in `.planning/trajectory/09-supply-chain-attestation.md`.
-//
-// The runtime constructor `SigstoreVerifier::with_embedded_root` consumes
-// these files via `include_bytes!`. If either file is missing at compile
-// time the build fails before any runtime path can dereference the
-// embedded blobs.
+// disk under `sigstore-root/`. The trust root is shipped in-tree and refreshed
+// via a quarterly CODEOWNERS-reviewed re-bake job; no network access at build time.
 
 use std::path::Path;
 

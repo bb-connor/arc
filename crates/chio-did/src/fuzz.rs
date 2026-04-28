@@ -1,12 +1,9 @@
-// owned-by: M02 (fuzz lane); module authored under M02.P1.T1.c.
-//
 //! libFuzzer entry-point module for `chio-did`.
 //!
-//! Authored under M02.P1.T1.c (`.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 1). This module is gated behind the `fuzz` Cargo feature so it only
-//! compiles into the standalone `chio-fuzz` workspace at `../../fuzz`. The
-//! production build of `chio-did` never pulls in `arbitrary`, never exposes
-//! these symbols, and never gets recompiled with libFuzzer instrumentation.
+//! Gated behind the `fuzz` Cargo feature so it only compiles into the
+//! standalone `chio-fuzz` workspace at `../../fuzz`. The production build of
+//! `chio-did` never pulls in `arbitrary`, never exposes these symbols, and
+//! never gets recompiled with libFuzzer instrumentation.
 //!
 //! The single entry point [`fuzz_did_resolve`] consumes arbitrary bytes and
 //! drives them through the four trust-boundary surfaces in `chio-did`:

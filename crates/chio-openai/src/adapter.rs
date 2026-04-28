@@ -1,9 +1,8 @@
 //! ProviderAdapter implementation for OpenAI Responses API batch payloads.
 //!
-//! This module is compiled only with the `provider-adapter` feature. It lifts
-//! non-streaming `responses.create` function-call items into the shared Chio
-//! [`chio_tool_call_fabric::ToolInvocation`] shape. Streaming and verdict
-//! lowering land in later M07.P2 tickets.
+//! Compiled only with the `provider-adapter` feature. Lifts non-streaming
+//! `responses.create` function-call items into the shared Chio
+//! [`chio_tool_call_fabric::ToolInvocation`] shape.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -40,7 +39,7 @@ pub struct OpenAiAdapterConfig {
 }
 
 impl OpenAiAdapterConfig {
-    /// Construct a config pinned to the M07 OpenAI Responses API snapshot.
+    /// Construct a config pinned to the current OpenAI Responses API snapshot.
     pub fn new(org_id: impl Into<String>) -> Self {
         Self {
             org_id: org_id.into(),

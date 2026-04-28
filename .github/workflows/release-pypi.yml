@@ -155,13 +155,10 @@ jobs:
 
   build:
     name: Build ${{ matrix.package }}
-    # owner: M09
     needs: plan
     runs-on: ubuntu-latest
     permissions:
       # Required for cosign keyless signing via Sigstore Fulcio.
-      # See M09.P3.T1 chio-attest-verify (crates/chio-attest-verify/README.md)
-      # for the verification trait surface and OIDC identity contract.
       id-token: write
       contents: read
     strategy:
@@ -289,16 +286,10 @@ jobs:
           cosign-release: "v2.4.1"
 
       - name: Sign sdist and wheel with cosign keyless
-        # owner: M09
         # Produces a detached `.sig` and Fulcio leaf cert `.pem` for
-        # every sdist + wheel in dist-out. The signatures and certs are
-        # uploaded as workflow artifacts and attached to the GitHub
-        # Release in the release-attest job below.
-        #
-        # Verification recipe lives in docs/install/VERIFY.md and uses
-        # the same OIDC identity regex contract that chio-attest-verify
-        # (crates/chio-attest-verify/README.md, M09.P3.T1) enforces from
-        # Rust callers via SigstoreVerifier.
+        # every sdist + wheel. Signatures and certs are uploaded and
+        # attached to the GitHub Release in the release-attest job.
+        # Verification recipe: docs/install/VERIFY.md.
         shell: bash
         env:
           COSIGN_YES: "true"
@@ -415,20 +406,10 @@ jobs:
 
   release-attest:
     name: Attach cosign signatures to GitHub Release
-    # owner: M09
-    # Attaches `.sig` (cosign signature) + `.pem` (Fulcio leaf cert) for
-    # every sdist + wheel to the GitHub Release that the `py/...` tag
-    # produces. Verification recipe lives in docs/install/VERIFY.md and
-    # cross-references the chio-attest-verify trait surface
-    # (crates/chio-attest-verify/README.md, M09.P3.T1).
-    #
-    # Gates on `publish` rather than just `[plan, build]` so the
-    # signed artifacts only attach to the GitHub Release after the
-    # `pypi`-environment-protected publish job has actually succeeded.
-    # The previous `needs: [plan, build]` shape would attach signed
-    # tarballs even when the environment approval was pending or
-    # `twine` failed mid-upload, advertising a release that never
-    # reached PyPI (cleanup-c11b; PR #75 review thread r3143041632).
+    # Attaches `.sig` + `.pem` for every sdist + wheel to the GitHub Release.
+    # Verification recipe: docs/install/VERIFY.md.
+    # Gates on `publish` so signed artifacts only attach after the
+    # PyPI-environment-protected publish job has actually succeeded.
     needs: [plan, build, publish]
     # Skip on workflow_dispatch dry runs; only attach on real tag pushes.
     if: needs.plan.outputs.dry_run != 'true' && github.event_name == 'push'

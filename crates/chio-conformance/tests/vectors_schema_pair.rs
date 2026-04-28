@@ -1,4 +1,4 @@
-//! Vector domain to schema coverage test (M01.P2.T8).
+//! Vector domain to schema coverage test.
 //!
 //! Asserts that every vector domain shipped under `tests/bindings/vectors/<domain>/v1.json`
 //! is represented in a hardcoded mapping table that pairs the domain with either

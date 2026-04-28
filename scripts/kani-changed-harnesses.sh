@@ -7,8 +7,8 @@
 # harness name per line, suitable for piping to
 # `xargs -n1 cargo kani -p chio-kernel-core --lib --harness ...`.
 #
-# Tracking ticket: M03.P2.T7. The full PR sweep that T6 introduced is
-# preserved on `main` and nightly; this script is the PR-only narrowing.
+# The full PR sweep is preserved on `main` and nightly; this script is
+# the PR-only narrowing.
 #
 # Fallback contract (load-bearing): if the diff base cannot be resolved
 # (shallow CI clone, detached HEAD, missing remote, ...) or if any file

@@ -1,23 +1,6 @@
-// owned-by: M09
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-//
-//! Integration coverage for [`SigstoreVerifier`].
-//!
-//! These tests exercise the real `sigstore-rs`-backed verifier (no mocks)
-//! against the embedded production TUF trust root. The positive
-//! end-to-end keyless flow requires a Fulcio-issued certificate from a
-//! real OIDC workflow run, which is not hermetically reproducible inside
-//! `cargo test`; the M09 release-binaries CI workflow exercises that
-//! path online via `cosign verify-blob`.
-//!
-//! What is hermetically testable, and what these tests cover, is the
-//! fail-closed contract of every trait method: every `verify_*` call
-//! must surface an [`AttestError`] for malformed inputs, signature
-//! mismatches, missing files, and bundles that fail Fulcio chain
-//! validation. A trust-boundary crate that returned `Ok(_)` on any of
-//! these paths would be a vulnerability the moment a feature flag flipped
-//! or a build option drifted (see EXECUTION-BOARD.md "No verifier or
-//! trust-boundary stubs").
+//! Integration coverage for [`SigstoreVerifier`]: fail-closed contract tests
+//! for malformed inputs, signature mismatches, and chain-validation failures.
 
 use std::io::Write;
 

@@ -30,8 +30,6 @@
 # Idempotency: re-running with no placeholders left exits with code 0
 # and prints "no placeholders to seal".
 #
-# Spec: .planning/trajectory/04-deterministic-replay.md (Phase 2 task 4),
-# audit-log clause 7 + "<sha> discipline" header note.
 
 set -euo pipefail
 

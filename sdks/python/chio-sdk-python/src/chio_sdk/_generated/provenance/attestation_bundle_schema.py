@@ -2,10 +2,10 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5
+# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
 #
 # Manual edits will be overwritten by the next regeneration; the
-# M01.P3.T5 spec-drift CI lane enforces this header on every file
+# spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
 
@@ -127,7 +127,7 @@ class Statement(BaseModel):
 
 class ChioProvenanceAttestationBundle(BaseModel):
     """
-    One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. The bundle names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class that Chio resolved across the bundle as a whole, the unix-second `assembledAt` timestamp at which the bundle was assembled, and the ordered list of normalized runtime attestation evidence statements inside `statements`. Each statement mirrors the `RuntimeAttestationEvidence` shape in `crates/chio-core-types/src/capability.rs` (lines 484-507) and is identical in structure to `chio-wire/v1/trust-control/attestation.schema.json`; this schema references that family by inlining the same required field set rather than by `$ref` until the codegen pipeline lands in M01 phase 3. NOTE: there is no live `AttestationBundle` Rust struct on this branch; the bundle is drafted from `.planning/trajectory/01-spec-codegen-conformance.md` (Cross-doc references) plus the M09 supply-chain attestation milestone, which consumes this shape in its phase 3 attestation-verify path. The dedicated Rust struct is expected to land alongside M09 P3 and the schema will be re-pinned to that serde shape at that time. Field names are camelCase to match the convention used by the `GovernedCallChainContext` shape that this bundle binds to (`crates/chio-core-types/src/capability.rs` lines 952-967, `serde(rename_all = camelCase)`).
+    One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. Names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class Chio resolved across the bundle, the unix-second `assembledAt` timestamp, and the ordered list of normalized statements. Each statement mirrors the `RuntimeAttestationEvidence` shape and is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json`; the family is inlined rather than `$ref`'d. Field names are camelCase to match `GovernedCallChainContext`.
     """
 
     model_config = ConfigDict(

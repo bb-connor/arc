@@ -1,22 +1,13 @@
 # fuzz/target-map.toml - ClusterFuzzLite changed-target sampling map.
 #
-# Owned by M02. Maps every in-tree libFuzzer binary under fuzz/fuzz_targets/
-# to the source-path globs that, when changed, must trigger that target on
-# the PR. Consumed by .github/workflows/cflite_pr.yml (PR-time changed-target
+# Maps every in-tree libFuzzer binary under fuzz/fuzz_targets/ to the
+# source-path globs that, when changed, must trigger that target on the PR.
+# Consumed by .github/workflows/cflite_pr.yml (PR-time changed-target
 # sampling) and .github/workflows/cflite_batch.yml (nightly rotation).
-#
-# Inventory (sixteen targets total): three from the PR-#13 baseline that
-# survived target-rename reconciliation (canonical_json, capability_receipt,
-# manifest_roundtrip), one from M09 supply-chain (attest_verify), and twelve
-# from the M02 P1 expansion (jwt_vc_verify, oid4vp_presentation, did_resolve,
-# anchor_bundle_verify, mcp_envelope_decode, a2a_envelope_decode,
-# acp_envelope_decode, wasm_preinstantiate_validate, wit_host_call_boundary,
-# chio_yaml_parse, openapi_ingest, receipt_log_replay).
 #
 # This list MUST stay in lockstep with .clusterfuzzlite/build.sh and
 # infra/oss-fuzz/build.sh; any new fuzz target lands in all three files in
-# the same change set. Drift is a process bug and blocks the M02 P4 close
-# ledger.
+# the same change set.
 #
 # Schema:
 #   [targets.<name>]
@@ -26,8 +17,6 @@
 #              run on the PR (used by cflite_pr.yml glob expansion)
 #   seeds    = directory of seed corpora under fuzz/corpus
 #   notes    = optional human-readable rationale
-
-# --- PR-#13 baseline (three surviving targets after rename) -----------------
 
 [targets.canonical_json]
 crate    = "chio-canonical-json"
@@ -66,8 +55,6 @@ triggers = [
 seeds    = "fuzz/corpus/manifest_roundtrip"
 notes    = "Tool-manifest decode plus canonicalization; downstream of M01 manifest vectors."
 
-# --- M09 supply-chain ------------------------------------------------------
-
 [targets.attest_verify]
 crate    = "chio-attest-verify"
 path     = "fuzz/fuzz_targets/attest_verify.rs"
@@ -76,9 +63,7 @@ triggers = [
     "spec/schemas/attestation/**",
 ]
 seeds    = "fuzz/corpus/attest_verify"
-notes    = "M09.P3.T5; sigstore bundle parser + cert chain verify; trust-boundary."
-
-# --- M02 P1 expansion (twelve targets) -------------------------------------
+notes    = "Sigstore bundle parser + cert chain verify; trust-boundary."
 
 [targets.jwt_vc_verify]
 crate    = "chio-credentials"
@@ -89,7 +74,7 @@ triggers = [
     "tests/bindings/vectors/credentials/**",
 ]
 seeds    = "fuzz/corpus/jwt_vc_verify"
-notes    = "M02.P1.T1.a; JWT VC verifier; trust-boundary; constant-time compare assertions live here."
+notes    = "JWT VC verifier; trust-boundary; constant-time compare assertions live here."
 
 [targets.oid4vp_presentation]
 crate    = "chio-credentials"
@@ -99,7 +84,7 @@ triggers = [
     "spec/schemas/oid4vp/**",
 ]
 seeds    = "fuzz/corpus/oid4vp_presentation"
-notes    = "M02.P1.T1.b; OID4VP holder response decode."
+notes    = "OID4VP holder response decode."
 
 [targets.did_resolve]
 crate    = "chio-did"
@@ -109,7 +94,7 @@ triggers = [
     "spec/schemas/did/**",
 ]
 seeds    = "fuzz/corpus/did_resolve"
-notes    = "M02.P1.T1.c; chio-did parser plus resolver."
+notes    = "chio-did parser plus resolver."
 
 [targets.anchor_bundle_verify]
 crate    = "chio-anchor"
@@ -119,7 +104,7 @@ triggers = [
     "spec/schemas/anchor/**",
 ]
 seeds    = "fuzz/corpus/anchor_bundle_verify"
-notes    = "M02.P1.T2; anchor proof bundle plus checkpoint records; trust-boundary."
+notes    = "Anchor proof bundle plus checkpoint records; trust-boundary."
 
 [targets.mcp_envelope_decode]
 crate    = "chio-mcp-edge"
@@ -130,7 +115,7 @@ triggers = [
     "spec/schemas/mcp/**",
 ]
 seeds    = "fuzz/corpus/mcp_envelope_decode"
-notes    = "M02.P1.T3.a; MCP NDJSON decode plus edge dispatch; pipes into evaluator post-decode."
+notes    = "MCP NDJSON decode plus edge dispatch; pipes into evaluator post-decode."
 
 [targets.a2a_envelope_decode]
 crate    = "chio-a2a-adapter"
@@ -140,7 +125,7 @@ triggers = [
     "spec/schemas/a2a/**",
 ]
 seeds    = "fuzz/corpus/a2a_envelope_decode"
-notes    = "M02.P1.T3.b; A2A SSE parse plus per-event fan-out."
+notes    = "A2A SSE parse plus per-event fan-out."
 
 [targets.acp_envelope_decode]
 crate    = "chio-acp-edge"
@@ -150,7 +135,7 @@ triggers = [
     "spec/schemas/acp/**",
 ]
 seeds    = "fuzz/corpus/acp_envelope_decode"
-notes    = "M02.P1.T3.c; ACP NDJSON plus handle_jsonrpc dispatch."
+notes    = "ACP NDJSON plus handle_jsonrpc dispatch."
 
 [targets.wasm_preinstantiate_validate]
 crate    = "chio-wasm-guards"
@@ -160,7 +145,7 @@ triggers = [
     "spec/schemas/wasm-guard/**",
 ]
 seeds    = "fuzz/corpus/wasm_preinstantiate_validate"
-notes    = "M02.P1.T4.a; ComponentBackend, WasmtimeBackend, format detect; trust-boundary."
+notes    = "ComponentBackend, WasmtimeBackend, format detect; trust-boundary."
 
 [targets.wit_host_call_boundary]
 crate    = "chio-wasm-guards"
@@ -170,7 +155,7 @@ triggers = [
     "spec/schemas/wasm-guard/**",
 ]
 seeds    = "fuzz/corpus/wit_host_call_boundary"
-notes    = "M02.P1.T4.b; GuardRequest/Verdict serde deserialization; trust-boundary."
+notes    = "GuardRequest/GuestDenyResponse serde deserialization; trust-boundary."
 
 [targets.chio_yaml_parse]
 crate    = "chio-config"
@@ -180,7 +165,7 @@ triggers = [
     "spec/schemas/config/**",
 ]
 seeds    = "fuzz/corpus/chio_yaml_parse"
-notes    = "M02.P1.T5.a; chio-config YAML loader."
+notes    = "chio-config YAML loader."
 
 [targets.openapi_ingest]
 crate    = "chio-openapi-mcp-bridge"
@@ -190,7 +175,7 @@ triggers = [
     "spec/schemas/openapi/**",
 ]
 seeds    = "fuzz/corpus/openapi_ingest"
-notes    = "M02.P1.T5.b; OpenApiMcpBridge::from_spec ingest path."
+notes    = "OpenApiMcpBridge::from_spec ingest path."
 
 [targets.receipt_log_replay]
 crate    = "chio-kernel-core"
@@ -200,4 +185,4 @@ triggers = [
     "spec/schemas/receipt/**",
 ]
 seeds    = "fuzz/corpus/receipt_log_replay"
-notes    = "M02.P1.T8; receipt log replay decode plus state-machine."
+notes    = "Receipt log replay decode plus chain-invariant state-machine."

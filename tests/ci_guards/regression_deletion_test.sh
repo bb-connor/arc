@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/ci_guards/regression_deletion_test.sh
 #
-# Self-test for scripts/check-regression-tests.sh (M02.P4.T3).
+# Self-test for scripts/check-regression-tests.sh.
 #
 # Builds an isolated temp git repo, then drives the guard script through
 # four scenarios:

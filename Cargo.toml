@@ -142,16 +142,13 @@ rust_public_entrypoints = [
 ]
 
 [workspace.metadata.cargo-vet]
-# M09 supply-chain audit metadata; later tickets layer on upstream
-# imports (T2), per-crate certifications (T3), and CI lanes (T8/T9).
 
 [workspace.metadata.cargo-auditable]
-# M09.P2.T1: release-binaries.yml wraps every release build with
-# `cargo auditable build`, embedding the workspace dependency graph
-# (per RFC at github.com/rust-secure-code/cargo-auditable) into each
-# published binary. Downstream consumers can extract the manifest with
-# `cargo audit -f <binary>` to scan for known vulnerabilities without
-# needing the source tree, providing an attestation surface for M09.
+# release-binaries.yml wraps every release build with `cargo auditable build`,
+# embedding the workspace dependency graph (per RFC at
+# github.com/rust-secure-code/cargo-auditable) into each published binary.
+# Downstream consumers can extract the manifest with `cargo audit -f <binary>`
+# to scan for known vulnerabilities without needing the source tree.
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
@@ -183,9 +180,8 @@ criterion = "0.5"
 tempfile = "3"
 testcontainers = { version = "0.27.3", default-features = false }
 jsonschema = { version = "0.46", default-features = false, features = ["resolve-file"] }
-# M05 async-kernel pivot (Phase 0): pin concurrency primitives + tower feature
-# set in the workspace so member crates can share resolved versions during the
-# upcoming async-kernel work. See .planning/trajectory/05-async-kernel-real.md.
+# Pin concurrency primitives + tower feature set in the workspace so member
+# crates can share resolved versions.
 dashmap = "6"
 arc-swap = "1"
 loom = "0.7"

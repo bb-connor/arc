@@ -15,8 +15,7 @@ name = "chio_config"
 default = []
 # Enables `chio_config::fuzz`, the libFuzzer entry-point module.
 # Off by default; turned on only by the `chio-fuzz` standalone workspace
-# at `../../fuzz`. Authored under M02.P1.T5.a; reference:
-# `.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1.
+# at `../../fuzz`.
 fuzz = ["dep:arbitrary"]
 
 [dependencies]

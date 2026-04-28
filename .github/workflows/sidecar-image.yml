@@ -105,20 +105,12 @@ jobs:
         run: |
           echo "Pushed image digest: ${{ steps.build.outputs.digest }}"
 
-      # owner: M09
-      # M09.P3.T2 - Sigstore keyless cosign signing of the multi-arch
-      # image manifest by digest. Signing the digest covers every tag
-      # (semver, sha, latest) emitted by docker/metadata-action above
-      # because all of them point at the same content-addressed manifest.
-      # The OIDC token minted by `id-token: write` (declared at the job
-      # level) is what `cosign sign --yes` exchanges with Fulcio for a
-      # short-lived signing certificate; no long-lived signing key is
-      # held in repo secrets.
-      #
-      # Verification recipe and cert-identity regex shape are documented
-      # in `docs/install/PUBLISHING.md` (section "Sidecar image signing").
-      # The trait surface that consumers verify against is in
-      # `crates/chio-attest-verify/README.md` (M09.P3.T1).
+      # Sigstore keyless cosign signing of the multi-arch image manifest by
+      # digest. Signing the digest covers every tag (semver, sha, latest)
+      # because all point at the same content-addressed manifest. The OIDC
+      # token from `id-token: write` is exchanged with Fulcio; no long-lived
+      # signing key is held in secrets. Verification recipe:
+      # docs/install/PUBLISHING.md, section "Sidecar image signing".
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.7.0
         with:

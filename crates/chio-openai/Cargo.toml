@@ -34,17 +34,9 @@ criterion = { workspace = true }
 # Default features keep the existing public surface compiling unchanged.
 default = []
 
-# `provider-adapter` opts the crate into the M07 ProviderAdapter surface
-# (lift/lower into the chio-tool-call-fabric ToolInvocation shape). The
-# implementation lands incrementally:
-#   - M07.P2.T1 (this ticket) wires the feature flag and the optional
-#     chio-tool-call-fabric dependency. No public adapter API yet.
-#   - M07.P2.T2 lands `ProviderAdapter::lift` for batch `responses.create`.
-#   - M07.P2.T3 lands `ProviderAdapter::lower` including the deny-synthetic
-#     `tool_outputs` path.
-#   - M07.P2.T4 (split T4.a + T4.b) lands SSE streaming with the fabric
-#     `StreamPhase` state machine and verdict-at-tool-use-block enforcement.
-# Pinned to OpenAI Responses API snapshot 2026-04-25 (see package.metadata).
+# `provider-adapter` opts into the ProviderAdapter surface (lift/lower into
+# the chio-tool-call-fabric ToolInvocation shape). Pinned to OpenAI Responses
+# API snapshot 2026-04-25 (see package.metadata).
 provider-adapter = ["dep:chio-tool-call-fabric"]
 
 [[bench]]

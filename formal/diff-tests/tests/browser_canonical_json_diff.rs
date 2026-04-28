@@ -1,6 +1,6 @@
-//! Browser wasm canonical-JSON differential test (M08.P2.T7).
+//! Browser wasm canonical-JSON differential test.
 //!
-//! The native half validates the frozen M01 canonical vector corpus against the
+//! The native half validates the frozen canonical vector corpus against the
 //! Rust oracle. The second native test launches this file under
 //! `wasm-bindgen-test` in a headless browser, where the same production
 //! canonicalizer runs as wasm and must emit byte-identical UTF-8 for every

@@ -31,10 +31,8 @@ web3 = [
 # Enables `chio_anchor::fuzz`, the libFuzzer entry-point module driving
 # `verify_proof_bundle` and `verify_checkpoint_publication_records`. Off by
 # default; turned on only by the `chio-fuzz` standalone workspace at
-# `../../fuzz` (see `fuzz/fuzz_targets/anchor_bundle_verify.rs`, M02.P1.T2).
-# Production builds of `chio-anchor` never pull in `arbitrary` and never
-# expose `fuzz` symbols. The `fuzz` feature implies `web3` because the
-# verifier surface lives behind that gate.
+# `../../fuzz`. The `fuzz` feature implies `web3` because the verifier
+# surface lives behind that gate.
 fuzz = ["web3", "dep:arbitrary"]
 
 [dependencies]
@@ -51,9 +49,7 @@ reqwest = { workspace = true, features = ["form", "json", "query", "rustls"], op
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
-# Pulled in by `fuzz/fuzz_targets/anchor_bundle_verify.rs` (M02.P1.T2) via
-# `chio-anchor = { features = ["fuzz"] }`. Production builds never see it
-# because the `fuzz` feature is off by default.
+# Gated behind the `fuzz` feature; production builds never see it.
 arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]

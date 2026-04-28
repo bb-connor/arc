@@ -1,8 +1,6 @@
 //! Property-based invariants for the Chio tool-call fabric.
 //!
-//! Source-doc anchor:
-//! `.planning/trajectory/07-provider-native-adapters.md`, Phase 1 task 5.
-//! The doc requires eight named properties over arbitrary fabric values:
+//! Eight named properties over arbitrary fabric values:
 //!
 //!   (a) `ToolInvocation` round-trips canonical JSON.
 //!   (b) `ProvenanceStamp` round-trips.
@@ -12,10 +10,9 @@
 //!   (f) `ProviderError` Display is em-dash-free.
 //!   (g) `ProvenanceStamp.received_at` round-trips through canonical JSON
 //!       without precision loss above ms granularity.
-//!   (h) Schema subsumption against the M01 capability schema (gated on the
-//!       `m01-schema-subsumption` feature; runs as a structural self-check
-//!       when the schema is not present so the property still exercises the
-//!       canonical-JSON pipeline).
+//!   (h) Schema subsumption (gated on the `m01-schema-subsumption` feature;
+//!       runs as a structural self-check over the canonical-JSON pipeline
+//!       when the schema is not present).
 //!
 //! Per-property budget: 64 cases (matches the doc's "8 proptest invariants"
 //! sizing and keeps the suite under ~1s on CI). Failed shrinks persist under
@@ -41,9 +38,8 @@ use proptest::collection::vec as prop_vec;
 use proptest::prelude::*;
 use proptest::test_runner::Config as ProptestConfig;
 
-/// Per-property budget. The doc calls for "8 proptest invariants"; each runs
-/// 64 cases so the full suite stays well under the 30s CI budget shared with
-/// the kernel replay-invariance suite.
+/// Per-property budget. 64 cases per property keeps the full suite well under
+/// the 30s CI budget shared with the kernel replay-invariance suite.
 const PROPTEST_BUDGET_CASES: u32 = 64;
 
 // -- arbitrary generators -------------------------------------------------

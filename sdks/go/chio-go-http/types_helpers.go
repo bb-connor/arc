@@ -2,27 +2,9 @@ package chio
 
 // Hand-written companion to types.go.
 //
-// types.go is regenerated from spec/schemas/chio-wire/v1/**/*.schema.json
-// by sdks/go/chio-go-http/scripts/regen-types.sh (M01.P3.T4). The
-// chio-wire/v1 schema set describes the wire-level message families
-// (agent / kernel / capability / receipt / jsonrpc / provenance /
-// trust-control / result / error) that travel between Chio peers. It does
-// not describe the localhost contract between the chio-go-http middleware
+// types.go holds generated wire types; this file holds the hand-written
+// Go shapes for the localhost contract between chio-go-http middleware
 // and the Chio sidecar kernel.
-//
-// This file holds the latter: the hand-written Go shapes that
-// chio.go / sidecar.go / helpers.go / identity.go / passthrough.go /
-// chio_test.go rely on. Moving them into a sibling file keeps types.go a
-// pure regeneration target without breaking the rest of the package.
-//
-// Wave 1 decision (decisions.yml: codegen-toolchain-per-language): Go
-// uses oapi-codegen with a checked-in regen script and committed output;
-// the live `cargo xtask codegen --lang go` pipeline shells out to
-// regen-types.sh. Helpers live here, generated types live in types.go.
-
-// Core types for the Chio HTTP substrate.
-// These types mirror the Rust chio-http-core crate and define the contract
-// between Go middleware and the Chio sidecar kernel.
 
 // CallerIdentity represents the identity of the caller as extracted from
 // the HTTP request. This is protocol-agnostic.

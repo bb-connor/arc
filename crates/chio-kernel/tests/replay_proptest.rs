@@ -1,9 +1,7 @@
 // Property-based replay-invariance suite for the Chio kernel.
 //
-// Source-doc anchor:
-// `.planning/trajectory/04-deterministic-replay.md`, Phase 5
-// ("property-based replay invariance"). The doc requires three properties
-// over arbitrary `(decision, payload, clock, nonce)` receipt tuples:
+// Three properties over arbitrary `(decision, payload, clock, nonce)` receipt
+// tuples:
 //
 //   1. Signing is a function (same canonical body, same signed bytes).
 //   2. Replaying the receipt log twice yields the same anchored Merkle root.
@@ -14,26 +12,14 @@
 // and PROPTEST_CASES). Failed shrinks persist under
 // `tests/replay/proptest-regressions/` so future runs replay the seed.
 //
-// House rules:
-// - No em dashes anywhere.
-// - `unwrap_used` / `expect_used` are denied workspace-wide; we allow them
-//   inside the `#[cfg(test)]` body of this file because the proptest harness
-//   constructs ad-hoc fixtures whose invariants are checked locally.
+// `unwrap_used` / `expect_used` are denied workspace-wide; we allow them
+// inside this file because the proptest harness constructs ad-hoc fixtures
+// whose invariants are checked locally.
 //
-// Named exit-criterion tests:
-// - `signing_is_a_function`
-// - `replay_root_is_idempotent`
-//
-// Plus a third declared property:
-// - `shuffle_independent_receipts_preserves_bytes`
-//
-// `signing_is_a_function`, `replay_root_is_idempotent`, and
-// `shuffle_independent_receipts_preserves_bytes` each live in their own
-// `proptest! { ... }` block with a raised `cases` budget
-// (`SIGNING_FUNCTION_CASES`, `REPLAY_ROOT_CASES`, and
-// `SHUFFLE_INDEPENDENCE_CASES` respectively). Splitting the macro invocations
-// is the only way to per-test-tune the case count, since `proptest!` only
-// honours the `#![proptest_config(...)]` inner attribute at block scope.
+// Each named property (`signing_is_a_function`, `replay_root_is_idempotent`,
+// `shuffle_independent_receipts_preserves_bytes`) lives in its own
+// `proptest! { ... }` block so the case count can be tuned per-property;
+// `proptest!` only honours `#![proptest_config(...)]` at block scope.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -62,29 +48,24 @@ const SIGNING_FUNCTION_CASES: u32 = 256;
 
 /// Higher case count for `replay_root_is_idempotent`. Each case builds two
 /// Merkle trees over up to 32 leaves and asserts byte equality on the root.
-/// 256 cases brings the property up to parity with `signing_is_a_function`
-/// (per the M04 P5 T3 contract) and stays inside the 30s CI budget because
-/// the per-case work (two anchors, no signature verification) is cheap.
+/// 256 cases stays inside the 30s CI budget because the per-case work (two
+/// anchors, no signature verification) is cheap.
 const REPLAY_ROOT_CASES: u32 = 256;
 
 /// Higher case count for `shuffle_independent_receipts_preserves_bytes`. Each
 /// case signs up to 16 receipts and compares per-receipt canonical bytes
-/// across a deterministic permutation; 256 cases brings the property up to
-/// parity with the other two named exit-criterion tests (per the M04 P5 T4
-/// contract) and stays inside the 30s CI budget because the per-case work
-/// (signatures only, no Merkle anchoring) is bounded.
+/// across a deterministic permutation; 256 cases stays inside the 30s CI
+/// budget because the per-case work (signatures only, no Merkle anchoring) is
+/// bounded.
 const SHUFFLE_INDEPENDENCE_CASES: u32 = 256;
 
-/// Maximum batch size for the independence shuffle property. The doc anchor
-/// (`.planning/trajectory/04-deterministic-replay.md` Phase 5 T4) calls for
-/// "N up to ~16"; we honour that ceiling so the shuffle exercises both small
-/// degenerate cases (2-3 receipts) and a non-trivial mid-range batch.
+/// Maximum batch size for the independence shuffle property. Capped at 16 so
+/// the shuffle exercises both small degenerate cases (2-3 receipts) and a
+/// non-trivial mid-range batch.
 const SHUFFLE_INDEPENDENCE_MAX: usize = 16;
 
-/// Maximum batch size for the random arm of `replay_sequence()`. Picked to
-/// match the original Phase 5 T1 strategy (`1..16`) on the small end while
-/// extending the upper bound to 32 receipts so the property exercises the
-/// next power-of-two RFC 6962 padding boundary.
+/// Maximum batch size for the random arm of `replay_sequence()`. Upper bound
+/// of 32 receipts exercises the next power-of-two RFC 6962 padding boundary.
 const REPLAY_RANDOM_MAX: usize = 32;
 
 fn kernel_keypair() -> Keypair {
@@ -339,9 +320,7 @@ fn regression_persistence() -> Box<FileFailurePersistence> {
 
 // Property 1 lives in its own `proptest!` block so we can dial up the case
 // count specifically for `signing_is_a_function` without slowing the other
-// two properties (which build full Merkle trees per case). Signing is the
-// cheapest property to evaluate, so the denser sweep stays well inside the
-// 30s CI budget.
+// two properties (which build full Merkle trees per case).
 proptest! {
     #![proptest_config(ProptestConfig {
         cases: SIGNING_FUNCTION_CASES,
@@ -421,11 +400,9 @@ proptest! {
 }
 
 // Property 2 lives in its own `proptest!` block so we can dial up the case
-// count specifically for `replay_root_is_idempotent` (256 cases, matching
-// `signing_is_a_function`) without slowing Property 3 (which sorts both
-// the baseline and shuffled byte vectors per case). The strategy
-// (`replay_sequence()`) covers the boundary shapes named in the M04 P5 T3
-// contract: empty, single-receipt, two-receipt, and random N up to 32.
+// count to 256 without slowing Property 3. The strategy (`replay_sequence()`)
+// covers the boundary shapes: empty, single-receipt, two-receipt, and random
+// N up to 32.
 proptest! {
     #![proptest_config(ProptestConfig {
         cases: REPLAY_ROOT_CASES,
@@ -531,13 +508,9 @@ fn independent_tuple_batch() -> impl Strategy<Value = Vec<ReceiptTuple>> {
         })
 }
 
-// Property 3 lives in its own `proptest!` block so we can dial up the case
-// count specifically for `shuffle_independent_receipts_preserves_bytes`
-// (256 cases, matching `signing_is_a_function` and `replay_root_is_idempotent`)
-// without rebudgeting the other two properties. Each case signs up to 16
-// receipts and compares per-receipt canonical bytes across a deterministic
-// permutation; this is more expensive than signing alone but cheaper than
-// building a Merkle tree, so 256 cases stay well inside the 30s CI budget.
+// Property 3 lives in its own `proptest!` block at 256 cases. Each case signs
+// up to 16 receipts and compares per-receipt canonical bytes across a
+// deterministic permutation.
 proptest! {
     #![proptest_config(ProptestConfig {
         cases: SHUFFLE_INDEPENDENCE_CASES,

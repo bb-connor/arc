@@ -7,10 +7,6 @@
 # crates/chio-kernel-core/src/kani_public_harnesses.rs has a
 # corresponding row in formal/MAPPING.md. Exits non-zero with a
 # human-readable diff if any property is unmapped.
-#
-# Owner: M03.P3.T5 (formal/MAPPING.md, scripts/check-mapping.sh).
-# Source of truth: .planning/trajectory/03-capability-algebra-properties.md
-# Phase 3 task 5.
 
 set -euo pipefail
 
@@ -38,8 +34,7 @@ fi
 
 # --- TLA+ named invariants ---------------------------------------------------
 # The named-invariants whitelist below is the canonical set of safety /
-# liveness invariants for RevocationPropagation as documented in the phase
-# doc and the M03.P3.T2 / T3 ticket specs. We require: any whitelisted name
+# liveness invariants for RevocationPropagation. We require: any whitelisted name
 # that is *defined* in the .tla file (top-level `<Name> ==`) must appear as
 # a row in MAPPING.md. Whitelisted-but-undefined is fine; that is just
 # "future work" (e.g. RevocationEventuallySeen lands at T3, not yet).
@@ -125,9 +120,9 @@ fi
 # `|` (after optional leading whitespace); the table-header separator row
 # (`| ----- | ----- |`) is filtered out below. Prose mentions, bullet
 # lists, and code-fence excerpts are NOT counted - they are not the unit
-# of cross-reference the gate is asserting (PR #61 comment r3142986117 and
-# r3142992287). Without this scoping the gate fail-opens whenever the
-# author drops a backtick mention of a property name into prose.
+# of cross-reference the gate is asserting. Without this scoping the gate
+# fail-opens whenever the author drops a backtick mention of a property name
+# into prose.
 table_rows="$(grep -E '^[[:space:]]*\|' "${mapping}" \
     | grep -v -E '^[[:space:]]*\|[[:space:]]*-+' || true)"
 

@@ -21,11 +21,9 @@ pub use runtime::{
 /// libFuzzer entry-point module for `chio-mcp-edge`.
 ///
 /// Gated behind the `fuzz` Cargo feature so it only compiles into the
-/// standalone `chio-fuzz` workspace at `../../fuzz`. Authored under
-/// M02.P1.T3.a (`.planning/trajectory/02-fuzzing-post-pr13.md` Phase 1,
-/// trust-boundary fuzz target #5). Production builds of `chio-mcp-edge`
-/// never pull in `arbitrary`, never expose these symbols, and never get
-/// recompiled with libFuzzer instrumentation.
+/// standalone `chio-fuzz` workspace at `../../fuzz`. Production builds never
+/// pull in `arbitrary`, never expose these symbols, and never get recompiled
+/// with libFuzzer instrumentation.
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 

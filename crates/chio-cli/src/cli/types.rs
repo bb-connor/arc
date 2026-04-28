@@ -239,26 +239,13 @@ enum Commands {
 }
 
 /// Arguments for the `chio replay` subcommand.
-///
-/// The handler logic for these arguments is implemented incrementally in
-/// tickets M04.P4.T2 through M04.P4.T7. This T1 ticket only wires the
-/// clap parser surface so downstream tickets have a stable seam.
-///
-/// M10.P2.T1 adds the optional `traffic` sub-subcommand below; the
-/// existing positional `<log>` surface is preserved by making `log`
-/// optional (clap routes `chio replay traffic --from foo` to the
-/// sub-subcommand and `chio replay ./receipts/` to the positional log
-/// path). The dispatcher (`cmd_replay`) requires `log` only when no
-/// sub-subcommand is supplied.
 #[derive(clap::Args)]
 pub struct ReplayArgs {
     /// Path to a receipt-log directory or NDJSON stream.
-    ///
-    /// Required for the legacy M04 surface (`chio replay <log>`); the
-    /// M10 `chio replay traffic` sub-subcommand uses `--from` instead.
+    /// Required when no sub-subcommand is supplied.
     pub log: Option<PathBuf>,
 
-    /// Treat `log` as an M10 tee NDJSON stream. When omitted, the reader
+    /// Treat `log` as a tee NDJSON stream. When omitted, the reader
     /// auto-detects the input shape (directory vs. NDJSON file).
     #[arg(long)]
     pub from_tee: bool,
@@ -280,27 +267,18 @@ pub struct ReplayArgs {
     #[arg(long, value_name = "FIXTURE-DIR", requires = "bless")]
     pub into: Option<PathBuf>,
 
-    /// Optional M10 sub-subcommand. Currently the only variant is
+    /// Optional sub-subcommand. Currently the only variant is
     /// `traffic`, which validates an NDJSON `chio-tee-frame.v1` capture.
     #[command(subcommand)]
     pub command: Option<ReplaySubcommand>,
 }
 
 /// Sub-subcommands under `chio replay`.
-///
-/// Today only `traffic` is exposed (M10.P2.T1). The existing M04 surface
-/// (`chio replay <log>`) is selected when no sub-subcommand is supplied,
-/// preserving the legacy positional argument shape.
 #[derive(clap::Subcommand)]
 pub enum ReplaySubcommand {
-    /// Validate an NDJSON `chio-tee-frame.v1` capture (schema-version
-    /// gate, tenant-sig verifier, M01 invocation validator).
-    ///
-    /// M10.P2.T1 landed the structural validators; M10.P2.T2 layered
-    /// `--against <policy-ref>` on top so the same capture can be
-    /// re-executed against an alternate policy with namespaced replay
-    /// receipts (`replay:<run_id>:<frame_id>`). The diff renderer for
-    /// the structured drift class is M10.P2.T3 / T4.
+    /// Validate or re-execute an NDJSON `chio-tee-frame.v1` capture.
+    /// Supply `--against <policy-ref>` to re-execute against a policy with
+    /// namespaced replay receipts (`replay:<run_id>:<frame_id>`).
     Traffic(TrafficArgs),
 }
 
@@ -312,14 +290,11 @@ pub struct TrafficArgs {
     #[arg(long, value_name = "NDJSON")]
     pub from: PathBuf,
 
-    /// Pinned schema name. Defaults to `chio-tee-frame.v1` (the M10
-    /// frame-schema-lock label, see
-    /// `.planning/trajectory/10-tee-replay-harness.md` line 64). The
-    /// on-the-wire `schema_version` field is the literal `"1"`; this
-    /// flag lets callers pin the schema *name* alongside it for
-    /// diagnostic clarity. Frames whose `schema_version` does not
-    /// match the M10 pinned literal are rejected regardless of this
-    /// value.
+    /// Pinned schema name. Defaults to `chio-tee-frame.v1`. The on-the-wire
+    /// `schema_version` field is the literal `"1"`; this flag lets callers
+    /// pin the schema name for diagnostic clarity. Frames whose
+    /// `schema_version` does not match the pinned literal are rejected
+    /// regardless of this value.
     #[arg(long, default_value = "chio-tee-frame.v1")]
     pub schema: String,
 
@@ -335,23 +310,20 @@ pub struct TrafficArgs {
     #[arg(long)]
     pub json: bool,
 
-    /// Re-execute every frame against this policy reference. The flag
-    /// accepts three discriminated shapes (M10.P2.T2):
+    /// Re-execute every frame against this policy reference.
     ///
-    /// 1. `<64-lower-hex>` or `sha256:<64-lower-hex>` -- a manifest
-    ///    sha256 digest. Resolution requires the manifest registry,
-    ///    which is downstream work; until then this arm surfaces a
-    ///    structured `NotResolvable` error.
-    /// 2. `<name>@<semver>` or `version:<name>@<semver>` -- a Cargo-style
-    ///    package coordinate. Same as above: structured
-    ///    `NotResolvable` until the package registry lands.
-    /// 3. Any other shape (or `path:<file>`) -- a workspace-local
-    ///    HushSpec / Chio YAML policy file. Fully resolvable in T2.
+    /// Three accepted shapes:
     ///
-    /// Replay receipts emitted under this re-execution are namespaced
-    /// `replay:<run_id>:<frame_id>` so they cannot collide with
-    /// production receipts in a shared store. See
-    /// `.planning/trajectory/10-tee-replay-harness.md` line 568.
+    /// 1. `<64-lower-hex>` or `sha256:<64-lower-hex>` -- manifest hash.
+    ///    Requires manifest registry (not yet wired); surfaces
+    ///    `NotResolvable` until then.
+    /// 2. `<name>@<semver>` or `version:<name>@<semver>` -- package
+    ///    coordinate. Same: `NotResolvable` until package registry lands.
+    /// 3. Any other shape (or `path:<file>`) -- workspace-local YAML
+    ///    policy file. Fully resolvable now.
+    ///
+    /// Replay receipts are namespaced `replay:<run_id>:<frame_id>` to
+    /// prevent collisions with production receipts.
     #[arg(long, value_name = "POLICY-REF")]
     pub against: Option<String>,
 
@@ -365,12 +337,6 @@ pub struct TrafficArgs {
 }
 
 /// Conformance harness commands.
-//
-// `Run` (M01.P4.T2): execute the cross-language conformance harness.
-// `FetchPeers` (M01.P4.T4): download pre-built peer-language adapter binaries
-// pinned by `crates/chio-conformance/peers.lock.toml`. External implementers
-// without Python / Node / Go / C++ toolchains can use this to obtain the
-// reference peer binaries.
 #[derive(Subcommand)]
 enum ConformanceCommands {
     /// Execute conformance scenarios against a peer language adapter.
@@ -413,7 +379,7 @@ enum ConformanceCommands {
 
         /// Optional explicit path to `peers.lock.toml`. When omitted the
         /// CLI consults `$CHIO_PEERS_LOCK`, the XDG config dir, the
-        /// in-repo path, and the cwd in that order. Cleanup C5 issue B.
+        /// in-repo path, and the cwd in that order.
         #[arg(long)]
         lockfile: Option<PathBuf>,
     },

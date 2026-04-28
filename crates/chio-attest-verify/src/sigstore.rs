@@ -1,5 +1,3 @@
-// owned-by: M09
-//
 //! Production [`AttestVerifier`] implementation backed by `sigstore-rs`.
 //!
 //! Three verification surfaces are exposed:
@@ -43,10 +41,8 @@ use x509_cert::Certificate;
 
 use crate::{AttestError, AttestVerifier, ExpectedIdentity, VerifiedAttestation};
 
-/// Embedded TUF trust-root materials. These are checked into the crate
-/// under `crates/chio-attest-verify/sigstore-root/` and refreshed by the
-/// quarterly CODEOWNERS-reviewed re-bake job described in
-/// `.planning/trajectory/09-supply-chain-attestation.md`.
+/// Embedded TUF trust-root materials. Checked in under `sigstore-root/` and
+/// refreshed by the quarterly CODEOWNERS-reviewed re-bake job.
 const EMBEDDED_TRUSTED_ROOT_JSON: &[u8] = include_bytes!("../sigstore-root/trusted_root.json");
 
 /// OID for the Fulcio OIDC issuer extension. Documented at

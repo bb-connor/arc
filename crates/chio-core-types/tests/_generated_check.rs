@@ -9,21 +9,7 @@
 //! 2. The file is reachable from the codegen pipeline (i.e. its contents do
 //!    not contain a `// HAND EDIT` opt-out marker, which we forbid).
 //!
-//! The test is referenced by the M01.P3.T1 gate
-//! (`cargo test -p chio-core-types --test _generated_check`) and by the
-//! M01.P3.T5 `header-stamp-untouched` CI lane.
-//!
-//! Note on file location: the M01.P3.T1 ticket's owner_glob lists
-//! `crates/chio-core-types/src/_generated_check.rs`, but cargo's
-//! integration-test harness only discovers files under `tests/` (the `--test`
-//! flag resolves to a target name, which in turn maps to `tests/<name>.rs`).
-//! Putting this file under `src/` would either turn it into a private module
-//! that `cargo test --test ...` cannot find, or require a custom `[[test]]`
-//! entry in `Cargo.toml` with `path = "src/_generated_check.rs"`, which
-//! would be a non-idiomatic Cargo layout. We resolve this by placing the
-//! file in the conventional `tests/` location; the owner_glob in the ticket
-//! is treated as a typo. The file is logically part of the
-//! `_generated/` policy surface and will be referenced from M01.P3.T5 CI.
+//! Run via `cargo test -p chio-core-types --test _generated_check`.
 
 use std::ffi::OsStr;
 use std::fs;

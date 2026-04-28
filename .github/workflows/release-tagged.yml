@@ -1,22 +1,16 @@
 # release-tagged.yml - Auto-append a row to release_compat_matrix.toml when
-# a new release is published (M04 P3.T5).
+# a new release is published.
 #
-# Source-doc anchor: .planning/trajectory/04-deterministic-replay.md
-# Phase 3 task 5: "Add release-tagged.yml automation that opens a PR adding
-# a row when release-qualification.yml publishes a new tag." This workflow
-# chains off release-qualification.yml: when release-qualification finalizes
-# a new tagged release, this workflow auto-appends a row to
+# Chains off release-qualification.yml: auto-appends a row to
 # tests/replay/release_compat_matrix.toml and opens a PR for human review.
 #
 # Why a PR (not a direct commit)? The bundle_sha256 emitted here is a
 # deterministic placeholder ("pending-${tag}" hashed). A reviewer must:
-#   1. Replace the bundle_sha256 with the real digest emitted by
+#   1. Replace the bundle_sha256 with the real digest from
 #      release-qualification.yml's artifact list.
 #   2. Set supported_until per the ratchet rule (current tag + 5 minor).
 #   3. Decide compat (default "supported"; flip to "best_effort" if the
 #      diff against the previous bundle exceeds threshold).
-# The PR target branch is project/roadmap-04-25-2026 while that line of
-# work is open; once it merges to main the base should be flipped to main.
 
 name: release-tagged
 

@@ -1,22 +1,10 @@
-# vectors-staleness.yml - P2 staleness alarm for the bindings vector corpus.
+# vectors-staleness.yml - Nightly staleness alarm for the bindings vector corpus.
 #
-# Owned by SEQUENCER per OWNERS.toml; individual jobs are tagged with
-# `# owner: M01` per EXECUTION-BOARD.md section 5 "Workflow lane ownership".
+# Uses the git-commit age of tests/bindings/vectors/MANIFEST.sha256 as the
+# "last blessed at" signal; `cargo xtask freeze-vectors` rewrites that file
+# every time the corpus is regenerated.
 #
-# Phase 5 (M01.P5.T4) lands this nightly staleness alarm per
-# .planning/trajectory/01-spec-codegen-conformance.md "Code touchpoints"
-# entry `.github/workflows/vectors-staleness.yml (nightly, P2 staleness
-# alarm)`. The intent: the bindings vector corpus
-# (`tests/bindings/vectors/**/*.json`) anchors every cross-language byte
-# guarantee in M01; if the corpus has not been re-blessed within
-# `STALENESS_DAYS` days the spec-vs-implementation gap may have widened
-# silently. We use the git-commit age of `tests/bindings/vectors/MANIFEST.sha256`
-# as the canonical "last blessed at" signal, since `cargo xtask freeze-vectors`
-# rewrites that file every time the corpus is regenerated.
-#
-# Alarm policy mirrors conformance-matrix.yml: a single failure opens an
-# issue tagged `alarm:vectors-staleness`; the human protocol owner watches
-# the label for repeated firings until a paging integration lands.
+# Alarm policy: a single failure opens an issue tagged `alarm:vectors-staleness`.
 
 name: vectors-staleness
 

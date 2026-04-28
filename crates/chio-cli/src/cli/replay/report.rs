@@ -1,20 +1,11 @@
 // Structured JSON output for `chio replay --json`.
 //
-// This file is included into `main.rs` via `include!` (matching the
-// pattern used by `cli/replay.rs`, `cli/replay/reader.rs`,
-// `cli/replay/verify.rs`, `cli/replay/merkle.rs`, and
-// `cli/replay/verdict.rs`). It owns the `chio.replay.report/v1` schema
-// the dispatch layer renders on `--json` runs.
-//
-// ## Schema (stable; do NOT change without a v2 schema in
-// `spec/schemas/chio-replay-report/v2.schema.json`)
-//
-// The JSON shape on stdout is exactly:
+// Owns the stable `chio.replay.report/v1` schema. JSON shape on stdout:
 //
 // ```json
 // {
 //   "schema": "chio.replay.report/v1",
-//   "log_path": "<positional arg verbatim>",
+//   "log_path": "<positional arg>",
 //   "receipts_checked": <integer>,
 //   "computed_root": "<lowercase hex>",
 //   "expected_root": "<lowercase hex>" | null,
@@ -33,28 +24,9 @@
 // }
 // ```
 //
-// The schema string is pinned by [`SCHEMA_ID`] and is the only field
-// downstream consumers MUST byte-match before parsing the rest of the
-// document. The set of `kind` enum values mirrors the canonical exit
-// code registry in `.planning/trajectory/04-deterministic-replay.md`
-// Phase 4 plus `merkle_mismatch` for the `--expect-root` mismatch case
-// (which still maps to a canonical exit code, just not its own).
-//
-// ## Status: surface complete; live wiring deferred to T6
-//
-// This ticket (M04.P4.T5) lands the report shape, the schema file under
-// `spec/schemas/chio-replay-report/v1.schema.json`, and the
-// [`render_json`] entry point the dispatch layer will call. It does
-// NOT wire the report into [`cmd_replay`] yet: the parser-surface stub
-// in `cli/replay.rs` stays in place until M04.P4.T6 / T7 land the live
-// reader -> verify -> verdict -> merkle pipeline, at which point the
-// dispatch layer will build a [`ReplayReport`] from the per-stage
-// outcomes and call [`render_json`] before exiting with [`exit_code`].
-//
-// Reference: `.planning/trajectory/04-deterministic-replay.md` Phase 4
-// task 5 ("Implement structured JSON output (`--json`) with a stable
-// schema") and the "JSON output schema" subsection of the same
-// document.
+// [`SCHEMA_ID`] is the only field downstream consumers MUST byte-match before
+// parsing the rest of the document. Schema file is at
+// `spec/schemas/chio-replay-report/v1.schema.json`.
 
 use serde::{Deserialize, Serialize};
 
@@ -63,12 +35,8 @@ use serde::{Deserialize, Serialize};
 /// the document.
 pub const SCHEMA_ID: &str = "chio.replay.report/v1";
 
-/// Divergence kinds the pipeline can attribute. The variant set mirrors
-/// the canonical exit-code registry in M04 Phase 4 plus
-/// [`DivergenceKind::MerkleMismatch`] for `--expect-root` mismatch.
-///
-/// The serde representation is `snake_case` to match the schema-pinned
-/// enum in `spec/schemas/chio-replay-report/v1.schema.json`.
+/// Divergence kinds the pipeline can attribute. `snake_case` serialization
+/// matches the schema in `spec/schemas/chio-replay-report/v1.schema.json`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DivergenceKind {
@@ -83,10 +51,8 @@ pub enum DivergenceKind {
     SchemaMismatch,
     /// Redaction manifest mismatch (drives exit code 50).
     RedactionMismatch,
-    /// Recomputed Merkle root differs from `--expect-root`. Maps to the
-    /// signature-or-parse exit code at the dispatch layer per the
-    /// canonical registry; the `merkle_mismatch` shape itself is purely
-    /// for triage attribution.
+    /// Recomputed Merkle root differs from `--expect-root`. Mapped to
+    /// exit code 20 at the dispatch layer; the shape is for triage only.
     MerkleMismatch,
 }
 
@@ -126,11 +92,7 @@ pub struct Divergence {
     pub detail: Option<String>,
 }
 
-/// `chio.replay.report/v1` document.
-///
-/// Built by the dispatch layer from the per-stage outcomes (reader,
-/// signature verifier, verdict re-derive, Merkle accumulator) and
-/// rendered to stdout via [`render_json`] on `--json` runs.
+/// `chio.replay.report/v1` document rendered on `--json` runs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplayReport {
     /// Stable schema identifier. Always [`SCHEMA_ID`].
@@ -196,13 +158,9 @@ impl ReplayReport {
     }
 }
 
-/// Canonical exit-code mapping for a [`DivergenceKind`]. Pinned by the
-/// canonical exit-code registry in `.planning/trajectory/04-deterministic-replay.md`
-/// Phase 4. [`DivergenceKind::MerkleMismatch`] does not have its own
-/// canonical code: the dispatch layer maps it to the
-/// signature-mismatch code (20) because a root mismatch implies at
-/// least one receipt's signed bytes differ, and the byte-level
-/// attribution is via the verifier rather than the accumulator.
+/// Canonical exit-code mapping for a [`DivergenceKind`].
+/// [`DivergenceKind::MerkleMismatch`] maps to 20 (same as signature mismatch)
+/// because a root mismatch implies at least one receipt's signed bytes differ.
 #[must_use]
 pub fn exit_code_for(kind: DivergenceKind) -> i32 {
     match kind {
@@ -248,8 +206,6 @@ mod replay_report_tests {
 
     #[test]
     fn schema_id_is_chio_replay_report_v1() {
-        // Pinned by M04.P4.T5: the schema string MUST stay byte-equal
-        // to `chio.replay.report/v1` until a v2 schema lands.
         assert_eq!(SCHEMA_ID, "chio.replay.report/v1");
     }
 
@@ -319,10 +275,6 @@ mod replay_report_tests {
 
     #[test]
     fn exit_code_mapping_matches_canonical_registry() {
-        // Pinned by `.planning/trajectory/04-deterministic-replay.md`
-        // Phase 4: 0 clean, 10 drift, 20 signature, 30 parse, 40
-        // schema, 50 redaction. MerkleMismatch shares 20 with
-        // SignatureMismatch by spec (see exit_code_for docs).
         assert_eq!(exit_code_for(DivergenceKind::VerdictDrift), 10);
         assert_eq!(exit_code_for(DivergenceKind::SignatureMismatch), 20);
         assert_eq!(exit_code_for(DivergenceKind::MerkleMismatch), 20);

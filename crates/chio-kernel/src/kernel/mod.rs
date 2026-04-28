@@ -960,19 +960,12 @@ pub struct ChioKernel {
     /// encoding of the kernel's signing public key, but operators can
     /// override it to a stable DNS name via `with_federation_peers`.
     federation_local_kernel_id: ArcSwap<Option<String>>,
-    /// M05.P1.T3 mpsc-backed signing task handle. Owns a clone of
-    /// `config.keypair` and pulls signing requests from a bounded
-    /// channel; producers `.await` on backpressure rather than on a
-    /// mutex. Spawned at [`ChioKernel::new`] and joined by
-    /// [`ChioKernel::shutdown`]. Wrapped in `Arc` so any future
-    /// `Arc<ChioKernel>` sharing (Phase 3 tower middleware) can hand
-    /// the signing handle to in-flight evaluators without cloning the
-    /// whole kernel.
-    ///
-    /// The existing synchronous `build_and_sign_receipt` helper in
-    /// `responses.rs` is unchanged: T3 only adds the channel path that
-    /// `ToolEvaluator::sign_receipt` routes through. Later phase work
-    /// migrates the inline call sites onto the channel.
+    /// Mpsc-backed signing task handle. Owns a clone of `config.keypair` and
+    /// pulls signing requests from a bounded channel; producers `.await` on
+    /// backpressure rather than on a mutex. Spawned at [`ChioKernel::new`] and
+    /// joined by [`ChioKernel::shutdown`]. Wrapped in `Arc` so shared kernel
+    /// handles can pass the signing handle to in-flight evaluators without
+    /// cloning the whole kernel.
     signing_task: std::sync::Arc<signing_task::SigningTaskHandle>,
 }
 
@@ -1303,16 +1296,12 @@ impl ChioKernel {
         info!("initializing Chio kernel");
         let authority_keypair = config.keypair.clone();
         let checkpoint_batch_size = config.checkpoint_batch_size;
-        // M05.P1.T3: build the mpsc-backed signing-task handle. The
-        // handle clones the signing keypair so the receipt-signing
-        // critical path no longer borrows from `self.config.keypair`
-        // while the evaluate pipeline is mid-flight. The underlying
-        // tokio task is spawned LAZILY on first `signing_task.sign(_)`
-        // call; this keeps `ChioKernel::new` constructible from sync
-        // contexts (229+ test-harness call sites today) while still
-        // ensuring the signing path is async-native. By the time any
-        // caller reaches `sign` they are inside an async function and
-        // a tokio runtime is necessarily active.
+        // Build the mpsc-backed signing-task handle. The handle clones the
+        // signing keypair so the receipt-signing critical path no longer borrows
+        // from `self.config.keypair` while the evaluate pipeline is mid-flight.
+        // The tokio task is spawned LAZILY on first `signing_task.sign(_)` call
+        // so `ChioKernel::new` remains constructible from sync contexts; by the
+        // time any caller reaches `sign`, a tokio runtime is necessarily active.
         let signing_keypair = config.keypair.clone();
         let signing_task =
             std::sync::Arc::new(signing_task::SigningTaskHandle::spawn(signing_keypair));
@@ -1357,31 +1346,23 @@ impl ChioKernel {
         }
     }
 
-    /// M05.P1.T3: borrow the kernel's mpsc-backed signing-task handle.
+    /// Borrow the kernel's mpsc-backed signing-task handle.
     ///
-    /// Internal callers (`ToolEvaluator::sign_receipt`, the M05.P4.T4
-    /// crash-recovery test harness) submit `ChioReceiptBody` payloads
-    /// through this handle and `.await` the signed `ChioReceipt`. The
-    /// underlying tokio task is spawned lazily on the first call.
+    /// Internal callers submit `ChioReceiptBody` payloads through this handle
+    /// and `.await` the signed `ChioReceipt`. The underlying tokio task is
+    /// spawned lazily on the first call.
     ///
     /// Not exposed publicly: callers should go through
-    /// [`Self::sign_receipt_via_channel`] (or, eventually, the
-    /// `ToolEvaluator` trait) so the channel boundary stays an
-    /// implementation detail of the kernel crate. Phase 3's
-    /// `chio-tower::KernelService` handles do not need direct access;
-    /// they wrap `evaluate_tool_call` which routes through the trait.
-    ///
-    /// `#[allow(dead_code)]` because T3 only adds the entrypoint; the
-    /// integration test in `tests/receipt_signing_async.rs` uses the
-    /// public `sign_receipt_via_channel` plus `shutdown` instead. P4
-    /// crash-recovery work consumes this directly.
+    /// [`Self::sign_receipt_via_channel`] or the `ToolEvaluator` trait so the
+    /// channel boundary stays an implementation detail of the kernel crate.
+    /// Crash-recovery tests reach this directly.
     #[allow(dead_code)]
     pub(crate) fn signing_task_handle(&self) -> &signing_task::SigningTaskHandle {
         &self.signing_task
     }
 
-    /// M05.P1.T3: sign a [`ChioReceiptBody`] off the kernel critical
-    /// path via the mpsc-backed signing task.
+    /// Sign a [`ChioReceiptBody`] off the kernel critical path via the
+    /// mpsc-backed signing task.
     ///
     /// Producers `.await` on bounded backpressure rather than on a
     /// receipt-log mutex. Returns
@@ -1403,10 +1384,10 @@ impl ChioKernel {
         self.signing_task.sign(body).await
     }
 
-    /// M05.P1.T3: drain the in-flight signing-task queue and join the
-    /// task. After this call, every signing request that successfully
-    /// `.send().await`-ed before shutdown has been signed and replied
-    /// to; new sends surface `KernelError::Internal`.
+    /// Drain the in-flight signing-task queue and join the task. After this
+    /// call, every signing request that successfully `.send().await`-ed before
+    /// shutdown has been signed and replied to; new sends surface
+    /// `KernelError::Internal`.
     ///
     /// Idempotent: safe to call more than once. Safe to call on a
     /// kernel whose signing task was never spawned (no signing
@@ -1415,9 +1396,7 @@ impl ChioKernel {
     /// Note: shutdown does NOT mark the kernel as terminally stopped
     /// for other paths (capability validation, guard pipeline, store
     /// lookups). Operators that want a hard stop should call
-    /// [`Self::emergency_stop`] in addition. Phase 4 work
-    /// (`tests/signer_crash.rs`, M05.P4.T4) layers crash-recovery
-    /// semantics on top of this method.
+    /// [`Self::emergency_stop`] in addition.
     pub async fn shutdown(&self) {
         self.signing_task.shutdown().await;
     }
@@ -1982,12 +1961,10 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        // M05.P1.T1: route the public async entrypoint through the
-        // ToolEvaluator trait so subsequent M05 tickets (T3 receipt-signing,
-        // T4 dispatch) can swap in async-native step bodies without touching
-        // this call site again. T1 is mechanical: the default
-        // BlockingToolEvaluator delegates straight back to the existing sync
-        // pipeline below, so semantics are byte-identical.
+        // Route through the ToolEvaluator trait so async-native step bodies
+        // can be swapped in without touching this call site. The default
+        // BlockingToolEvaluator delegates to the existing sync pipeline; semantics
+        // are byte-identical.
         use crate::kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
         BlockingToolEvaluator.evaluate(self, request).await
     }
@@ -5634,12 +5611,9 @@ impl ChioKernel {
 
     /// Forward the validated request and optionally report actual invocation cost.
     ///
-    /// M05.P1.T4 async-native entrypoint used by `ToolEvaluator::dispatch`.
-    /// The body delegates to the sync helper while the tool-server trait
-    /// remains sync-only, preserving the exact dispatch and cost-accounting
-    /// semantics used by the legacy evaluator. The important boundary is that
-    /// dispatch now has an awaitable ToolEvaluator step, so later phases can
-    /// swap the server invocation mechanism without changing call sites again.
+    /// Async-native dispatch entrypoint used by `ToolEvaluator::dispatch`.
+    /// Delegates to the sync helper while the tool-server trait remains
+    /// sync-only, preserving the exact dispatch and cost-accounting semantics.
     pub(crate) async fn dispatch_tool_call_with_cost(
         &self,
         request: &ToolCallRequest,
@@ -5966,11 +5940,9 @@ pub mod evaluator;
 mod responses;
 #[path = "session_ops.rs"]
 mod session_ops;
-// M05.P1.T3: mpsc-backed signing task. Owns a clone of the kernel
-// signing keypair and pulls signing requests from a bounded
-// `tokio::sync::mpsc` channel so receipt signing leaves the synchronous
-// critical path. Default body of `ToolEvaluator::sign_receipt` routes
-// through this module.
+// Mpsc-backed signing task. Owns a clone of the kernel signing keypair and
+// pulls signing requests from a bounded `tokio::sync::mpsc` channel so receipt
+// signing leaves the synchronous critical path.
 #[path = "signing_task.rs"]
 pub(crate) mod signing_task;
 #[cfg(test)]

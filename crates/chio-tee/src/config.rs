@@ -7,8 +7,8 @@
 //!   path is taken from `CHIO_TEE_CONFIG`, falling back to
 //!   `/etc/chio/tee.toml`.
 //! - [`load_tenant_manifest_mode`]: reads `tenant.tee.mode` from a manifest
-//!   document. Until M10.P1.T6 wires `chio-manifest` end-to-end, callers can
-//!   pass the tenant TOML directly via [`load_tenant_manifest_mode_from_str`].
+//!   document. Callers can pass the tenant TOML directly via
+//!   [`load_tenant_manifest_mode_from_str`].
 //!
 //! This module is deliberately I/O-light and side-effect-free where possible
 //! so tests can drive it with explicit env mutations and `tempfile` paths.
@@ -62,8 +62,7 @@ pub enum ConfigError {
 
 /// Sidecar TOML schema fragment.
 ///
-/// Only the `[tee]` table is parsed; other tables pass through (the file is
-/// shared with future T2-T9 tickets).
+/// Only the `[tee]` table is parsed; other tables pass through.
 #[derive(Debug, Default, Deserialize)]
 struct SidecarConfig {
     #[serde(default)]
@@ -78,9 +77,7 @@ struct SidecarTeeSection {
 
 /// Tenant manifest schema fragment.
 ///
-/// Until [`chio-manifest`](../../chio-manifest) exposes a shared type, the
-/// tenant TOML is parsed locally. M10.P1.T6 should replace this with a
-/// `chio_manifest::Tenant::tee_mode()` accessor.
+/// Parsed locally until `chio-manifest` exposes a shared type.
 #[derive(Debug, Default, Deserialize)]
 struct TenantManifest {
     #[serde(default)]

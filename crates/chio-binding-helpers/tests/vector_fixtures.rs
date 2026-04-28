@@ -797,47 +797,42 @@ fn manifest_vector_fixture() -> Value {
     })
 }
 
-// M01 P2 expanded the on-disk corpora to >=20 cases per subtree; the in-Rust
-// fixture-generators below remain at the original 5-case bootstrap. On-disk
-// JSON is now the source of truth; the round-trip tests further down read from
-// disk and exercise all 20 cases per subtree. The matches-checked-in tests are
-// retained as #[ignore] bootstrap-helpers (`cargo test -- --ignored` regenerates
-// after a hand-edit to a fixture-builder).
+// On-disk JSON is the source of truth; the in-Rust generators remain at the
+// original 5-case bootstrap. The #[ignore] tests below regenerate the checked-in
+// files when run manually (`cargo test -- --ignored`).
 
 #[test]
-#[ignore = "M01.P2.T1+ on-disk canonical corpus is the source of truth (20 cases vs 5 hardcoded)"]
+#[ignore = "on-disk canonical corpus is the source of truth; run to regenerate after editing the fixture builder"]
 fn canonical_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&canonical_fixture_path(), &canonical_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T3 expanded hashing corpus to 20 cases; on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
+#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn hashing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&hashing_fixture_path(), &hashing_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T5 expanded receipt corpus to 20 cases; on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
+#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn receipt_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&receipt_fixture_path(), &receipt_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T4 expanded signing corpus to 22 cases (with per-case seed overrides); on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
+#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn signing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&signing_fixture_path(), &signing_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T6 expanded capability corpus to 20 cases (with per-case max_delegation_depth overrides); on-disk JSON is the source of truth, the in-Rust generator stays at the 5-case bootstrap as a regenerator helper"]
+#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn capability_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&capability_fixture_path(), &capability_vector_fixture());
 }
 
 #[test]
-#[ignore = "M01.P2.T2 expanded the on-disk manifest corpus to 20 cases; \
-            manifest_vector_fixture() still constructs the original 5 cases as a bootstrap helper. \
-            On-disk JSON is now the source of truth. The round-trip test below covers all 20 cases."]
+#[ignore = "on-disk JSON is the source of truth; manifest_vector_fixture() is a regenerator helper for the original 5 cases"]
 fn manifest_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&manifest_fixture_path(), &manifest_vector_fixture());
 }
@@ -855,12 +850,8 @@ fn canonical_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn hashing_fixture_cases_round_trip_through_public_api() {
-    // Read the on-disk corpus as ground truth so the test exercises every
-    // case regardless of whether the in-Rust generator has been updated.
-    // M01.P2.T3 grew the hashing corpus from 5 to 20 cases; iterating the
-    // disk JSON keeps round-trip parity with the cross-language consumers
-    // (chio-go, chio-py, chio-ts) without depending on the bootstrap
-    // generator.
+    // Read the on-disk corpus so the test exercises every case regardless of
+    // whether the in-Rust generator has been updated.
     let raw = fs::read_to_string(hashing_fixture_path()).expect("read hashing fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse hashing fixture");
     for case in fixture["cases"].as_array().expect("cases array") {
@@ -873,9 +864,7 @@ fn hashing_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn receipt_fixture_cases_round_trip_through_public_api() {
-    // Read the on-disk corpus (M01.P2.T5 grew it from 5 to 20 cases) so the
-    // round-trip covers every case rather than only the bootstrap five
-    // emitted by the in-Rust generator.
+    // Read the on-disk corpus so the round-trip covers every case.
     let raw = fs::read_to_string(receipt_fixture_path()).expect("read receipt fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse receipt fixture");
     for case in fixture["cases"].as_array().expect("cases array") {
@@ -890,13 +879,9 @@ fn receipt_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn signing_fixture_cases_round_trip_through_public_api() {
-    // Read the on-disk corpus (M01.P2.T4 grew it from 5 to 22 cases across
-    // utf8_cases + json_cases). Some cases carry a per-case
-    // `signing_key_seed_hex` override that pins the keypair used to produce
-    // the recorded signature; honoring it is what makes the round-trip
-    // exact for those cases (the previous implementation always used the
-    // top-level seed and so silently emitted a different public key for
-    // alt-seed cases).
+    // Read the on-disk corpus. Per-case `signing_key_seed_hex` overrides pin
+    // the keypair for cases that use an alternate seed; honoring them makes the
+    // round-trip exact for those cases.
     let raw = fs::read_to_string(signing_fixture_path()).expect("read signing fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse signing fixture");
     let global_seed_hex = fixture["signing_key_seed_hex"]
@@ -975,13 +960,10 @@ fn signing_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn capability_fixture_cases_round_trip_through_public_api() {
-    // Read the on-disk corpus (M01.P2.T6 grew it from 5 to 20 cases). The
-    // shared `expected` field is depth-AGNOSTIC so cross-language consumers
-    // (chio-go / chio-py / chio-ts) that cannot parameterize
-    // max_delegation_depth still compare against the same vectors. Cases
-    // that exercise depth-aware behavior carry an optional
-    // `max_delegation_depth` plus `expected_with_max_delegation_depth`
-    // pair; this test asserts both branches when present.
+    // Read the on-disk corpus. The shared `expected` field is depth-agnostic so
+    // cross-language consumers can compare against the same vectors. Cases with
+    // depth-aware behavior carry an optional `max_delegation_depth` plus
+    // `expected_with_max_delegation_depth` pair; this test asserts both branches when present.
     let raw = fs::read_to_string(capability_fixture_path()).expect("read capability fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse capability fixture");
     for case in fixture["cases"].as_array().expect("cases array") {
@@ -1029,8 +1011,7 @@ fn capability_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn manifest_fixture_cases_round_trip_through_public_api() {
-    // Read the on-disk corpus as ground truth (M01.P2.T2 grew it from 5 to 20 cases;
-    // the in-Rust manifest_vector_fixture() generator only emits the original 5).
+    // Read the on-disk corpus as ground truth.
     let raw = std::fs::read_to_string(manifest_fixture_path()).expect("read manifest fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse manifest fixture");
     for case in fixture["cases"].as_array().expect("cases array") {

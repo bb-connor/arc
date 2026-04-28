@@ -1,10 +1,9 @@
 //! OpenAI Responses SSE gating.
 //!
-//! This module wires the M07.P2.T4.b OpenAI verdict gate into deterministic
-//! Responses SSE parsing. Tool-call start and argument-delta frames are held
-//! behind the shared fabric `StreamPhase` until `response.output_item.done`
-//! carries the final argument string, the adapter lifts that tool call into a
-//! canonical invocation, and the verdict allows the block.
+//! Tool-call start and argument-delta frames are held behind the shared fabric
+//! `StreamPhase` until `response.output_item.done` carries the final argument
+//! string, the adapter lifts that tool call into a canonical invocation, and
+//! the verdict allows the block.
 
 use chio_tool_call_fabric::{
     BlockKind, BufferedBlock, DenyReason, ProviderError, ProviderRequest, StreamEvent, StreamPhase,

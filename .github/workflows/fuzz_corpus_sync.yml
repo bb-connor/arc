@@ -1,26 +1,14 @@
-# fuzz_corpus_sync.yml - Weekly minimized-corpus sync (M02-owned).
+# fuzz_corpus_sync.yml - Weekly minimized-corpus sync.
 #
-# Reference: .planning/trajectory/02-fuzzing-post-pr13.md Phase 2 P2.T3
-# (storage backend = bb-connor/arc-fuzz-corpus sibling private repo, no GCS).
-# Decision lock: .planning/trajectory/decisions.yml id=continuous-fuzzing-path.
+# Pulls minimized inputs from the arc-fuzz-corpus sibling private repo and
+# PRs them into fuzz/corpus/<target>/ for permanent retention. Every candidate
+# diff is scanned by gitleaks; if any secret-like token is detected the sync
+# FAILS and refuses to commit (no production-issued JWTs or DIDs in seeds).
 #
-# Once a week, pull minimized inputs from the arc-fuzz-corpus sibling
-# private repo and PR them back into this repo under fuzz/corpus/<target>/
-# for permanent retention alongside the fuzz harnesses. Every candidate
-# diff is scanned by gitleaks before a PR is opened; if any secret-like
-# token (production-issued JWT, DID, signing key, etc.) is detected the
-# sync FAILS and refuses to commit, mitigating the corpus-exfil risk
-# called out in the M02 P4 plan (no production-issued JWTs or DIDs in
-# seeds).
+# Merge gate: CODEOWNERS rule `fuzz/corpus/**  @bb-connor` requires a
+# maintainer review before the PR can land.
 #
-# Merge gate: PR title is matched by the repo CODEOWNERS rule
-# `fuzz/corpus/**  @bb-connor`, so a maintainer review from @bb-connor
-# is required before the PR can land. The PR title intentionally
-# contains the literal string `chore(fuzz): sync minimized corpus`,
-# which the M02.P4.T7 ticket gate greps for.
-#
-# Required check name: fuzz_corpus_sync / sync
-# (advisory; this workflow opens PRs, it does not gate other workflows.)
+# Required check name: fuzz_corpus_sync / sync (advisory)
 
 name: fuzz_corpus_sync
 
@@ -61,10 +49,8 @@ jobs:
           fetch-depth: 0
           path: chio
 
-      # M02.P4.T8 sunset gate: refuse to run a corpus sync while
-      # fuzz/upstream_skips.toml contains expired or out-of-bounds
-      # entries. Source: .planning/trajectory/02-fuzzing-post-pr13.md
-      # Phase 2 P2.T4 (force re-evaluation of false-positive skips).
+      # Sunset gate: refuse to run a corpus sync while
+      # fuzz/upstream_skips.toml contains expired or out-of-bounds entries.
       - name: Check upstream-skips sunset
         working-directory: chio
         run: bash scripts/check-upstream-skips.sh
@@ -233,17 +219,15 @@ jobs:
             printf '### gitleaks scan\n\n'
             printf '%s%s%s\nresult clean (no secret-like tokens detected)\n%s%s%s\n\n' \
               "${BT}" "${BT}" "${BT}" "${BT}" "${BT}" "${BT}"
-            printf 'The gitleaks scan is the corpus-exfil mitigation for the\n'
-            printf 'M02 P4 risk in the source doc: no production-issued JWTs\n'
-            printf 'or DIDs may land in seed corpora. If gitleaks fires, the\n'
-            printf 'workflow refuses to open the PR.\n\n'
+            printf 'The gitleaks scan ensures no production-issued JWTs or DIDs\n'
+            printf 'land in seed corpora. If gitleaks fires, the workflow refuses\n'
+            printf 'to open the PR.\n\n'
             printf '### Maintainer review gate\n\n'
-            printf "The CODEOWNERS rule %sfuzz/corpus/** @bb-connor%s (added in\n" \
+            printf "The CODEOWNERS rule %sfuzz/corpus/** @bb-connor%s requires\n" \
               "${BT}" "${BT}"
-            printf 'M02.P4.T4) requires a @bb-connor review before this PR\n'
-            printf 'can merge.\n\n'
+            printf 'a @bb-connor review before this PR can merge.\n\n'
             printf -- '---\n\n'
-            printf "Auto-opened by %s.github/workflows/fuzz_corpus_sync.yml%s (M02.P4.T7).\n" \
+            printf "Auto-opened by %s.github/workflows/fuzz_corpus_sync.yml%s.\n" \
               "${BT}" "${BT}"
           } > /tmp/pr-body.md
           gh pr create \

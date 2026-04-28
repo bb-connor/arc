@@ -1,13 +1,9 @@
 /**
  * Browser/Edge conformance subset selector (BROWSER_SUBSET_V1).
  *
- * M08 ships @chio-protocol/{browser,workers,edge,deno}. Those runtimes
- * are verify-only and execute a NAMED, VERSIONED subset of the M01
- * conformance corpus, not the full corpus. This module defines that
- * subset.
- *
- * Source of truth: `.planning/trajectory/08-browser-edge-sdk.md`,
- * section "Conformance subset definition".
+ * Browser/edge runtimes are verify-only and execute a named, versioned
+ * subset of the conformance corpus, not the full corpus. This module
+ * defines that subset.
  *
  * The subset (v1) is intentionally narrow:
  *
@@ -17,19 +13,17 @@
  *   - capability/v1.json: cases tagged `verify_only: true`.
  *
  * Explicitly excluded:
- *   - Receipt and capability SIGNING cases (signing waits on the M08
- *     Phase 3 trust-boundary review; verify-only ships first).
+ *   - Receipt and capability SIGNING cases (verify-only ships first).
  *   - manifest, hashing, signing corpora (server-side concerns).
  *   - Any vector requiring fresh entropy or live time.
  *
- * The subset constant `BROWSER_SUBSET_V1` is referenced from M01's
- * conformance manifest. M01 owns the corpus; M08 owns this selector.
- * Bumping to v2 requires a coordinated change in both milestones.
+ * Bumping to v2 requires a coordinated change in the conformance corpus
+ * and this selector.
  */
 
 /**
- * Stable tag identifying this subset version. M01's conformance manifest
- * pins this string to gate cross-milestone compatibility.
+ * Stable tag identifying this subset version. The conformance manifest
+ * pins this string to gate cross-runtime compatibility.
  */
 export const BROWSER_SUBSET_TAG = "chio.conformance.browser-subset/v1" as const;
 
@@ -44,13 +38,12 @@ export type CategorySelection =
   | { readonly mode: "verify_only" };
 
 /**
- * The subset enumeration: which M01 corpus categories belong to the
+ * The subset enumeration: which corpus categories belong to the
  * browser/edge runtime gate, and how each is filtered.
  *
- * Iteration order matches the phase-doc declaration order
- * (canonical, receipt, capability); downstream consumers MUST NOT rely
- * on Object.keys ordering for correctness, but stable order is
- * convenient for snapshot tests.
+ * Iteration order is canonical, receipt, capability; downstream consumers
+ * MUST NOT rely on Object.keys ordering for correctness, but stable order
+ * is convenient for snapshot tests.
  */
 export const BROWSER_SUBSET_V1 = {
   tag: BROWSER_SUBSET_TAG,
@@ -70,17 +63,12 @@ export const BROWSER_SUBSET_V1 = {
   };
 };
 
-/**
- * Category names included in BROWSER_SUBSET_V1. Used as a closed enum
- * in the selector input shape below.
- */
+/** Category names included in BROWSER_SUBSET_V1. */
 export type BrowserSubsetCategory = keyof typeof BROWSER_SUBSET_V1.categories;
 
 /**
- * Minimal shape of a single conformance case as it appears in
- * `tests/bindings/vectors/<category>/v1.json`. The selector only reads
- * `id` and `verify_only`; cases carry additional fields per category
- * which the selector preserves verbatim via the generic.
+ * Minimal shape of a conformance case. The selector reads `id` and
+ * `verify_only`; additional per-category fields are preserved via the generic.
  */
 export interface ConformanceCase {
   readonly id: string;
@@ -88,30 +76,19 @@ export interface ConformanceCase {
 }
 
 /**
- * Minimal shape of a single category file
- * (`tests/bindings/vectors/<category>/v1.json`). The selector only
- * reads `cases`; the rest of the file (signing seeds, version, etc.)
- * is preserved on the input for callers that pass the full parsed
- * file in.
+ * Minimal shape of a category file. The selector reads `cases`; callers
+ * may pass the full parsed file - other fields are preserved on input.
  */
 export interface ConformanceCategoryFile<C extends ConformanceCase = ConformanceCase> {
   readonly cases: ReadonlyArray<C>;
 }
 
-/**
- * Shape the selector accepts: a record keyed by category name with the
- * parsed JSON for that category. Callers build this by reading the
- * three category files from disk (or from a bundled fixture in tests).
- */
+/** Record keyed by category name with the parsed JSON for that category. */
 export type ConformanceManifest = {
   readonly [K in BrowserSubsetCategory]: ConformanceCategoryFile;
 };
 
-/**
- * Result of running the selector: a versioned, tagged record listing
- * which case IDs are in scope per category. Consumers iterate this to
- * drive the per-runtime test runner.
- */
+/** Versioned, tagged record listing which case IDs are in scope per category. */
 export interface BrowserSubsetSelection {
   readonly tag: typeof BROWSER_SUBSET_TAG;
   readonly version: 1;
@@ -121,13 +98,9 @@ export interface BrowserSubsetSelection {
 }
 
 /**
- * Apply BROWSER_SUBSET_V1 to a parsed M01 conformance manifest and
- * return the per-category list of case IDs that runtimes must pass.
- *
- * The function is pure: it does no I/O and does not mutate the input.
- * It is total: any category whose file lists zero matching cases
- * yields an empty array (callers may treat that as a manifest drift
- * signal).
+ * Apply BROWSER_SUBSET_V1 to a parsed conformance manifest and return
+ * the per-category list of case IDs that runtimes must pass.
+ * Pure and total: zero-match categories yield an empty array.
  */
 export function selector(manifest: ConformanceManifest): BrowserSubsetSelection {
   const categories: { [K in BrowserSubsetCategory]: ReadonlyArray<string> } = {

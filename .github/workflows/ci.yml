@@ -1,16 +1,7 @@
 name: CI
 
-# M09.P1.T11: required-check inventory.
-#
-# GitHub branch rulesets match required checks by the **reported check
-# context name** (`name:` field on each job), NOT by job id. The
-# previous inventory listed job ids (`check`, `msrv`) which would
-# silently configure non-existent checks and leave PRs blocked waiting
-# for statuses that never arrive (cleanup-c11c; PR #40 review thread
-# r3142883192). The names below match the `name:` of each gating job
-# verbatim. When adding or renaming a job that should gate merges,
-# update this inventory in the same commit so the ruleset and the
-# workflow stay in lockstep.
+# Required-check inventory (GitHub branch rulesets match by `name:` field,
+# not job id).
 #
 #   required (reported check context names):
 #     - "Build, lint, test"                                  # check job
@@ -18,7 +9,7 @@ name: CI
 #     - "cargo-vet (supply-chain audit)"                     # cargo-vet job
 #     - "cargo-deny (supply-chain bans/advisories/licenses)" # cargo-deny job
 #     - "freeze-guard"                                       # m05-freeze-guard.yml
-#     - "bench-regression"                                  # bench-regression.yml
+#     - "bench-regression"                                   # bench-regression.yml
 #
 #   advisory (do not gate):
 #     - "JVM build", "Coverage", "Mutants"
@@ -45,12 +36,8 @@ env:
   CHIO_AENEAS_LINUX_X86_64_SHA256: 11b4e88776655c9fd5e391bfd2824e8b52916590962fbcb392768c57b7b32ca7
   CHIO_CREUSOT_REV: a12f3ac7f688c7b93cee2c2eb60282004a2bdb30
   CHIO_KANI_VERSION: 0.67.0
-  # M03.P1.T6: PR-tier proptest case count for the eighteen named
-  # invariants (chio-core-types/property_capability_algebra,
-  # chio-kernel-core/property_evaluate, chio-credentials/property_passport,
-  # chio-policy/property_evaluate). The nightly tier (4096) lives in
-  # .github/workflows/nightly.yml; the gap surfaces algebra-bug seams
-  # that low-case-count PR runs miss.
+  # PR-tier proptest case count for the named invariants. The nightly tier
+  # (4096) lives in .github/workflows/nightly.yml.
   PROPTEST_CASES: "256"
 
 jobs:
@@ -199,11 +186,9 @@ jobs:
             sudo apt-get install -y chromium-driver chromium-browser libcurl4-openssl-dev
           fi
 
-      # M03.P1.T7: gate the eighteen named capability-algebra invariants.
-      # Source of truth for the name set is in the script itself, mirroring
-      # .planning/trajectory/03-capability-algebra-properties.md Phase 1.
-      # A silent rename of any invariant fn fails this step before the
-      # workspace lane builds.
+      # Gate the named capability-algebra invariants. The authoritative name
+      # set is in the script itself; a silent rename of any invariant fn
+      # fails this step before the workspace lane builds.
       - name: Proptest invariant coverage
         run: ./scripts/check-proptest-coverage.sh
 
@@ -356,13 +341,11 @@ jobs:
         continue-on-error: true
         run: cargo deny check bans
 
-  # M03.P3.T4: PR-tier Apalache safety lane for the RevocationPropagation
-  # TLA+ module. Discharges the three named safety invariants
-  # (NoAllowAfterRevoke, MonotoneLog, AttenuationPreserving) via the
-  # MCRevocationPropagation.cfg companion at PROCS=4, CAPS=8 (locked
-  # Wave-1 decision 6). Liveness (RevocationEventuallySeen) runs nightly,
-  # not on PR; see formal-tla-liveness in nightly.yml. Fails closed: a
-  # non-zero apalache-mc exit blocks the merge.
+  # PR-tier Apalache safety lane for the RevocationPropagation TLA+ module.
+  # Checks safety invariants (NoAllowAfterRevoke, MonotoneLog,
+  # AttenuationPreserving) via MCRevocationPropagation.cfg at PROCS=4, CAPS=8.
+  # Liveness (RevocationEventuallySeen) runs nightly; see formal-tla-liveness
+  # in nightly.yml. Fails closed: a non-zero apalache-mc exit blocks merge.
   formal-tla:
     name: formal-tla (apalache safety)
     # owner: M03
@@ -403,27 +386,14 @@ jobs:
             --config=formal/tla/MCRevocationPropagation.cfg \
             formal/tla/RevocationPropagation.tla
 
-  # M03.P2.T6 + M03.P2.T7: PR-tier Kani lane for the public
-  # chio-kernel-core harnesses listed under `[lanes.pr]` in
-  # formal/rust-verification/kani-public-harnesses.toml. Each harness is
-  # invoked with `cargo kani -p chio-kernel-core --lib --harness <h>
-  # --default-unwind 8 --no-unwinding-checks`, mirroring the per-harness
-  # contract that scripts/check-kani-public-core.sh enforces locally.
-  # T6 wall-clocked all fourteen harnesses (~134s total on Apple
-  # M-series, hot cache); the heuristic split T5 introduced was inverted
-  # by the data, so the full sweep now lives in `lanes.pr` and
-  # `lanes.nightly_only` is empty. The nightly job (kani-public-nightly
-  # in nightly.yml) runs the union of both lanes and serves as a backstop
-  # if a future harness pushes past the 6-minute PR budget.
-  #
-  # T7 narrows the per-PR sweep to only those `lanes.pr` harnesses whose
-  # source line was changed in the PR diff via
-  # scripts/kani-changed-harnesses.sh. Pushes to `main` keep the full
-  # sweep (this job runs the full lane on `push`), and the nightly lane
-  # is unchanged. The script falls back to running every harness in
-  # `lanes.pr` if the diff base cannot be resolved or if any
-  # proof-relevant file outside the harness source has changed, so the
-  # PR signal is never silently weakened.
+  # PR-tier Kani lane for the public chio-kernel-core harnesses listed under
+  # `[lanes.pr]` in formal/rust-verification/kani-public-harnesses.toml.
+  # Each harness is invoked with `cargo kani -p chio-kernel-core --lib
+  # --harness <h> --default-unwind 8 --no-unwinding-checks`.
+  # On PRs, narrows to harnesses whose source line was changed (via
+  # scripts/kani-changed-harnesses.sh). Falls back to the full lane if the
+  # diff base cannot be resolved or a proof-relevant file changed. Pushes
+  # to main always run the full lane.
   kani-public-pr:
     name: kani-public-pr (lanes.pr harnesses)
     # owner: M03
@@ -477,8 +447,7 @@ jobs:
             echo "narrow=true" >> "$GITHUB_OUTPUT"
             echo "Resolved Kani diff base for PR: $GH_PR_BASE_SHA"
           else
-            # Push to main (or any non-PR trigger): preserve the full
-            # sweep contract from M03.P2.T6 by leaving narrow=false.
+            # Push to main (or any non-PR trigger): run the full sweep.
             echo "base=" >> "$GITHUB_OUTPUT"
             echo "narrow=false" >> "$GITHUB_OUTPUT"
             echo "Non-PR event ($GH_EVENT); running full lanes.pr sweep."
@@ -537,15 +506,11 @@ jobs:
           done
           echo "lanes.pr Kani sweep passed (${#HARNESSES[@]} harnesses, narrow=${KANI_NARROW})"
 
-  # M02.P4.T3: regression-test deletion guard.
-  #
-  # Detects deletion of fuzz-promoted regression tests under
-  # tests/regression_*.rs or crates/*/tests/regression_*.rs between the
-  # PR base and HEAD. Fails CI when such a deletion has no paired issue
-  # link (closes #N / fixes #N / tracks #N or a github.com URL) in the
-  # PR body or commit-message range. Source-doc anchor:
-  # .planning/trajectory/02-fuzzing-post-pr13.md Phase 4 P4.T3 +
-  # Crash-triage automation > CODEOWNERS gate paragraph.
+  # Regression-test deletion guard. Detects deletion of fuzz-promoted
+  # regression tests under tests/regression_*.rs or
+  # crates/*/tests/regression_*.rs between the PR base and HEAD. Fails CI
+  # when such a deletion has no paired issue link in the PR body or
+  # commit-message range.
   check-regression-tests:
     name: check-regression-tests
     # owner: M02

@@ -1,30 +1,24 @@
-// owned-by: M02 (fuzz lane); module authored under M02.P1.T8.
-//
 //! libFuzzer entry-point module for `chio-kernel-core` receipt-log replay.
 //!
-//! Authored under M02.P1.T8 (`.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 1, Round-2 trust-boundary fuzz target #12). This module is gated
-//! behind the `fuzz` Cargo feature so it only compiles into the standalone
-//! `chio-fuzz` workspace at `../../fuzz`. The production build of
+//! Gated behind the `fuzz` Cargo feature so it only compiles into the
+//! standalone `chio-fuzz` workspace at `../../fuzz`. The production build of
 //! `chio-kernel-core` never pulls in `arbitrary`, never exposes these symbols,
 //! and never gets recompiled with libFuzzer instrumentation. The `fuzz`
 //! feature also implies `std` because libFuzzer itself only runs in a hosted
 //! environment, so the portable `no_std + alloc` host + wasm proof in
 //! `scripts/check-portable-kernel.sh` never observes this surface.
 //!
-//! # Why this target exists (Round-2 rationale)
+//! # Why this target exists
 //!
-//! Per the source-of-truth Round-2 add: catches reordered / corrupted-chain
-//! bugs that the merkle_checkpoint target cannot. The merkle root only
-//! commits to the set of leaf hashes; it cannot detect a re-encoded receipt
-//! whose canonical-JSON bytes still hash to the same leaf, nor a receipt
-//! log whose timestamps move backwards while every individual signature
-//! still verifies. The replay-time verifier is the canonical
-//! "decode-then-verify-then-check-chain-invariants" surface for the M04
-//! deterministic replay path: the M10 tee streams produce NDJSON receipt
-//! logs (one canonical-JSON `ChioReceipt` per line) that the gate then
-//! re-reads and validates, and any panic on that re-read path would crash
-//! the gate every time the malformed bytes are seen.
+//! Catches reordered / corrupted-chain bugs that the merkle_checkpoint target
+//! cannot. The merkle root only commits to the set of leaf hashes; it cannot
+//! detect a re-encoded receipt whose canonical-JSON bytes still hash to the
+//! same leaf, nor a receipt log whose timestamps move backwards while every
+//! individual signature still verifies. The replay-time verifier is the
+//! canonical "decode-then-verify-then-check-chain-invariants" surface: tee
+//! streams produce NDJSON receipt logs (one canonical-JSON `ChioReceipt` per
+//! line) that the gate re-reads and validates, and any panic on that re-read
+//! path would crash the gate every time the malformed bytes are seen.
 //!
 //! # Chosen entry point
 //!

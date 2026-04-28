@@ -1,46 +1,18 @@
-# fuzz.yml - Native cargo-fuzz scheduled matrix (M02-owned).
+# fuzz.yml - Native cargo-fuzz scheduled matrix.
 #
-# Source of truth: .planning/trajectory/02-fuzzing-post-pr13.md
-# (Phase 1 lines 141-160; Phase 4 crash-triage references at 323/413).
-# Decision lock: .planning/trajectory/decisions.yml
-# id=continuous-fuzzing-path (OSS-Fuzz primary, ClusterFuzzLite bridge,
-# 1,800 GHA runner-min/30d hard halt before the 2,000 min/month free-tier
-# cap).
-#
-# This workflow is the in-tree `cargo +nightly fuzz` scheduled matrix
-# referenced throughout the source doc. It complements (does NOT
-# duplicate) the ClusterFuzzLite workflows:
-#
+# In-tree `cargo +nightly fuzz` scheduled matrix. Complements the
+# ClusterFuzzLite workflows:
 #   - cflite_pr.yml    : PR-time changed-target sampling (60s/target)
 #   - cflite_batch.yml : nightly ClusterFuzzLite rotation (1,800s/target)
-#   - fuzz.yml (this)  : nightly native libFuzzer matrix (>= 30 min/target,
-#                        ASan, all targets in parallel)
+#   - fuzz.yml (this)  : nightly native libFuzzer matrix (30 min/target, ASan)
 #
-# T6 scope (this commit): extend the matrix to enumerate every libFuzzer
-# target that has landed under M02 P1 plus the M09 supply-chain entry,
-# pre-including the receipt_log_replay slot for M02.P1.T8 so wiring it up
-# later is a one-line target-binary add rather than a workflow edit.
+# Per-target wall-time: 1,800s via `--max_total_time=1800` plus
+# `timeout-minutes: 45`. Budget guard (`scripts/check-fuzz-budget.sh`)
+# counts cflite + this workflow toward the 1,800 min/30d cap and refuses
+# to fan out the matrix when the trailing total would breach it.
 #
-# Per-target wall-time budget: 1,800s (30 min) hard cap via
-# `--max_total_time=1800` plus `timeout-minutes: 45` belt-and-braces.
-# With 13 matrix entries (12 live + 1 placeholder) the worst-case nightly
-# wall-time is 13 * 30 = 390 minutes if every job ran to budget. The
-# matrix runs jobs in parallel on the GitHub-hosted pool (default 20
-# concurrent runners on the free tier), so wall-clock is bounded by
-# the longest single target rather than the sum. Budget accounting:
-# nightly = 13 jobs * 30 min = 390 billed-min; weekly = 7 * 390 = 2,730
-# billed-min; monthly = 4 * 2,730 = 10,920 billed-min. That deliberately
-# exceeds the 1,800-min cflite cap because this lane runs on the SAME
-# GHA account, so the in-tree budget guard
-# (`scripts/check-fuzz-budget.sh`) is invoked before the matrix fans
-# out. The guard counts cflite + this workflow toward the cap and
-# refuses to fan out the matrix when the trailing 30-day total
-# would breach 1,800 minutes (see fuzz-budget job below).
-#
-# Pre-empted target: receipt_log_replay (M02.P1.T8) is listed in the
-# matrix but the per-target step short-circuits when the binary does
-# not yet exist in fuzz/Cargo.toml. T8 lands the binary, no workflow
-# edit needed.
+# The receipt_log_replay matrix slot is reserved; its per-target step
+# short-circuits until the target binary lands in fuzz/Cargo.toml.
 
 name: fuzz
 
@@ -104,27 +76,22 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # M02 baseline targets currently present in fuzz/Cargo.toml.
           - canonical_json
           - capability_receipt
           - manifest_roundtrip
-          # M09 P3.T5 supply-chain entry (already landed via PR #76).
           - attest_verify
-          # M02 P1 expansion (eleven new targets).
-          - jwt_vc_verify           # M02.P1.T1.a
-          - oid4vp_presentation     # M02.P1.T1.b
-          - did_resolve             # M02.P1.T1.c
-          - anchor_bundle_verify    # M02.P1.T2
-          - mcp_envelope_decode     # M02.P1.T3.a
-          - a2a_envelope_decode     # M02.P1.T3.b
-          - acp_envelope_decode     # M02.P1.T3.c
-          - wasm_preinstantiate_validate  # M02.P1.T4.a
-          - wit_host_call_boundary  # M02.P1.T4.b
-          - chio_yaml_parse         # M02.P1.T5.a
-          - openapi_ingest          # M02.P1.T5.b
-          # M02 P1.T8 slot (target binary lands later; per-step guard
-          # short-circuits until then so this entry does not break the
-          # matrix).
+          - jwt_vc_verify
+          - oid4vp_presentation
+          - did_resolve
+          - anchor_bundle_verify
+          - mcp_envelope_decode
+          - a2a_envelope_decode
+          - acp_envelope_decode
+          - wasm_preinstantiate_validate
+          - wit_host_call_boundary
+          - chio_yaml_parse
+          - openapi_ingest
+          # reserved slot; per-step guard short-circuits until the binary lands
           - receipt_log_replay
     steps:
       # Cleanup C6: GHA `exit 0` only marks the step successful; it does

@@ -1,8 +1,5 @@
 //! Timing-leak dudect harness for capability scope-subset evaluation.
 //!
-//! Source-doc anchor: `.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 3 atomic task P3.T5 + the "Timing-leak (dudect) harness" section.
-//!
 //! Gated behind the `dudect` Cargo feature so default `cargo test -p
 //! chio-kernel-core` is unaffected; opt in via:
 //!
@@ -44,8 +41,7 @@
 //! capability-bearing tool call. A timing leak here would let a tenant
 //! learn the structure of another tenant's parent capability through
 //! response-time analysis. A `t < 4.5` result in two consecutive CI runs
-//! is the documented pass criterion (`.github/workflows/dudect.yml`,
-//! M02.P2.T4).
+//! is the documented pass criterion (`.github/workflows/dudect.yml`).
 
 #![cfg(feature = "dudect")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]

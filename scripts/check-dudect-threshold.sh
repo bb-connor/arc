@@ -2,17 +2,12 @@
 # check-dudect-threshold.sh - Parse dudect-bencher stdout and verdict
 # the maximum |t|-statistic against the leakage threshold (default 4.5).
 #
-# Source-doc anchors:
-#   .planning/trajectory/02-fuzzing-post-pr13.md - Phase 3 atomic task P3.T6
-#   ("Timing-leak (dudect) harness" + "false-positive on noisy host" risk).
-# CI lane:
-#   .github/workflows/dudect.yml (M02.P2.T4) invokes this script once per
-#   harness output file and uses its exit code (0 = under threshold,
-#   1 = over threshold) as a per-run verdict. A leak alarm requires TWO
-#   consecutive nightly runs to BOTH return exit 1 for the same harness
-#   ("two-consecutive-run pass rule"), which the workflow enforces by
-#   comparing the current verdict against the prior run's artifact before
-#   opening a GitHub Issue.
+# The dudect CI lane invokes this script once per harness output file and
+# uses its exit code (0 = under threshold, 1 = over threshold) as a
+# per-run verdict. A leak alarm requires TWO consecutive nightly runs to
+# BOTH return exit 1 for the same harness ("two-consecutive-run pass rule"),
+# which the workflow enforces by comparing the current verdict against the
+# prior run's artifact before opening a GitHub Issue.
 #
 # Why 4.5:
 #   The dudect paper (Reparaz, Balasch, Verbauwhede - 2017) recommends a

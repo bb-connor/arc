@@ -50,8 +50,7 @@ pub struct PeerEntry {
     pub binary: String,
     /// Whether this entry has been published with a real sha256 pin and a
     /// reachable url. Defaults to `true` so historical entries do not need
-    /// to be edited; placeholder entries (where the M01 release pipeline
-    /// has not yet uploaded a real binary) MUST set `published = false`.
+    /// to be edited; placeholder entries MUST set `published = false`.
     /// `chio conformance fetch-peers` SKIPS entries with
     /// `published = false` rather than failing them with a sha256
     /// mismatch. See cleanup C5 issue D for the gating contract.
@@ -227,7 +226,7 @@ fn is_lowercase_hex_64(value: &str) -> bool {
 ///
 /// Returns the first candidate that exists. When none exist this returns
 /// the in-repo default (candidate 4) so the error message points users at
-/// the canonical path, mirroring the M04.P3.T3 cache-dir strategy.
+/// the canonical path.
 #[must_use]
 pub fn default_peers_lock_path() -> PathBuf {
     if let Some(path) = std::env::var_os("CHIO_PEERS_LOCK") {
@@ -453,9 +452,9 @@ published = true
 
     #[test]
     fn shipped_lockfile_marks_placeholders_as_unpublished() {
-        // Cleanup C5 issue D: the shipped lockfile carries placeholder
-        // sha256 pins, so every entry MUST be flagged as unpublished
-        // until the M01 release pipeline fills in real values.
+        // The shipped lockfile carries placeholder sha256 pins, so every
+        // entry MUST be flagged as unpublished until the release pipeline
+        // fills in real values.
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set during cargo test");
         let path = Path::new(&manifest_dir).join("peers.lock.toml");

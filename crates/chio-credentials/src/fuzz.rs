@@ -1,11 +1,9 @@
 //! libFuzzer entry-point module.
 //!
-//! Authored under M02.P1.T1.a (`.planning/trajectory/02-fuzzing-post-pr13.md`
-//! Phase 1). This module is gated behind the `fuzz` Cargo feature so it only
-//! compiles into the standalone `chio-fuzz` workspace at `../../fuzz`. The
-//! production build of `chio-credentials` never pulls in `arbitrary`, never
-//! exposes these symbols, and never gets recompiled with libFuzzer
-//! instrumentation.
+//! Gated behind the `fuzz` Cargo feature so it only compiles into the
+//! standalone `chio-fuzz` workspace at `../../fuzz`. The production build of
+//! `chio-credentials` never pulls in `arbitrary`, never exposes these
+//! symbols, and never gets recompiled with libFuzzer instrumentation.
 //!
 //! The entry point [`fuzz_jwt_vc_verify`] consumes arbitrary bytes
 //! and drives them through [`crate::verify_chio_passport_jwt_vc_json`], the

@@ -6,9 +6,7 @@
 # binary into $OUT/<target>, plus a per-target seed corpus zip when one
 # exists under fuzz/corpus/<target>/.
 #
-# Source-of-truth: .planning/trajectory/02-fuzzing-post-pr13.md
-# (OSS-Fuzz application steps section). Companion docs in
-# docs/fuzzing/continuous.md (OSS-Fuzz integration section).
+# See docs/fuzzing/continuous.md for OSS-Fuzz integration details.
 
 set -euo pipefail
 

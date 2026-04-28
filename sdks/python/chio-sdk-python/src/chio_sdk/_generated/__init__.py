@@ -2,10 +2,10 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5
+# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
 #
 # Manual edits will be overwritten by the next regeneration; the
-# M01.P3.T5 spec-drift CI lane enforces this header on every file
+# spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
 """Generated Pydantic v2 models for the Chio wire protocol (chio-wire/v1).
@@ -13,7 +13,7 @@
 Re-exports every subpackage so callers can write
 ``from chio_sdk._generated import CapabilityToken`` without knowing the
 per-subpackage layout. The SCHEMA_SHA256 constant pins the schema set
-this build was generated from; the M01.P3.T5 spec-drift CI lane reads
+this build was generated from; the spec-drift CI lane reads
 it to detect tampering.
 """
 
@@ -22,7 +22,7 @@ from __future__ import annotations
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "47c14e6bc7f276540f7ae14d78b3cfb7b2b67b0a023df6a65298a2fa4d2b38e5"
+SCHEMA_SHA256 = "548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0"
 
 from .agent import CapabilityToken, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, DelegationChainItem, Grant, MaxCostPerInvocation, MaxTotalCost, Operation, PromptGrant, ResourceGrant, Scope
 from .capability import Algorithm, Attenuation, ChioCapabilityGrant, ChioCapabilityRevocationEntry, ChioCapabilitytoken, ChioScope, Constraint, DelegationLink, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant

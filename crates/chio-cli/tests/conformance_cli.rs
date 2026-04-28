@@ -1,17 +1,10 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-//! M01.P4.T3: integration coverage for `chio conformance run`.
+//! Integration coverage for `chio conformance run`.
 //!
-//! Two complementary checks land here. First, the help output of
-//! `chio conformance run --help` is captured via `insta::assert_snapshot!`
-//! so we notice if the surface area of the subcommand drifts (new flags,
-//! renamed flags, etc.). Second, when the local environment provides the
-//! reference peer toolchains (Node.js plus Python 3.11+), the test exercises
+//! Snapshots the `--help` output and (when Python 3.11+ is available) drives
 //! the live harness against the Python peer adapter and snapshots the JSON
-//! report's *shape* via `insta::assert_json_snapshot!` with redactions for
-//! non-deterministic fields (paths, listen port, durations, transcript
-//! locations). When peers are unavailable the live portion silently returns,
-//! mirroring the gating used by `crates/chio-conformance/tests/mcp_core_live.rs`.
+//! report shape. Live portions are skipped when peers are unavailable.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -51,10 +44,8 @@ fn python3_supports_chio_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
-/// Snapshot the `--help` text for `chio conformance run` so that any drift
-/// in the subcommand's flag surface lands in a reviewable diff. Help text
-/// is fully deterministic across machines (no paths, no ports), so no
-/// redactions are needed.
+/// Snapshot `chio conformance run --help` so flag-surface drift appears in
+/// review.
 #[test]
 fn conformance_run_help_shape_is_stable() {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -72,19 +63,9 @@ fn conformance_run_help_shape_is_stable() {
     assert_snapshot!("conformance_run_help", help_text);
 }
 
-/// Drive the live conformance harness and snapshot the JSON report's
-/// structural shape. Asserts all 5 mcp-core scenarios are green before
-/// snapshotting so the snapshot reflects a passing run.
-///
-/// The test silently no-ops if Python 3.11+ is unavailable on the host,
-/// which keeps the test green on stripped-down CI runners that lack the
-/// Python toolchain. Live harness runs are also gated by the
-/// `CHIO_SKIP_CONFORMANCE_LIVE` env var for ad-hoc opt-out.
-///
-/// Cleanup C5 issue H: the gate previously also required `node`, which
-/// silently no-op'd this test on Python-only environments even though
-/// `--peer python` exercises only the Python toolchain. The detection is
-/// now per-peer: this `--peer python` test only checks for python3.
+/// Drive the live harness against the Python peer and snapshot the JSON report
+/// shape. Silently skips when Python 3.11+ is unavailable or
+/// `CHIO_SKIP_CONFORMANCE_LIVE` is set.
 #[test]
 fn conformance_run_python_report_shape_is_stable() {
     if std::env::var_os("CHIO_SKIP_CONFORMANCE_LIVE").is_some() {

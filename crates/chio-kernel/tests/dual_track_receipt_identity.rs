@@ -1,12 +1,12 @@
-//! Dual-track receipt byte-identity regression for M05.P1.T7.
+//! Dual-track receipt byte-identity regression.
 //!
-//! The input is anchored to the M04 replay corpus rather than a new fixture
-//! format: `tests/replay/fixtures/allow_simple/01_basic_capability.json`
-//! plus its blessed receipt stream under `tests/replay/goldens`.
+//! Anchored to the replay corpus at
+//! `tests/replay/fixtures/allow_simple/01_basic_capability.json` plus its
+//! blessed receipt stream under `tests/replay/goldens`.
 //!
-//! The contract under `legacy-sync` is narrow: the async signing path used
-//! by `ToolEvaluator::sign_receipt` must emit the same canonical signed
-//! receipt bytes as the legacy synchronous signer for the same receipt body.
+//! Under `legacy-sync`: the async signing path used by
+//! `ToolEvaluator::sign_receipt` must emit the same canonical signed receipt
+//! bytes as the legacy synchronous signer for the same receipt body.
 
 #![cfg(feature = "legacy-sync")]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
@@ -136,7 +136,6 @@ fn m04_fixture_receipt_body(kernel_key: &Keypair) -> ChioReceiptBody {
         metadata: Some(json!({
             "m04_fixture": M04_FIXTURE_PATH,
             "m04_golden_receipts": M04_GOLDEN_RECEIPTS_PATH,
-            "m05_ticket": "M05.P1.T7"
         })),
         trust_level: TrustLevel::default(),
         tenant_id: None,

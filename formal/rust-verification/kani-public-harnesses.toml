@@ -2,13 +2,10 @@ schema = "chio.kani-public-harnesses.v1"
 crate = "chio-kernel-core"
 script = "scripts/check-kani-public-core.sh"
 
-# Harness groups (M03.P2.T5: covered_symbols 5 -> 10).
-# `harness_groups` is the existing flat-array catalog (one entry per
-# logical edge or algebraic property the harnesses exercise). The new
-# entries below T5 cover the four expansion harnesses landed in T1-T4:
-# scope intersection associativity, revocation idempotence, single-step
-# delegation attenuation, receipt sign/verify roundtrip, and the
-# budget-checked-add overflow guard.
+# `harness_groups` is the flat-array catalog (one entry per logical edge or
+# algebraic property the harnesses exercise). Entries cover scope intersection
+# associativity, revocation idempotence, single-step delegation attenuation,
+# receipt sign/verify roundtrip, and the budget-checked-add overflow guard.
 harness_groups = [
   "public verify_capability fail-closed edges",
   "public NormalizedScope subset edges",
@@ -22,10 +19,7 @@ harness_groups = [
   "verify budget checked-add no partial commit on overflow",
 ]
 
-# Public Rust symbols whose behaviour is witnessed by the harnesses
-# above. Five of these are unchanged from the pre-T5 manifest; the
-# additional five are the algebraic primitives and the canonical-JSON
-# verify entry point that T1-T4's harnesses target.
+# Public Rust symbols witnessed by the harnesses above.
 covered_symbols = [
   "chio_kernel_core::verify_capability",
   "chio_kernel_core::NormalizedScope::is_subset_of",
@@ -39,18 +33,16 @@ covered_symbols = [
   "chio_core_types::crypto::PublicKey::verify_canonical",
 ]
 
-# Lane assignment (M03.P2.T6, replacing T5's heuristic split).
+# Lane assignment.
 #
-# T5 bucketed the five `verify_*` algebraic harnesses on the assumption
-# that their multi-axis u8-promoted symbolic search would dominate the
-# concrete-fixture `public_*` harnesses. T6 wall-clocked each harness
-# individually with `cargo kani -p chio-kernel-core --lib --harness <h>
+# Wall-clocked each harness individually with
+# `cargo kani -p chio-kernel-core --lib --harness <h>
 # --default-unwind 8 --no-unwinding-checks` on aarch64-apple-darwin
-# (kani 0.67.0, 2026-04-26) and found the heuristic inverted: the
-# concrete-fixture harnesses dominate because `public_verify_capability`
-# and `public_evaluate` exercise the full canonical-JSON serialise plus
-# Ed25519/P-384 verify path, while the algebraic harnesses model
-# signatures with `model_sign`/`model_verify` and finish in 1-3 seconds.
+# (kani 0.67.0, 2026-04-26). The concrete-fixture harnesses dominate
+# because `public_verify_capability` and `public_evaluate` exercise the
+# full canonical-JSON serialise plus Ed25519/P-384 verify path, while the
+# algebraic harnesses model signatures with `model_sign`/`model_verify`
+# and finish in 1-3 seconds.
 #
 # Per-harness wall-clock (local Apple M-series, hot cargo cache):
 #   public_verify_capability_rejects_untrusted_issuer_before_signature  31s
@@ -71,12 +63,11 @@ covered_symbols = [
 #
 # Sum is ~2.2 min locally; even the typical 2-3x ubuntu-latest CI
 # overhead leaves the full sweep within the 6-minute PR budget. All
-# fourteen harnesses therefore land in `lanes.pr`. The `lanes.nightly_only`
-# bucket is preserved (empty) so future T6-style re-measurements can
-# move slow harnesses into it without a schema migration. The nightly
-# Kani job runs the union of `lanes.pr` and `lanes.nightly_only`, so
-# moving a harness to `nightly_only` strictly reduces PR coverage,
-# never nightly coverage.
+# fourteen harnesses land in `lanes.pr`. The `lanes.nightly_only` bucket
+# is preserved (empty) so future re-measurements can move slow harnesses
+# into it without a schema migration. The nightly Kani job runs the union
+# of `lanes.pr` and `lanes.nightly_only`, so moving a harness to
+# `nightly_only` strictly reduces PR coverage, never nightly coverage.
 [lanes.pr]
 description = "Fast Kani harnesses run on every pull request (full sweep)"
 harnesses = [
@@ -97,5 +88,5 @@ harnesses = [
 ]
 
 [lanes.nightly_only]
-description = "Slow Kani harnesses gated to the nightly lane (empty after T6 wall-clock; reserved for future slow harnesses)"
+description = "Slow Kani harnesses gated to the nightly lane (currently empty; reserved for future slow harnesses)"
 harnesses = []

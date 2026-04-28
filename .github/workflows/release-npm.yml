@@ -142,13 +142,10 @@ jobs:
 
   build:
     name: Build ${{ matrix.package }}
-    # owner: M09
     needs: plan
     runs-on: ubuntu-latest
     permissions:
       # Required for cosign keyless signing via Sigstore Fulcio.
-      # See M09.P3.T1 chio-attest-verify (crates/chio-attest-verify/README.md)
-      # for the verification trait surface and OIDC identity contract.
       id-token: write
       contents: read
     strategy:
@@ -338,14 +335,10 @@ jobs:
           cosign-release: "v2.4.1"
 
       - name: Sign npm tarball with cosign keyless
-        # owner: M09
         # Produces a detached `.sig` and Fulcio leaf cert `.pem` for
-        # the npm tarball. npm provenance via `--provenance` (the
-        # publish job below) and cosign keyless are complementary:
-        # provenance is enforced by the npm registry, cosign is verified
-        # client-side via the recipe in docs/install/VERIFY.md and via
-        # the chio-attest-verify trait surface
-        # (crates/chio-attest-verify/README.md, M09.P3.T1).
+        # the npm tarball. npm provenance (--provenance) and cosign keyless
+        # are complementary; cosign is verified client-side via the recipe
+        # in docs/install/VERIFY.md.
         shell: bash
         env:
           COSIGN_YES: "true"
@@ -459,21 +452,10 @@ jobs:
 
   release-attest:
     name: Attach cosign signatures to GitHub Release
-    # owner: M09
-    # Attaches `.sig` (cosign signature) + `.pem` (Fulcio leaf cert) for
-    # every npm tarball to the GitHub Release that the `ts/...` tag
-    # produces. Verification recipe lives in docs/install/VERIFY.md and
-    # cross-references the chio-attest-verify trait surface
-    # (crates/chio-attest-verify/README.md, M09.P3.T1).
-    #
-    # Gates on `publish` rather than just `[plan, build]` so the
-    # signed artifacts only attach to the GitHub Release after the
-    # `npm`-environment-protected publish job has actually succeeded.
-    # The previous `needs: [plan, build]` shape would attach signed
-    # tarballs even when the environment approval was pending or
-    # `npm publish` failed mid-upload, advertising a release that
-    # never reached the npm registry (cleanup-c11b; PR #75 review
-    # thread r3143041637).
+    # Attaches `.sig` + `.pem` for every npm tarball to the GitHub Release.
+    # Verification recipe: docs/install/VERIFY.md.
+    # Gates on `publish` so signed artifacts only attach after the
+    # npm-environment-protected publish job has actually succeeded.
     needs: [plan, build, publish]
     # Skip on workflow_dispatch dry runs; only attach on real tag pushes.
     if: needs.plan.outputs.dry_run != 'true' && github.event_name == 'push'
