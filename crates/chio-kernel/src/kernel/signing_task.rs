@@ -295,6 +295,34 @@ impl SigningTaskHandle {
         self.inner.get().is_some()
     }
 
+    /// Abort the spawned task and close the canonical sender.
+    ///
+    /// This is intentionally crate-private: it exists for the M05.P4.T4
+    /// crash-recovery integration test, which needs to model a hard
+    /// task loss rather than a graceful [`Self::shutdown`]. Producers
+    /// that were queued observe a dropped reply channel, and producers
+    /// that arrive afterward observe a closed signing task.
+    #[allow(dead_code)]
+    pub(crate) fn abort_for_crash_recovery_test(&self) {
+        let Some(inner) = self.inner.get() else {
+            return;
+        };
+
+        let dropped_sender = match inner.sender.lock() {
+            Ok(mut slot) => slot.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        };
+        drop(dropped_sender);
+
+        let guard = match inner.join.lock() {
+            Ok(slot) => slot,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(join) = guard.as_ref() {
+            join.abort();
+        }
+    }
+
     /// Drain in-flight requests and join the signing task.
     ///
     /// 1. Drops the canonical channel sender. The receiver inside the
