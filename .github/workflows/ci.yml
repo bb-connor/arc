@@ -549,6 +549,7 @@ jobs:
   check-regression-tests:
     name: check-regression-tests
     # owner: M02
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
