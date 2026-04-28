@@ -1,7 +1,6 @@
-//! Integration tests for the M05.P1.T3 mpsc-backed signing task.
+//! Integration tests for the mpsc-backed signing task.
 //!
-//! Source-doc anchor: `.planning/trajectory/05-async-kernel-real.md` Phase
-//! 1 Task 3. The doc names three behavioural contracts T3 must satisfy:
+//! Three behavioural contracts:
 //!
 //! 1. The kernel signs N receipts via the mpsc path and every signature
 //!    verifies against the kernel's public key.
@@ -16,15 +15,11 @@
 //! and `ChioKernel::shutdown` entrypoints. They deliberately avoid the
 //! synchronous `evaluate_tool_call_blocking` path so the assertions
 //! attribute to the channel boundary, not to the inline
-//! `build_and_sign_receipt` helper that T3 leaves untouched.
+//! `build_and_sign_receipt` helper.
 //!
-//! ## House rules (replay_proptest.rs precedent)
-//!
-//! - No em dashes anywhere.
-//! - The crate-wide `unwrap_used` / `expect_used` clippy lints are denied
-//!   workspace-wide; the integration-test binary opts back in via the
-//!   crate-level allow attribute below, matching the precedent set by
-//!   `tests/replay_proptest.rs`.
+//! The crate-wide `unwrap_used` / `expect_used` clippy lints are denied
+//! workspace-wide; the integration-test binary opts back in via the
+//! crate-level allow attribute below.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -222,9 +217,9 @@ async fn mpsc_signing_path_applies_backpressure_at_capacity() {
     // the runtime drain everything before backpressure has any chance
     // to engage).
     assert!(
-        chio_kernel::M05_T3_SIGNING_CHANNEL_DEFAULT_CAPACITY >= 16,
+        chio_kernel::SIGNING_CHANNEL_DEFAULT_CAPACITY >= 16,
         "default capacity {} too small to exercise backpressure",
-        chio_kernel::M05_T3_SIGNING_CHANNEL_DEFAULT_CAPACITY
+        chio_kernel::SIGNING_CHANNEL_DEFAULT_CAPACITY
     );
 
     // Queue twice the default capacity. With a fast signer this races
@@ -233,7 +228,7 @@ async fn mpsc_signing_path_applies_backpressure_at_capacity() {
     // documented to make `send().await` block (never error) until
     // capacity frees, so a successful drain at 2x capacity demonstrates
     // backpressure was observed without losing messages.
-    let target = chio_kernel::M05_T3_SIGNING_CHANNEL_DEFAULT_CAPACITY.saturating_mul(2);
+    let target = chio_kernel::SIGNING_CHANNEL_DEFAULT_CAPACITY.saturating_mul(2);
 
     let mut handles = Vec::with_capacity(target);
     for i in 0..target {
@@ -287,8 +282,8 @@ async fn mpsc_signing_path_applies_backpressure_at_capacity() {
 // began are NOT "in-flight"; they are "pending". The contract for them
 // is fail-closed: the canonical sender is gone (shutdown took it), so
 // the next clone-attempt observes `None` and surfaces
-// `KernelError::Internal`. This is the M05.P4.T4 "fail closed within
-// the channel-bounded deadline" contract one ticket up the milestone.
+// `KernelError::Internal`. This is the fail-closed-within-channel-deadline
+// contract.
 //
 // To exercise the drain path deterministically without racing the
 // scheduler, we drive in two phases:

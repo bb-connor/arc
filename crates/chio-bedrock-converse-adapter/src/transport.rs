@@ -1,10 +1,4 @@
 //! Bedrock Runtime transport scaffold.
-//!
-//! T1 keeps the transport offline and deterministic. The trait identifies
-//! the two supported Bedrock operations (`Converse` and `ConverseStream`),
-//! pins the region to `us-east-1`, and provides a mock transport that records
-//! call intent in memory. Later tickets replace the mock-only surface with a
-//! real AWS SDK client while preserving the same region and operation gates.
 
 use std::sync::Mutex;
 
@@ -40,25 +34,17 @@ impl BedrockOperation {
 /// Wire-level transport errors.
 #[derive(Debug, Error)]
 pub enum TransportError {
-    /// The mock transport has no scripted behavior for this operation.
     #[error("mock bedrock transport has no scripted response for {operation}")]
     MockExhausted { operation: &'static str },
-    /// A caller attempted to use an operation outside the M07.P4 scope.
     #[error("unsupported bedrock runtime operation: {operation}")]
     UnsupportedOperation { operation: String },
-    /// A caller attempted to use a region outside the v1 pin.
     #[error("unsupported bedrock region: {region}; expected us-east-1")]
     UnsupportedRegion { region: String },
-    /// Reserved for the real AWS SDK transport that lands in later tickets.
-    #[error("bedrock SDK transport path is not implemented in T1: {0}")]
-    NotImplementedInT1(&'static str),
+    #[error("bedrock SDK transport path is not implemented: {0}")]
+    NotImplemented(&'static str),
 }
 
 /// Wire-level transport contract.
-///
-/// The default methods enforce the T1 scope: `us-east-1`, `Converse`, and
-/// `ConverseStream`. Real transports added later can implement request
-/// dispatch while keeping the region and operation checks in one place.
 pub trait Transport: Send + Sync {
     /// AWS region targeted by this transport.
     fn region(&self) -> &str {
@@ -90,11 +76,7 @@ pub trait Transport: Send + Sync {
     }
 }
 
-/// In-memory transport that records intended Bedrock calls.
-///
-/// The mock does not contact AWS and does not require credentials. It exists
-/// so T1 tests and later fixture replays can assert which operation would
-/// have been issued.
+/// In-memory transport that records intended Bedrock calls without contacting AWS.
 #[derive(Default)]
 pub struct MockTransport {
     calls: Mutex<Vec<(BedrockOperation, Vec<u8>)>>,
@@ -171,7 +153,7 @@ mod tests {
             TransportError::UnsupportedRegion {
                 region: "us-west-2".to_string(),
             },
-            TransportError::NotImplementedInT1("converse"),
+            TransportError::NotImplemented("converse"),
         ];
         for err in cases {
             let s = err.to_string();
