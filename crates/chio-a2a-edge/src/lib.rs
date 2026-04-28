@@ -40,6 +40,9 @@ use chio_mcp_edge::McpTargetExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+#[cfg(feature = "otel")]
+pub mod otel;
+
 /// Errors produced by the A2A edge.
 #[derive(Debug, thiserror::Error)]
 pub enum A2aEdgeError {
