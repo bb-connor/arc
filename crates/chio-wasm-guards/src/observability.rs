@@ -13,6 +13,7 @@ pub const UNKNOWN_GUARD_DIGEST: &str = "unknown";
 
 pub const VERDICT_ALLOW: &str = "allow";
 pub const VERDICT_DENY: &str = "deny";
+pub const VERDICT_REWRITE: &str = "rewrite";
 pub const VERDICT_ERROR: &str = "error";
 
 pub const HOST_LOG: &str = "log";
