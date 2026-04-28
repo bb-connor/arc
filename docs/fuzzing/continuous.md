@@ -168,16 +168,17 @@ The CFLite builder image lives under `.clusterfuzzlite/`:
   contact, the address+undefined sanitizer pair, the `x86_64` architecture,
   and the `libfuzzer` engine. The `report_to_oss_fuzz` flag stays `false`
   until OSS-Fuzz acceptance lands. The corpus `storage-repo` is wired as
-  an action input on the `run_fuzzers` step in `.github/workflows/cflite_pr.yml`
-  and `.github/workflows/cflite_batch.yml` per ClusterFuzzLite's published
-  schema (it is not a `project.yaml` field).
+  a `FUZZ_CORPUS_PAT`-backed action input on the `run_fuzzers` step in
+  `.github/workflows/cflite_pr.yml` and `.github/workflows/cflite_batch.yml`
+  per ClusterFuzzLite's published schema (it is not a `project.yaml` field).
 
 Storage backend: `bb-connor/arc-fuzz-corpus` (sibling private repo). The
 repo is created out-of-band before the first `cflite_batch.yml` run; until
 it exists, ClusterFuzzLite falls back to per-run artifact storage and the
 rotation still passes its crash-search criterion. Keeping corpus storage in
 the GitHub control plane avoids new cloud-billing surfaces and keeps the
-1,800 min/30d cap legible.
+1,800 min/30d cap legible. Cross-repo writes require the repository secret
+`FUZZ_CORPUS_PAT`; `GITHUB_TOKEN` cannot push to the sibling private repo.
 
 ## OSS-Fuzz application status
 

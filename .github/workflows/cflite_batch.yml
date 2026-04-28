@@ -9,8 +9,8 @@
 # blow the monthly free tier.
 #
 # Storage backend (corpus persistence between rotations):
-# bb-connor/arc-fuzz-corpus sibling private repo, declared in
-# .clusterfuzzlite/project.yaml `storage-repo`. No GCS.
+# bb-connor/arc-fuzz-corpus sibling private repo, wired as a
+# FUZZ_CORPUS_PAT-backed `storage-repo` action input. No GCS.
 
 name: cflite_batch
 
@@ -114,9 +114,9 @@ jobs:
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # storage-repo is an action input (not a project.yaml field) per
-          # ClusterFuzzLite docs; declares the sibling corpus repo so the
-          # nightly rotation persists corpus across runs.
-          storage-repo: https://github.com/bb-connor/arc-fuzz-corpus
+          # ClusterFuzzLite docs. The PAT-backed URL is required because
+          # GITHUB_TOKEN cannot write the sibling private corpus repo.
+          storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
           report-unreproducible-crashes: true
 
       - name: Upload crash reports

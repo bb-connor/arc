@@ -610,16 +610,14 @@ jobs:
           while IFS= read -r line; do
             trimmed="${line#"${line%%[![:space:]]*}"}"
             trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-            case "${trimmed}" in
-              cycle_end_tag*=*)
-                value="${trimmed#*=}"
-                value="${value#"${value%%[![:space:]]*}"}"
-                value="${value#\"}"
-                value="${value%\"}"
-                current="${value}"
-                break
-                ;;
-            esac
+            if [[ "${trimmed}" =~ ^cycle_end_tag[[:space:]]*= ]]; then
+              value="${trimmed#*=}"
+              value="${value#"${value%%[![:space:]]*}"}"
+              value="${value#\"}"
+              value="${value%\"}"
+              current="${value}"
+              break
+            fi
           done < releases.toml
           echo "current=${current}" >> "$GITHUB_OUTPUT"
           if [ -z "${current}" ]; then

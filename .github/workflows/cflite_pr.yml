@@ -184,9 +184,9 @@ jobs:
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # storage-repo is an action input (not a project.yaml field) per
-          # ClusterFuzzLite docs; declares the sibling corpus repo so PR-time
-          # runs read prior corpus and write back any new coverage.
-          storage-repo: https://github.com/bb-connor/arc-fuzz-corpus
+          # ClusterFuzzLite docs. The PAT-backed URL is required because
+          # GITHUB_TOKEN cannot write the sibling private corpus repo.
+          storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
           report-unreproducible-crashes: false
 
       - name: "Run ClusterFuzzLite full-corpus sweep (fuzz-full label)"
@@ -198,7 +198,7 @@ jobs:
           mode: batch
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          storage-repo: https://github.com/bb-connor/arc-fuzz-corpus
+          storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
           report-unreproducible-crashes: false
 
       - name: Upload crash reports
