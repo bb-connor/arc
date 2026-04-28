@@ -307,6 +307,7 @@ jobs:
           cosign-release: v2.4.1
 
       - name: Cosign sign-blob release archive
+        if: runner.os != 'Windows'
         shell: bash
         env:
           CHIO_ARCHIVE_KIND: ${{ matrix.archive }}
@@ -335,6 +336,35 @@ jobs:
             exit 1
           fi
           echo "Signed ${archive}; sig=${sig} pem=${pem}"
+
+      - name: Cosign sign-blob release archive (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CHIO_ARCHIVE_KIND: ${{ matrix.archive }}
+          CHIO_TARGET: ${{ matrix.target }}
+          CHIO_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $stage = "chio-$env:CHIO_VERSION-$env:CHIO_TARGET"
+          $archive = "dist/$stage.$env:CHIO_ARCHIVE_KIND"
+          if (-not (Test-Path -Path $archive -PathType Leaf)) {
+            Write-Error "expected release archive missing: $archive"
+            exit 1
+          }
+          $sig = "$archive.sig"
+          $pem = "$archive.pem"
+          Write-Host "Signing $archive with cosign sign-blob"
+          cosign sign-blob --yes `
+            --output-signature "$sig" `
+            --output-certificate "$pem" `
+            "$archive"
+          $sig_ok = (Test-Path -Path $sig -PathType Leaf) -and ((Get-Item $sig).Length -gt 0)
+          $pem_ok = (Test-Path -Path $pem -PathType Leaf) -and ((Get-Item $pem).Length -gt 0)
+          if (-not $sig_ok -or -not $pem_ok) {
+            Write-Error "cosign sign-blob did not produce non-empty $sig and $pem"
+            exit 1
+          }
+          Write-Host "Signed $archive; sig=$sig pem=$pem"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
