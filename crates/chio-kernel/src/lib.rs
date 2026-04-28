@@ -33,6 +33,7 @@ pub mod dpop;
 pub mod evidence_export;
 pub mod execution_nonce;
 pub mod memory_provenance;
+pub mod observability;
 pub mod operator_report;
 pub mod payment;
 pub mod post_invocation;
@@ -311,6 +312,11 @@ pub use memory_provenance::{
     MemoryActionKind, MemoryProvenanceAppend, MemoryProvenanceEntry, MemoryProvenanceError,
     MemoryProvenanceStore, ProvenanceVerification, UnverifiedReason,
     MEMORY_PROVENANCE_ENTRY_SCHEMA, MEMORY_PROVENANCE_GENESIS_PREV_HASH,
+};
+pub use observability::metrics::{
+    guard_metrics_endpoint, render_guard_metrics_prometheus, GuardMetricFamily,
+    MetricsEndpointResponse, PrometheusMetricKind, GUARD_METRICS_PATH, GUARD_METRIC_FAMILIES,
+    PROMETHEUS_TEXT_CONTENT_TYPE,
 };
 pub use operator_report::{behavioral_anomaly_score, BehavioralAnomalyScore, EmaBaselineState};
 pub use operator_report::{
