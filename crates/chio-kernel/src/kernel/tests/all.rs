@@ -2874,6 +2874,11 @@ fn close_session_persists_anonymous_anchor_and_rejects_late_auth_rotation() {
     assert!(!closed.auth_context().is_authenticated());
 
     let closed_anchor_id = closed.session_anchor().id().to_string();
+    kernel.close_session(&session_id).unwrap();
+    let reclosed = kernel.session(&session_id).unwrap();
+    assert_eq!(reclosed.state(), SessionState::Closed);
+    assert_eq!(reclosed.session_anchor().id(), closed_anchor_id);
+
     let records = anchors.lock().unwrap();
     assert_eq!(records.len(), 3);
     assert_eq!(records[2].anchor_id, closed_anchor_id);

@@ -1043,6 +1043,10 @@ impl Session {
     pub fn close(&self) -> Result<(), SessionError> {
         {
             let mut inner = self.write_inner();
+            if inner.state == SessionState::Closed {
+                return Ok(());
+            }
+
             let active_count = self.inflight.len() as u64;
             if active_count > 0 {
                 if inner.state != SessionState::Closed {
@@ -1085,6 +1089,10 @@ impl Session {
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
     ) -> Result<(), SessionPersistError<E>> {
         let mut inner = self.write_inner();
+        if inner.state == SessionState::Closed {
+            return Ok(());
+        }
+
         let active_count = self.inflight.len() as u64;
         if active_count > 0 {
             if inner.state != SessionState::Closed {
@@ -1884,6 +1892,41 @@ mod tests {
         assert_ne!(snapshot.session_anchor.id(), initial_anchor.id());
         assert_ne!(snapshot.session_anchor.id(), active_anchor.id());
         assert_eq!(session.session_anchor(), snapshot.session_anchor);
+    }
+
+    #[test]
+    fn close_persisted_is_idempotent_once_closed() {
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+            "static-bearer:abcd1234",
+            "cafebabe",
+            Some("http://localhost:3000".to_string()),
+        ));
+
+        let mut persisted = Vec::new();
+        session
+            .close_persisted(|snapshot, supersedes| {
+                persisted.push((
+                    snapshot.session_anchor.clone(),
+                    supersedes.map(str::to_string),
+                ));
+                Ok::<(), ()>(())
+            })
+            .unwrap();
+        let closed_anchor = session.session_anchor();
+
+        session
+            .close_persisted(|snapshot, supersedes| {
+                persisted.push((
+                    snapshot.session_anchor.clone(),
+                    supersedes.map(str::to_string),
+                ));
+                Ok::<(), ()>(())
+            })
+            .unwrap();
+
+        assert_eq!(persisted.len(), 1);
+        assert_eq!(session.session_anchor(), closed_anchor);
     }
 
     #[test]
