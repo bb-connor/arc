@@ -53,25 +53,10 @@ fn schemas_root() -> PathBuf {
     repo_root().join("spec/schemas")
 }
 
-/// Load `path` and assert it parses as JSON. Returns the parsed value so callers
-/// can perform additional checks if desired.
-fn assert_valid_json(path: &Path) -> Value {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) => panic!("failed to read {}: {error}", path.display()),
-    };
-    match serde_json::from_slice::<Value>(&bytes) {
-        Ok(value) => value,
-        Err(error) => panic!("failed to parse {} as JSON: {error}", path.display()),
-    }
-}
-
 /// Non-panicking JSON validator used inside the per-domain loop in
 /// `every_mapping_entry_resolves_to_existing_files`. The loop accumulates
-/// failures across every domain so the operator gets a single batched
-/// report; calling the panicking [`assert_valid_json`] helper in the loop
-/// would short-circuit on the first malformed file and hide failures in
-/// later domains. Returns a human-readable error string on failure.
+/// failures across every domain so the operator gets a single batched report.
+/// Returns a human-readable error string on failure.
 fn try_load_json(path: &Path) -> Result<Value, String> {
     let bytes =
         fs::read(path).map_err(|err| format!("failed to read {}: {err}", path.display()))?;
