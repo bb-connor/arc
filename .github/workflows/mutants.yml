@@ -121,6 +121,7 @@ jobs:
         if: steps.forced.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
         run: |
           set -euo pipefail
           # Mutation runs share the 1,800 min/30d envelope with fuzz.
@@ -267,6 +268,7 @@ jobs:
         if: steps.forced.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
         run: |
           set -euo pipefail
           if [[ -x scripts/check-fuzz-budget.sh ]]; then

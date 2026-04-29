@@ -9,8 +9,8 @@
 #
 # This script queries the workflow-run history for the cflite_pr.yml,
 # cflite_batch.yml, fuzz.yml, mutants.yml, and mutants-fuzz-cocoverage.yml workflows, sums their
-# billed seconds across the last 30 days, converts to minutes, and exits
-# non-zero when the sum crosses 1,800. The orchestrator runs this on a
+# observed run wall time across the last 30 days, converts to minutes, and
+# exits non-zero when the sum crosses 1,800. The orchestrator runs this on a
 # scheduled cadence and as a step in cflite_batch.yml plus fuzz.yml so the
 # cap acts as a hard halt rather than a soft warning.
 #
@@ -24,6 +24,7 @@
 #   scripts/check-fuzz-budget.sh                      # default repo: bb-connor/arc
 #   scripts/check-fuzz-budget.sh OWNER/REPO
 #   GH_FUZZ_BUDGET_MINUTES=900 scripts/check-fuzz-budget.sh    # override cap
+#   GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn scripts/check-fuzz-budget.sh
 #
 # Exit codes:
 #   0  budget OK
@@ -61,6 +62,8 @@ esac
 
 total_seconds=0
 
+rate_limit_mode="${GH_FUZZ_BUDGET_RATE_LIMIT_MODE:-fail}"
+
 for wf in "${WORKFLOWS[@]}"; do
     runs_path="repos/${REPO}/actions/workflows/${wf}/runs"
     # Fetch runs created in the window, paginate up to 1000.
@@ -74,6 +77,12 @@ for wf in "${WORKFLOWS[@]}"; do
             err "fuzz-budget: workflow ${wf} is not registered yet; counting 0 minutes"
             continue
         fi
+        if grep -Eiq 'rate limit exceeded|HTTP 403' <<<"${error_text}" \
+            && [[ "${rate_limit_mode}" == "warn" ]]; then
+            err "fuzz-budget: GitHub API rate limited while checking ${wf}; budget usage is unverified"
+            err "fuzz-budget: continuing because GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn"
+            exit 0
+        fi
         err "fuzz-budget: GitHub API failed for ${wf}: ${error_text}"
         exit 2
     fi
@@ -83,35 +92,22 @@ for wf in "${WORKFLOWS[@]}"; do
         exit 2
     fi
     # gh api --paginate returns concatenated JSON objects; jq -s merges.
-    if ! ids="$(printf '%s' "${runs}" \
-        | jq -s '[.[].workflow_runs[]?.id // empty] | unique | .[]')"; then
+    # Use run wall time from the list payload instead of one timing API call
+    # per run. This keeps the gate inside the GitHub App installation rate
+    # limit even when several fuzz and mutation checks start together.
+    if ! workflow_seconds="$(printf '%s' "${runs}" \
+        | jq -s '[.[].workflow_runs[]?
+            | select(.run_started_at != null and .updated_at != null)
+            | ((.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601))
+            | if . < 0 then 0 else . end
+        ] | add // 0 | floor')"; then
         err "fuzz-budget: failed to parse workflow runs for ${wf}"
         exit 2
     fi
-    if [[ -z "${ids}" ]]; then
+    if [[ -z "${workflow_seconds}" ]]; then
         continue
     fi
-    while IFS= read -r run_id; do
-        [[ -z "${run_id}" ]] && continue
-        api_error="$(mktemp)"
-        if ! timing="$(gh api "repos/${REPO}/actions/runs/${run_id}/timing" \
-            2>"${api_error}")"; then
-            err "fuzz-budget: GitHub API failed for ${wf} run ${run_id}: $(cat "${api_error}")"
-            rm -f "${api_error}"
-            exit 2
-        fi
-        rm -f "${api_error}"
-        if [[ -z "${timing}" ]]; then
-            err "fuzz-budget: GitHub API returned empty timing for ${wf} run ${run_id}"
-            exit 2
-        fi
-        if ! ms="$(printf '%s' "${timing}" \
-            | jq '[.billable | to_entries[] | .value.total_ms // 0] | add // 0')"; then
-            err "fuzz-budget: failed to parse timing for ${wf} run ${run_id}"
-            exit 2
-        fi
-        total_seconds=$(( total_seconds + ms / 1000 ))
-    done <<<"${ids}"
+    total_seconds=$(( total_seconds + workflow_seconds ))
 done
 
 total_minutes=$(( (total_seconds + 59) / 60 ))
