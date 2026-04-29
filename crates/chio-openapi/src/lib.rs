@@ -26,11 +26,7 @@ pub enum OpenApiError {
 
     /// The input is not valid YAML.
     #[error("invalid YAML: {0}")]
-    InvalidYaml(#[from] serde_yml::Error),
-
-    /// The YAML parser panicked while reading attacker-controlled input.
-    #[error("invalid YAML: parser panic: {0}")]
-    InvalidYamlParserPanic(String),
+    InvalidYaml(#[from] serde_yaml::Error),
 
     /// The OpenAPI spec is missing a required field.
     #[error("missing required field: {0}")]

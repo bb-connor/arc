@@ -3036,7 +3036,7 @@ dependencies = [
  "chio-http-core",
  "serde",
  "serde_json",
- "serde_yml",
+ "serde_yaml",
  "thiserror 1.0.69",
 ]
 

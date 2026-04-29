@@ -17,7 +17,7 @@
 //!
 //! `chio-openapi-mcp-bridge` ingests untrusted bytes (operator-supplied
 //! OpenAPI specs at runtime), so this target catches parse-path panics and
-//! allocator regressions in the `serde_json` / `serde_yml` -> `OpenApiSpec`
+//! allocator regressions in the `serde_json` / `serde_yaml` -> `OpenApiSpec`
 //! -> manifest-validate chain.
 
 use crate::{BridgeConfig, OpenApiMcpBridge};
@@ -26,7 +26,7 @@ use crate::{BridgeConfig, OpenApiMcpBridge};
 /// at [`crate::OpenApiMcpBridge::from_spec`].
 ///
 /// Bytes are first decoded as UTF-8 (non-UTF-8 inputs are silently dropped,
-/// mirroring the `serde_json` / `serde_yml` contracts). The decoded text is
+/// mirroring the `serde_json` / `serde_yaml` contracts). The decoded text is
 /// then handed to `OpenApiMcpBridge::from_spec`, which auto-detects JSON vs
 /// YAML, parses the spec, generates an MCP tool manifest, populates route
 /// bindings, and validates the manifest end-to-end.

@@ -1651,7 +1651,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     .public_key()
     .to_hex();
     {
-        let mut store = SqliteReceiptStore::open(&a_receipt_db_path).expect("open a receipt store");
+        let store = SqliteReceiptStore::open(&a_receipt_db_path).expect("open a receipt store");
         store
             .append_chio_receipt(&make_receipt(
                 "fed-hop-a-1",
