@@ -153,14 +153,31 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
     }
 
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut attempts = Vec::new();
-    if chrome_and_driver_major_match() {
-        attempts.push((
+    let runner =
+        std::env::var("CHIO_CANONICAL_DIFF_WASM_RUNNER").unwrap_or_else(|_| "auto".to_string());
+    let attempts = match runner.as_str() {
+        "auto" => {
+            let mut attempts = Vec::new();
+            if chrome_and_driver_major_match() {
+                attempts.push((
+                    "headless Chrome",
+                    vec!["test", "--headless", "--chrome", ".", "--test"],
+                ));
+            }
+            attempts.push(("Node wasm-bindgen", vec!["test", "--node", ".", "--test"]));
+            attempts
+        }
+        "chrome" => vec![(
             "headless Chrome",
             vec!["test", "--headless", "--chrome", ".", "--test"],
-        ));
-    }
-    attempts.push(("Node wasm-bindgen", vec!["test", "--node", ".", "--test"]));
+        )],
+        "node" => vec![("Node wasm-bindgen", vec!["test", "--node", ".", "--test"])],
+        other => {
+            return Err(format!(
+                "unsupported CHIO_CANONICAL_DIFF_WASM_RUNNER `{other}`; expected `auto`, `chrome`, or `node`"
+            ));
+        }
+    };
 
     let mut failures = Vec::new();
     for (mode, mut args) in attempts {
@@ -177,7 +194,9 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
         failures.push(format_wasm_pack_failure(mode, &output));
     }
 
-    Err(failures.join("\n\n"))
+    let failure = failures.join("\n\n");
+    eprintln!("{failure}");
+    Err(failure)
 }
 
 #[cfg(not(target_arch = "wasm32"))]

@@ -126,4 +126,6 @@ jobs:
       - name: Install wasm-pack (pinned)
         run: cargo install wasm-pack --version "$(cat .tooling/wasm-pack.version)" --locked
       - name: Browser canonical JSON differential
+        env:
+          CHIO_CANONICAL_DIFF_WASM_RUNNER: node
         run: cargo test -p chio-formal-diff-tests --test browser_canonical_json_diff
