@@ -420,6 +420,23 @@ impl ReceiptStore for SqliteReceiptStore {
         anchor_json: &serde_json::Value,
     ) -> Result<(), ReceiptStoreError> {
         let connection = self.connection()?;
+        let replaces_current_anchor = match supersedes_anchor_id {
+            Some(supersedes_anchor_id) => connection
+                .query_row(
+                    r#"
+                    SELECT is_current
+                    FROM session_anchors
+                    WHERE session_id = ?1
+                      AND anchor_id = ?2
+                    "#,
+                    params![session_id, supersedes_anchor_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+                .map(|is_current| is_current != 0)
+                .unwrap_or(false),
+            None => false,
+        };
         let existing_anchor = connection
             .query_row(
                 r#"
@@ -435,9 +452,11 @@ impl ReceiptStore for SqliteReceiptStore {
             )
             .optional()?;
         if let Some(existing_anchor) = existing_anchor {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "session anchor replay detected for session `{session_id}` auth_context_fingerprint `{auth_context_fingerprint}` existing `{existing_anchor}`"
-            )));
+            if !replaces_current_anchor {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "session anchor replay detected for session `{session_id}` auth_context_fingerprint `{auth_context_fingerprint}` existing `{existing_anchor}`"
+                )));
+            }
         }
 
         connection.execute(
@@ -2858,9 +2877,12 @@ fn close_session_persists_anonymous_anchor_and_rejects_late_auth_rotation() {
     let records = anchors.lock().unwrap();
     assert_eq!(records.len(), 3);
     assert_eq!(records[2].anchor_id, closed_anchor_id);
-    assert_eq!(closed_anchor_id, initial_anchor_id);
+    assert_ne!(closed_anchor_id, initial_anchor_id);
     assert_ne!(closed_anchor_id, authenticated_anchor_id);
-    assert_eq!(records[2].supersedes_anchor_id, None);
+    assert_eq!(
+        records[2].supersedes_anchor_id.as_deref(),
+        Some(authenticated_anchor_id.as_str())
+    );
     drop(records);
 
     let error = kernel

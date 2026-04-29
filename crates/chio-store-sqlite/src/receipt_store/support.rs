@@ -3636,21 +3636,40 @@ fn persist_session_anchor_tx(
         )));
     }
 
-    if tx
-        .query_row(
-            r#"
-            SELECT anchor_id
-            FROM session_anchors
-            WHERE session_id = ?1
-              AND auth_context_fingerprint = ?2
-              AND anchor_id <> ?3
-            LIMIT 1
-            "#,
-            params![&session_id, &auth_context_fingerprint, &anchor_id],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?
-        .is_some()
+    let replaces_current_anchor = match supersedes_anchor_id.as_deref() {
+        Some(supersedes_anchor_id) => tx
+            .query_row(
+                r#"
+                SELECT is_current
+                FROM session_anchors
+                WHERE session_id = ?1
+                  AND anchor_id = ?2
+                "#,
+                params![&session_id, supersedes_anchor_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .map(|is_current| is_current != 0)
+            .unwrap_or(false),
+        None => false,
+    };
+
+    if !replaces_current_anchor
+        && tx
+            .query_row(
+                r#"
+                SELECT anchor_id
+                FROM session_anchors
+                WHERE session_id = ?1
+                  AND auth_context_fingerprint = ?2
+                  AND anchor_id <> ?3
+                LIMIT 1
+                "#,
+                params![&session_id, &auth_context_fingerprint, &anchor_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .is_some()
     {
         return Err(ReceiptStoreError::Conflict(format!(
             "session anchor replay detected for session `{session_id}` auth_context_fingerprint `{auth_context_fingerprint}`"
