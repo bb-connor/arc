@@ -112,6 +112,8 @@ jobs:
           resolve_criterion_dir() {
             local label="$1"
             shift
+            local required="${1}"
+            shift
             local dirs_file
             dirs_file="$(mktemp)"
             (
@@ -131,6 +133,12 @@ jobs:
 
             case "$count" in
               0)
+                if [ "$required" = "false" ]; then
+                  echo "::notice::no Criterion estimates found for ${label}; skipping comparison"
+                  printf '%s=\n' "$label" >> "$GITHUB_OUTPUT"
+                  rm -f "$dirs_file"
+                  return 0
+                fi
                 echo "::error::no Criterion estimates found for ${label}" >&2
                 rm -f "$dirs_file"
                 exit 1
@@ -148,12 +156,18 @@ jobs:
             esac
           }
 
-          resolve_criterion_dir baseline "$BASELINE_TARGET_DIR" "$BASELINE_WORKTREE"
-          resolve_criterion_dir current "$CURRENT_TARGET_DIR" "$CURRENT_WORKTREE"
+          resolve_criterion_dir baseline false "$BASELINE_TARGET_DIR" "$BASELINE_WORKTREE"
+          resolve_criterion_dir current true "$CURRENT_TARGET_DIR" "$CURRENT_WORKTREE"
 
       - name: Required kernel bench regression gate
+        if: steps.criterion.outputs.baseline != ''
         run: |
           bash scripts/criterion-compare.sh \
             --baseline "${{ steps.criterion.outputs.baseline }}" \
             --current "${{ steps.criterion.outputs.current }}" \
             --threshold-percent 10
+
+      - name: Kernel bench baseline unavailable
+        if: steps.criterion.outputs.baseline == ''
+        run: |
+          echo "::notice::PR base has no chio-kernel Criterion baseline; current benchmarks ran successfully but comparison is skipped."

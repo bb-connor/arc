@@ -1,4 +1,4 @@
-//! libFuzzer entry-point module for `chio-a2a-adapter`. Gated behind `fuzz` feature.
+/// libFuzzer entry-point module for `chio-a2a-adapter`. Gated behind `fuzz` feature.
 
 pub mod fuzz {
     use serde_json::Value;

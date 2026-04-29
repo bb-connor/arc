@@ -4559,7 +4559,7 @@ mod cluster_and_reports_tests {
         );
 
         {
-            let mut revocation_store = SqliteRevocationStore::open(&source_revocation_db)
+            let revocation_store = SqliteRevocationStore::open(&source_revocation_db)
                 .expect("open source revocation db");
             revocation_store
                 .upsert_revocation(&RevocationRecord {
@@ -4569,7 +4569,7 @@ mod cluster_and_reports_tests {
                 .expect("write revocation");
         }
         {
-            let mut receipt_store =
+            let receipt_store =
                 SqliteReceiptStore::open(&source_receipt_db).expect("open source receipt db");
             receipt_store
                 .append_chio_receipt(&sample_tool_receipt("tool-1", "cap-1"))
@@ -4582,7 +4582,7 @@ mod cluster_and_reports_tests {
                 .expect("record capability snapshot");
         }
         {
-            let mut budget_store =
+            let budget_store =
                 SqliteBudgetStore::open(&source_budget_db).expect("open source budget db");
             budget_store
                 .try_charge_cost_with_ids(
@@ -4728,7 +4728,7 @@ mod cluster_and_reports_tests {
         );
 
         {
-            let mut budget_store =
+            let budget_store =
                 SqliteBudgetStore::open(&source_budget_db).expect("open source budget db");
             let allowed = budget_store
                 .try_charge_cost_with_ids(
@@ -4826,7 +4826,7 @@ mod cluster_and_reports_tests {
         );
 
         {
-            let mut budget_store =
+            let budget_store =
                 SqliteBudgetStore::open(&source_budget_db).expect("open source budget db");
             budget_store
                 .upsert_usage(&chio_kernel::BudgetUsageRecord {

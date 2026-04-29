@@ -4843,7 +4843,7 @@ mod service_runtime_tests {
         })
         .to_string();
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-        let mut store =
+        let store =
             build_remote_budget_store(&server.url, "secret").expect("build remote budget store");
 
         let decision = store

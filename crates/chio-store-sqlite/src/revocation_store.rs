@@ -160,7 +160,7 @@ mod tests {
     fn sqlite_revocation_store_persists_across_reopen() {
         let path = unique_db_path("chio-revocations");
         {
-            let mut store = SqliteRevocationStore::open(&path).unwrap();
+            let store = SqliteRevocationStore::open(&path).unwrap();
             assert!(!store.is_revoked("cap-1").unwrap());
             assert!(store.revoke("cap-1").unwrap());
             assert!(store.is_revoked("cap-1").unwrap());
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn sqlite_revocation_store_lists_filtered_entries() {
         let path = unique_db_path("chio-revocations-filtered");
-        let mut store = SqliteRevocationStore::open(&path).unwrap();
+        let store = SqliteRevocationStore::open(&path).unwrap();
         assert!(store.revoke("cap-1").unwrap());
         assert!(store.revoke("cap-2").unwrap());
 

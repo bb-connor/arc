@@ -1240,6 +1240,30 @@ pub(crate) fn ensure_transparency_projection_guards(
     Ok(())
 }
 
+pub(crate) fn drop_transparency_projection_guards(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(
+        r#"
+        DROP TRIGGER IF EXISTS chio_tool_receipts_reject_update;
+        DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete;
+        DROP TRIGGER IF EXISTS chio_child_receipts_reject_update;
+        DROP TRIGGER IF EXISTS chio_child_receipts_reject_delete;
+        DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_update;
+        DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;
+        DROP TRIGGER IF EXISTS checkpoint_tree_heads_reject_update;
+        DROP TRIGGER IF EXISTS checkpoint_tree_heads_reject_delete;
+        DROP TRIGGER IF EXISTS checkpoint_predecessor_witnesses_reject_update;
+        DROP TRIGGER IF EXISTS checkpoint_predecessor_witnesses_reject_delete;
+        DROP TRIGGER IF EXISTS checkpoint_publication_metadata_reject_update;
+        DROP TRIGGER IF EXISTS checkpoint_publication_metadata_reject_delete;
+        DROP TRIGGER IF EXISTS checkpoint_publication_trust_anchor_bindings_reject_update;
+        DROP TRIGGER IF EXISTS checkpoint_publication_trust_anchor_bindings_reject_delete;
+        "#,
+    )?;
+    Ok(())
+}
+
 pub(crate) fn backfill_claim_receipt_log_entries(
     connection: &mut Connection,
 ) -> Result<(), ReceiptStoreError> {

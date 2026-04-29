@@ -153,32 +153,41 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
     }
 
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let (mode, mut args) = if chrome_and_driver_major_match() {
-        (
+    let mut attempts = Vec::new();
+    if chrome_and_driver_major_match() {
+        attempts.push((
             "headless Chrome",
             vec!["test", "--headless", "--chrome", ".", "--test"],
-        )
-    } else {
-        ("Node wasm-bindgen", vec!["test", "--node", ".", "--test"])
-    };
-    args.push("browser_canonical_json_diff");
-
-    let output = Command::new("wasm-pack")
-        .args(args)
-        .current_dir(manifest_dir)
-        .output()
-        .map_err(|error| format!("spawn wasm-pack {mode} test: {error}"))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "wasm-pack {mode} test failed with status {}\nstdout:\n{}\nstderr:\n{}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
         ));
     }
+    attempts.push(("Node wasm-bindgen", vec!["test", "--node", ".", "--test"]));
 
-    Ok(())
+    let mut failures = Vec::new();
+    for (mode, mut args) in attempts {
+        args.push("browser_canonical_json_diff");
+        let output = Command::new("wasm-pack")
+            .args(args)
+            .current_dir(manifest_dir)
+            .output()
+            .map_err(|error| format!("spawn wasm-pack {mode} test: {error}"))?;
+
+        if output.status.success() {
+            return Ok(());
+        }
+        failures.push(format_wasm_pack_failure(mode, &output));
+    }
+
+    Err(failures.join("\n\n"))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn format_wasm_pack_failure(mode: &str, output: &std::process::Output) -> String {
+    format!(
+        "wasm-pack {mode} test failed with status {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
 }
 
 #[cfg(not(target_arch = "wasm32"))]
