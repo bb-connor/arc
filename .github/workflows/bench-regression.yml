@@ -78,8 +78,8 @@ jobs:
           ' crates/chio-kernel/Cargo.toml > "${benches_file}"
           bench_count="$(wc -l < "${benches_file}" | tr -d ' ')"
           if [ "${bench_count}" = "0" ]; then
-            echo "::error::no chio-kernel benchmarks found in Cargo.toml" >&2
-            exit 1
+            echo "::notice::baseline has no chio-kernel benchmarks; comparison will be skipped"
+            exit 0
           fi
           while IFS= read -r bench; do
             cargo bench -p chio-kernel --bench "$bench" -- --noplot --sample-size 100
