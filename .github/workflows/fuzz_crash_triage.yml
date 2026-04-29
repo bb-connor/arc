@@ -57,6 +57,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
       - name: Install Rust nightly + cargo-fuzz
@@ -251,13 +253,19 @@ jobs:
             # are tokenized by GitHub's indexer so the dedupe search
             # actually returns hits on a recurrence.
             sha_prefix=$(echo "${sha256}" | cut -c1-16)
-            existing=$(gh issue list \
+            dedupe_error=$(mktemp)
+            if ! existing=$(gh issue list \
               --repo "${REPO_FULL}" \
               --state open \
               --label "${TRIAGE_LABEL}" \
               --search "\"${sha_prefix}\" in:title,body" \
               --json number,title \
-              --jq '.[0].number' || true)
+              --jq '.[0].number' 2>"${dedupe_error}"); then
+              echo "::error::Failed to query existing fuzz-crash issues for dedupe: $(cat "${dedupe_error}")"
+              rm -f "${dedupe_error}"
+              exit 1
+            fi
+            rm -f "${dedupe_error}"
 
             if [ -n "${existing}" ] && [ "${existing}" != "null" ]; then
               echo "Dedupe hit: existing issue #${existing} matches sha256 prefix ${sha_prefix}"
