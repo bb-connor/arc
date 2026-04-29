@@ -5,10 +5,16 @@
 //! `serde_json::Value` internally and resolves simple `$ref` pointers within
 //! the `#/components/schemas` and `#/components/parameters` namespaces.
 
+use std::any::Any;
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::Mutex;
+
 use serde_json::Value;
 
 use crate::extensions::ChioExtensions;
 use crate::{OpenApiError, Result};
+
+static YAML_PARSE_HOOK_LOCK: Mutex<()> = Mutex::new(());
 
 /// A parsed OpenAPI specification.
 #[derive(Debug, Clone)]
@@ -88,7 +94,7 @@ impl OpenApiSpec {
         let value: Value = if trimmed.starts_with('{') {
             serde_json::from_str(input)?
         } else {
-            serde_yml::from_str(input)?
+            parse_yaml_value(input)?
         };
         Self::from_value(value)
     }
@@ -390,6 +396,34 @@ impl OpenApiSpec {
     }
 }
 
+fn parse_yaml_value(input: &str) -> Result<Value> {
+    let _hook_guard = match YAML_PARSE_HOOK_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let previous_hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| {}));
+    let parsed = panic::catch_unwind(AssertUnwindSafe(|| serde_yml::from_str(input)));
+    panic::set_hook(previous_hook);
+
+    match parsed {
+        Ok(value) => value.map_err(OpenApiError::from),
+        Err(payload) => Err(OpenApiError::InvalidYamlParserPanic(panic_payload_message(
+            &payload,
+        ))),
+    }
+}
+
+fn panic_payload_message(payload: &(dyn Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic payload".to_string()
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -677,6 +711,33 @@ paths:
         let input = r##"{not valid json"##;
         let err = OpenApiSpec::parse(input).unwrap_err();
         assert!(matches!(err, OpenApiError::InvalidJson(_)));
+    }
+
+    #[test]
+    fn yaml_parser_panic_produces_error() {
+        let input = "openapre: limiu\n     path       - name    \"\n";
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        assert!(matches!(err, OpenApiError::InvalidYamlParserPanic(_)));
+    }
+
+    #[test]
+    fn yaml_parser_panic_does_not_invoke_outer_hook() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        let input = "openapre: limiu\n     path       - name    \"\n";
+        let hook_called = Arc::new(AtomicBool::new(false));
+        let hook_called_clone = Arc::clone(&hook_called);
+        let previous_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |_| {
+            hook_called_clone.store(true, Ordering::SeqCst);
+        }));
+
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        std::panic::set_hook(previous_hook);
+
+        assert!(matches!(err, OpenApiError::InvalidYamlParserPanic(_)));
+        assert!(!hook_called.load(Ordering::SeqCst));
     }
 
     #[test]
