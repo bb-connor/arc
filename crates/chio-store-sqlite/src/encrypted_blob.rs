@@ -11,12 +11,13 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chacha20poly1305::aead::rand_core::RngCore;
-use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
+use chacha20poly1305::aead::{Aead, KeyInit, OsRng, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Tenant identifier used to isolate encrypted BLOB rows.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -49,7 +50,7 @@ impl From<String> for TenantId {
 }
 
 /// Tenant-scoped 256-bit AEAD key.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct TenantKey([u8; 32]);
 
 impl TenantKey {
@@ -79,6 +80,13 @@ pub struct EncryptedBlob {
     pub ciphertext: Vec<u8>,
     /// 96-bit nonce generated per encrypted blob.
     pub nonce: [u8; 12],
+}
+
+struct StoredEncryptedBlob {
+    blob: EncryptedBlob,
+    blob_id: String,
+    tenant_id: TenantId,
+    created_at: i64,
 }
 
 impl std::fmt::Debug for EncryptedBlob {
@@ -211,12 +219,43 @@ pub fn decrypt_blob(tenant_key: &TenantKey, blob: &EncryptedBlob) -> Result<Vec<
         .map_err(|_| DecryptError::AuthenticationFailed)
 }
 
+fn decrypt_blob_with_aad(
+    tenant_key: &TenantKey,
+    blob: &EncryptedBlob,
+    aad: &[u8],
+) -> Result<Vec<u8>, DecryptError> {
+    let cipher = cipher_for_key(tenant_key);
+    cipher
+        .decrypt(
+            Nonce::from_slice(&blob.nonce),
+            Payload {
+                msg: blob.ciphertext.as_ref(),
+                aad,
+            },
+        )
+        .map_err(|_| DecryptError::AuthenticationFailed)
+}
+
 fn try_encrypt_blob(tenant_key: &TenantKey, plaintext: &[u8]) -> Result<EncryptedBlob, ()> {
+    try_encrypt_blob_with_aad(tenant_key, plaintext, &[])
+}
+
+fn try_encrypt_blob_with_aad(
+    tenant_key: &TenantKey,
+    plaintext: &[u8],
+    aad: &[u8],
+) -> Result<EncryptedBlob, ()> {
     let cipher = cipher_for_key(tenant_key);
     let mut nonce = [0_u8; 12];
     OsRng.fill_bytes(&mut nonce);
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), plaintext)
+        .encrypt(
+            Nonce::from_slice(&nonce),
+            Payload {
+                msg: plaintext,
+                aad,
+            },
+        )
         .map_err(|_| ())?;
     Ok(EncryptedBlob { ciphertext, nonce })
 }
@@ -286,9 +325,11 @@ impl SqliteEncryptedBlobStore {
         payload: &[u8],
     ) -> Result<BlobHandle, BlobStoreError> {
         validate_tenant_id(tenant_id)?;
-        let encrypted = encrypt_blob(key, payload);
         let blob_id = format!("blob-{}", Uuid::now_v7());
         let created_at = now_secs();
+        let aad = blob_aad(&blob_id, tenant_id.as_str(), created_at);
+        let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
+            .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
         let conn = self.pool.get()?;
         conn.execute(
             r#"
@@ -349,9 +390,58 @@ impl SqliteEncryptedBlobStore {
         handle: &BlobHandle,
         key: &TenantKey,
     ) -> Result<Vec<u8>, BlobStoreError> {
-        let blob = self.load_encrypted_blob(handle)?;
-        decrypt_blob(key, &blob).map_err(BlobStoreError::from)
+        let stored = self.load_encrypted_blob_record(handle)?;
+        let aad = blob_aad(
+            &stored.blob_id,
+            stored.tenant_id.as_str(),
+            stored.created_at,
+        );
+        Ok(decrypt_blob_with_aad(key, &stored.blob, &aad)?)
     }
+
+    fn load_encrypted_blob_record(
+        &self,
+        handle: &BlobHandle,
+    ) -> Result<StoredEncryptedBlob, BlobStoreError> {
+        let conn = self.pool.get()?;
+        let row = conn
+            .query_row(
+                r#"
+                SELECT blob_id, tenant_id, nonce, ciphertext, created_at
+                FROM chio_encrypted_blobs
+                WHERE blob_id = ?1 AND tenant_id = ?2
+                "#,
+                params![handle.blob_id(), handle.tenant_id().as_str()],
+                |row| {
+                    let blob_id: String = row.get("blob_id")?;
+                    let tenant_id: String = row.get("tenant_id")?;
+                    let nonce: Vec<u8> = row.get("nonce")?;
+                    let ciphertext: Vec<u8> = row.get("ciphertext")?;
+                    let created_at: i64 = row.get("created_at")?;
+                    Ok((blob_id, tenant_id, nonce, ciphertext, created_at))
+                },
+            )
+            .optional()?;
+
+        let Some((blob_id, tenant_id, nonce, ciphertext, created_at)) = row else {
+            return Err(BlobStoreError::NotFound);
+        };
+        let nonce_len = nonce.len();
+        let nonce = match <[u8; 12]>::try_from(nonce) {
+            Ok(value) => value,
+            Err(_) => return Err(BlobStoreError::InvalidNonceLength(nonce_len)),
+        };
+        Ok(StoredEncryptedBlob {
+            blob: EncryptedBlob { ciphertext, nonce },
+            blob_id,
+            tenant_id: TenantId::new(tenant_id),
+            created_at,
+        })
+    }
+}
+
+fn blob_aad(blob_id: &str, tenant_id: &str, created_at: i64) -> Vec<u8> {
+    format!("{blob_id}\0{tenant_id}\0{created_at}").into_bytes()
 }
 
 fn validate_tenant_id(tenant_id: &TenantId) -> Result<(), BlobStoreError> {
@@ -390,5 +480,73 @@ mod tests {
         let blob = encrypt_blob(&key, b"payload");
         let error = decrypt_blob(&wrong_key, &blob).expect_err("wrong key must fail");
         assert_eq!(error, DecryptError::AuthenticationFailed);
+    }
+
+    #[test]
+    fn stored_blob_ciphertext_is_bound_to_handle_metadata() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let tenant = TenantId::new("tenant-a");
+        let key = TenantKey::from_bytes([9; 32]);
+        let source = store
+            .write_encrypted_blob(&tenant, &key, b"source payload")
+            .unwrap();
+        let target = store
+            .write_encrypted_blob(&tenant, &key, b"target payload")
+            .unwrap();
+
+        let conn = store.pool.get().unwrap();
+        conn.execute(
+            r#"
+            UPDATE chio_encrypted_blobs
+            SET nonce = (
+                    SELECT nonce FROM chio_encrypted_blobs WHERE blob_id = ?1
+                ),
+                ciphertext = (
+                    SELECT ciphertext FROM chio_encrypted_blobs WHERE blob_id = ?1
+                )
+            WHERE blob_id = ?2
+            "#,
+            params![source.blob_id(), target.blob_id()],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = store
+            .read_encrypted_blob(&target, &key)
+            .expect_err("transplanted ciphertext should fail metadata-bound AEAD");
+        assert!(matches!(
+            error,
+            BlobStoreError::Decrypt(DecryptError::AuthenticationFailed)
+        ));
+    }
+
+    #[test]
+    fn store_schema_does_not_publish_plaintext_hashes() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let conn = store.pool.get().unwrap();
+        let mut statement = conn
+            .prepare("PRAGMA table_info(chio_encrypted_blobs)")
+            .unwrap();
+        let names = statement
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(
+            !names.iter().any(|name| name == "plaintext_sha256"),
+            "encrypted blob store must not persist plaintext-derived hashes"
+        );
+    }
+
+    #[test]
+    fn tenant_key_implements_zeroize_on_drop() {
+        fn assert_zod<T: ZeroizeOnDrop>() {}
+        assert_zod::<TenantKey>();
+    }
+
+    #[test]
+    fn tenant_key_debug_redacts_material() {
+        let key = TenantKey::from_bytes([7; 32]);
+        assert_eq!(std::format!("{key:?}"), "TenantKey(<redacted>)");
     }
 }

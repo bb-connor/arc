@@ -28,6 +28,7 @@ The fixture corpus pins these OpenAI Responses event names for the `2026-04-25` 
 - `response.created`
 - `response.output_item.added`
 - `response.function_call_arguments.delta`
+- `response.function_call_arguments.done`
 - `response.output_item.done`
 - `response.completed`
 - `response.error`

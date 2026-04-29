@@ -32,9 +32,17 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 /// Drop wipes the inner `Vec<u8>`; the heap allocation is overwritten
 /// with zeros before deallocation. See module-level docs for the
 /// scoping rules callers MUST follow.
-#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct RawPayloadBuffer {
     inner: Vec<u8>,
+}
+
+impl core::fmt::Debug for RawPayloadBuffer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RawPayloadBuffer")
+            .field("len", &self.inner.len())
+            .finish()
+    }
 }
 
 impl RawPayloadBuffer {
@@ -130,5 +138,13 @@ mod tests {
         // would fail to compile.
         fn assert_zod<T: ZeroizeOnDrop>() {}
         assert_zod::<RawPayloadBuffer>();
+    }
+
+    #[test]
+    fn debug_redacts_plaintext_bytes() {
+        let buf = RawPayloadBuffer::new(b"sensitive-token".to_vec());
+        let debug = std::format!("{buf:?}");
+        assert!(debug.contains("len"));
+        assert!(!debug.contains("sensitive-token"));
     }
 }

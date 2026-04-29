@@ -43,10 +43,10 @@ pub mod bindings {
     wasmtime::component::bindgen!({
         path: "../../wit/chio-guard",
         world: "guard",
-        async: true,
-        trappable_imports: true,
+        imports: { default: async | trappable },
+        exports: { default: async },
         with: {
-            "chio:guard/policy-context/bundle-handle": super::BundleHandle,
+            "chio:guard/policy-context.bundle-handle": super::BundleHandle,
         },
     });
 }
@@ -220,7 +220,7 @@ pub fn create_shared_engine() -> Result<Arc<Engine>, WasmGuardError> {
     let mut config = wasmtime::Config::new();
     config.consume_fuel(true);
     config.wasm_component_model(true);
-    config.async_support(true);
+    config.wasm_component_model_async(true);
     let engine = Engine::new(&config).map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
     Ok(Arc::new(engine))
 }
@@ -232,12 +232,13 @@ pub fn create_shared_engine() -> Result<Arc<Engine>, WasmGuardError> {
 /// Register WIT-generated `chio:guard/guard@0.2.0` host imports.
 pub fn register_component_host_functions<T>(
     linker: &mut ComponentLinker<T>,
-    get: impl Fn(&mut T) -> &mut WasmHostState + Send + Sync + Copy + 'static,
+    get: fn(&mut T) -> &mut WasmHostState,
 ) -> Result<(), WasmGuardError>
 where
     T: Send,
 {
-    Guard::add_to_linker(linker, get).map_err(|e| WasmGuardError::HostFunction(e.to_string()))
+    Guard::add_to_linker::<T, wasmtime::component::HasSelf<WasmHostState>>(linker, get)
+        .map_err(|e| WasmGuardError::HostFunction(e.to_string()))
 }
 
 /// Register legacy raw-ABI core-module imports.

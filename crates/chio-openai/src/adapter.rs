@@ -11,7 +11,7 @@ use std::time::SystemTime;
 use chio_core::canonical::canonical_json_bytes;
 use chio_tool_call_fabric::{
     DenyReason, Principal, ProvenanceStamp, ProviderAdapter, ProviderError, ProviderId,
-    ProviderRequest, ProviderResponse, ToolInvocation, ToolResult, VerdictResult,
+    ProviderRequest, ProviderResponse, Redaction, ToolInvocation, ToolResult, VerdictResult,
 };
 use serde_json::{json, Value};
 
@@ -93,7 +93,8 @@ impl OpenAiAdapter {
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
         let parsed = parse_payload(raw)?;
         let org_id = self.org_id_for_payload(parsed.org_id_from_header.as_deref())?;
-        let calls = ChioOpenAiAdapter::extract_responses_api_calls(&parsed.body);
+        let calls = ChioOpenAiAdapter::extract_responses_api_calls(&parsed.body)
+            .map_err(|e| ProviderError::Malformed(e.to_string()))?;
 
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
@@ -256,6 +257,12 @@ fn parse_tool_result(result: ToolResult) -> Result<Vec<PendingToolOutput>, Provi
             "OpenAI ToolResult did not contain any tool outputs".to_string(),
         ));
     }
+    if entries.len() != 1 {
+        return Err(ProviderError::Malformed(format!(
+            "OpenAI ToolResult lower expects exactly one tool output per verdict, found {}",
+            entries.len()
+        )));
+    }
 
     Ok(entries)
 }
@@ -290,25 +297,33 @@ fn lower_output_entry(
     entry: &PendingToolOutput,
 ) -> Result<Value, ProviderError> {
     match verdict {
-        VerdictResult::Allow { .. } => allow_tool_output(entry),
+        VerdictResult::Allow { redactions, .. } => allow_tool_output(entry, redactions),
         VerdictResult::Deny { reason, receipt_id } => {
             deny_tool_output(entry, reason, &receipt_id.0)
         }
     }
 }
 
-fn allow_tool_output(entry: &PendingToolOutput) -> Result<Value, ProviderError> {
+fn allow_tool_output(
+    entry: &PendingToolOutput,
+    redactions: &[Redaction],
+) -> Result<Value, ProviderError> {
     let output = entry.output.as_ref().ok_or_else(|| {
         ProviderError::Malformed(format!(
             "OpenAI ToolResult entry `{}` was missing output for allow verdict",
             entry.call_id
         ))
     })?;
+    let output = apply_redactions(
+        output.clone(),
+        redactions,
+        &format!("OpenAI ToolResult entry `{}` output", entry.call_id),
+    )?;
 
     Ok(json!({
         "type": "function_call_output",
         "call_id": entry.call_id,
-        "output": output_string(output)?,
+        "output": output_string(&output)?,
     }))
 }
 
@@ -345,6 +360,42 @@ fn output_string(value: &Value) -> Result<String, ProviderError> {
     String::from_utf8(bytes).map_err(|error| {
         ProviderError::Malformed(format!("OpenAI tool output was not UTF-8: {error}"))
     })
+}
+
+fn apply_redactions(
+    mut value: Value,
+    redactions: &[Redaction],
+    context: &str,
+) -> Result<Value, ProviderError> {
+    for redaction in redactions {
+        apply_redaction(&mut value, redaction, context)?;
+    }
+    Ok(value)
+}
+
+fn apply_redaction(
+    value: &mut Value,
+    redaction: &Redaction,
+    context: &str,
+) -> Result<(), ProviderError> {
+    if redaction.path.is_empty() {
+        *value = Value::String(redaction.replacement.clone());
+        return Ok(());
+    }
+    if !redaction.path.starts_with('/') {
+        return Err(ProviderError::Malformed(format!(
+            "{context} allow verdict requested redaction path `{}`; only JSON Pointer paths are supported",
+            redaction.path
+        )));
+    }
+    let target = value.pointer_mut(&redaction.path).ok_or_else(|| {
+        ProviderError::Malformed(format!(
+            "{context} allow verdict requested redaction path `{}` that did not resolve",
+            redaction.path
+        ))
+    })?;
+    *target = Value::String(redaction.replacement.clone());
+    Ok(())
 }
 
 struct ParsedPayload {

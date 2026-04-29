@@ -4,11 +4,12 @@
 //! module uses deterministic JSON event-message fixtures for tests and replay:
 //! each event is represented as an object with one top-level Bedrock event
 //! key such as `contentBlockStart`, `contentBlockDelta`, or `messageStop`.
-//! The adapter evaluates Chio's verdict as soon as `contentBlockStart`
-//! carries a `toolUse` start, then buffers that tool-use start and later
-//! `contentBlockDelta` frames until the verdict allows. Malformed events,
-//! evaluator errors, redaction-bearing allows, and denied starts all fail
-//! closed before any bytes for the tool-use block are released.
+//! The adapter buffers `toolUse` starts and later `contentBlockDelta` input
+//! fragments until `contentBlockStop`, reconstructs the completed JSON,
+//! evaluates Chio's verdict, then releases buffered frames only when the
+//! verdict allows. Malformed events, evaluator errors, redaction-bearing
+//! allows, and denied tool uses all fail closed before any bytes for the
+//! tool-use block are released.
 
 use chio_tool_call_fabric::{
     BlockKind, DenyReason, ProviderError, StreamEvent, StreamPhase, ToolInvocation, VerdictResult,
@@ -24,7 +25,7 @@ pub struct GatedConverseStream {
     pub bytes: Vec<u8>,
     /// Forwarded event messages in stream order.
     pub events: Vec<Value>,
-    /// Tool invocations evaluated at `contentBlockStart`.
+    /// Tool invocations evaluated at `contentBlockStop`.
     pub invocations: Vec<ToolInvocation>,
     /// Verdicts returned for each invocation, in stream order.
     pub verdicts: Vec<VerdictResult>,
@@ -33,9 +34,9 @@ pub struct GatedConverseStream {
 impl BedrockAdapter {
     /// Gate a deterministic Bedrock ConverseStream payload.
     ///
-    /// `evaluate` is called exactly when a `contentBlockStart` event carries
-    /// a `toolUse` start. Returning a deny verdict fails closed before any
-    /// bytes for that tool-use block are released.
+    /// `evaluate` is called once the full `toolUse` input JSON has arrived.
+    /// Returning a deny verdict fails closed before any bytes for that block
+    /// are released.
     pub fn gate_converse_stream<F>(
         &self,
         raw: &[u8],
@@ -97,9 +98,9 @@ impl<'a> StreamGate<'a> {
                 self.forward(event);
                 Ok(())
             }
-            EventKind::ContentBlockStart => self.start_content_block(event, evaluate),
+            EventKind::ContentBlockStart => self.start_content_block(event),
             EventKind::ContentBlockDelta => self.delta_content_block(event),
-            EventKind::ContentBlockStop => self.stop_content_block(event),
+            EventKind::ContentBlockStop => self.stop_content_block(event, evaluate),
             EventKind::MessageStop => self.stop_message(event),
             EventKind::Error => Err(ProviderError::Malformed(format!(
                 "Bedrock ConverseStream error event `{}`: {}",
@@ -112,14 +113,7 @@ impl<'a> StreamGate<'a> {
         }
     }
 
-    fn start_content_block<F>(
-        &mut self,
-        event: ConverseStreamEvent,
-        evaluate: &mut F,
-    ) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn start_content_block(&mut self, event: ConverseStreamEvent) -> Result<(), ProviderError> {
         if let Some(active) = &self.active {
             return Err(ProviderError::Malformed(format!(
                 "Bedrock contentBlockStart arrived before content block {} stopped",
@@ -136,10 +130,6 @@ impl<'a> StreamGate<'a> {
             return Ok(());
         };
 
-        let invocation = self.adapter.invocation_from_tool_use(block.clone())?;
-        let verdict = evaluate(&invocation)?;
-        ensure_streaming_allow(&block, &verdict)?;
-
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -147,9 +137,7 @@ impl<'a> StreamGate<'a> {
                 kind: BlockKind::ToolCall,
             },
         )?;
-        self.invocations.push(invocation);
-        self.verdicts.push(verdict);
-        self.active = Some(ActiveToolBlock::new(index, block.tool_use_id, event.raw));
+        self.active = Some(ActiveToolBlock::new(index, block, event.raw));
         Ok(())
     }
 
@@ -174,11 +162,19 @@ impl<'a> StreamGate<'a> {
                 chunk: input.as_bytes().to_vec(),
             },
         )?;
+        active.input_json.push_str(input);
         active.frames.push(event.raw);
         Ok(())
     }
 
-    fn stop_content_block(&mut self, event: ConverseStreamEvent) -> Result<(), ProviderError> {
+    fn stop_content_block<F>(
+        &mut self,
+        event: ConverseStreamEvent,
+        evaluate: &mut F,
+    ) -> Result<(), ProviderError>
+    where
+        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
+    {
         let index = content_block_index(&event.payload, "contentBlockStop")?;
         let Some(mut active) = self.active.take() else {
             self.forward(event);
@@ -186,7 +182,13 @@ impl<'a> StreamGate<'a> {
         };
         active.ensure_index(index, "contentBlockStop")?;
 
+        let block = active.completed_tool_use()?;
+        let invocation = self.adapter.invocation_from_tool_use(block.clone())?;
+        let verdict = evaluate(&invocation)?;
+        ensure_streaming_allow(&block, &verdict)?;
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;
+        self.invocations.push(invocation);
+        self.verdicts.push(verdict);
         active.frames.push(event.raw);
         self.output.extend(active.frames);
         Ok(())
@@ -233,13 +235,17 @@ impl<'a> StreamGate<'a> {
 #[derive(Debug)]
 struct ActiveToolBlock {
     index: u64,
+    block: ToolUseBlock,
+    input_json: String,
     frames: Vec<Value>,
 }
 
 impl ActiveToolBlock {
-    fn new(index: u64, _tool_use_id: String, first: Value) -> Self {
+    fn new(index: u64, block: ToolUseBlock, first: Value) -> Self {
         Self {
             index,
+            block,
+            input_json: String::new(),
             frames: vec![first],
         }
     }
@@ -252,6 +258,44 @@ impl ActiveToolBlock {
             )));
         }
         Ok(())
+    }
+
+    fn completed_tool_use(&self) -> Result<ToolUseBlock, ProviderError> {
+        let mut block = self.block.clone();
+        if self.input_json.is_empty() {
+            if !block.input.is_object() {
+                return Err(ProviderError::BadToolArgs(format!(
+                    "Bedrock toolUse `{}` input must be a JSON object",
+                    block.tool_use_id
+                )));
+            }
+            return Ok(block);
+        }
+        if !block
+            .input
+            .as_object()
+            .is_some_and(serde_json::Map::is_empty)
+        {
+            return Err(ProviderError::BadToolArgs(format!(
+                "Bedrock toolUse `{}` mixed non-empty start input with delta.toolUse.input frames",
+                block.tool_use_id
+            )));
+        }
+
+        let input: Value = serde_json::from_str(&self.input_json).map_err(|error| {
+            ProviderError::BadToolArgs(format!(
+                "Bedrock toolUse `{}` completed delta.toolUse.input was not valid JSON: {error}",
+                block.tool_use_id
+            ))
+        })?;
+        if !input.is_object() {
+            return Err(ProviderError::BadToolArgs(format!(
+                "Bedrock toolUse `{}` completed delta.toolUse.input was not a JSON object",
+                block.tool_use_id
+            )));
+        }
+        block.input = input;
+        Ok(block)
     }
 }
 
@@ -435,7 +479,7 @@ fn ensure_streaming_allow(
             block.tool_use_id
         ))),
         VerdictResult::Deny { reason, receipt_id } => Err(ProviderError::Malformed(format!(
-            "Bedrock streaming toolUse `{}` denied at contentBlockStart: {} (receipt {})",
+            "Bedrock streaming toolUse `{}` denied at contentBlockStop: {} (receipt {})",
             block.tool_use_id,
             deny_reason_text(reason),
             receipt_id.0

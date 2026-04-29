@@ -41,6 +41,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  CHIO_CPP_CBINDGEN_VERSION: "0.29.2"
+  CHIO_CPP_CONAN_VERSION: "2.28.0"
+  CHIO_CPP_VCPKG_REF: 7a9071743140154391b0e18b77d46cc66c5f3663
   # No trailing slash. Some Conan/Nexus combos loop on redirects when the
   # configured remote URL doesn't match the canonical form Nexus serves.
   CHIO_NEXUS_REMOTE_URL: https://nexus.dev.backbay.io/repository/chio-conan
@@ -54,7 +57,7 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       dry_run: ${{ steps.meta.outputs.dry_run }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Resolve version + dry-run
         id: meta
@@ -65,11 +68,12 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+          semver_re='(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?'
           if [[ "$EVENT_NAME" == "push" ]]; then
-            if [[ "$REF_NAME" =~ ^cpp/v([0-9]+\.[0-9]+\.[0-9]+.*)$ ]]; then
+            if [[ "$REF_NAME" =~ ^cpp/v(${semver_re})$ ]]; then
               version="${BASH_REMATCH[1]}"
             else
-              echo "Tag $REF_NAME does not match cpp/v*.*.*" >&2
+              echo "Tag $REF_NAME does not match cpp/v<semver>" >&2
               exit 1
             fi
             dry_run="false"
@@ -88,15 +92,18 @@ jobs:
           echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
           echo "Resolved version=$version dry_run=$dry_run"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake curl git pkg-config python3 python3-pip zip unzip tar libcurl4-openssl-dev
-          cargo install cbindgen --locked
-          python3 -m pip install --user conan
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+          cargo install cbindgen --locked --version "${CHIO_CPP_CBINDGEN_VERSION}"
+          python3 -m pip install --user "conan==${CHIO_CPP_CONAN_VERSION}"
+          git init "${RUNNER_TEMP}/vcpkg"
+          git -C "${RUNNER_TEMP}/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "${RUNNER_TEMP}/vcpkg" fetch --depth 1 origin "${CHIO_CPP_VCPKG_REF}"
+          git -C "${RUNNER_TEMP}/vcpkg" checkout --detach FETCH_HEAD
           "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh"
           echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
           echo "${RUNNER_TEMP}/vcpkg" >> "$GITHUB_PATH"
@@ -129,7 +136,7 @@ jobs:
         run: tar -C "$HOME/.conan2" -czf "${RUNNER_TEMP}/conan-cache.tar.gz" .
 
       - name: Upload Conan cache snapshot
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: conan-cache-${{ steps.meta.outputs.version }}
           path: ${{ runner.temp }}/conan-cache.tar.gz
@@ -144,15 +151,15 @@ jobs:
     environment:
       name: chio-conan-private
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install conan
         run: |
-          python3 -m pip install --user conan
+          python3 -m pip install --user "conan==${CHIO_CPP_CONAN_VERSION}"
           echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
 
       - name: Restore Conan cache snapshot
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: conan-cache-${{ needs.qualify.outputs.version }}
           path: ${{ runner.temp }}/snapshot
@@ -185,13 +192,9 @@ jobs:
           CONAN_PASSWORD_CHIO_PRIVATE: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
         run: |
           set -euo pipefail
-          # `-v debug` logs every HTTP method + URL + response so the next
-          # failure mode (if any) is diagnosable from the GHA log alone.
-          # Drop this back to default verbosity once the publish path is
-          # stable.
           for sdk in chio-cpp chio-cpp-kernel chio-guard-cpp chio-drogon; do
             conan upload "${sdk}/${{ needs.qualify.outputs.version }}" \
-              -r=chio-private --confirm -v debug
+              -r=chio-private --confirm
           done
 
   publish-vcpkg:
@@ -203,12 +206,12 @@ jobs:
       name: chio-vcpkg-registry
     steps:
       - name: Check out chio
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           path: chio
 
       - name: Check out vcpkg overlay registry
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           repository: ${{ env.CHIO_VCPKG_REGISTRY_REPO }}
           ssh-key: ${{ secrets.CHIO_VCPKG_REGISTRY_DEPLOY_KEY }}

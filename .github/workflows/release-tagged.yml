@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: project/roadmap-04-25-2026
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -49,9 +49,10 @@ jobs:
           # Validate tag format strictly before any further use. The tag flows
           # into shell strings, file contents, and a PR title/branch via the
           # peter-evans action, so an unsanitised tag is a script-injection
-          # surface (CWE-94). Permitted shape: v<major>.<minor>(.<patch>)?
-          if ! printf '%s' "${RELEASE_TAG}" | grep -Eq '^v[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
-            echo "ERROR: release tag ${RELEASE_TAG@Q} does not match v<major>.<minor>(.<patch>)?" >&2
+          # surface (CWE-94).
+          semver_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
+          if ! printf '%s' "${RELEASE_TAG}" | grep -Eq "${semver_re}"; then
+            echo "ERROR: release tag ${RELEASE_TAG@Q} does not match v<semver>" >&2
             exit 1
           fi
           # Pin the released-at date to the release event's published_at so a
@@ -120,7 +121,7 @@ jobs:
           } >> "${matrix}"
 
       - name: Open PR
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c
         with:
           base: project/roadmap-04-25-2026
           branch: chore/release-tagged-${{ steps.compute.outputs.tag }}

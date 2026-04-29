@@ -55,6 +55,26 @@ fn tool_use_payload(name: &str) -> Result<ProviderRequest, serde_json::Error> {
 }
 
 #[test]
+#[cfg(not(feature = "computer-use"))]
+fn server_tools_fail_closed_without_computer_use_feature() -> Result<(), Box<dyn std::error::Error>>
+{
+    let adapter = AnthropicAdapter::new_with_manifest(
+        config(),
+        Arc::new(MockTransport::new()),
+        &manifest(vec![ServerTool::Bash]),
+    )?;
+    let result = adapter.lift_batch(tool_use_payload("bash_20241022")?);
+
+    assert!(matches!(
+        result,
+        Err(ProviderError::Malformed(message))
+            if message.contains("requires the `computer-use` cargo feature")
+    ));
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "computer-use")]
 fn server_tools_fail_closed_without_manifest_allowlist() -> Result<(), Box<dyn std::error::Error>> {
     let adapter = AnthropicAdapter::new(config(), Arc::new(MockTransport::new()));
     let result = adapter.lift_batch(tool_use_payload("bash_20241022")?);
@@ -68,6 +88,7 @@ fn server_tools_fail_closed_without_manifest_allowlist() -> Result<(), Box<dyn s
 }
 
 #[test]
+#[cfg(feature = "computer-use")]
 fn server_tools_manifest_allowlist_allows_matching_tool() -> Result<(), Box<dyn std::error::Error>>
 {
     let adapter = AnthropicAdapter::new_with_manifest(
@@ -83,6 +104,7 @@ fn server_tools_manifest_allowlist_allows_matching_tool() -> Result<(), Box<dyn 
 }
 
 #[test]
+#[cfg(feature = "computer-use")]
 fn server_tools_manifest_allowlist_denies_unlisted_peer() -> Result<(), Box<dyn std::error::Error>>
 {
     let adapter = AnthropicAdapter::new_with_manifest(

@@ -32,6 +32,13 @@ fn bump_session_counter_from_id(session_id: &SessionId) {
     }
 }
 
+fn map_session_persist_error(error: SessionPersistError<KernelError>) -> KernelError {
+    match error {
+        SessionPersistError::Session(error) => KernelError::Session(error),
+        SessionPersistError::Persist(error) => error,
+    }
+}
+
 impl ChioKernel {
     pub fn open_session(
         &self,
@@ -95,13 +102,13 @@ impl ChioKernel {
         session_id: &SessionId,
         auth_context: SessionAuthContext,
     ) -> Result<(), KernelError> {
-        let (session_snapshot, supersedes_anchor_id) =
-            self.with_session_mut(session_id, |session| {
-                let (_rotated, session_snapshot, supersedes_anchor_id) =
-                    session.set_auth_context(auth_context);
-                Ok((session_snapshot, supersedes_anchor_id))
-            })?;
-        self.persist_session_anchor_snapshot(&session_snapshot, supersedes_anchor_id.as_deref())
+        self.with_session_mut(session_id, |session| {
+            session
+                .set_auth_context_persisted(auth_context, |session_snapshot, supersedes| {
+                    self.persist_session_anchor_snapshot(session_snapshot, supersedes)
+                })
+                .map_err(map_session_persist_error)
+        })
     }
 
     /// Persist peer capabilities negotiated at the edge for a session.
@@ -335,8 +342,11 @@ impl ChioKernel {
     /// Close a session and clear transient session-scoped state.
     pub fn close_session(&self, session_id: &SessionId) -> Result<(), KernelError> {
         self.with_session_mut(session_id, |session| {
-            session.close()?;
-            Ok(())
+            session
+                .close_persisted(|session_snapshot, supersedes| {
+                    self.persist_session_anchor_snapshot(session_snapshot, supersedes)
+                })
+                .map_err(map_session_persist_error)
         })
     }
 
@@ -374,7 +384,16 @@ impl ChioKernel {
         let start = self.with_sessions_write(|sessions| {
             begin_session_request_in_sessions(sessions, context, operation_kind, cancellable)
         })?;
-        self.persist_request_lineage_snapshot(&start)
+        if let Err(error) = self.persist_request_lineage_snapshot(&start) {
+            let _ = self.with_sessions_write(|sessions| {
+                if let Ok(session) = session_from_map(sessions, &start.session.session_id) {
+                    session.discard_unpersisted_request_start(&start.lineage.request_id);
+                }
+                Ok(())
+            });
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// Construct and register a child request under an existing parent request.
@@ -396,7 +415,15 @@ impl ChioKernel {
                 cancellable,
             )
         })?;
-        self.persist_request_lineage_snapshot(&start)?;
+        if let Err(error) = self.persist_request_lineage_snapshot(&start) {
+            let _ = self.with_sessions_write(|sessions| {
+                if let Ok(session) = session_from_map(sessions, &start.session.session_id) {
+                    session.discard_unpersisted_request_start(&start.lineage.request_id);
+                }
+                Ok(())
+            });
+            return Err(error);
+        }
         Ok(child_context)
     }
 

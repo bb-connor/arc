@@ -250,6 +250,16 @@ pub struct ReplayArgs {
     #[arg(long)]
     pub from_tee: bool,
 
+    /// Ed25519 tenant public-key file required when `--from-tee` is used.
+    /// Raw 32-byte and 64-lowercase-hex files are accepted.
+    #[arg(long, value_name = "PATH")]
+    pub tenant_pubkey: Option<PathBuf>,
+
+    /// Trusted kernel public-key file required for receipt-log replay.
+    /// Raw 32-byte Ed25519 and algorithm-aware hex files are accepted.
+    #[arg(long, value_name = "PATH")]
+    pub trusted_kernel_pubkey: Option<PathBuf>,
+
     /// Assert the recomputed Merkle root matches this hex string.
     #[arg(long, value_name = "HEX")]
     pub expect_root: Option<String>,

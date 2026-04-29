@@ -2,12 +2,9 @@
 //
 // Provides [`rederive_verdict`], which extracts the stored decision from a
 // receipt and compares it against the verdict the current build would produce
-// for the same input.
-//
-// Currently runs an identity re-derive (stored vs itself) because live kernel
-// evaluation from a receipt alone requires reconstruction work that is not yet
-// wired. The comparator surface is fully exercised by unit tests; the dispatch
-// layer can already map drift to exit 10.
+// for the same input. Receipt-only logs do not contain enough authority,
+// policy, guard, and tool context to safely re-execute a verdict, so ordinary
+// receipts fail closed instead of receiving an identity comparison.
 
 /// Canonical exit code emitted when a receipt's stored decision disagrees
 /// with what the current build would produce.
@@ -42,7 +39,6 @@ pub struct VerdictOutcome {
     /// `"incomplete"`).
     pub stored_decision: String,
     /// Decision label the current build would produce for the same input.
-    /// Currently equals `stored_decision` (identity re-derive).
     pub current_decision: String,
     /// `true` when stored and current decisions disagree.
     pub drift: bool,
@@ -96,9 +92,9 @@ const REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL: &str = "drift-marker";
 
 /// Re-derive the verdict for a single receipt against the current build.
 ///
-/// Currently performs an identity re-derive (stored vs itself). Still validates
-/// that the receipt carries a usable id and decision so the dispatch layer can
-/// handle [`VerdictError::MissingDecision`] fail-closed.
+/// The legacy receipt log does not carry enough context to reconstruct a live
+/// kernel evaluation, so this function refuses to mark ordinary receipts clean.
+/// Replay callers must use a richer replay surface for actual drift checks.
 ///
 /// See [`REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL`] for the synthetic-drift hook.
 pub fn rederive_verdict(
@@ -115,9 +111,10 @@ pub fn rederive_verdict(
             return compare_verdicts(&receipt.id, stored, "allow");
         }
     }
-    // Identity re-derive: live kernel evaluation is not yet wired.
-    let current = stored;
-    compare_verdicts(&receipt.id, stored, current)
+    Err(VerdictError::EvalFailed {
+        receipt_id: receipt.id.clone(),
+        detail: "receipt-only replay cannot safely rederive verdicts without policy, capability, and guard context".to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -135,10 +132,7 @@ mod replay_verdict_tests {
             capability_id: "cap-test".to_string(),
             tool_server: "fs".to_string(),
             tool_name: "read_file".to_string(),
-            action: ToolCallAction {
-                parameters: json!({}),
-                parameter_hash: "0".repeat(64),
-            },
+            action: ToolCallAction::from_parameters(json!({})).expect("hash test parameters"),
             decision,
             content_hash: "0".repeat(64),
             policy_hash: "0".repeat(64),
@@ -162,17 +156,14 @@ mod replay_verdict_tests {
     }
 
     #[test]
-    fn rederive_matching_verdict_returns_no_drift() {
+    fn rederive_without_live_context_fails_closed() {
         let receipt = signed_receipt_with("rcpt-allow-0001", Decision::Allow);
-        let outcome = rederive_verdict(&receipt).unwrap();
-        assert_eq!(outcome.receipt_id, "rcpt-allow-0001");
-        assert_eq!(outcome.stored_decision, "allow");
-        assert_eq!(outcome.current_decision, "allow");
-        assert!(!outcome.drift, "identity re-derive must not report drift");
+        let err = rederive_verdict(&receipt).unwrap_err();
+        assert!(matches!(err, VerdictError::EvalFailed { .. }));
     }
 
     #[test]
-    fn rederive_deny_receipt_yields_deny_label() {
+    fn rederive_deny_receipt_without_live_context_fails_closed() {
         let receipt = signed_receipt_with(
             "rcpt-deny-0001",
             Decision::Deny {
@@ -180,34 +171,32 @@ mod replay_verdict_tests {
                 guard: "budget".to_string(),
             },
         );
-        let outcome = rederive_verdict(&receipt).unwrap();
-        assert_eq!(outcome.stored_decision, "deny");
-        assert_eq!(outcome.current_decision, "deny");
-        assert!(!outcome.drift);
+        let err = rederive_verdict(&receipt).unwrap_err();
+        assert!(matches!(err, VerdictError::EvalFailed { .. }));
     }
 
     #[test]
-    fn rederive_cancelled_receipt_yields_cancelled_label() {
+    fn rederive_cancelled_receipt_without_live_context_fails_closed() {
         let receipt = signed_receipt_with(
             "rcpt-cancel-0001",
             Decision::Cancelled {
                 reason: "client disconnect".to_string(),
             },
         );
-        let outcome = rederive_verdict(&receipt).unwrap();
-        assert_eq!(outcome.stored_decision, "cancelled");
+        let err = rederive_verdict(&receipt).unwrap_err();
+        assert!(matches!(err, VerdictError::EvalFailed { .. }));
     }
 
     #[test]
-    fn rederive_incomplete_receipt_yields_incomplete_label() {
+    fn rederive_incomplete_receipt_without_live_context_fails_closed() {
         let receipt = signed_receipt_with(
             "rcpt-incomplete-0001",
             Decision::Incomplete {
                 reason: "timeout".to_string(),
             },
         );
-        let outcome = rederive_verdict(&receipt).unwrap();
-        assert_eq!(outcome.stored_decision, "incomplete");
+        let err = rederive_verdict(&receipt).unwrap_err();
+        assert!(matches!(err, VerdictError::EvalFailed { .. }));
     }
 
     #[test]

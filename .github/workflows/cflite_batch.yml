@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   security-events: write
 
 concurrency:
@@ -38,7 +39,7 @@ jobs:
     name: fuzz-budget
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install yq
         run: |
           set -euo pipefail
@@ -46,6 +47,7 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
             -o "${HOME}/.local/bin/yq"
+          echo "a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7  ${HOME}/.local/bin/yq" | sha256sum -c -
           chmod +x "${HOME}/.local/bin/yq"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
       - name: Verify 30-day fuzz budget
@@ -59,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install yq
         run: |
           set -euo pipefail
@@ -67,6 +69,7 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
             -o "${HOME}/.local/bin/yq"
+          echo "a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7  ${HOME}/.local/bin/yq" | sha256sum -c -
           chmod +x "${HOME}/.local/bin/yq"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
@@ -113,7 +116,7 @@ jobs:
 
       - name: Run ClusterFuzzLite batch with corpus storage
         if: steps.corpus.outputs.enabled == 'true'
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
         env:
           CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
@@ -130,7 +133,7 @@ jobs:
 
       - name: Run ClusterFuzzLite batch without corpus storage
         if: steps.corpus.outputs.enabled != 'true'
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
         env:
           CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
@@ -143,7 +146,7 @@ jobs:
 
       - name: Upload crash reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cflite-batch-${{ steps.pick.outputs.target }}-${{ github.run_id }}
           path: ./out/artifacts

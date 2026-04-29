@@ -225,10 +225,10 @@ impl From<VerifiedCapability> for VerifiedCapabilityJson {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifyReceiptResultJson {
     /// `true` when the receipt's Ed25519 signature verifies against the
-    /// embedded `kernel_key` and the `kernel_key` is in the supplied
-    /// trusted issuer set (when one is supplied; an empty / `None`
-    /// trusted set skips the issuer-pinning check and only verifies the
-    /// signature mathematically).
+    /// embedded `kernel_key`, the parameter hash is valid, and the
+    /// `kernel_key` appears in the supplied trusted issuer set. Callers
+    /// must provide at least one trusted issuer before a receipt can be
+    /// marked trusted.
     pub ok: bool,
     /// Lowercase hex of the receipt's `kernel_key`.
     pub signer_key_hex: String,
@@ -241,11 +241,11 @@ pub struct VerifyReceiptResultJson {
     /// matches the canonical hash of the parameters.
     pub parameter_hash_valid: bool,
     /// `true` when the signature math verified. Distinct from `ok`
-    /// because `ok` also requires the signer to be trusted (when a
-    /// trusted set is supplied).
+    /// because `ok` also requires explicit issuer pinning.
     pub signature_valid: bool,
-    /// `true` when the signer was either not constrained (no trusted
-    /// set) or appears in the supplied trusted set.
+    /// `true` when the signer appears in a non-empty trusted issuer
+    /// set. Empty trusted issuer sets report signature status only and
+    /// never mark the signer trusted.
     pub signer_trusted: bool,
 }
 
@@ -387,10 +387,10 @@ pub fn verify_capability_pure(
 /// envelope, runs the embedded-key signature check, optionally pins the
 /// signer to a trusted-issuer set, and returns a structured outcome.
 ///
-/// `trusted_issuers` is consulted only when non-empty. An empty slice
-/// means "do not pin the signer; signature math alone decides". This
-/// matches the demo path where the M04 fixture corpus carries a known
-/// signer the browser caller may or may not have configured up front.
+/// `trusted_issuers` must contain the signer before `ok` can be true.
+/// An empty slice means "signature-only verification": the signature
+/// and parameter hash fields still report their mathematical status,
+/// but the receipt is not marked trusted.
 ///
 /// Verification is fail-closed in the sense that a malformed envelope,
 /// a parameter-hash mismatch, or a signature that does not verify
@@ -431,13 +431,10 @@ pub fn verify_receipt_pure(
         )
     })?;
 
-    let signer_trusted = if trusted_issuers.is_empty() {
-        true
-    } else {
-        trusted_issuers
+    let signer_trusted = !trusted_issuers.is_empty()
+        && trusted_issuers
             .iter()
-            .any(|issuer| issuer == &receipt.kernel_key)
-    };
+            .any(|issuer| issuer == &receipt.kernel_key);
 
     let ok = signature_valid && parameter_hash_valid && signer_trusted;
 
@@ -667,8 +664,8 @@ pub mod wasm {
     /// `ChioReceipt`. `trusted_issuers` is a JS value that the browser
     /// caller may pass as:
     ///
-    /// - `undefined` / `null` -- skip the issuer-pinning check; only the
-    ///   signature math decides whether `ok` is `true`.
+    /// - `undefined` / `null` -- run signature and parameter-hash checks
+    ///   only; `ok` remains `false` because no trusted issuer was pinned.
     /// - a JS string -- a single hex-encoded Ed25519 public key.
     /// - a JS array of strings -- multiple hex-encoded keys; the
     ///   receipt's `kernel_key` MUST appear in the set for `ok` to be
@@ -958,15 +955,15 @@ mod tests {
     }
 
     #[test]
-    fn verify_receipt_pure_allow_path_without_trust_pinning() {
+    fn verify_receipt_pure_signature_only_without_trust_pinning() {
         let receipt = make_signed_receipt([7u8; 32]);
         let envelope = serde_json::to_vec(&receipt).unwrap();
 
         let result = verify_receipt_pure(&envelope, &[]).expect("verify_receipt_pure");
-        assert!(result.ok);
+        assert!(!result.ok);
         assert!(result.signature_valid);
         assert!(result.parameter_hash_valid);
-        assert!(result.signer_trusted);
+        assert!(!result.signer_trusted);
         assert_eq!(result.decision, "allow");
         assert_eq!(result.receipt_id, "rcpt-verify-pure");
         assert_eq!(result.signer_key_hex, receipt.kernel_key.to_hex());
@@ -977,7 +974,7 @@ mod tests {
         let receipt = make_signed_receipt([9u8; 32]);
         let envelope = serde_json::to_vec(&receipt).unwrap();
 
-        let result = verify_receipt_pure(&envelope, &[receipt.kernel_key.clone()])
+        let result = verify_receipt_pure(&envelope, core::slice::from_ref(&receipt.kernel_key))
             .expect("verify_receipt_pure");
         assert!(result.ok);
         assert!(result.signer_trusted);

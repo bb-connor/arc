@@ -9,7 +9,7 @@
     allow(dead_code, unused_imports)
 )]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -277,12 +277,14 @@ pub fn replay_bedrock_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, R
     let (mode, invocations, verdicts) = if fixture.has_bedrock_stream_tool_events() {
         let (invocations, verdicts) = replay_bedrock_stream(&fixture, &adapter, &captured)?;
         (ReplayMode::Stream, invocations, verdicts)
-    } else if captured.is_empty() {
-        (ReplayMode::NoToolCall, Vec::new(), Vec::new())
     } else {
         let invocations = replay_bedrock_batch(&fixture, &adapter)?;
-        let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
-        (ReplayMode::Batch, invocations, verdicts)
+        if captured.is_empty() && invocations.is_empty() {
+            (ReplayMode::NoToolCall, Vec::new(), Vec::new())
+        } else {
+            let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
+            (ReplayMode::Batch, invocations, verdicts)
+        }
     };
 
     assert_replayed_invocations(&fixture, &captured, &invocations)?;
@@ -314,12 +316,14 @@ pub fn replay_openai_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     let (mode, invocations, verdicts) = if fixture.has_stream_tool_events() {
         let (invocations, verdicts) = replay_openai_stream(&fixture, &adapter, &captured)?;
         (ReplayMode::Stream, invocations, verdicts)
-    } else if captured.is_empty() {
-        (ReplayMode::NoToolCall, Vec::new(), Vec::new())
     } else {
         let invocations = replay_openai_batch(&fixture, &adapter)?;
-        let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
-        (ReplayMode::Batch, invocations, verdicts)
+        if captured.is_empty() && invocations.is_empty() {
+            (ReplayMode::NoToolCall, Vec::new(), Vec::new())
+        } else {
+            let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
+            (ReplayMode::Batch, invocations, verdicts)
+        }
     };
 
     assert_replayed_invocations(&fixture, &captured, &invocations)?;
@@ -349,12 +353,14 @@ pub fn replay_anthropic_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome,
     let (mode, invocations, verdicts) = if fixture.has_anthropic_stream_tool_events() {
         let (invocations, verdicts) = replay_anthropic_stream(&fixture, &adapter, &captured)?;
         (ReplayMode::Stream, invocations, verdicts)
-    } else if captured.is_empty() {
-        (ReplayMode::NoToolCall, Vec::new(), Vec::new())
     } else {
         let invocations = replay_anthropic_batch(&fixture, &adapter)?;
-        let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
-        (ReplayMode::Batch, invocations, verdicts)
+        if captured.is_empty() && invocations.is_empty() {
+            (ReplayMode::NoToolCall, Vec::new(), Vec::new())
+        } else {
+            let verdicts = captured.iter().map(|entry| entry.verdict.clone()).collect();
+            (ReplayMode::Batch, invocations, verdicts)
+        }
     };
 
     assert_replayed_invocations(&fixture, &captured, &invocations)?;
@@ -555,6 +561,52 @@ impl ProviderCaptureFixture {
         })
     }
 
+    #[cfg(feature = "fixtures-openai")]
+    fn ensure_openai_stream_verdict_chronology(&self) -> Result<(), ReplayError> {
+        let mut completed_calls = BTreeSet::<String>::new();
+
+        for record in &self.records {
+            match record.direction {
+                CaptureDirection::UpstreamEvent => {
+                    if event_name(&record.payload) != Some("response.output_item.done") {
+                        continue;
+                    }
+                    if let Some(call_id) = record
+                        .payload
+                        .get("data")
+                        .and_then(|data| data.get("item"))
+                        .and_then(|item| {
+                            (item.get("type").and_then(Value::as_str) == Some("function_call"))
+                                .then_some(item)
+                        })
+                        .and_then(|item| item.get("call_id"))
+                        .and_then(Value::as_str)
+                    {
+                        completed_calls.insert(call_id.to_string());
+                    }
+                }
+                CaptureDirection::KernelVerdict => {
+                    let invocation_id = required_field(
+                        &self.path,
+                        record.invocation_id.as_deref(),
+                        "invocation_id",
+                    )?;
+                    if !completed_calls.contains(invocation_id) {
+                        return Err(invalid_fixture(
+                            &self.path,
+                            format!(
+                                "OpenAI stream kernel_verdict for {invocation_id} appeared before response.output_item.done"
+                            ),
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
     #[cfg(feature = "fixtures-anthropic")]
     fn has_anthropic_stream_tool_events(&self) -> bool {
         self.records.iter().any(|record| {
@@ -573,6 +625,74 @@ impl ProviderCaptureFixture {
         })
     }
 
+    #[cfg(feature = "fixtures-anthropic")]
+    fn ensure_anthropic_stream_verdict_chronology(&self) -> Result<(), ReplayError> {
+        let mut block_to_tool = BTreeMap::<u64, String>::new();
+        let mut completed_tools = BTreeSet::<String>::new();
+
+        for record in &self.records {
+            match record.direction {
+                CaptureDirection::UpstreamEvent => match event_name(&record.payload) {
+                    Some("content_block_start") => {
+                        let Some(index) = record
+                            .payload
+                            .get("data")
+                            .and_then(|data| data.get("index"))
+                            .and_then(Value::as_u64)
+                        else {
+                            continue;
+                        };
+                        if let Some(tool_use_id) = record
+                            .payload
+                            .get("data")
+                            .and_then(|data| data.get("content_block"))
+                            .and_then(|block| {
+                                (block.get("type").and_then(Value::as_str) == Some("tool_use"))
+                                    .then_some(block)
+                            })
+                            .and_then(|block| block.get("id"))
+                            .and_then(Value::as_str)
+                        {
+                            block_to_tool.insert(index, tool_use_id.to_string());
+                        }
+                    }
+                    Some("content_block_stop") => {
+                        let Some(index) = record
+                            .payload
+                            .get("data")
+                            .and_then(|data| data.get("index"))
+                            .and_then(Value::as_u64)
+                        else {
+                            continue;
+                        };
+                        if let Some(tool_use_id) = block_to_tool.get(&index) {
+                            completed_tools.insert(tool_use_id.clone());
+                        }
+                    }
+                    _ => {}
+                },
+                CaptureDirection::KernelVerdict => {
+                    let invocation_id = required_field(
+                        &self.path,
+                        record.invocation_id.as_deref(),
+                        "invocation_id",
+                    )?;
+                    if !completed_tools.contains(invocation_id) {
+                        return Err(invalid_fixture(
+                            &self.path,
+                            format!(
+                                "Anthropic stream kernel_verdict for {invocation_id} appeared before content_block_stop"
+                            ),
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
     #[cfg(feature = "fixtures-bedrock")]
     fn has_bedrock_stream_tool_events(&self) -> bool {
         self.records.iter().any(|record| {
@@ -587,6 +707,61 @@ impl ProviderCaptureFixture {
                 .and_then(|start| start.get("toolUse"))
                 .is_some()
         })
+    }
+
+    #[cfg(feature = "fixtures-bedrock")]
+    fn ensure_bedrock_stream_verdict_chronology(&self) -> Result<(), ReplayError> {
+        let mut block_to_tool = BTreeMap::<u64, String>::new();
+        let mut completed_tools = BTreeSet::<String>::new();
+
+        for record in &self.records {
+            match record.direction {
+                CaptureDirection::UpstreamEvent => {
+                    if let Some(start) = record.payload.get("contentBlockStart") {
+                        let Some(index) = start.get("contentBlockIndex").and_then(Value::as_u64)
+                        else {
+                            continue;
+                        };
+                        if let Some(tool_use_id) = start
+                            .get("start")
+                            .and_then(|start| start.get("toolUse"))
+                            .and_then(|tool| tool.get("toolUseId"))
+                            .and_then(Value::as_str)
+                        {
+                            block_to_tool.insert(index, tool_use_id.to_string());
+                        }
+                    }
+
+                    if let Some(stop) = record.payload.get("contentBlockStop") {
+                        let Some(index) = stop.get("contentBlockIndex").and_then(Value::as_u64)
+                        else {
+                            continue;
+                        };
+                        if let Some(tool_use_id) = block_to_tool.get(&index) {
+                            completed_tools.insert(tool_use_id.clone());
+                        }
+                    }
+                }
+                CaptureDirection::KernelVerdict => {
+                    let invocation_id = required_field(
+                        &self.path,
+                        record.invocation_id.as_deref(),
+                        "invocation_id",
+                    )?;
+                    if !completed_tools.contains(invocation_id) {
+                        return Err(invalid_fixture(
+                            &self.path,
+                            format!(
+                                "Bedrock stream kernel_verdict for {invocation_id} appeared before contentBlockStop"
+                            ),
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
     }
 
     fn upstream_responses(&self) -> impl Iterator<Item = &CaptureRecord> {
@@ -699,6 +874,7 @@ fn replay_openai_stream(
     adapter: &chio_openai::OpenAiAdapter,
     captured: &[CapturedVerdict],
 ) -> Result<(Vec<ToolInvocation>, Vec<VerdictResult>), ReplayError> {
+    fixture.ensure_openai_stream_verdict_chronology()?;
     let mut verdicts_by_id = captured
         .iter()
         .map(|entry| (entry.invocation_id.clone(), entry.verdict.clone()))
@@ -729,6 +905,7 @@ fn replay_anthropic_stream(
     adapter: &chio_anthropic_tools_adapter::AnthropicAdapter,
     captured: &[CapturedVerdict],
 ) -> Result<(Vec<ToolInvocation>, Vec<VerdictResult>), ReplayError> {
+    fixture.ensure_anthropic_stream_verdict_chronology()?;
     let mut verdicts_by_id = captured
         .iter()
         .map(|entry| (entry.invocation_id.clone(), entry.verdict.clone()))
@@ -759,6 +936,7 @@ fn replay_bedrock_stream(
     adapter: &chio_bedrock_converse_adapter::BedrockAdapter,
     captured: &[CapturedVerdict],
 ) -> Result<(Vec<ToolInvocation>, Vec<VerdictResult>), ReplayError> {
+    fixture.ensure_bedrock_stream_verdict_chronology()?;
     let mut verdicts_by_id = captured
         .iter()
         .map(|entry| (entry.invocation_id.clone(), entry.verdict.clone()))
@@ -849,6 +1027,23 @@ fn assert_replayed_verdicts(
     Ok(())
 }
 
+fn captured_verdict_by_invocation_id(
+    path: &Path,
+    captured: &[CapturedVerdict],
+    invocation_id: &str,
+) -> Result<VerdictResult, ReplayError> {
+    captured
+        .iter()
+        .find(|entry| entry.invocation_id == invocation_id)
+        .map(|entry| entry.verdict.clone())
+        .ok_or_else(|| {
+            invalid_fixture(
+                path,
+                format!("lowered tool output {invocation_id} had no captured verdict"),
+            )
+        })
+}
+
 #[cfg(feature = "fixtures-openai")]
 fn assert_openai_lowered_responses(
     fixture: &ProviderCaptureFixture,
@@ -857,7 +1052,6 @@ fn assert_openai_lowered_responses(
 ) -> Result<usize, ReplayError> {
     use chio_tool_call_fabric::ProviderAdapter;
 
-    let lower_verdict = shared_lower_verdict(&fixture.path, captured)?;
     let mut lowered = 0;
 
     for record in fixture.lowered_tool_output_requests() {
@@ -867,18 +1061,52 @@ fn assert_openai_lowered_responses(
                 "lowered upstream_request payload was missing body",
             )
         })?;
-        let Some(verdict) = lower_verdict.clone() else {
-            return Err(invalid_fixture(
-                &fixture.path,
-                "lowered tool output request appeared without captured verdict",
-            ));
-        };
-        let result = ToolResult(canonical_json_bytes_for(
-            format!("{} captured tool result", fixture.fixture_id),
-            expected_body,
-        )?);
-        let response = futures_lite_block_on(adapter.lower(verdict, result))?;
-        let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+        let expected_outputs = expected_body
+            .get("tool_outputs")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                invalid_fixture(
+                    &fixture.path,
+                    "OpenAI lowered body was missing tool_outputs",
+                )
+            })?;
+        let mut actual_outputs = Vec::with_capacity(expected_outputs.len());
+        for expected_output in expected_outputs {
+            let call_id = expected_output
+                .get("call_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    invalid_fixture(&fixture.path, "OpenAI lowered output was missing call_id")
+                })?;
+            let verdict = captured_verdict_by_invocation_id(&fixture.path, captured, call_id)?;
+            let single_output_body = serde_json::json!({
+                "tool_outputs": [expected_output.clone()],
+            });
+            let result = ToolResult(canonical_json_bytes_for(
+                format!("{} captured tool result {call_id}", fixture.fixture_id),
+                &single_output_body,
+            )?);
+            let response = futures_lite_block_on(adapter.lower(verdict, result))?;
+            let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+            let mut outputs = actual_body
+                .get("tool_outputs")
+                .and_then(Value::as_array)
+                .cloned()
+                .ok_or_else(|| {
+                    invalid_fixture(
+                        &fixture.path,
+                        "OpenAI adapter lower response was missing tool_outputs",
+                    )
+                })?;
+            if outputs.len() != 1 {
+                return Err(invalid_fixture(
+                    &fixture.path,
+                    "OpenAI adapter lower response must contain one tool output",
+                ));
+            }
+            actual_outputs.push(outputs.remove(0));
+        }
+        let actual_body = serde_json::json!({ "tool_outputs": actual_outputs });
 
         assert_canonical_json_eq(
             format!("{} lowered OpenAI tool_outputs", fixture.fixture_id),
@@ -899,7 +1127,6 @@ fn assert_anthropic_lowered_responses(
 ) -> Result<usize, ReplayError> {
     use chio_tool_call_fabric::ProviderAdapter;
 
-    let lower_verdict = shared_lower_verdict(&fixture.path, captured)?;
     let mut lowered = 0;
 
     for record in fixture.lowered_anthropic_tool_result_requests() {
@@ -909,17 +1136,17 @@ fn assert_anthropic_lowered_responses(
                 "lowered upstream_request payload was missing body",
             )
         })?;
-        let Some(verdict) = lower_verdict.clone() else {
-            return Err(invalid_fixture(
-                &fixture.path,
-                "lowered tool_result request appeared without captured verdict",
-            ));
-        };
-        let result = ToolResult(anthropic_tool_result_payload(
-            &fixture.path,
-            expected_body,
-            &verdict,
-        )?);
+        let tool_use_id = expected_body
+            .get("tool_use_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                invalid_fixture(
+                    &fixture.path,
+                    "Anthropic lowered tool_result was missing tool_use_id",
+                )
+            })?;
+        let verdict = captured_verdict_by_invocation_id(&fixture.path, captured, tool_use_id)?;
+        let result = ToolResult(anthropic_tool_result_payload(&fixture.path, expected_body)?);
         let response = futures_lite_block_on(adapter.lower(verdict, result))?;
         let actual_body = serde_json::from_slice::<Value>(&response.0)?;
 
@@ -942,7 +1169,6 @@ fn assert_bedrock_lowered_responses(
 ) -> Result<usize, ReplayError> {
     use chio_tool_call_fabric::ProviderAdapter;
 
-    let lower_verdict = shared_lower_verdict(&fixture.path, captured)?;
     let mut lowered = 0;
 
     for record in fixture.lowered_bedrock_tool_result_requests() {
@@ -952,12 +1178,17 @@ fn assert_bedrock_lowered_responses(
                 "lowered upstream_request payload was missing body",
             )
         })?;
-        let Some(verdict) = lower_verdict.clone() else {
-            return Err(invalid_fixture(
-                &fixture.path,
-                "lowered toolResult request appeared without captured verdict",
-            ));
-        };
+        let tool_use_id = expected_body
+            .get("toolResult")
+            .and_then(|tool_result| tool_result.get("toolUseId"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                invalid_fixture(
+                    &fixture.path,
+                    "Bedrock lowered toolResult was missing toolUseId",
+                )
+            })?;
+        let verdict = captured_verdict_by_invocation_id(&fixture.path, captured, tool_use_id)?;
         let result = ToolResult(bedrock_tool_result_payload(&fixture.path, expected_body)?);
         let response = futures_lite_block_on(adapter.lower(verdict, result))?;
         let actual_body = serde_json::from_slice::<Value>(&response.0)?;
@@ -1038,18 +1269,15 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
 fn anthropic_tool_result_payload(
     path: &Path,
     expected_body: &Value,
-    verdict: &VerdictResult,
 ) -> Result<Vec<u8>, ReplayError> {
-    match verdict {
-        VerdictResult::Allow { .. } => {
-            let content = expected_body.get("content").ok_or_else(|| {
-                invalid_fixture(path, "Anthropic allow tool_result was missing content")
-            })?;
-            canonical_json_bytes_for("captured Anthropic tool result content", content)
-                .map_err(ReplayError::from)
-        }
-        VerdictResult::Deny { .. } => Ok(b"{}".to_vec()),
+    if expected_body.get("tool_use_id").is_none() {
+        return Err(invalid_fixture(
+            path,
+            "Anthropic lowered tool_result was missing tool_use_id",
+        ));
     }
+    canonical_json_bytes_for("captured Anthropic tool_result envelope", expected_body)
+        .map_err(ReplayError::from)
 }
 
 #[cfg(feature = "fixtures-bedrock")]
@@ -1142,44 +1370,6 @@ fn captured_deny_reason(path: &Path, payload: &Value) -> Result<DenyReason, Repl
         .get("reason")
         .ok_or_else(|| invalid_fixture(path, "deny kernel_verdict payload was missing reason"))?;
     serde_json::from_value(reason.clone()).map_err(ReplayError::from)
-}
-
-#[cfg(any(
-    feature = "fixtures-openai",
-    feature = "fixtures-anthropic",
-    feature = "fixtures-bedrock"
-))]
-fn shared_lower_verdict(
-    path: &Path,
-    captured: &[CapturedVerdict],
-) -> Result<Option<VerdictResult>, ReplayError> {
-    let mut verdicts = captured.iter().map(|entry| entry.verdict.clone());
-    let Some(first) = verdicts.next() else {
-        return Ok(None);
-    };
-
-    for verdict in verdicts {
-        if verdict_kind(&first) != verdict_kind(&verdict) {
-            return Err(invalid_fixture(
-                path,
-                "one lowered tool_outputs payload cannot represent mixed verdict kinds",
-            ));
-        }
-    }
-
-    Ok(Some(first))
-}
-
-#[cfg(any(
-    feature = "fixtures-openai",
-    feature = "fixtures-anthropic",
-    feature = "fixtures-bedrock"
-))]
-fn verdict_kind(verdict: &VerdictResult) -> &'static str {
-    match verdict {
-        VerdictResult::Allow { .. } => "allow",
-        VerdictResult::Deny { .. } => "deny",
-    }
 }
 
 #[cfg(feature = "fixtures-bedrock")]

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
+# Schema sha256: 3ed943267c60942b5a63a39515fbbc1a553d614d895d142e307096a7a99c7da2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from .capability_list_schema import Capability, ChioKernelmessageCapabilityList, DelegationChainItem, Grant, MaxCostPerInvocation, MaxTotalCost, Operation, PromptGrant, ResourceGrant, Scope
+from .capability_list_schema import Capability, ChioKernelmessageCapabilityList, Constraint, DelegationChainItem, Grant, MaxCostPerInvocation, MaxTotalCost, Operation, PromptGrant, ResourceGrant, Scope
 from .capability_revoked_schema import ChioKernelmessageCapabilityRevoked
 from .heartbeat_schema import ChioKernelmessageHeartbeat
 from .tool_call_chunk_schema import ChioKernelmessageToolCallChunk
@@ -24,6 +24,7 @@ __all__ = [
     "ChioKernelmessageHeartbeat",
     "ChioKernelmessageToolCallChunk",
     "ChioKernelmessageToolCallResponse",
+    "Constraint",
     "Decision",
     "Decision6",
     "Decision7",

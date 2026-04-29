@@ -1,9 +1,9 @@
 //! OpenAI Responses SSE gating.
 //!
 //! Tool-call start and argument-delta frames are held behind the shared fabric
-//! `StreamPhase` until `response.output_item.done` carries the final argument
-//! string, the adapter lifts that tool call into a canonical invocation, and
-//! the verdict allows the block.
+//! `StreamPhase` until the final argument frames have been checked, the adapter
+//! lifts `response.output_item.done` into a canonical invocation, and the
+//! verdict allows the block.
 
 use chio_tool_call_fabric::{
     BlockKind, BufferedBlock, DenyReason, ProviderError, ProviderRequest, StreamEvent, StreamPhase,
@@ -56,8 +56,8 @@ impl OpenAiAdapter {
     /// Gate a deterministic OpenAI Responses SSE payload.
     ///
     /// `evaluate` is called exactly when `response.output_item.done` carries a
-    /// completed tool-call output item. The start frame and all argument deltas
-    /// remain buffered until the verdict allows the block.
+    /// completed tool-call output item. The start frame, argument deltas, and
+    /// argument-done frame remain buffered until the verdict allows the block.
     pub fn gate_sse_stream<F>(
         &self,
         raw: &[u8],
@@ -110,6 +110,7 @@ impl<'a> StreamGate<'a> {
         match event {
             "response.output_item.added" => self.start_output_item(frame),
             "response.function_call_arguments.delta" => self.argument_delta(frame),
+            "response.function_call_arguments.done" => self.argument_done(frame),
             "response.output_item.done" => self.finish_output_item(frame, evaluate),
             "response.completed" => self.close_stream(frame),
             "error" | "response.error" => Err(ProviderError::Malformed(format!(
@@ -151,8 +152,10 @@ impl<'a> StreamGate<'a> {
         )?;
         self.active = Some(ActiveToolBlock::new(
             frame_output_index(data),
+            call.item_id,
             call.call_id,
             call.name,
+            call.arguments,
             frame,
         ));
         Ok(())
@@ -168,12 +171,29 @@ impl<'a> StreamGate<'a> {
         active.ensure_match(&frame, "response.function_call_arguments.delta")?;
 
         let delta = argument_delta_text(&frame)?;
+        active.record_argument_delta()?;
         self.phase = transition(
             &self.phase,
             StreamEvent::AppendBytes {
                 chunk: delta.as_bytes().to_vec(),
             },
         )?;
+        active.frames.push(frame);
+        Ok(())
+    }
+
+    fn argument_done(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+        let buffered = self.phase.buffered().cloned();
+        let Some(active) = self.active.as_mut() else {
+            return Err(ProviderError::Malformed(
+                "OpenAI function_call_arguments.done arrived without an active tool call"
+                    .to_string(),
+            ));
+        };
+        active.ensure_match(&frame, "response.function_call_arguments.done")?;
+
+        let arguments = argument_done_text(&frame)?;
+        active.record_argument_done(arguments, buffered.as_ref())?;
         active.frames.push(frame);
         Ok(())
     }
@@ -248,6 +268,10 @@ impl<'a> StreamGate<'a> {
                 active.call_id
             )));
         }
+        if self.phase.is_closed() {
+            self.output.extend_from_slice(&frame.raw);
+            return Ok(());
+        }
         self.phase = transition(&self.phase, StreamEvent::Close)?;
         self.output.extend_from_slice(&frame.raw);
         Ok(())
@@ -309,24 +333,73 @@ impl<'a> StreamGate<'a> {
 #[derive(Debug)]
 struct ActiveToolBlock {
     output_index: Option<u64>,
+    item_id: Option<String>,
     call_id: String,
     name: Option<String>,
+    start_arguments: Option<String>,
+    saw_argument_delta: bool,
+    done_arguments: Option<String>,
     frames: Vec<SseFrame>,
 }
 
 impl ActiveToolBlock {
     fn new(
         output_index: Option<u64>,
+        item_id: Option<String>,
         call_id: String,
         name: Option<String>,
+        start_arguments: Option<String>,
         first: SseFrame,
     ) -> Self {
         Self {
             output_index,
+            item_id,
             call_id,
             name,
+            start_arguments,
+            saw_argument_delta: false,
+            done_arguments: None,
             frames: vec![first],
         }
+    }
+
+    fn record_argument_delta(&mut self) -> Result<(), ProviderError> {
+        self.saw_argument_delta = true;
+        if self
+            .start_arguments
+            .as_deref()
+            .is_some_and(|arguments| !arguments.is_empty())
+        {
+            return Err(ProviderError::BadToolArgs(format!(
+                "OpenAI tool call `{}` mixed non-empty output_item.added arguments with argument delta frames",
+                self.call_id
+            )));
+        }
+        Ok(())
+    }
+
+    fn record_argument_done(
+        &mut self,
+        arguments: String,
+        buffered: Option<&BufferedBlock>,
+    ) -> Result<(), ProviderError> {
+        if self.done_arguments.is_some() {
+            return Err(ProviderError::Malformed(format!(
+                "OpenAI function_call_arguments.done repeated for tool call `{}`",
+                self.call_id
+            )));
+        }
+        if self.saw_argument_delta {
+            let buffered = buffered.ok_or_else(|| {
+                ProviderError::Malformed(format!(
+                    "OpenAI SSE state lost streamed arguments for tool call `{}`",
+                    self.call_id
+                ))
+            })?;
+            ensure_streamed_arguments_match_text(&self.call_id, &arguments, buffered)?;
+        }
+        self.done_arguments = Some(arguments);
+        Ok(())
     }
 
     fn ensure_match(&self, frame: &SseFrame, event: &str) -> Result<(), ProviderError> {
@@ -335,6 +408,13 @@ impl ActiveToolBlock {
             if expected != actual {
                 return Err(ProviderError::Malformed(format!(
                     "OpenAI {event} output_index {actual} did not match active output_index {expected}"
+                )));
+            }
+        }
+        if let (Some(expected), Some(actual)) = (&self.item_id, frame_item_id(data)) {
+            if expected != &actual {
+                return Err(ProviderError::Malformed(format!(
+                    "OpenAI {event} item_id {actual} did not match active item_id {expected}"
                 )));
             }
         }
@@ -350,6 +430,13 @@ impl ActiveToolBlock {
     }
 
     fn ensure_completed_call_matches(&self, call: &ResponseToolCall) -> Result<(), ProviderError> {
+        if let (Some(expected), Some(actual)) = (&self.item_id, &call.item_id) {
+            if expected != actual {
+                return Err(ProviderError::Malformed(format!(
+                    "OpenAI output_item.done item_id {actual} did not match active item_id {expected}"
+                )));
+            }
+        }
         if call.call_id != self.call_id {
             return Err(ProviderError::Malformed(format!(
                 "OpenAI output_item.done call_id {} did not match active call_id {}",
@@ -364,16 +451,44 @@ impl ActiveToolBlock {
                 )));
             }
         }
+        if let Some(start_arguments) = &self.start_arguments {
+            if !start_arguments.is_empty()
+                && !self.saw_argument_delta
+                && start_arguments.as_bytes() != call.arguments.as_bytes()
+            {
+                return Err(ProviderError::Malformed(format!(
+                    "OpenAI output_item.done arguments for tool call `{}` did not match non-empty output_item.added arguments",
+                    self.call_id
+                )));
+            }
+        }
+        if self.saw_argument_delta && self.done_arguments.is_none() {
+            return Err(ProviderError::Malformed(format!(
+                "OpenAI tool call `{}` streamed argument deltas without response.function_call_arguments.done",
+                self.call_id
+            )));
+        }
+        if let Some(done_arguments) = &self.done_arguments {
+            if done_arguments.as_bytes() != call.arguments.as_bytes() {
+                return Err(ProviderError::Malformed(format!(
+                    "OpenAI function_call_arguments.done arguments for tool call `{}` did not match output_item.done arguments",
+                    self.call_id
+                )));
+            }
+        }
         Ok(())
     }
 }
 
 struct ResponseToolCallStart {
+    item_id: Option<String>,
     call_id: String,
     name: Option<String>,
+    arguments: Option<String>,
 }
 
 struct ResponseToolCall {
+    item_id: Option<String>,
     call_id: String,
     name: String,
     arguments: String,
@@ -384,12 +499,22 @@ fn response_tool_call_start_from_item(
     item: &Value,
 ) -> Result<ResponseToolCallStart, ProviderError> {
     Ok(ResponseToolCallStart {
+        item_id: tool_call_item_id(item),
         call_id: tool_call_id(item)?,
         name: tool_call_name(item),
+        arguments: item
+            .get("arguments")
+            .or_else(|| {
+                item.get("function")
+                    .and_then(|function| function.get("arguments"))
+            })
+            .map(start_arguments_string)
+            .transpose()?,
     })
 }
 
 fn response_tool_call_from_item(item: &Value) -> Result<ResponseToolCall, ProviderError> {
+    let item_id = tool_call_item_id(item);
     let call_id = tool_call_id(item)?;
     let name = tool_call_name(item).ok_or_else(|| {
         ProviderError::Malformed("OpenAI SSE tool-call item was missing non-empty name".to_string())
@@ -406,6 +531,7 @@ fn response_tool_call_from_item(item: &Value) -> Result<ResponseToolCall, Provid
     let arguments = arguments_string(arguments)?;
 
     Ok(ResponseToolCall {
+        item_id,
         call_id: call_id.clone(),
         name: name.clone(),
         arguments: arguments.clone(),
@@ -418,9 +544,12 @@ fn response_tool_call_from_item(item: &Value) -> Result<ResponseToolCall, Provid
     })
 }
 
+fn tool_call_item_id(item: &Value) -> Option<String> {
+    item.get("id").and_then(Value::as_str).and_then(non_empty)
+}
+
 fn tool_call_id(item: &Value) -> Result<String, ProviderError> {
     item.get("call_id")
-        .or_else(|| item.get("id"))
         .and_then(Value::as_str)
         .and_then(non_empty)
         .ok_or_else(|| {
@@ -461,6 +590,13 @@ fn arguments_string(value: &Value) -> Result<String, ProviderError> {
     }
 }
 
+fn start_arguments_string(value: &Value) -> Result<String, ProviderError> {
+    if value.as_str() == Some("") {
+        return Ok(String::new());
+    }
+    arguments_string(value)
+}
+
 fn is_tool_call_item(item: &Value) -> bool {
     item.get("type")
         .and_then(Value::as_str)
@@ -473,10 +609,16 @@ fn frame_output_index(data: &Value) -> Option<u64> {
         .and_then(Value::as_u64)
 }
 
+fn frame_item_id(data: &Value) -> Option<String> {
+    data.get("item_id")
+        .or_else(|| data.get("item").and_then(|item| item.get("id")))
+        .and_then(Value::as_str)
+        .and_then(non_empty)
+}
+
 fn frame_call_id(data: &Value) -> Option<String> {
     data.get("call_id")
         .or_else(|| data.get("item").and_then(|item| item.get("call_id")))
-        .or_else(|| data.get("item").and_then(|item| item.get("id")))
         .and_then(Value::as_str)
         .and_then(non_empty)
 }
@@ -617,17 +759,34 @@ fn argument_delta_text(frame: &SseFrame) -> Result<&str, ProviderError> {
         })
 }
 
+fn argument_done_text(frame: &SseFrame) -> Result<String, ProviderError> {
+    let data = frame.required_data("response.function_call_arguments.done")?;
+    let arguments = data.get("arguments").ok_or_else(|| {
+        ProviderError::Malformed(
+            "OpenAI function_call_arguments.done was missing arguments".to_string(),
+        )
+    })?;
+    arguments_string(arguments)
+}
+
 fn ensure_streamed_arguments_match(
     call: &ResponseToolCall,
     buffered: &BufferedBlock,
 ) -> Result<(), ProviderError> {
-    if buffered.bytes.is_empty() || buffered.bytes == call.arguments.as_bytes() {
+    ensure_streamed_arguments_match_text(&call.call_id, &call.arguments, buffered)
+}
+
+fn ensure_streamed_arguments_match_text(
+    call_id: &str,
+    arguments: &str,
+    buffered: &BufferedBlock,
+) -> Result<(), ProviderError> {
+    if buffered.bytes.is_empty() || buffered.bytes == arguments.as_bytes() {
         return Ok(());
     }
 
     Err(ProviderError::Malformed(format!(
-        "OpenAI streamed argument deltas for tool call `{}` did not match final output_item.done arguments",
-        call.call_id
+        "OpenAI streamed argument deltas for tool call `{call_id}` did not match final arguments"
     )))
 }
 

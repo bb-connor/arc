@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
+# Schema sha256: 3ed943267c60942b5a63a39515fbbc1a553d614d895d142e307096a7a99c7da2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -24,6 +24,11 @@ class Operation(Enum):
     subscribe = "subscribe"
     get = "get"
     delegate = "delegate"
+
+
+class Constraint(BaseModel):
+    type: constr(min_length=1)
+    value: Any | None = None
 
 
 class MaxCostPerInvocation(BaseModel):
@@ -49,7 +54,7 @@ class Grant(BaseModel):
     server_id: constr(min_length=1)
     tool_name: constr(min_length=1)
     operations: list[Operation] = Field(..., min_length=1)
-    constraints: list[dict[str, Any]] | None = None
+    constraints: list[Constraint] | None = None
     max_invocations: conint(ge=0) | None = None
     max_cost_per_invocation: MaxCostPerInvocation | None = None
     max_total_cost: MaxTotalCost | None = None

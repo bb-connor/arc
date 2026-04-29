@@ -27,13 +27,15 @@ fn tool_call_stream() -> &'static str {
         "event: response.created\n",
         "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_stream_1\"}}\n\n",
         "event: response.output_item.added\n",
-        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\"}\n\n",
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"\\\"Chio sync\\\",\\\"duration_minutes\\\":30}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_calendar_1\",\"arguments\":\"{\\\"title\\\":\\\"Chio sync\\\",\\\"duration_minutes\\\":30}\"}\n\n",
         "event: response.output_item.done\n",
-        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"Chio sync\\\",\\\"duration_minutes\\\":30}\"}}\n\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"Chio sync\\\",\\\"duration_minutes\\\":30}\"}}\n\n",
         "event: response.completed\n",
         "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_stream_1\"}}\n\n",
     )
@@ -74,8 +76,23 @@ fn buffers_function_call_argument_deltas_until_done_verdict_allows() {
     assert!(forwarded.contains("response.created"));
     assert!(forwarded.contains("response.output_item.added"));
     assert!(forwarded.contains("response.function_call_arguments.delta"));
+    assert!(forwarded.contains("response.function_call_arguments.done"));
     assert!(forwarded.contains("response.output_item.done"));
     assert!(forwarded.contains("response.completed"));
+}
+
+#[test]
+fn done_sentinel_after_completed_is_idempotent() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = format!("{}data: [DONE]\n\n", tool_call_stream());
+
+    let gated = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| Ok(allow_verdict()))
+        .unwrap();
+
+    let forwarded = String::from_utf8(gated.bytes).unwrap();
+    assert!(forwarded.contains("response.completed"));
+    assert!(forwarded.ends_with("data: [DONE]\n\n"));
 }
 
 #[test]
@@ -103,6 +120,8 @@ fn mismatched_done_arguments_fail_closed_before_verdict() {
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\\\"queued\\\"}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"arguments\":\"{\\\"title\\\":\\\"queued\\\"}\"}\n\n",
         "event: response.output_item.done\n",
         "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"different\\\"}\"}}\n\n",
     );
@@ -118,6 +137,139 @@ fn mismatched_done_arguments_fail_closed_before_verdict() {
     assert_eq!(calls, 0);
     assert!(matches!(err, ProviderError::Malformed(_)));
     assert!(err.to_string().contains("did not match"));
+}
+
+#[test]
+fn missing_function_arguments_done_fails_closed_before_verdict() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "event: response.function_call_arguments.delta\n",
+        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\\\"queued\\\"}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"queued\\\"}\"}}\n\n",
+    );
+
+    let mut calls = 0;
+    let err = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("missing argument done should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::Malformed(_)));
+    assert!(err
+        .to_string()
+        .contains("without response.function_call_arguments.done"));
+}
+
+#[test]
+fn mismatched_function_arguments_done_fails_closed_before_verdict() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "event: response.function_call_arguments.delta\n",
+        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\\\"queued\\\"}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_calendar_1\",\"arguments\":\"{\\\"title\\\":\\\"forbidden\\\"}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"queued\\\"}\"}}\n\n",
+    );
+
+    let mut calls = 0;
+    let err = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("argument done mismatch should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::Malformed(_)));
+    assert!(err.to_string().contains("did not match final arguments"));
+}
+
+#[test]
+fn function_arguments_done_must_match_output_item_done_before_verdict() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_calendar_1\",\"arguments\":\"{\\\"title\\\":\\\"forbidden\\\"}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"safe\\\"}\"}}\n\n",
+    );
+
+    let mut calls = 0;
+    let err = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("argument done and item done mismatch should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::Malformed(_)));
+    assert!(err.to_string().contains("arguments for tool call"));
+}
+
+#[test]
+fn non_empty_start_arguments_with_delta_fail_closed_before_verdict() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"secret\\\":\\\"forbidden\\\"}\"}}\n\n",
+        "event: response.function_call_arguments.delta\n",
+        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_calendar_1\",\"delta\":\"{\\\"title\\\":\\\"safe\\\"}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"arguments\":\"{\\\"title\\\":\\\"safe\\\"}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"safe\\\"}\"}}\n\n",
+    );
+
+    let mut calls = 0;
+    let err = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("non-empty start args plus deltas should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::BadToolArgs(_)));
+    assert!(err.to_string().contains("mixed non-empty"));
+}
+
+#[test]
+fn id_only_function_call_fails_closed_before_verdict() {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let raw = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"item_fc_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
+        "event: response.function_call_arguments.delta\n",
+        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"item_fc_1\",\"delta\":\"{}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"item_fc_1\",\"arguments\":\"{}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"item_fc_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{}\"}}\n\n",
+    );
+
+    let mut calls = 0;
+    let err = adapter
+        .gate_sse_stream(raw.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("id-only function call must fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::Malformed(_)));
+    assert!(err.to_string().contains("missing non-empty call_id"));
 }
 
 #[test]

@@ -206,7 +206,17 @@ for ChioAgentMessageListCapabilities {
 ///                  "constraints": {
 ///                    "type": "array",
 ///                    "items": {
-///                      "type": "object"
+///                      "type": "object",
+///                      "required": [
+///                        "type"
+///                      ],
+///                      "properties": {
+///                        "type": {
+///                          "type": "string",
+///                          "minLength": 1
+///                        },
+///                        "value": true
+///                      }
 ///                    }
 ///                  },
 ///                  "dpop_required": {
@@ -483,7 +493,17 @@ for ChioAgentMessageToolCallRequest {
 ///              "constraints": {
 ///                "type": "array",
 ///                "items": {
-///                  "type": "object"
+///                  "type": "object",
+///                  "required": [
+///                    "type"
+///                  ],
+///                  "properties": {
+///                    "type": {
+///                      "type": "string",
+///                      "minLength": 1
+///                    },
+///                    "value": true
+///                  }
 ///                }
 ///              },
 ///              "dpop_required": {
@@ -1288,7 +1308,17 @@ for ChioAgentMessageToolCallRequestCapabilityTokenIssuer {
 ///          "constraints": {
 ///            "type": "array",
 ///            "items": {
-///              "type": "object"
+///              "type": "object",
+///              "required": [
+///                "type"
+///              ],
+///              "properties": {
+///                "type": {
+///                  "type": "string",
+///                  "minLength": 1
+///                },
+///                "value": true
+///              }
 ///            }
 ///          },
 ///          "dpop_required": {
@@ -1474,7 +1504,17 @@ impl ::std::default::Default for ChioAgentMessageToolCallRequestCapabilityTokenS
 ///    "constraints": {
 ///      "type": "array",
 ///      "items": {
-///        "type": "object"
+///        "type": "object",
+///        "required": [
+///          "type"
+///        ],
+///        "properties": {
+///          "type": {
+///            "type": "string",
+///            "minLength": 1
+///          },
+///          "value": true
+///        }
 ///      }
 ///    },
 ///    "dpop_required": {
@@ -1552,7 +1592,7 @@ impl ::std::default::Default for ChioAgentMessageToolCallRequestCapabilityTokenS
 pub struct ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItem {
     #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
     pub constraints: ::std::vec::Vec<
-        ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+        ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItem,
     >,
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub dpop_required: ::std::option::Option<bool>,
@@ -1578,6 +1618,135 @@ for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItem {
         value: &ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItem,
     ) -> Self {
         value.clone()
+    }
+}
+///`ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItem`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "object",
+///  "required": [
+///    "type"
+///  ],
+///  "properties": {
+///    "type": {
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "value": true
+///  }
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+pub struct ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItem {
+    #[serde(rename = "type")]
+    pub type_: ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub value: ::std::option::Option<::serde_json::Value>,
+}
+impl ::std::convert::From<
+    &ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItem,
+> for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItem {
+    fn from(
+        value: &ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItem,
+    ) -> Self {
+        value.clone()
+    }
+}
+///`ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType(
+    ::std::string::String,
+);
+impl ::std::ops::Deref
+for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<
+    ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType,
+> for ::std::string::String {
+    fn from(
+        value: ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType,
+    ) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<
+    &ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType,
+> for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    fn from(
+        value: &ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType,
+    ) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr
+for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemConstraintsItemType {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
     }
 }
 ///`ChioAgentMessageToolCallRequestCapabilityTokenScopeGrantsItemMaxCostPerInvocation`
@@ -4860,7 +5029,17 @@ impl<'de> ::serde::Deserialize<'de> for ChioJsonRpc20ResponseVariant1IdVariant1 
 ///                    "constraints": {
 ///                      "type": "array",
 ///                      "items": {
-///                        "type": "object"
+///                        "type": "object",
+///                        "required": [
+///                          "type"
+///                        ],
+///                        "properties": {
+///                          "type": {
+///                            "type": "string",
+///                            "minLength": 1
+///                          },
+///                          "value": true
+///                        }
 ///                      }
 ///                    },
 ///                    "dpop_required": {
@@ -5121,7 +5300,17 @@ for ChioKernelMessageCapabilityList {
 ///              "constraints": {
 ///                "type": "array",
 ///                "items": {
-///                  "type": "object"
+///                  "type": "object",
+///                  "required": [
+///                    "type"
+///                  ],
+///                  "properties": {
+///                    "type": {
+///                      "type": "string",
+///                      "minLength": 1
+///                    },
+///                    "value": true
+///                  }
 ///                }
 ///              },
 ///              "dpop_required": {
@@ -5927,7 +6116,17 @@ for ChioKernelMessageCapabilityListCapabilitiesItemIssuer {
 ///          "constraints": {
 ///            "type": "array",
 ///            "items": {
-///              "type": "object"
+///              "type": "object",
+///              "required": [
+///                "type"
+///              ],
+///              "properties": {
+///                "type": {
+///                  "type": "string",
+///                  "minLength": 1
+///                },
+///                "value": true
+///              }
 ///            }
 ///          },
 ///          "dpop_required": {
@@ -6113,7 +6312,17 @@ impl ::std::default::Default for ChioKernelMessageCapabilityListCapabilitiesItem
 ///    "constraints": {
 ///      "type": "array",
 ///      "items": {
-///        "type": "object"
+///        "type": "object",
+///        "required": [
+///          "type"
+///        ],
+///        "properties": {
+///          "type": {
+///            "type": "string",
+///            "minLength": 1
+///          },
+///          "value": true
+///        }
 ///      }
 ///    },
 ///    "dpop_required": {
@@ -6191,7 +6400,7 @@ impl ::std::default::Default for ChioKernelMessageCapabilityListCapabilitiesItem
 pub struct ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItem {
     #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
     pub constraints: ::std::vec::Vec<
-        ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+        ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItem,
     >,
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub dpop_required: ::std::option::Option<bool>,
@@ -6218,6 +6427,135 @@ impl ::std::convert::From<
         value: &ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItem,
     ) -> Self {
         value.clone()
+    }
+}
+///`ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItem`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "object",
+///  "required": [
+///    "type"
+///  ],
+///  "properties": {
+///    "type": {
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "value": true
+///  }
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+pub struct ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItem {
+    #[serde(rename = "type")]
+    pub type_: ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub value: ::std::option::Option<::serde_json::Value>,
+}
+impl ::std::convert::From<
+    &ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItem,
+> for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItem {
+    fn from(
+        value: &ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItem,
+    ) -> Self {
+        value.clone()
+    }
+}
+///`ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType(
+    ::std::string::String,
+);
+impl ::std::ops::Deref
+for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<
+    ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType,
+> for ::std::string::String {
+    fn from(
+        value: ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType,
+    ) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<
+    &ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType,
+> for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    fn from(
+        value: &ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType,
+    ) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr
+for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de>
+for ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemConstraintsItemType {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
     }
 }
 ///`ChioKernelMessageCapabilityListCapabilitiesItemScopeGrantsItemMaxCostPerInvocation`
@@ -19621,7 +19959,8 @@ for ChioTrustControlRuntimeAttestationEvidenceWorkloadIdentityUri {
 ///    "type": {
 ///      "type": "string",
 ///      "minLength": 1
-///    }
+///    },
+///    "value": true
 ///  }
 ///}
 /// ```
@@ -19630,19 +19969,21 @@ for ChioTrustControlRuntimeAttestationEvidenceWorkloadIdentityUri {
 pub struct Constraint {
     #[serde(rename = "type")]
     pub type_: ConstraintType,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub value: ::std::option::Option<::serde_json::Value>,
 }
 impl ::std::convert::From<&Constraint> for Constraint {
     fn from(value: &Constraint) -> Self {
         value.clone()
     }
 }
-///Tagged enum mirroring `Constraint` in `chio-core-types`. Encoded as `{ type, value }` (or just `{ type }` for unit variants such as `governed_intent_required`). Constraint variants intentionally remain extensible; `additionalProperties` is permissive here so new variants do not require schema rev-locks.
+///Tagged enum mirroring `Constraint`. Encoded as `{ type, value }` (or `{ type }` for unit variants like `governed_intent_required`). The variant set is intentionally extensible per ADR-TYPE-EVOLUTION; this schema validates the discriminator only and lets downstream guards interpret the `value`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Tagged enum mirroring `Constraint` in `chio-core-types`. Encoded as `{ type, value }` (or just `{ type }` for unit variants such as `governed_intent_required`). Constraint variants intentionally remain extensible; `additionalProperties` is permissive here so new variants do not require schema rev-locks.",
+///  "description": "Tagged enum mirroring `Constraint`. Encoded as `{ type, value }` (or `{ type }` for unit variants like `governed_intent_required`). The variant set is intentionally extensible per ADR-TYPE-EVOLUTION; this schema validates the discriminator only and lets downstream guards interpret the `value`.",
 ///  "type": "object",
 ///  "required": [
 ///    "type"
@@ -19651,7 +19992,8 @@ impl ::std::convert::From<&Constraint> for Constraint {
 ///    "type": {
 ///      "type": "string",
 ///      "minLength": 1
-///    }
+///    },
+///    "value": true
 ///  }
 ///}
 /// ```
@@ -19660,6 +20002,8 @@ impl ::std::convert::From<&Constraint> for Constraint {
 pub struct Constraint {
     #[serde(rename = "type")]
     pub type_: ConstraintType,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub value: ::std::option::Option<::serde_json::Value>,
 }
 impl ::std::convert::From<&Constraint> for Constraint {
     fn from(value: &Constraint) -> Self {
@@ -20539,12 +20883,13 @@ impl ::std::convert::From<&MonetaryAmount> for MonetaryAmount {
         value.clone()
     }
 }
-///`MonetaryAmount`
+///A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
+///  "description": "A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.",
 ///  "type": "object",
 ///  "required": [
 ///    "currency",
@@ -20892,13 +21237,13 @@ impl ::std::convert::From<&PromptGrant> for PromptGrant {
         value.clone()
     }
 }
-///Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+///Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.",
+///  "description": "Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.",
 ///  "type": "object",
 ///  "required": [
 ///    "operations",
@@ -21049,13 +21394,13 @@ impl ::std::convert::From<&ResourceGrant> for ResourceGrant {
         value.clone()
     }
 }
-///Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+///Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.",
+///  "description": "Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.",
 ///  "type": "object",
 ///  "required": [
 ///    "operations",
@@ -21366,13 +21711,13 @@ impl ::std::convert::From<&ToolGrant> for ToolGrant {
         value.clone()
     }
 }
-///Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+///Authorization to invoke a single tool. Mirrors `ToolGrant`.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
-///  "description": "Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.",
+///  "description": "Authorization to invoke a single tool. Mirrors `ToolGrant`.",
 ///  "type": "object",
 ///  "required": [
 ///    "operations",
@@ -21387,6 +21732,7 @@ impl ::std::convert::From<&ToolGrant> for ToolGrant {
 ///      }
 ///    },
 ///    "dpop_required": {
+///      "description": "If true, the kernel requires a valid DPoP proof for every invocation under this grant.",
 ///      "type": "boolean"
 ///    },
 ///    "max_cost_per_invocation": {
@@ -21407,10 +21753,12 @@ impl ::std::convert::From<&ToolGrant> for ToolGrant {
 ///      "minItems": 1
 ///    },
 ///    "server_id": {
+///      "description": "Tool server identifier from the manifest. Use `*` to match any server (only valid in parent grants for delegation).",
 ///      "type": "string",
 ///      "minLength": 1
 ///    },
 ///    "tool_name": {
+///      "description": "Tool name on the server. Use `*` to match any tool (only valid in parent grants for delegation).",
 ///      "type": "string",
 ///      "minLength": 1
 ///    }
@@ -21424,6 +21772,7 @@ impl ::std::convert::From<&ToolGrant> for ToolGrant {
 pub struct ToolGrant {
     #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
     pub constraints: ::std::vec::Vec<Constraint>,
+    ///If true, the kernel requires a valid DPoP proof for every invocation under this grant.
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub dpop_required: ::std::option::Option<bool>,
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
@@ -21433,7 +21782,9 @@ pub struct ToolGrant {
     #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
     pub max_total_cost: ::std::option::Option<MonetaryAmount>,
     pub operations: ::std::vec::Vec<Operation>,
+    ///Tool server identifier from the manifest. Use `*` to match any server (only valid in parent grants for delegation).
     pub server_id: ToolGrantServerId,
+    ///Tool name on the server. Use `*` to match any tool (only valid in parent grants for delegation).
     pub tool_name: ToolGrantToolName,
 }
 impl ::std::convert::From<&ToolGrant> for ToolGrant {

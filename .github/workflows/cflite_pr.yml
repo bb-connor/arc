@@ -27,6 +27,9 @@ on:
       - labeled
     paths:
       - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
       - "fuzz/**"
       - "spec/schemas/**"
       - "tests/bindings/vectors/**"
@@ -36,6 +39,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   security-events: write
   pull-requests: read
 
@@ -54,7 +58,7 @@ jobs:
     name: fuzz-budget
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install yq + jq
         run: |
           set -euo pipefail
@@ -62,6 +66,7 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
             -o "${HOME}/.local/bin/yq"
+          echo "a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7  ${HOME}/.local/bin/yq" | sha256sum -c -
           chmod +x "${HOME}/.local/bin/yq"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
       - name: Verify 30-day fuzz budget
@@ -77,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -88,20 +93,9 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" \
             -o "${HOME}/.local/bin/yq"
+          echo "a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7  ${HOME}/.local/bin/yq" | sha256sum -c -
           chmod +x "${HOME}/.local/bin/yq"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
-
-      - name: Detect corpus storage availability
-        id: corpus
-        env:
-          FUZZ_CORPUS_PAT: ${{ secrets.FUZZ_CORPUS_PAT }}
-        run: |
-          set -euo pipefail
-          if [ -n "${FUZZ_CORPUS_PAT}" ]; then
-            echo "enabled=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "enabled=false" >> "${GITHUB_OUTPUT}"
-          fi
 
       - name: Detect fuzz-full label
         id: mode
@@ -149,15 +143,11 @@ jobs:
               fi
             done
           done
-          # Builder-image fallback: edits under `.clusterfuzzlite/**`
-          # (Dockerfile, build.sh, project.yaml) do not appear in
-          # `fuzz/target-map.toml` triggers, but they can break the
-          # CFLite builder image without any target firing. Force the
-          # full-target inventory when only-builder edits are detected
-          # so the smoke run still exercises every fuzz target through
-          # the new builder image.
-          if grep -qE '^\.clusterfuzzlite/' changed.txt; then
-            echo "builder-image edit detected; firing the full inventory"
+          # Inventory fallback: builder, workflow, and target-map edits
+          # can break changed-target sampling without matching a source
+          # trigger. Run the full inventory for those control-plane edits.
+          if grep -qE '^(\.cargo/|\.clusterfuzzlite/|\.github/workflows/cflite_pr\.yml$|Cargo\.(toml|lock)$|fuzz/(Cargo\.toml|target-map\.toml)$)' changed.txt; then
+            echo "fuzz inventory edit detected; firing the full inventory"
             fired=("${targets[@]}")
           fi
           if ((${#fired[@]} == 0)); then
@@ -173,52 +163,30 @@ jobs:
             printf 'targets<<EOF\n%s\nEOF\n' "$(cat fired.txt)"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Skip if no targets fired (changed-target mode)
+      - name: Fail if no targets fired (changed-target mode)
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
         run: |
-          echo "no fuzz target triggered by this diff; PR smoke is a no-op"
-
-      - name: Run ClusterFuzzLite changed-target sampling with corpus storage
-        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0' && steps.corpus.outputs.enabled == 'true'
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
-        with:
-          language: rust
-          fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
-          mode: code-change
-          sanitizer: address
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # storage-repo is an action input (not a project.yaml field) per
-          # ClusterFuzzLite docs. The PAT-backed URL is required because
-          # GITHUB_TOKEN cannot write the sibling private corpus repo.
-          storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
-          report-unreproducible-crashes: false
+          echo "changed-target sampling found no mapped fuzz target for this diff" >&2
+          echo "changed files:" >&2
+          sed 's/^/  /' changed.txt >&2
+          exit 1
 
       - name: Run ClusterFuzzLite changed-target sampling without corpus storage
-        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0' && steps.corpus.outputs.enabled != 'true'
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
+        env:
+          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
         with:
           language: rust
           fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
           mode: code-change
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          report-unreproducible-crashes: false
-
-      - name: "Run ClusterFuzzLite full-corpus sweep with corpus storage (fuzz-full label)"
-        if: steps.mode.outputs.full == 'true' && steps.corpus.outputs.enabled == 'true'
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
-        with:
-          language: rust
-          fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
-          mode: batch
-          sanitizer: address
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
           report-unreproducible-crashes: false
 
       - name: "Run ClusterFuzzLite full-corpus sweep without corpus storage (fuzz-full label)"
-        if: steps.mode.outputs.full == 'true' && steps.corpus.outputs.enabled != 'true'
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        if: steps.mode.outputs.full == 'true'
+        uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
         with:
           language: rust
           fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
@@ -229,7 +197,7 @@ jobs:
 
       - name: Upload crash reports
         if: failure() && (steps.mode.outputs.full == 'true' || steps.targets.outputs.count != '0')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cflite-pr-crashes-${{ github.event.pull_request.number }}
           path: ./out/artifacts

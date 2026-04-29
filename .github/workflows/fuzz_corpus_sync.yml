@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout main repo (full history)
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
           path: chio
@@ -56,7 +56,7 @@ jobs:
         run: bash scripts/check-upstream-skips.sh
 
       - name: Checkout arc-fuzz-corpus sibling repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           repository: ${{ env.CORPUS_REPO }}
           ref: ${{ env.SOURCE_REF }}
@@ -143,6 +143,7 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/gitleaks/gitleaks/releases/download/v${ver}/gitleaks_${ver}_linux_x64.tar.gz" \
             -o /tmp/gitleaks.tgz
+          echo "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba  /tmp/gitleaks.tgz" | sha256sum -c -
           tar -xzf /tmp/gitleaks.tgz -C "${HOME}/.local/bin" gitleaks
           chmod +x "${HOME}/.local/bin/gitleaks"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
@@ -174,7 +175,7 @@ jobs:
 
       - name: Upload gitleaks report
         if: always() && steps.copy.outputs.added_files != '0'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: gitleaks-report-${{ github.run_id }}
           path: gitleaks-out/

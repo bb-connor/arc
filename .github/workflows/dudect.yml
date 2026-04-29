@@ -106,7 +106,7 @@ jobs:
             crate: chio-kernel-core
             test_binary: dudect_scope_subset
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Skip when forced harness does not match
         id: forced
@@ -181,7 +181,7 @@ jobs:
 
       - name: Upload per-harness artifact
         if: always() && steps.forced.outputs.skip == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: dudect-nightly-${{ matrix.harness.name }}-${{ github.run_id }}
           path: dudect-out/
@@ -199,10 +199,10 @@ jobs:
       issues: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Download current run artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: current-run/
           pattern: dudect-nightly-*-${{ github.run_id }}

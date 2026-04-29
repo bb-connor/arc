@@ -6,7 +6,8 @@ use chio_bedrock_converse_adapter::{
     transport, BedrockAdapter, BedrockAdapterConfig, BEDROCK_CONVERSE_API_VERSION,
 };
 use chio_tool_call_fabric::{
-    DenyReason, ProviderError, ProviderId, ProviderRequest, ReceiptId, ToolResult, VerdictResult,
+    DenyReason, ProviderError, ProviderId, ProviderRequest, ReceiptId, Redaction, ToolResult,
+    VerdictResult,
 };
 use serde_json::{json, Value};
 
@@ -152,7 +153,7 @@ fn gates_tool_use_at_content_block_start_and_forwards_after_allow() {
             );
             assert_eq!(
                 String::from_utf8(invocation.arguments.clone()).unwrap(),
-                "{}"
+                "{\"location\":\"LA\",\"unit\":\"f\"}"
             );
             Ok(allow_verdict())
         })
@@ -176,7 +177,95 @@ fn denied_tool_use_start_fails_closed() {
         })
         .expect_err("deny verdict should close the stream");
 
-    assert!(err.to_string().contains("denied at contentBlockStart"));
+    assert!(err.to_string().contains("denied at contentBlockStop"));
+}
+
+#[test]
+fn forbidden_late_tool_use_delta_fails_closed_before_forwarding() {
+    let adapter = adapter();
+    let err = adapter
+        .gate_converse_stream(&stream_bytes(converse_stream_fixture()), |invocation| {
+            let args = String::from_utf8(invocation.arguments.clone()).unwrap();
+            if args.contains("\"unit\":\"f\"") {
+                Ok(deny_verdict())
+            } else {
+                Ok(allow_verdict())
+            }
+        })
+        .expect_err("late forbidden args should deny after reconstruction");
+
+    assert!(err.to_string().contains("denied at contentBlockStop"));
+}
+
+#[test]
+fn non_empty_start_input_with_delta_fails_closed() {
+    let adapter = adapter();
+    let stream = json!([
+        {
+            "contentBlockStart": {
+                "contentBlockIndex": 0,
+                "start": {
+                    "toolUse": {
+                        "toolUseId": "tooluse_split_1",
+                        "name": "get_weather",
+                        "input": {"secret": "forbidden"}
+                    }
+                }
+            }
+        },
+        {
+            "contentBlockDelta": {
+                "contentBlockIndex": 0,
+                "delta": {
+                    "toolUse": {
+                        "input": "{\"location\":\"LA\"}"
+                    }
+                }
+            }
+        },
+        {"contentBlockStop": {"contentBlockIndex": 0}}
+    ]);
+    let mut calls = 0;
+    let err = adapter
+        .gate_converse_stream(&stream_bytes(stream), |_invocation| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("mixed start and delta args should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(err.to_string().contains("mixed non-empty start input"));
+}
+
+#[test]
+fn scalar_start_only_input_fails_closed_before_verdict() {
+    let adapter = adapter();
+    let stream = json!([
+        {
+            "contentBlockStart": {
+                "contentBlockIndex": 0,
+                "start": {
+                    "toolUse": {
+                        "toolUseId": "tooluse_scalar_1",
+                        "name": "get_weather",
+                        "input": "forbidden"
+                    }
+                }
+            }
+        },
+        {"contentBlockStop": {"contentBlockIndex": 0}}
+    ]);
+    let mut calls = 0;
+    let err = adapter
+        .gate_converse_stream(&stream_bytes(stream), |_invocation| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .expect_err("start-only scalar args should fail closed");
+
+    assert_eq!(calls, 0);
+    assert!(matches!(err, ProviderError::BadToolArgs(_)));
+    assert!(err.to_string().contains("input must be a JSON object"));
 }
 
 #[test]
@@ -299,6 +388,30 @@ fn batch_lift_lower_behavior_still_round_trips() {
     assert_eq!(
         lowered["toolResult"]["content"],
         json!([{"json": {"temperature": 5, "unit": "celsius"}}])
+    );
+}
+
+#[test]
+fn lower_allow_applies_redactions_before_serialization() {
+    let adapter = adapter();
+    let lowered = adapter
+        .lower_tool_result(
+            "tooluse_weather_1",
+            VerdictResult::Allow {
+                redactions: vec![Redaction {
+                    path: "/secret".to_string(),
+                    replacement: "[redacted]".to_string(),
+                }],
+                receipt_id: ReceiptId("rcpt_allow_redacted".to_string()),
+            },
+            tool_result(json!({"secret": "abc123", "status": "ok"})),
+        )
+        .unwrap();
+    let lowered: Value = serde_json::from_slice(&lowered.0).unwrap();
+
+    assert_eq!(
+        lowered["toolResult"]["content"],
+        json!([{"json": {"secret": "[redacted]", "status": "ok"}}])
     );
 }
 

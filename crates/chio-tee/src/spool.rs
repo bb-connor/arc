@@ -5,7 +5,6 @@ use chio_store_sqlite::{BlobHandle, EncryptedBlob, TenantId, TenantKey};
 use crate::persist::{PersistedBlob, PersistenceError, TeeBlobPersistence};
 
 /// Persisted request/response pair for one tee observation.
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpooledTraffic {
     /// Redacted request body persisted as an encrypted BLOB.
     pub request: PersistedBlob,

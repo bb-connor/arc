@@ -57,6 +57,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pull-requests: write
   issues: write
 
@@ -86,7 +87,7 @@ jobs:
           - chio-guards
           - chio-credentials
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -109,12 +110,12 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Install cargo-mutants (pinned 25.x per Decision 12)
+      - name: Install cargo-mutants (pinned per Decision 12)
         if: steps.forced.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          # Decision 12: cargo-mutants pinned at 25.x; do not float.
-          cargo install cargo-mutants --version '25.*' --locked
+          # Decision 12: cargo-mutants pinned exactly; do not float.
+          cargo install cargo-mutants --version 25.3.1 --locked
 
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.forced.outputs.skip == 'false'
@@ -122,16 +123,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Mutation runs share the 1,800 min/30d envelope with fuzz; the
-          # check is best-effort because the helper enumerates only the
-          # cflite_*.yml workflows today (M02 P3 will extend it to count
-          # mutants.yml and fuzz.yml runs as well). Soft fail so a
-          # missing-script or API blip does not kill the advisory lane.
+          # Mutation runs share the 1,800 min/30d envelope with fuzz.
+          # Budget failures stop this job even though mutation findings
+          # remain advisory.
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
-            scripts/check-fuzz-budget.sh "${{ github.repository }}" || \
-              echo "advisory: fuzz-budget check returned non-zero; continuing (advisory lane)"
+            scripts/check-fuzz-budget.sh "${{ github.repository }}"
           else
-            echo "scripts/check-fuzz-budget.sh missing or non-executable; skipping budget check"
+            echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
+            exit 2
           fi
 
       - name: Capture PR diff for --in-diff scoping
@@ -211,7 +210,7 @@ jobs:
 
       - name: Upload mutation report
         if: always() && steps.forced.outputs.skip == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mutants-pr-${{ matrix.package }}
           path: mutants-out/${{ matrix.package }}
@@ -235,7 +234,7 @@ jobs:
           - chio-guards
           - chio-credentials
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -258,11 +257,11 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Install cargo-mutants (pinned 25.x per Decision 12)
+      - name: Install cargo-mutants (pinned per Decision 12)
         if: steps.forced.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          cargo install cargo-mutants --version '25.*' --locked
+          cargo install cargo-mutants --version 25.3.1 --locked
 
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.forced.outputs.skip == 'false'
@@ -271,10 +270,10 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
-            scripts/check-fuzz-budget.sh "${{ github.repository }}" || \
-              echo "advisory: fuzz-budget check returned non-zero; continuing (advisory lane)"
+            scripts/check-fuzz-budget.sh "${{ github.repository }}"
           else
-            echo "scripts/check-fuzz-budget.sh missing or non-executable; skipping budget check"
+            echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
+            exit 2
           fi
 
       - name: Run cargo-mutants full-workspace sweep
@@ -315,7 +314,7 @@ jobs:
 
       - name: Upload mutation report
         if: always() && steps.forced.outputs.skip == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mutants-nightly-${{ matrix.package }}-${{ github.run_id }}
           path: mutants-out/${{ matrix.package }}

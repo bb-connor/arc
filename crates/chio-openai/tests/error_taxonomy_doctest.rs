@@ -33,6 +33,8 @@ fn tool_call_stream() -> &'static str {
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_taxonomy_1\",\"name\":\"get_weather\",\"arguments\":\"\"}}\n\n",
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_taxonomy_1\",\"delta\":\"{\\\"location\\\":\\\"NYC\\\"}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"arguments\":\"{\\\"location\\\":\\\"NYC\\\"}\"}\n\n",
         "event: response.output_item.done\n",
         "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_taxonomy_1\",\"name\":\"get_weather\",\"arguments\":\"{\\\"location\\\":\\\"NYC\\\"}\"}}\n\n",
     )

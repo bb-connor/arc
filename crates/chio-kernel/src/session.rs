@@ -427,6 +427,19 @@ impl TerminalRegistry {
             .with_current(|current| current.states.get(request_id).cloned())
     }
 
+    pub fn remove(&self, request_id: &RequestId) {
+        self.inner.replace_with(|current| {
+            if !current.states.contains_key(request_id) {
+                return (None, ());
+            }
+
+            let mut next = current.clone();
+            next.states.remove(request_id);
+            next.order.retain(|existing| existing != request_id);
+            (Some(next), ())
+        });
+    }
+
     pub fn len(&self) -> usize {
         self.inner.with_current(|current| current.states.len())
     }
@@ -473,6 +486,12 @@ pub enum SessionError {
     #[error("request {request_id} is not cancellable")]
     RequestNotCancellable { request_id: RequestId },
 
+    #[error("session {session_id} cannot close while {active_count} request(s) remain active")]
+    CloseRequiresDrain {
+        session_id: SessionId,
+        active_count: u64,
+    },
+
     #[error("parent request {parent_request_id} is not in flight for child request {request_id}")]
     ParentRequestNotInflight {
         request_id: RequestId,
@@ -488,6 +507,12 @@ pub enum SessionError {
         parent_session_anchor_id: String,
         current_session_anchor_id: String,
     },
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SessionPersistError<E> {
+    Session(SessionError),
+    Persist(E),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -935,6 +960,63 @@ impl Session {
         })
     }
 
+    pub fn set_auth_context_persisted<E>(
+        &self,
+        auth_context: SessionAuthContext,
+        persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
+    ) -> Result<(), SessionPersistError<E>> {
+        let state_guard = self.write_inner();
+        if state_guard.state == SessionState::Closed {
+            return Err(SessionPersistError::Session(
+                SessionError::OperationNotAllowed {
+                    session_id: self.id.clone(),
+                    operation: "set_auth_context",
+                    state: state_guard.state.as_str(),
+                },
+            ));
+        }
+
+        self.auth_state.replace_with(|current| {
+            let rotated = current.auth_context != auth_context;
+            let (next, snapshot, supersedes_anchor_id) = if rotated {
+                let previous_anchor_id = current.session_anchor.id().to_string();
+                let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+                let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+                let snapshot = SessionAnchorSnapshot {
+                    session_id: self.id.clone(),
+                    agent_id: self.agent_id.clone(),
+                    auth_context: auth_context.clone(),
+                    session_anchor: session_anchor.clone(),
+                };
+                (
+                    Some(SessionAuthState {
+                        auth_context,
+                        session_anchor,
+                    }),
+                    snapshot,
+                    Some(previous_anchor_id),
+                )
+            } else {
+                (
+                    None,
+                    SessionAnchorSnapshot {
+                        session_id: self.id.clone(),
+                        agent_id: self.agent_id.clone(),
+                        auth_context: current.auth_context.clone(),
+                        session_anchor: current.session_anchor.clone(),
+                    },
+                    None,
+                )
+            };
+
+            let result = persist(&snapshot, supersedes_anchor_id.as_deref());
+            match result {
+                Ok(()) => (next, Ok(())),
+                Err(error) => (None, Err(SessionPersistError::Persist(error))),
+            }
+        })
+    }
+
     pub fn set_peer_capabilities(&self, peer_capabilities: PeerCapabilities) {
         self.peer_capabilities.replace(peer_capabilities);
     }
@@ -959,7 +1041,22 @@ impl Session {
     }
 
     pub fn close(&self) -> Result<(), SessionError> {
-        self.transition(SessionState::Closed)?;
+        {
+            let mut inner = self.write_inner();
+            let active_count = self.inflight.len() as u64;
+            if active_count > 0 {
+                if inner.state != SessionState::Closed {
+                    inner.state = SessionState::Draining;
+                }
+                return Err(SessionError::CloseRequiresDrain {
+                    session_id: self.id.clone(),
+                    active_count,
+                });
+            }
+
+            inner.state = SessionState::Closed;
+        }
+
         self.inflight.clear();
         self.subscriptions.clear();
         self.auth_state.replace_with(|current| {
@@ -974,6 +1071,64 @@ impl Session {
                 (),
             )
         });
+        self.roots.replace(SessionRoots {
+            roots: Vec::new(),
+            normalized_roots: Vec::new(),
+        });
+        self.write_pending_url_elicitations().clear();
+        self.write_late_events().clear();
+        Ok(())
+    }
+
+    pub fn close_persisted<E>(
+        &self,
+        persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
+    ) -> Result<(), SessionPersistError<E>> {
+        let mut inner = self.write_inner();
+        let active_count = self.inflight.len() as u64;
+        if active_count > 0 {
+            if inner.state != SessionState::Closed {
+                inner.state = SessionState::Draining;
+            }
+            return Err(SessionPersistError::Session(
+                SessionError::CloseRequiresDrain {
+                    session_id: self.id.clone(),
+                    active_count,
+                },
+            ));
+        }
+
+        self.auth_state.replace_with(|current| {
+            let auth_context = SessionAuthContext::in_process_anonymous();
+            let session_anchor = if current.auth_context == auth_context {
+                current.session_anchor.clone()
+            } else {
+                SessionAnchorState::new(&self.id, &auth_context, 0)
+            };
+            let snapshot = SessionAnchorSnapshot {
+                session_id: self.id.clone(),
+                agent_id: self.agent_id.clone(),
+                auth_context: auth_context.clone(),
+                session_anchor: session_anchor.clone(),
+            };
+            let result = persist(&snapshot, None);
+            match result {
+                Ok(()) => (
+                    Some(SessionAuthState {
+                        auth_context,
+                        session_anchor,
+                    }),
+                    Ok(()),
+                ),
+                Err(error) => (None, Err(SessionPersistError::Persist(error))),
+            }
+        })?;
+
+        inner.state = SessionState::Closed;
+        drop(inner);
+
+        self.inflight.clear();
+        self.subscriptions.clear();
         self.roots.replace(SessionRoots {
             roots: Vec::new(),
             normalized_roots: Vec::new(),
@@ -1006,8 +1161,8 @@ impl Session {
     ) -> Result<SessionRequestStart, SessionError> {
         self.validate_context(context)?;
 
-        let inner = self.read_inner();
-        let state = inner.state;
+        let state_guard = self.read_inner();
+        let state = state_guard.state;
         if !operation_allowed_for_state(state, operation_kind) {
             return Err(SessionError::OperationNotAllowed {
                 session_id: self.id.clone(),
@@ -1016,7 +1171,7 @@ impl Session {
             });
         }
 
-        self.auth_state.with_current(|auth_state| {
+        let start = self.auth_state.with_current(|auth_state| {
             let session_snapshot = SessionAnchorSnapshot {
                 session_id: self.id.clone(),
                 agent_id: self.agent_id.clone(),
@@ -1065,7 +1220,9 @@ impl Session {
                 session: session_snapshot,
                 lineage,
             })
-        })
+        })?;
+        drop(state_guard);
+        Ok(start)
     }
 
     pub fn complete_request(
@@ -1083,6 +1240,12 @@ impl Session {
         let inflight = self.inflight.complete(request_id)?;
         self.mark_request_terminal(request_id, terminal_state);
         Ok(inflight)
+    }
+
+    pub fn discard_unpersisted_request_start(&self, request_id: &RequestId) {
+        let _ = self.inflight.complete(request_id);
+        self.write_request_lineage().remove(request_id);
+        self.terminal.remove(request_id);
     }
 
     fn mark_request_terminal(
@@ -1249,6 +1412,48 @@ mod tests {
         assert_eq!(shared.state(), SessionState::Ready);
         shared.begin_draining().unwrap();
         assert_eq!(shared.state(), SessionState::Draining);
+    }
+
+    #[test]
+    fn close_refuses_to_clear_active_requests_until_drained() {
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let context = make_context("req-close-drain");
+
+        session.activate().unwrap();
+        session
+            .track_request(&context, OperationKind::ToolCall, true)
+            .unwrap();
+
+        let err = session.close().unwrap_err();
+        assert!(matches!(
+            err,
+            SessionError::CloseRequiresDrain {
+                active_count: 1,
+                ..
+            }
+        ));
+        assert_eq!(session.state(), SessionState::Draining);
+        assert_eq!(session.inflight().len(), 1);
+        assert!(session.terminal().get(&context.request_id).is_none());
+
+        session
+            .complete_request_with_terminal_state(
+                &context.request_id,
+                OperationTerminalState::Incomplete {
+                    reason: "closed while request was active".to_string(),
+                },
+            )
+            .unwrap();
+        assert!(session.inflight().is_empty());
+        assert_eq!(
+            session.terminal().get(&context.request_id),
+            Some(OperationTerminalState::Incomplete {
+                reason: "closed while request was active".to_string(),
+            })
+        );
+
+        session.close().unwrap();
+        assert_eq!(session.state(), SessionState::Closed);
     }
 
     #[test]

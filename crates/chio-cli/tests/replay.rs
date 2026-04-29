@@ -6,7 +6,7 @@
 //!
 //! | Test name                                      | Exit |
 //! |------------------------------------------------|------|
-//! | `replay::clean_log_exits_zero`                 | 0    |
+//! | `replay::receipt_only_clean_log_fails_closed_without_rederive_context` | 10 |
 //! | `replay::verdict_drift_exits_ten`              | 10   |
 //! | `replay::bad_signature_exits_twenty`           | 20   |
 //! | `replay::malformed_json_exits_thirty`          | 30   |
@@ -76,10 +76,8 @@ fn signed_receipt(id: &str, decision: Decision) -> ChioReceipt {
         capability_id: "cap-replay-fixture".to_string(),
         tool_server: "fs".to_string(),
         tool_name: "read_file".to_string(),
-        action: ToolCallAction {
-            parameters: json!({"path": "/tmp/replay-fixture"}),
-            parameter_hash: "0".repeat(64),
-        },
+        action: ToolCallAction::from_parameters(json!({"path": "/tmp/replay-fixture"}))
+            .expect("fixture action hash must compute"),
         decision,
         content_hash: "0".repeat(64),
         policy_hash: "0".repeat(64),
@@ -106,9 +104,14 @@ struct ReplayRun {
 
 /// Spawn `chio replay <log> --json` and capture the result.
 fn run_replay_json(log_path: &Path) -> ReplayRun {
+    let keypair = Keypair::from_seed(&FIXTURE_SEED);
+    let trusted_key = tempfile::NamedTempFile::new().expect("trusted key tempfile");
+    std::fs::write(trusted_key.path(), keypair.public_key().as_bytes()).expect("write trusted key");
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .arg("replay")
         .arg(log_path)
+        .arg("--trusted-kernel-pubkey")
+        .arg(trusted_key.path())
         .arg("--json")
         .output()
         .expect("spawn chio replay");
@@ -138,11 +141,11 @@ fn parsed_report(run: &ReplayRun) -> Value {
 mod replay {
     use super::*;
 
-    /// Exit code 0: a clean receipt log with valid signatures, matching
-    /// verdicts, and (when `--expect-root` is supplied) a matching root
-    /// re-verifies cleanly.
+    /// Exit code 10: a receipt-only log with valid signatures and hashes
+    /// still fails closed because it does not carry the policy / guard
+    /// context required for verdict re-derivation.
     #[test]
-    fn clean_log_exits_zero() {
+    fn receipt_only_clean_log_fails_closed_without_rederive_context() {
         let fixture = fixture_path("00-clean");
         assert!(
             fixture.exists(),
@@ -154,16 +157,19 @@ mod replay {
         let run = run_replay_json(&fixture);
 
         assert_eq!(
-            run.exit_code, 0,
-            "clean log must exit 0; got {} stderr={}",
+            run.exit_code, 10,
+            "receipt-only replay must fail closed with exit 10; got {} stderr={}",
             run.exit_code, run.stderr,
         );
         let report = parsed_report(&run);
         assert_eq!(report["schema"], "chio.replay.report/v1");
-        assert_eq!(report["exit_code"], 0);
+        assert_eq!(report["exit_code"], 10);
         assert!(
-            report["first_divergence"].is_null(),
-            "clean run must report no divergence; got {}",
+            report["first_divergence"]["detail"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("receipt-only replay cannot safely rederive verdicts"),
+            "receipt-only replay must explain the fail-closed verdict; got {}",
             report["first_divergence"],
         );
     }

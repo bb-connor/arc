@@ -1,10 +1,10 @@
 //! Anthropic Messages SSE gating.
 //!
-//! The adapter evaluates Chio's verdict at the Anthropic
-//! `content_block_start` event when the block is a `tool_use`. The start
-//! event and later `input_json_delta` frames stay buffered until the verdict
-//! allows. A deny verdict or malformed tool-use frame fails closed and returns
-//! no forwarded stream bytes.
+//! The adapter buffers Anthropic `tool_use` blocks until
+//! `content_block_stop`, reconstructs the completed input JSON, evaluates
+//! Chio's verdict, then releases the buffered start and `input_json_delta`
+//! frames only when the verdict allows. A deny verdict or malformed tool-use
+//! frame fails closed and returns no forwarded stream bytes for the block.
 
 use chio_tool_call_fabric::{
     BlockKind, DenyReason, ProviderError, StreamEvent, StreamPhase, ToolInvocation, VerdictResult,
@@ -18,7 +18,7 @@ use crate::{AnthropicAdapter, ToolUseBlock};
 pub struct GatedSseStream {
     /// SSE bytes that are safe to forward downstream.
     pub bytes: Vec<u8>,
-    /// Tool invocations evaluated at `content_block_start`.
+    /// Tool invocations evaluated at `content_block_stop`.
     pub invocations: Vec<ToolInvocation>,
     /// Verdicts returned for each invocation, in stream order.
     pub verdicts: Vec<VerdictResult>,
@@ -27,9 +27,9 @@ pub struct GatedSseStream {
 impl AnthropicAdapter {
     /// Gate a deterministic Anthropic SSE payload.
     ///
-    /// `evaluate` is called exactly when a `content_block_start` event carries
-    /// a `tool_use` block. Returning a deny verdict fails closed before any
-    /// bytes for that tool-use block are released.
+    /// `evaluate` is called once the full `tool_use` input JSON has arrived.
+    /// Returning a deny verdict fails closed before any bytes for that block
+    /// are released.
     pub fn gate_sse_stream<F>(
         &self,
         raw: &[u8],
@@ -80,9 +80,9 @@ impl<'a> StreamGate<'a> {
         };
 
         match event {
-            "content_block_start" => self.start_content_block(frame, evaluate),
+            "content_block_start" => self.start_content_block(frame),
             "content_block_delta" => self.delta_content_block(frame),
-            "content_block_stop" => self.stop_content_block(frame),
+            "content_block_stop" => self.stop_content_block(frame, evaluate),
             "message_stop" => self.stop_message(frame),
             "error" => Err(ProviderError::Malformed(format!(
                 "Anthropic SSE error event: {}",
@@ -95,14 +95,7 @@ impl<'a> StreamGate<'a> {
         }
     }
 
-    fn start_content_block<F>(
-        &mut self,
-        frame: SseFrame,
-        evaluate: &mut F,
-    ) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn start_content_block(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
         if let Some(active) = &self.active {
             return Err(ProviderError::Malformed(format!(
                 "Anthropic SSE started content block {} before stopping block {}",
@@ -127,11 +120,6 @@ impl<'a> StreamGate<'a> {
         }
 
         let block = tool_use_from_content_block(content_block)?;
-        let invocation = self.adapter.invocation_from_tool_use(&block)?;
-        let verdict = evaluate(&invocation)?;
-        ensure_streaming_allow(&block, &verdict)?;
-        self.adapter.push_pending_tool_use_id(block.id.clone())?;
-
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -139,9 +127,7 @@ impl<'a> StreamGate<'a> {
                 kind,
             },
         )?;
-        self.invocations.push(invocation);
-        self.verdicts.push(verdict);
-        self.active = Some(ActiveBlock::tool(index, frame));
+        self.active = Some(ActiveBlock::tool(index, frame, block));
         Ok(())
     }
 
@@ -166,11 +152,19 @@ impl<'a> StreamGate<'a> {
                 chunk: partial_json.as_bytes().to_vec(),
             },
         )?;
+        active.input_json.push_str(partial_json);
         active.frames.push(frame);
         Ok(())
     }
 
-    fn stop_content_block(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+    fn stop_content_block<F>(
+        &mut self,
+        frame: SseFrame,
+        evaluate: &mut F,
+    ) -> Result<(), ProviderError>
+    where
+        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
+    {
         let index = frame_index(&frame, "content_block_stop")?;
         let mut active = self.active.take().ok_or_else(|| {
             ProviderError::Malformed(
@@ -184,7 +178,13 @@ impl<'a> StreamGate<'a> {
             return Ok(());
         }
 
+        let block = active.completed_tool_use()?;
+        let invocation = self.adapter.invocation_from_tool_use(&block)?;
+        let verdict = evaluate(&invocation)?;
+        ensure_streaming_allow(&block, &verdict)?;
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;
+        self.invocations.push(invocation);
+        self.verdicts.push(verdict);
         active.frames.push(frame);
         for frame in active.frames {
             self.output.extend_from_slice(&frame.raw);
@@ -235,6 +235,8 @@ struct ActiveBlock {
     index: u64,
     kind: BlockKind,
     frames: Vec<SseFrame>,
+    tool_use: Option<ToolUseBlock>,
+    input_json: String,
 }
 
 impl ActiveBlock {
@@ -243,14 +245,18 @@ impl ActiveBlock {
             index,
             kind,
             frames: Vec::new(),
+            tool_use: None,
+            input_json: String::new(),
         }
     }
 
-    fn tool(index: u64, frame: SseFrame) -> Self {
+    fn tool(index: u64, frame: SseFrame, block: ToolUseBlock) -> Self {
         Self {
             index,
             kind: BlockKind::ToolCall,
             frames: vec![frame],
+            tool_use: Some(block),
+            input_json: String::new(),
         }
     }
 
@@ -262,6 +268,42 @@ impl ActiveBlock {
             )));
         }
         Ok(())
+    }
+
+    fn completed_tool_use(&self) -> Result<ToolUseBlock, ProviderError> {
+        let mut block = self.tool_use.clone().ok_or_else(|| {
+            ProviderError::Malformed(
+                "Anthropic active tool block lost its tool_use start".to_string(),
+            )
+        })?;
+        if self.input_json.is_empty() {
+            return Ok(block);
+        }
+        if !block
+            .input
+            .as_object()
+            .is_some_and(serde_json::Map::is_empty)
+        {
+            return Err(ProviderError::BadToolArgs(format!(
+                "Anthropic tool_use `{}` mixed non-empty start input with input_json_delta frames",
+                block.id
+            )));
+        }
+
+        let input: Value = serde_json::from_str(&self.input_json).map_err(|error| {
+            ProviderError::BadToolArgs(format!(
+                "Anthropic tool_use `{}` completed input_json_delta was not valid JSON: {error}",
+                block.id
+            ))
+        })?;
+        if !input.is_object() {
+            return Err(ProviderError::BadToolArgs(format!(
+                "Anthropic tool_use `{}` completed input_json_delta was not a JSON object",
+                block.id
+            )));
+        }
+        block.input = input;
+        Ok(block)
     }
 }
 
@@ -432,7 +474,7 @@ fn ensure_streaming_allow(
             block.id
         ))),
         VerdictResult::Deny { reason, receipt_id } => Err(ProviderError::Malformed(format!(
-            "Anthropic streaming tool_use `{}` denied at content_block_start: {} (receipt {})",
+            "Anthropic streaming tool_use `{}` denied at content_block_stop: {} (receipt {})",
             block.id,
             deny_reason_text(reason),
             receipt_id.0

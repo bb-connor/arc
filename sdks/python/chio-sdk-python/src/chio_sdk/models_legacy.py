@@ -31,12 +31,27 @@ from pydantic import BaseModel, Field
 class Operation(str, enum.Enum):
     """Allowed operation on a tool, resource, or prompt grant."""
 
-    INVOKE = "Invoke"
-    READ_RESULT = "ReadResult"
-    READ = "Read"
-    SUBSCRIBE = "Subscribe"
-    GET = "Get"
-    DELEGATE = "Delegate"
+    INVOKE = "invoke"
+    READ_RESULT = "read_result"
+    READ = "read"
+    SUBSCRIBE = "subscribe"
+    GET = "get"
+    DELEGATE = "delegate"
+
+    @classmethod
+    def _missing_(cls, value: object) -> Operation | None:
+        if isinstance(value, str):
+            legacy_alias = {
+                "Invoke": cls.INVOKE,
+                "ReadResult": cls.READ_RESULT,
+                "Read": cls.READ,
+                "Subscribe": cls.SUBSCRIBE,
+                "Get": cls.GET,
+                "Delegate": cls.DELEGATE,
+            }.get(value)
+            if legacy_alias is not None:
+                return legacy_alias
+        return None
 
 
 class RuntimeAssuranceTier(str, enum.Enum):
@@ -81,7 +96,7 @@ class Constraint(BaseModel):
     """
 
     type: str
-    value: str | int | None = None
+    value: Any | None = None
 
     @classmethod
     def path_prefix(cls, prefix: str) -> Constraint:

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 5e70f903a487ad522a1a3c448e0f9f91aacc910269b201e6efd5617d0a07e542
+// Schema SHA: 245eed29f21665ab1a611519bdd565a5c82f04d1811dc55bbce08461df9e8905
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -49,7 +49,10 @@ export namespace Agent_ToolCallRequest {
             "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
             ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
           ];
-          constraints?: {}[];
+          constraints?: {
+            type: string;
+            value?: unknown;
+          }[];
           max_invocations?: number;
           max_cost_per_invocation?: {
             units: number;
@@ -139,6 +142,7 @@ export namespace Capability_Grant {
    */
   export interface Constraint {
     type: string;
+    value?: unknown;
   }
   /**
    * A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
@@ -239,10 +243,16 @@ export namespace Capability_Token {
     prompt_grants?: PromptGrant[];
   }
   /**
-   * Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+   * Authorization to invoke a single tool. Mirrors `ToolGrant`.
    */
   export interface ToolGrant {
+    /**
+     * Tool server identifier from the manifest. Use `*` to match any server (only valid in parent grants for delegation).
+     */
     server_id: string;
+    /**
+     * Tool name on the server. Use `*` to match any tool (only valid in parent grants for delegation).
+     */
     tool_name: string;
     /**
      * @minItems 1
@@ -252,20 +262,27 @@ export namespace Capability_Token {
     max_invocations?: number;
     max_cost_per_invocation?: MonetaryAmount;
     max_total_cost?: MonetaryAmount;
+    /**
+     * If true, the kernel requires a valid DPoP proof for every invocation under this grant.
+     */
     dpop_required?: boolean;
   }
   /**
-   * Tagged enum mirroring `Constraint` in `chio-core-types`. Encoded as `{ type, value }` (or just `{ type }` for unit variants such as `governed_intent_required`). Constraint variants intentionally remain extensible; `additionalProperties` is permissive here so new variants do not require schema rev-locks.
+   * Tagged enum mirroring `Constraint`. Encoded as `{ type, value }` (or `{ type }` for unit variants like `governed_intent_required`). The variant set is intentionally extensible per ADR-TYPE-EVOLUTION; this schema validates the discriminator only and lets downstream guards interpret the `value`.
    */
   export interface Constraint {
     type: string;
+    value?: unknown;
   }
+  /**
+   * A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
+   */
   export interface MonetaryAmount {
     units: number;
     currency: string;
   }
   /**
-   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
    */
   export interface ResourceGrant {
     uri_pattern: string;
@@ -275,7 +292,7 @@ export namespace Capability_Token {
     operations: [Operation, ...Operation[]];
   }
   /**
-   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
    */
   export interface PromptGrant {
     prompt_name: string;
@@ -476,7 +493,10 @@ export namespace Kernel_CapabilityList {
             "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
             ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
           ];
-          constraints?: {}[];
+          constraints?: {
+            type: string;
+            value?: unknown;
+          }[];
           max_invocations?: number;
           max_cost_per_invocation?: {
             units: number;

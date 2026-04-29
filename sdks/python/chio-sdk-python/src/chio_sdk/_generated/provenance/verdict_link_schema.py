@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
+# Schema sha256: 3ed943267c60942b5a63a39515fbbc1a553d614d895d142e307096a7a99c7da2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr, model_validator
 
 
 class Verdict(Enum):
@@ -78,6 +78,12 @@ class ChioProvenanceVerdictLink1(BaseModel):
         None,
         description="Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
     )
+
+    @model_validator(mode="after")
+    def _allow_excludes_rejection_fields(self) -> "ChioProvenanceVerdictLink1":
+        if "reason" in self.model_fields_set or "guard" in self.model_fields_set:
+            raise ValueError("allow verdict must not include reason or guard")
+        return self
 
 
 class ChioProvenanceVerdictLink2(BaseModel):
@@ -163,6 +169,12 @@ class ChioProvenanceVerdictLink3(BaseModel):
         description="Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
     )
 
+    @model_validator(mode="after")
+    def _cancel_excludes_guard(self) -> "ChioProvenanceVerdictLink3":
+        if "guard" in self.model_fields_set:
+            raise ValueError("cancel verdict must not include guard")
+        return self
+
 
 class ChioProvenanceVerdictLink4(BaseModel):
     """
@@ -204,6 +216,12 @@ class ChioProvenanceVerdictLink4(BaseModel):
         None,
         description="Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.",
     )
+
+    @model_validator(mode="after")
+    def _incomplete_excludes_guard(self) -> "ChioProvenanceVerdictLink4":
+        if "guard" in self.model_fields_set:
+            raise ValueError("incomplete verdict must not include guard")
+        return self
 
 
 class ChioProvenanceVerdictLink(

@@ -11,8 +11,8 @@
 # counts cflite + this workflow toward the 1,800 min/30d cap and refuses
 # to fan out the matrix when the trailing total would breach it.
 #
-# The receipt_log_replay matrix slot is reserved; its per-target step
-# short-circuits until the target binary lands in fuzz/Cargo.toml.
+# Matrix entries must stay in lockstep with fuzz/Cargo.toml,
+# .clusterfuzzlite/build.sh, and fuzz/target-map.toml.
 
 name: fuzz
 
@@ -37,6 +37,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   security-events: write
 
 concurrency:
@@ -55,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Verify 30-day fuzz budget
         env:
@@ -91,8 +92,11 @@ jobs:
           - wit_host_call_boundary
           - chio_yaml_parse
           - openapi_ingest
-          # reserved slot; per-step guard short-circuits until the binary lands
           - receipt_log_replay
+          - fuzz_policy_parse_compile
+          - fuzz_sql_parser
+          - fuzz_merkle_checkpoint
+          - fuzz_tool_action
     steps:
       # Cleanup C6: GHA `exit 0` only marks the step successful; it does
       # not skip subsequent steps in the same job. Set a `selected` step
@@ -114,7 +118,7 @@ jobs:
 
       - name: Checkout
         if: steps.select.outputs.selected == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install nightly Rust toolchain
         if: steps.select.outputs.selected == 'true'
@@ -127,7 +131,7 @@ jobs:
         if: steps.select.outputs.selected == 'true'
         run: |
           set -euo pipefail
-          cargo install cargo-fuzz --locked || cargo install cargo-fuzz
+          cargo install cargo-fuzz --locked --version 0.13.1
 
       - name: Confirm fuzz target binary exists
         id: confirm
@@ -137,8 +141,8 @@ jobs:
           if grep -qE "^name = \"${{ matrix.target }}\"" fuzz/Cargo.toml; then
             echo "exists=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "fuzz target ${{ matrix.target }} not yet wired in fuzz/Cargo.toml; skipping (slot reserved)"
-            echo "exists=false" >> "${GITHUB_OUTPUT}"
+            echo "fuzz target ${{ matrix.target }} is missing from fuzz/Cargo.toml" >&2
+            exit 1
           fi
 
       - name: Build fuzz target with ASan
@@ -171,7 +175,7 @@ jobs:
 
       - name: Upload crash artifacts
         if: failure() && steps.select.outputs.selected == 'true' && steps.confirm.outputs.exists == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
           path: |

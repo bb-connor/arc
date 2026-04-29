@@ -7,8 +7,8 @@ use std::task::{Context, Poll, Wake, Waker};
 use chio_anthropic_tools_adapter::transport::MockTransport;
 use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig, ANTHROPIC_VERSION};
 use chio_tool_call_fabric::{
-    DenyReason, Principal, ProviderAdapter, ProviderId, ProviderRequest, ReceiptId, ToolResult,
-    VerdictResult,
+    DenyReason, Principal, ProviderAdapter, ProviderId, ProviderRequest, ReceiptId, Redaction,
+    ToolResult, VerdictResult,
 };
 use serde_json::{json, Value};
 
@@ -253,10 +253,15 @@ fn lower_allow_emits_tool_result_with_executed_content() {
         .unwrap();
     assert_eq!(invocations.len(), 1);
 
-    let response = block_on(adapter.lower(
-        allow_verdict(),
-        ToolResult(br#"[{"type":"text","text":"72F"}]"#.to_vec()),
-    ))
+    let response = block_on(
+        adapter.lower(
+            allow_verdict(),
+            ToolResult(
+                br#"{"tool_use_id":"toolu_weather_1","content":[{"type":"text","text":"72F"}]}"#
+                    .to_vec(),
+            ),
+        ),
+    )
     .unwrap();
     let block: Value = serde_json::from_slice(&response.0).unwrap();
 
@@ -282,7 +287,11 @@ fn lower_deny_emits_error_tool_result_with_reason() {
     .unwrap();
     assert_eq!(invocation.provenance.request_id, "toolu_search_1");
 
-    let response = block_on(adapter.lower(deny_verdict(), ToolResult(b"{}".to_vec()))).unwrap();
+    let response = block_on(adapter.lower(
+        deny_verdict(),
+        ToolResult(br#"{"tool_use_id":"toolu_search_1"}"#.to_vec()),
+    ))
+    .unwrap();
     let block: Value = serde_json::from_slice(&response.0).unwrap();
 
     assert_eq!(block["type"], "tool_result");
@@ -295,8 +304,35 @@ fn lower_deny_emits_error_tool_result_with_reason() {
 fn lower_without_pending_tool_use_fails_closed() {
     let adapter = adapter();
     let result = block_on(adapter.lower(allow_verdict(), ToolResult(b"{}".to_vec())));
-    assert!(result.is_err(), "lower needs a matching tool_use id");
+    assert!(result.is_err(), "lower needs an explicit tool_use id");
     let err = result.err().unwrap();
 
-    assert!(err.to_string().contains("without a pending tool_use id"));
+    assert!(err
+        .to_string()
+        .contains("requires ToolResult JSON with tool_use_id"));
+}
+
+#[test]
+fn lower_allow_applies_redactions_before_provider_serialization() {
+    let adapter = adapter();
+    let response = block_on(
+        adapter.lower(
+            VerdictResult::Allow {
+                redactions: vec![Redaction {
+                    path: "/0/text".to_string(),
+                    replacement: "[redacted]".to_string(),
+                }],
+                receipt_id: ReceiptId("rcpt_allow_redacted".to_string()),
+            },
+            ToolResult(
+                br#"{"tool_use_id":"toolu_weather_1","content":[{"type":"text","text":"secret"}]}"#
+                    .to_vec(),
+            ),
+        ),
+    )
+    .unwrap();
+    let block: Value = serde_json::from_slice(&response.0).unwrap();
+
+    assert_eq!(block["tool_use_id"], "toolu_weather_1");
+    assert_eq!(block["content"][0]["text"], "[redacted]");
 }

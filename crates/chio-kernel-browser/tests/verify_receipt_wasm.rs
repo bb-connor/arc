@@ -41,17 +41,17 @@ fn fixture_envelope_for(case_id: &str) -> Vec<u8> {
 }
 
 #[wasm_bindgen_test]
-fn verify_receipt_allow_fixture_passes_without_pinning() {
+fn verify_receipt_allow_fixture_is_signature_only_without_pinning() {
     // M04 case: known-good signed allow receipt with valid parameter hash.
     let envelope = fixture_envelope_for("allow_receipt");
 
     let result_js = verify_receipt(&envelope, &JsValue::UNDEFINED).expect("verify_receipt Ok");
     let result: serde_json::Value = from_value(result_js).unwrap();
 
-    assert_eq!(result["ok"], true);
+    assert_eq!(result["ok"], false);
     assert_eq!(result["signature_valid"], true);
     assert_eq!(result["parameter_hash_valid"], true);
-    assert_eq!(result["signer_trusted"], true);
+    assert_eq!(result["signer_trusted"], false);
     assert_eq!(result["decision"], "allow");
     assert_eq!(result["receipt_id"], "rcpt-bindings-allow");
     assert_eq!(

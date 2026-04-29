@@ -99,6 +99,14 @@ fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
         }
     }
 
+    if total == 0 {
+        first_error = Some((
+            0,
+            "empty capture cannot be replayed as clean evidence".to_string(),
+            EXIT_PARSE_ERROR,
+        ));
+    }
+
     if args.json {
         // Flat JSON object so CI scripts can grep "ok" / "fail".
         let payload = serde_json::json!({
@@ -150,8 +158,21 @@ fn cmd_replay_traffic_with_against(
 ) -> Result<(), CliError> {
     let against = PolicyRef::parse(against_str)
         .map_err(|e| CliError::Other(format!("--against parse failed: {e}")))?;
-    let report = run_traffic_replay(args, &against)
-        .map_err(|e| CliError::Other(format!("chio replay traffic --against: {e}")))?;
+    let report = match run_traffic_replay(args, &against) {
+        Ok(report) => report,
+        Err(ExecuteError::MissingTenantPubkey) => {
+            return finish_replay_failure(
+                EXIT_BAD_TENANT_SIG,
+                "chio replay traffic --against requires --tenant-pubkey"
+                    .to_string(),
+            );
+        }
+        Err(err) => {
+            return Err(CliError::Other(format!(
+                "chio replay traffic --against: {err}"
+            )));
+        }
+    };
     let diff = build_traffic_diff_report(&report);
 
     let mut stdout = std::io::stdout().lock();
@@ -179,7 +200,10 @@ fn cmd_replay_traffic_with_against(
 fn traffic_diff_exit_code(diff: &TrafficReplayDiffReport) -> i32 {
     if let Some(error) = diff.error_outcomes.first() {
         let detail = error.error.as_str();
-        if detail.contains("ndjson parse error") || detail.contains("ndjson io error") {
+        if detail.contains("ndjson parse error")
+            || detail.contains("ndjson io error")
+            || detail.contains("empty capture")
+        {
             return EXIT_PARSE_ERROR;
         }
         if detail.contains("redaction") {

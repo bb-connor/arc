@@ -3,13 +3,14 @@
 use std::future::Future;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
+use std::time::SystemTime;
 
 use chio_bedrock_converse_adapter::{
     transport, BedrockAdapter, BedrockAdapterConfig, BEDROCK_CONVERSE_API_VERSION,
 };
 use chio_tool_call_fabric::{
     DenyReason, Principal, ProviderAdapter, ProviderError, ProviderId, ProviderRequest, ReceiptId,
-    ToolResult, VerdictResult,
+    Redaction, ToolResult, VerdictResult,
 };
 use serde_json::{json, Value};
 
@@ -221,13 +222,45 @@ fn lower_allow_builds_bedrock_tool_result_content_block() {
 }
 
 #[test]
-fn lift_batch_provider_metadata_is_deterministic() {
+fn lower_allow_applies_redactions_before_provider_serialization() {
     let adapter = adapter();
+    let response = adapter
+        .lower_tool_result(
+            "tooluse_weather_1",
+            VerdictResult::Allow {
+                redactions: vec![Redaction {
+                    path: "/token".to_string(),
+                    replacement: "[redacted]".to_string(),
+                }],
+                receipt_id: ReceiptId("rcpt_allow_redacted".to_string()),
+            },
+            tool_result(json!({"token": "secret", "ok": true})),
+        )
+        .unwrap();
+    let value: Value = serde_json::from_slice(&response.0).unwrap();
 
-    let first = adapter.lift_batch(raw(converse_fixture())).unwrap();
-    let second = adapter.lift_batch(raw(converse_fixture())).unwrap();
+    assert_eq!(
+        value["toolResult"]["content"],
+        json!([{"json": {"token": "[redacted]", "ok": true}}])
+    );
+}
 
-    assert_eq!(first, second);
+#[test]
+fn lift_batch_provider_metadata_uses_receive_time() {
+    let adapter = adapter();
+    let before = SystemTime::now();
+
+    let invocations = adapter.lift_batch(raw(converse_fixture())).unwrap();
+    let after = SystemTime::now();
+
+    assert_eq!(
+        invocations[0].provenance.request_id,
+        "tooluse_weather_1".to_string()
+    );
+    assert!(invocations[0].provenance.received_at >= before);
+    assert!(invocations[0].provenance.received_at <= after);
+    assert!(invocations[1].provenance.received_at >= before);
+    assert!(invocations[1].provenance.received_at <= after);
 }
 
 #[test]

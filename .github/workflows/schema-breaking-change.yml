@@ -40,13 +40,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout PR head with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '20'
 
@@ -55,9 +55,9 @@ jobs:
         # package's bin is invoked as `json-schema-diff <source> <destination>`
         # and exits with a non-zero status when a breaking change is
         # detected (additions of required props, removals, narrowed type
-        # unions, etc.). Pinned to ^1.0.0 so security patches flow in
-        # without shape drift.
-        run: npm install -g json-schema-diff@^1.0.0
+        # unions, etc.). Pinned exactly so schema gating bytes do not
+        # drift between reruns without a repository diff.
+        run: npm install -g json-schema-diff@1.0.0
 
       - name: Compute merge-base for PR diff scope
         id: mergebase
@@ -203,7 +203,7 @@ jobs:
         # so a clean push rewrites a stale sticky to an all-clear message
         # rather than leaving the previous warning in place.
         if: always() && steps.diff.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         env:
           SUMMARY_MD: ${{ steps.diff.outputs.summary }}
           BREAKING_COUNT: ${{ steps.diff.outputs.breaking_count }}

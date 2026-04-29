@@ -186,3 +186,55 @@ triggers = [
 ]
 seeds    = "fuzz/corpus/receipt_log_replay"
 notes    = "Receipt log replay decode plus chain-invariant state-machine."
+
+[targets.fuzz_policy_parse_compile]
+crate    = "chio-policy"
+path     = "fuzz/fuzz_targets/policy_parse_compile.rs"
+triggers = [
+    "crates/chio-policy/**",
+    "spec/schemas/policy/**",
+    "fuzz/fuzz_targets/policy_parse_compile.rs",
+    "fuzz/corpus/fuzz_policy_parse_compile/**",
+]
+seeds    = "fuzz/corpus/fuzz_policy_parse_compile"
+notes    = "HushSpec parser, validator, compiler, and YAML round-trip."
+
+[targets.fuzz_sql_parser]
+crate    = "chio-data-guards"
+path     = "fuzz/fuzz_targets/sql_parser.rs"
+triggers = [
+    "crates/chio-data-guards/**",
+    "spec/schemas/data-guards/**",
+    "fuzz/fuzz_targets/sql_parser.rs",
+    "fuzz/corpus/fuzz_sql_parser/**",
+]
+seeds    = "fuzz/corpus/fuzz_sql_parser"
+notes    = "SQL parser and SQL guard fail-closed analysis across dialects."
+
+[targets.fuzz_merkle_checkpoint]
+crate    = "chio-kernel"
+path     = "fuzz/fuzz_targets/merkle_checkpoint.rs"
+triggers = [
+    "crates/chio-core/src/merkle*.rs",
+    "crates/chio-core/src/hashing*.rs",
+    "crates/chio-kernel/src/checkpoint*.rs",
+    "spec/schemas/receipt/**",
+    "fuzz/fuzz_targets/merkle_checkpoint.rs",
+    "fuzz/corpus/fuzz_merkle_checkpoint/**",
+]
+seeds    = "fuzz/corpus/fuzz_merkle_checkpoint"
+notes    = "Merkle tree inclusion proofs and signed checkpoint validation."
+
+[targets.fuzz_tool_action]
+crate    = "chio-guards"
+path     = "fuzz/fuzz_targets/tool_action.rs"
+triggers = [
+    "crates/chio-guards/**",
+    "crates/chio-kernel/src/**",
+    "crates/chio-core/src/capability*.rs",
+    "spec/schemas/capability/**",
+    "fuzz/fuzz_targets/tool_action.rs",
+    "fuzz/corpus/fuzz_tool_action/**",
+]
+seeds    = "fuzz/corpus/fuzz_tool_action"
+notes    = "Tool action classification and guard verdicts for egress, shell, SQL, memory, and MCP."

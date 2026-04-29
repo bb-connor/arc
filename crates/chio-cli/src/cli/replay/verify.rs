@@ -31,7 +31,10 @@ pub struct VerifyOutcome {
 ///
 /// Never returns `Err`; all failure modes are captured in [`VerifyOutcome`]
 /// so callers can drive exit-code policy off the outcome shape.
-pub fn verify_receipt(value: &serde_json::Value) -> VerifyOutcome {
+pub fn verify_receipt(
+    value: &serde_json::Value,
+    trusted_kernel_key: Option<&chio_core::PublicKey>,
+) -> VerifyOutcome {
     let receipt: chio_core::receipt::ChioReceipt = match serde_json::from_value(value.clone()) {
         Ok(r) => r,
         Err(error) => {
@@ -44,6 +47,32 @@ pub fn verify_receipt(value: &serde_json::Value) -> VerifyOutcome {
     };
 
     let signer_key_hex = receipt.kernel_key.to_hex();
+
+    if trusted_kernel_key.is_none_or(|trusted| trusted != &receipt.kernel_key) {
+        return VerifyOutcome {
+            ok: false,
+            signer_key_hex,
+            error: Some("receipt signer is not in the trusted kernel key pin set".to_string()),
+        };
+    }
+
+    match receipt.action.verify_hash() {
+        Ok(true) => {}
+        Ok(false) => {
+            return VerifyOutcome {
+                ok: false,
+                signer_key_hex,
+                error: Some("action parameter_hash does not match canonical parameters".to_string()),
+            };
+        }
+        Err(error) => {
+            return VerifyOutcome {
+                ok: false,
+                signer_key_hex,
+                error: Some(format!("action parameter_hash verifier error: {error}")),
+            };
+        }
+    }
 
     match receipt.verify_signature() {
         Ok(true) => VerifyOutcome {
@@ -79,10 +108,7 @@ mod replay_verify_tests {
             capability_id: "cap-test".to_string(),
             tool_server: "fs".to_string(),
             tool_name: "read_file".to_string(),
-            action: ToolCallAction {
-                parameters: json!({}),
-                parameter_hash: "0".repeat(64),
-            },
+            action: ToolCallAction::from_parameters(json!({})).unwrap(),
             decision: Decision::Allow,
             content_hash: "0".repeat(64),
             policy_hash: "0".repeat(64),
@@ -105,7 +131,7 @@ mod replay_verify_tests {
         let receipt = signed_receipt();
         let value = serde_json::to_value(&receipt).unwrap();
 
-        let outcome = verify_receipt(&value);
+        let outcome = verify_receipt(&value, Some(&receipt.kernel_key));
         assert!(outcome.ok, "good signature must verify: {outcome:?}");
         assert!(outcome.error.is_none(), "no error for good signature");
         assert_eq!(outcome.signer_key_hex.len(), 64, "ed25519 key is 32 bytes");
@@ -120,7 +146,7 @@ mod replay_verify_tests {
         // untouched so the function can still attribute the failure.
         value["content_hash"] = json!("ff".repeat(32));
 
-        let outcome = verify_receipt(&value);
+        let outcome = verify_receipt(&value, Some(&receipt.kernel_key));
         assert!(!outcome.ok, "tampered receipt must not verify");
         assert!(outcome.error.is_some(), "bad signature carries an error note");
         assert_eq!(
@@ -136,7 +162,7 @@ mod replay_verify_tests {
         // serde_json::from_value should fail before any signature check.
         let value = json!({"id": "no-signature-here"});
 
-        let outcome = verify_receipt(&value);
+        let outcome = verify_receipt(&value, None);
         assert!(!outcome.ok, "malformed JSON must not verify");
         assert_eq!(
             outcome.signer_key_hex, "",
@@ -152,5 +178,32 @@ mod replay_verify_tests {
     #[test]
     fn exit_bad_signature_constant_is_twenty() {
         assert_eq!(EXIT_BAD_SIGNATURE, 20);
+    }
+
+    #[test]
+    fn verify_receipt_rejects_unpinned_signer() {
+        let receipt = signed_receipt();
+        let other = Keypair::generate();
+        let value = serde_json::to_value(&receipt).unwrap();
+
+        let outcome = verify_receipt(&value, Some(&other.public_key()));
+        assert!(!outcome.ok, "unpinned signer must not verify");
+        assert!(outcome
+            .error
+            .unwrap()
+            .contains("not in the trusted kernel key"));
+    }
+
+    #[test]
+    fn verify_receipt_rejects_mismatched_parameter_hash() {
+        let kp = Keypair::generate();
+        let mut body = sample_body(&kp);
+        body.action.parameter_hash = "0".repeat(64);
+        let resigned = ChioReceipt::sign(body, &kp).unwrap();
+        let value = serde_json::to_value(&resigned).unwrap();
+
+        let outcome = verify_receipt(&value, Some(&resigned.kernel_key));
+        assert!(!outcome.ok, "mismatched parameter hash must not verify");
+        assert!(outcome.error.unwrap().contains("parameter_hash"));
     }
 }

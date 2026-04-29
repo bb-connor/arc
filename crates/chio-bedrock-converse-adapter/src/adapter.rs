@@ -13,11 +13,12 @@ use std::future::Future;
 use std::pin::Pin;
 use std::time::SystemTime;
 
+use chio_core::canonical::canonical_json_bytes;
 use chio_tool_call_fabric::{
     DenyReason, ProvenanceStamp, ProviderAdapter, ProviderError, ProviderId, ProviderRequest,
-    ProviderResponse, ReceiptId, ToolInvocation, ToolResult, VerdictResult,
+    ProviderResponse, ReceiptId, Redaction, ToolInvocation, ToolResult, VerdictResult,
 };
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use crate::{BedrockAdapter, ToolResultBlock, ToolResultStatus, ToolUseBlock};
 
@@ -82,8 +83,8 @@ impl BedrockAdapter {
     ) -> Result<ProviderResponse, ProviderError> {
         let tool_use_id = non_empty_str(tool_use_id, TOOL_USE_ID_FIELD)?;
         let block = match verdict {
-            VerdictResult::Allow { .. } => {
-                let content = bedrock_content_from_tool_result(result)?;
+            VerdictResult::Allow { redactions, .. } => {
+                let content = bedrock_content_from_tool_result(result, &redactions)?;
                 ToolResultBlock {
                     tool_use_id: tool_use_id.to_string(),
                     content,
@@ -168,7 +169,7 @@ impl BedrockAdapter {
                 request_id: tool_use.tool_use_id,
                 api_version: self.api_version().to_string(),
                 principal: self.config().principal(),
-                received_at: SystemTime::UNIX_EPOCH,
+                received_at: SystemTime::now(),
             },
         })
     }
@@ -326,16 +327,56 @@ fn validate_tool_use(tool_use: ToolUseBlock) -> Result<ToolUseBlock, ProviderErr
     Ok(tool_use)
 }
 
-fn bedrock_content_from_tool_result(result: ToolResult) -> Result<Value, ProviderError> {
+fn bedrock_content_from_tool_result(
+    result: ToolResult,
+    redactions: &[Redaction],
+) -> Result<Value, ProviderError> {
     let value: Value = serde_json::from_slice(&result.0).map_err(|error| {
         ProviderError::BadToolArgs(format!("bedrock tool result was not valid JSON: {error}"))
     })?;
+    let value = apply_redactions(value, redactions, "Bedrock toolResult content")?;
 
     if looks_like_bedrock_content(&value) {
         Ok(value)
     } else {
         Ok(json!([{ "json": value }]))
     }
+}
+
+fn apply_redactions(
+    mut value: Value,
+    redactions: &[Redaction],
+    context: &str,
+) -> Result<Value, ProviderError> {
+    for redaction in redactions {
+        apply_redaction(&mut value, redaction, context)?;
+    }
+    Ok(value)
+}
+
+fn apply_redaction(
+    value: &mut Value,
+    redaction: &Redaction,
+    context: &str,
+) -> Result<(), ProviderError> {
+    if redaction.path.is_empty() {
+        *value = Value::String(redaction.replacement.clone());
+        return Ok(());
+    }
+    if !redaction.path.starts_with('/') {
+        return Err(ProviderError::Malformed(format!(
+            "{context} allow verdict requested redaction path `{}`; only JSON Pointer paths are supported",
+            redaction.path
+        )));
+    }
+    let target = value.pointer_mut(&redaction.path).ok_or_else(|| {
+        ProviderError::Malformed(format!(
+            "{context} allow verdict requested redaction path `{}` that did not resolve",
+            redaction.path
+        ))
+    })?;
+    *target = Value::String(redaction.replacement.clone());
+    Ok(())
 }
 
 fn looks_like_bedrock_content(value: &Value) -> bool {
@@ -393,28 +434,6 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
         )))
     } else {
         Ok(trimmed)
-    }
-}
-
-fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
-    serde_json::to_vec(&canonical_value(value))
-}
-
-fn canonical_value(value: &Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.iter().map(canonical_value).collect()),
-        Value::Object(map) => {
-            let mut keys: Vec<&String> = map.keys().collect();
-            keys.sort();
-            let mut sorted = Map::new();
-            for key in keys {
-                if let Some(value) = map.get(key) {
-                    sorted.insert(key.clone(), canonical_value(value));
-                }
-            }
-            Value::Object(sorted)
-        }
-        _ => value.clone(),
     }
 }
 

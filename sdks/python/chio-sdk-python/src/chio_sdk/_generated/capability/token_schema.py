@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
+# Schema sha256: 3ed943267c60942b5a63a39515fbbc1a553d614d895d142e307096a7a99c7da2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
@@ -36,6 +37,10 @@ class Operation(Enum):
 
 
 class MonetaryAmount(BaseModel):
+    """
+    A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
+    """
+
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -45,10 +50,11 @@ class MonetaryAmount(BaseModel):
 
 class Constraint(BaseModel):
     """
-    Tagged enum mirroring `Constraint` in `chio-core-types`. Encoded as `{ type, value }` (or just `{ type }` for unit variants such as `governed_intent_required`). Constraint variants intentionally remain extensible; `additionalProperties` is permissive here so new variants do not require schema rev-locks.
+    Tagged enum mirroring `Constraint`. Encoded as `{ type, value }` (or `{ type }` for unit variants like `governed_intent_required`). The variant set is intentionally extensible per ADR-TYPE-EVOLUTION; this schema validates the discriminator only and lets downstream guards interpret the `value`.
     """
 
     type: constr(min_length=1)
+    value: Any | None = None
 
 
 class Attenuation(BaseModel):
@@ -88,25 +94,34 @@ class DelegationLink(BaseModel):
 
 class ToolGrant(BaseModel):
     """
-    Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+    Authorization to invoke a single tool. Mirrors `ToolGrant`.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    server_id: constr(min_length=1)
-    tool_name: constr(min_length=1)
+    server_id: constr(min_length=1) = Field(
+        ...,
+        description="Tool server identifier from the manifest. Use `*` to match any server (only valid in parent grants for delegation).",
+    )
+    tool_name: constr(min_length=1) = Field(
+        ...,
+        description="Tool name on the server. Use `*` to match any tool (only valid in parent grants for delegation).",
+    )
     operations: list[Operation] = Field(..., min_length=1)
     constraints: list[Constraint] | None = None
     max_invocations: conint(ge=0) | None = None
     max_cost_per_invocation: MonetaryAmount | None = None
     max_total_cost: MonetaryAmount | None = None
-    dpop_required: bool | None = None
+    dpop_required: bool | None = Field(
+        None,
+        description="If true, the kernel requires a valid DPoP proof for every invocation under this grant.",
+    )
 
 
 class ResourceGrant(BaseModel):
     """
-    Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+    Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
     """
 
     model_config = ConfigDict(
@@ -118,7 +133,7 @@ class ResourceGrant(BaseModel):
 
 class PromptGrant(BaseModel):
     """
-    Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+    Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
     """
 
     model_config = ConfigDict(

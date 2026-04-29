@@ -4,9 +4,19 @@ fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
     let into = args.into.as_ref().ok_or_else(|| {
         CliError::Other("chio replay --bless requires --into <fixture-dir>".to_string())
     })?;
+    if args.tenant_pubkey.is_none() {
+        return finish_replay_failure(
+            EXIT_BAD_TENANT_SIG,
+            "chio replay --bless requires --tenant-pubkey".to_string(),
+        );
+    }
 
     require_replay_bless_capability()?;
     let scenario = validate_replay_bless_into_path(into)?;
+    let tenant_pubkey = load_tenant_pubkey(args.tenant_pubkey.as_deref().ok_or_else(|| {
+        CliError::Other("chio replay --bless requires --tenant-pubkey".to_string())
+    })?)
+    .map_err(|error| CliError::Other(format!("failed to load tenant pubkey: {error}")))?;
 
     let iter = open_ndjson(log).map_err(|error| {
         CliError::Other(format!(
@@ -22,6 +32,17 @@ fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
                 log.display()
             ))
         })?;
+        if let Err(err) =
+            validate_frame(&record.frame, "chio-tee-frame.v1", Some(&tenant_pubkey))
+        {
+            return finish_replay_failure(
+                err.exit_code(),
+                format!(
+                    "chio replay --bless: validation failed on line {}: {err}",
+                    record.line,
+                ),
+            );
+        }
         frames.push(record.frame);
     }
 
@@ -54,11 +75,37 @@ fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod replay_bless_tests {
     use super::*;
+    use base64::Engine;
+    use chio_tool_call_fabric::{Principal, ProviderId, ProvenanceStamp, ToolInvocation};
     use chio_tee_frame::{Frame, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem, Verdict};
-    use serde_json::json;
+    use ed25519_dalek::{Signer, SigningKey};
+    use std::time::SystemTime;
 
-    fn frame_json() -> String {
-        let frame = Frame::build(FrameInputs {
+    fn signing_keypair() -> SigningKey {
+        SigningKey::from_bytes(&[19u8; 32])
+    }
+
+    fn canonical_invocation() -> serde_json::Value {
+        let invocation = ToolInvocation {
+            provider: ProviderId::OpenAi,
+            tool_name: "send".to_string(),
+            arguments: br#"{"email":"alice@example.com"}"#.to_vec(),
+            provenance: ProvenanceStamp {
+                provider: ProviderId::OpenAi,
+                request_id: "req_bless_1".to_string(),
+                api_version: "2025-10-01".to_string(),
+                principal: Principal::OpenAiOrg {
+                    org_id: "org_chio_demo".to_string(),
+                },
+                received_at: SystemTime::UNIX_EPOCH,
+            },
+        };
+        let bytes = chio_core::canonical::canonical_json_bytes(&invocation).unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    fn signed_frame(keypair: &SigningKey) -> Frame {
+        let mut frame = Frame::build(FrameInputs {
             event_id: "01H7ZZZZZZZZZZZZZZZZZZZZZA".to_string(),
             ts: "2026-04-25T18:02:11.418Z".to_string(),
             tee_id: "tee-test-1".to_string(),
@@ -67,7 +114,7 @@ mod replay_bless_tests {
                 operation: "responses.create".to_string(),
                 api_version: "2025-10-01".to_string(),
             },
-            invocation: json!({"tool":"send","email":"alice@example.com"}),
+            invocation: canonical_invocation(),
             provenance: Provenance {
                 otel: Otel {
                     trace_id: "0".repeat(32),
@@ -81,23 +128,42 @@ mod replay_bless_tests {
             verdict: Verdict::Allow,
             deny_reason: None,
             would_have_blocked: false,
-            tenant_sig: format!("ed25519:{}", "A".repeat(86)),
+            tenant_sig: format!(
+                "ed25519:{}",
+                base64::engine::general_purpose::STANDARD.encode([0u8; 64])
+            ),
         })
         .unwrap();
+        let payload = signing_payload(&frame).unwrap();
+        let sig = keypair.sign(&payload);
+        frame.tenant_sig = format!(
+            "ed25519:{}",
+            base64::engine::general_purpose::STANDARD.encode(sig.to_bytes())
+        );
+        frame
+    }
+
+    fn frame_json(keypair: &SigningKey) -> String {
+        let frame = signed_frame(keypair);
         serde_json::to_string(&frame).unwrap()
     }
 
     #[test]
     fn bless_dispatch_writes_fixture_when_capability_is_present() {
         let tmp = tempfile::TempDir::new().unwrap();
+        let keypair = signing_keypair();
+        let pubkey = tmp.path().join("tenant.pub");
+        fs::write(&pubkey, keypair.verifying_key().to_bytes()).unwrap();
         let capture = tmp.path().join("capture.ndjson");
-        fs::write(&capture, format!("{}\n", frame_json())).unwrap();
+        fs::write(&capture, format!("{}\n", frame_json(&keypair))).unwrap();
         let into = tmp.path().join("family").join("name");
         std::env::set_var(REPLAY_BLESS_CAPABILITY_ENV, REPLAY_BLESS_CAPABILITY);
 
         let args = ReplayArgs {
             log: Some(capture.clone()),
             from_tee: false,
+            tenant_pubkey: Some(pubkey),
+            trusted_kernel_pubkey: None,
             expect_root: None,
             json: false,
             bless: true,
@@ -115,4 +181,32 @@ mod replay_bless_tests {
         assert!(!receipts.contains("alice@example.com"));
     }
 
+    #[test]
+    fn bless_dispatch_requires_tenant_pubkey() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let keypair = signing_keypair();
+        let capture = tmp.path().join("capture.ndjson");
+        fs::write(&capture, format!("{}\n", frame_json(&keypair))).unwrap();
+        let into = tmp.path().join("family").join("name");
+        std::env::set_var(REPLAY_BLESS_CAPABILITY_ENV, REPLAY_BLESS_CAPABILITY);
+
+        let args = ReplayArgs {
+            log: Some(capture.clone()),
+            from_tee: false,
+            tenant_pubkey: None,
+            trusted_kernel_pubkey: None,
+            expect_root: None,
+            json: false,
+            bless: true,
+            into: Some(into),
+            command: None,
+        };
+
+        let err = cmd_replay_bless(&args, &capture).unwrap_err();
+        std::env::remove_var(REPLAY_BLESS_CAPABILITY_ENV);
+
+        assert!(err
+            .to_string()
+            .contains("chio replay --bless requires --tenant-pubkey"));
+    }
 }

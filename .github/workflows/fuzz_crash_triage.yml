@@ -55,17 +55,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 1
 
       - name: Install Rust nightly + cargo-fuzz
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@5b842231ba77f5c045dba54ac5560fed2db780e2
         with:
           components: rust-src
 
       - name: Cache cargo-fuzz binary
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ~/.cargo/bin/cargo-fuzz
           key: cargo-fuzz-bin-v1
@@ -73,7 +73,7 @@ jobs:
       - name: Install cargo-fuzz (if not cached)
         run: |
           if ! command -v cargo-fuzz >/dev/null 2>&1; then
-            cargo install cargo-fuzz --locked
+            cargo install cargo-fuzz --locked --version 0.13.1
           fi
 
       - name: Download crash artifacts from upstream run

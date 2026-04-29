@@ -106,10 +106,7 @@ impl ReceiptStoreSink {
         .map_err(OTelReceiptExportError::Sign)?;
 
         let body = ChioReceiptBody {
-            id: span
-                .attribute_string(ATTR_CHIO_RECEIPT_ID)
-                .map(str::to_string)
-                .unwrap_or_else(next_receipt_id),
+            id: next_receipt_id(),
             timestamp: timestamp_from_span(span),
             capability_id: span
                 .attribute_string("chio.capability.id")
@@ -124,7 +121,7 @@ impl ReceiptStoreSink {
                 .map(str::to_string)
                 .unwrap_or_else(|| self.config.default_tool_name.clone()),
             action,
-            decision: decision_from_span(span),
+            decision: decision_from_span(span)?,
             content_hash: sha256_hex(&canonical_span),
             policy_hash: self.config.policy_hash.clone(),
             evidence: Vec::new(),
@@ -142,7 +139,7 @@ fn receipt_metadata(
     span: &OtlpSpan,
     sanitized_attributes: &[crate::ingress::OtlpAttribute],
 ) -> serde_json::Value {
-    serde_json::json!({
+    let mut metadata = serde_json::json!({
         "provenance": {
             "otel": {
                 "trace_id": span.trace_id,
@@ -156,25 +153,49 @@ fn receipt_metadata(
             "agent_id": span.attribute_string(ATTR_CHIO_AGENT_ID),
             "attributes": attributes_to_map(sanitized_attributes)
         }
-    })
+    });
+
+    if let Some(source_receipt_id) = span.attribute_string(ATTR_CHIO_RECEIPT_ID) {
+        if let Some(object) = metadata.as_object_mut() {
+            object.insert(
+                "correlation".to_string(),
+                serde_json::json!({
+                    "source_chio_receipt_id": source_receipt_id
+                }),
+            );
+        }
+    }
+
+    metadata
 }
 
-fn decision_from_span(span: &OtlpSpan) -> Decision {
-    match span.attribute_string("chio.verdict") {
-        Some("deny") => Decision::Deny {
+fn decision_from_span(span: &OtlpSpan) -> Result<Decision, OTelReceiptExportError> {
+    match span.attribute_value("chio.verdict") {
+        None => Err(OTelReceiptExportError::InvalidSpan(
+            "chio.verdict is required".to_string(),
+        )),
+        Some(serde_json::Value::String(verdict)) if verdict == "allow" => Ok(Decision::Allow),
+        Some(serde_json::Value::String(verdict)) if verdict == "deny" => Ok(Decision::Deny {
             reason: span
                 .attribute_string("chio.deny.reason")
                 .unwrap_or("otel span reported deny verdict")
                 .to_string(),
             guard: "otel-receipt-exporter".to_string(),
-        },
-        Some("incomplete") => Decision::Incomplete {
-            reason: span
-                .attribute_string("chio.incomplete.reason")
-                .unwrap_or("otel span reported incomplete verdict")
-                .to_string(),
-        },
-        _ => Decision::Allow,
+        }),
+        Some(serde_json::Value::String(verdict)) if verdict == "incomplete" => {
+            Ok(Decision::Incomplete {
+                reason: span
+                    .attribute_string("chio.incomplete.reason")
+                    .unwrap_or("otel span reported incomplete verdict")
+                    .to_string(),
+            })
+        }
+        Some(serde_json::Value::String(verdict)) => Err(OTelReceiptExportError::InvalidSpan(
+            format!("chio.verdict must be allow, deny, or incomplete, got {verdict:?}"),
+        )),
+        Some(value) => Err(OTelReceiptExportError::InvalidSpan(format!(
+            "chio.verdict must be a string, got {value}"
+        ))),
     }
 }
 

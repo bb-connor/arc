@@ -8,7 +8,7 @@
 # for everything else on the free tier.
 #
 # This script queries the workflow-run history for the cflite_pr.yml,
-# cflite_batch.yml, and fuzz.yml workflows (all M02-owned), sums their
+# cflite_batch.yml, fuzz.yml, mutants.yml, and mutants-fuzz-cocoverage.yml workflows, sums their
 # billed seconds across the last 30 days, converts to minutes, and exits
 # non-zero when the sum crosses 1,800. The orchestrator runs this on a
 # scheduled cadence and as a step in cflite_batch.yml plus fuzz.yml so the
@@ -37,7 +37,7 @@ set -euo pipefail
 REPO="${1:-bb-connor/arc}"
 CAP_MINUTES="${GH_FUZZ_BUDGET_MINUTES:-1800}"
 WINDOW_DAYS=30
-WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml" "fuzz.yml")
+WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml" "fuzz.yml" "mutants.yml" "mutants-fuzz-cocoverage.yml")
 
 err() { printf '%s\n' "$*" >&2; }
 
@@ -64,26 +64,52 @@ total_seconds=0
 for wf in "${WORKFLOWS[@]}"; do
     runs_path="repos/${REPO}/actions/workflows/${wf}/runs"
     # Fetch runs created in the window, paginate up to 1000.
-    runs="$(gh api --paginate \
+    api_error="$(mktemp)"
+    if ! runs="$(gh api --paginate \
         "${runs_path}?created=>=${since}&per_page=100" \
-        2>/dev/null || true)"
+        2>"${api_error}")"; then
+        error_text="$(cat "${api_error}")"
+        rm -f "${api_error}"
+        if grep -Eq 'HTTP 404|Not Found' <<<"${error_text}"; then
+            err "fuzz-budget: workflow ${wf} is not registered yet; counting 0 minutes"
+            continue
+        fi
+        err "fuzz-budget: GitHub API failed for ${wf}: ${error_text}"
+        exit 2
+    fi
+    rm -f "${api_error}"
     if [[ -z "${runs}" ]]; then
-        # Workflow may not exist yet; treat as zero.
-        continue
+        err "fuzz-budget: GitHub API returned an empty runs payload for ${wf}"
+        exit 2
     fi
     # gh api --paginate returns concatenated JSON objects; jq -s merges.
-    ids="$(printf '%s' "${runs}" | jq -s '[.[].workflow_runs[]?.id // empty] | unique | .[]')"
+    if ! ids="$(printf '%s' "${runs}" \
+        | jq -s '[.[].workflow_runs[]?.id // empty] | unique | .[]')"; then
+        err "fuzz-budget: failed to parse workflow runs for ${wf}"
+        exit 2
+    fi
     if [[ -z "${ids}" ]]; then
         continue
     fi
     while IFS= read -r run_id; do
         [[ -z "${run_id}" ]] && continue
-        timing="$(gh api "repos/${REPO}/actions/runs/${run_id}/timing" 2>/dev/null || true)"
-        if [[ -z "${timing}" ]]; then
-            continue
+        api_error="$(mktemp)"
+        if ! timing="$(gh api "repos/${REPO}/actions/runs/${run_id}/timing" \
+            2>"${api_error}")"; then
+            err "fuzz-budget: GitHub API failed for ${wf} run ${run_id}: $(cat "${api_error}")"
+            rm -f "${api_error}"
+            exit 2
         fi
-        ms="$(printf '%s' "${timing}" \
-            | jq '[.billable | to_entries[] | .value.total_ms // 0] | add // 0')"
+        rm -f "${api_error}"
+        if [[ -z "${timing}" ]]; then
+            err "fuzz-budget: GitHub API returned empty timing for ${wf} run ${run_id}"
+            exit 2
+        fi
+        if ! ms="$(printf '%s' "${timing}" \
+            | jq '[.billable | to_entries[] | .value.total_ms // 0] | add // 0')"; then
+            err "fuzz-budget: failed to parse timing for ${wf} run ${run_id}"
+            exit 2
+        fi
         total_seconds=$(( total_seconds + ms / 1000 ))
     done <<<"${ids}"
 done

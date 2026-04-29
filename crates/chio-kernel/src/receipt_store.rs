@@ -74,6 +74,13 @@ pub trait ReceiptStore: Send + Sync {
         Ok(None)
     }
     fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError>;
+    fn append_child_receipt_returning_seq(
+        &self,
+        receipt: &ChildRequestReceipt,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.append_child_receipt(receipt)?;
+        Ok(None)
+    }
 
     fn receipts_canonical_bytes_range(
         &self,
@@ -92,6 +99,32 @@ pub trait ReceiptStore: Send + Sync {
         _checkpoint_seq: u64,
     ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
         Ok(None)
+    }
+
+    fn load_latest_checkpoint(&self) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+        let mut checkpoint_seq = 1;
+        let mut latest = None;
+        loop {
+            let Some(checkpoint) = self.load_checkpoint_by_seq(checkpoint_seq)? else {
+                return Ok(latest);
+            };
+            if checkpoint.body.checkpoint_seq != checkpoint_seq {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint loader returned checkpoint {} for requested sequence {}",
+                    checkpoint.body.checkpoint_seq, checkpoint_seq
+                )));
+            }
+            checkpoint_seq = checkpoint
+                .body
+                .checkpoint_seq
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ReceiptStoreError::Conflict(
+                        "checkpoint_seq overflow while loading latest".to_string(),
+                    )
+                })?;
+            latest = Some(checkpoint);
+        }
     }
 
     fn supports_kernel_signed_checkpoints(&self) -> bool {

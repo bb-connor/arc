@@ -1327,6 +1327,7 @@ fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
         .map_err(|err| XtaskError::Io(display_path(&header_path), err))?;
 
     invoke_datamodel_codegen(&clean_input, &staging_out, &header_path)?;
+    harden_python_generated_models(&staging_out)?;
 
     // Walk the freshly-generated tree and rewrite each subpackage's
     // `__init__.py` to re-export its top-level model classes. The
@@ -1395,6 +1396,84 @@ fn build_python_file_header(schema_digest: &str) -> String {
     )
 }
 
+fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
+    harden_python_jsonrpc_response(&root_dir.join("jsonrpc").join("response_schema.py"))?;
+    harden_python_provenance_verdict_link(
+        &root_dir.join("provenance").join("verdict_link_schema.py"),
+    )?;
+    Ok(())
+}
+
+fn harden_python_jsonrpc_response(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from pydantic import BaseModel, ConfigDict, Field, RootModel, constr",
+        "from pydantic import BaseModel, ConfigDict, Field, RootModel, constr, model_validator",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    error: Error | None = Field(\n        None,\n        description=\"Error payload. Present only on failure. Mutually exclusive with `result`.\",\n    )\n\n\nclass ChioJsonRpc20Response2(BaseModel):",
+        "    error: Error | None = Field(\n        None,\n        description=\"Error payload. Present only on failure. Mutually exclusive with `result`.\",\n    )\n\n    @model_validator(mode=\"after\")\n    def _success_excludes_error(self) -> \"ChioJsonRpc20Response1\":\n        if \"error\" in self.model_fields_set:\n            raise ValueError(\"JSON-RPC success response must not include error\")\n        return self\n\n\nclass ChioJsonRpc20Response2(BaseModel):",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    error: Error = Field(\n        ...,\n        description=\"Error payload. Present only on failure. Mutually exclusive with `result`.\",\n    )\n\n\nclass ChioJsonRpc20Response(RootModel[ChioJsonRpc20Response1 | ChioJsonRpc20Response2]):",
+        "    error: Error = Field(\n        ...,\n        description=\"Error payload. Present only on failure. Mutually exclusive with `result`.\",\n    )\n\n    @model_validator(mode=\"after\")\n    def _error_excludes_result(self) -> \"ChioJsonRpc20Response2\":\n        if \"result\" in self.model_fields_set:\n            raise ValueError(\"JSON-RPC error response must not include result\")\n        return self\n\n\nclass ChioJsonRpc20Response(RootModel[ChioJsonRpc20Response1 | ChioJsonRpc20Response2]):",
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
+}
+
+fn harden_python_provenance_verdict_link(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr",
+        "from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr, model_validator",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    evidenceClass: EvidenceClass | None = Field(\n        None,\n        description=\"Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.\",\n    )\n\n\nclass ChioProvenanceVerdictLink2(BaseModel):",
+        "    evidenceClass: EvidenceClass | None = Field(\n        None,\n        description=\"Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.\",\n    )\n\n    @model_validator(mode=\"after\")\n    def _allow_excludes_rejection_fields(self) -> \"ChioProvenanceVerdictLink1\":\n        if \"reason\" in self.model_fields_set or \"guard\" in self.model_fields_set:\n            raise ValueError(\"allow verdict must not include reason or guard\")\n        return self\n\n\nclass ChioProvenanceVerdictLink2(BaseModel):",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    evidenceClass: EvidenceClass | None = Field(\n        None,\n        description=\"Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.\",\n    )\n\n\nclass ChioProvenanceVerdictLink4(BaseModel):",
+        "    evidenceClass: EvidenceClass | None = Field(\n        None,\n        description=\"Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.\",\n    )\n\n    @model_validator(mode=\"after\")\n    def _cancel_excludes_guard(self) -> \"ChioProvenanceVerdictLink3\":\n        if \"guard\" in self.model_fields_set:\n            raise ValueError(\"cancel verdict must not include guard\")\n        return self\n\n\nclass ChioProvenanceVerdictLink4(BaseModel):",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    evidenceClass: EvidenceClass | None = Field(\n        None,\n        description=\"Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.\",\n    )\n\n\nclass ChioProvenanceVerdictLink(",
+        "    evidenceClass: EvidenceClass | None = Field(\n        None,\n        description=\"Optional provenance evidence class Chio resolved at the time the verdict was rendered. Mirrors `GovernedProvenanceEvidenceClass` in `crates/chio-core-types/src/capability.rs` (lines 1303-1314). Omitted when the verdict was rendered without consulting the provenance graph.\",\n    )\n\n    @model_validator(mode=\"after\")\n    def _incomplete_excludes_guard(self) -> \"ChioProvenanceVerdictLink4\":\n        if \"guard\" in self.model_fields_set:\n            raise ValueError(\"incomplete verdict must not include guard\")\n        return self\n\n\nclass ChioProvenanceVerdictLink(",
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
+}
+
+fn replace_python_codegen_snippet(
+    path: &Path,
+    body: &mut String,
+    needle: &str,
+    replacement: &str,
+) -> Result<(), XtaskError> {
+    if !body.contains(needle) {
+        return Err(XtaskError::ToolFailed(format!(
+            "codegen python hardening pattern missing in {}",
+            display_path(path)
+        )));
+    }
+    *body = body.replacen(needle, replacement, 1);
+    Ok(())
+}
+
 /// Per-subpackage re-export plan built by [`rewrite_python_subpackage_inits`].
 ///
 /// Each entry is `(subpackage_dir_name, [class_name, ...])` sorted by
@@ -1411,14 +1490,24 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
     let mut imports = String::new();
     let mut all_names: Vec<String> = vec!["SCHEMA_SHA256".to_string()];
     for (subpkg, classes) in subpackages {
-        if classes.is_empty() {
+        let mut import_classes = classes.clone();
+        if subpkg == "agent" {
+            import_classes.retain(|name| name != "CapabilityToken");
+        }
+        if import_classes.is_empty() {
             continue;
         }
         imports.push_str(&format!(
             "from .{subpkg} import {names}\n",
-            names = classes.join(", ")
+            names = import_classes.join(", ")
         ));
-        all_names.extend(classes.iter().cloned());
+        all_names.extend(import_classes.iter().cloned());
+    }
+    if subpackages.iter().any(|(subpkg, classes)| {
+        subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytoken")
+    }) {
+        imports.push_str("\nCapabilityToken = ChioCapabilitytoken\n");
+        all_names.push("CapabilityToken".to_string());
     }
     all_names.sort();
     all_names.dedup();
@@ -1434,10 +1523,10 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
          \"\"\"Generated Pydantic v2 models for the Chio wire protocol (chio-wire/v1).\n\
          \n\
          Re-exports every subpackage so callers can write\n\
-         ``from chio_sdk._generated import CapabilityToken`` without knowing the\n\
-         per-subpackage layout. The SCHEMA_SHA256 constant pins the schema set\n\
-         this build was generated from; the spec-drift CI lane reads\n\
-         it to detect tampering.\n\
+         ``from chio_sdk._generated import CapabilityToken`` for the canonical\n\
+         capability token shape without knowing the per-subpackage layout. The\n\
+         SCHEMA_SHA256 constant pins the schema set this build was generated from;\n\
+         the spec-drift CI lane reads it to detect tampering.\n\
          \"\"\"\n\
          \n\
          from __future__ import annotations\n\

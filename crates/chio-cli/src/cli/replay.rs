@@ -26,7 +26,39 @@ fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
 /// and on divergence returns through [`finish_replay_failure`] so the binary
 /// exits with the canonical 0/10/20/30/40/50 code.
 fn cmd_replay_legacy(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
-    let report = run_legacy_replay(log, args.expect_root.as_deref(), args.from_tee)?;
+    if args.from_tee && args.tenant_pubkey.is_none() {
+        return finish_replay_failure(
+            EXIT_BAD_TENANT_SIG,
+            "chio replay --from-tee requires --tenant-pubkey".to_string(),
+        );
+    }
+    if !args.from_tee && args.trusted_kernel_pubkey.is_none() {
+        return finish_replay_failure(
+            EXIT_BAD_SIGNATURE,
+            "chio replay receipt logs require --trusted-kernel-pubkey".to_string(),
+        );
+    }
+
+    let tenant_pubkey = match args.tenant_pubkey.as_deref() {
+        Some(path) => Some(load_tenant_pubkey(path).map_err(|e| {
+            CliError::Other(format!("failed to load tenant pubkey: {e}"))
+        })?),
+        None => None,
+    };
+    let trusted_kernel_key = match args.trusted_kernel_pubkey.as_deref() {
+        Some(path) => Some(load_trusted_kernel_pubkey(path).map_err(|e| {
+            CliError::Other(format!("failed to load trusted kernel pubkey: {e}"))
+        })?),
+        None => None,
+    };
+
+    let report = run_legacy_replay(
+        log,
+        args.expect_root.as_deref(),
+        args.from_tee,
+        tenant_pubkey.as_ref(),
+        trusted_kernel_key.as_ref(),
+    )?;
 
     let mut stdout = std::io::stdout().lock();
     if args.json {
@@ -58,12 +90,19 @@ fn run_legacy_replay(
     log: &Path,
     expect_root: Option<&str>,
     from_tee: bool,
+    tenant_pubkey: Option<&[u8; 32]>,
+    trusted_kernel_key: Option<&chio_core::PublicKey>,
 ) -> Result<ReplayReport, CliError> {
     let log_path = log.display().to_string();
     let expected_root = expect_root.map(|s| s.to_string());
 
     if from_tee {
-        return run_legacy_replay_from_tee(log, &log_path, expected_root);
+        let Some(tenant_pubkey) = tenant_pubkey else {
+            return Err(CliError::Other(
+                "chio replay --from-tee requires --tenant-pubkey".to_string(),
+            ));
+        };
+        return run_legacy_replay_from_tee(log, &log_path, expected_root, tenant_pubkey);
     }
 
     let reader = ReceiptLogReader::open(log).map_err(|e| {
@@ -237,7 +276,7 @@ fn run_legacy_replay(
             }
         };
 
-        let outcome = verify_receipt(&value);
+        let outcome = verify_receipt(&value, trusted_kernel_key);
         if !outcome.ok {
             let signer = if outcome.signer_key_hex.is_empty() {
                 "unknown".to_string()
@@ -281,6 +320,26 @@ fn run_legacy_replay(
                     expected: Some(stored),
                     observed: Some(current),
                     detail: Some("stored verdict differs from current build".to_string()),
+                };
+                return Ok(ReplayReport::diverged(
+                    log_path,
+                    receipts_checked,
+                    acc.finalize_hex(),
+                    expected_root,
+                    divergence,
+                    exit_code_for(DivergenceKind::VerdictDrift),
+                ));
+            }
+            Err(VerdictError::EvalFailed { receipt_id, detail }) => {
+                let divergence = Divergence {
+                    kind: DivergenceKind::VerdictDrift,
+                    receipt_index: index,
+                    receipt_id: Some(receipt_id),
+                    json_pointer: Some("/decision/verdict".to_string()),
+                    byte_offset: None,
+                    expected: Some("rederived verdict".to_string()),
+                    observed: Some("unavailable".to_string()),
+                    detail: Some(detail),
                 };
                 return Ok(ReplayReport::diverged(
                     log_path,
@@ -345,6 +404,7 @@ fn run_legacy_replay_from_tee(
     log: &Path,
     log_path: &str,
     expected_root: Option<String>,
+    tenant_pubkey: &[u8; 32],
 ) -> Result<ReplayReport, CliError> {
     let iter = open_ndjson(log).map_err(|e| {
         CliError::Other(format!(
@@ -359,7 +419,9 @@ fn run_legacy_replay_from_tee(
     for (index, item) in iter.enumerate() {
         match item {
             Ok(record) => {
-                if let Err(err) = validate_frame(&record.frame, "chio-tee-frame.v1", None) {
+                if let Err(err) =
+                    validate_frame(&record.frame, "chio-tee-frame.v1", Some(tenant_pubkey))
+                {
                     let kind = match err.exit_code() {
                         EXIT_BAD_TENANT_SIG => DivergenceKind::SignatureMismatch,
                         EXIT_REDACTION_MISMATCH => DivergenceKind::RedactionMismatch,
@@ -415,6 +477,27 @@ fn run_legacy_replay_from_tee(
                 ));
             }
         }
+    }
+
+    if receipts_checked == 0 {
+        let divergence = Divergence {
+            kind: DivergenceKind::ParseError,
+            receipt_index: 0,
+            receipt_id: None,
+            json_pointer: None,
+            byte_offset: None,
+            expected: Some("at least one chio-tee-frame.v1 frame".to_string()),
+            observed: Some("0 frames".to_string()),
+            detail: Some("empty TEE capture cannot be replayed as clean evidence".to_string()),
+        };
+        return Ok(ReplayReport::diverged(
+            log_path.to_string(),
+            receipts_checked,
+            acc.finalize_hex(),
+            expected_root,
+            divergence,
+            exit_code_for(DivergenceKind::ParseError),
+        ));
     }
 
     let computed_root = acc.finalize_hex();

@@ -2,13 +2,12 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 92f773dc43ecb4049abce199685b4f9bdfd312dcd0a6e75600efdc6f44fa00ed-dirty
+// Schema content SHA-256: 9ed7ccddee1378164a5a7aba97d482833ee71b4f95c562137265899d61aa5f48
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
 // (not git history) so the stamp is stable across rebases, shallow clones,
-// and committed-but-unindexed edits. The optional '-dirty' suffix marks a
-// regen that picked up uncommitted (working-tree or staged) schema edits.
+// and dirty working trees.
 //
 // Manual edits will be overwritten by the next regeneration; the
 // spec-drift CI lane runs this script and 'git diff --exit-code'
@@ -24,11 +23,251 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AgentHeartbeatType.
+const (
+	AgentHeartbeatTypeHeartbeat AgentHeartbeatType = "heartbeat"
+)
+
+// Defines values for AgentListCapabilitiesType.
+const (
+	AgentListCapabilitiesTypeListCapabilities AgentListCapabilitiesType = "list_capabilities"
+)
+
+// Defines values for AgentToolCallRequestCapabilityTokenScopeGrantsOperations.
+const (
+	AgentToolCallRequestCapabilityTokenScopeGrantsOperationsDelegate   AgentToolCallRequestCapabilityTokenScopeGrantsOperations = "delegate"
+	AgentToolCallRequestCapabilityTokenScopeGrantsOperationsGet        AgentToolCallRequestCapabilityTokenScopeGrantsOperations = "get"
+	AgentToolCallRequestCapabilityTokenScopeGrantsOperationsInvoke     AgentToolCallRequestCapabilityTokenScopeGrantsOperations = "invoke"
+	AgentToolCallRequestCapabilityTokenScopeGrantsOperationsRead       AgentToolCallRequestCapabilityTokenScopeGrantsOperations = "read"
+	AgentToolCallRequestCapabilityTokenScopeGrantsOperationsReadResult AgentToolCallRequestCapabilityTokenScopeGrantsOperations = "read_result"
+	AgentToolCallRequestCapabilityTokenScopeGrantsOperationsSubscribe  AgentToolCallRequestCapabilityTokenScopeGrantsOperations = "subscribe"
+)
+
+// Defines values for AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations.
+const (
+	AgentToolCallRequestCapabilityTokenScopePromptGrantsOperationsDelegate   AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations = "delegate"
+	AgentToolCallRequestCapabilityTokenScopePromptGrantsOperationsGet        AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations = "get"
+	AgentToolCallRequestCapabilityTokenScopePromptGrantsOperationsInvoke     AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations = "invoke"
+	AgentToolCallRequestCapabilityTokenScopePromptGrantsOperationsRead       AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations = "read"
+	AgentToolCallRequestCapabilityTokenScopePromptGrantsOperationsReadResult AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations = "read_result"
+	AgentToolCallRequestCapabilityTokenScopePromptGrantsOperationsSubscribe  AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations = "subscribe"
+)
+
+// Defines values for AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations.
+const (
+	AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperationsDelegate   AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations = "delegate"
+	AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperationsGet        AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations = "get"
+	AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperationsInvoke     AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations = "invoke"
+	AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperationsRead       AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations = "read"
+	AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperationsReadResult AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations = "read_result"
+	AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperationsSubscribe  AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations = "subscribe"
+)
+
+// Defines values for AgentToolCallRequestType.
+const (
+	AgentToolCallRequestTypeToolCallRequest AgentToolCallRequestType = "tool_call_request"
+)
+
+// Defines values for CapabilityGrantOperation.
+const (
+	CapabilityGrantOperationDelegate   CapabilityGrantOperation = "delegate"
+	CapabilityGrantOperationGet        CapabilityGrantOperation = "get"
+	CapabilityGrantOperationInvoke     CapabilityGrantOperation = "invoke"
+	CapabilityGrantOperationRead       CapabilityGrantOperation = "read"
+	CapabilityGrantOperationReadResult CapabilityGrantOperation = "read_result"
+	CapabilityGrantOperationSubscribe  CapabilityGrantOperation = "subscribe"
+)
+
 // Defines values for CapabilityTokenAlgorithm.
 const (
 	CapabilityTokenAlgorithmEd25519 CapabilityTokenAlgorithm = "ed25519"
 	CapabilityTokenAlgorithmP256    CapabilityTokenAlgorithm = "p256"
 	CapabilityTokenAlgorithmP384    CapabilityTokenAlgorithm = "p384"
+)
+
+// Defines values for CapabilityTokenOperation.
+const (
+	CapabilityTokenOperationDelegate   CapabilityTokenOperation = "delegate"
+	CapabilityTokenOperationGet        CapabilityTokenOperation = "get"
+	CapabilityTokenOperationInvoke     CapabilityTokenOperation = "invoke"
+	CapabilityTokenOperationRead       CapabilityTokenOperation = "read"
+	CapabilityTokenOperationReadResult CapabilityTokenOperation = "read_result"
+	CapabilityTokenOperationSubscribe  CapabilityTokenOperation = "subscribe"
+)
+
+// Defines values for ErrorCapabilityDeniedCode.
+const (
+	ErrorCapabilityDeniedCodeCapabilityDenied ErrorCapabilityDeniedCode = "capability_denied"
+)
+
+// Defines values for ErrorCapabilityExpiredCode.
+const (
+	ErrorCapabilityExpiredCodeCapabilityExpired ErrorCapabilityExpiredCode = "capability_expired"
+)
+
+// Defines values for ErrorCapabilityRevokedCode.
+const (
+	ErrorCapabilityRevokedCodeCapabilityRevoked ErrorCapabilityRevokedCode = "capability_revoked"
+)
+
+// Defines values for ErrorInternalErrorCode.
+const (
+	ErrorInternalErrorCodeInternalError ErrorInternalErrorCode = "internal_error"
+)
+
+// Defines values for ErrorPolicyDeniedCode.
+const (
+	ErrorPolicyDeniedCodePolicyDenied ErrorPolicyDeniedCode = "policy_denied"
+)
+
+// Defines values for ErrorToolServerErrorCode.
+const (
+	ErrorToolServerErrorCodeToolServerError ErrorToolServerErrorCode = "tool_server_error"
+)
+
+// Defines values for JsonrpcNotificationJsonrpc.
+const (
+	JsonrpcNotificationJsonrpcN20 JsonrpcNotificationJsonrpc = "2.0"
+)
+
+// Defines values for JsonrpcRequestJsonrpc.
+const (
+	JsonrpcRequestJsonrpcN20 JsonrpcRequestJsonrpc = "2.0"
+)
+
+// Defines values for JsonrpcResponseJsonrpc.
+const (
+	JsonrpcResponseJsonrpcN20 JsonrpcResponseJsonrpc = "2.0"
+)
+
+// Defines values for KernelCapabilityListCapabilitiesScopeGrantsOperations.
+const (
+	KernelCapabilityListCapabilitiesScopeGrantsOperationsDelegate   KernelCapabilityListCapabilitiesScopeGrantsOperations = "delegate"
+	KernelCapabilityListCapabilitiesScopeGrantsOperationsGet        KernelCapabilityListCapabilitiesScopeGrantsOperations = "get"
+	KernelCapabilityListCapabilitiesScopeGrantsOperationsInvoke     KernelCapabilityListCapabilitiesScopeGrantsOperations = "invoke"
+	KernelCapabilityListCapabilitiesScopeGrantsOperationsRead       KernelCapabilityListCapabilitiesScopeGrantsOperations = "read"
+	KernelCapabilityListCapabilitiesScopeGrantsOperationsReadResult KernelCapabilityListCapabilitiesScopeGrantsOperations = "read_result"
+	KernelCapabilityListCapabilitiesScopeGrantsOperationsSubscribe  KernelCapabilityListCapabilitiesScopeGrantsOperations = "subscribe"
+)
+
+// Defines values for KernelCapabilityListCapabilitiesScopePromptGrantsOperations.
+const (
+	KernelCapabilityListCapabilitiesScopePromptGrantsOperationsDelegate   KernelCapabilityListCapabilitiesScopePromptGrantsOperations = "delegate"
+	KernelCapabilityListCapabilitiesScopePromptGrantsOperationsGet        KernelCapabilityListCapabilitiesScopePromptGrantsOperations = "get"
+	KernelCapabilityListCapabilitiesScopePromptGrantsOperationsInvoke     KernelCapabilityListCapabilitiesScopePromptGrantsOperations = "invoke"
+	KernelCapabilityListCapabilitiesScopePromptGrantsOperationsRead       KernelCapabilityListCapabilitiesScopePromptGrantsOperations = "read"
+	KernelCapabilityListCapabilitiesScopePromptGrantsOperationsReadResult KernelCapabilityListCapabilitiesScopePromptGrantsOperations = "read_result"
+	KernelCapabilityListCapabilitiesScopePromptGrantsOperationsSubscribe  KernelCapabilityListCapabilitiesScopePromptGrantsOperations = "subscribe"
+)
+
+// Defines values for KernelCapabilityListCapabilitiesScopeResourceGrantsOperations.
+const (
+	KernelCapabilityListCapabilitiesScopeResourceGrantsOperationsDelegate   KernelCapabilityListCapabilitiesScopeResourceGrantsOperations = "delegate"
+	KernelCapabilityListCapabilitiesScopeResourceGrantsOperationsGet        KernelCapabilityListCapabilitiesScopeResourceGrantsOperations = "get"
+	KernelCapabilityListCapabilitiesScopeResourceGrantsOperationsInvoke     KernelCapabilityListCapabilitiesScopeResourceGrantsOperations = "invoke"
+	KernelCapabilityListCapabilitiesScopeResourceGrantsOperationsRead       KernelCapabilityListCapabilitiesScopeResourceGrantsOperations = "read"
+	KernelCapabilityListCapabilitiesScopeResourceGrantsOperationsReadResult KernelCapabilityListCapabilitiesScopeResourceGrantsOperations = "read_result"
+	KernelCapabilityListCapabilitiesScopeResourceGrantsOperationsSubscribe  KernelCapabilityListCapabilitiesScopeResourceGrantsOperations = "subscribe"
+)
+
+// Defines values for KernelCapabilityListType.
+const (
+	KernelCapabilityListTypeCapabilityList KernelCapabilityListType = "capability_list"
+)
+
+// Defines values for KernelCapabilityRevokedType.
+const (
+	KernelCapabilityRevokedTypeCapabilityRevoked KernelCapabilityRevokedType = "capability_revoked"
+)
+
+// Defines values for KernelHeartbeatType.
+const (
+	KernelHeartbeatTypeHeartbeat KernelHeartbeatType = "heartbeat"
+)
+
+// Defines values for KernelToolCallChunkType.
+const (
+	KernelToolCallChunkTypeToolCallChunk KernelToolCallChunkType = "tool_call_chunk"
+)
+
+// Defines values for KernelToolCallResponseReceiptDecision0Verdict.
+const (
+	KernelToolCallResponseReceiptDecision0VerdictAllow KernelToolCallResponseReceiptDecision0Verdict = "allow"
+)
+
+// Defines values for KernelToolCallResponseReceiptDecision1Verdict.
+const (
+	KernelToolCallResponseReceiptDecision1VerdictDeny KernelToolCallResponseReceiptDecision1Verdict = "deny"
+)
+
+// Defines values for KernelToolCallResponseReceiptDecision2Verdict.
+const (
+	KernelToolCallResponseReceiptDecision2VerdictCancelled KernelToolCallResponseReceiptDecision2Verdict = "cancelled"
+)
+
+// Defines values for KernelToolCallResponseReceiptDecision3Verdict.
+const (
+	KernelToolCallResponseReceiptDecision3VerdictIncomplete KernelToolCallResponseReceiptDecision3Verdict = "incomplete"
+)
+
+// Defines values for KernelToolCallResponseResult0Status.
+const (
+	KernelToolCallResponseResult0StatusOk KernelToolCallResponseResult0Status = "ok"
+)
+
+// Defines values for KernelToolCallResponseResult1Status.
+const (
+	KernelToolCallResponseResult1StatusStreamComplete KernelToolCallResponseResult1Status = "stream_complete"
+)
+
+// Defines values for KernelToolCallResponseResult2Status.
+const (
+	KernelToolCallResponseResult2StatusCancelled KernelToolCallResponseResult2Status = "cancelled"
+)
+
+// Defines values for KernelToolCallResponseResult3Status.
+const (
+	KernelToolCallResponseResult3StatusIncomplete KernelToolCallResponseResult3Status = "incomplete"
+)
+
+// Defines values for KernelToolCallResponseResult4Error0Code.
+const (
+	KernelToolCallResponseResult4Error0CodeCapabilityDenied KernelToolCallResponseResult4Error0Code = "capability_denied"
+)
+
+// Defines values for KernelToolCallResponseResult4Error1Code.
+const (
+	KernelToolCallResponseResult4Error1CodeCapabilityExpired KernelToolCallResponseResult4Error1Code = "capability_expired"
+)
+
+// Defines values for KernelToolCallResponseResult4Error2Code.
+const (
+	KernelToolCallResponseResult4Error2CodeCapabilityRevoked KernelToolCallResponseResult4Error2Code = "capability_revoked"
+)
+
+// Defines values for KernelToolCallResponseResult4Error3Code.
+const (
+	KernelToolCallResponseResult4Error3CodePolicyDenied KernelToolCallResponseResult4Error3Code = "policy_denied"
+)
+
+// Defines values for KernelToolCallResponseResult4Error4Code.
+const (
+	KernelToolCallResponseResult4Error4CodeToolServerError KernelToolCallResponseResult4Error4Code = "tool_server_error"
+)
+
+// Defines values for KernelToolCallResponseResult4Error5Code.
+const (
+	KernelToolCallResponseResult4Error5CodeInternalError KernelToolCallResponseResult4Error5Code = "internal_error"
+)
+
+// Defines values for KernelToolCallResponseResult4Status.
+const (
+	KernelToolCallResponseResult4StatusErr KernelToolCallResponseResult4Status = "err"
+)
+
+// Defines values for KernelToolCallResponseType.
+const (
+	KernelToolCallResponseTypeToolCallResponse KernelToolCallResponseType = "tool_call_response"
 )
 
 // Defines values for ProvenanceAttestationBundleEvidenceClass.
@@ -73,6 +312,26 @@ const (
 	ProvenanceVerdictLinkVerdictIncomplete ProvenanceVerdictLinkVerdict = "incomplete"
 )
 
+// Defines values for ProvenanceVerdictLink0Verdict.
+const (
+	ProvenanceVerdictLink0VerdictAllow ProvenanceVerdictLink0Verdict = "allow"
+)
+
+// Defines values for ProvenanceVerdictLink1Verdict.
+const (
+	ProvenanceVerdictLink1VerdictDeny ProvenanceVerdictLink1Verdict = "deny"
+)
+
+// Defines values for ProvenanceVerdictLink2Verdict.
+const (
+	ProvenanceVerdictLink2VerdictCancel ProvenanceVerdictLink2Verdict = "cancel"
+)
+
+// Defines values for ProvenanceVerdictLink3Verdict.
+const (
+	ProvenanceVerdictLink3VerdictIncomplete ProvenanceVerdictLink3Verdict = "incomplete"
+)
+
 // Defines values for ReceiptRecordAlgorithm.
 const (
 	ReceiptRecordAlgorithmEd25519 ReceiptRecordAlgorithm = "ed25519"
@@ -85,6 +344,81 @@ const (
 	ReceiptRecordTrustLevelAdvisory ReceiptRecordTrustLevel = "advisory"
 	ReceiptRecordTrustLevelMediated ReceiptRecordTrustLevel = "mediated"
 	ReceiptRecordTrustLevelVerified ReceiptRecordTrustLevel = "verified"
+)
+
+// Defines values for ReceiptRecordDecision0Verdict.
+const (
+	ReceiptRecordDecision0VerdictAllow ReceiptRecordDecision0Verdict = "allow"
+)
+
+// Defines values for ReceiptRecordDecision1Verdict.
+const (
+	ReceiptRecordDecision1VerdictDeny ReceiptRecordDecision1Verdict = "deny"
+)
+
+// Defines values for ReceiptRecordDecision2Verdict.
+const (
+	ReceiptRecordDecision2VerdictCancelled ReceiptRecordDecision2Verdict = "cancelled"
+)
+
+// Defines values for ReceiptRecordDecision3Verdict.
+const (
+	ReceiptRecordDecision3VerdictIncomplete ReceiptRecordDecision3Verdict = "incomplete"
+)
+
+// Defines values for ResultCancelledStatus.
+const (
+	ResultCancelledStatusCancelled ResultCancelledStatus = "cancelled"
+)
+
+// Defines values for ResultErrError0Code.
+const (
+	ResultErrError0CodeCapabilityDenied ResultErrError0Code = "capability_denied"
+)
+
+// Defines values for ResultErrError1Code.
+const (
+	ResultErrError1CodeCapabilityExpired ResultErrError1Code = "capability_expired"
+)
+
+// Defines values for ResultErrError2Code.
+const (
+	ResultErrError2CodeCapabilityRevoked ResultErrError2Code = "capability_revoked"
+)
+
+// Defines values for ResultErrError3Code.
+const (
+	ResultErrError3CodePolicyDenied ResultErrError3Code = "policy_denied"
+)
+
+// Defines values for ResultErrError4Code.
+const (
+	ResultErrError4CodeToolServerError ResultErrError4Code = "tool_server_error"
+)
+
+// Defines values for ResultErrError5Code.
+const (
+	ResultErrError5CodeInternalError ResultErrError5Code = "internal_error"
+)
+
+// Defines values for ResultErrStatus.
+const (
+	ResultErrStatusErr ResultErrStatus = "err"
+)
+
+// Defines values for ResultIncompleteStatus.
+const (
+	ResultIncompleteStatusIncomplete ResultIncompleteStatus = "incomplete"
+)
+
+// Defines values for ResultOkStatus.
+const (
+	ResultOkStatusOk ResultOkStatus = "ok"
+)
+
+// Defines values for ResultStreamCompleteStatus.
+const (
+	ResultStreamCompleteStatusStreamComplete ResultStreamCompleteStatus = "stream_complete"
 )
 
 // Defines values for TrustControlAttestationTier.
@@ -117,13 +451,19 @@ const (
 
 // AgentHeartbeat defines model for AgentHeartbeat.
 type AgentHeartbeat struct {
-	Type interface{} `json:"type"`
+	Type AgentHeartbeatType `json:"type"`
 }
+
+// AgentHeartbeatType defines model for AgentHeartbeat.Type.
+type AgentHeartbeatType string
 
 // AgentListCapabilities defines model for AgentListCapabilities.
 type AgentListCapabilities struct {
-	Type interface{} `json:"type"`
+	Type AgentListCapabilitiesType `json:"type"`
 }
+
+// AgentListCapabilitiesType defines model for AgentListCapabilities.Type.
+type AgentListCapabilitiesType string
 
 // AgentToolCallRequest defines model for AgentToolCallRequest.
 type AgentToolCallRequest struct {
@@ -134,47 +474,62 @@ type AgentToolCallRequest struct {
 			Delegatee    string                    `json:"delegatee"`
 			Delegator    string                    `json:"delegator"`
 			Signature    string                    `json:"signature"`
-			Timestamp    int                       `json:"timestamp"`
+			Timestamp    int64                     `json:"timestamp"`
 		} `json:"delegation_chain,omitempty"`
-		ExpiresAt int    `json:"expires_at"`
+		ExpiresAt int64  `json:"expires_at"`
 		Id        string `json:"id"`
-		IssuedAt  int    `json:"issued_at"`
+		IssuedAt  int64  `json:"issued_at"`
 		Issuer    string `json:"issuer"`
 		Scope     struct {
 			Grants *[]struct {
-				Constraints          *[]map[string]interface{} `json:"constraints,omitempty"`
-				DpopRequired         *bool                     `json:"dpop_required,omitempty"`
+				Constraints *[]struct {
+					Type  string       `json:"type"`
+					Value *interface{} `json:"value,omitempty"`
+				} `json:"constraints,omitempty"`
+				DpopRequired         *bool `json:"dpop_required,omitempty"`
 				MaxCostPerInvocation *struct {
 					Currency string `json:"currency"`
-					Units    int    `json:"units"`
+					Units    int64  `json:"units"`
 				} `json:"max_cost_per_invocation,omitempty"`
-				MaxInvocations *int `json:"max_invocations,omitempty"`
+				MaxInvocations *int64 `json:"max_invocations,omitempty"`
 				MaxTotalCost   *struct {
 					Currency string `json:"currency"`
-					Units    int    `json:"units"`
+					Units    int64  `json:"units"`
 				} `json:"max_total_cost,omitempty"`
-				Operations []interface{} `json:"operations"`
-				ServerId   string        `json:"server_id"`
-				ToolName   string        `json:"tool_name"`
+				Operations []AgentToolCallRequestCapabilityTokenScopeGrantsOperations `json:"operations"`
+				ServerId   string                                                     `json:"server_id"`
+				ToolName   string                                                     `json:"tool_name"`
 			} `json:"grants,omitempty"`
 			PromptGrants *[]struct {
-				Operations []interface{} `json:"operations"`
-				PromptName string        `json:"prompt_name"`
+				Operations []AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations `json:"operations"`
+				PromptName string                                                           `json:"prompt_name"`
 			} `json:"prompt_grants,omitempty"`
 			ResourceGrants *[]struct {
-				Operations []interface{} `json:"operations"`
-				UriPattern string        `json:"uri_pattern"`
+				Operations []AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations `json:"operations"`
+				UriPattern string                                                             `json:"uri_pattern"`
 			} `json:"resource_grants,omitempty"`
 		} `json:"scope"`
 		Signature string `json:"signature"`
 		Subject   string `json:"subject"`
 	} `json:"capability_token"`
-	Id       string      `json:"id"`
-	Params   interface{} `json:"params"`
-	ServerId string      `json:"server_id"`
-	Tool     string      `json:"tool"`
-	Type     interface{} `json:"type"`
+	Id       string                   `json:"id"`
+	Params   interface{}              `json:"params"`
+	ServerId string                   `json:"server_id"`
+	Tool     string                   `json:"tool"`
+	Type     AgentToolCallRequestType `json:"type"`
 }
+
+// AgentToolCallRequestCapabilityTokenScopeGrantsOperations defines model for AgentToolCallRequest.CapabilityToken.Scope.Grants.Operations.
+type AgentToolCallRequestCapabilityTokenScopeGrantsOperations string
+
+// AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations defines model for AgentToolCallRequest.CapabilityToken.Scope.PromptGrants.Operations.
+type AgentToolCallRequestCapabilityTokenScopePromptGrantsOperations string
+
+// AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations defines model for AgentToolCallRequest.CapabilityToken.Scope.ResourceGrants.Operations.
+type AgentToolCallRequestCapabilityTokenScopeResourceGrantsOperations string
+
+// AgentToolCallRequestType defines model for AgentToolCallRequest.Type.
+type AgentToolCallRequestType string
 
 // CapabilityGrant A single grant carried inside a capability token's `scope`. Chio uses three distinct grant kinds (tool, resource, prompt) that share no common discriminator field; this schema accepts any one of them via `oneOf`. Mirrors `ToolGrant`, `ResourceGrant`, and `PromptGrant` in `crates/chio-core-types/src/capability.rs`. The wrapper `ChioScope` partitions grants into three named arrays (`grants`, `resource_grants`, `prompt_grants`); validators that consume a token can dispatch to the appropriate `$defs/*` shape directly without relying on `oneOf` matching.
 type CapabilityGrant struct {
@@ -183,17 +538,18 @@ type CapabilityGrant struct {
 
 // CapabilityGrantConstraint Tagged enum mirroring `Constraint`. Encoded as `{ type, value }` (or `{ type }` for unit variants like `governed_intent_required`). The variant set is intentionally extensible per ADR-TYPE-EVOLUTION; this schema validates the discriminator only and lets downstream guards interpret the `value`.
 type CapabilityGrantConstraint struct {
-	Type string `json:"type"`
+	Type  string       `json:"type"`
+	Value *interface{} `json:"value,omitempty"`
 }
 
 // CapabilityGrantMonetaryAmount A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
 type CapabilityGrantMonetaryAmount struct {
 	Currency string `json:"currency"`
-	Units    int    `json:"units"`
+	Units    int64  `json:"units"`
 }
 
 // CapabilityGrantOperation defines model for CapabilityGrantOperation.
-type CapabilityGrantOperation = interface{}
+type CapabilityGrantOperation string
 
 // CapabilityGrantPromptGrant Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
 type CapabilityGrantPromptGrant struct {
@@ -216,7 +572,7 @@ type CapabilityGrantToolGrant struct {
 
 	// MaxCostPerInvocation A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
 	MaxCostPerInvocation *CapabilityGrantMonetaryAmount `json:"max_cost_per_invocation,omitempty"`
-	MaxInvocations       *int                           `json:"max_invocations,omitempty"`
+	MaxInvocations       *int64                         `json:"max_invocations,omitempty"`
 
 	// MaxTotalCost A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
 	MaxTotalCost *CapabilityGrantMonetaryAmount `json:"max_total_cost,omitempty"`
@@ -235,7 +591,7 @@ type CapabilityRevocation struct {
 	CapabilityId string `json:"capability_id"`
 
 	// RevokedAt Unix timestamp (seconds) at which the revocation took effect. Stored as a signed integer in the kernel store; negative values are not produced by the issuer but are not rejected here in order to match the Rust `i64` shape.
-	RevokedAt int `json:"revoked_at"`
+	RevokedAt int64 `json:"revoked_at"`
 }
 
 // CapabilityToken A Chio capability token: an Ed25519-signed (or FIPS-algorithm), scoped, time-bounded authorization to invoke a tool. Mirrors the serde shape of `CapabilityToken` in `crates/chio-core-types/src/capability.rs`. The `signature` field covers the canonical JSON of all other fields except `algorithm`. The `algorithm` envelope field is informational (verification dispatches off the signature hex prefix) and is omitted for legacy Ed25519 tokens. PublicKey serde renders Ed25519 keys as bare 64-character lowercase hex (`PublicKey::to_hex` in `crates/chio-core-types/src/crypto.rs`), and renders FIPS keys with a self-describing prefix (`p256:<130-char hex>` for uncompressed SEC1 P-256, `p384:<194-char hex>` for P-384). Signatures follow the same convention: bare 128-char hex for Ed25519, `p256:<DER hex>` and `p384:<DER hex>` for FIPS algorithms. The grant `$defs` (`toolGrant`, `resourceGrant`, `promptGrant`, `operation`, `monetaryAmount`, `constraint`) are duplicated with `capability/grant.schema.json` because the current Rust codegen pipeline (`typify =0.4.3`) does not support cross-file `$ref`; both copies must be kept byte-identical when either file is edited until the M01 phase 3 codegen split lands.
@@ -247,13 +603,13 @@ type CapabilityToken struct {
 	DelegationChain *[]CapabilityTokenDelegationLink `json:"delegation_chain,omitempty"`
 
 	// ExpiresAt Unix timestamp (seconds) when the token expires.
-	ExpiresAt int `json:"expires_at"`
+	ExpiresAt int64 `json:"expires_at"`
 
 	// Id Unique token ID (UUIDv7 recommended), used for revocation.
 	Id string `json:"id"`
 
 	// IssuedAt Unix timestamp (seconds) when the token was issued.
-	IssuedAt int `json:"issued_at"`
+	IssuedAt int64 `json:"issued_at"`
 
 	// Issuer Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).
 	Issuer string `json:"issuer"`
@@ -278,9 +634,10 @@ type CapabilityTokenChioScope struct {
 	ResourceGrants *[]CapabilityTokenResourceGrant `json:"resource_grants,omitempty"`
 }
 
-// CapabilityTokenConstraint Tagged enum mirroring `Constraint` in `chio-core-types`. Encoded as `{ type, value }` (or just `{ type }` for unit variants such as `governed_intent_required`). Constraint variants intentionally remain extensible; `additionalProperties` is permissive here so new variants do not require schema rev-locks.
+// CapabilityTokenConstraint Tagged enum mirroring `Constraint`. Encoded as `{ type, value }` (or `{ type }` for unit variants like `governed_intent_required`). The variant set is intentionally extensible per ADR-TYPE-EVOLUTION; this schema validates the discriminator only and lets downstream guards interpret the `value`.
 type CapabilityTokenConstraint struct {
-	Type string `json:"type"`
+	Type  string       `json:"type"`
+	Value *interface{} `json:"value,omitempty"`
 }
 
 // CapabilityTokenDelegationLink A single link in a delegation chain. Mirrors `DelegationLink`.
@@ -298,83 +655,111 @@ type CapabilityTokenDelegationLink struct {
 
 	// Signature Delegation-link signature. Same encoding as the token-level `signature`.
 	Signature string `json:"signature"`
-	Timestamp int    `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"`
 }
 
-// CapabilityTokenMonetaryAmount defines model for CapabilityTokenMonetaryAmount.
+// CapabilityTokenMonetaryAmount A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
 type CapabilityTokenMonetaryAmount struct {
 	Currency string `json:"currency"`
-	Units    int    `json:"units"`
+	Units    int64  `json:"units"`
 }
 
 // CapabilityTokenOperation defines model for CapabilityTokenOperation.
-type CapabilityTokenOperation = interface{}
+type CapabilityTokenOperation string
 
-// CapabilityTokenPromptGrant Authorization for retrieving a prompt by name. Mirrors `PromptGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/promptGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+// CapabilityTokenPromptGrant Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
 type CapabilityTokenPromptGrant struct {
 	Operations []CapabilityTokenOperation `json:"operations"`
 	PromptName string                     `json:"prompt_name"`
 }
 
-// CapabilityTokenResourceGrant Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/resourceGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+// CapabilityTokenResourceGrant Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
 type CapabilityTokenResourceGrant struct {
 	Operations []CapabilityTokenOperation `json:"operations"`
 	UriPattern string                     `json:"uri_pattern"`
 }
 
-// CapabilityTokenToolGrant Authorization to invoke a single tool. Mirrors `ToolGrant`. Kept byte-identical with `capability/grant.schema.json#/$defs/toolGrant` until cross-file `$ref` is supported by the Rust codegen pipeline.
+// CapabilityTokenToolGrant Authorization to invoke a single tool. Mirrors `ToolGrant`.
 type CapabilityTokenToolGrant struct {
-	Constraints          *[]CapabilityTokenConstraint   `json:"constraints,omitempty"`
-	DpopRequired         *bool                          `json:"dpop_required,omitempty"`
+	Constraints *[]CapabilityTokenConstraint `json:"constraints,omitempty"`
+
+	// DpopRequired If true, the kernel requires a valid DPoP proof for every invocation under this grant.
+	DpopRequired *bool `json:"dpop_required,omitempty"`
+
+	// MaxCostPerInvocation A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
 	MaxCostPerInvocation *CapabilityTokenMonetaryAmount `json:"max_cost_per_invocation,omitempty"`
-	MaxInvocations       *int                           `json:"max_invocations,omitempty"`
-	MaxTotalCost         *CapabilityTokenMonetaryAmount `json:"max_total_cost,omitempty"`
-	Operations           []CapabilityTokenOperation     `json:"operations"`
-	ServerId             string                         `json:"server_id"`
-	ToolName             string                         `json:"tool_name"`
+	MaxInvocations       *int64                         `json:"max_invocations,omitempty"`
+
+	// MaxTotalCost A monetary amount in the currency's smallest minor unit (e.g. cents for USD). Mirrors `MonetaryAmount`.
+	MaxTotalCost *CapabilityTokenMonetaryAmount `json:"max_total_cost,omitempty"`
+	Operations   []CapabilityTokenOperation     `json:"operations"`
+
+	// ServerId Tool server identifier from the manifest. Use `*` to match any server (only valid in parent grants for delegation).
+	ServerId string `json:"server_id"`
+
+	// ToolName Tool name on the server. Use `*` to match any tool (only valid in parent grants for delegation).
+	ToolName string `json:"tool_name"`
 }
 
 // ErrorCapabilityDenied defines model for ErrorCapabilityDenied.
 type ErrorCapabilityDenied struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   ErrorCapabilityDeniedCode `json:"code"`
+	Detail string                    `json:"detail"`
 }
+
+// ErrorCapabilityDeniedCode defines model for ErrorCapabilityDenied.Code.
+type ErrorCapabilityDeniedCode string
 
 // ErrorCapabilityExpired defines model for ErrorCapabilityExpired.
 type ErrorCapabilityExpired struct {
-	Code interface{} `json:"code"`
+	Code ErrorCapabilityExpiredCode `json:"code"`
 }
+
+// ErrorCapabilityExpiredCode defines model for ErrorCapabilityExpired.Code.
+type ErrorCapabilityExpiredCode string
 
 // ErrorCapabilityRevoked defines model for ErrorCapabilityRevoked.
 type ErrorCapabilityRevoked struct {
-	Code interface{} `json:"code"`
+	Code ErrorCapabilityRevokedCode `json:"code"`
 }
+
+// ErrorCapabilityRevokedCode defines model for ErrorCapabilityRevoked.Code.
+type ErrorCapabilityRevokedCode string
 
 // ErrorInternalError defines model for ErrorInternalError.
 type ErrorInternalError struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   ErrorInternalErrorCode `json:"code"`
+	Detail string                 `json:"detail"`
 }
+
+// ErrorInternalErrorCode defines model for ErrorInternalError.Code.
+type ErrorInternalErrorCode string
 
 // ErrorPolicyDenied defines model for ErrorPolicyDenied.
 type ErrorPolicyDenied struct {
-	Code   interface{} `json:"code"`
+	Code   ErrorPolicyDeniedCode `json:"code"`
 	Detail struct {
 		Guard  string `json:"guard"`
 		Reason string `json:"reason"`
 	} `json:"detail"`
 }
 
+// ErrorPolicyDeniedCode defines model for ErrorPolicyDenied.Code.
+type ErrorPolicyDeniedCode string
+
 // ErrorToolServerError defines model for ErrorToolServerError.
 type ErrorToolServerError struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   ErrorToolServerErrorCode `json:"code"`
+	Detail string                   `json:"detail"`
 }
+
+// ErrorToolServerErrorCode defines model for ErrorToolServerError.Code.
+type ErrorToolServerErrorCode string
 
 // JsonrpcNotification JSON-RPC 2.0 notification envelope used by Chio for MCP and A2A wire framing. Mirrors the inline serde shape constructed in `crates/chio-mcp-adapter/src/transport.rs::send_notification` (lines 770-774) and the streaming-chunk and cancellation notifications in `crates/chio-mcp-edge/src/runtime/protocol.rs` and transport.rs (lines 401-407, 1384-1392). A notification is structurally a request with no `id` field; the receiver MUST NOT respond. Common Chio notification methods include 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status', 'notifications/resources/updated', 'notifications/resources/list_changed', and the Chio-specific tool-streaming chunk method exposed as `CHIO_TOOL_STREAMING_NOTIFICATION_METHOD`.
 type JsonrpcNotification struct {
 	// Jsonrpc Protocol version literal. Always the string '2.0'.
-	Jsonrpc interface{} `json:"jsonrpc"`
+	Jsonrpc JsonrpcNotificationJsonrpc `json:"jsonrpc"`
 
 	// Method Notification method name (for example 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status').
 	Method string `json:"method"`
@@ -382,6 +767,9 @@ type JsonrpcNotification struct {
 	// Params Method parameters. JSON-RPC 2.0 allows omission; Chio call sites typically supply at least an empty object.
 	Params *JsonrpcNotification_Params `json:"params,omitempty"`
 }
+
+// JsonrpcNotificationJsonrpc Protocol version literal. Always the string '2.0'.
+type JsonrpcNotificationJsonrpc string
 
 // JsonrpcNotificationParams0 defines model for .
 type JsonrpcNotificationParams0 = map[string]interface{}
@@ -400,7 +788,7 @@ type JsonrpcRequest struct {
 	Id *JsonrpcRequest_Id `json:"id"`
 
 	// Jsonrpc Protocol version literal. Always the string '2.0'.
-	Jsonrpc interface{} `json:"jsonrpc"`
+	Jsonrpc JsonrpcRequestJsonrpc `json:"jsonrpc"`
 
 	// Method RPC method name (for example 'tools/call', 'initialize', 'sampling/createMessage').
 	Method string `json:"method"`
@@ -410,7 +798,7 @@ type JsonrpcRequest struct {
 }
 
 // JsonrpcRequestId0 defines model for .
-type JsonrpcRequestId0 = int
+type JsonrpcRequestId0 = int64
 
 // JsonrpcRequestId1 defines model for .
 type JsonrpcRequestId1 = string
@@ -419,6 +807,9 @@ type JsonrpcRequestId1 = string
 type JsonrpcRequest_Id struct {
 	union json.RawMessage
 }
+
+// JsonrpcRequestJsonrpc Protocol version literal. Always the string '2.0'.
+type JsonrpcRequestJsonrpc string
 
 // JsonrpcRequestParams0 defines model for .
 type JsonrpcRequestParams0 = map[string]interface{}
@@ -436,7 +827,7 @@ type JsonrpcResponse struct {
 	// Error Error payload. Present only on failure. Mutually exclusive with `result`.
 	Error *struct {
 		// Code JSON-RPC 2.0 error code. Reserved range -32768..-32000 is implementation-defined; Chio uses -32600 (Invalid Request), -32601 (Method not found), -32602 (Invalid params), -32603 (Internal error), -32800 (request cancelled, MCP), -32002 (nested-flow policy denial, Chio), -32042 (URL elicitations required, Chio).
-		Code int `json:"code"`
+		Code int64 `json:"code"`
 
 		// Data Optional structured detail. Shape is method- or code-specific.
 		Data *interface{} `json:"data,omitempty"`
@@ -449,7 +840,7 @@ type JsonrpcResponse struct {
 	Id *JsonrpcResponse_Id `json:"id"`
 
 	// Jsonrpc Protocol version literal. Always the string '2.0'.
-	Jsonrpc interface{} `json:"jsonrpc"`
+	Jsonrpc JsonrpcResponseJsonrpc `json:"jsonrpc"`
 
 	// Result Method-specific success payload. Present only on success. Mutually exclusive with `error`. Shape is method-defined; commonly an object.
 	Result *interface{} `json:"result,omitempty"`
@@ -457,7 +848,7 @@ type JsonrpcResponse struct {
 }
 
 // JsonrpcResponseId0 defines model for .
-type JsonrpcResponseId0 = int
+type JsonrpcResponseId0 = int64
 
 // JsonrpcResponseId1 defines model for .
 type JsonrpcResponseId1 = string
@@ -467,11 +858,29 @@ type JsonrpcResponse_Id struct {
 	union json.RawMessage
 }
 
+// JsonrpcResponseJsonrpc Protocol version literal. Always the string '2.0'.
+type JsonrpcResponseJsonrpc string
+
 // JsonrpcResponse0 defines model for .
-type JsonrpcResponse0 = interface{}
+type JsonrpcResponse0 struct {
+	// Result Method-specific success payload. Present only on success. Mutually exclusive with `error`. Shape is method-defined; commonly an object.
+	Result interface{} `json:"result"`
+}
 
 // JsonrpcResponse1 defines model for .
-type JsonrpcResponse1 = interface{}
+type JsonrpcResponse1 struct {
+	// Error Error payload. Present only on failure. Mutually exclusive with `result`.
+	Error struct {
+		// Code JSON-RPC 2.0 error code. Reserved range -32768..-32000 is implementation-defined; Chio uses -32600 (Invalid Request), -32601 (Method not found), -32602 (Invalid params), -32603 (Internal error), -32800 (request cancelled, MCP), -32002 (nested-flow policy denial, Chio), -32042 (URL elicitations required, Chio).
+		Code int64 `json:"code"`
+
+		// Data Optional structured detail. Shape is method- or code-specific.
+		Data *interface{} `json:"data,omitempty"`
+
+		// Message Short human-readable error description.
+		Message string `json:"message"`
+	} `json:"error"`
+}
 
 // KernelCapabilityList defines model for KernelCapabilityList.
 type KernelCapabilityList struct {
@@ -482,62 +891,86 @@ type KernelCapabilityList struct {
 			Delegatee    string                    `json:"delegatee"`
 			Delegator    string                    `json:"delegator"`
 			Signature    string                    `json:"signature"`
-			Timestamp    int                       `json:"timestamp"`
+			Timestamp    int64                     `json:"timestamp"`
 		} `json:"delegation_chain,omitempty"`
-		ExpiresAt int    `json:"expires_at"`
+		ExpiresAt int64  `json:"expires_at"`
 		Id        string `json:"id"`
-		IssuedAt  int    `json:"issued_at"`
+		IssuedAt  int64  `json:"issued_at"`
 		Issuer    string `json:"issuer"`
 		Scope     struct {
 			Grants *[]struct {
-				Constraints          *[]map[string]interface{} `json:"constraints,omitempty"`
-				DpopRequired         *bool                     `json:"dpop_required,omitempty"`
+				Constraints *[]struct {
+					Type  string       `json:"type"`
+					Value *interface{} `json:"value,omitempty"`
+				} `json:"constraints,omitempty"`
+				DpopRequired         *bool `json:"dpop_required,omitempty"`
 				MaxCostPerInvocation *struct {
 					Currency string `json:"currency"`
-					Units    int    `json:"units"`
+					Units    int64  `json:"units"`
 				} `json:"max_cost_per_invocation,omitempty"`
-				MaxInvocations *int `json:"max_invocations,omitempty"`
+				MaxInvocations *int64 `json:"max_invocations,omitempty"`
 				MaxTotalCost   *struct {
 					Currency string `json:"currency"`
-					Units    int    `json:"units"`
+					Units    int64  `json:"units"`
 				} `json:"max_total_cost,omitempty"`
-				Operations []interface{} `json:"operations"`
-				ServerId   string        `json:"server_id"`
-				ToolName   string        `json:"tool_name"`
+				Operations []KernelCapabilityListCapabilitiesScopeGrantsOperations `json:"operations"`
+				ServerId   string                                                  `json:"server_id"`
+				ToolName   string                                                  `json:"tool_name"`
 			} `json:"grants,omitempty"`
 			PromptGrants *[]struct {
-				Operations []interface{} `json:"operations"`
-				PromptName string        `json:"prompt_name"`
+				Operations []KernelCapabilityListCapabilitiesScopePromptGrantsOperations `json:"operations"`
+				PromptName string                                                        `json:"prompt_name"`
 			} `json:"prompt_grants,omitempty"`
 			ResourceGrants *[]struct {
-				Operations []interface{} `json:"operations"`
-				UriPattern string        `json:"uri_pattern"`
+				Operations []KernelCapabilityListCapabilitiesScopeResourceGrantsOperations `json:"operations"`
+				UriPattern string                                                          `json:"uri_pattern"`
 			} `json:"resource_grants,omitempty"`
 		} `json:"scope"`
 		Signature string `json:"signature"`
 		Subject   string `json:"subject"`
 	} `json:"capabilities"`
-	Type interface{} `json:"type"`
+	Type KernelCapabilityListType `json:"type"`
 }
+
+// KernelCapabilityListCapabilitiesScopeGrantsOperations defines model for KernelCapabilityList.Capabilities.Scope.Grants.Operations.
+type KernelCapabilityListCapabilitiesScopeGrantsOperations string
+
+// KernelCapabilityListCapabilitiesScopePromptGrantsOperations defines model for KernelCapabilityList.Capabilities.Scope.PromptGrants.Operations.
+type KernelCapabilityListCapabilitiesScopePromptGrantsOperations string
+
+// KernelCapabilityListCapabilitiesScopeResourceGrantsOperations defines model for KernelCapabilityList.Capabilities.Scope.ResourceGrants.Operations.
+type KernelCapabilityListCapabilitiesScopeResourceGrantsOperations string
+
+// KernelCapabilityListType defines model for KernelCapabilityList.Type.
+type KernelCapabilityListType string
 
 // KernelCapabilityRevoked defines model for KernelCapabilityRevoked.
 type KernelCapabilityRevoked struct {
-	Id   string      `json:"id"`
-	Type interface{} `json:"type"`
+	Id   string                      `json:"id"`
+	Type KernelCapabilityRevokedType `json:"type"`
 }
+
+// KernelCapabilityRevokedType defines model for KernelCapabilityRevoked.Type.
+type KernelCapabilityRevokedType string
 
 // KernelHeartbeat defines model for KernelHeartbeat.
 type KernelHeartbeat struct {
-	Type interface{} `json:"type"`
+	Type KernelHeartbeatType `json:"type"`
 }
+
+// KernelHeartbeatType defines model for KernelHeartbeat.Type.
+type KernelHeartbeatType string
 
 // KernelToolCallChunk defines model for KernelToolCallChunk.
 type KernelToolCallChunk struct {
-	ChunkIndex int         `json:"chunk_index"`
-	Data       interface{} `json:"data"`
-	Id         string      `json:"id"`
-	Type       interface{} `json:"type"`
+	ChunkIndex int64                   `json:"chunk_index"`
+	Data       interface{}             `json:"data"`
+	Id         string                  `json:"id"`
+	Type       KernelToolCallChunkType `json:"type"`
 }
+
+// KernelToolCallChunkType defines model for KernelToolCallChunk.Type.
+type KernelToolCallChunkType string
 
 // KernelToolCallResponse defines model for KernelToolCallResponse.
 type KernelToolCallResponse struct {
@@ -560,37 +993,49 @@ type KernelToolCallResponse struct {
 		Metadata   *interface{} `json:"metadata,omitempty"`
 		PolicyHash string       `json:"policy_hash"`
 		Signature  string       `json:"signature"`
-		Timestamp  int          `json:"timestamp"`
+		Timestamp  int64        `json:"timestamp"`
 		ToolName   string       `json:"tool_name"`
 		ToolServer string       `json:"tool_server"`
 	} `json:"receipt"`
 	Result KernelToolCallResponse_Result `json:"result"`
-	Type   interface{}                   `json:"type"`
+	Type   KernelToolCallResponseType    `json:"type"`
 }
 
 // KernelToolCallResponseReceiptDecision0 defines model for .
 type KernelToolCallResponseReceiptDecision0 struct {
-	Verdict interface{} `json:"verdict"`
+	Verdict KernelToolCallResponseReceiptDecision0Verdict `json:"verdict"`
 }
+
+// KernelToolCallResponseReceiptDecision0Verdict defines model for KernelToolCallResponse.Receipt.Decision.0.Verdict.
+type KernelToolCallResponseReceiptDecision0Verdict string
 
 // KernelToolCallResponseReceiptDecision1 defines model for .
 type KernelToolCallResponseReceiptDecision1 struct {
-	Guard   string      `json:"guard"`
-	Reason  string      `json:"reason"`
-	Verdict interface{} `json:"verdict"`
+	Guard   string                                        `json:"guard"`
+	Reason  string                                        `json:"reason"`
+	Verdict KernelToolCallResponseReceiptDecision1Verdict `json:"verdict"`
 }
+
+// KernelToolCallResponseReceiptDecision1Verdict defines model for KernelToolCallResponse.Receipt.Decision.1.Verdict.
+type KernelToolCallResponseReceiptDecision1Verdict string
 
 // KernelToolCallResponseReceiptDecision2 defines model for .
 type KernelToolCallResponseReceiptDecision2 struct {
-	Reason  string      `json:"reason"`
-	Verdict interface{} `json:"verdict"`
+	Reason  string                                        `json:"reason"`
+	Verdict KernelToolCallResponseReceiptDecision2Verdict `json:"verdict"`
 }
+
+// KernelToolCallResponseReceiptDecision2Verdict defines model for KernelToolCallResponse.Receipt.Decision.2.Verdict.
+type KernelToolCallResponseReceiptDecision2Verdict string
 
 // KernelToolCallResponseReceiptDecision3 defines model for .
 type KernelToolCallResponseReceiptDecision3 struct {
-	Reason  string      `json:"reason"`
-	Verdict interface{} `json:"verdict"`
+	Reason  string                                        `json:"reason"`
+	Verdict KernelToolCallResponseReceiptDecision3Verdict `json:"verdict"`
 }
+
+// KernelToolCallResponseReceiptDecision3Verdict defines model for KernelToolCallResponse.Receipt.Decision.3.Verdict.
+type KernelToolCallResponseReceiptDecision3Verdict string
 
 // KernelToolCallResponse_Receipt_Decision defines model for KernelToolCallResponse.Receipt.Decision.
 type KernelToolCallResponse_Receipt_Decision struct {
@@ -599,87 +1044,123 @@ type KernelToolCallResponse_Receipt_Decision struct {
 
 // KernelToolCallResponseResult0 defines model for .
 type KernelToolCallResponseResult0 struct {
-	Status interface{} `json:"status"`
-	Value  interface{} `json:"value"`
+	Status KernelToolCallResponseResult0Status `json:"status"`
+	Value  interface{}                         `json:"value"`
 }
+
+// KernelToolCallResponseResult0Status defines model for KernelToolCallResponse.Result.0.Status.
+type KernelToolCallResponseResult0Status string
 
 // KernelToolCallResponseResult1 defines model for .
 type KernelToolCallResponseResult1 struct {
-	Status      interface{} `json:"status"`
-	TotalChunks int         `json:"total_chunks"`
+	Status      KernelToolCallResponseResult1Status `json:"status"`
+	TotalChunks int64                               `json:"total_chunks"`
 }
+
+// KernelToolCallResponseResult1Status defines model for KernelToolCallResponse.Result.1.Status.
+type KernelToolCallResponseResult1Status string
 
 // KernelToolCallResponseResult2 defines model for .
 type KernelToolCallResponseResult2 struct {
-	ChunksReceived int         `json:"chunks_received"`
-	Reason         string      `json:"reason"`
-	Status         interface{} `json:"status"`
+	ChunksReceived int64                               `json:"chunks_received"`
+	Reason         string                              `json:"reason"`
+	Status         KernelToolCallResponseResult2Status `json:"status"`
 }
+
+// KernelToolCallResponseResult2Status defines model for KernelToolCallResponse.Result.2.Status.
+type KernelToolCallResponseResult2Status string
 
 // KernelToolCallResponseResult3 defines model for .
 type KernelToolCallResponseResult3 struct {
-	ChunksReceived int         `json:"chunks_received"`
-	Reason         string      `json:"reason"`
-	Status         interface{} `json:"status"`
+	ChunksReceived int64                               `json:"chunks_received"`
+	Reason         string                              `json:"reason"`
+	Status         KernelToolCallResponseResult3Status `json:"status"`
 }
+
+// KernelToolCallResponseResult3Status defines model for KernelToolCallResponse.Result.3.Status.
+type KernelToolCallResponseResult3Status string
 
 // KernelToolCallResponseResult4 defines model for .
 type KernelToolCallResponseResult4 struct {
 	Error  KernelToolCallResponse_Result_4_Error `json:"error"`
-	Status interface{}                           `json:"status"`
+	Status KernelToolCallResponseResult4Status   `json:"status"`
 }
 
 // KernelToolCallResponseResult4Error0 defines model for .
 type KernelToolCallResponseResult4Error0 struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   KernelToolCallResponseResult4Error0Code `json:"code"`
+	Detail string                                  `json:"detail"`
 }
+
+// KernelToolCallResponseResult4Error0Code defines model for KernelToolCallResponse.Result.4.Error.0.Code.
+type KernelToolCallResponseResult4Error0Code string
 
 // KernelToolCallResponseResult4Error1 defines model for .
 type KernelToolCallResponseResult4Error1 struct {
-	Code interface{} `json:"code"`
+	Code KernelToolCallResponseResult4Error1Code `json:"code"`
 }
+
+// KernelToolCallResponseResult4Error1Code defines model for KernelToolCallResponse.Result.4.Error.1.Code.
+type KernelToolCallResponseResult4Error1Code string
 
 // KernelToolCallResponseResult4Error2 defines model for .
 type KernelToolCallResponseResult4Error2 struct {
-	Code interface{} `json:"code"`
+	Code KernelToolCallResponseResult4Error2Code `json:"code"`
 }
+
+// KernelToolCallResponseResult4Error2Code defines model for KernelToolCallResponse.Result.4.Error.2.Code.
+type KernelToolCallResponseResult4Error2Code string
 
 // KernelToolCallResponseResult4Error3 defines model for .
 type KernelToolCallResponseResult4Error3 struct {
-	Code   interface{} `json:"code"`
+	Code   KernelToolCallResponseResult4Error3Code `json:"code"`
 	Detail struct {
 		Guard  string `json:"guard"`
 		Reason string `json:"reason"`
 	} `json:"detail"`
 }
 
+// KernelToolCallResponseResult4Error3Code defines model for KernelToolCallResponse.Result.4.Error.3.Code.
+type KernelToolCallResponseResult4Error3Code string
+
 // KernelToolCallResponseResult4Error4 defines model for .
 type KernelToolCallResponseResult4Error4 struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   KernelToolCallResponseResult4Error4Code `json:"code"`
+	Detail string                                  `json:"detail"`
 }
+
+// KernelToolCallResponseResult4Error4Code defines model for KernelToolCallResponse.Result.4.Error.4.Code.
+type KernelToolCallResponseResult4Error4Code string
 
 // KernelToolCallResponseResult4Error5 defines model for .
 type KernelToolCallResponseResult4Error5 struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   KernelToolCallResponseResult4Error5Code `json:"code"`
+	Detail string                                  `json:"detail"`
 }
+
+// KernelToolCallResponseResult4Error5Code defines model for KernelToolCallResponse.Result.4.Error.5.Code.
+type KernelToolCallResponseResult4Error5Code string
 
 // KernelToolCallResponse_Result_4_Error defines model for KernelToolCallResponse.Result.4.Error.
 type KernelToolCallResponse_Result_4_Error struct {
 	union json.RawMessage
 }
 
+// KernelToolCallResponseResult4Status defines model for KernelToolCallResponse.Result.4.Status.
+type KernelToolCallResponseResult4Status string
+
 // KernelToolCallResponse_Result defines model for KernelToolCallResponse.Result.
 type KernelToolCallResponse_Result struct {
 	union json.RawMessage
 }
 
+// KernelToolCallResponseType defines model for KernelToolCallResponse.Type.
+type KernelToolCallResponseType string
+
 // ProvenanceAttestationBundle One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. Names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class Chio resolved across the bundle, the unix-second `assembledAt` timestamp, and the ordered list of normalized statements. Each statement mirrors the `RuntimeAttestationEvidence` shape and is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json`; the family is inlined rather than `$ref`'d. Field names are camelCase to match `GovernedCallChainContext`.
 type ProvenanceAttestationBundle struct {
 	// AssembledAt Unix timestamp (seconds) at which the bundle was assembled. Used to bound bundle freshness and to establish ordering with respect to receipts emitted from the same kernel.
-	AssembledAt int `json:"assembledAt"`
+	AssembledAt int64 `json:"assembledAt"`
 
 	// ChainId Stable identifier of the governed call chain this bundle attests. Matches the `chainId` carried by `provenance/context.schema.json`.
 	ChainId string `json:"chainId"`
@@ -699,10 +1180,10 @@ type ProvenanceAttestationBundle struct {
 		EvidenceSha256 string `json:"evidence_sha256"`
 
 		// ExpiresAt Unix timestamp (seconds) when this attestation expires. Bundle assembly fails closed when `assembledAt < issued_at` or `assembledAt >= expires_at`.
-		ExpiresAt int `json:"expires_at"`
+		ExpiresAt int64 `json:"expires_at"`
 
 		// IssuedAt Unix timestamp (seconds) when this attestation was issued.
-		IssuedAt int `json:"issued_at"`
+		IssuedAt int64 `json:"issued_at"`
 
 		// RuntimeIdentity Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
 		RuntimeIdentity *string `json:"runtime_identity,omitempty"`
@@ -778,7 +1259,7 @@ type ProvenanceStamp struct {
 	Provider string `json:"provider"`
 
 	// ReceivedAt Unix timestamp (seconds) at which Chio observed the provider response. Monotonic with respect to receipts emitted from the same kernel; M07 fails closed if the value is in the future relative to the kernel clock.
-	ReceivedAt int `json:"received_at"`
+	ReceivedAt int64 `json:"received_at"`
 
 	// RequestId Upstream request identifier returned by the provider for this call. Opaque to Chio; preserved verbatim so operators can correlate Chio receipts with provider-side logs.
 	RequestId string `json:"request_id"`
@@ -802,7 +1283,7 @@ type ProvenanceVerdictLink struct {
 	ReceiptId *string `json:"receiptId,omitempty"`
 
 	// RenderedAt Unix timestamp (seconds) at which the policy engine rendered this verdict. Monotonic with respect to receipts emitted from the same kernel.
-	RenderedAt int `json:"renderedAt"`
+	RenderedAt int64 `json:"renderedAt"`
 
 	// RequestId Stable identifier of the Chio request the verdict applies to. Threads the verdict into the request lineage carried by `crates/chio-core-types/src/session.rs` (`RequestLineageMode`, lines 717-768).
 	RequestId string `json:"requestId"`
@@ -820,23 +1301,44 @@ type ProvenanceVerdictLinkVerdict string
 
 // ProvenanceVerdictLink0 Allow verdicts MUST NOT carry `reason` or `guard`; the policy engine emits these fields only on rejection.
 type ProvenanceVerdictLink0 struct {
-	Verdict interface{} `json:"verdict"`
+	Verdict ProvenanceVerdictLink0Verdict `json:"verdict"`
 }
+
+// ProvenanceVerdictLink0Verdict defines model for ProvenanceVerdictLink.0.Verdict.
+type ProvenanceVerdictLink0Verdict string
 
 // ProvenanceVerdictLink1 Deny verdicts MUST carry both a human-readable `reason` and the `guard` identifier that produced the denial. Mirrors the deny branch of `chio-http/v1/verdict.schema.json`.
 type ProvenanceVerdictLink1 struct {
-	Verdict interface{} `json:"verdict"`
+	// Guard Policy guard identifier that produced a `deny` verdict. Required by the HTTP verdict union (and by this schema's `oneOf`) when `verdict` is `deny`. Forbidden for non-deny verdicts.
+	Guard string `json:"guard"`
+
+	// Reason Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
+	Reason  string                        `json:"reason"`
+	Verdict ProvenanceVerdictLink1Verdict `json:"verdict"`
 }
+
+// ProvenanceVerdictLink1Verdict defines model for ProvenanceVerdictLink.1.Verdict.
+type ProvenanceVerdictLink1Verdict string
 
 // ProvenanceVerdictLink2 Cancel verdicts MUST carry `reason` (operator or transport cancellation rationale) and MUST NOT carry `guard`.
 type ProvenanceVerdictLink2 struct {
-	Verdict interface{} `json:"verdict"`
+	// Reason Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
+	Reason  string                        `json:"reason"`
+	Verdict ProvenanceVerdictLink2Verdict `json:"verdict"`
 }
+
+// ProvenanceVerdictLink2Verdict defines model for ProvenanceVerdictLink.2.Verdict.
+type ProvenanceVerdictLink2Verdict string
 
 // ProvenanceVerdictLink3 Incomplete verdicts MUST carry `reason` describing the terminal failure mode (for example interrupted upstream stream) and MUST NOT carry `guard`.
 type ProvenanceVerdictLink3 struct {
-	Verdict interface{} `json:"verdict"`
+	// Reason Policy reason string. Required by the HTTP verdict union (and by this schema's `oneOf`) for `deny`, `cancel`, and `incomplete` verdicts. Forbidden for `allow`.
+	Reason  string                        `json:"reason"`
+	Verdict ProvenanceVerdictLink3Verdict `json:"verdict"`
 }
+
+// ProvenanceVerdictLink3Verdict defines model for ProvenanceVerdictLink.3.Verdict.
+type ProvenanceVerdictLink3Verdict string
 
 // ReceiptInclusionProof Merkle inclusion proof for a single receipt leaf in a receipt-log Merkle tree. Mirrors the serde shape of `MerkleProof` in `crates/chio-core-types/src/merkle.rs`. The proof allows an auditor, holding only the published Merkle root and the original leaf bytes, to verify that the leaf was included in a tree of the given size at the given position. The audit path is the ordered list of sibling hashes encountered when walking from the leaf up to the root; siblings whose subtree was carried upward without pairing (the right-edge of an unbalanced level) are omitted. M04 deterministic-replay consumes this schema as the contract for golden-bundle inclusion artifacts under `tests/replay/goldens/<family>/<name>/`.
 type ReceiptInclusionProof struct {
@@ -844,10 +1346,10 @@ type ReceiptInclusionProof struct {
 	AuditPath []string `json:"audit_path"`
 
 	// LeafIndex Zero-based index of the leaf being proved. MUST satisfy `leaf_index < tree_size`.
-	LeafIndex int `json:"leaf_index"`
+	LeafIndex int64 `json:"leaf_index"`
 
 	// TreeSize Total number of leaves in the Merkle tree at the time the proof was issued.
-	TreeSize int `json:"tree_size"`
+	TreeSize int64 `json:"tree_size"`
 }
 
 // ReceiptRecord A signed Chio receipt: proof that a tool call was evaluated by the Kernel. Mirrors the serde shape of `ChioReceipt` in `crates/chio-core-types/src/receipt.rs`. The `signature` field covers the canonical JSON of `ChioReceiptBody` (every field below except `algorithm` and `signature`). The `algorithm` envelope field is informational (verification dispatches off the self-describing hex prefix on the signature itself) and is omitted for legacy Ed25519 receipts to preserve byte-for-byte compatibility. Optional fields (`evidence`, `metadata`, `trust_level`, `tenant_id`, `algorithm`) are skipped on the wire when set to their default or unset values.
@@ -889,7 +1391,7 @@ type ReceiptRecord struct {
 	TenantId *string `json:"tenant_id,omitempty"`
 
 	// Timestamp Unix timestamp (seconds) when the receipt was created.
-	Timestamp int `json:"timestamp"`
+	Timestamp int64 `json:"timestamp"`
 
 	// ToolName Tool that was invoked (or attempted).
 	ToolName string `json:"tool_name"`
@@ -914,8 +1416,11 @@ type ReceiptRecordDecision struct {
 
 // ReceiptRecordDecision0 defines model for .
 type ReceiptRecordDecision0 struct {
-	Verdict interface{} `json:"verdict"`
+	Verdict ReceiptRecordDecision0Verdict `json:"verdict"`
 }
+
+// ReceiptRecordDecision0Verdict defines model for ReceiptRecordDecision.0.Verdict.
+type ReceiptRecordDecision0Verdict string
 
 // ReceiptRecordDecision1 defines model for .
 type ReceiptRecordDecision1 struct {
@@ -923,23 +1428,32 @@ type ReceiptRecordDecision1 struct {
 	Guard string `json:"guard"`
 
 	// Reason Human-readable reason for the denial.
-	Reason  string      `json:"reason"`
-	Verdict interface{} `json:"verdict"`
+	Reason  string                        `json:"reason"`
+	Verdict ReceiptRecordDecision1Verdict `json:"verdict"`
 }
+
+// ReceiptRecordDecision1Verdict defines model for ReceiptRecordDecision.1.Verdict.
+type ReceiptRecordDecision1Verdict string
 
 // ReceiptRecordDecision2 defines model for .
 type ReceiptRecordDecision2 struct {
 	// Reason Human-readable reason for the cancellation.
-	Reason  string      `json:"reason"`
-	Verdict interface{} `json:"verdict"`
+	Reason  string                        `json:"reason"`
+	Verdict ReceiptRecordDecision2Verdict `json:"verdict"`
 }
+
+// ReceiptRecordDecision2Verdict defines model for ReceiptRecordDecision.2.Verdict.
+type ReceiptRecordDecision2Verdict string
 
 // ReceiptRecordDecision3 defines model for .
 type ReceiptRecordDecision3 struct {
 	// Reason Human-readable reason for the incomplete terminal state.
-	Reason  string      `json:"reason"`
-	Verdict interface{} `json:"verdict"`
+	Reason  string                        `json:"reason"`
+	Verdict ReceiptRecordDecision3Verdict `json:"verdict"`
 }
+
+// ReceiptRecordDecision3Verdict defines model for ReceiptRecordDecision.3.Verdict.
+type ReceiptRecordDecision3Verdict string
 
 // ReceiptRecordGuardEvidence Evidence from a single guard's evaluation. Mirrors `GuardEvidence`.
 type ReceiptRecordGuardEvidence struct {
@@ -964,77 +1478,110 @@ type ReceiptRecordToolCallAction struct {
 
 // ResultCancelled defines model for ResultCancelled.
 type ResultCancelled struct {
-	ChunksReceived int         `json:"chunks_received"`
-	Reason         string      `json:"reason"`
-	Status         interface{} `json:"status"`
+	ChunksReceived int64                 `json:"chunks_received"`
+	Reason         string                `json:"reason"`
+	Status         ResultCancelledStatus `json:"status"`
 }
+
+// ResultCancelledStatus defines model for ResultCancelled.Status.
+type ResultCancelledStatus string
 
 // ResultErr defines model for ResultErr.
 type ResultErr struct {
 	Error  ResultErr_Error `json:"error"`
-	Status interface{}     `json:"status"`
+	Status ResultErrStatus `json:"status"`
 }
 
 // ResultErrError0 defines model for .
 type ResultErrError0 struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   ResultErrError0Code `json:"code"`
+	Detail string              `json:"detail"`
 }
+
+// ResultErrError0Code defines model for ResultErr.Error.0.Code.
+type ResultErrError0Code string
 
 // ResultErrError1 defines model for .
 type ResultErrError1 struct {
-	Code interface{} `json:"code"`
+	Code ResultErrError1Code `json:"code"`
 }
+
+// ResultErrError1Code defines model for ResultErr.Error.1.Code.
+type ResultErrError1Code string
 
 // ResultErrError2 defines model for .
 type ResultErrError2 struct {
-	Code interface{} `json:"code"`
+	Code ResultErrError2Code `json:"code"`
 }
+
+// ResultErrError2Code defines model for ResultErr.Error.2.Code.
+type ResultErrError2Code string
 
 // ResultErrError3 defines model for .
 type ResultErrError3 struct {
-	Code   interface{} `json:"code"`
+	Code   ResultErrError3Code `json:"code"`
 	Detail struct {
 		Guard  string `json:"guard"`
 		Reason string `json:"reason"`
 	} `json:"detail"`
 }
 
+// ResultErrError3Code defines model for ResultErr.Error.3.Code.
+type ResultErrError3Code string
+
 // ResultErrError4 defines model for .
 type ResultErrError4 struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   ResultErrError4Code `json:"code"`
+	Detail string              `json:"detail"`
 }
+
+// ResultErrError4Code defines model for ResultErr.Error.4.Code.
+type ResultErrError4Code string
 
 // ResultErrError5 defines model for .
 type ResultErrError5 struct {
-	Code   interface{} `json:"code"`
-	Detail string      `json:"detail"`
+	Code   ResultErrError5Code `json:"code"`
+	Detail string              `json:"detail"`
 }
+
+// ResultErrError5Code defines model for ResultErr.Error.5.Code.
+type ResultErrError5Code string
 
 // ResultErr_Error defines model for ResultErr.Error.
 type ResultErr_Error struct {
 	union json.RawMessage
 }
 
+// ResultErrStatus defines model for ResultErr.Status.
+type ResultErrStatus string
+
 // ResultIncomplete defines model for ResultIncomplete.
 type ResultIncomplete struct {
-	ChunksReceived int         `json:"chunks_received"`
-	Reason         string      `json:"reason"`
-	Status         interface{} `json:"status"`
+	ChunksReceived int64                  `json:"chunks_received"`
+	Reason         string                 `json:"reason"`
+	Status         ResultIncompleteStatus `json:"status"`
 }
+
+// ResultIncompleteStatus defines model for ResultIncomplete.Status.
+type ResultIncompleteStatus string
 
 // ResultOk defines model for ResultOk.
 type ResultOk struct {
-	Status interface{} `json:"status"`
-	Value  interface{} `json:"value"`
+	Status ResultOkStatus `json:"status"`
+	Value  interface{}    `json:"value"`
 }
+
+// ResultOkStatus defines model for ResultOk.Status.
+type ResultOkStatus string
 
 // ResultStreamComplete defines model for ResultStreamComplete.
 type ResultStreamComplete struct {
-	Status      interface{} `json:"status"`
-	TotalChunks int         `json:"total_chunks"`
+	Status      ResultStreamCompleteStatus `json:"status"`
+	TotalChunks int64                      `json:"total_chunks"`
 }
+
+// ResultStreamCompleteStatus defines model for ResultStreamComplete.Status.
+type ResultStreamCompleteStatus string
 
 // TrustControlAttestation One normalized runtime attestation evidence statement carried alongside trust-control authority operations and governed capability issuance. The shape names the upstream attestation schema, the verifier or relying party that accepted the evidence, the normalized assurance tier Chio resolved, the evidence's issued-at and expires-at bounds, and a stable SHA-256 digest of the underlying attestation payload. Optional fields preserve a runtime or workload identifier and a normalized SPIFFE workload identity when the verifier exposed one. Mirrors the `RuntimeAttestationEvidence` struct in `crates/chio-core-types/src/capability.rs` (lines 484-507). The struct does not carry `serde(rename_all)`, so wire field names are snake_case. Verifier adapters and trust-control issuance call sites in `crates/chio-control-plane/src/attestation.rs` populate this shape after running the per-vendor verifier bridges (Azure MAA, AWS Nitro, Google Confidential VM).
 type TrustControlAttestation struct {
@@ -1045,10 +1592,10 @@ type TrustControlAttestation struct {
 	EvidenceSha256 string `json:"evidence_sha256"`
 
 	// ExpiresAt Unix timestamp (seconds) when this attestation expires. Trust-control fails closed when `now < issued_at` or `now >= expires_at`.
-	ExpiresAt int `json:"expires_at"`
+	ExpiresAt int64 `json:"expires_at"`
 
 	// IssuedAt Unix timestamp (seconds) when this attestation was issued.
-	IssuedAt int `json:"issued_at"`
+	IssuedAt int64 `json:"issued_at"`
 
 	// RuntimeIdentity Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.
 	RuntimeIdentity *string `json:"runtime_identity,omitempty"`
@@ -1096,16 +1643,16 @@ type TrustControlHeartbeat struct {
 	LeaderUrl string `json:"leaderUrl"`
 
 	// LeaseEpoch Lease epoch carried alongside `leaseId`. Trust-control fails closed if the heartbeat targets a stale epoch.
-	LeaseEpoch int `json:"leaseEpoch"`
+	LeaseEpoch int64 `json:"leaseEpoch"`
 
 	// LeaseId Lease identifier being refreshed. Must match the `leaseId` previously projected by the lease schema.
 	LeaseId string `json:"leaseId"`
 
 	// ObservedAt Unix-millisecond timestamp at which the leader observed the cluster state that motivated this heartbeat.
-	ObservedAt int `json:"observedAt"`
+	ObservedAt int64 `json:"observedAt"`
 
 	// ProposedExpiresAt Optional unix-millisecond timestamp the leader proposes for the refreshed `leaseExpiresAt`. Trust-control may clamp this to the policy-bounded TTL.
-	ProposedExpiresAt *int `json:"proposedExpiresAt,omitempty"`
+	ProposedExpiresAt *int64 `json:"proposedExpiresAt,omitempty"`
 }
 
 // TrustControlLease One operator-visible authority lease projection emitted by the trust-control service over `/v1/internal/cluster/status` and the budget-write authority block. A lease names the leader URL that currently holds the trust-control authority, the cluster election term that minted it, the lease identifier and epoch that scope subsequent budget and revocation writes, and the unix-second expiry plus configured TTL that bound the lease's continued validity. Mirrors the `ClusterAuthorityLeaseView` serde shape in `crates/chio-cli/src/trust_control/service_types.rs` (lines 1837-1848). The view uses `serde(rename_all = camelCase)` so wire field names are camelCase. The shape is constructed in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (`cluster_authority_lease_view_locked`, lines 841-862) from the live cluster consensus view; `leaseValid` is true only when the cluster has quorum and `leaseExpiresAt` is still in the future. NOTE: `leaseExpiresAt` and `termStartedAt` are unix **seconds** (computed in `cluster_and_reports.rs` lines 1580-1606 as `unix_timestamp_now() + lease_ttl_ms / 1000`), even though `leaseTtlMs` itself is in milliseconds. The asymmetry mirrors the live runtime shape and is preserved on the wire so consumers do not have to re-scale by 1000.
@@ -1117,25 +1664,25 @@ type TrustControlLease struct {
 	LeaderUrl string `json:"leaderUrl"`
 
 	// LeaseEpoch Lease epoch carried alongside `leaseId`. Currently equals `term`; kept distinct on the wire so future epoch bumps within a term remain expressible.
-	LeaseEpoch int `json:"leaseEpoch"`
+	LeaseEpoch int64 `json:"leaseEpoch"`
 
 	// LeaseExpiresAt Unix-second timestamp at which the lease expires if not renewed. Computed as `unix_timestamp_now() + lease_ttl_ms / 1000` in `cluster_and_reports.rs` lines 1580-1606. The unit is seconds (not milliseconds) even though the configured TTL is expressed in milliseconds; downstream consumers MUST treat this field as a unix-second timestamp.
-	LeaseExpiresAt int `json:"leaseExpiresAt"`
+	LeaseExpiresAt int64 `json:"leaseExpiresAt"`
 
 	// LeaseId Composite lease identifier in the form `{leaderUrl}#term-{leaseEpoch}`. Authoritative for downstream writes.
 	LeaseId string `json:"leaseId"`
 
 	// LeaseTtlMs Configured lease time-to-live in milliseconds. Bounded between 500ms and 5000ms by `authority_lease_ttl` (cluster_and_reports.rs lines 832-839). NOTE: this field is the only millisecond-denominated quantity in the lease projection; `termStartedAt` and `leaseExpiresAt` are unix seconds.
-	LeaseTtlMs int `json:"leaseTtlMs"`
+	LeaseTtlMs int64 `json:"leaseTtlMs"`
 
 	// LeaseValid True only when the cluster currently has quorum and `leaseExpiresAt` has not yet passed. Trust-control fails closed and rejects authority-bearing writes when this is false.
 	LeaseValid bool `json:"leaseValid"`
 
 	// Term Cluster election term that minted this lease. Monotonically non-decreasing.
-	Term int `json:"term"`
+	Term int64 `json:"term"`
 
 	// TermStartedAt Optional unix-second timestamp at which the current term began on this leader. Captured via `unix_timestamp_now()` in `cluster_and_reports.rs` line 1603. Omitted via `serde(skip_serializing_if = Option::is_none)` when unknown (no quorum or no leader).
-	TermStartedAt *int `json:"termStartedAt,omitempty"`
+	TermStartedAt *int64 `json:"termStartedAt,omitempty"`
 }
 
 // TrustControlTerminate One trust-control termination request that voluntarily releases a held authority lease before its TTL expires. Termination names the lease being released (`leaseId` plus `leaseEpoch`), the leader URL releasing it, and a typed `reason` so operators can distinguish leader handoff from quorum loss or operator-initiated stepdown. Drafted from `spec/PROTOCOL.md` section 9 prose plus the lease invalidation paths in `crates/chio-cli/src/trust_control/cluster_and_reports.rs` (lines 1595-1611) where loss of quorum or a leader change clears `lease_expires_at` and bumps the election term. NOTE: this schema is drafted from prose; there is no dedicated `LeaseTerminateRequest` Rust struct in the live trust-control surface yet. The dedicated request/response struct is expected to land alongside the cluster RPC formalization in M09 P3. Wire field names follow the `serde(rename_all = camelCase)` convention used by the sibling lease projection so the families stay consistent on the wire.
@@ -1144,13 +1691,13 @@ type TrustControlTerminate struct {
 	LeaderUrl string `json:"leaderUrl"`
 
 	// LeaseEpoch Lease epoch carried alongside `leaseId`.
-	LeaseEpoch int `json:"leaseEpoch"`
+	LeaseEpoch int64 `json:"leaseEpoch"`
 
 	// LeaseId Lease identifier being released. Must match the `leaseId` previously projected by the lease schema.
 	LeaseId string `json:"leaseId"`
 
 	// ObservedAt Unix-millisecond timestamp at which the releasing leader observed the condition that motivated termination.
-	ObservedAt int `json:"observedAt"`
+	ObservedAt int64 `json:"observedAt"`
 
 	// Reason Typed reason for releasing the lease. `leader_handoff` covers planned reassignment, `quorum_lost` covers detected loss of cluster quorum, `operator_stepdown` covers explicit operator action, and `term_advanced` covers a higher election term superseding the lease.
 	Reason TrustControlTerminateReason `json:"reason"`
@@ -1312,6 +1859,83 @@ func (t *JsonrpcNotification_Params) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (t JsonrpcNotification) MarshalJSON() ([]byte, error) {
+	object := make(map[string]json.RawMessage)
+	var err error
+
+	object["jsonrpc"], err = json.Marshal(t.Jsonrpc)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'jsonrpc': %w", err)
+	}
+
+	object["method"], err = json.Marshal(t.Method)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'method': %w", err)
+	}
+
+	if t.Params != nil {
+		object["params"], err = json.Marshal(t.Params)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'params': %w", err)
+		}
+	}
+
+	if err := validateJsonrpcNotificationObject(object); err != nil {
+		return nil, err
+	}
+	return json.Marshal(object)
+}
+
+func (t *JsonrpcNotification) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(b, &object); err != nil {
+		return err
+	}
+
+	if raw, found := object["jsonrpc"]; found {
+		if err := json.Unmarshal(raw, &t.Jsonrpc); err != nil {
+			return fmt.Errorf("error reading 'jsonrpc': %w", err)
+		}
+	}
+	if raw, found := object["method"]; found {
+		if err := json.Unmarshal(raw, &t.Method); err != nil {
+			return fmt.Errorf("error reading 'method': %w", err)
+		}
+	}
+	if raw, found := object["params"]; found {
+		if err := json.Unmarshal(raw, &t.Params); err != nil {
+			return fmt.Errorf("error reading 'params': %w", err)
+		}
+	}
+
+	return validateJsonrpcNotificationObject(object)
+}
+
+func validateJsonrpcNotificationObject(object map[string]json.RawMessage) error {
+	if err := validateJsonrpcAllowedFieldsRaw(
+		object,
+		"jsonrpc notification",
+		map[string]struct{}{"jsonrpc": {}, "method": {}, "params": {}},
+	); err != nil {
+		return err
+	}
+	if _, found := object["id"]; found {
+		return fmt.Errorf("jsonrpc notification must not contain id")
+	}
+	if err := validateJsonrpcLiteralRaw(
+		object,
+		"jsonrpc",
+		string(JsonrpcNotificationJsonrpcN20),
+		"jsonrpc notification",
+	); err != nil {
+		return err
+	}
+	if err := validateJsonrpcMethodRaw(object, "jsonrpc notification"); err != nil {
+		return err
+	}
+	return validateJsonrpcParamsRaw(object, "jsonrpc notification")
+}
+
 // AsJsonrpcRequestId0 returns the union data inside the JsonrpcRequest_Id as a JsonrpcRequestId0
 func (t JsonrpcRequest_Id) AsJsonrpcRequestId0() (JsonrpcRequestId0, error) {
 	var body JsonrpcRequestId0
@@ -1436,6 +2060,97 @@ func (t *JsonrpcRequest_Params) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (t JsonrpcRequest) MarshalJSON() ([]byte, error) {
+	object := make(map[string]json.RawMessage)
+	var err error
+
+	object["id"], err = json.Marshal(t.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["jsonrpc"], err = json.Marshal(t.Jsonrpc)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'jsonrpc': %w", err)
+	}
+
+	object["method"], err = json.Marshal(t.Method)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'method': %w", err)
+	}
+
+	if t.Params != nil {
+		object["params"], err = json.Marshal(t.Params)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'params': %w", err)
+		}
+	}
+
+	if err := validateJsonrpcRequestObject(object); err != nil {
+		return nil, err
+	}
+	return json.Marshal(object)
+}
+
+func (t *JsonrpcRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(b, &object); err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		if err := json.Unmarshal(raw, &t.Id); err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+	}
+	if raw, found := object["jsonrpc"]; found {
+		if err := json.Unmarshal(raw, &t.Jsonrpc); err != nil {
+			return fmt.Errorf("error reading 'jsonrpc': %w", err)
+		}
+	}
+	if raw, found := object["method"]; found {
+		if err := json.Unmarshal(raw, &t.Method); err != nil {
+			return fmt.Errorf("error reading 'method': %w", err)
+		}
+	}
+	if raw, found := object["params"]; found {
+		if err := json.Unmarshal(raw, &t.Params); err != nil {
+			return fmt.Errorf("error reading 'params': %w", err)
+		}
+	}
+
+	return validateJsonrpcRequestObject(object)
+}
+
+func validateJsonrpcRequestObject(object map[string]json.RawMessage) error {
+	if err := validateJsonrpcAllowedFieldsRaw(
+		object,
+		"jsonrpc request",
+		map[string]struct{}{"jsonrpc": {}, "id": {}, "method": {}, "params": {}},
+	); err != nil {
+		return err
+	}
+	if err := validateJsonrpcLiteralRaw(
+		object,
+		"jsonrpc",
+		string(JsonrpcRequestJsonrpcN20),
+		"jsonrpc request",
+	); err != nil {
+		return err
+	}
+	if err := validateJsonrpcMethodRaw(object, "jsonrpc request"); err != nil {
+		return err
+	}
+	rawID, found := object["id"]
+	if !found {
+		return fmt.Errorf("jsonrpc request missing id")
+	}
+	if err := validateJsonrpcIdRaw(rawID, "jsonrpc request id"); err != nil {
+		return err
+	}
+	return validateJsonrpcParamsRaw(object, "jsonrpc request")
+}
+
 // AsJsonrpcResponse0 returns the union data inside the JsonrpcResponse as a JsonrpcResponse0
 func (t JsonrpcResponse) AsJsonrpcResponse0() (JsonrpcResponse0, error) {
 	var body JsonrpcResponse0
@@ -1524,6 +2239,9 @@ func (t JsonrpcResponse) MarshalJSON() ([]byte, error) {
 			return nil, fmt.Errorf("error marshaling 'result': %w", err)
 		}
 	}
+	if err := validateJsonrpcResponseObject(object); err != nil {
+		return nil, err
+	}
 	b, err = json.Marshal(object)
 	return b, err
 }
@@ -1567,7 +2285,43 @@ func (t *JsonrpcResponse) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	return err
+	return validateJsonrpcResponseObject(object)
+}
+
+func validateJsonrpcResponseObject(object map[string]json.RawMessage) error {
+	if err := validateJsonrpcAllowedFieldsRaw(
+		object,
+		"jsonrpc response",
+		map[string]struct{}{"jsonrpc": {}, "id": {}, "result": {}, "error": {}},
+	); err != nil {
+		return err
+	}
+	if err := validateJsonrpcLiteralRaw(
+		object,
+		"jsonrpc",
+		string(JsonrpcResponseJsonrpcN20),
+		"jsonrpc response",
+	); err != nil {
+		return err
+	}
+	rawID, found := object["id"]
+	if !found {
+		return fmt.Errorf("jsonrpc response missing id")
+	}
+	if err := validateJsonrpcIdRaw(rawID, "jsonrpc response id"); err != nil {
+		return err
+	}
+	_, hasResult := object["result"]
+	rawError, hasError := object["error"]
+	if hasResult == hasError {
+		return fmt.Errorf("jsonrpc response must contain exactly one of result or error")
+	}
+	if hasError {
+		if err := validateJsonrpcErrorRaw(rawError); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AsJsonrpcResponseId0 returns the union data inside the JsonrpcResponse_Id as a JsonrpcResponseId0
@@ -2217,6 +2971,9 @@ func (t ProvenanceVerdictLink) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("error marshaling 'verdict': %w", err)
 	}
 
+	if err := validateProvenanceVerdictLinkObject(object); err != nil {
+		return nil, err
+	}
 	b, err = json.Marshal(object)
 	return b, err
 }
@@ -2288,7 +3045,278 @@ func (t *ProvenanceVerdictLink) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	return err
+	return validateProvenanceVerdictLinkObject(object)
+}
+
+func validateProvenanceVerdictLinkObject(object map[string]json.RawMessage) error {
+	if _, err := requiredNonEmptyJsonString(object, "chainId"); err != nil {
+		return err
+	}
+	if _, err := requiredNonEmptyJsonString(object, "requestId"); err != nil {
+		return err
+	}
+	renderedAt, err := requiredJsonInt64(object, "renderedAt")
+	if err != nil {
+		return err
+	}
+	if renderedAt < 0 {
+		return fmt.Errorf("provenance verdict link renderedAt must be non-negative")
+	}
+	if rawReceiptID, found := object["receiptId"]; found && !rawJsonIsNull(rawReceiptID) {
+		if _, err := requiredNonEmptyJsonString(object, "receiptId"); err != nil {
+			return err
+		}
+	}
+	if rawEvidenceClass, found := object["evidenceClass"]; found && !rawJsonIsNull(rawEvidenceClass) {
+		var evidenceClass ProvenanceVerdictLinkEvidenceClass
+		if err := json.Unmarshal(rawEvidenceClass, &evidenceClass); err != nil {
+			return fmt.Errorf("error reading 'evidenceClass': %w", err)
+		}
+		switch evidenceClass {
+		case ProvenanceVerdictLinkEvidenceClassAsserted,
+			ProvenanceVerdictLinkEvidenceClassObserved,
+			ProvenanceVerdictLinkEvidenceClassVerified:
+		default:
+			return fmt.Errorf("unsupported provenance evidenceClass %q", evidenceClass)
+		}
+	}
+	rawVerdict, found := object["verdict"]
+	if !found || rawJsonIsNull(rawVerdict) {
+		return fmt.Errorf("provenance verdict link missing verdict")
+	}
+	var verdict ProvenanceVerdictLinkVerdict
+	if err := json.Unmarshal(rawVerdict, &verdict); err != nil {
+		return fmt.Errorf("error reading 'verdict': %w", err)
+	}
+
+	hasReason := jsonFieldPresentAndNonNull(object, "reason")
+	hasGuard := jsonFieldPresentAndNonNull(object, "guard")
+	switch verdict {
+	case ProvenanceVerdictLinkVerdictAllow:
+		if _, found := object["reason"]; found {
+			return fmt.Errorf("allow verdict must not include reason")
+		}
+		if _, found := object["guard"]; found {
+			return fmt.Errorf("allow verdict must not include guard")
+		}
+	case ProvenanceVerdictLinkVerdictDeny:
+		if !hasReason || !hasGuard {
+			return fmt.Errorf("deny verdict must include reason and guard")
+		}
+	case ProvenanceVerdictLinkVerdictCancel:
+		if !hasReason {
+			return fmt.Errorf("cancel verdict must include reason")
+		}
+		if _, found := object["guard"]; found {
+			return fmt.Errorf("cancel verdict must not include guard")
+		}
+	case ProvenanceVerdictLinkVerdictIncomplete:
+		if !hasReason {
+			return fmt.Errorf("incomplete verdict must include reason")
+		}
+		if _, found := object["guard"]; found {
+			return fmt.Errorf("incomplete verdict must not include guard")
+		}
+	default:
+		return fmt.Errorf("unsupported provenance verdict %q", verdict)
+	}
+	return nil
+}
+
+func validateJsonrpcLiteralRaw(
+	object map[string]json.RawMessage,
+	key string,
+	want string,
+	context string,
+) error {
+	raw, found := object[key]
+	if !found || rawJsonIsNull(raw) {
+		return fmt.Errorf("%s missing %s", context, key)
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return fmt.Errorf("error reading '%s': %w", key, err)
+	}
+	if value != want {
+		return fmt.Errorf("%s %s must be %q", context, key, want)
+	}
+	return nil
+}
+
+func validateJsonrpcAllowedFieldsRaw(
+	object map[string]json.RawMessage,
+	context string,
+	allowed map[string]struct{},
+) error {
+	for key := range object {
+		if _, ok := allowed[key]; !ok {
+			return fmt.Errorf("%s contains unknown field %q", context, key)
+		}
+	}
+	return nil
+}
+
+func validateJsonrpcMethodRaw(object map[string]json.RawMessage, context string) error {
+	raw, found := object["method"]
+	if !found || rawJsonIsNull(raw) {
+		return fmt.Errorf("%s missing method", context)
+	}
+	var method string
+	if err := json.Unmarshal(raw, &method); err != nil {
+		return fmt.Errorf("error reading 'method': %w", err)
+	}
+	if method == "" {
+		return fmt.Errorf("%s method must be non-empty", context)
+	}
+	return nil
+}
+
+func validateJsonrpcIdRaw(raw json.RawMessage, context string) error {
+	if rawJsonIsNull(raw) {
+		return nil
+	}
+	var idString string
+	if err := json.Unmarshal(raw, &idString); err == nil {
+		if idString == "" {
+			return fmt.Errorf("%s string must be non-empty", context)
+		}
+		return nil
+	}
+	var idInt int64
+	if err := json.Unmarshal(raw, &idInt); err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s must be an integer, non-empty string, or null", context)
+}
+
+func validateJsonrpcParamsRaw(object map[string]json.RawMessage, context string) error {
+	raw, found := object["params"]
+	if !found {
+		return nil
+	}
+	if rawJsonIsNull(raw) {
+		return fmt.Errorf("%s params must not be null", context)
+	}
+	switch firstJsonByte(raw) {
+	case '{', '[':
+		return nil
+	default:
+		return fmt.Errorf("%s params must be an object or array", context)
+	}
+}
+
+func validateJsonrpcErrorRaw(raw json.RawMessage) error {
+	if rawJsonIsNull(raw) {
+		return fmt.Errorf("jsonrpc error response error must not be null")
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
+		if err != nil {
+			return fmt.Errorf("jsonrpc error response error must be an object: %w", err)
+		}
+		return fmt.Errorf("jsonrpc error response error must be an object")
+	}
+	if err := validateJsonrpcAllowedFieldsRaw(
+		object,
+		"jsonrpc error response error",
+		map[string]struct{}{"code": {}, "message": {}, "data": {}},
+	); err != nil {
+		return err
+	}
+	if _, err := requiredJsonInt64Field(object, "code", "jsonrpc error response error"); err != nil {
+		return err
+	}
+	if _, err := requiredNonEmptyJsonStringField(
+		object,
+		"message",
+		"jsonrpc error response error",
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func requiredNonEmptyJsonStringField(
+	object map[string]json.RawMessage,
+	key string,
+	context string,
+) (string, error) {
+	raw, found := object[key]
+	if !found || rawJsonIsNull(raw) {
+		return "", fmt.Errorf("%s missing %s", context, key)
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", fmt.Errorf("error reading '%s': %w", key, err)
+	}
+	if value == "" {
+		return "", fmt.Errorf("%s %s must be non-empty", context, key)
+	}
+	return value, nil
+}
+
+func requiredJsonInt64Field(
+	object map[string]json.RawMessage,
+	key string,
+	context string,
+) (int64, error) {
+	raw, found := object[key]
+	if !found || rawJsonIsNull(raw) {
+		return 0, fmt.Errorf("%s missing %s", context, key)
+	}
+	var value int64
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return 0, fmt.Errorf("error reading '%s': %w", key, err)
+	}
+	return value, nil
+}
+
+func firstJsonByte(raw json.RawMessage) byte {
+	for _, b := range raw {
+		switch b {
+		case ' ', '\n', '\r', '\t':
+			continue
+		default:
+			return b
+		}
+	}
+	return 0
+}
+
+func jsonFieldPresentAndNonNull(object map[string]json.RawMessage, key string) bool {
+	raw, found := object[key]
+	return found && !rawJsonIsNull(raw)
+}
+
+func requiredNonEmptyJsonString(object map[string]json.RawMessage, key string) (string, error) {
+	raw, found := object[key]
+	if !found || rawJsonIsNull(raw) {
+		return "", fmt.Errorf("provenance verdict link missing %s", key)
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", fmt.Errorf("error reading '%s': %w", key, err)
+	}
+	if value == "" {
+		return "", fmt.Errorf("provenance verdict link %s must be non-empty", key)
+	}
+	return value, nil
+}
+
+func requiredJsonInt64(object map[string]json.RawMessage, key string) (int64, error) {
+	raw, found := object[key]
+	if !found || rawJsonIsNull(raw) {
+		return 0, fmt.Errorf("provenance verdict link missing %s", key)
+	}
+	var value int64
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return 0, fmt.Errorf("error reading '%s': %w", key, err)
+	}
+	return value, nil
+}
+
+func rawJsonIsNull(raw json.RawMessage) bool {
+	return string(raw) == "null"
 }
 
 // AsReceiptRecordDecision0 returns the union data inside the ReceiptRecordDecision as a ReceiptRecordDecision0

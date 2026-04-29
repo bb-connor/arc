@@ -51,7 +51,7 @@ if(CHIO_CPP_KERNEL_ENABLE_FFI)
   get_filename_component(CHIO_CPP_KERNEL_FFI_LIBRARY_DIR "${CHIO_CPP_KERNEL_FFI_LIBRARY}" DIRECTORY)
   set_target_properties(chio_cpp_kernel PROPERTIES
     BUILD_RPATH "${CHIO_CPP_KERNEL_FFI_LIBRARY_DIR}"
-    INSTALL_RPATH "${CHIO_CPP_KERNEL_FFI_LIBRARY_DIR}"
+    INSTALL_RPATH ""
   )
 endif()
 
@@ -101,6 +101,7 @@ configure_package_config_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ChioCppKernelConfig.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/ChioCppKernelConfig.cmake"
   INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ChioCppKernel
+  PATH_VARS CMAKE_INSTALL_LIBDIR CMAKE_INSTALL_INCLUDEDIR
 )
 
 install(FILES

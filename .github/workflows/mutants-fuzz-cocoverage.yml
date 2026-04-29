@@ -4,7 +4,7 @@
 # The libFuzzer corpus under fuzz/corpus/<target>/ exercises code paths the
 # unit suite does not reach. Replaying the fuzz corpus against each surviving
 # mutant lets the two oracles cover one another.
-# Always advisory; never fails the workflow.
+# Cocoverage findings are advisory, but setup and budget gates fail closed.
 #
 # Schedule: 05:45 UTC, after mutants-nightly (05:00) and fuzz nightly (03:23).
 
@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   issues: write
 
 concurrency:
@@ -47,7 +48,6 @@ jobs:
     # fuzz-replay phase adds a bounded budget on top. 300 min keeps
     # headroom under the GitHub 6 h cap.
     timeout-minutes: 300
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -57,7 +57,7 @@ jobs:
           - chio-guards
           - chio-credentials
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -87,18 +87,18 @@ jobs:
           rustup toolchain install nightly --profile minimal
           rustup component add rust-src --toolchain nightly
 
-      - name: Install cargo-mutants (pinned 25.x per Decision 12)
+      - name: Install cargo-mutants (pinned per Decision 12)
         if: steps.forced.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          # Decision 12: cargo-mutants pinned at 25.x; do not float.
-          cargo install cargo-mutants --version '25.*' --locked
+          # Decision 12: cargo-mutants pinned exactly; do not float.
+          cargo install cargo-mutants --version 25.3.1 --locked
 
       - name: Install cargo-fuzz
         if: steps.forced.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          cargo install cargo-fuzz --locked
+          cargo install cargo-fuzz --locked --version 0.13.1
 
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.forced.outputs.skip == 'false'
@@ -107,14 +107,12 @@ jobs:
         run: |
           set -euo pipefail
           # Cocoverage runs share the 1,800 min/30d envelope with
-          # fuzz.yml and mutants.yml. The helper enumerates the
-          # cflite_*.yml workflows today; soft fail so a missing-script
-          # or API blip does not kill the advisory lane.
+          # cflite_*.yml and fuzz.yml. Budget failures stop the job.
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
-            scripts/check-fuzz-budget.sh "${{ github.repository }}" || \
-              echo "advisory: fuzz-budget check returned non-zero; continuing (advisory lane)"
+            scripts/check-fuzz-budget.sh "${{ github.repository }}"
           else
-            echo "scripts/check-fuzz-budget.sh missing or non-executable; skipping budget check"
+            echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
+            exit 2
           fi
 
       - name: Run cargo-mutants to enumerate surviving mutants
@@ -161,7 +159,7 @@ jobs:
 
       - name: Upload cocoverage report
         if: always() && steps.forced.outputs.skip == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mutants-fuzz-cocoverage-${{ matrix.package }}-${{ github.run_id }}
           path: |

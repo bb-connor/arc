@@ -889,6 +889,7 @@ pub struct ChioKernel {
     receipt_log: Mutex<ReceiptLog>,
     child_receipt_log: Mutex<ChildReceiptLog>,
     receipt_store: Option<Arc<dyn ReceiptStore>>,
+    receipt_store_write_lock: Mutex<()>,
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
     attestation_trust_policy: Option<AttestationTrustPolicy>,
@@ -1320,6 +1321,7 @@ impl ChioKernel {
             receipt_log: Mutex::new(ReceiptLog::new()),
             child_receipt_log: Mutex::new(ChildReceiptLog::new()),
             receipt_store: None,
+            receipt_store_write_lock: Mutex::new(()),
             payment_adapter: None,
             price_oracle: None,
             attestation_trust_policy: None,
@@ -1406,7 +1408,35 @@ impl ChioKernel {
     }
 
     pub fn set_receipt_store_handle(&mut self, receipt_store: Arc<dyn ReceiptStore>) {
+        self.try_set_receipt_store_handle(receipt_store)
+            .unwrap_or_else(|error| {
+                panic!("failed to install receipt store: {error}");
+            });
+    }
+
+    pub fn try_set_receipt_store_handle(
+        &mut self,
+        receipt_store: Arc<dyn ReceiptStore>,
+    ) -> Result<(), KernelError> {
+        match receipt_store.load_latest_checkpoint() {
+            Ok(Some(checkpoint)) => {
+                self.checkpoint_seq_counter
+                    .store(checkpoint.body.checkpoint_seq, Ordering::SeqCst);
+                self.last_checkpoint_seq
+                    .store(checkpoint.body.batch_end_seq, Ordering::SeqCst);
+            }
+            Ok(None) => {
+                self.checkpoint_seq_counter.store(0, Ordering::SeqCst);
+                self.last_checkpoint_seq.store(0, Ordering::SeqCst);
+            }
+            Err(error) => {
+                return Err(KernelError::Internal(format!(
+                    "failed to hydrate checkpoint counters from receipt store: {error}"
+                )));
+            }
+        }
         self.receipt_store = Some(receipt_store);
+        Ok(())
     }
 
     pub fn set_payment_adapter(&mut self, payment_adapter: Box<dyn PaymentAdapter>) {
@@ -5659,7 +5689,20 @@ impl ChioKernel {
     /// Build a denial response, including FinancialReceiptMetadata when the
     fn record_child_receipts(&self, receipts: Vec<ChildRequestReceipt>) -> Result<(), KernelError> {
         for receipt in receipts {
-            let _ = self.with_receipt_store(|store| Ok(store.append_child_receipt(&receipt)?))?;
+            let receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
+                KernelError::Internal("receipt store write lock poisoned".to_string())
+            })?;
+            if let Some(seq) = self
+                .with_receipt_store(
+                    |store| Ok(store.append_child_receipt_returning_seq(&receipt)?),
+                )?
+                .flatten()
+            {
+                if self.should_checkpoint_after_seq(seq) {
+                    self.maybe_trigger_checkpoint_locked(seq)?;
+                }
+            }
+            drop(receipt_store_write);
             self.append_child_receipt_to_local_log(receipt);
         }
         Ok(())

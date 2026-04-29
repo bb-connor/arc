@@ -3,6 +3,37 @@
 use chio_provider_conformance::{openai_fixture_paths, replay_openai_fixture, ReplayMode};
 
 #[test]
+fn openai_batch_tool_call_without_verdict_fails_replay() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/openai/openai_basic_single_tool_call.ndjson");
+    let fixture = std::fs::read_to_string(fixture_path)?;
+    let fixture_without_verdict = fixture
+        .lines()
+        .filter(|line| !line.contains(r#""direction":"kernel_verdict""#))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let temp_path = std::env::temp_dir().join(format!(
+        "chio-openai-verdictless-{}.ndjson",
+        std::process::id()
+    ));
+    std::fs::write(&temp_path, format!("{fixture_without_verdict}\n"))?;
+
+    let error = match replay_openai_fixture(&temp_path) {
+        Ok(_) => {
+            let _ = std::fs::remove_file(temp_path);
+            panic!("verdictless tool call must fail");
+        }
+        Err(error) => error,
+    };
+    let _ = std::fs::remove_file(temp_path);
+    assert!(
+        error.to_string().contains("unexpected invocation"),
+        "unexpected error: {error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn replays_all_openai_fixtures_with_canonical_byte_assertions() {
     let paths = match openai_fixture_paths() {
         Ok(paths) => paths,

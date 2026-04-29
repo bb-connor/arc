@@ -324,25 +324,19 @@ same lower-casing for the image name itself. Pin a tag rather than
 following `:latest` if you need reproducible deploys; the digest is
 the canonical reference.
 
-The regex covers the three trigger shapes the workflow accepts:
+The regex covers the two trigger shapes that push and sign images:
 
 | Trigger             | SAN suffix                               |
 |---------------------|------------------------------------------|
 | `v*.*.*` tag push   | `@refs/tags/v<MAJOR.MINOR.PATCH[-pre]>`  |
 | `main` branch push  | `@refs/heads/main`                       |
-| `workflow_dispatch` | `@refs/heads/<branch>` (run by operator) |
 
-The `heads/[A-Za-z0-9._/-]+` arm matches both the `main`-branch push
-and the `workflow_dispatch` shape (which signs under
-`@refs/heads/<dispatched-branch>`, not under the input tag). The
-previous `heads/main`-only arm rejected legitimate operator-driven
-rebuilds from non-main branches as documented in the trigger table
-(cleanup-c11b; PR #73 review thread r3143034423).
+Manual `workflow_dispatch` runs are smoke builds only. They do not push
+GHCR tags and do not mint cosign signatures.
 
 Operators who require strict release-only verification should narrow
 the `--certificate-identity-regexp` to just the `refs/tags/v...` arm
-and reject `main`-branch and `workflow_dispatch` images at deploy
-time.
+and reject `main`-branch images at deploy time.
 
 ### Programmatic verification from chio code
 
@@ -407,15 +401,12 @@ sidecars are unchanged.
 
 ### Consumer verification
 
-The `release-binaries.yml` workflow signs from two trigger paths:
-the tag-push primary release path (`refs/tags/v...`) and the
-`workflow_dispatch` operator-driven rebuild path
-(`refs/heads/<branch>` of whichever branch the dispatch runs from).
-The verification regex below covers both arms; consumers who require
-strict release-only verification can drop the `heads/...` arm at
-deploy time. The previous tag-only regex rejected legitimate
-operator-rebuilt archives that the workflow itself signs and
-publishes (cleanup-c11b; PR #77 review thread r3143040469).
+The `release-binaries.yml` workflow signs only tag-bound release
+builds. Tag pushes already run on `refs/tags/v...`; dispatched
+rebuilds must be launched from the matching tag ref and then check out
+`refs/tags/<input-tag>` before building. The workflow attaches release
+metadata that SLSA consumes. The verification regex below therefore
+rejects branch-shaped signing identities by default.
 
 ```bash
 # Pin the version you intend to install and pick a target triple.
@@ -435,7 +426,7 @@ cosign verify-blob \
     --certificate "${ARCHIVE}.pem" \
     --signature   "${ARCHIVE}.sig" \
     --certificate-identity-regexp \
-        "^https://github\.com/<owner>/chio/\.github/workflows/release-binaries\.yml@refs/(tags/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|heads/[A-Za-z0-9._/-]+)$" \
+        "^https://github\.com/<owner>/chio/\.github/workflows/release-binaries\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$" \
     --certificate-oidc-issuer \
         "https://token.actions.githubusercontent.com" \
     "${ARCHIVE}"
@@ -449,11 +440,8 @@ The `<owner>` placeholder is the lower-cased GitHub repository owner
 (one per matrix leg) and each carries its own `.sig` + `.pem`
 pair; verifying one platform never implies verifying another.
 
-Operators who require strict release-only verification should narrow
-the regex to drop the `heads/...` arm and reject any archive whose
-SAN is not `refs/tags/v...`. That guard rejects both
-operator-dispatched rebuilds AND any non-tag build smuggled under a
-release name.
+Archives whose Fulcio SAN is not `refs/tags/v...` are not valid Chio
+release archives, even if they are attached to a release name.
 
 ### Programmatic verification from chio code
 
@@ -500,9 +488,12 @@ generator never runs against a half-built release.
 ### What gets attested
 
 `collect-digests` downloads the per-target `chio-<target>` artifacts
-that `release-binaries.yml` uploaded, computes one SHA-256 digest per
-archive (`*.tar.gz` and `*.zip`), and emits the digests as a
-base64-encoded subjects list. The reusable
+that `release-binaries.yml` uploaded, validates the embedded
+`release-metadata.json` across every matrix leg, computes one SHA-256
+digest per archive (`*.tar.gz` and `*.zip`), and emits the digests as a
+base64-encoded subjects list. The metadata pins the release tag,
+`refs/tags/<tag>` source ref, and checked-out source commit, including
+operator-dispatched rebuilds. The reusable
 `generator_generic_slsa3.yml` job consumes that list and emits an
 in-toto attestation named
 `chio-<head_sha>.intoto.jsonl`. With `upload-assets: true` the

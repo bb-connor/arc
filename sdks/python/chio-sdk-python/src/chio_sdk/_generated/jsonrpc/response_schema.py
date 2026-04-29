@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 548469177041d70db1c6999103d626959f135cfe60ebef1fdb935bd0385134d0
+# Schema sha256: 3ed943267c60942b5a63a39515fbbc1a553d614d895d142e307096a7a99c7da2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel, constr, model_validator
 
 
 class Error(BaseModel):
@@ -61,6 +61,12 @@ class ChioJsonRpc20Response1(BaseModel):
         description="Error payload. Present only on failure. Mutually exclusive with `result`.",
     )
 
+    @model_validator(mode="after")
+    def _success_excludes_error(self) -> "ChioJsonRpc20Response1":
+        if "error" in self.model_fields_set:
+            raise ValueError("JSON-RPC success response must not include error")
+        return self
+
 
 class ChioJsonRpc20Response2(BaseModel):
     """
@@ -85,6 +91,12 @@ class ChioJsonRpc20Response2(BaseModel):
         ...,
         description="Error payload. Present only on failure. Mutually exclusive with `result`.",
     )
+
+    @model_validator(mode="after")
+    def _error_excludes_result(self) -> "ChioJsonRpc20Response2":
+        if "result" in self.model_fields_set:
+            raise ValueError("JSON-RPC error response must not include result")
+        return self
 
 
 class ChioJsonRpc20Response(RootModel[ChioJsonRpc20Response1 | ChioJsonRpc20Response2]):

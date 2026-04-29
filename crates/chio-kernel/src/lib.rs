@@ -389,7 +389,8 @@ pub use runtime::{
 };
 pub use session::{
     InflightRegistry, InflightRequest, LateSessionEvent, PeerCapabilities, Session, SessionError,
-    SessionOperationResponse, SessionState, SubscriptionRegistry, TerminalRegistry,
+    SessionOperationResponse, SessionPersistError, SessionState, SubscriptionRegistry,
+    TerminalRegistry,
 };
 
 /// A string-typed agent identifier.

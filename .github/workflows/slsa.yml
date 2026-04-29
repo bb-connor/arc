@@ -24,10 +24,10 @@ name: slsa
 #
 # The replacement triggers on every successful `Release Binaries` run
 # regardless of ref shape. The `collect-digests` job below performs
-# the release-vs-non-release branching by inspecting
-# `github.event.workflow_run.head_branch`; non-tag runs still produce
-# provenance but pass an empty `upload-tag-name`, which the
-# slsa-github-generator workflow treats as a no-op.
+# the release-vs-non-release branching by reading the tag-bound
+# release-metadata.json emitted by release-binaries.yml. The
+# workflow_run event's head_branch is branch-shaped for dispatched
+# rebuilds, so it is not used as release provenance.
 
 on:
   workflow_run:
@@ -48,9 +48,10 @@ jobs:
     outputs:
       subjects: ${{ steps.compute.outputs.subjects }}
       release_tag: ${{ steps.compute.outputs.release_tag }}
+      source_sha: ${{ steps.compute.outputs.source_sha }}
     steps:
       - name: Download artifacts from release-binaries.yml
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -60,28 +61,56 @@ jobs:
         id: compute
         shell: bash
         env:
-          # `head_branch` carries the ref name without the `refs/<kind>/`
-          # prefix. For a `push: tags: v*.*.*` trigger this is the tag
-          # itself (e.g. `v0.1.0`); for `workflow_dispatch` runs it is
-          # the dispatched branch name. Anything matching the release
-          # tag shape is treated as a tag-driven release and emitted
-          # as `release_tag` so the provenance job can pin
-          # `upload-tag-name`. Without that pin slsa-github-generator
-          # v2.1.0 skips the release upload under workflow_run, since
-          # `github.ref` resolves to the default branch rather than
-          # the originating tag (cleanup-c11b; PR #46 thread
-          # r3142898932).
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           cd artifacts
           SUBJECTS=$(find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; | base64 -w0)
           echo "subjects=${SUBJECTS}" >> "${GITHUB_OUTPUT}"
-          if [[ "${HEAD_BRANCH}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "release_tag=${HEAD_BRANCH}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "release_tag=" >> "${GITHUB_OUTPUT}"
+          mapfile -t metadata_files < <(find . -type f -name release-metadata.json | sort)
+          if [[ "${#metadata_files[@]}" -eq 0 ]]; then
+            echo "::error::release-binaries artifacts did not include release-metadata.json" >&2
+            exit 1
           fi
+          release_tag=""
+          source_ref=""
+          source_sha=""
+          for metadata_file in "${metadata_files[@]}"; do
+            current_tag="$(jq -r '.release_tag // empty' "${metadata_file}")"
+            current_ref="$(jq -r '.source_ref // empty' "${metadata_file}")"
+            current_sha="$(jq -r '.source_sha // empty' "${metadata_file}")"
+            if [[ -z "${current_tag}" || -z "${current_ref}" || -z "${current_sha}" ]]; then
+              echo "::error::${metadata_file} is missing release_tag, source_ref, or source_sha" >&2
+              exit 1
+            fi
+            if [[ "${current_sha}" != "${WORKFLOW_RUN_HEAD_SHA}" ]]; then
+              echo "::error::${metadata_file} source_sha ${current_sha} does not match workflow_run.head_sha ${WORKFLOW_RUN_HEAD_SHA}" >&2
+              exit 1
+            fi
+            if [[ -z "${release_tag}" ]]; then
+              release_tag="${current_tag}"
+              source_ref="${current_ref}"
+              source_sha="${current_sha}"
+            elif [[ "${release_tag}" != "${current_tag}" || "${source_ref}" != "${current_ref}" || "${source_sha}" != "${current_sha}" ]]; then
+              echo "::error::release metadata differs across matrix artifacts" >&2
+              exit 1
+            fi
+          done
+          semver_re='(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?'
+          if ! [[ "${release_tag}" =~ ^v${semver_re}$ ]]; then
+            echo "::error::release tag '${release_tag}' does not match v<semver>" >&2
+            exit 1
+          fi
+          if [[ "${source_ref}" != "refs/tags/${release_tag}" ]]; then
+            echo "::error::release metadata source_ref '${source_ref}' is not refs/tags/${release_tag}" >&2
+            exit 1
+          fi
+          if ! [[ "${source_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::release metadata source_sha '${source_sha}' is not a 40-character git SHA" >&2
+            exit 1
+          fi
+          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          echo "source_sha=${source_sha}" >> "${GITHUB_OUTPUT}"
 
   provenance:
     name: SLSA L2 provenance
@@ -92,13 +121,12 @@ jobs:
       contents: write
       actions: read
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a
     with:
       base64-subjects: ${{ needs.collect-digests.outputs.subjects }}
-      provenance-name: chio-${{ github.event.workflow_run.head_sha }}.intoto.jsonl
+      provenance-name: chio-${{ needs.collect-digests.outputs.source_sha }}.intoto.jsonl
       upload-assets: true
-      # See collect-digests step comment: empty for non-release runs,
-      # populated for tag-driven releases. Pinning the tag is required
-      # under workflow_run because `github.ref` is not the originating
-      # tag.
+      # Populated from release-metadata.json after source_sha is checked
+      # against workflow_run.head_sha. Dispatch rebuilds are tag-ref
+      # gated and upload provenance to that exact release tag.
       upload-tag-name: ${{ needs.collect-digests.outputs.release_tag }}

@@ -98,6 +98,10 @@ pub enum ExecuteError {
     #[error("partition error: {0}")]
     Partition(#[from] PartitionError),
 
+    /// `--against` requires tenant signature verification before comparison.
+    #[error("traffic replay with --against requires --tenant-pubkey")]
+    MissingTenantPubkey,
+
     /// A non-line-level failure during dispatch.
     #[error("execute error: {0}")]
     Other(String),
@@ -118,6 +122,12 @@ pub fn run_traffic_replay(
     let _resolved = against.resolve()?;
     let loaded_policy = against.load_workspace_policy()?;
     let against_label = against.label();
+    let tenant_pubkey = match args.tenant_pubkey.as_deref() {
+        Some(path) => load_tenant_pubkey(path).map_err(|e| {
+            ExecuteError::Other(format!("failed to load tenant pubkey: {e}"))
+        })?,
+        None => return Err(ExecuteError::MissingTenantPubkey),
+    };
 
     // 2. Allocate a fresh replay partition so receipt ids are
     //    namespace-isolated from production.
@@ -166,6 +176,24 @@ pub fn run_traffic_replay(
                 let captured_verdict = record.frame.verdict;
                 let (captured_guard, captured_reason) =
                     captured_guard_reason(&record.frame);
+                if let Err(err) =
+                    validate_frame(&record.frame, &args.schema, Some(&tenant_pubkey))
+                {
+                    errors = errors.saturating_add(1);
+                    outcomes.push(TrafficFrameOutcome {
+                        line: record.line,
+                        frame_id,
+                        replay_receipt_id: replay_id,
+                        captured_verdict,
+                        captured_guard,
+                        captured_reason,
+                        replay_verdict: None,
+                        replay_guard: None,
+                        replay_reason: None,
+                        error: Some(err.to_string()),
+                    });
+                    continue;
+                }
                 let outcome = match recompute_decision(&mut kernel, &record.frame) {
                     Ok(replay_decision) => {
                         let outcome = TrafficFrameOutcome {
@@ -230,6 +258,26 @@ pub fn run_traffic_replay(
                 });
             }
         }
+    }
+
+    if total == 0 {
+        errors = 1;
+        let frame_id = "empty-capture".to_string();
+        let replay_id = replay_partition
+            .replay_receipt_id(&frame_id)
+            .map_err(ExecuteError::Partition)?;
+        outcomes.push(TrafficFrameOutcome {
+            line: 0,
+            frame_id,
+            replay_receipt_id: replay_id,
+            captured_verdict: chio_tee_frame::Verdict::Deny,
+            captured_guard: None,
+            captured_reason: None,
+            replay_verdict: None,
+            replay_guard: None,
+            replay_reason: None,
+            error: Some("empty capture contained no frames".to_string()),
+        });
     }
 
     Ok(TrafficReplayReport {
@@ -450,6 +498,12 @@ mod replay_execute_tests {
         path
     }
 
+    fn write_tenant_pubkey(dir: &std::path::Path, kp: &SigningKey) -> PathBuf {
+        let path = dir.join("tenant.pub");
+        std::fs::write(&path, kp.verifying_key().to_bytes()).unwrap();
+        path
+    }
+
     fn allow_all_policy(dir: &std::path::Path) -> PathBuf {
         // Minimal Chio YAML policy with permissive defaults. The kernel
         // built from this policy issues capabilities by default and
@@ -478,11 +532,12 @@ capabilities: {}
         let kp = signing_keypair();
         let frame = signed_frame(&kp, "01H7ZZZZZZZZZZZZZZZZZZZZZZ");
         let ndjson_path = write_capture(&[frame], dir.path());
+        let tenant_pubkey = write_tenant_pubkey(dir.path(), &kp);
 
         let args = TrafficArgs {
             from: ndjson_path,
             schema: "chio-tee-frame.v1".to_string(),
-            tenant_pubkey: None,
+            tenant_pubkey: Some(tenant_pubkey),
             json: false,
             against: None,
             run_id: None,
@@ -518,11 +573,12 @@ capabilities: {}
             signed_frame(&kp, "01H7ZZZZZZZZZZZZZZZZZZZZZC"),
         ];
         let ndjson_path = write_capture(&frames, dir.path());
+        let tenant_pubkey = write_tenant_pubkey(dir.path(), &kp);
 
         let args = TrafficArgs {
             from: ndjson_path,
             schema: "chio-tee-frame.v1".to_string(),
-            tenant_pubkey: None,
+            tenant_pubkey: Some(tenant_pubkey),
             json: false,
             against: None,
             run_id: None,
@@ -544,11 +600,13 @@ capabilities: {}
         let policy_path = allow_all_policy(dir.path());
         let ndjson_path = dir.path().join("capture.ndjson");
         std::fs::write(&ndjson_path, "{not valid json\n").unwrap();
+        let kp = signing_keypair();
+        let tenant_pubkey = write_tenant_pubkey(dir.path(), &kp);
 
         let args = TrafficArgs {
             from: ndjson_path,
             schema: "chio-tee-frame.v1".to_string(),
-            tenant_pubkey: None,
+            tenant_pubkey: Some(tenant_pubkey),
             json: false,
             against: None,
             run_id: None,

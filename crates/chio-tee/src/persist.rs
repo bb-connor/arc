@@ -4,18 +4,17 @@
 //! delegated to `chio-store-sqlite` so the runtime uses the same
 //! tenant-key hook as other SQLite-backed surfaces.
 
-use chio_core::crypto::sha256_hex;
 use chio_store_sqlite::{
     BlobHandle, BlobStoreError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
 };
 
 /// Metadata returned for a persisted redacted payload.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct PersistedBlob {
     /// Store handle required to read the encrypted BLOB later.
     pub handle: BlobHandle,
-    /// Plaintext hash computed before encryption for frame linking.
-    pub plaintext_sha256: String,
+    /// Opaque store-generated reference. It is not derived from plaintext.
+    pub blob_ref: String,
     /// Plaintext length in bytes.
     pub plaintext_len: usize,
 }
@@ -62,12 +61,12 @@ impl TeeBlobPersistence {
         key: &TenantKey,
         payload: &[u8],
     ) -> Result<PersistedBlob, PersistenceError> {
-        let plaintext_sha256 = sha256_hex(payload);
         let plaintext_len = payload.len();
         let handle = self.store.write_encrypted_blob(tenant_id, key, payload)?;
+        let blob_ref = handle.blob_id().to_string();
         Ok(PersistedBlob {
             handle,
-            plaintext_sha256,
+            blob_ref,
             plaintext_len,
         })
     }

@@ -78,9 +78,7 @@ fi
 #
 # We replace that with a content hash of the lex-sorted schema files: the
 # stamp becomes a deterministic function of the bytes feeding into
-# oapi-codegen, regardless of repository state. We additionally check both
-# unstaged (`git diff`) and staged (`git diff --cached`) drift against the
-# committed tree so reviewers see a `-dirty` marker when either is non-zero.
+# oapi-codegen, regardless of repository state.
 cd "${WORKSPACE_ROOT}"
 SCHEMA_HEAD_SHA="$(
   python3 - "${SCHEMAS_DIR}" <<'PY'
@@ -110,16 +108,7 @@ if [[ -z "${SCHEMA_HEAD_SHA}" ]]; then
   SCHEMA_HEAD_SHA="unknown"
 fi
 
-# Detect drift against the committed tree. Either a working-tree edit or a
-# staged-but-not-committed edit annotates the stamp with '-dirty' so the
-# regenerated header records the divergence.
-SCHEMA_DIRTY=""
-if ! git diff --quiet -- "spec/schemas/chio-wire/v1" 2>/dev/null; then
-  SCHEMA_DIRTY="-dirty"
-elif ! git diff --cached --quiet -- "spec/schemas/chio-wire/v1" 2>/dev/null; then
-  SCHEMA_DIRTY="-dirty"
-fi
-SCHEMA_SHA_STAMP="${SCHEMA_HEAD_SHA}${SCHEMA_DIRTY}"
+SCHEMA_SHA_STAMP="${SCHEMA_HEAD_SHA}"
 
 # --- build a temp work area -------------------------------------------------
 WORK_DIR="$(mktemp -d -t chio-go-regen.XXXXXX)"
@@ -149,6 +138,7 @@ RAW_OUTPUT_PATH="${WORK_DIR}/types.raw.go"
 # `ReceiptRecordDecision`).
 python3 - "${SCHEMAS_DIR}" "${OPENAPI_PATH}" <<'PY'
 import json
+import copy
 import os
 import sys
 from pathlib import Path
@@ -188,10 +178,40 @@ def rewrite(node, lifts: dict, prefix: str):
         # that at the parent level (in the property loop below) - by the
         # time we recurse here, dicts are dicts.
 
-        # `const: X` -> `enum: [X]`
+        # `const: X` -> `enum: [X]`. Preserve type information so
+        # oapi-codegen does not fall back to interface{} for literal
+        # discriminator fields.
         if "const" in node:
             value = node.pop("const")
             node["enum"] = [value]
+            if isinstance(value, str):
+                node.setdefault("type", "string")
+            elif isinstance(value, bool):
+                node.setdefault("type", "boolean")
+            elif isinstance(value, int):
+                node.setdefault("type", "integer")
+                node.setdefault("format", "int64")
+            elif isinstance(value, float):
+                node.setdefault("type", "number")
+
+        # JSON Schema enum-only string aliases need an explicit type for
+        # oapi-codegen to emit a string type instead of interface{}.
+        if "enum" in node and "type" not in node:
+            enum_values = node["enum"]
+            if isinstance(enum_values, list) and enum_values:
+                if all(isinstance(value, str) for value in enum_values):
+                    node["type"] = "string"
+                elif all(isinstance(value, bool) for value in enum_values):
+                    node["type"] = "boolean"
+                elif all(isinstance(value, int) for value in enum_values):
+                    node["type"] = "integer"
+                    node.setdefault("format", "int64")
+
+        # Wire numeric counters and timestamps can exceed platform-width
+        # Go int on 32-bit targets. Emit int64 consistently for integer
+        # schemas unless a schema has already chosen a narrower format.
+        if node.get("type") == "integer":
+            node.setdefault("format", "int64")
 
         # oneOf with a `type: "null"` member -> drop that member and set
         # `nullable: true` on the parent. If only one non-null member
@@ -255,6 +275,36 @@ def rewrite(node, lifts: dict, prefix: str):
                     node["properties"][key] = {}
                 elif value is False:
                     node["properties"][key] = {"not": {}}
+
+        # JSON Schema `oneOf` members can rely on parent-level property
+        # definitions while tightening `required` per variant. OpenAPI
+        # generators materialize each member independently, so copy any
+        # parent-defined required properties into the member before codegen.
+        # Without this, generated Go branch structs for verdict unions drop
+        # required payload fields such as deny.reason/deny.guard.
+        if (
+            "properties" in node
+            and isinstance(node["properties"], dict)
+            and "oneOf" in node
+            and isinstance(node["oneOf"], list)
+        ):
+            parent_properties = node["properties"]
+            for member in node["oneOf"]:
+                if not isinstance(member, dict):
+                    continue
+                required = member.get("required")
+                if not isinstance(required, list):
+                    continue
+                properties = member.setdefault("properties", {})
+                if not isinstance(properties, dict):
+                    continue
+                for key in required:
+                    if (
+                        isinstance(key, str)
+                        and key not in properties
+                        and key in parent_properties
+                    ):
+                        properties[key] = copy.deepcopy(parent_properties[key])
 
         # Recurse.
         for key, value in list(node.items()):
@@ -394,8 +444,7 @@ cat > "${HEADER_FILE}" <<HEADER_EOF
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
 // (not git history) so the stamp is stable across rebases, shallow clones,
-// and committed-but-unindexed edits. The optional '-dirty' suffix marks a
-// regen that picked up uncommitted (working-tree or staged) schema edits.
+// and dirty working trees.
 //
 // Manual edits will be overwritten by the next regeneration; the
 // spec-drift CI lane runs this script and 'git diff --exit-code'
@@ -428,6 +477,634 @@ awk '
 
 # Concatenate header + tail.
 cat "${HEADER_FILE}" "${TAIL_FILE}" > "${OUTPUT_FILE}"
+
+python3 - "${OUTPUT_FILE}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+
+def replace_once(needle: str, replacement: str) -> None:
+    global text
+    if needle not in text:
+        raise SystemExit(
+            f"regen-types.sh: generated hardening pattern missing: {needle[:80]!r}"
+        )
+    text = text.replace(needle, replacement, 1)
+
+
+replace_once(
+    """\tif t.Result != nil {
+\t\tobject["result"], err = json.Marshal(t.Result)
+\t\tif err != nil {
+\t\t\treturn nil, fmt.Errorf("error marshaling 'result': %w", err)
+\t\t}
+\t}
+\tb, err = json.Marshal(object)
+\treturn b, err
+}
+""",
+    """\tif t.Result != nil {
+\t\tobject["result"], err = json.Marshal(t.Result)
+\t\tif err != nil {
+\t\t\treturn nil, fmt.Errorf("error marshaling 'result': %w", err)
+\t\t}
+\t}
+\tif err := validateJsonrpcResponseObject(object); err != nil {
+\t\treturn nil, err
+\t}
+\tb, err = json.Marshal(object)
+\treturn b, err
+}
+""",
+)
+replace_once(
+    """func (t *JsonrpcNotification_Params) UnmarshalJSON(b []byte) error {
+\terr := t.union.UnmarshalJSON(b)
+\treturn err
+}
+
+// AsJsonrpcRequestId0 returns the union data inside the JsonrpcRequest_Id as a JsonrpcRequestId0
+""",
+    """func (t *JsonrpcNotification_Params) UnmarshalJSON(b []byte) error {
+\terr := t.union.UnmarshalJSON(b)
+\treturn err
+}
+
+func (t JsonrpcNotification) MarshalJSON() ([]byte, error) {
+\tobject := make(map[string]json.RawMessage)
+\tvar err error
+
+\tobject["jsonrpc"], err = json.Marshal(t.Jsonrpc)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'jsonrpc': %w", err)
+\t}
+
+\tobject["method"], err = json.Marshal(t.Method)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'method': %w", err)
+\t}
+
+\tif t.Params != nil {
+\t\tobject["params"], err = json.Marshal(t.Params)
+\t\tif err != nil {
+\t\t\treturn nil, fmt.Errorf("error marshaling 'params': %w", err)
+\t\t}
+\t}
+
+\tif err := validateJsonrpcNotificationObject(object); err != nil {
+\t\treturn nil, err
+\t}
+\treturn json.Marshal(object)
+}
+
+func (t *JsonrpcNotification) UnmarshalJSON(b []byte) error {
+\tobject := make(map[string]json.RawMessage)
+\tif err := json.Unmarshal(b, &object); err != nil {
+\t\treturn err
+\t}
+
+\tif raw, found := object["jsonrpc"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Jsonrpc); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'jsonrpc': %w", err)
+\t\t}
+\t}
+\tif raw, found := object["method"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Method); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'method': %w", err)
+\t\t}
+\t}
+\tif raw, found := object["params"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Params); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'params': %w", err)
+\t\t}
+\t}
+
+\treturn validateJsonrpcNotificationObject(object)
+}
+
+func validateJsonrpcNotificationObject(object map[string]json.RawMessage) error {
+\tif err := validateJsonrpcAllowedFieldsRaw(
+\t\tobject,
+\t\t"jsonrpc notification",
+\t\tmap[string]struct{}{"jsonrpc": {}, "method": {}, "params": {}},
+\t); err != nil {
+\t\treturn err
+\t}
+\tif _, found := object["id"]; found {
+\t\treturn fmt.Errorf("jsonrpc notification must not contain id")
+\t}
+\tif err := validateJsonrpcLiteralRaw(
+\t\tobject,
+\t\t"jsonrpc",
+\t\tstring(JsonrpcNotificationJsonrpcN20),
+\t\t"jsonrpc notification",
+\t); err != nil {
+\t\treturn err
+\t}
+\tif err := validateJsonrpcMethodRaw(object, "jsonrpc notification"); err != nil {
+\t\treturn err
+\t}
+\treturn validateJsonrpcParamsRaw(object, "jsonrpc notification")
+}
+
+// AsJsonrpcRequestId0 returns the union data inside the JsonrpcRequest_Id as a JsonrpcRequestId0
+""",
+)
+replace_once(
+    """func (t *JsonrpcRequest_Params) UnmarshalJSON(b []byte) error {
+\terr := t.union.UnmarshalJSON(b)
+\treturn err
+}
+
+// AsJsonrpcResponse0 returns the union data inside the JsonrpcResponse as a JsonrpcResponse0
+""",
+    """func (t *JsonrpcRequest_Params) UnmarshalJSON(b []byte) error {
+\terr := t.union.UnmarshalJSON(b)
+\treturn err
+}
+
+func (t JsonrpcRequest) MarshalJSON() ([]byte, error) {
+\tobject := make(map[string]json.RawMessage)
+\tvar err error
+
+\tobject["id"], err = json.Marshal(t.Id)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'id': %w", err)
+\t}
+
+\tobject["jsonrpc"], err = json.Marshal(t.Jsonrpc)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'jsonrpc': %w", err)
+\t}
+
+\tobject["method"], err = json.Marshal(t.Method)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'method': %w", err)
+\t}
+
+\tif t.Params != nil {
+\t\tobject["params"], err = json.Marshal(t.Params)
+\t\tif err != nil {
+\t\t\treturn nil, fmt.Errorf("error marshaling 'params': %w", err)
+\t\t}
+\t}
+
+\tif err := validateJsonrpcRequestObject(object); err != nil {
+\t\treturn nil, err
+\t}
+\treturn json.Marshal(object)
+}
+
+func (t *JsonrpcRequest) UnmarshalJSON(b []byte) error {
+\tobject := make(map[string]json.RawMessage)
+\tif err := json.Unmarshal(b, &object); err != nil {
+\t\treturn err
+\t}
+
+\tif raw, found := object["id"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Id); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'id': %w", err)
+\t\t}
+\t}
+\tif raw, found := object["jsonrpc"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Jsonrpc); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'jsonrpc': %w", err)
+\t\t}
+\t}
+\tif raw, found := object["method"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Method); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'method': %w", err)
+\t\t}
+\t}
+\tif raw, found := object["params"]; found {
+\t\tif err := json.Unmarshal(raw, &t.Params); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'params': %w", err)
+\t\t}
+\t}
+
+\treturn validateJsonrpcRequestObject(object)
+}
+
+func validateJsonrpcRequestObject(object map[string]json.RawMessage) error {
+\tif err := validateJsonrpcAllowedFieldsRaw(
+\t\tobject,
+\t\t"jsonrpc request",
+\t\tmap[string]struct{}{"jsonrpc": {}, "id": {}, "method": {}, "params": {}},
+\t); err != nil {
+\t\treturn err
+\t}
+\tif err := validateJsonrpcLiteralRaw(
+\t\tobject,
+\t\t"jsonrpc",
+\t\tstring(JsonrpcRequestJsonrpcN20),
+\t\t"jsonrpc request",
+\t); err != nil {
+\t\treturn err
+\t}
+\tif err := validateJsonrpcMethodRaw(object, "jsonrpc request"); err != nil {
+\t\treturn err
+\t}
+\trawID, found := object["id"]
+\tif !found {
+\t\treturn fmt.Errorf("jsonrpc request missing id")
+\t}
+\tif err := validateJsonrpcIdRaw(rawID, "jsonrpc request id"); err != nil {
+\t\treturn err
+\t}
+\treturn validateJsonrpcParamsRaw(object, "jsonrpc request")
+}
+
+// AsJsonrpcResponse0 returns the union data inside the JsonrpcResponse as a JsonrpcResponse0
+""",
+)
+replace_once(
+    """\tif raw, found := object["result"]; found {
+\t\terr = json.Unmarshal(raw, &t.Result)
+\t\tif err != nil {
+\t\t\treturn fmt.Errorf("error reading 'result': %w", err)
+\t\t}
+\t}
+
+\treturn err
+}
+
+// AsJsonrpcResponseId0 returns the union data inside the JsonrpcResponse_Id as a JsonrpcResponseId0
+""",
+    """\tif raw, found := object["result"]; found {
+\t\terr = json.Unmarshal(raw, &t.Result)
+\t\tif err != nil {
+\t\t\treturn fmt.Errorf("error reading 'result': %w", err)
+\t\t}
+\t}
+
+\treturn validateJsonrpcResponseObject(object)
+}
+
+func validateJsonrpcResponseObject(object map[string]json.RawMessage) error {
+\tif err := validateJsonrpcAllowedFieldsRaw(
+\t\tobject,
+\t\t"jsonrpc response",
+\t\tmap[string]struct{}{"jsonrpc": {}, "id": {}, "result": {}, "error": {}},
+\t); err != nil {
+\t\treturn err
+\t}
+\tif err := validateJsonrpcLiteralRaw(
+\t\tobject,
+\t\t"jsonrpc",
+\t\tstring(JsonrpcResponseJsonrpcN20),
+\t\t"jsonrpc response",
+\t); err != nil {
+\t\treturn err
+\t}
+\trawID, found := object["id"]
+\tif !found {
+\t\treturn fmt.Errorf("jsonrpc response missing id")
+\t}
+\tif err := validateJsonrpcIdRaw(rawID, "jsonrpc response id"); err != nil {
+\t\treturn err
+\t}
+\t_, hasResult := object["result"]
+\trawError, hasError := object["error"]
+\tif hasResult == hasError {
+\t\treturn fmt.Errorf("jsonrpc response must contain exactly one of result or error")
+\t}
+\tif hasError {
+\t\tif err := validateJsonrpcErrorRaw(rawError); err != nil {
+\t\t\treturn err
+\t\t}
+\t}
+\treturn nil
+}
+
+// AsJsonrpcResponseId0 returns the union data inside the JsonrpcResponse_Id as a JsonrpcResponseId0
+""",
+)
+replace_once(
+    """\tobject["verdict"], err = json.Marshal(t.Verdict)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'verdict': %w", err)
+\t}
+
+\tb, err = json.Marshal(object)
+\treturn b, err
+}
+""",
+    """\tobject["verdict"], err = json.Marshal(t.Verdict)
+\tif err != nil {
+\t\treturn nil, fmt.Errorf("error marshaling 'verdict': %w", err)
+\t}
+
+\tif err := validateProvenanceVerdictLinkObject(object); err != nil {
+\t\treturn nil, err
+\t}
+\tb, err = json.Marshal(object)
+\treturn b, err
+}
+""",
+)
+replace_once(
+    """\tif raw, found := object["verdict"]; found {
+\t\terr = json.Unmarshal(raw, &t.Verdict)
+\t\tif err != nil {
+\t\t\treturn fmt.Errorf("error reading 'verdict': %w", err)
+\t\t}
+\t}
+
+\treturn err
+}
+
+// AsReceiptRecordDecision0 returns the union data inside the ReceiptRecordDecision as a ReceiptRecordDecision0
+""",
+    """\tif raw, found := object["verdict"]; found {
+\t\terr = json.Unmarshal(raw, &t.Verdict)
+\t\tif err != nil {
+\t\t\treturn fmt.Errorf("error reading 'verdict': %w", err)
+\t\t}
+\t}
+
+\treturn validateProvenanceVerdictLinkObject(object)
+}
+
+func validateProvenanceVerdictLinkObject(object map[string]json.RawMessage) error {
+\tif _, err := requiredNonEmptyJsonString(object, "chainId"); err != nil {
+\t\treturn err
+\t}
+\tif _, err := requiredNonEmptyJsonString(object, "requestId"); err != nil {
+\t\treturn err
+\t}
+\trenderedAt, err := requiredJsonInt64(object, "renderedAt")
+\tif err != nil {
+\t\treturn err
+\t}
+\tif renderedAt < 0 {
+\t\treturn fmt.Errorf("provenance verdict link renderedAt must be non-negative")
+\t}
+\tif rawReceiptID, found := object["receiptId"]; found && !rawJsonIsNull(rawReceiptID) {
+\t\tif _, err := requiredNonEmptyJsonString(object, "receiptId"); err != nil {
+\t\t\treturn err
+\t\t}
+\t}
+\tif rawEvidenceClass, found := object["evidenceClass"]; found && !rawJsonIsNull(rawEvidenceClass) {
+\t\tvar evidenceClass ProvenanceVerdictLinkEvidenceClass
+\t\tif err := json.Unmarshal(rawEvidenceClass, &evidenceClass); err != nil {
+\t\t\treturn fmt.Errorf("error reading 'evidenceClass': %w", err)
+\t\t}
+\t\tswitch evidenceClass {
+\t\tcase ProvenanceVerdictLinkEvidenceClassAsserted,
+\t\t\tProvenanceVerdictLinkEvidenceClassObserved,
+\t\t\tProvenanceVerdictLinkEvidenceClassVerified:
+\t\tdefault:
+\t\t\treturn fmt.Errorf("unsupported provenance evidenceClass %q", evidenceClass)
+\t\t}
+\t}
+\trawVerdict, found := object["verdict"]
+\tif !found || rawJsonIsNull(rawVerdict) {
+\t\treturn fmt.Errorf("provenance verdict link missing verdict")
+\t}
+\tvar verdict ProvenanceVerdictLinkVerdict
+\tif err := json.Unmarshal(rawVerdict, &verdict); err != nil {
+\t\treturn fmt.Errorf("error reading 'verdict': %w", err)
+\t}
+
+\thasReason := jsonFieldPresentAndNonNull(object, "reason")
+\thasGuard := jsonFieldPresentAndNonNull(object, "guard")
+\tswitch verdict {
+\tcase ProvenanceVerdictLinkVerdictAllow:
+\t\tif _, found := object["reason"]; found {
+\t\t\treturn fmt.Errorf("allow verdict must not include reason")
+\t\t}
+\t\tif _, found := object["guard"]; found {
+\t\t\treturn fmt.Errorf("allow verdict must not include guard")
+\t\t}
+\tcase ProvenanceVerdictLinkVerdictDeny:
+\t\tif !hasReason || !hasGuard {
+\t\t\treturn fmt.Errorf("deny verdict must include reason and guard")
+\t\t}
+\tcase ProvenanceVerdictLinkVerdictCancel:
+\t\tif !hasReason {
+\t\t\treturn fmt.Errorf("cancel verdict must include reason")
+\t\t}
+\t\tif _, found := object["guard"]; found {
+\t\t\treturn fmt.Errorf("cancel verdict must not include guard")
+\t\t}
+\tcase ProvenanceVerdictLinkVerdictIncomplete:
+\t\tif !hasReason {
+\t\t\treturn fmt.Errorf("incomplete verdict must include reason")
+\t\t}
+\t\tif _, found := object["guard"]; found {
+\t\t\treturn fmt.Errorf("incomplete verdict must not include guard")
+\t\t}
+\tdefault:
+\t\treturn fmt.Errorf("unsupported provenance verdict %q", verdict)
+\t}
+\treturn nil
+}
+
+func validateJsonrpcLiteralRaw(
+\tobject map[string]json.RawMessage,
+\tkey string,
+\twant string,
+\tcontext string,
+) error {
+\traw, found := object[key]
+\tif !found || rawJsonIsNull(raw) {
+\t\treturn fmt.Errorf("%s missing %s", context, key)
+\t}
+\tvar value string
+\tif err := json.Unmarshal(raw, &value); err != nil {
+\t\treturn fmt.Errorf("error reading '%s': %w", key, err)
+\t}
+\tif value != want {
+\t\treturn fmt.Errorf("%s %s must be %q", context, key, want)
+\t}
+\treturn nil
+}
+
+func validateJsonrpcAllowedFieldsRaw(
+\tobject map[string]json.RawMessage,
+\tcontext string,
+\tallowed map[string]struct{},
+) error {
+\tfor key := range object {
+\t\tif _, ok := allowed[key]; !ok {
+\t\t\treturn fmt.Errorf("%s contains unknown field %q", context, key)
+\t\t}
+\t}
+\treturn nil
+}
+
+func validateJsonrpcMethodRaw(object map[string]json.RawMessage, context string) error {
+\traw, found := object["method"]
+\tif !found || rawJsonIsNull(raw) {
+\t\treturn fmt.Errorf("%s missing method", context)
+\t}
+\tvar method string
+\tif err := json.Unmarshal(raw, &method); err != nil {
+\t\treturn fmt.Errorf("error reading 'method': %w", err)
+\t}
+\tif method == "" {
+\t\treturn fmt.Errorf("%s method must be non-empty", context)
+\t}
+\treturn nil
+}
+
+func validateJsonrpcIdRaw(raw json.RawMessage, context string) error {
+\tif rawJsonIsNull(raw) {
+\t\treturn nil
+\t}
+\tvar idString string
+\tif err := json.Unmarshal(raw, &idString); err == nil {
+\t\tif idString == "" {
+\t\t\treturn fmt.Errorf("%s string must be non-empty", context)
+\t\t}
+\t\treturn nil
+\t}
+\tvar idInt int64
+\tif err := json.Unmarshal(raw, &idInt); err == nil {
+\t\treturn nil
+\t}
+\treturn fmt.Errorf("%s must be an integer, non-empty string, or null", context)
+}
+
+func validateJsonrpcParamsRaw(object map[string]json.RawMessage, context string) error {
+\traw, found := object["params"]
+\tif !found {
+\t\treturn nil
+\t}
+\tif rawJsonIsNull(raw) {
+\t\treturn fmt.Errorf("%s params must not be null", context)
+\t}
+\tswitch firstJsonByte(raw) {
+\tcase '{', '[':
+\t\treturn nil
+\tdefault:
+\t\treturn fmt.Errorf("%s params must be an object or array", context)
+\t}
+}
+
+func validateJsonrpcErrorRaw(raw json.RawMessage) error {
+\tif rawJsonIsNull(raw) {
+\t\treturn fmt.Errorf("jsonrpc error response error must not be null")
+\t}
+\tvar object map[string]json.RawMessage
+\tif err := json.Unmarshal(raw, &object); err != nil || object == nil {
+\t\tif err != nil {
+\t\t\treturn fmt.Errorf("jsonrpc error response error must be an object: %w", err)
+\t\t}
+\t\treturn fmt.Errorf("jsonrpc error response error must be an object")
+\t}
+\tif err := validateJsonrpcAllowedFieldsRaw(
+\t\tobject,
+\t\t"jsonrpc error response error",
+\t\tmap[string]struct{}{"code": {}, "message": {}, "data": {}},
+\t); err != nil {
+\t\treturn err
+\t}
+\tif _, err := requiredJsonInt64Field(object, "code", "jsonrpc error response error"); err != nil {
+\t\treturn err
+\t}
+\tif _, err := requiredNonEmptyJsonStringField(
+\t\tobject,
+\t\t"message",
+\t\t"jsonrpc error response error",
+\t); err != nil {
+\t\treturn err
+\t}
+\treturn nil
+}
+
+func requiredNonEmptyJsonStringField(
+\tobject map[string]json.RawMessage,
+\tkey string,
+\tcontext string,
+) (string, error) {
+\traw, found := object[key]
+\tif !found || rawJsonIsNull(raw) {
+\t\treturn "", fmt.Errorf("%s missing %s", context, key)
+\t}
+\tvar value string
+\tif err := json.Unmarshal(raw, &value); err != nil {
+\t\treturn "", fmt.Errorf("error reading '%s': %w", key, err)
+\t}
+\tif value == "" {
+\t\treturn "", fmt.Errorf("%s %s must be non-empty", context, key)
+\t}
+\treturn value, nil
+}
+
+func requiredJsonInt64Field(
+\tobject map[string]json.RawMessage,
+\tkey string,
+\tcontext string,
+) (int64, error) {
+\traw, found := object[key]
+\tif !found || rawJsonIsNull(raw) {
+\t\treturn 0, fmt.Errorf("%s missing %s", context, key)
+\t}
+\tvar value int64
+\tif err := json.Unmarshal(raw, &value); err != nil {
+\t\treturn 0, fmt.Errorf("error reading '%s': %w", key, err)
+\t}
+\treturn value, nil
+}
+
+func firstJsonByte(raw json.RawMessage) byte {
+\tfor _, b := range raw {
+\t\tswitch b {
+\t\tcase ' ', '\\n', '\\r', '\\t':
+\t\t\tcontinue
+\t\tdefault:
+\t\t\treturn b
+\t\t}
+\t}
+\treturn 0
+}
+
+func jsonFieldPresentAndNonNull(object map[string]json.RawMessage, key string) bool {
+\traw, found := object[key]
+\treturn found && !rawJsonIsNull(raw)
+}
+
+func requiredNonEmptyJsonString(object map[string]json.RawMessage, key string) (string, error) {
+\traw, found := object[key]
+\tif !found || rawJsonIsNull(raw) {
+\t\treturn "", fmt.Errorf("provenance verdict link missing %s", key)
+\t}
+\tvar value string
+\tif err := json.Unmarshal(raw, &value); err != nil {
+\t\treturn "", fmt.Errorf("error reading '%s': %w", key, err)
+\t}
+\tif value == "" {
+\t\treturn "", fmt.Errorf("provenance verdict link %s must be non-empty", key)
+\t}
+\treturn value, nil
+}
+
+func requiredJsonInt64(object map[string]json.RawMessage, key string) (int64, error) {
+\traw, found := object[key]
+\tif !found || rawJsonIsNull(raw) {
+\t\treturn 0, fmt.Errorf("provenance verdict link missing %s", key)
+\t}
+\tvar value int64
+\tif err := json.Unmarshal(raw, &value); err != nil {
+\t\treturn 0, fmt.Errorf("error reading '%s': %w", key, err)
+\t}
+\treturn value, nil
+}
+
+func rawJsonIsNull(raw json.RawMessage) bool {
+\treturn string(raw) == "null"
+}
+
+// AsReceiptRecordDecision0 returns the union data inside the ReceiptRecordDecision as a ReceiptRecordDecision0
+""",
+)
+
+path.write_text(text, encoding="utf-8")
+PY
 
 # Final pass: gofmt the file in-place. oapi-codegen already runs gofmt on
 # its output, but our header prepend can shift line-numbering across

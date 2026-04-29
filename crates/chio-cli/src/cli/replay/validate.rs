@@ -190,6 +190,32 @@ pub fn load_tenant_pubkey(path: &std::path::Path) -> Result<[u8; 32], ValidateEr
     )))
 }
 
+/// Parse a trusted kernel public-key file for receipt replay.
+///
+/// The file may contain raw 32-byte Ed25519 key material, bare Ed25519 hex,
+/// or an algorithm-aware `PublicKey::to_hex()` string such as `p256:<hex>`.
+pub fn load_trusted_kernel_pubkey(
+    path: &std::path::Path,
+) -> Result<chio_core::PublicKey, ValidateError> {
+    let bytes = std::fs::read(path).map_err(|e| {
+        ValidateError::TenantSig(format!(
+            "failed to read trusted kernel pubkey file {}: {e}",
+            path.display()
+        ))
+    })?;
+    if bytes.len() == 32 {
+        return chio_core::PublicKey::from_hex(&hex::encode(bytes)).map_err(|e| {
+            ValidateError::TenantSig(format!("invalid trusted kernel pubkey: {e}"))
+        });
+    }
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|e| ValidateError::TenantSig(format!("non-utf8 trusted kernel pubkey: {e}")))?
+        .trim();
+    chio_core::PublicKey::from_hex(text).map_err(|e| {
+        ValidateError::TenantSig(format!("invalid trusted kernel pubkey {}: {e}", path.display()))
+    })
+}
+
 /// Assert that `frame.invocation` deserializes into a
 /// `chio_tool_call_fabric::ToolInvocation` and that re-canonicalizing the
 /// round-tripped value produces byte-identical RFC 8785 bytes.
@@ -211,6 +237,19 @@ pub fn validate_m01_invocation(frame: &chio_tee_frame::Frame) -> Result<(), Vali
     if typed_bytes != raw_bytes {
         return Err(ValidateError::Invocation(
             "invocation is not RFC 8785 canonical (typed/raw byte mismatch)".to_string(),
+        ));
+    }
+    let arguments: serde_json::Value =
+        serde_json::from_slice(&invocation.arguments).map_err(|e| {
+            ValidateError::Invocation(format!("invocation.arguments not valid JSON: {e}"))
+        })?;
+    let canonical_arguments =
+        chio_core::canonical::canonical_json_bytes(&arguments).map_err(|e| {
+            ValidateError::Invocation(format!("canonicalize invocation.arguments: {e}"))
+        })?;
+    if canonical_arguments != invocation.arguments {
+        return Err(ValidateError::Invocation(
+            "invocation.arguments is not RFC 8785 canonical JSON".to_string(),
         ));
     }
     Ok(())
@@ -436,6 +475,30 @@ mod replay_validate_tests {
     fn m01_invocation_validator_accepts_canonical() {
         let frame = good_frame_with_invocation(canonical_invocation());
         validate_m01_invocation(&frame).unwrap();
+    }
+
+    #[test]
+    fn m01_invocation_validator_rejects_noncanonical_argument_bytes() {
+        let invocation = ToolInvocation {
+            provider: ProviderId::OpenAi,
+            tool_name: "search".to_string(),
+            arguments: br#"{"z":1,"a":2}"#.to_vec(),
+            provenance: ProvenanceStamp {
+                provider: ProviderId::OpenAi,
+                request_id: "req_abc".to_string(),
+                api_version: "2025-10-01".to_string(),
+                principal: Principal::OpenAiOrg {
+                    org_id: "org_42".to_string(),
+                },
+                received_at: SystemTime::UNIX_EPOCH,
+            },
+        };
+        let bytes = chio_core::canonical::canonical_json_bytes(&invocation).unwrap();
+        let frame = good_frame_with_invocation(serde_json::from_slice(&bytes).unwrap());
+
+        let err = validate_m01_invocation(&frame).unwrap_err();
+        assert!(matches!(err, ValidateError::Invocation(_)));
+        assert!(err.to_string().contains("arguments"));
     }
 
     #[test]

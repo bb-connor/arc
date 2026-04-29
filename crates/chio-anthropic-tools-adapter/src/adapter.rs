@@ -8,16 +8,15 @@
 #[path = "streaming.rs"]
 pub mod streaming;
 
-use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::time::SystemTime;
 
+use chio_core::canonical::canonical_json_bytes;
 use chio_tool_call_fabric::{
     DenyReason, Principal, ProvenanceStamp, ProviderAdapter, ProviderError, ProviderId,
-    ProviderRequest, ProviderResponse, ToolInvocation, ToolResult, VerdictResult,
+    ProviderRequest, ProviderResponse, Redaction, ToolInvocation, ToolResult, VerdictResult,
 };
-use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::{AnthropicAdapter, ToolResultBlock, ToolUseBlock};
@@ -49,7 +48,6 @@ impl AnthropicAdapter {
             .iter()
             .map(|block| self.invocation_from_tool_use(block))
             .collect::<Result<Vec<_>, _>>()?;
-        self.replace_pending_tool_use_ids(blocks.iter().map(|block| block.id.clone()).collect())?;
         Ok(invocations)
     }
 
@@ -68,7 +66,6 @@ impl AnthropicAdapter {
             )
         })?;
         let invocation = self.invocation_from_tool_use(&block)?;
-        self.replace_pending_tool_use_ids(vec![block.id])?;
         Ok(invocation)
     }
 
@@ -79,7 +76,11 @@ impl AnthropicAdapter {
         validate_tool_use_block(block)?;
         ensure_server_tool_feature(&block.name)?;
         self.server_tool_gate().ensure_tool_allowed(&block.name)?;
-        let arguments = canonical_json_bytes(&block.input)?;
+        let arguments = canonical_json_bytes(&block.input).map_err(|error| {
+            ProviderError::BadToolArgs(format!(
+                "Anthropic tool_use input failed canonical JSON encoding: {error}"
+            ))
+        })?;
 
         Ok(ToolInvocation {
             provider: ProviderId::Anthropic,
@@ -101,47 +102,21 @@ impl AnthropicAdapter {
     /// `tool_result` content block.
     pub fn lower_tool_result_block(
         &self,
+        tool_use_id: &str,
         verdict: VerdictResult,
         result: ToolResult,
     ) -> Result<ToolResultBlock, ProviderError> {
-        let tool_use_id = self.pop_pending_tool_use_id()?;
+        let tool_use_id = non_empty_str(tool_use_id, "tool_use_id")?;
         match verdict {
-            VerdictResult::Allow { .. } => {
-                let content = parse_tool_result(result)?;
+            VerdictResult::Allow { redactions, .. } => {
+                let content = parse_tool_result_content(result)?;
+                let content = apply_redactions(content, &redactions, "Anthropic tool_result")?;
                 Ok(ToolResultBlock::allow(tool_use_id, content))
             }
             VerdictResult::Deny { reason, .. } => {
                 Ok(ToolResultBlock::deny(tool_use_id, deny_content(&reason)))
             }
         }
-    }
-
-    fn replace_pending_tool_use_ids(&self, ids: Vec<String>) -> Result<(), ProviderError> {
-        let mut guard = self.pending_tool_use_ids.lock().map_err(|_| {
-            ProviderError::Malformed("Anthropic pending tool_use state is unavailable".to_string())
-        })?;
-        guard.clear();
-        guard.extend(ids);
-        Ok(())
-    }
-
-    fn push_pending_tool_use_id(&self, id: String) -> Result<(), ProviderError> {
-        let mut guard = self.pending_tool_use_ids.lock().map_err(|_| {
-            ProviderError::Malformed("Anthropic pending tool_use state is unavailable".to_string())
-        })?;
-        guard.push_back(id);
-        Ok(())
-    }
-
-    fn pop_pending_tool_use_id(&self) -> Result<String, ProviderError> {
-        let mut guard = self.pending_tool_use_ids.lock().map_err(|_| {
-            ProviderError::Malformed("Anthropic pending tool_use state is unavailable".to_string())
-        })?;
-        guard.pop_front().ok_or_else(|| {
-            ProviderError::Malformed(
-                "cannot lower Anthropic tool_result without a pending tool_use id".to_string(),
-            )
-        })
     }
 }
 
@@ -175,7 +150,27 @@ impl ProviderAdapter for AnthropicAdapter {
         Self: 'async_trait,
     {
         Box::pin(async move {
-            let block = self.lower_tool_result_block(verdict, result)?;
+            let pending = parse_tool_result_envelope(result)?;
+            let block = match verdict {
+                verdict @ VerdictResult::Allow { .. } => {
+                    let content = pending.content.ok_or_else(|| {
+                        ProviderError::Malformed(
+                            "Anthropic ProviderAdapter::lower allow path requires ToolResult content"
+                                .to_string(),
+                        )
+                    })?;
+                    self.lower_tool_result_block(
+                        &pending.tool_use_id,
+                        verdict,
+                        ToolResult(json_bytes(&content, "Anthropic tool_result content")?),
+                    )?
+                }
+                verdict @ VerdictResult::Deny { .. } => self.lower_tool_result_block(
+                    &pending.tool_use_id,
+                    verdict,
+                    ToolResult(b"null".to_vec()),
+                )?,
+            };
             serde_json::to_vec(&block)
                 .map(ProviderResponse)
                 .map_err(|error| {
@@ -286,66 +281,97 @@ fn ensure_server_tool_feature(name: &str) -> Result<(), ProviderError> {
     Ok(())
 }
 
-fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, ProviderError> {
-    let mut out = Vec::new();
-    write_canonical_value(value, &mut out)?;
-    Ok(out)
+struct PendingToolResult {
+    tool_use_id: String,
+    content: Option<Value>,
 }
 
-fn write_canonical_value(value: &Value, out: &mut Vec<u8>) -> Result<(), ProviderError> {
-    match value {
-        Value::Null => out.extend_from_slice(b"null"),
-        Value::Bool(value) => {
-            if *value {
-                out.extend_from_slice(b"true");
-            } else {
-                out.extend_from_slice(b"false");
-            }
-        }
-        Value::Number(value) => out.extend_from_slice(value.to_string().as_bytes()),
-        Value::String(value) => write_json(value, out)?,
-        Value::Array(values) => {
-            out.push(b'[');
-            for (index, value) in values.iter().enumerate() {
-                if index > 0 {
-                    out.push(b',');
-                }
-                write_canonical_value(value, out)?;
-            }
-            out.push(b']');
-        }
-        Value::Object(values) => {
-            out.push(b'{');
-            let entries: BTreeMap<&str, &Value> = values
-                .iter()
-                .map(|(key, value)| (key.as_str(), value))
-                .collect();
-            for (index, (key, value)) in entries.iter().enumerate() {
-                if index > 0 {
-                    out.push(b',');
-                }
-                write_json(key, out)?;
-                out.push(b':');
-                write_canonical_value(value, out)?;
-            }
-            out.push(b'}');
-        }
-    }
-    Ok(())
-}
+fn parse_tool_result_envelope(result: ToolResult) -> Result<PendingToolResult, ProviderError> {
+    let value: Value = serde_json::from_slice(&result.0).map_err(|error| {
+        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
+    })?;
+    let object = value.as_object().ok_or_else(|| {
+        ProviderError::Malformed(
+            "Anthropic ProviderAdapter::lower requires ToolResult JSON with tool_use_id"
+                .to_string(),
+        )
+    })?;
+    let tool_use_id = object
+        .get("tool_use_id")
+        .or_else(|| object.get("toolUseId"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            ProviderError::Malformed(
+                "Anthropic ProviderAdapter::lower requires ToolResult JSON with tool_use_id"
+                    .to_string(),
+            )
+        })?;
+    let tool_use_id = non_empty_str(tool_use_id, "tool_use_id")?.to_string();
+    let content = object.get("content").cloned();
 
-fn write_json<T: Serialize + ?Sized>(value: &T, out: &mut Vec<u8>) -> Result<(), ProviderError> {
-    serde_json::to_writer(out, value).map_err(|error| {
-        ProviderError::BadToolArgs(format!(
-            "Anthropic tool_use input failed canonical JSON encoding: {error}"
-        ))
+    Ok(PendingToolResult {
+        tool_use_id,
+        content,
     })
 }
 
-fn parse_tool_result(result: ToolResult) -> Result<Value, ProviderError> {
+fn parse_tool_result_content(result: ToolResult) -> Result<Value, ProviderError> {
     serde_json::from_slice(&result.0).map_err(|error| {
         ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
     })
+}
+
+fn apply_redactions(
+    mut value: Value,
+    redactions: &[Redaction],
+    context: &str,
+) -> Result<Value, ProviderError> {
+    for redaction in redactions {
+        apply_redaction(&mut value, redaction, context)?;
+    }
+    Ok(value)
+}
+
+fn apply_redaction(
+    value: &mut Value,
+    redaction: &Redaction,
+    context: &str,
+) -> Result<(), ProviderError> {
+    if redaction.path.is_empty() {
+        *value = Value::String(redaction.replacement.clone());
+        return Ok(());
+    }
+    if !redaction.path.starts_with('/') {
+        return Err(ProviderError::Malformed(format!(
+            "{context} allow verdict requested redaction path `{}`; only JSON Pointer paths are supported",
+            redaction.path
+        )));
+    }
+    let target = value.pointer_mut(&redaction.path).ok_or_else(|| {
+        ProviderError::Malformed(format!(
+            "{context} allow verdict requested redaction path `{}` that did not resolve",
+            redaction.path
+        ))
+    })?;
+    *target = Value::String(redaction.replacement.clone());
+    Ok(())
+}
+
+fn json_bytes(value: &Value, context: &str) -> Result<Vec<u8>, ProviderError> {
+    serde_json::to_vec(value).map_err(|error| {
+        ProviderError::Malformed(format!("failed to serialize {context}: {error}"))
+    })
+}
+
+fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        Err(ProviderError::Malformed(format!(
+            "Anthropic {field} must not be empty"
+        )))
+    } else {
+        Ok(trimmed)
+    }
 }
 
 fn deny_content(reason: &DenyReason) -> Value {

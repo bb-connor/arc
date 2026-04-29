@@ -9,9 +9,7 @@ pub mod manifest;
 pub mod native;
 pub mod transport;
 
-use std::collections::VecDeque;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use chio_tool_call_fabric::ProviderId;
 use serde::{Deserialize, Serialize};
@@ -66,7 +64,6 @@ impl AnthropicAdapterConfig {
 pub struct AnthropicAdapter {
     config: AnthropicAdapterConfig,
     transport: Arc<dyn Transport>,
-    pending_tool_use_ids: Arc<Mutex<VecDeque<String>>>,
     server_tool_gate: AnthropicServerToolGate,
 }
 
@@ -76,7 +73,6 @@ impl AnthropicAdapter {
         Self {
             config,
             transport,
-            pending_tool_use_ids: Arc::new(Mutex::new(VecDeque::new())),
             server_tool_gate: AnthropicServerToolGate::deny_all(),
         }
     }
@@ -91,7 +87,6 @@ impl AnthropicAdapter {
         Ok(Self {
             config,
             transport,
-            pending_tool_use_ids: Arc::new(Mutex::new(VecDeque::new())),
             server_tool_gate: AnthropicServerToolGate::from_manifest(manifest)?,
         })
     }
