@@ -44,13 +44,14 @@ concurrency:
 
 env:
   TRIAGE_LABEL: fuzz-crash
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   triage:
     # Only act when the upstream fuzz run actually crashed. Successful runs
-    # have nothing to triage.
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    # have nothing to triage. Fork PR crash minimization would execute
+    # untrusted code before filing write-scoped issues, so those runs are left
+    # for manual triage from the upstream artifact.
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -81,6 +82,7 @@ jobs:
       - name: Download crash artifacts from upstream run
         id: download
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
@@ -142,14 +144,32 @@ jobs:
           # The cflite_pr layout puts the target in a *nested* directory
           # rather than the top-level artifact name, so target inference
           # walks every path component of the crash file (not just the
-          # immediate parent). The list of valid targets matches
-          # fuzz/fuzz_targets/.
-          known_targets=$(find fuzz/fuzz_targets -maxdepth 1 -type f -name '*.rs' -printf '%f\n' 2>/dev/null \
-            | sed 's/\.rs$//' \
+          # immediate parent). The canonical target list comes from the
+          # fuzz/Cargo.toml [[bin]] names, not source filenames.
+          known_targets=$(awk '
+              /^\[\[bin\]\]/ { in_bin = 1; next }
+              in_bin && /^name = "/ {
+                gsub(/^name = "/, "")
+                gsub(/"$/, "")
+                print
+                in_bin = 0
+              }
+            ' fuzz/Cargo.toml \
             | sort -u \
             | awk '{ print length, $0 }' \
             | sort -rn -k1,1 -k2,2 \
             | cut -d' ' -f2-)
+
+          is_known_target() {
+            local candidate="$1"
+            local known
+            for known in ${known_targets}; do
+              if [ "${known}" = "${candidate}" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
 
           strip_numeric_suffix() {
             local candidate="$1"
@@ -204,6 +224,10 @@ jobs:
               echo "::warning::Inferred invalid fuzz target '${target}' from path '${crash_path}'; skipping"
               continue
             fi
+            if ! is_known_target "${target}"; then
+              echo "::warning::Inferred unknown fuzz target '${target}' from path '${crash_path}'; skipping"
+              continue
+            fi
 
             echo "Minimizing ${crash_path} for target ${target}"
             min_dir="minimized/${target}"
@@ -254,7 +278,7 @@ jobs:
             # actually returns hits on a recurrence.
             sha_prefix=$(echo "${sha256}" | cut -c1-16)
             dedupe_error=$(mktemp)
-            if ! existing=$(gh issue list \
+            if ! existing=$(GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" gh issue list \
               --repo "${REPO_FULL}" \
               --state open \
               --label "${TRIAGE_LABEL}" \
@@ -271,7 +295,7 @@ jobs:
               echo "Dedupe hit: existing issue #${existing} matches sha256 prefix ${sha_prefix}"
               dedupe_body=$(printf 'Recurrence detected by [fuzz-crash-triage](%s).\n* Upstream lane: %s\n* Head SHA: %s\n* Branch: %s\n* Target: %s\n* SHA-256: %s\n' \
                 "${UPSTREAM_RUN_URL}" "${UPSTREAM_RUN_NAME}" "${UPSTREAM_HEAD_SHA}" "${UPSTREAM_HEAD_BRANCH}" "${target}" "${sha256}")
-              gh issue comment "${existing}" --repo "${REPO_FULL}" --body "${dedupe_body}"
+              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" gh issue comment "${existing}" --repo "${REPO_FULL}" --body "${dedupe_body}"
               continue
             fi
 
@@ -300,7 +324,7 @@ jobs:
                 "'${b64}'" "${target}" "${target}" "${target}"
               printf 'See `docs/fuzzing/triage.md` for the triage runbook and SLOs.\n'
             } >"${body_file}"
-            gh issue create \
+            GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" gh issue create \
               --repo "${REPO_FULL}" \
               --title "${issue_title}" \
               --label "${TRIAGE_LABEL}" \
@@ -312,6 +336,7 @@ jobs:
       - name: Comment on upstream PR (if any)
         if: ${{ steps.download.outputs.no-artifacts != 'true' && github.event.workflow_run.event == 'pull_request' }}
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPSTREAM_PULL_REQUESTS: ${{ toJson(github.event.workflow_run.pull_requests) }}
           UPSTREAM_RUN_URL: ${{ github.event.workflow_run.html_url }}
           REPO_FULL: ${{ github.repository }}
