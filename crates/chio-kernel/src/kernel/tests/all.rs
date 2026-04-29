@@ -2159,7 +2159,7 @@ fn wildcard_server_grant_allows_real_server() {
 #[test]
 fn revoked_ancestor_capability_denies_descendant() {
     let path = unique_receipt_db_path("chio-kernel-revoked-ancestor-lineage");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut kernel = ChioKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -2208,7 +2208,7 @@ fn revoked_ancestor_capability_denies_descendant() {
 #[test]
 fn delegated_tool_call_records_observed_capability_lineage() {
     let path = unique_receipt_db_path("chio-kernel-observed-lineage");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut kernel = ChioKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -2314,7 +2314,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
 #[test]
 fn delegated_tool_call_without_delegate_operation_denies() {
     let path = unique_receipt_db_path("chio-kernel-missing-delegate-op");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut kernel = ChioKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -2367,7 +2367,7 @@ fn delegated_tool_call_without_delegate_operation_denies() {
 #[test]
 fn delegated_tool_call_with_scope_escalation_denies() {
     let path = unique_receipt_db_path("chio-kernel-scope-escalation");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut kernel = ChioKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -2431,7 +2431,7 @@ fn delegated_tool_call_with_scope_escalation_denies() {
 #[test]
 fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
     let path = unique_receipt_db_path("chio-kernel-delegatee-mismatch");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut kernel = ChioKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -2491,7 +2491,7 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
 #[test]
 fn delegated_tool_call_exceeding_configured_max_depth_denies() {
     let path = unique_receipt_db_path("chio-kernel-max-delegation-depth");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut config = make_config();
     config.max_delegation_depth = 1;
@@ -2563,7 +2563,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
 #[test]
 fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
     let path = unique_receipt_db_path("chio-kernel-truncated-lineage");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
 
     let mut kernel = ChioKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -2651,7 +2651,7 @@ fn wildcard_tool_grant_allows_any_tool() {
 
 #[test]
 fn in_memory_revocation_store() {
-    let mut store = InMemoryRevocationStore::default();
+    let store = InMemoryRevocationStore::default();
     assert!(!store.is_revoked("cap-1").unwrap());
     assert!(store.revoke("cap-1").unwrap());
     assert!(store.is_revoked("cap-1").unwrap());
@@ -6379,7 +6379,7 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
 #[test]
 fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
     let path = unique_receipt_db_path("chio-kernel-call-chain-capability-lineage");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = ChioKernel::new(make_config());
     let root_kp = make_keypair();
     let child_kp = make_keypair();
@@ -6468,7 +6468,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
 #[test]
 fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
     let path = unique_receipt_db_path("chio-kernel-call-chain-upstream-proof");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = ChioKernel::new(make_config());
     let root_kp = make_keypair();
     let child_kp = make_keypair();
@@ -6687,7 +6687,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
     assert!(observed_governed["call_chain"]["upstreamProof"].is_null());
 
     let path = unique_receipt_db_path("chio-kernel-call-chain-execution-order");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut verified_kernel = ChioKernel::new(make_config());
     let root_kp = make_keypair();
     let child_kp = make_keypair();
@@ -6792,7 +6792,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
 #[test]
 fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
     let path = unique_receipt_db_path("chio-kernel-call-chain-upstream-proof-subject-mismatch");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = ChioKernel::new(make_config());
     let root_kp = make_keypair();
     let child_kp = make_keypair();
@@ -6880,7 +6880,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
 #[test]
 fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_capability_lineage() {
     let path = unique_receipt_db_path("chio-kernel-call-chain-delegator-mismatch");
-    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = ChioKernel::new(make_config());
     let root_kp = make_keypair();
     let child_kp = make_keypair();
@@ -7941,7 +7941,7 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let path = unique_receipt_db_path("kernel-bond-expired");
-    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let store = SqliteReceiptStore::open(&path).unwrap();
 
     let grant = with_minimum_autonomy_tier(
         make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
@@ -8021,7 +8021,7 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let path = unique_receipt_db_path("kernel-bond-active");
-    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let store = SqliteReceiptStore::open(&path).unwrap();
 
     let grant = with_minimum_autonomy_tier(
         make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),

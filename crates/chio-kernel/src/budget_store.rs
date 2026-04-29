@@ -2034,7 +2034,7 @@ mod tests {
 
     #[test]
     fn authorize_and_reconcile_hold_preserve_authority_metadata() {
-        let mut store = InMemoryBudgetStore::new();
+        let store = InMemoryBudgetStore::new();
         let authority = BudgetEventAuthority {
             authority_id: "kernel:test-authority".to_string(),
             lease_id: "single-node".to_string(),
@@ -2106,7 +2106,7 @@ mod tests {
 
     #[test]
     fn denied_authorize_hold_reports_guarantee_metadata_without_commit_index() {
-        let mut store = InMemoryBudgetStore::new();
+        let store = InMemoryBudgetStore::new();
         let authority = BudgetEventAuthority {
             authority_id: "kernel:test-authority".to_string(),
             lease_id: "single-node".to_string(),
