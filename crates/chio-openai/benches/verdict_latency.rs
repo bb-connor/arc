@@ -24,6 +24,8 @@ fn tool_call_stream() -> &'static [u8] {
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_latency_calendar\",\"delta\":\"{\\\"title\\\":\"}\n\n",
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_latency_calendar\",\"delta\":\"\\\"Chio budget review\\\",\\\"duration_minutes\\\":30}\"}\n\n",
+        "event: response.function_call_arguments.done\n",
+        "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_latency_calendar\",\"arguments\":\"{\\\"title\\\":\\\"Chio budget review\\\",\\\"duration_minutes\\\":30}\"}\n\n",
         "event: response.output_item.done\n",
         "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_latency_calendar\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"title\\\":\\\"Chio budget review\\\",\\\"duration_minutes\\\":30}\"}}\n\n",
         "event: response.completed\n",

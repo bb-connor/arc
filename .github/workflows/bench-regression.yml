@@ -65,7 +65,7 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo bench -p chio-kernel -- --noplot --sample-size 100
+          cargo bench -p chio-kernel --benches -- --noplot --sample-size 100
 
       - name: Run current kernel benchmarks
         working-directory: ${{ runner.temp }}/chio-bench-current
@@ -74,7 +74,7 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo bench -p chio-kernel -- --noplot --sample-size 100
+          cargo bench -p chio-kernel --benches -- --noplot --sample-size 100
 
       - name: Locate Criterion outputs
         id: criterion

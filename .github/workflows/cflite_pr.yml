@@ -171,6 +171,17 @@ jobs:
           sed 's/^/  /' changed.txt >&2
           exit 1
 
+      - name: Build ClusterFuzzLite changed-target fuzzers
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
+        uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
+        env:
+          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
+        with:
+          language: rust
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          keep-unaffected-fuzz-targets: true
+
       - name: Run ClusterFuzzLite changed-target sampling without corpus storage
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
@@ -183,6 +194,14 @@ jobs:
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
           report-unreproducible-crashes: false
+
+      - name: Build ClusterFuzzLite full-corpus fuzzers
+        if: steps.mode.outputs.full == 'true'
+        uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
+        with:
+          language: rust
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "Run ClusterFuzzLite full-corpus sweep without corpus storage (fuzz-full label)"
         if: steps.mode.outputs.full == 'true'

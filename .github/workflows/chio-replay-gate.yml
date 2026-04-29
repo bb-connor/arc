@@ -87,7 +87,8 @@ jobs:
             --pins tests/replay/corpus_pins.toml \
             --out target/tee-corpus \
             --verify-sha256 \
-            --verify-manifest-sig
+            --verify-manifest-sig \
+            --allow-unpublished-placeholders
 
       - name: Run replay-gate corpus smoke
         run: cargo test -p chio-replay-gate --release --test corpus_smoke

@@ -27,6 +27,7 @@ DEFAULT_REPO = "bb-connor/arc"
 GITHUB_API = "https://api.github.com"
 RELEASE_TAG_RE = re.compile(r"^tee-corpus-[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+PLACEHOLDER_SHA256 = "0" * 64
 
 
 class CorpusError(Exception):
@@ -65,6 +66,7 @@ def load_pins(path: Path) -> list[dict[str, Any]]:
         sha256 = artifact.get("sha256")
         size_bytes = artifact.get("size_bytes")
         min_schema_version = artifact.get("min_schema_version")
+        published = artifact.get("published", True)
 
         if not isinstance(name, str) or not name:
             raise CorpusError(f"artifacts[{index}].name must be a non-empty string")
@@ -80,6 +82,18 @@ def load_pins(path: Path) -> list[dict[str, Any]]:
             raise CorpusError(f"artifacts[{index}].size_bytes must be a positive integer")
         if min_schema_version is not None and not isinstance(min_schema_version, str):
             raise CorpusError(f"artifacts[{index}].min_schema_version must be a string")
+        if not isinstance(published, bool):
+            raise CorpusError(f"artifacts[{index}].published must be a boolean")
+        if published and sha256.lower() == PLACEHOLDER_SHA256:
+            raise CorpusError(
+                f"artifacts[{index}].sha256 is a placeholder; set published = false "
+                "until the release asset is cut and pinned"
+            )
+        if not published and sha256.lower() != PLACEHOLDER_SHA256:
+            raise CorpusError(
+                f"artifacts[{index}].sha256 must remain the all-zero placeholder "
+                "while published = false"
+            )
 
         key = (release_tag, name)
         if key in seen:
@@ -88,6 +102,7 @@ def load_pins(path: Path) -> list[dict[str, Any]]:
 
         normalized = dict(artifact)
         normalized["sha256"] = sha256.lower()
+        normalized["published"] = published
         validated.append(normalized)
 
     return validated
@@ -287,7 +302,16 @@ def grouped_by_release(artifacts: list[dict[str, Any]]) -> dict[str, list[dict[s
 
 def pull(args: argparse.Namespace) -> int:
     artifacts = load_pins(args.pins)
-    release_count = len(grouped_by_release(artifacts))
+    unpublished = [artifact for artifact in artifacts if not artifact["published"]]
+    published = [artifact for artifact in artifacts if artifact["published"]]
+    release_count = len(grouped_by_release(published))
+
+    if unpublished and not args.allow_unpublished_placeholders:
+        names = ", ".join(f"{artifact['release_tag']}/{artifact['name']}" for artifact in unpublished)
+        raise CorpusError(
+            "unpublished placeholder artifact pins are present; "
+            f"pass --allow-unpublished-placeholders only in pre-publication CI paths: {names}"
+        )
 
     if args.verify_manifest_sig and not args.public_key.is_file():
         raise CorpusError(f"public key not found: {args.public_key}")
@@ -303,7 +327,13 @@ def pull(args: argparse.Namespace) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     repo = args.repo or os.environ.get("GITHUB_REPOSITORY") or DEFAULT_REPO
 
-    for release_tag, pins in grouped_by_release(artifacts).items():
+    for artifact in unpublished:
+        print(
+            "skipping unpublished placeholder "
+            f"{artifact['release_tag']}/{artifact['name']} (published = false)"
+        )
+
+    for release_tag, pins in grouped_by_release(published).items():
         release = get_release(repo, release_tag)
         assets = assets_by_name(release, release_tag)
 
@@ -376,6 +406,14 @@ def parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="validate pins and key path without network downloads or signature checks",
+    )
+    parser.add_argument(
+        "--allow-unpublished-placeholders",
+        action="store_true",
+        help=(
+            "allow artifacts marked published = false to keep their all-zero sha256 "
+            "placeholder and skip network downloads for those artifacts"
+        ),
     )
     return parser
 

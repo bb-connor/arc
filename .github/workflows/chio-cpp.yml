@@ -52,6 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential
       - name: Install cbindgen
+        shell: bash
         run: cargo install cbindgen --locked --version "${CHIO_CPP_CBINDGEN_VERSION}"
       - name: Full Unix SDK smoke
         if: runner.os != 'Windows'
