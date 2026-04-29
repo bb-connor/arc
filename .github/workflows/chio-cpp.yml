@@ -160,7 +160,15 @@ jobs:
           git -C "${{ runner.temp }}/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
           git -C "${{ runner.temp }}/vcpkg" fetch --depth 1 origin 7a9071743140154391b0e18b77d46cc66c5f3663
           git -C "${{ runner.temp }}/vcpkg" checkout --detach FETCH_HEAD
-          "${{ runner.temp }}/vcpkg/bootstrap-vcpkg.sh"
+          for attempt in 1 2 3 4 5; do
+            if "${{ runner.temp }}/vcpkg/bootstrap-vcpkg.sh"; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
           echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
           echo "${{ runner.temp }}/vcpkg" >> "$GITHUB_PATH"
       - name: Release package smoke
