@@ -218,16 +218,16 @@ jobs:
               scan_path=$(dirname "${scan_path}")
             done
             if [ -z "${target}" ]; then
-              echo "::warning::Could not infer fuzz target from path '${crash_path}'; skipping"
-              continue
+              echo "::error::Could not infer fuzz target from path '${crash_path}'; refusing to drop crash signal."
+              exit 1
             fi
             if [[ ! "${target}" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]; then
-              echo "::warning::Inferred invalid fuzz target '${target}' from path '${crash_path}'; skipping"
-              continue
+              echo "::error::Inferred invalid fuzz target '${target}' from path '${crash_path}'; refusing to drop crash signal."
+              exit 1
             fi
             if ! is_known_target "${target}"; then
-              echo "::warning::Inferred unknown fuzz target '${target}' from path '${crash_path}'; skipping"
-              continue
+              echo "::error::Inferred unknown fuzz target '${target}' from path '${crash_path}'; refusing to drop crash signal."
+              exit 1
             fi
 
             echo "Minimizing ${crash_path} for target ${target}"

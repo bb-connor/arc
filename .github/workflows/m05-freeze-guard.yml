@@ -74,9 +74,15 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
-          mapfile -t frozen < <(yq -r \
+          frozen_paths="$(mktemp)"
+          if ! yq -r \
             '.freezes[] | select(.id == "m05-kernel-async-pivot" and .state != "released") | .paths[]' \
-            .planning/trajectory/freezes.yml)
+            .planning/trajectory/freezes.yml > "${frozen_paths}"; then
+            echo "ERROR: failed to read active M05 freeze paths from .planning/trajectory/freezes.yml" >&2
+            exit 1
+          fi
+          mapfile -t frozen < "${frozen_paths}"
+          rm -f "${frozen_paths}"
           if ((${#frozen[@]} == 0)); then
             echo "M05 freeze is released or has no active paths"
           fi
