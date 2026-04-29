@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Mutex, MutexGuard};
 use std::thread;
 
@@ -40,6 +41,8 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 struct SqliteReceiptStore {
     connection: Mutex<Connection>,
 }
+
+static UNIQUE_RECEIPT_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl SqliteReceiptStore {
     fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
@@ -653,7 +656,9 @@ fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    let counter = UNIQUE_RECEIPT_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir()
+        .join(format!("{prefix}-{}-{nonce}-{counter}.sqlite3", std::process::id()))
 }
 
 fn make_elicited_content() -> CreateElicitationResult {
