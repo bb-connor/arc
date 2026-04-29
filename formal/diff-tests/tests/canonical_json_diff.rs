@@ -1,3 +1,5 @@
+#![cfg(not(target_arch = "wasm32"))]
+
 //! Differential proptest harness for RFC 8785 (JSON Canonicalization Scheme).
 //!
 //! Cross-checks `chio_core::canonical::canonicalize` (the production

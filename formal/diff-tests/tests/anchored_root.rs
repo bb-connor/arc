@@ -1,3 +1,5 @@
+#![cfg(not(target_arch = "wasm32"))]
+
 //! Differential anchored-root tuple harness for M04 Phase 6.
 //!
 //! This Cargo-recognized integration test emits the Rust-side

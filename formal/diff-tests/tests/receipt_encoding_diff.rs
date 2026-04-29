@@ -1,3 +1,5 @@
+#![cfg(not(target_arch = "wasm32"))]
+
 //! Cross-language receipt-encoding differential test.
 //!
 //! Proves that the Rust receipt encoder produces byte-identical canonical JSON
