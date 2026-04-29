@@ -4683,7 +4683,6 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
     let subject_hex = subject_kp.public_key().to_hex();
-    let issuer_hex = issuer_kp.public_key().to_hex();
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -4701,7 +4700,7 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
                 "rc-auth-no-issuer",
                 "cap-auth-no-issuer",
                 &subject_hex,
-                &issuer_hex,
+                "",
                 "shell",
                 "bash",
                 8_101,
@@ -4709,12 +4708,6 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
             .expect("append missing issuer authorization receipt");
     }
     let connection = Connection::open(&receipt_db_path).expect("open raw receipt db");
-    connection
-        .execute(
-            "UPDATE chio_tool_receipts SET issuer_key = NULL WHERE capability_id = ?1",
-            ["cap-auth-no-issuer"],
-        )
-        .expect("clear receipt issuer key");
     connection
         .execute(
             "UPDATE capability_lineage SET issuer_key = '' WHERE capability_id = ?1",
