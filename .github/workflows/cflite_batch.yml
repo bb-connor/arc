@@ -104,6 +104,27 @@ jobs:
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Build ClusterFuzzLite batch fuzzer with corpus storage
+        if: steps.corpus.outputs.enabled == 'true'
+        uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
+        env:
+          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
+        with:
+          language: rust
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          storage-repo: https://${{ secrets.FUZZ_CORPUS_PAT }}@github.com/bb-connor/arc-fuzz-corpus.git
+
+      - name: Build ClusterFuzzLite batch fuzzer without corpus storage
+        if: steps.corpus.outputs.enabled != 'true'
+        uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
+        env:
+          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
+        with:
+          language: rust
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run ClusterFuzzLite batch with corpus storage
         if: steps.corpus.outputs.enabled == 'true'
         uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
