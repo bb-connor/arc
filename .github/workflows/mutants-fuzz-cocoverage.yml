@@ -63,9 +63,11 @@ jobs:
 
       - name: Skip when forced package does not match
         id: forced
+        env:
+          FORCED_PACKAGE: ${{ inputs.package || '' }}
         run: |
           set -euo pipefail
-          forced='${{ inputs.package }}'
+          forced="${FORCED_PACKAGE}"
           if [[ -n "${forced}" && "${forced}" != '${{ matrix.package }}' ]]; then
             echo "skip=true" >> "${GITHUB_OUTPUT}"
             echo "skipping ${{ matrix.package }} (forced=${forced})"

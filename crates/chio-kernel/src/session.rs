@@ -1100,18 +1100,16 @@ impl Session {
 
         self.auth_state.replace_with(|current| {
             let auth_context = SessionAuthContext::in_process_anonymous();
-            let session_anchor = if current.auth_context == auth_context {
-                current.session_anchor.clone()
-            } else {
-                SessionAnchorState::new(&self.id, &auth_context, 0)
-            };
+            let previous_anchor_id = current.session_anchor.id().to_string();
+            let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+            let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
             let snapshot = SessionAnchorSnapshot {
                 session_id: self.id.clone(),
                 agent_id: self.agent_id.clone(),
                 auth_context: auth_context.clone(),
                 session_anchor: session_anchor.clone(),
             };
-            let result = persist(&snapshot, None);
+            let result = persist(&snapshot, Some(previous_anchor_id.as_str()));
             match result {
                 Ok(()) => (
                     Some(SessionAuthState {
@@ -1847,6 +1845,45 @@ mod tests {
         assert_eq!(supersedes_anchor_id, None);
 
         assert_eq!(session.session_anchor(), rotated_anchor);
+    }
+
+    #[test]
+    fn close_persisted_appends_terminal_anchor_with_supersedes_link() {
+        let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let initial_anchor = session.session_anchor().clone();
+        let (rotated, _snapshot, supersedes_anchor_id) =
+            session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+                "static-bearer:abcd1234",
+                "cafebabe",
+                Some("http://localhost:3000".to_string()),
+            ));
+        assert!(rotated);
+        assert_eq!(supersedes_anchor_id.as_deref(), Some(initial_anchor.id()));
+        let active_anchor = session.session_anchor().clone();
+
+        let mut captured_snapshot = None;
+        let mut captured_supersedes = None;
+        session
+            .close_persisted(|snapshot, supersedes| {
+                captured_snapshot = Some(snapshot.clone());
+                captured_supersedes = supersedes.map(str::to_string);
+                Ok::<(), ()>(())
+            })
+            .unwrap();
+
+        let snapshot = captured_snapshot.expect("close persisted snapshot");
+        assert_eq!(captured_supersedes.as_deref(), Some(active_anchor.id()));
+        assert_eq!(
+            snapshot.auth_context,
+            SessionAuthContext::in_process_anonymous()
+        );
+        assert_eq!(
+            snapshot.session_anchor.auth_epoch(),
+            active_anchor.auth_epoch() + 1
+        );
+        assert_ne!(snapshot.session_anchor.id(), initial_anchor.id());
+        assert_ne!(snapshot.session_anchor.id(), active_anchor.id());
+        assert_eq!(session.session_anchor(), snapshot.session_anchor);
     }
 
     #[test]

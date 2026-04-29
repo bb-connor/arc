@@ -91,7 +91,7 @@ jobs:
           # under `spec/schemas/`; without `:(glob)`, git treats `**` as
           # a literal path segment and the filter matches nothing.
           status_file="$(mktemp)"
-          git diff --name-status --diff-filter=AMR \
+          git diff --name-status --diff-filter=AMRD \
             "${MERGE_BASE}" "${HEAD_SHA}" -- ':(glob)spec/schemas/**/*.json' \
             > "${status_file}"
           echo "Raw diff name-status:"
@@ -124,7 +124,7 @@ jobs:
           : > "${summary_file}"
           breaking_count=0
           # Walk the name-status records line by line. Each line is
-          # tab-separated: `A\t<path>`, `M\t<path>`, or `R<score>\t<old>\t<new>`.
+          # tab-separated: `A\t<path>`, `M\t<path>`, `D\t<path>`, or `R<score>\t<old>\t<new>`.
           while IFS=$'\t' read -r status old new; do
             [ -z "${status:-}" ] && continue
             case "${status}" in
@@ -132,7 +132,7 @@ jobs:
                 base_path="${old}"
                 head_path="${new}"
                 ;;
-              A|M)
+              A|M|D)
                 base_path="${old}"
                 head_path="${old}"
                 ;;
@@ -143,6 +143,14 @@ jobs:
             esac
             safe="$(printf '%s' "${head_path}" | tr '/' '_')"
             base_blob="${tmpdir}/base-${safe}"
+            if [ "${status}" = "D" ]; then
+              echo "breaking ${base_path}: deleted schema"
+              breaking_count=$((breaking_count + 1))
+              # shellcheck disable=SC2016
+              printf -- '- `%s`: BREAKING. Schema was deleted from `spec/schemas/`.\n\n' \
+                "${base_path}" >> "${summary_file}"
+              continue
+            fi
             # `A` (added) records have no base blob to diff against;
             # additions alone are not breaking under json-schema-diff
             # semantics, so skip them.

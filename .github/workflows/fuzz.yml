@@ -51,6 +51,37 @@ env:
   CHIO_FUZZ_MAX_TOTAL_TIME: ${{ inputs.max_total_time || '1800' }}
 
 jobs:
+  validate-dispatch-target:
+    name: validate-dispatch-target
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Validate forced fuzz target
+        env:
+          FORCED_TARGET: ${{ inputs.target || '' }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${FORCED_TARGET}" ]]; then
+            echo "no forced fuzz target requested"
+            exit 0
+          fi
+          if awk '
+            /^\[\[bin\]\]/ { in_bin = 1; next }
+            in_bin && /^name = "/ {
+              gsub(/^name = "/, "")
+              gsub(/"$/, "")
+              print
+              in_bin = 0
+            }
+          ' fuzz/Cargo.toml | grep -Fxq -- "${FORCED_TARGET}"; then
+            echo "forced fuzz target exists: ${FORCED_TARGET}"
+          else
+            echo "unknown forced fuzz target: ${FORCED_TARGET}" >&2
+            exit 1
+          fi
+
   fuzz-budget:
     name: fuzz-budget
     runs-on: ubuntu-latest
@@ -70,7 +101,9 @@ jobs:
 
   fuzz-scheduled:
     name: fuzz-scheduled (${{ matrix.target }})
-    needs: fuzz-budget
+    needs:
+      - validate-dispatch-target
+      - fuzz-budget
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -106,9 +139,11 @@ jobs:
       # plus fuzz-run pipeline 13 times.
       - name: Resolve forced-target selection
         id: select
+        env:
+          FORCED_TARGET: ${{ inputs.target || '' }}
         run: |
           set -euo pipefail
-          forced='${{ inputs.target }}'
+          forced="${FORCED_TARGET}"
           if [[ -n "${forced}" && "${forced}" != "${{ matrix.target }}" ]]; then
             echo "skipping ${{ matrix.target }} (forced=${forced})"
             echo "selected=false" >> "${GITHUB_OUTPUT}"

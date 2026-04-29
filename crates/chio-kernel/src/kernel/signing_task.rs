@@ -44,7 +44,7 @@
 //! [`SigningTaskHandle::with_capacity`].
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
@@ -144,6 +144,10 @@ pub(crate) struct SigningTaskHandle {
     /// Configured channel capacity. Exposed for diagnostics and tests.
     capacity: usize,
 
+    /// Serializes lazy spawn against shutdown so a shutdown request cannot
+    /// race between the closed-state check and task creation.
+    spawn_gate: Mutex<()>,
+
     /// Set once shutdown is requested, including pre-spawn shutdown.
     closed: AtomicBool,
 }
@@ -169,8 +173,20 @@ impl SigningTaskHandle {
             inner: OnceLock::new(),
             keypair,
             capacity,
+            spawn_gate: Mutex::new(()),
             closed: AtomicBool::new(false),
         }
+    }
+
+    fn lock_spawn_gate(&self) -> MutexGuard<'_, ()> {
+        match self.spawn_gate.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    fn shutdown_error() -> KernelError {
+        KernelError::Internal("receipt signing task already shut down".to_string())
     }
 
     /// Lazily spawn the signing task and return a reference to the
@@ -178,10 +194,9 @@ impl SigningTaskHandle {
     /// the first observes the existing task without spawning.
     ///
     fn ensure_spawned(&self) -> Result<&SigningTaskInner, KernelError> {
+        let _spawn_guard = self.lock_spawn_gate();
         if self.closed.load(Ordering::Acquire) {
-            return Err(KernelError::Internal(
-                "receipt signing task already shut down".to_string(),
-            ));
+            return Err(Self::shutdown_error());
         }
         if let Some(inner) = self.inner.get() {
             return Ok(inner);
@@ -344,28 +359,31 @@ impl SigningTaskHandle {
     /// sender / join slots empty and return immediately. Safe to call
     /// before the task has been spawned (no-op).
     pub(crate) async fn shutdown(&self) {
-        self.closed.store(true, Ordering::Release);
-        let Some(inner) = self.inner.get() else {
-            // Task was never spawned (no signing happened on this
-            // kernel); closed is still latched so later signing fails.
-            return;
-        };
+        let join = {
+            let _spawn_guard = self.lock_spawn_gate();
+            self.closed.store(true, Ordering::Release);
+            let Some(inner) = self.inner.get() else {
+                // Task was never spawned (no signing happened on this
+                // kernel); closed is still latched so later signing fails.
+                return;
+            };
 
-        // Step 1: drop the canonical sender. We take it out of the
-        // mutex-guarded slot under a short critical section so the
-        // drop happens AFTER the lock is released; this avoids a
-        // deadlock with any concurrent `sender_clone` caller.
-        let dropped_sender = match inner.sender.lock() {
-            Ok(mut slot) => slot.take(),
-            Err(poisoned) => poisoned.into_inner().take(),
-        };
-        drop(dropped_sender);
+            // Step 1: drop the canonical sender. We take it out of the
+            // mutex-guarded slot under a short critical section so the
+            // drop happens AFTER the lock is released; this avoids a
+            // deadlock with any concurrent `sender_clone` caller.
+            let dropped_sender = match inner.sender.lock() {
+                Ok(mut slot) => slot.take(),
+                Err(poisoned) => poisoned.into_inner().take(),
+            };
+            drop(dropped_sender);
 
-        // Step 2: take the JoinHandle out under the mutex so concurrent
-        // shutdowns do not double-join.
-        let join = match inner.join.lock() {
-            Ok(mut slot) => slot.take(),
-            Err(poisoned) => poisoned.into_inner().take(),
+            // Step 2: take the JoinHandle out under the mutex so concurrent
+            // shutdowns do not double-join.
+            match inner.join.lock() {
+                Ok(mut slot) => slot.take(),
+                Err(poisoned) => poisoned.into_inner().take(),
+            }
         };
 
         let Some(join) = join else {

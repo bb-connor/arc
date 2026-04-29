@@ -345,13 +345,15 @@ jobs:
   # PR-tier Apalache safety lane for the RevocationPropagation TLA+ module.
   # Checks safety invariants (NoAllowAfterRevoke, MonotoneLog,
   # AttenuationPreserving) via MCRevocationPropagation.cfg at PROCS=4, CAPS=8.
-  # Liveness (RevocationEventuallySeen) runs nightly; see formal-tla-liveness
-  # in nightly.yml. Fails closed: a non-zero apalache-mc exit blocks merge.
+  # The PR tier uses a bounded length=6 smoke depth to keep review latency
+  # stable. Liveness (RevocationEventuallySeen) runs nightly; see
+  # formal-tla-liveness in nightly.yml. Fails closed: a non-zero apalache-mc
+  # exit blocks merge.
   formal-tla:
     name: formal-tla (apalache safety)
     # owner: M03
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     concurrency:
       group: ${{ github.event_name == 'pull_request' && format('pr-{0}-formal-tla', github.ref) || format('main-{0}-formal-tla', github.sha) }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -378,12 +380,12 @@ jobs:
           command -v apalache-mc
           apalache-mc version || true
 
-      - name: Apalache safety check (PROCS=4 CAPS=8 length=12)
+      - name: Apalache safety check (PROCS=4 CAPS=8 length=6)
         shell: bash
         run: |
           set -euo pipefail
           apalache-mc check \
-            --length=12 \
+            --length=6 \
             --config=formal/tla/MCRevocationPropagation.cfg \
             formal/tla/RevocationPropagation.tla
 

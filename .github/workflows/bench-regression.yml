@@ -67,6 +67,7 @@ jobs:
           CARGO_INCREMENTAL: "0"
         run: |
           set -euo pipefail
+          benches_file="$(mktemp)"
           awk '
             /^\[\[bench\]\]/ { in_bench = 1; next }
             in_bench && /^name = / {
@@ -74,9 +75,15 @@ jobs:
               print $3
               in_bench = 0
             }
-          ' crates/chio-kernel/Cargo.toml | while IFS= read -r bench; do
+          ' crates/chio-kernel/Cargo.toml > "${benches_file}"
+          bench_count="$(wc -l < "${benches_file}" | tr -d ' ')"
+          if [ "${bench_count}" = "0" ]; then
+            echo "::error::no chio-kernel benchmarks found in Cargo.toml" >&2
+            exit 1
+          fi
+          while IFS= read -r bench; do
             cargo bench -p chio-kernel --bench "$bench" -- --noplot --sample-size 100
-          done
+          done < "${benches_file}"
 
       - name: Run current kernel benchmarks
         working-directory: ${{ runner.temp }}/chio-bench-current
@@ -87,6 +94,7 @@ jobs:
           CARGO_INCREMENTAL: "0"
         run: |
           set -euo pipefail
+          benches_file="$(mktemp)"
           awk '
             /^\[\[bench\]\]/ { in_bench = 1; next }
             in_bench && /^name = / {
@@ -94,9 +102,15 @@ jobs:
               print $3
               in_bench = 0
             }
-          ' crates/chio-kernel/Cargo.toml | while IFS= read -r bench; do
+          ' crates/chio-kernel/Cargo.toml > "${benches_file}"
+          bench_count="$(wc -l < "${benches_file}" | tr -d ' ')"
+          if [ "${bench_count}" = "0" ]; then
+            echo "::error::no chio-kernel benchmarks found in Cargo.toml" >&2
+            exit 1
+          fi
+          while IFS= read -r bench; do
             cargo bench -p chio-kernel --bench "$bench" -- --noplot --sample-size 100
-          done
+          done < "${benches_file}"
 
       - name: Locate Criterion outputs
         id: criterion

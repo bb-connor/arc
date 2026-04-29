@@ -62,7 +62,10 @@ jobs:
           set -euo pipefail
           base_sha="${{ github.event.pull_request.base.sha }}"
           head_sha="${{ github.event.pull_request.head.sha }}"
-          git diff --name-only "${base_sha}" "${head_sha}" > changed.txt
+          merge_base="$(git merge-base "${base_sha}" "${head_sha}")"
+          echo "merge_base=${merge_base}" >> "${GITHUB_OUTPUT}"
+          echo "merge-base: ${merge_base}"
+          git diff --name-only "${merge_base}" "${head_sha}" > changed.txt
           printf 'changed file count: %d\n' "$(wc -l < changed.txt)"
           cat changed.txt
 
@@ -111,12 +114,14 @@ jobs:
       - name: Classify trust-boundary diff
         env:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          MERGE_BASE: ${{ steps.diff.outputs.merge_base }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           diff_file="$(mktemp)"
           git diff --no-color \
-            "${{ github.event.pull_request.base.sha }}" \
-            "${{ github.event.pull_request.head.sha }}" > "${diff_file}"
+            "${MERGE_BASE}" \
+            "${HEAD_SHA}" > "${diff_file}"
           label="$(scripts/classify-trust-diff.sh "${diff_file}" || true)"
           printf 'classifier verdict: %s\n' "${label}"
           case "${label}" in

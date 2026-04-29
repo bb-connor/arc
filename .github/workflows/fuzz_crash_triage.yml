@@ -65,6 +65,7 @@ jobs:
       - name: Install Rust nightly + cargo-fuzz
         uses: dtolnay/rust-toolchain@5b842231ba77f5c045dba54ac5560fed2db780e2
         with:
+          toolchain: nightly
           components: rust-src
 
       - name: Cache cargo-fuzz binary
