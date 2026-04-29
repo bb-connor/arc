@@ -182,9 +182,10 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
     let mut failures = Vec::new();
     for (mode, mut args) in attempts {
         args.push("browser_canonical_json_diff");
-        let output = Command::new("wasm-pack")
-            .args(args)
-            .current_dir(manifest_dir)
+        let mut command = Command::new("wasm-pack");
+        command.args(args).current_dir(manifest_dir);
+        apply_wasm_safe_rustflags(&mut command);
+        let output = command
             .output()
             .map_err(|error| format!("spawn wasm-pack {mode} test: {error}"))?;
 
@@ -197,6 +198,36 @@ fn headless_browser_wasm_matches_frozen_canonical_vector_bytes() -> Result<(), S
     let failure = failures.join("\n\n");
     eprintln!("{failure}");
     Err(failure)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn apply_wasm_safe_rustflags(command: &mut std::process::Command) {
+    let Ok(rustflags) = std::env::var("RUSTFLAGS") else {
+        return;
+    };
+    let filtered = filter_wasm_rustflags(&rustflags);
+    if filtered.is_empty() {
+        command.env_remove("RUSTFLAGS");
+    } else {
+        command.env("RUSTFLAGS", filtered);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn filter_wasm_rustflags(rustflags: &str) -> String {
+    let mut filtered = Vec::new();
+    let mut parts = rustflags.split_whitespace().peekable();
+    while let Some(part) = parts.next() {
+        if part == "-C" && parts.peek() == Some(&"link-arg=-Wl,--threads=1") {
+            let _ = parts.next();
+            continue;
+        }
+        if part == "-Clink-arg=-Wl,--threads=1" || part == "link-arg=-Wl,--threads=1" {
+            continue;
+        }
+        filtered.push(part);
+    }
+    filtered.join(" ")
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -282,6 +313,19 @@ fn major_version_from_text(text: &str) -> Option<u32> {
         .find(|part| part.as_bytes().first().is_some_and(u8::is_ascii_digit))
         .and_then(|version| version.split('.').next())
         .and_then(|major| major.parse::<u32>().ok())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn wasm_rustflags_filter_removes_linux_host_link_thread_arg() {
+    assert_eq!(
+        filter_wasm_rustflags("-D warnings -C link-arg=-Wl,--threads=1 -C debuginfo=0"),
+        "-D warnings -C debuginfo=0"
+    );
+    assert_eq!(
+        filter_wasm_rustflags("-D warnings -Clink-arg=-Wl,--threads=1"),
+        "-D warnings"
+    );
 }
 
 #[cfg(target_arch = "wasm32")]
