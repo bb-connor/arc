@@ -60,21 +60,43 @@ jobs:
 
       - name: Run baseline kernel benchmarks
         working-directory: ${{ runner.temp }}/chio-bench-baseline
+        shell: bash
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-bench-baseline-target
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo bench -p chio-kernel --benches -- --noplot --sample-size 100
+          set -euo pipefail
+          awk '
+            /^\[\[bench\]\]/ { in_bench = 1; next }
+            in_bench && /^name = / {
+              gsub(/"/, "", $3)
+              print $3
+              in_bench = 0
+            }
+          ' crates/chio-kernel/Cargo.toml | while IFS= read -r bench; do
+            cargo bench -p chio-kernel --bench "$bench" -- --noplot --sample-size 100
+          done
 
       - name: Run current kernel benchmarks
         working-directory: ${{ runner.temp }}/chio-bench-current
+        shell: bash
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-bench-current-target
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo bench -p chio-kernel --benches -- --noplot --sample-size 100
+          set -euo pipefail
+          awk '
+            /^\[\[bench\]\]/ { in_bench = 1; next }
+            in_bench && /^name = / {
+              gsub(/"/, "", $3)
+              print $3
+              in_bench = 0
+            }
+          ' crates/chio-kernel/Cargo.toml | while IFS= read -r bench; do
+            cargo bench -p chio-kernel --bench "$bench" -- --noplot --sample-size 100
+          done
 
       - name: Locate Criterion outputs
         id: criterion
