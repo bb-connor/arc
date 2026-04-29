@@ -74,7 +74,10 @@ if [[ -z "${diff_text}" ]]; then
 fi
 
 # Pull the trust-boundary path globs out of freezes.yml.
-mapfile -t globs < <(yq -r '.freezes[] | select(.id == "trust-boundary-set") | .paths[]' "${FREEZES}")
+globs=()
+while IFS= read -r glob; do
+    [[ -n "${glob}" ]] && globs+=("${glob}")
+done < <(yq -r '.freezes[] | select(.id == "trust-boundary-set") | .paths[]' "${FREEZES}")
 if (( ${#globs[@]} == 0 )); then
     err "freezes.yml has no trust-boundary-set entry"
     exit 2
@@ -94,6 +97,11 @@ for g in "${globs[@]}"; do
     regexes+=("$(glob_to_regex "${g}")")
 done
 
+regex_blob=""
+for regex in "${regexes[@]}"; do
+    regex_blob+="${regex}"$'\034'
+done
+
 awk_path_match='
 function path_matches(p) {
     for (i in regexes) {
@@ -107,11 +115,13 @@ function path_matches(p) {
 # trust-boundary file, classify additions/removals as substantive when
 # they include any non-comment, non-blank code; otherwise cosmetic.
 result="$(printf '%s' "${diff_text}" | awk -v RS='\n' \
-    -v RGX="$(printf '%s\n' "${regexes[@]}")" \
+    -v RGX="${regex_blob}" \
     '
     BEGIN {
-        n = split(RGX, arr, "\n")
-        for (i=1; i<=n; i++) regexes[i] = arr[i]
+        n = split(RGX, arr, "\034")
+        for (i=1; i<=n; i++) {
+            if (arr[i] != "") regexes[i] = arr[i]
+        }
         any_match = 0
         substantive = 0
     }
@@ -137,7 +147,11 @@ result="$(printf '%s' "${diff_text}" | awk -v RS='\n' \
         if (line ~ /^\/\//) next        # // ...
         if (line ~ /^\/\*/) next        # /* ... */
         if (line ~ /^\*/)  next         # * ... (block comment continuation)
-        if (line ~ /^#/)   next         # # ...
+        if (line ~ /^#/) {
+            if (line ~ /^#(!)?\[/) { substantive = 1; next } # Rust attributes.
+            if (line ~ /^#!/)      { substantive = 1; next } # Shebangs.
+            next                                      # # ...
+        }
         if (line ~ /^;/)   next         # ; ...
         substantive = 1
     }
