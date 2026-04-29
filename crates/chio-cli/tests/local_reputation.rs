@@ -229,7 +229,7 @@ fn import_federated_reputation_share(
     let delegate_capability_id = format!("{share_id}-delegate");
     let scope_json = imported_scope_json();
 
-    let store = SqliteReceiptStore::open(receipt_db_path).expect("open receipt store");
+    let mut store = SqliteReceiptStore::open(receipt_db_path).expect("open receipt store");
     store
         .import_federated_evidence_share(&FederatedEvidenceShareImport {
             share_id: share_id.to_string(),
