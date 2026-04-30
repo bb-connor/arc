@@ -31,6 +31,14 @@ Source files read:
   `AttestError`. There is no `QuoteVerifier` trait or quote backend module.
 - `crates/chio-attest-verify/src/sigstore.rs` is still 626 lines and remains
   the only production verifier implementation.
+- Current `chio-attest-verify` extension points are
+  `AttestVerifier::{verify_blob, verify_bytes, verify_bundle}`,
+  `SigstoreVerifier::with_embedded_root`, non-exhaustive `AttestError`, and
+  `VerifiedAttestation` metadata. P0 should not add `QuoteVerifier` or quote
+  modules.
+- `crates/chio-attest-verify/build.rs` only checks embedded
+  `sigstore-root/{root.json,trusted_root.json}` presence. The trust-root files
+  are evidence-sensitive and should stay out of M03 P0.
 - `crates/chio-core-types/src/crypto.rs` is 1252 lines in this worktree. It
   has Ed25519, P-256, and P-384 key and signature material, plus the
   `SigningBackend` abstraction. There is no hybrid or PQ variant.
@@ -46,6 +54,14 @@ Source files read:
   wording says `SessionComplianceCertificate`; P0 agents should use the live
   type names in code and avoid renaming in this phase.
 
+## Decision Reference Hygiene
+
+Decision ids observed in `.planning/trajectory-2/decisions.yml`: D08, D09,
+D10. P0 implementation notes, PR descriptions, and the audit opener should
+cite these ids by id only. If day-of evidence conflicts with one of those ids,
+pause for a decision amendment before merging dependency or threat-model
+changes.
+
 ## Dependency Version Recheck
 
 `cargo search` results on 2026-04-30:
@@ -57,11 +73,10 @@ Source files read:
 - `sev = "7.1.0"`
 - `coset = "0.4.2"`
 
-The trajectory decision D08 still binds the milestone to `fips204` unless
-amended. Treat these search results as a drift warning, not authority to
-change D08 inside P0. P0.T5 must record whether the `fips204` pin remains
-valid, whether the patch pin should move from `0.4` to `0.4.6`, and whether
-RustCrypto `ml-dsa` is mature enough to require a formal D08 amendment.
+Treat these search results as a drift warning, not authority to change a
+locked decision inside P0. P0.T5 must rerun the search on the opener branch,
+cite D08 by id, and record whether the observed patch set still matches the
+locked decision.
 
 ## M03.P0.T1 - Pin PQ and TEE Crates
 
@@ -268,9 +283,9 @@ Implementation notes:
 
 - Record a line matching the ticket gate, for example:
   `fips204 re-check 2026-04-30: ...`
-- If the implementation wants to change away from `fips204`, do not do that
-  silently in P0. It requires a D08 amendment, which is outside the normal
-  ticket path unless the orchestrator approves it.
+- If the implementation wants to change away from the locked primitive, do not
+  do that silently in P0. It requires a D08 amendment, which is outside the
+  normal ticket path unless the orchestrator approves it.
 - If only a patch-level `fips204` update is chosen, state why it remains
   consistent with D08.
 - If RustCrypto `ml-dsa = "0.1.0-rc.9"` is still pre-release, record that as
@@ -331,14 +346,41 @@ cargo clippy -p chio-attest-verify --features pq -- -D warnings
 
 ## Wave 2 Coordination Notes
 
+- Do not open M03 implementation branches while `.planning/trajectory-2/EXECUTION-STATE.json`
+  still says `current_wave: "W1"` unless the execution log contains a passing
+  Wave 1 `wave_gate_run` and the orchestrator has advanced W2 scheduling.
+- Wave 1 drain evidence expected before M03 P0 opens: workspace one-liner
+  green, mutation baseline for the six trust-boundary crates, verdict-matrix
+  scaffold present, and `CanonicalBytes` byte-identity through the M01 vector
+  corpus.
 - P0 serializes through root `Cargo.toml` and `Cargo.lock`. Do not split P0.T1
   into concurrent branches that both refresh the lockfile.
 - M03 freezes begin in P1, not P0, but P0 choices determine the dependency
   surface used by the trust-boundary freeze windows.
+- Later source workers should treat `crates/chio-attest-verify/src/lib.rs` as
+  the `QuoteVerifier` API choke point and `src/sigstore.rs` as preserved unless
+  a ticket explicitly targets Sigstore regression protection.
+- `crates/chio-attest-verify/sigstore-root/**` and `build.rs` are outside the
+  registered M03 freeze globs, but they are trust-root evidence. Keep them out
+  of M03 P0 and require a separate trust-root re-bake review if they change.
 - M06 `CanonicalBytes` is a P1 soft dependency, not a P0 blocker.
 - M05 consumes the two threat IDs later, so exact spelling matters.
 - M10 custody work depends on the later quote-binding and hybrid-signing
   surface. P0 should avoid broadening scope into custody envelope design.
+
+## Same-Day Opener Checklist
+
+For `wave/W2/m03/p0.t1-pin-pq-and-tee-crates`:
+
+- Confirm M03 is still `phase: ready_for_p0` and every P0 ticket remains
+  `status: pending`.
+- Re-run the crate-version searches in the branch and paste a short evidence
+  table into the audit doc for P0.T5.
+- Keep the first PR to root dependency pins and lockfile resolution unless the
+  orchestrator explicitly bundles another P0 ticket.
+- Run the exact P0.T1 `gate_check.cmd` plus `cargo fmt --all -- --check`.
+- Add security x2 reviewers and `@bb-connor`.
+- Defer `cargo build ... --features pq` gates until P0.T2 creates the feature.
 
 ## Review Checklist
 

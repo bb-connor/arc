@@ -9,7 +9,7 @@ Inputs read:
 
 - `.planning/trajectory-2/03-pq-hybrid-and-tee-quote-verifier.md`
 - `.planning/trajectory-2/tickets/M03/P0.yml`
-- `.planning/trajectory-2/decisions.yml` decisions D08, D09, D10
+- `.planning/trajectory-2/decisions.yml` decision ids D08, D09, D10
 - `.planning/trajectory-2/freezes.yml`
 - `.planning/trajectory-2/research/M03-P0-implementation-notes.md`
 - `Cargo.toml`
@@ -32,6 +32,14 @@ Inputs read:
 - `crates/chio-attest-verify/src/sigstore.rs`: 626 lines. It is still the
   only production verifier implementation and preserves the Sigstore single
   source of truth.
+- Current `chio-attest-verify` extension points are deliberately narrow:
+  `AttestVerifier::{verify_blob, verify_bytes, verify_bundle}`,
+  `SigstoreVerifier::with_embedded_root`, the non-exhaustive `AttestError`,
+  and the metadata carried by `VerifiedAttestation`.
+- `crates/chio-attest-verify/build.rs` only checks that
+  `sigstore-root/{root.json,trusted_root.json}` exist. It performs no network
+  work. Treat those trust-root files as sensitive evidence, not an M03 P0
+  dependency surface.
 - `crates/chio-core-types/src/crypto.rs`: 1252 lines. It has Ed25519, P-256,
   P-384, `SigningAlgorithm`, `PublicKey`, `Signature`, and `SigningBackend`.
   There is no hybrid or PQ variant today.
@@ -47,14 +55,28 @@ Inputs read:
   M03 prose says `SessionComplianceCertificate`; P0 should use the live names
   in code and avoid renaming during the opener.
 
-## Binding Decisions
+## Ticket Source Map
 
-- D08: ML-DSA-65 uses the pure-Rust `fips204` crate. Changing to RustCrypto
-  `ml-dsa` or any C-binding crate needs an explicit D08 amendment.
-- D09: Kyber / ML-KEM is out of scope. P0 must not add KEM dependencies or TLS
-  hybrid work.
-- D10: Quote verifier backends are Intel TDX DCAP, AMD SEV-SNP VLEK/VCEK, and
-  AWS Nitro NSM. Apple SEP and SGX remain out of scope.
+- `M03.P0.T1`: serial root dependency pin and `Cargo.lock` refresh. This is
+  the only P0 ticket with shared root lockfile ownership.
+- `M03.P0.T2`: default-off `pq` feature plumbing in `chio-core-types` and
+  `chio-attest-verify`; no public hybrid API is required by this ticket.
+- `M03.P0.T3`: audit-doc opener with the literal phrase `starting counts`.
+- `M03.P0.T4`: append only `pq_signature_downgrade` and
+  `tee_quote_forgery` to both threat-model artifacts.
+- `M03.P0.T5`: day-of ecosystem recheck recorded in the audit doc; if the
+  result conflicts with a locked decision id, stop for an amendment.
+
+## Decision Reference Hygiene
+
+- Decision ids observed in `.planning/trajectory-2/decisions.yml`: D08, D09,
+  D10.
+- P0 implementation notes, PR descriptions, and the audit opener should cite
+  those ids by id only. Do not restate or fork decision-body text into local
+  docs where it can drift.
+- If day-of crate evidence changes the recommended primitive, KEM scope, or
+  quote-backend scope, pause P0 and amend the relevant decision id before
+  merging dependency or threat-model changes.
 
 Crates.io recheck on 2026-04-30:
 
@@ -64,9 +86,9 @@ Crates.io recheck on 2026-04-30:
 - `sev = "7.1.0"`
 - `coset = "0.4.2"`
 
-Interpret this as drift evidence, not approval to change decisions. D08 still
-binds M03 to `fips204`; P0.T5 should record whether `0.4.6` is the intended
-patch pin and whether `ml-dsa` is still too pre-release to amend D08.
+Interpret this as drift evidence, not approval to change decisions. P0.T5
+should rerun the searches on the opener branch, cite D08 by id, and record
+whether the observed patch set still matches the locked decision.
 
 ## P0 Tickets
 
@@ -179,7 +201,8 @@ Implementation notes:
 
 - Add a line matching the ticket gate, for example:
   `fips204 re-check 2026-04-30: ...`
-- If the recommendation changes away from `fips204`, stop and amend D08 first.
+- If the recommendation changes away from the locked primitive, stop and amend
+  D08 first.
 - If only the patch pin moves to `0.4.6`, say why that is still consistent
   with D08.
 - If `ml-dsa = "0.1.0-rc.9"` remains pre-release, record that as evidence for
@@ -210,6 +233,13 @@ cargo search coset --limit 5
 - `m03-pq-primitives-pivot` covers `crates/chio-core/src/signature*.rs`,
   `crates/chio-core/tests/pq_kats.rs`, and
   `crates/chio-core-types/src/canonical*.rs` during P1-P2.
+- Later workers should treat `crates/chio-attest-verify/src/lib.rs` as the
+  API choke point for `QuoteVerifier`, and `src/sigstore.rs` as frozen unless
+  a ticket explicitly targets Sigstore regression protection.
+- `crates/chio-attest-verify/sigstore-root/**` and `build.rs` are not listed
+  under the M03 freeze ids, but changing them would alter verifier trust-root
+  evidence. Keep them out of M03 P0 and require a separate trust-root re-bake
+  review if they ever move.
 - P0 may touch `Cargo.toml`, `Cargo.lock`, crate `Cargo.toml` files, audit
   docs, and security threat-model docs. It should not touch
   `crates/chio-attest-verify/src/**`, `crates/chio-core-types/src/crypto.rs`,
@@ -261,9 +291,28 @@ Do not combine P0.T4 with P0.T1 unless lockfile serialization becomes the only
 practical path. Keeping threat-model edits separate lowers review risk and lets
 M05 consume exact IDs cleanly.
 
+## Same-Day Opener Checklist
+
+Before opening `wave/W2/m03/p0.t1-pin-pq-and-tee-crates`:
+
+- Confirm `.planning/trajectory-2/EXECUTION-STATE.json` has advanced from
+  `current_wave: "W1"` to W2, or the execution log contains a passing Wave 1
+  `wave_gate_run`.
+- Confirm the Wave 1 gate evidence is present: workspace one-liner green,
+  mutation baseline for the six trust-boundary crates, verdict-matrix
+  scaffold, and `CanonicalBytes` byte-identity through the M01 vector corpus.
+- Confirm M03 remains `phase: ready_for_p0` and all five P0 tickets remain
+  `status: pending`.
+- Re-run the crates.io searches in the P0 branch and paste the exact output or
+  concise version table into the audit doc for P0.T5.
+- Start with P0.T1 only. Do not combine source edits, threat-model rows, or
+  audit prose unless the orchestrator explicitly serializes a bundled opener.
+- Add security x2 reviewers and `@bb-connor` even though P0 is dependency and
+  documentation work.
+
 ## Gate Bundle Before Review
 
-Run ticket gates exactly, then add:
+Run each ticket's `gate_check.cmd` exactly, then add:
 
 ```bash
 cargo fmt --all -- --check
@@ -273,6 +322,10 @@ cargo build -p chio-attest-verify --features pq --quiet
 cargo test -p chio-core-types threat_model_artifacts --quiet
 cargo tree -p chio-attest-verify -d
 ```
+
+For a P0.T1-only opener before `pq` feature plumbing exists, run the ticket
+gate plus `cargo fmt --all -- --check`; defer `--features pq` commands to
+P0.T2 after the feature exists.
 
 If the dependency bump is small enough to afford stricter checks:
 
