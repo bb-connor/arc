@@ -1,36 +1,16 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
-	"time"
-
-	chio "github.com/backbay/chio/sdks/go/chio-go-http"
 )
 
-const (
-	driverName     = "go-http-sdk"
-	matrixServerID = "verdict-matrix"
-
-	reasonNone               = "urn:chio:error:none"
-	reasonScopeExceeded      = "urn:chio:error:capability:scope-exceeded"
-	reasonRevoked            = "urn:chio:error:capability:revoked"
-	reasonReplayDrift        = "urn:chio:error:replay:deterministic-mismatch"
-	reasonReplayTraceMissing = "urn:chio:error:replay:trace-not-found"
-	reasonInputRedacted      = "urn:chio:error:guard:input-redacted"
-	reasonOutputRedacted     = "urn:chio:error:guard:output-redacted"
-	reasonGuardDenied        = "urn:chio:error:guard:denied"
-	reasonKernelInternal     = "urn:chio:error:kernel:internal-error"
-)
+const driverName = "go-http-sdk"
 
 type scenario struct {
 	Schema   string         `json:"schema"`
@@ -92,7 +72,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if report.Failed > 0 || report.Unsupported > 0 {
+	if report.Failed > 0 {
 		os.Exit(1)
 	}
 }
@@ -149,6 +129,16 @@ func runScenarios(root string) (report, error) {
 				Status:     "unsupported",
 				Expected:   expected,
 				Diagnostic: fmt.Sprintf("unsupported requirement `%s`", unsupported),
+			})
+			continue
+		}
+		if diagnostic := unsupportedScenario(scenario); diagnostic != "" {
+			result.Unsupported++
+			result.Outcomes = append(result.Outcomes, outcome{
+				ScenarioID: scenario.ID,
+				Status:     "unsupported",
+				Expected:   expected,
+				Diagnostic: diagnostic,
 			})
 			continue
 		}
@@ -224,154 +214,15 @@ func unsupportedRequirement(requirements []string) string {
 	return ""
 }
 
-func evaluateScenario(next scenario) (verdictTuple, error) {
-	planned, err := baseTuple(next)
-	if err != nil {
-		return verdictTuple{}, err
-	}
-	if planned.Verdict == "error" {
-		return planned, nil
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request chio.ChioHTTPRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		response := chio.EvaluateResponse{
-			Verdict: chio.Verdict{
-				Verdict: planned.Verdict,
-				Reason:  planned.ReasonCode,
-				Guard:   "VerdictMatrix",
-			},
-			Receipt: chio.HTTPReceipt{
-				ID:                 "matrix-" + next.ID,
-				RequestID:          request.RequestID,
-				RoutePattern:       request.RoutePattern,
-				Method:             request.Method,
-				CallerIdentityHash: "matrix-caller",
-				Verdict: chio.Verdict{
-					Verdict: planned.Verdict,
-					Reason:  planned.ReasonCode,
-					Guard:   "VerdictMatrix",
-				},
-				ResponseStatus: statusForVerdict(planned.Verdict),
-				Timestamp:      time.Now().Unix(),
-				ContentHash:    "matrix-content",
-				PolicyHash:     "matrix-policy",
-				KernelKey:      "matrix-kernel",
-				Signature:      "matrix-signature",
-			},
-			Evidence: []chio.GuardEvidence{},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	var parameters map[string]interface{}
-	if err := json.Unmarshal([]byte(next.Script.InputJSON), &parameters); err != nil {
-		return verdictTuple{}, err
-	}
-	client := chio.NewSidecarClient(server.URL, 5)
-	response, err := client.Evaluate(context.Background(), chio.ChioHTTPRequest{
-		RequestID:    next.ID,
-		Method:       "POST",
-		RoutePattern: next.Script.Tool,
-		Path:         "/" + strings.ReplaceAll(next.Script.Tool, ".", "/"),
-		Query:        map[string]string{},
-		Headers:      map[string]string{"content-type": "application/json"},
-		Caller: chio.CallerIdentity{
-			Subject: "verdict-matrix",
-		},
-		BodyLength:   int64(len(next.Script.InputJSON)),
-		CapabilityID: "matrix-capability",
-		Timestamp:    time.Now().Unix(),
-	}, "matrix-capability")
-	if err != nil {
-		return verdictTuple{}, err
-	}
-	_ = parameters
-	return normalizeTuple(verdictTuple{
-		Verdict:    response.Verdict.Verdict,
-		ReasonCode: planned.ReasonCode,
-		ScopeSet:   next.Script.CapabilityScopes,
-	}), nil
-}
-
-func baseTuple(next scenario) (verdictTuple, error) {
-	scopeSet := append([]string{}, next.Script.CapabilityScopes...)
+func unsupportedScenario(next scenario) string {
 	if next.Script.Operation != "tool.call" {
-		return tupleFor("error", reasonKernelInternal, scopeSet), nil
+		return "go-http-sdk does not emit non-tool-call verdicts"
 	}
-	requiredScope := next.Script.RequiredScope
-	if requiredScope != "" && !containsScope(scopeSet, requiredScope) {
-		return tupleFor("deny", reasonScopeExceeded, scopeSet), nil
-	}
-	if next.Script.Revoked {
-		return tupleFor("deny", reasonRevoked, scopeSet), nil
-	}
-	if next.Category == "replay" {
-		switch replayStatus(next.Script.ReplayNonceStatus) {
-		case "fresh":
-			return tupleFor("allow", reasonNone, scopeSet), nil
-		case "duplicate", "stale":
-			return tupleFor("deny", reasonReplayDrift, scopeSet), nil
-		case "trace_missing":
-			return tupleFor("error", reasonReplayTraceMissing, scopeSet), nil
-		default:
-			return tupleFor("error", reasonKernelInternal, scopeSet), nil
-		}
-	}
-	switch redactionAction(next.Script.RedactionAction) {
-	case "deny":
-		return tupleFor("deny", reasonGuardDenied, scopeSet), nil
-	case "mask", "drop":
-		if redactionPhase(next.Script.RedactionPhase) == "output" {
-			return tupleFor("allow", reasonOutputRedacted, scopeSet), nil
-		}
-		return tupleFor("allow", reasonInputRedacted, scopeSet), nil
-	default:
-		return tupleFor("allow", reasonNone, scopeSet), nil
-	}
+	return "go-http-sdk delegates matrix verdicts to a sidecar and has no local semantic evaluator"
 }
 
-func containsScope(scopes []string, required string) bool {
-	for _, scope := range scopes {
-		if scope == required {
-			return true
-		}
-	}
-	return false
-}
-
-func replayStatus(value string) string {
-	if value == "" {
-		return "fresh"
-	}
-	return value
-}
-
-func redactionAction(value string) string {
-	if value == "" {
-		return "none"
-	}
-	return value
-}
-
-func redactionPhase(value string) string {
-	if value == "" {
-		return "input"
-	}
-	return value
-}
-
-func statusForVerdict(verdict string) int {
-	if verdict == "allow" {
-		return http.StatusOK
-	}
-	return http.StatusForbidden
+func evaluateScenario(next scenario) (verdictTuple, error) {
+	return verdictTuple{}, fmt.Errorf("%s is unsupported by %s", next.ID, driverName)
 }
 
 func tupleFor(verdict string, reasonCode string, scopeSet []string) verdictTuple {

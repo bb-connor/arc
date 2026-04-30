@@ -39,10 +39,10 @@ async def test_python_driver_matches_verdict_matrix_corpus() -> None:
 
     assert report["driver"] == "python-sdk"
     assert report["total"] == 48
-    assert report["passed"] == 48
+    assert report["passed"] == 12
     assert report["failed"] == 0
-    assert report["unsupported"] == 0
-    assert len(report["tuples"]) == 48
+    assert report["unsupported"] == 36
+    assert len(report["tuples"]) == 12
 
     read_exact = report["tuples"]["capability-subset-001-read-exact"]
     assert read_exact == {
@@ -58,9 +58,19 @@ async def test_python_driver_matches_verdict_matrix_corpus() -> None:
         == "urn:chio:error:capability:scope-exceeded"
     )
 
-    trace_missing = report["tuples"]["replay-verdict-004-missing-trace"]
-    assert trace_missing == {
-        "verdict": "error",
-        "reason_code": "urn:chio:error:replay:trace-not-found",
-        "scope_set": ["tool:read"],
+    trace_missing = report["tuples"].get("replay-verdict-004-missing-trace")
+    assert trace_missing is None
+
+    unsupported = {
+        outcome["scenario_id"]: outcome
+        for outcome in report["outcomes"]
+        if outcome["status"] == "unsupported"
     }
+    assert unsupported["replay-verdict-004-missing-trace"][
+        "diagnostic"
+    ] == "python-sdk verdict path has no local replay evaluator"
+
+    prompt_write_scope = driver.scope_for_labels(["prompt:write"])
+    assert prompt_write_scope.prompt_grants[0].operations == [
+        driver.Operation.INVOKE
+    ]

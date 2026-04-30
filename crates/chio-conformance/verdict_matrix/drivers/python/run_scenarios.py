@@ -66,6 +66,7 @@ def install_sdk_path() -> None:
 install_sdk_path()
 
 from chio_sdk.models import (  # noqa: E402
+    CapabilityToken,
     ChioScope,
     Operation,
     PromptGrant,
@@ -134,8 +135,9 @@ def scope_for_labels(labels: list[str]) -> ChioScope:
                 ResourceGrant(uri_pattern=tool, operations=[Operation.READ])
             )
         elif label.startswith("prompt:"):
+            operation = Operation.INVOKE if label == "prompt:write" else Operation.GET
             prompt_grants.append(
-                PromptGrant(prompt_name=tool, operations=[Operation.GET])
+                PromptGrant(prompt_name=tool, operations=[operation])
             )
         else:
             grants.append(
@@ -166,72 +168,99 @@ def tuple_for(verdict: str, reason_code: str, scope_set: list[str]) -> VerdictTu
     )
 
 
-def base_tuple(scenario: dict[str, Any]) -> VerdictTuple:
+def scope_label_for_tool(tool_name: str) -> str:
+    mapping = {
+        "files.read": "tool:read",
+        "files.write": "tool:write",
+        "system.rotate": "tool:admin",
+        "metrics.query": "telemetry:read",
+        "prompts.get": "prompt:read",
+        "prompts.update": "prompt:write",
+        "resources.read": "resource:read",
+        "tools.invoke": "tool:call",
+    }
+    try:
+        return mapping[tool_name]
+    except KeyError as error:
+        raise ValueError(f"unsupported matrix tool `{tool_name}`") from error
+
+
+def unsupported_reason(scenario: dict[str, Any]) -> str | None:
     script = scenario["script"]
-    scope_set = list(script.get("capability_scopes", []))
     if script.get("operation") != "tool.call":
-        return tuple_for("error", REASON_KERNEL_INTERNAL, scope_set)
-
-    granted = scope_for_labels(scope_set)
-    required = required_scope(script.get("required_scope"))
-    if not required.is_subset_of(granted):
-        return tuple_for("deny", REASON_SCOPE_EXCEEDED, scope_set)
-    if script.get("revoked", False):
-        return tuple_for("deny", REASON_REVOKED, scope_set)
-
-    if scenario["category"] == "replay":
-        replay_status = script.get("replay_nonce_status", "fresh")
-        if replay_status == "fresh":
-            return tuple_for("allow", REASON_NONE, scope_set)
-        if replay_status in {"duplicate", "stale"}:
-            return tuple_for("deny", REASON_REPLAY_DRIFT, scope_set)
-        if replay_status == "trace_missing":
-            return tuple_for("error", REASON_REPLAY_TRACE_MISSING, scope_set)
-        return tuple_for("error", REASON_KERNEL_INTERNAL, scope_set)
-
-    redaction_action = script.get("redaction_action", "none")
-    redaction_phase = script.get("redaction_phase", "input")
-    if redaction_action == "deny":
-        return tuple_for("deny", REASON_GUARD_DENIED, scope_set)
-    if redaction_action in {"mask", "drop"}:
-        reason = (
-            REASON_OUTPUT_REDACTED
-            if redaction_phase == "output"
-            else REASON_INPUT_REDACTED
+        return "python-sdk does not emit non-tool-call verdicts"
+    if scenario["category"] != "capability":
+        return (
+            "python-sdk verdict path has no local "
+            f"{scenario['category']} evaluator"
         )
-        return tuple_for("allow", reason, scope_set)
+    if script.get("revoked", False):
+        return "python-sdk mock capabilities do not expose revocation"
+    return None
 
-    return tuple_for("allow", REASON_NONE, scope_set)
+
+def tuple_from_receipt(
+    receipt: Any,
+    scope_set: list[str],
+) -> VerdictTuple:
+    decision = receipt.decision
+    if decision.verdict == "allow":
+        reason_code = decision.reason or REASON_NONE
+        return tuple_for("allow", reason_code, scope_set)
+    if decision.verdict == "deny":
+        return tuple_for(
+            "deny",
+            decision.reason or REASON_KERNEL_INTERNAL,
+            scope_set,
+        )
+    return tuple_for(
+        "error",
+        decision.reason or REASON_KERNEL_INTERNAL,
+        scope_set,
+    )
 
 
 async def evaluate_scenario(scenario: dict[str, Any]) -> VerdictTuple:
-    planned = base_tuple(scenario)
-    if planned.verdict == "error":
-        return planned
+    script = scenario["script"]
+    scope_set = list(script.get("capability_scopes", []))
+    token_by_id: dict[str, CapabilityToken] = {}
 
     def policy(
-        _tool_name: str,
+        tool_name: str,
         _scope: dict[str, Any],
-        _context: dict[str, Any],
+        context: dict[str, Any],
     ) -> MockVerdict:
-        if planned.verdict == "allow":
+        capability_id = str(context.get("capability_id", ""))
+        token = token_by_id.get(capability_id)
+        if token is None:
+            return MockVerdict.deny_verdict(
+                REASON_KERNEL_INTERNAL,
+                guard="VerdictMatrixCapability",
+            )
+        required = required_scope(scope_label_for_tool(tool_name))
+        if required.is_subset_of(token.scope):
             return MockVerdict.allow_verdict()
         return MockVerdict.deny_verdict(
-            planned.reason_code,
-            guard="VerdictMatrix",
+            REASON_SCOPE_EXCEEDED,
+            guard="VerdictMatrixCapability",
         )
 
     client = MockChioClient(policy=policy, raise_on_deny=False)
-    script = scenario["script"]
+    token = await client.create_capability(
+        subject=f"matrix-{scenario['id']}",
+        scope=scope_for_labels(scope_set),
+    )
+    token_by_id[token.id] = token
+    if not await client.validate_capability(token):
+        return tuple_for("error", REASON_KERNEL_INTERNAL, scope_set)
     parameters = json.loads(str(script["input_json"]))
     receipt = await client.evaluate_tool_call(
-        capability_id=f"matrix-{scenario['id']}",
+        capability_id=token.id,
         tool_server=MATRIX_SERVER_ID,
         tool_name=str(script["tool"]),
         parameters=parameters,
     )
-    verdict = "allow" if receipt.is_allowed else "deny"
-    return tuple_for(verdict, planned.reason_code, list(planned.scope_set))
+    return tuple_from_receipt(receipt, scope_set)
 
 
 async def run_scenarios(root: Path) -> dict[str, Any]:
@@ -244,10 +273,15 @@ async def run_scenarios(root: Path) -> dict[str, Any]:
             for requirement in scenario.get("requires", [])
             if not supports_requirement(str(requirement))
         ]
+        scenario_unsupported = unsupported_reason(scenario)
         if unsupported:
             actual = None
             status = "unsupported"
             diagnostic = f"unsupported requirement `{unsupported[0]}`"
+        elif scenario_unsupported is not None:
+            actual = None
+            status = "unsupported"
+            diagnostic = scenario_unsupported
         else:
             actual_tuple = await evaluate_scenario(scenario)
             actual = actual_tuple.as_json()
@@ -288,7 +322,7 @@ def main() -> int:
     args = parser.parse_args()
     report = asyncio.run(run_scenarios(args.scenario_root))
     print(json.dumps(report, sort_keys=True, indent=2))
-    return 1 if report["failed"] or report["unsupported"] else 0
+    return 1 if report["failed"] else 0
 
 
 if __name__ == "__main__":
