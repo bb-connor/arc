@@ -1,6 +1,6 @@
 {
   "schema": "chio.threat-model.v1",
-  "updatedAt": "2026-04-13",
+  "updatedAt": "2026-04-30",
   "boundary": {
     "focus": "agent-kernel-tool trust boundary",
     "surfaces": [
@@ -159,6 +159,53 @@
         }
       ],
       "residualRisk": "The shipped runtime is stronger than unchecked delegation metadata, but it is not yet a universally recursive, fail-closed delegated-authority proof system at every entry point."
+    },
+    {
+      "id": "pq_signature_downgrade",
+      "name": "Post-quantum signature downgrade",
+      "surfaces": [
+        "trust_control",
+        "hosted_mcp",
+        "native_chio"
+      ],
+      "mitigations": [
+        {
+          "status": "planned",
+          "control": "Signed artifacts that opt into the post-quantum profile will carry policy-visible algorithm metadata so verifiers can reject classical-only substitutions."
+        },
+        {
+          "status": "planned",
+          "control": "Receipt, capability, and compliance-certificate verification will enforce the configured cryptographic floor before accepting an artifact."
+        },
+        {
+          "status": "planned",
+          "control": "Migration tests will cover classical compatibility and post-quantum-required rejection of downgraded signatures."
+        }
+      ],
+      "residualRisk": "Until hybrid signature verification and cryptographic-floor enforcement ship, operators must treat post-quantum protection as planned rather than available."
+    },
+    {
+      "id": "tee_quote_forgery",
+      "name": "TEE quote forgery or misbinding",
+      "surfaces": [
+        "hosted_mcp",
+        "native_chio"
+      ],
+      "mitigations": [
+        {
+          "status": "planned",
+          "control": "Quote verifiers will validate platform evidence for Intel TDX, AMD SEV-SNP, and AWS Nitro before accepting a claimed confidential-runtime binding."
+        },
+        {
+          "status": "planned",
+          "control": "Accepted quotes will bind report data to the kernel signing key and receipt root so copied or stale quotes cannot authorize another runtime."
+        },
+        {
+          "status": "planned",
+          "control": "Pinned positive and negative quote fixtures will exercise malformed, stale, and mismatched quote paths."
+        }
+      ],
+      "residualRisk": "Until platform quote verification lands, TEE deployment claims depend on external operator evidence and are not independently verified by Chio."
     }
   ],
   "transportRequirements": {

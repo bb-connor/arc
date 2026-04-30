@@ -68,7 +68,9 @@ fn threat_model_register_lists_required_threats_with_mitigations() {
         "delegation_chain_abuse".to_string(),
         "kernel_impersonation".to_string(),
         "native_channel_replay".to_string(),
+        "pq_signature_downgrade".to_string(),
         "resource_exhaustion_dos".to_string(),
+        "tee_quote_forgery".to_string(),
         "tool_server_escape".to_string(),
     ]);
 
