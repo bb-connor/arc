@@ -45,9 +45,9 @@
   agent_role: provider-rust
   review_required:
     - "@bb-connor"
-  first_commit_sha: null
+  first_commit_sha: 7dff9d835
   merged_sha: null
-  opened_ts: null
+  opened_ts: 2026-04-30T18:57:00Z
   merged_ts: null
 
 - id: M07.P3.T2
@@ -73,9 +73,9 @@
   agent_role: provider-rust
   review_required:
     - "@bb-connor"
-  first_commit_sha: null
+  first_commit_sha: c2cfb8638
   merged_sha: null
-  opened_ts: null
+  opened_ts: 2026-04-30T18:57:00Z
   merged_ts: null
 
 - id: M07.P3.T3
@@ -105,9 +105,9 @@
   agent_role: provider-rust
   review_required:
     - "@bb-connor"
-  first_commit_sha: null
+  first_commit_sha: 756091afa
   merged_sha: null
-  opened_ts: null
+  opened_ts: 2026-04-30T18:57:00Z
   merged_ts: null
 
 - id: M07.P3.T4
@@ -133,9 +133,9 @@
   agent_role: provider-rust
   review_required:
     - "@bb-connor"
-  first_commit_sha: null
+  first_commit_sha: 3f3932034
   merged_sha: null
-  opened_ts: null
+  opened_ts: 2026-04-30T18:57:00Z
   merged_ts: null
 
 - id: M07.P3.T5
@@ -168,9 +168,9 @@
   agent_role: provider-rust
   review_required:
     - "@bb-connor"
-  first_commit_sha: null
+  first_commit_sha: 12e7429d0
   merged_sha: null
-  opened_ts: null
+  opened_ts: 2026-04-30T18:57:00Z
   merged_ts: null
 
 - id: M07.P3.T6
@@ -196,7 +196,7 @@
   agent_role: provider-rust
   review_required:
     - "@bb-connor"
-  first_commit_sha: null
+  first_commit_sha: 0755b3a50
   merged_sha: null
-  opened_ts: null
+  opened_ts: 2026-04-30T18:57:00Z
   merged_ts: null
