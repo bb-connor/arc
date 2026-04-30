@@ -12,8 +12,35 @@ integration in P0.
 - P0 tickets: `.planning/trajectory-2/tickets/M04/P0.yml`
 - Decisions: `.planning/trajectory-2/decisions.yml`
 - Freezes: `.planning/trajectory-2/freezes.yml`
+- Freeze guard stub: `.planning/trajectory-2/ci-stubs/m04-freeze-guard.yml`
+- M04 audit template: `.planning/trajectory-2/audits/M04-AUDIT.md`
+- Trajectory-2 ownership manifest: `.planning/trajectory-2/OWNERS.toml`
 - Current dependency and workspace layout: `Cargo.toml`, `Cargo.lock`
 - Current ownership surface: `.github/CODEOWNERS`
+
+## Same-Day Opener Checklist
+
+Use this when W1 gates have drained and the M04 P0 opener is cut:
+
+1. Confirm branch base and file ownership. M04 P0 may touch only the ticket-owned opener files and research or audit artifacts. It must not edit crate source except the new scaffold crate owned by M04.P0.T2.
+2. M04.P0.T1: add the root workspace dependency pin, refresh `Cargo.lock` with Cargo, then run `grep -q 'rs_merkle' Cargo.toml && cargo metadata --quiet --format-version 1 >/dev/null`.
+3. M04.P0.T2: add the `crates/chio-revocation-oracle` workspace member and a minimal package scaffold, then run `cargo build -p chio-revocation-oracle --quiet` and `cargo test -p chio-revocation-oracle --quiet`.
+4. M04.P0.T3: create `.planning/audits/M04-delegation-revocation.md` with starting counts, command evidence, and no claims that oracle, gossip, delegation, or formal work exists.
+5. M04.P0.T4: resolve the exact-path freeze mismatch before editing generated ownership surfaces. The ticket gate requires exact `capability.rs` and `federation/src/lib.rs` CODEOWNERS hits, while the current register uses broader capability and revocation-specific federation globs.
+6. PR body cites `D11` and `D12` by id only, plus `m04-revocation-oracle-pivot` and `m04-delegation-pivot`. Include ticket gate output and the security x2 review record.
+
+## Current Repo Snapshot
+
+Verified on 2026-04-30 from the M04 research worktree:
+
+- `crates/chio-revocation-oracle/` is absent.
+- `rs_merkle` is absent from root `Cargo.toml` and `Cargo.lock`.
+- Baseline revocation implementation line count is still 254 across `crates/chio-kernel/src/revocation_store.rs` (17), `crates/chio-kernel/src/revocation_runtime.rs` (45), and `crates/chio-store-sqlite/src/revocation_store.rs` (192).
+- `formal/rust-verification/kani-public-harnesses.toml` has 10 `covered_symbols`.
+- `formal/tla/RevocationPropagation.tla` exists; `formal/tla/DelegationDepthBound.tla` does not.
+- `formal/lean4/Chio/Chio/Capability/Delegation.lean` does not exist.
+- `.github/CODEOWNERS` currently has `crates/chio-core-types/src/capability*.rs @bb-connor`, but lacks the exact `crates/chio-core-types/src/capability.rs` and `crates/chio-federation/src/lib.rs` lines required by the P0.T4 gate.
+- `.planning/trajectory-2/OWNERS.toml` marks M04 as trust-boundary with `review_x2 = true`.
 
 ## Ticket Notes
 
@@ -163,6 +190,8 @@ Implementation notes:
   - `m04-revocation-oracle-pivot`
   - `m04-delegation-pivot`
 - The P0 ticket says to cover `crates/chio-core-types/src/capability.rs` and `crates/chio-federation/src/lib.rs` for P3-P4. The current freeze register uses globbed capability paths and revocation-specific federation paths. Resolve that mismatch explicitly in the implementation PR rather than silently broadening or narrowing coverage.
+- The current register opens `m04-revocation-oracle-pivot` at M04.P1.T1 and closes it at M04.P3.T5. It opens `m04-delegation-pivot` at M04.P3.T1 and closes it at M04.P5.T5. During M04.P3.T1..M04.P3.T5, the guard unions both rows.
+- The P0.T4 header says the capability and federation freeze covers P3-P4, but `m04-delegation-pivot` currently runs through P5 and `m04-revocation-oracle-pivot` does not cover `crates/chio-federation/src/lib.rs`. Treat this as an intentional decision point.
 - `.github/CODEOWNERS` says it is generated from `.planning/trajectory/OWNERS.toml`, while this wave uses trajectory-2 ticketing. Before editing, find the current generator path and source of truth. If CODEOWNERS must be regenerated from a protected owner file, record that in the PR and avoid hand edits that will drift.
 - The milestone prose mentions wiring freeze on `crates/chio-core-types/src/capability.rs` and `crates/chio-federation/src/lib.rs`; do not edit those code files in P0.
 
@@ -207,6 +236,20 @@ grep -q 'm04-' .planning/trajectory-2/freezes.yml
 
 If T4 keeps the exact-path gate from the ticket, also run the two CODEOWNERS
 grep checks from T4 and verify they pass for exact paths, not only globs.
+
+## Formal Gate Expectations
+
+P0 formal posture is baseline capture only:
+
+- Do not add or edit Lean, TLA, or Kani implementation files in P0.
+- The audit doc should record 10 current Kani `covered_symbols`, 1 existing TLA module (`RevocationPropagation.tla`), 0 Lean delegation theorems, and 254 LoC of current revocation implementation surface.
+- Future P4 formal gates are additive: `DelegationDepthBound.tla` plus `MCDelegationDepthBound.cfg`, `RevocationFreshness` added to `RevocationPropagation.tla` without renaming existing invariants, `Capability/Delegation.lean`, 4 new Kani harnesses, `formal/MAPPING.md`, and `formal/proof-manifest.toml`.
+- Before P4 opens, resolve the Lean path mismatch: the current Lean tree lives under `formal/lean4/Chio/Chio/`, while `freezes.yml` names `formal/lean4/Chio/Capability/Delegation.lean`.
+- Any P0 diff containing `DelegationDepthBound.tla`, `Capability/Delegation.lean`, `RevocationFreshness`, or new public Kani harness functions should be rejected as premature unless the ticket is explicitly amended.
+
+## Security Review Note
+
+M04 is a Wave 2 trust-boundary milestone. Every P0 PR that touches M04-owned paths should record Security x2 review in addition to `@bb-connor`: two independent reviewer instances, different seeds, and no shared scratchpad. This applies even to opener metadata if it changes freeze, ownership, or trust-boundary workflow surfaces.
 
 ## Known Surfaces To Inspect First
 

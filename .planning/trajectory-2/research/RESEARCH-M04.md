@@ -15,10 +15,11 @@ Scope: M04 P0 wave-opener ready-pack. This note is for the first implementation 
 - Formal surfaces in `formal/rust-verification/kani-public-harnesses.toml`, `crates/chio-kernel-core/src/kani_public_harnesses.rs`, `formal/tla/RevocationPropagation.tla`, `formal/MAPPING.md`, and `formal/proof-manifest.toml`
 - Workspace and ownership surfaces in `Cargo.toml` and `.github/CODEOWNERS`
 
-## Locked Decisions
+## Decision References
 
-- `D11`: M04 adds exactly 4 new public Kani harnesses and caps the public surface at about 14 total. P0 must not propose extra public Kani targets.
-- `D12`: `Capability::Delegate` ships behind `delegation_v2` through P4 and flips default-on only after P5 acceptance. P0 must not add the enum variant or runtime behavior.
+- Cite `D11` and `D12` by id only in P0 PR bodies and audit evidence. Do not paste their full text into the opener.
+- P0 records the current Kani baseline only. It does not propose or add extra public Kani targets.
+- P0 does not add `Capability::Delegate`, `delegation_v2`, or runtime behavior.
 
 ## Existing Surfaces
 
@@ -29,6 +30,20 @@ Scope: M04 P0 wave-opener ready-pack. This note is for the first implementation 
 - `formal/rust-verification/kani-public-harnesses.toml` already lists 14 lane harness function names, but its `covered_symbols` list has 10 symbols. Treat the M04 "10 baseline plus 4" claim as the public covered-symbol baseline named by the milestone, and re-measure before editing the audit doc.
 - `formal/MAPPING.md` currently maps `RevocationPropagation.tla` invariants and the existing Kani harnesses. P4 must add new rows in the same PR as any new invariant or harness.
 - `.github/CODEOWNERS` is generated from `.planning/trajectory/OWNERS.toml` by `scripts/regen-codeowners.sh`. Do not hand-edit it unless the generator source of truth is intentionally changed too.
+
+## Current Readiness Snapshot
+
+Verified from the M04 research worktree on 2026-04-30:
+
+- `crates/chio-revocation-oracle/` is absent, so M04.P0.T2 is still a scaffold task.
+- Root `Cargo.toml` and `Cargo.lock` do not currently contain `rs_merkle`, so M04.P0.T1 is still open.
+- `crates/chio-core-types/src/capability.rs` is 3700 lines and already contains `DelegationLink`, `DelegationLinkBody`, `DelegationLink::sign`, `validate_delegation_chain`, and `Error::DelegationDepthExceeded`.
+- Baseline revocation implementation lines still match the M04 narrative: 17 lines in `crates/chio-kernel/src/revocation_store.rs`, 45 in `crates/chio-kernel/src/revocation_runtime.rs`, and 192 in `crates/chio-store-sqlite/src/revocation_store.rs`, for 254 total.
+- `formal/tla/RevocationPropagation.tla` and `MCRevocationPropagation.cfg` exist. `formal/tla/DelegationDepthBound.tla` does not.
+- Lean revocation modules exist under `formal/lean4/Chio/Chio/Core/` and `formal/lean4/Chio/Chio/Proofs/`. `formal/lean4/Chio/Chio/Capability/Delegation.lean` does not.
+- `formal/rust-verification/kani-public-harnesses.toml` has 10 `covered_symbols`; the 4 M04 harnesses remain future P4 work.
+- `.github/CODEOWNERS` currently has `crates/chio-core-types/src/capability*.rs @bb-connor`, but no exact `crates/chio-core-types/src/capability.rs` line and no exact `crates/chio-federation/src/lib.rs` line.
+- `.planning/trajectory-2/OWNERS.toml` already marks M04 as `trust_boundary = true` and `review_x2 = true`; this is the source to carry into PR review instructions.
 
 ## P0 Files To Touch
 
@@ -123,6 +138,9 @@ grep -q 'crates/chio-core-types/src/capability.rs' .github/CODEOWNERS && grep -q
   - `m04-revocation-oracle-pivot`: P1-P3 over `crates/chio-revocation-oracle/**`, `crates/chio-credentials/src/revocation*.rs`, and `crates/chio-federation/src/revocation*.rs`.
   - `m04-delegation-pivot`: P3-P5 over `crates/chio-core-types/src/capability*.rs`, `crates/chio-kernel/src/delegation*.rs`, `formal/lean4/Chio/Capability/Delegation.lean`, and `formal/tla/DelegationDepthBound.tla`.
 - During M04 P3, the guard unions both freeze rows. Any non-M04 PR touching either set fails closed unless titled with the accepted M04 or bypass prefix.
+- The P3 overlap is specifically M04.P3.T1 through M04.P3.T5. Treat the union as load-bearing because P3 introduces delegation behavior while the oracle freeze is still open.
+- The P0.T4 header and ticket gate are stricter and different from the current freeze register: they ask for exact `crates/chio-core-types/src/capability.rs` and `crates/chio-federation/src/lib.rs` coverage for P3-P4. The implementation PR must resolve that mismatch explicitly rather than relying on the existing globs.
+- `m04-revocation-oracle-pivot` does not currently cover `crates/chio-federation/src/lib.rs`; it covers only `crates/chio-federation/src/revocation*.rs`. If P0.T4 keeps the exact `lib.rs` gate, the freeze register or ticket text needs a conscious amendment.
 - P0 should not touch `crates/chio-core-types/src/capability.rs`, `crates/chio-federation/src/lib.rs`, `crates/chio-kernel/src/delegation*.rs`, or formal delegation implementation files. P0 freeze work should be metadata and ownership only.
 - The freeze-guard stub says it should be copied to `.github/workflows/m04-freeze-guard.yml` as part of the M04.P1 wave-opener, not necessarily P0. Do not prematurely activate it unless the ticket is amended.
 
@@ -142,6 +160,12 @@ grep -q 'crates/chio-core-types/src/capability.rs' .github/CODEOWNERS && grep -q
 - P4 TLA work adds `formal/tla/DelegationDepthBound.tla` and `formal/tla/MCDelegationDepthBound.cfg`. It must not replace `formal/tla/RevocationPropagation.tla`.
 - P4 adds `RevocationFreshness` to `RevocationPropagation.tla` additively and preserves existing invariant names.
 - Lean work adds `formal/lean4/Chio/Chio/Capability/Delegation.lean` and import wiring only when P4 opens. `D12` requires `delegation_v2` to stay off by default until P5 acceptance.
+
+P0 formal gate expectation:
+
+- No Lean, TLA, or Kani files should change in the opener unless the ticket is amended.
+- The P0 audit doc should record the live baseline only: 10 Kani `covered_symbols`, 1 existing TLA module, 0 Lean delegation theorems, and 254 LoC of current revocation implementation surface.
+- P0 reviewers should treat any `DelegationDepthBound.tla`, `Capability/Delegation.lean`, `RevocationFreshness`, or new Kani harness diff as out of scope.
 
 ## First PR Shape
 
@@ -168,10 +192,21 @@ Exclude:
 
 PR body should cite:
 
-- `D11` for the Kani cap.
-- `D12` for the feature-flag boundary.
+- `D11` and `D12` by id only.
 - `m04-revocation-oracle-pivot` and `m04-delegation-pivot` for freeze context.
 - The exact gate commands for included tickets.
+- Security x2 review requirement from the trajectory-2 owner manifest: two independent reviewer instances with different seeds and no shared scratchpad, plus `@bb-connor`.
+
+## Same-Day Opener Checklist
+
+When W1 gates drain, the M04 P0 opener can proceed in this order:
+
+1. Rebase or recreate the opener branch from the current trajectory-2 integration base. Confirm no other active worktree owns the same files.
+2. Run the M04.P0.T1 gate after adding the workspace `rs_merkle = "1.5"` pin and refreshing `Cargo.lock`.
+3. Land M04.P0.T2 as scaffold only. The crate should build and test, but should not expose oracle logic, sparse-Merkle behavior, signed roots, gossip, or freshness checks.
+4. Land M04.P0.T3 with the starting-count audit doc. Include both milestone baseline numbers and live measurements if they differ.
+5. Land M04.P0.T4 only after deciding whether the exact-path gate updates `freezes.yml`, the CODEOWNERS generator inputs, or the ticket text. Run the exact grep gate from the ticket.
+6. PR body cites `D11`, `D12`, `m04-revocation-oracle-pivot`, and `m04-delegation-pivot` by id. Include ticket gate output, security x2 reviewers, and the freeze-overlap decision.
 
 ## P0 Close Gate Bundle
 
@@ -193,4 +228,4 @@ If P0.T4 lands, also run the exact CODEOWNERS grep gate from the ticket and veri
 
 - Should P0.T4 amend the M04 delegation freeze from P3-P5 to P3-P4, or should the ticket header be treated as stale and the freeze register remain authoritative through P5?
 - Should the exact `crates/chio-federation/src/lib.rs` CODEOWNERS line be generated from `.planning/trajectory/OWNERS.toml`, or should the trajectory-2 owner source be introduced first?
-- Should the audit doc record the Kani baseline as 10 covered symbols or 14 harness lane entries? The milestone text uses 10 as the baseline; the current file lists 14 lane harness function names.
+- Should the P4 Lean path follow the existing `formal/lean4/Chio/Chio/...` tree or the freeze-register path `formal/lean4/Chio/Capability/Delegation.lean`?
