@@ -11,10 +11,15 @@ Scope: implementation notes for `M05.P0.T1`
 - `.planning/trajectory-2/decisions.yml` decisions D13 and D14
 - `.planning/trajectory-2/freezes.yml`
 - `.planning/trajectory-2/WAVE-OPENER-STRATEGY.md`
+- `.planning/trajectory-2/EXECUTION-BOARD.md`
+- `.planning/trajectory-2/audits/M05-AUDIT.md`
 - `.planning/trajectory-2/ci-stubs/adversarial-suite.yml`
 - `.planning/trajectory-2/ci-stubs/wasm-guard-escape.yml`
+- `.planning/trajectory-2/ci-stubs/threat-model-coverage.yml`
 - `.planning/trajectory-2/ci-stubs/m04-freeze-guard.yml` as the reusable freeze-guard shape
+- `spec/security/chio-threat-model.v1.json`
 - Live manifests for `crates/chio-attest-verify` and `crates/chio-wasm-guards`
+- `Cargo.lock`
 
 ## P0 Objective
 
@@ -30,6 +35,40 @@ load-bearing M05 phases open. The ticket asks for:
 This is a wave-opener prep PR. It should not create the adversarial suite, add
 escape fixtures, alter threat-model JSON, or implement the expected-identity
 policy loader.
+
+## Same-Day P0 Opener Checklist
+
+Use this exact order once Wave 1 gates drain:
+
+- Confirm Wave 1 is fully merged before opening M05 P0. `M01`, `M02`, and
+  `M06` ticket rows in `.planning/trajectory-2/tickets/manifest.yml` must all
+  be `merged`, and the Wave 2 workspace gate in
+  `.planning/trajectory-2/WAVE-OPENER-STRATEGY.md` must be green or explicitly
+  replaced by the current local executor gate.
+- Create the implementation branch named in `P0.yml`:
+  `wave/W2/m05/p0.t1-cargo-lock-bump-toml-arbitrary`.
+- Re-read `P0.yml`, this ready pack, the two crate manifests, and `Cargo.lock`
+  before editing. Do not rely on this file if the live manifests drift.
+- Keep the implementation write set to `crates/chio-attest-verify/Cargo.toml`,
+  `crates/chio-wasm-guards/Cargo.toml` only if needed, `Cargo.lock`, and
+  generated trajectory manifest output only if the regen command emits it.
+- Do not edit `decisions.yml`, `freezes.yml`, `OWNERS.toml`, CODEOWNERS,
+  milestone narratives, ticket YAML, execution state, crate source, or any M05
+  P1..P5 protected implementation path.
+- Add `toml = "0.8"` as the direct `chio-attest-verify` dependency. Treat the
+  existing optional direct `arbitrary` dependency in `chio-wasm-guards` as
+  already satisfying the dependency edge unless Cargo metadata on the
+  implementation branch proves the future tests need a separate dev edge.
+- Refresh `Cargo.lock` through Cargo only, then run the P0 ticket gate and
+  changed-file hygiene checks listed below.
+- Open the PR with `[M05]` in the title and the M05 freeze label or equivalent
+  trajectory label. State explicitly that no adversarial suite, threat-model,
+  escape harness, or policy loader code is included.
+- Pre-stage security x2 review before requesting merge. The audit template and
+  Wave 2 strategy require two independent reviewer instances with different
+  seeds and no shared scratchpad, plus `@bb-connor`. If the path-based freeze
+  guard does not auto-request security x2 because P0 is manifest-only, request
+  it manually or record the explicit override in the M05 audit before merge.
 
 ## Live Dependency State
 
@@ -82,6 +121,29 @@ Protected trust-boundary implementation paths to avoid in P0:
 - `spec/security/chio-threat-model.v1.json`
 - `crates/chio-conformance/tests/threats/**`
 
+## Threat-Model Gate Readiness
+
+P0 is not the threat-model implementation phase. The opener should leave the
+registry and CI stub untouched, but it should preserve the assumptions that make
+P5 land cleanly:
+
+- `spec/security/chio-threat-model.v1.json` currently has six baseline threat
+  IDs and no live coverage mapping consumed by tests.
+- `.planning/trajectory-2/ci-stubs/threat-model-coverage.yml` is still a stub.
+  It assumes a future `scripts/check-threat-model-coverage.sh`, a coverage
+  block or equivalent row linkage in the registry, and
+  `crates/chio-adversarial-suite` build/test targets.
+- The close bar is 100 percent threat-model coverage: every registered threat
+  ID must have a green test mapping. `coverage_state: covered` and
+  `coverage_state: partial` count as pass per the execution board; any
+  `coverage_state: pending` row without `deferred_to` fails closed.
+- Below 100 percent coverage is halt trigger 13 once the M05 P5 gate is active.
+  Recovery is only one of two paths: add the missing green test mapping under
+  `crates/chio-conformance/tests/threats/`, or revert the uncovered threat row.
+  Do not downgrade the gate or merge around it.
+- Auto-promoted adversarial vectors do not satisfy coverage until human triage
+  clears them. Reference the decisions register by ID only: `D13`, `D14`.
+
 ## Expected Gates
 
 Run the ticket gate exactly:
@@ -121,24 +183,27 @@ dependency bump.
 
 ## Corpus And Test Contract For Later Phases
 
-D13 fixes the adversarial vector contract:
+- Decision anchors: `D13`, `D14`. This ready pack references those decisions by
+  ID only; the decision register stays the source of truth for their exact
+  wording.
 
-- JSON files live at
-  `crates/chio-adversarial-suite/cases/<class>/<sha>.json`.
-- Each vector carries at least `{ class, expected_verdict, expected_reason }`.
-- The milestone narrative extends the envelope with `threat_id` for coverage
-  linkage.
+Corpus schema readiness for P1 and P2, derived from the M05 narrative and
+current threat-model file:
 
-D14 fixes the auto-promotion contract:
-
-- `scripts/promote_fuzz_seed.sh --mode adversarial` writes
-  `pending: true`.
-- Pending vectors do not count as threat-model coverage until human triage
-  strips the flag.
-- Orphan `pending: true` vectors block trajectory close.
-
-P0 should not create corpus files. It only makes the future TOML policy loader
-and WASM escape/fuzz harness dependency graph predictable.
+- JSON remains the only planned corpus encoding. Do not introduce TOML corpus
+  cases just because P0 adds a TOML parser dependency for P4 policy files.
+- Each P1 vector should be ready to carry `class`, `expected_verdict`,
+  `expected_reason`, and `threat_id` so P5 can generate coverage without a
+  schema migration.
+- Auto-promoted vectors should be ready to carry `pending`, `source`, and enough
+  content-addressing metadata for `fuzz/corpus_metadata.toml` to index the seed
+  by source, class, and threat ID.
+- The six current threat IDs are:
+  `capability_token_theft`, `kernel_impersonation`, `tool_server_escape`,
+  `native_channel_replay`, `resource_exhaustion_dos`, and
+  `delegation_chain_abuse`.
+- P0 must not create any corpus file, schema crate, metadata file, or threat
+  coverage report. It only makes the later dependency graph predictable.
 
 ## WASM Guard Surface Notes
 
@@ -199,3 +264,5 @@ Stop and report rather than expanding scope if:
 - Cargo tries to rewrite unrelated workspace dependency versions.
 - `cargo xtask trajectory regen-manifest` wants to modify decisions, freezes, or
   owner files.
+- The M05 P5 threat-model gate is active and reports less than 100 percent
+  coverage. Treat that as halt trigger 13, not as a warning.

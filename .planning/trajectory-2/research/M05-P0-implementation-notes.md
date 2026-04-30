@@ -8,6 +8,11 @@ Sources read:
 - `.planning/trajectory-2/tickets/M05/P0.yml`
 - `.planning/trajectory-2/decisions.yml`
 - `.planning/trajectory-2/freezes.yml`
+- `.planning/trajectory-2/WAVE-OPENER-STRATEGY.md`
+- `.planning/trajectory-2/EXECUTION-BOARD.md`
+- `.planning/trajectory-2/audits/M05-AUDIT.md`
+- `.planning/trajectory-2/ci-stubs/threat-model-coverage.yml`
+- `spec/security/chio-threat-model.v1.json`
 - `Cargo.toml`
 - `Cargo.lock`
 - `crates/chio-attest-verify/Cargo.toml`
@@ -42,6 +47,39 @@ Do not include in this P0 PR:
 - `crates/chio-conformance/tests/threats/**`
 - any adversarial corpus crate genesis
 
+## Same-Day Opener Checklist
+
+Run this as the handoff checklist for the P0 opener after Wave 1 gates drain:
+
+- Verify Wave 1 has fully drained. All `M01`, `M02`, and `M06` rows in
+  `.planning/trajectory-2/tickets/manifest.yml` must be `merged`, and the Wave
+  2 pre-flight gate in `.planning/trajectory-2/WAVE-OPENER-STRATEGY.md` must be
+  green or replaced by the current local executor gate.
+- Check out `wave/W2/m05/p0.t1-cargo-lock-bump-toml-arbitrary` from the current
+  integration base. Do not start from a stale research branch.
+- Re-read `M05.P0.T1`, the two crate manifests, and `Cargo.lock` before editing.
+  The live manifest state is authoritative.
+- Apply only the dependency bump: `toml = "0.8"` in
+  `crates/chio-attest-verify/Cargo.toml`; `crates/chio-wasm-guards/Cargo.toml`
+  changes only if Cargo metadata proves the existing optional direct
+  `arbitrary` edge is insufficient for tests.
+- Refresh `Cargo.lock` through Cargo. Do not hand-edit the lockfile.
+- Run the ticket gate exactly, then the focused hygiene gates below.
+- Regenerate trajectory manifest output only if the orchestrator requires it.
+  Include generated output in the same PR only if the command emits a diff.
+- Confirm `git diff --name-only` excludes crate source, `decisions.yml`,
+  `freezes.yml`, `OWNERS.toml`, ticket YAML, execution state, and the P1..P5
+  M05 protected paths.
+- Open the PR as `[M05] chore(m05): pin P0 dependency surface` or an equivalent
+  conventional title. The body should say P0 did not implement adversarial
+  suite code, threat-model coverage, a WASM escape harness, or policy loader
+  code.
+- Schedule security x2 review before merge: two independent security reviewers
+  with different seeds and no shared scratchpad, plus `@bb-connor`. If the
+  path-scoped freeze guard does not request security x2 for this manifest-only
+  P0 diff, manually request it or record the explicit audit override before
+  merge.
+
 ## Current Surface Notes
 
 `crates/chio-attest-verify` currently has no direct `toml` dependency. Its manifest includes `sigstore`, `serde`, `serde_json`, `thiserror`, `sha2`, `regex`, `tokio`, `tracing`, x509 and webpki dependencies, plus `tempfile` for tests. The P4 target surface is the existing `ExpectedIdentity` struct in `src/lib.rs`, whose fields are `certificate_identity_regexp` and `certificate_oidc_issuer`. P0 should not change that API.
@@ -49,6 +87,40 @@ Do not include in this P0 PR:
 `crates/chio-wasm-guards` already has optional production dependency `arbitrary = { version = "1", features = ["derive"], optional = true }` gated by the `fuzz` feature. It is not present in `[dev-dependencies]`. P0 should add a direct test/dev dependency only if the implementation ticket owner confirms the intended interpretation of "on chio-wasm-guards tests" is a dev dependency rather than relying on the existing optional feature. Keep the existing `fuzz` feature shape intact.
 
 `fuzz/Cargo.toml` already pins `arbitrary = { version = "1", features = ["derive"] }`. `Cargo.lock` already contains `arbitrary 1.4.2` and multiple `toml` versions, including `toml 0.8.23`. The likely P0 lockfile diff should be limited to package dependency lists, not new registry package entries, unless Cargo resolution shifts.
+
+## Decision And Corpus Readiness Notes
+
+Reference M05 corpus decisions by ID only: `D13`, `D14`. Do not paste or
+paraphrase their decision text into the implementation PR as if this research
+note were the source of truth. The opener should link or mention the IDs and
+leave `decisions.yml` unchanged.
+
+Corpus readiness assumptions for later phases:
+
+- P1 should be able to add JSON corpus cases without changing the encoding
+  choice again. P0's TOML dependency is for P4 policy files only.
+- P1/P2 should reserve room for `threat_id`, `pending`, `source`, and
+  content-addressing metadata so P5 coverage and P2 corpus metadata can join
+  vectors to registry rows.
+- The current registry baseline has six threat IDs:
+  `capability_token_theft`, `kernel_impersonation`, `tool_server_escape`,
+  `native_channel_replay`, `resource_exhaustion_dos`, and
+  `delegation_chain_abuse`.
+- P0 must not create `crates/chio-adversarial-suite`, corpus files,
+  `fuzz/corpus_metadata.toml`, generated threat tests, or
+  `docs/security/threat-coverage.md`.
+
+Threat-model coverage gate assumptions:
+
+- `threat-model-coverage` is still a CI stub at P0. It becomes load-bearing in
+  M05 P5 after the registry coverage linkage and checker script exist.
+- Once active, coverage is 100 percent required: every registered threat ID must
+  have a green test mapping.
+- `coverage_state: covered` and `coverage_state: partial` count as pass per the
+  execution board. `coverage_state: pending` without `deferred_to` fails closed.
+- Less than 100 percent active coverage is halt trigger 13. Recovery is to add a
+  green test mapping under `crates/chio-conformance/tests/threats/` or revert
+  the uncovered threat row. Do not merge by marking the gate advisory.
 
 ## APIs And Files To Inspect First
 
