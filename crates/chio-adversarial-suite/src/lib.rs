@@ -88,6 +88,9 @@ impl AdversarialCase {
         if !is_valid_threat_id(&self.threat_id) {
             return Err(CaseError::InvalidThreatId(self.threat_id.clone()));
         }
+        if self.notes.iter().any(|note| note.trim().is_empty()) {
+            return Err(CaseError::EmptyField("notes"));
+        }
         match self.artifact.as_object() {
             Some(object) if !object.is_empty() => {}
             _ => return Err(CaseError::InvalidArtifact),
@@ -308,6 +311,44 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unsupported_schema_versions() {
+        let err = AdversarialCase::from_slice(
+            br#"{
+              "schema_version": 2,
+              "id": "future-version",
+              "class": "replayed_nonce",
+              "expected_verdict": "DENY",
+              "expected_reason": "nonce_replayed",
+              "threat_id": "native_channel_replay",
+              "pending": false,
+              "artifact": { "nonce": "n-1" }
+            }"#,
+        )
+        .err();
+
+        assert!(matches!(err, Some(CaseError::UnsupportedSchemaVersion(2))));
+    }
+
+    #[test]
+    fn rejects_non_deny_verdicts() {
+        let err = AdversarialCase::from_slice(
+            br#"{
+              "schema_version": 1,
+              "id": "allow-verdict",
+              "class": "replayed_nonce",
+              "expected_verdict": "ALLOW",
+              "expected_reason": "nonce_replayed",
+              "threat_id": "native_channel_replay",
+              "pending": false,
+              "artifact": { "nonce": "n-1" }
+            }"#,
+        )
+        .err();
+
+        assert!(matches!(err, Some(CaseError::Json(_))));
+    }
+
+    #[test]
     fn rejects_malformed_ids() {
         let err = AdversarialCase::from_slice(
             br#"{
@@ -343,6 +384,26 @@ mod tests {
         .err();
 
         assert!(matches!(err, Some(CaseError::InvalidThreatId(_))));
+    }
+
+    #[test]
+    fn rejects_empty_notes() {
+        let err = AdversarialCase::from_slice(
+            br#"{
+              "schema_version": 1,
+              "id": "empty-note",
+              "class": "scope_superset",
+              "expected_verdict": "DENY",
+              "expected_reason": "scope_superset",
+              "threat_id": "delegation_chain_abuse",
+              "pending": false,
+              "artifact": { "scope": "*" },
+              "notes": [""]
+            }"#,
+        )
+        .err();
+
+        assert!(matches!(err, Some(CaseError::EmptyField("notes"))));
     }
 
     #[test]
