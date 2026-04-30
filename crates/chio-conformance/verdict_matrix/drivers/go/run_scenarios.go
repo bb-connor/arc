@@ -132,7 +132,10 @@ func runScenarios(root string) (report, error) {
 			})
 			continue
 		}
-		diagnostic := unsupportedDiagnostic(scenario)
+		diagnostic := "go-http-sdk delegates matrix verdicts to a sidecar and has no local semantic evaluator"
+		if scenario.Script.Operation != "tool.call" {
+			diagnostic = "go-http-sdk does not emit non-tool-call verdicts"
+		}
 		result.Unsupported++
 		result.Outcomes = append(result.Outcomes, outcome{
 			ScenarioID: scenario.ID,
@@ -191,13 +194,6 @@ func unsupportedRequirement(requirements []string) string {
 		}
 	}
 	return ""
-}
-
-func unsupportedDiagnostic(next scenario) string {
-	if next.Script.Operation != "tool.call" {
-		return "go-http-sdk does not emit non-tool-call verdicts"
-	}
-	return "go-http-sdk delegates matrix verdicts to a sidecar and has no local semantic evaluator"
 }
 
 func normalizeTuple(tuple verdictTuple) verdictTuple {
