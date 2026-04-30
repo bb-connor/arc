@@ -132,34 +132,13 @@ func runScenarios(root string) (report, error) {
 			})
 			continue
 		}
-		if diagnostic := unsupportedScenario(scenario); diagnostic != "" {
-			result.Unsupported++
-			result.Outcomes = append(result.Outcomes, outcome{
-				ScenarioID: scenario.ID,
-				Status:     "unsupported",
-				Expected:   expected,
-				Diagnostic: diagnostic,
-			})
-			continue
-		}
-		actual, err := evaluateScenario(scenario)
-		if err != nil {
-			return report{}, fmt.Errorf("%s: %w", scenario.ID, err)
-		}
-		status := "pass"
-		if !tupleEqual(actual, expected) {
-			status = "fail"
-			result.Failed++
-		} else {
-			result.Passed++
-		}
-		result.Tuples[scenario.ID] = actual
-		actualCopy := actual
+		diagnostic := unsupportedDiagnostic(scenario)
+		result.Unsupported++
 		result.Outcomes = append(result.Outcomes, outcome{
 			ScenarioID: scenario.ID,
-			Status:     status,
-			Actual:     &actualCopy,
+			Status:     "unsupported",
 			Expected:   expected,
+			Diagnostic: diagnostic,
 		})
 	}
 	return result, nil
@@ -214,44 +193,15 @@ func unsupportedRequirement(requirements []string) string {
 	return ""
 }
 
-func unsupportedScenario(next scenario) string {
+func unsupportedDiagnostic(next scenario) string {
 	if next.Script.Operation != "tool.call" {
 		return "go-http-sdk does not emit non-tool-call verdicts"
 	}
 	return "go-http-sdk delegates matrix verdicts to a sidecar and has no local semantic evaluator"
 }
 
-func evaluateScenario(next scenario) (verdictTuple, error) {
-	return verdictTuple{}, fmt.Errorf("%s is unsupported by %s", next.ID, driverName)
-}
-
-func tupleFor(verdict string, reasonCode string, scopeSet []string) verdictTuple {
-	return normalizeTuple(verdictTuple{
-		Verdict:    verdict,
-		ReasonCode: reasonCode,
-		ScopeSet:   scopeSet,
-	})
-}
-
 func normalizeTuple(tuple verdictTuple) verdictTuple {
 	tuple.ScopeSet = append([]string{}, tuple.ScopeSet...)
 	sort.Strings(tuple.ScopeSet)
 	return tuple
-}
-
-func tupleEqual(left verdictTuple, right verdictTuple) bool {
-	left = normalizeTuple(left)
-	right = normalizeTuple(right)
-	if left.Verdict != right.Verdict || left.ReasonCode != right.ReasonCode {
-		return false
-	}
-	if len(left.ScopeSet) != len(right.ScopeSet) {
-		return false
-	}
-	for index := range left.ScopeSet {
-		if left.ScopeSet[index] != right.ScopeSet[index] {
-			return false
-		}
-	}
-	return true
 }
