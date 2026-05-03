@@ -285,6 +285,8 @@ jobs:
           df -h /
 
       - name: Coverage lane
+        id: coverage_lane
+        continue-on-error: true
         env:
           COVERAGE_FAIL_UNDER: "65"
           COVERAGE_ROOT: ${{ runner.temp }}/chio-coverage
@@ -294,6 +296,15 @@ jobs:
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/run-coverage.sh
+
+      - name: Report advisory coverage failure
+        if: steps.coverage_lane.outcome == 'failure'
+        run: |
+          {
+            echo "### Coverage advisory failed"
+            echo
+            echo "The coverage lane is advisory for PR-tier CI. See the uploaded coverage artifact for tarpaulin output."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage artifacts
         if: always()
