@@ -342,12 +342,6 @@ name = "half"
 name = "oid-registry"
 
 [[bans.skip]]
-# M06.P4 last-checked = 2026-05-02. openssl-sys is transitive through
-# openssl in sigstore verification; the ban remains documented above and
-# this skip is reviewed with the CVE monitor baseline until sigstore moves.
-name = "openssl-sys"
-
-[[bans.skip]]
 name = "redox_users"
 
 [[bans.skip]]
@@ -355,9 +349,6 @@ name = "syn-solidity"
 
 [[bans.skip]]
 name = "synstructure"
-
-[[bans.skip]]
-name = "target-lexicon"
 
 [[bans.skip]]
 name = "wit-bindgen"
