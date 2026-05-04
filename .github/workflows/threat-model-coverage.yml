@@ -4,8 +4,11 @@
 # spec/security/chio-threat-model.v1.json lacks a populated test
 # body (the codegen stub at crates/chio-conformance/tests/threats/<id>.rs
 # still calls `unimplemented!()`) and is not explicitly marked
-# `coverage_state: pending` or `coverage_state: partial` in the
-# threat-model JSON.
+# `coverage_state: pending` with a non-empty `deferred_to` in the
+# threat-model JSON. `partial` fails closed.
+#
+# Also fails if docs/security/threat-coverage.md is stale relative to
+# spec/security/chio-threat-model.v1.json and spec/security/coverage.yaml.
 #
 # Pending vectors auto-promoted by the M05.P2 fuzz-seed promoter
 # (D14) live in the corpus, not the threat list, and are excluded
@@ -20,8 +23,11 @@ on:
     paths:
       - "spec/security/chio-threat-model.v1.json"
       - "spec/security/chio-threat-model.schema.json"
+      - "spec/security/coverage.yaml"
       - "crates/chio-conformance/tests/threats/**"
       - "crates/chio-spec-codegen/src/threat_model.rs"
+      - "crates/chio-spec-codegen/src/threat_coverage_doc.rs"
+      - "docs/security/threat-coverage.md"
       - "scripts/check-threat-coverage.sh"
       - "scripts/tests/check-threat-coverage.test.sh"
       - ".github/workflows/threat-model-coverage.yml"
@@ -58,6 +64,9 @@ jobs:
 
       - name: Run threat-model coverage gate
         run: bash scripts/check-threat-coverage.sh
+
+      - name: Check generated threat coverage doc freshness
+        run: cargo run -p chio-spec-codegen -- --threat-model-doc --check --repo-root "$PWD"
 
       - name: Self-test the coverage gate (state matrix)
         run: bash scripts/tests/check-threat-coverage.test.sh

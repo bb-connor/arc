@@ -73,8 +73,9 @@ pub use errors_pass::{
     ERROR_REGISTRY_INPUT,
 };
 pub use threat_coverage_doc::{
-    codegen_threat_coverage_doc, codegen_threat_coverage_doc_default, render_threat_coverage_doc,
-    ThreatCoverageInputs, ADVERSARIAL_MANIFEST, ESCAPE_HARNESS_DIR, THREAT_COVERAGE_DOC,
+    check_threat_coverage_doc_default, codegen_threat_coverage_doc,
+    codegen_threat_coverage_doc_default, render_threat_coverage_doc, ThreatCoverageInputs,
+    ADVERSARIAL_MANIFEST, ESCAPE_HARNESS_DIR, SECURITY_COVERAGE_MAP, THREAT_COVERAGE_DOC,
     THREAT_STUBS_DIR,
 };
 pub use threat_model::{
@@ -123,6 +124,8 @@ pub enum CodegenError {
     Registry(PathBuf, String),
     /// The schemas directory did not exist on disk.
     SchemasDirMissing(PathBuf),
+    /// Regenerated output differs from the checked-in file.
+    Drift(PathBuf, String),
 }
 
 impl fmt::Display for CodegenError {
@@ -146,6 +149,9 @@ impl fmt::Display for CodegenError {
             }
             Self::SchemasDirMissing(path) => {
                 write!(f, "schemas directory does not exist: {}", path.display())
+            }
+            Self::Drift(path, msg) => {
+                write!(f, "generated output drift in {}: {msg}", path.display())
             }
         }
     }

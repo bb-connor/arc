@@ -164,7 +164,9 @@ not the raw P5_merged status from EXECUTION-STATE.json.
 
 ## Branch protection state at trajectory-3.1 close
 
-`main` is protected with:
+`main` branch protection was queried on 2026-05-04 with
+`gh api repos/bb-connor/arc/branches/main/protection/required_status_checks`.
+GitHub branch protection currently requires:
 
 - Required status checks: `Build, lint, test`, `MSRV build and test`,
   `cargo-vet (supply-chain audit)`, `cargo-deny
@@ -182,15 +184,27 @@ Repo settings:
 The workflow OAuth scope was added to the active token during
 trajectory-3.1 to allow workflow YAML edits.
 
+Trajectory closure also treated these lanes as gates, but they are not
+in the GitHub branch-protection required contexts above:
+
+| Closure gate | Workflow / job | Closeout status |
+|--------------|----------------|-----------------|
+| Formal Apalache safety | `.github/workflows/ci.yml` `formal-tla (apalache safety)` and `.github/workflows/apalache-safety.yml` `m06-apalache-subset` | supplemental gate, individual replay/deferral tracked in CI-DEBT |
+| Kani public harnesses | `.github/workflows/ci.yml` `kani-public-pr (lanes.pr harnesses)` and `.github/workflows/nightly.yml` `kani-public-nightly (lanes.pr + lanes.nightly_only)` | supplemental gate, trust-boundary expansion deferred in `KANI-DEFERRAL.md` |
+| Threat-model coverage | `.github/workflows/threat-model-coverage.yml` `coverage-gate` | supplemental gate, now includes generated-doc freshness |
+| Mutation gate | `.github/workflows/mutants.yml` `mutants-pr` plus `mutants-nightly` evidence | supplemental gate, advisory until full-sweep evidence closes |
+| Mutation/fuzz co-coverage | `.github/workflows/mutants-fuzz-cocoverage.yml` | supplemental gate, nightly replay/deferral tracked in CI-DEBT |
+| Verdict matrix | `.github/workflows/verdict-matrix.yml` `verdict_matrix rust-kernel` and `verdict_matrix python-sdk go-http-sdk (required)` | supplemental gate, individual replay/deferral tracked in CI-DEBT |
+
 ## Trajectory-3.1 close commit and replay anchor
 
-- **Trajectory-3.1 close main HEAD:** TODO_TRJ3_1_CLOSE_SHA
-- **Consolidated CI green run URL:** TODO_TRJ3_1_CLOSE_RUN
+- **Trajectory-3.1 close main HEAD:** `b3023a0c4ee20cac23368a45ac7ba42edd7f51c4`
+- **Consolidated CI green run URL:** https://github.com/bb-connor/arc/actions/runs/25296839206
 
-These two pointers are filled in once the trajectory-3.1 wave PRs all
-merge and a hosted CI run on the resulting main HEAD lands green. They
-form the canonical replay anchor for CI-DEBT.md and for `releases.toml`
-nightly_runs.
+These two pointers form the canonical replay anchor for CI-DEBT.md and
+for `releases.toml` nightly_runs. The hosted `CI` run above completed
+with conclusion `success` on 2026-05-04 for the main push that merged
+PR #521, after PR #520 wrote this closeout report.
 
 ## Decision: ship at this honesty bar
 

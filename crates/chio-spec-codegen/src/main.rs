@@ -24,7 +24,7 @@ use std::process::ExitCode;
 const USAGE: &str = "usage: chio-spec-codegen <schemas-dir> <out-dir>\n\
                      \x20      chio-spec-codegen --errors-only\n\
                      \x20      chio-spec-codegen --threat-model <input.json> --out <stubs-dir>\n\
-                     \x20      chio-spec-codegen --threat-model-doc [--repo-root <path>]";
+                     \x20      chio-spec-codegen --threat-model-doc [--check] [--repo-root <path>]";
 
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
@@ -64,8 +64,27 @@ fn main() -> ExitCode {
     }
 
     if schemas_dir == "--threat-model-doc" {
-        // chio-spec-codegen --threat-model-doc [--repo-root <path>]
-        let repo_root: PathBuf = match args.next().as_deref() {
+        // chio-spec-codegen --threat-model-doc [--check] [--repo-root <path>]
+        let mut repo_root: Option<PathBuf> = None;
+        let mut check_only = false;
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--check" => check_only = true,
+                "--repo-root" => {
+                    let Some(path) = args.next() else {
+                        eprintln!("error: --repo-root requires a path argument");
+                        return ExitCode::FAILURE;
+                    };
+                    repo_root = Some(PathBuf::from(path));
+                }
+                other => {
+                    eprintln!("error: unexpected argument {other}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
+        let repo_root = match repo_root {
+            Some(path) => path,
             None => match std::env::current_dir() {
                 Ok(d) => d,
                 Err(err) => {
@@ -73,21 +92,18 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             },
-            Some("--repo-root") => match args.next() {
-                Some(p) => PathBuf::from(p),
-                None => {
-                    eprintln!("error: --repo-root requires a path argument");
-                    return ExitCode::FAILURE;
-                }
-            },
-            Some(other) => {
-                eprintln!("error: unexpected argument {other}");
-                return ExitCode::FAILURE;
-            }
         };
-        if args.next().is_some() {
-            eprintln!("error: unexpected extra argument");
-            return ExitCode::FAILURE;
+        if check_only {
+            return match chio_spec_codegen::check_threat_coverage_doc_default(&repo_root) {
+                Ok(out) => {
+                    println!("fresh {}", out.display());
+                    ExitCode::SUCCESS
+                }
+                Err(err) => {
+                    eprintln!("chio-spec-codegen: {err}");
+                    ExitCode::FAILURE
+                }
+            };
         }
         return match chio_spec_codegen::codegen_threat_coverage_doc_default(&repo_root) {
             Ok(out) => {

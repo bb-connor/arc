@@ -2,16 +2,17 @@
 
 The original trajectory-3 closeout admin-merged 62 PRs (#443-#504) without
 waiting for hosted CI. Trajectory-3.1 establishes a single consolidated
-replay anchor: the post-trajectory-3.1-close main HEAD will be subjected to
-the full required-check suite (Build/lint/test, MSRV, cargo-vet, cargo-deny,
-freeze-guard, bench-regression). When that run lands green, every PR below
-is considered replayed-green via the consolidated main, because main now
-contains the merge commit of every PR below.
+replay anchor: the post-trajectory-3.1-close main HEAD was subjected to
+the GitHub-protected status-check suite (Build/lint/test, MSRV, cargo-vet,
+cargo-deny, freeze-guard, bench-regression). When that run landed green,
+the standard-CI entries below were considered replayed-green via the
+consolidated main, because main contains the merge commit of every entry
+in that standard-CI set.
 
 ## Consolidated replay anchor
 
-- target_main_sha: TODO_TRJ3_1_CLOSE_SHA   (parent agent fills this in at trajectory-3.1 close)
-- target_run_url:  TODO_TRJ3_1_CLOSE_RUN   (parent agent fills this in once CI greens on the close commit)
+- target_main_sha: b3023a0c4ee20cac23368a45ac7ba42edd7f51c4
+- target_run_url:  https://github.com/bb-connor/arc/actions/runs/25296839206
 - replay_method:   consolidated-main-green-via-trajectory-3-1
 - replay_rationale: |
   Per the trajectory-3.1 prompt strategy 2-3, "trigger workflows on main
@@ -19,6 +20,34 @@ contains the merge commit of every PR below.
   a recent main covers many PRs at once." Trajectory-3.1 chose the
   consolidated path because all 62 entries share the same gating
   workflow (CI), and main is monotonic across them.
+
+## Required-check inventory
+
+GitHub branch protection for `main` was queried on 2026-05-04 with
+`gh api repos/bb-connor/arc/branches/main/protection/required_status_checks`.
+The protected contexts are:
+
+| Protected context | Source workflow |
+| --- | --- |
+| `Build, lint, test` | `.github/workflows/ci.yml` |
+| `MSRV build and test` | `.github/workflows/ci.yml` |
+| `cargo-vet (supply-chain audit)` | `.github/workflows/ci.yml` / `.github/workflows/cargo-vet.yml` |
+| `cargo-deny (supply-chain bans/advisories/licenses)` | `.github/workflows/ci.yml` |
+| `freeze-guard` | `.github/workflows/m05-freeze-guard.yml` |
+| `bench-regression` | `.github/workflows/bench-regression.yml` |
+
+Trajectory closure also treated the following lanes as gates, but they
+are not present in the GitHub branch-protection contexts above and are
+therefore not covered by the consolidated-main green run:
+
+| Closure gate | Workflow / job | CI-DEBT status |
+| --- | --- | --- |
+| Formal Apalache safety | `.github/workflows/ci.yml` `formal-tla (apalache safety)` and `.github/workflows/apalache-safety.yml` `m06-apalache-subset` | individual replay or explicit deferral required |
+| Kani public harnesses | `.github/workflows/ci.yml` `kani-public-pr (lanes.pr harnesses)` and `.github/workflows/nightly.yml` `kani-public-nightly (lanes.pr + lanes.nightly_only)` | individual replay or explicit deferral required |
+| Threat-model coverage | `.github/workflows/threat-model-coverage.yml` `coverage-gate` | individual replay required; now includes generated-doc freshness |
+| Mutation gate | `.github/workflows/mutants.yml` `mutants-pr` plus `mutants-nightly` evidence | individual replay or explicit deferral required |
+| Mutation/fuzz co-coverage | `.github/workflows/mutants-fuzz-cocoverage.yml` | individual replay or explicit deferral required |
+| Verdict matrix | `.github/workflows/verdict-matrix.yml` `verdict_matrix rust-kernel` and `verdict_matrix python-sdk go-http-sdk (required)` | individual replay or explicit deferral required |
 
 ## Replayed-via-consolidated-main entries
 
@@ -72,10 +101,10 @@ contains the merge commit of every PR below.
 
 ## Trajectory-3.1 wave PRs
 
-The trajectory-3.1 wave PRs (#509-#518) auto-merged before branch protection
-was tightened on 2026-05-03. The consolidated-main green retroactively
-anchors these too, since main contains every one of their merge commits and
-the same CI suite gates them.
+The trajectory-3.1 wave PRs below merged before branch protection was
+tightened on 2026-05-03. The consolidated-main green retroactively
+anchors these too, since main contains their merge commits and the same
+GitHub-protected status-check suite gates them.
 
 - PR #509: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
 - PR #510: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
@@ -83,10 +112,13 @@ the same CI suite gates them.
 - PR #512: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
 - PR #513: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
 - PR #514: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
-- PR #515: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
 - PR #516: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
 - PR #517: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
 - PR #518: trajectory-3.1 wave entry. Replayed via consolidated-main anchor (see above). Original-skip-reason: auto-merged before 2026-05-03 branch protection tightening.
+
+## Closed-unmerged trajectory-3.1 entry
+
+- PR #515 (`e5ac5b460de2ab5bd6bef8d9f1027b9af8976af1`): `fix(chio-tee): copy integrations/ into builder stage`. GitHub PR evidence on 2026-05-04: `state=CLOSED`, `mergedAt=null`, `mergeCommit=null`. It is not replayed via the consolidated-main anchor because it did not merge. The nearby merged fix carrying the Dockerfile builder-stage integration copy is PR #514 (`62494a45f6c826f49ad76fa4c21b286f5a0cc508`).
 
 ## Non-CI-gated entries
 
