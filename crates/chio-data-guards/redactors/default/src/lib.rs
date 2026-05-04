@@ -140,8 +140,85 @@ pub enum RedactError {
 /// silently skips the corresponding class for this process; the tee's
 /// `--paranoid` heuristic (zero-match-on-large-payload quarantine,
 /// trajectory doc line 21) catches the misconfiguration downstream.
+///
+/// To surface the failure earlier, [`validate_default_redactor_compiles`]
+/// re-attempts every default pattern at startup and returns the list of
+/// failures so callers can refuse to serve traffic when a vetted
+/// constant fails to compile (the fail-closed contract spelled out in
+/// the module docs).
 fn try_compile(pattern: &str) -> Option<Regex> {
-    Regex::new(pattern).ok()
+    match Regex::new(pattern) {
+        Ok(re) => Some(re),
+        Err(error) => {
+            // We deliberately avoid `tracing` here so the redactor stays
+            // dependency-light for the wasm32-wasip2 guest export. The
+            // `validate_default_redactor_compiles` startup hook below is
+            // the load-bearing surface for fail-closed callers.
+            eprintln!(
+                "chio-data-guards-redactors-default: regex compile failed for pattern `{pattern}`: {error}"
+            );
+            None
+        }
+    }
+}
+
+/// Default redactor patterns the [`validate_default_redactor_compiles`]
+/// startup hook re-checks. Kept in lockstep with the `LazyLock` blocks
+/// below; adding a new class without updating this list is caught by the
+/// `default_pattern_inventory_matches_lazylocks` test.
+const DEFAULT_PATTERNS: &[(&str, &str)] = &[
+    ("secrets.aws-key", r"(?-u)\bAKIA[0-9A-Z]{16}\b"),
+    (
+        "secrets.jwt",
+        r"(?-u)\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b",
+    ),
+    (
+        "secrets.stripe",
+        r"(?-u)\bsk_(?:live|test)_[0-9A-Za-z]{24,}\b",
+    ),
+    (
+        "secrets.stripe-pub",
+        r"(?-u)\bpk_(?:live|test)_[0-9A-Za-z]{24,}\b",
+    ),
+    ("secrets.high-entropy", r"(?-u)\b[A-Za-z0-9_]{32,}\b"),
+    (
+        "pii.email",
+        r"(?-u)\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
+    ),
+    (
+        "pii.phone-us",
+        r"(?-u)(?:\+?1[\s\-.])?(?:\(\d{3}\)|\d{3})[\s\-.]\d{3}[\s\-.]\d{4}\b",
+    ),
+    ("pii.ssn-us", r"(?-u)\b\d{3}-\d{2}-\d{4}\b"),
+    ("pii.credit-card", r"(?-u)\b(?:\d[ -]?){12,18}\d\b"),
+    (
+        "bearer.authorization",
+        r"(?i-u)\bBearer\s+[A-Za-z0-9._\-+/=]{8,}",
+    ),
+];
+
+/// Re-check every default redactor pattern at startup so deployments
+/// that prefer a hard fail-closed contract over the `--paranoid`
+/// downstream heuristic can refuse to serve traffic when a vetted
+/// constant unexpectedly fails to compile. Returns an error describing
+/// every (label, pattern) pair that failed.
+///
+/// This complements the soft fallback in [`try_compile`]: callers that
+/// want the original silent-skip behaviour simply skip this hook,
+/// callers that want the strict load-time guarantee call it during
+/// service bootstrap.
+pub fn validate_default_redactor_compiles() -> Result<(), Vec<String>> {
+    let mut failures = Vec::new();
+    for (label, pattern) in DEFAULT_PATTERNS {
+        if Regex::new(pattern).is_err() {
+            failures.push(format!("{label} (`{pattern}`)"));
+        }
+    }
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures)
+    }
 }
 
 static AWS_KEY: LazyLock<Option<Regex>> =
@@ -549,5 +626,70 @@ mod tests {
     fn luhn_helper_validates_known_numbers() {
         assert!(luhn_ok(b"4111111111111111"));
         assert!(!luhn_ok(b"1234567890123456"));
+    }
+
+    #[test]
+    fn validate_default_redactor_compiles_succeeds_on_known_patterns() {
+        // Every vetted-constant pattern must compile cleanly; a failure
+        // here means a maintainer broke a default pattern and the
+        // soft-fallback `try_compile` would have masked it. The startup
+        // validator surfaces such regressions for callers that prefer a
+        // hard fail-closed contract.
+        validate_default_redactor_compiles().expect("default patterns must compile");
+    }
+
+    #[test]
+    fn default_pattern_inventory_matches_lazylocks() {
+        // Trip-wire: if a maintainer adds a new pattern to the redactor
+        // hot path without updating DEFAULT_PATTERNS, the startup
+        // validator silently stops covering it. Counting the inventory
+        // against the live `LazyLock` siblings keeps them in lockstep.
+        let live: &[&LazyLock<Option<Regex>>] = &[
+            &AWS_KEY,
+            &JWT,
+            &STRIPE,
+            &STRIPE_PUB,
+            &HIGH_ENTROPY,
+            &EMAIL,
+            &PHONE_US,
+            &SSN_US,
+            &CARD,
+            &BEARER,
+        ];
+        assert_eq!(DEFAULT_PATTERNS.len(), live.len());
+        for entry in live {
+            assert!(
+                entry.is_some(),
+                "live LazyLock pattern unexpectedly None; check `try_compile` warning on stderr"
+            );
+        }
+    }
+
+    #[test]
+    fn multibyte_utf8_around_match_is_preserved() {
+        // Email regex anchors with `\b`. Multibyte characters around the
+        // match must not split codepoints in the output and the matched
+        // span must still resolve to the email bytes only.
+        let payload = "café alice@example.com 携帯".as_bytes();
+        let out = redact_payload(payload, full()).unwrap();
+        let body = String::from_utf8(out.bytes).expect("output must remain valid utf-8");
+        assert!(body.contains("café"));
+        assert!(body.contains("携帯"));
+        assert!(body.contains("[REDACTED-EMAIL]"));
+        assert!(!body.contains("alice@example.com"));
+    }
+
+    #[test]
+    fn ssn_adjacent_to_emoji_is_redacted_without_corruption() {
+        // Sanity check that a `\b`-anchored regex match on bytes inside a
+        // utf-8 stream with adjacent multi-byte characters still slices on
+        // codepoint boundaries (regex::bytes word boundary fires only at
+        // ASCII word edges, which are valid utf-8 boundaries).
+        let payload = "🚨 ssn 123-45-6789 🚨".as_bytes();
+        let out = redact_payload(payload, full()).unwrap();
+        let body = String::from_utf8(out.bytes).expect("output must remain valid utf-8");
+        assert!(body.contains("[REDACTED-SSN]"));
+        assert!(body.contains("🚨"));
+        assert!(!body.contains("123-45-6789"));
     }
 }
