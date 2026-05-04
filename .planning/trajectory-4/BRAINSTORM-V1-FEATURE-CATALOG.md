@@ -12,7 +12,7 @@ For ideas explicitly rejected by their proposing agent, see `REJECTED-IDEAS.md`.
 |---|---|
 | 119 workspace members | **89 chio-* crates** + xtask + bench/* + tests/* + formal/* + editors/zed-chio + 2 integrations + 7 examples |
 | cargo-vet exemptions 26 -> 179 | **819** (767 `safe-to-deploy` + 52 `safe-to-run`) |
-| Threat-model 17 of 17 covered | **20 threats**, gate-state per `scripts/check-threat-coverage.sh` (which keys on the `coverage_state` field, not `coveredBy`): **11 covered**, **6 pending with `deferred_to`** (the unimplemented stubs `agent_velocity_abuse`, `behavioral_sequence_attack`, `cumulative_data_exfiltration`, `pii_phi_exposure`, `ssrf_via_http_substrate`, `wasm_guard_resource_exhaustion`), **3 uncovered / gate-failing today** (the mobile-pending rows `mobile_attestation_replay`, `device_key_extraction`, `play_integrity_token_replay` are marked `coverage_state: pending` but lack `deferred_to`). Of the 11 covered, `pq_signature_downgrade` and `tee_quote_forgery` already carry `covered_by_tests`; only `weights_hash_spoof` is `coverage_state: covered` with neither `covered_by_tests` nor `coveredBy` linkage. |
+| Threat-model 17 of 17 covered | **20 threats**, gate-state per `scripts/check-threat-coverage.sh` on the trj4-planning branch: **PASS at 11 covered / 9 pending-with-`deferred_to` / 0 uncovered**. The 9 pending split into 6 `unimplemented!()` stub files (`agent_velocity_abuse`, `behavioral_sequence_attack`, `cumulative_data_exfiltration`, `pii_phi_exposure`, `ssrf_via_http_substrate`, `wasm_guard_resource_exhaustion`) plus 3 mobile rows (`mobile_attestation_replay`, `device_key_extraction`, `play_integrity_token_replay`) all carrying `deferred_to: trajectory-4.M07.real-attestation`. Of the 11 covered, `pq_signature_downgrade` and `tee_quote_forgery` carry `covered_by_tests`; only `weights_hash_spoof` is `coverage_state: covered` with neither `covered_by_tests` nor `coveredBy` linkage. The trj4 work is to flip the 9 pending rows to covered and add the missing test linkage. |
 | `crates/chio-tee/` is TEE attestation | **`chio-tee/` is the streaming-tap crate**; TEE attestation lives in `chio-attest-verify` (TDX + SEV-SNP + Nitro already implemented). Naming collision worth flagging. |
 | `chio-core` is the core crate | `chio-core` is a 12-line `pub use` umbrella; `chio-core-types` (35 KLOC, 112 in-tree dependents) is the real substrate |
 
@@ -42,7 +42,7 @@ Same primitive, different motivations: CPU savings (ML-DSA-65 sign cost 200-400u
 
 - **Hybrid PQ as plumbing, not invention** (trust-graph T-8): `HybridSigningBackend` exists in `chio-core-types::pq`; signature wire format already declared in `signature.v1.json` (`hybrid:<classical>:<mldsa65>:<alg_set>`); `KernelTrustExchange` is just hardcoded to `Ed25519Backend`.
 - **Workspace-public surfaces with no dependents** (archaeology X-3): `chio-tower` (2738 LOC), `chio-envoy-ext-authz` (1434), `chio-ag-ui-proxy` (830), `chio-openapi-mcp-bridge` (815). Either ship example wiring or demote to `integrations/`.
-- **Threat-model coverage gate is built but coverage is partial** (archaeology + observability): gate, codegen, schema all exist; 6 stubs unimplemented + 3 missing JSON links + 3 mobile-pending. The cheapest near-100%-coverage claim available.
+- **Threat-model coverage gate is built and PASS at 11 covered / 9 pending-with-`deferred_to` / 0 uncovered** (archaeology + observability): the gate keys on `coverage_state` (not `coveredBy`); the 9 pending split into 6 `unimplemented!()` stubs and 3 mobile rows whose `deferred_to` already points at `trajectory-4.M07.real-attestation`. Concrete trj4 work to claim 100%: fill 6 stubs, land 3 mobile tests (Tier 0 Phase C), add `covered_by_tests` linkage to `weights_hash_spoof`.
 - **Multi-modal / agentic-browser gap** (AI-frontier A-5, capability C-1): browser/mobile kernels are stubs (clock + rng only); current `ToolInvocation::arguments: Vec<u8>` for canonical JSON only.
 - **Receipt explanation surface** (DX-2 + AI-frontier A-12): both lenses propose the same primitive - a tool that walks a receipt's policy clauses, guards, scope, parent chain, and produces human-readable rationale. CLI `chio explain` first; web explorer (DX-3) later.
 
@@ -427,7 +427,7 @@ End-to-end signed mediated tool call every 60s per tenant; asserts receipt produ
 **X-1. `chio-hosted-mcp` is a 13-line `#[path]`-include of private chio-cli files** - M, *****
 Workspace public entrypoint (in `[workspace.metadata.chio.rust_public_entrypoints]`) is structurally a textual splice of CLI internals. Extract `remote_mcp/*.rs` into its own crate; both CLI and `chio-hosted-mcp` consume it normally.
 
-**X-2. Threat-model coverage**: 8 of 20 threats covered with tests + `coveredBy`. **6 stub `unimplemented!()` files** (`agent_velocity_abuse`, `behavioral_sequence_attack`, `cumulative_data_exfiltration`, `pii_phi_exposure`, `ssrf_via_http_substrate`, `wasm_guard_resource_exhaustion`). **3 real test files but missing `coveredBy` JSON** (`pq_signature_downgrade`, `tee_quote_forgery`, `weights_hash_spoof`). **3 mobile threats with no files yet**. Codegen + CI gate already enforce. - L, *****
+**X-2. Threat-model coverage**: live gate is **PASS at 11 covered / 9 pending-with-`deferred_to` / 0 uncovered** (`scripts/check-threat-coverage.sh` keys on `coverage_state`). The 9 pending split into **6 `unimplemented!()` stub files** (`agent_velocity_abuse`, `behavioral_sequence_attack`, `cumulative_data_exfiltration`, `pii_phi_exposure`, `ssrf_via_http_substrate`, `wasm_guard_resource_exhaustion`) plus **3 mobile rows** (`mobile_attestation_replay`, `device_key_extraction`, `play_integrity_token_replay`) whose `deferred_to` already points at `trajectory-4.M07.real-attestation`. Among the 11 covered, `pq_signature_downgrade` and `tee_quote_forgery` carry `covered_by_tests`; only `weights_hash_spoof` lacks any test linkage in JSON. Codegen + CI gate already enforce; trj4 work is concretely 6 stub fills + 3 mobile tests + 1 linkage add. - L, *****
 
 **X-3. `chio-tower` (2738 LOC) has zero in-tree dependents** - Same with `chio-envoy-ext-authz` (1434 LOC), `chio-ag-ui-proxy` (830 LOC), `chio-openapi-mcp-bridge` (815 LOC, only fuzz refs it). Either land an `examples/hello-tower`, `examples/istio-tower`, `examples/ag-ui` integration, or move under `integrations/` with explicit "external-only" tag. - S per crate, ****
 
@@ -457,7 +457,7 @@ Workspace public entrypoint (in `[workspace.metadata.chio.rust_public_entrypoint
 
 ### Top 5 "finish what we started" (highest-leverage finishing moves)
 
-1. **X-2 Threat-model coverage push**: 6 stubs + 3 missing JSON links + 3 mobile-pending. Codegen + CI gate built. One focused week unlocks "near-100% threat-model coverage" claim with the 3 mobile rows landing as part of Tier 0 mobile-attestation.
+1. **X-2 Threat-model coverage push**: gate is PASS at 11/9/0; trj4 flips 6 stubs + 3 mobile-deferral rows to `covered` and adds `covered_by_tests` linkage to `weights_hash_spoof`. Mobile rows land as part of Tier 0 Phase C mobile-attestation. End state: 20/0/0.
 2. **X-4 Provider-adapter-core extraction**: cuts ~3 KLOC, makes Nth adapter a 1-day job.
 3. **X-1 `chio-hosted-mcp` real extraction**: half-day surgical move.
 4. **X-3 `chio-tower` example/integration**: 2738 LOC of Tower middleware with zero workspace consumers.
@@ -473,7 +473,7 @@ Workspace public entrypoint (in `[workspace.metadata.chio.rust_public_entrypoint
 
 1. **The "core" crate is empty.** `chio-core` is a 12-line `pub use` umbrella; the actual core is `chio-core-types` (35 KLOC, 112 in-tree dependents). Naming inverts what newcomers expect; an in-progress extraction never completed cleanup.
 2. **The "tools-adapter" pattern is implicit, not codified.** Seven crates follow `{lib, native, transport, streaming, loaded_weights}.rs` to the file. No shared trait crate. **Single biggest "we already half-built X" opportunity.**
-3. **The threat-model codegen gate exists, the stubs exist, the schema exists, and a third of threats are still `unimplemented!()`** or missing JSON links. **Highest-leverage finishing move; the CI gate already enforces it.**
+3. **The threat-model codegen gate exists and is PASS** (11 covered / 9 pending-with-`deferred_to` / 0 uncovered) **but 9 of 20 threats are still placeholder rows**: 6 `unimplemented!()` stub files plus 3 mobile rows deferred to this trajectory. The cheap finishing-move work is concrete: 6 stub fills, 3 mobile tests, 1 linkage add.
 
 ---
 
