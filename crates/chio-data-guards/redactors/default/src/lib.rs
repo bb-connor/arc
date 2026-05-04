@@ -162,39 +162,48 @@ fn try_compile(pattern: &str) -> Option<Regex> {
     }
 }
 
+// -------------------------------------------------------------------------
+// Single source of truth for every default-pattern source string.
+//
+// The `LazyLock`-pinned `Regex` instances on the redactor hot path and
+// the `validate_default_redactor_compiles` startup hook both compile
+// from these same `&'static str` constants, so a future divergence is
+// impossible by construction: there is only one string per label, and
+// editing it changes both the runtime regex and the validator.
+// -------------------------------------------------------------------------
+
+const PATTERN_AWS_KEY: &str = r"(?-u)\bAKIA[0-9A-Z]{16}\b";
+const PATTERN_JWT: &str = r"(?-u)\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b";
+const PATTERN_STRIPE: &str = r"(?-u)\bsk_(?:live|test)_[0-9A-Za-z]{24,}\b";
+const PATTERN_STRIPE_PUB: &str = r"(?-u)\bpk_(?:live|test)_[0-9A-Za-z]{24,}\b";
+const PATTERN_HIGH_ENTROPY: &str = r"(?-u)\b[A-Za-z0-9_]{32,}\b";
+const PATTERN_EMAIL: &str = r"(?-u)\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b";
+// US phone: optional +1, then (xxx) xxx-xxxx OR xxx-xxx-xxxx OR xxx.xxx.xxxx OR xxx xxx xxxx.
+const PATTERN_PHONE_US: &str =
+    r"(?-u)(?:\+?1[\s\-.])?(?:\(\d{3}\)|\d{3})[\s\-.]\d{3}[\s\-.]\d{4}\b";
+const PATTERN_SSN_US: &str = r"(?-u)\b\d{3}-\d{2}-\d{4}\b";
+// Credit-card candidate: 13-19 digits possibly broken by spaces/hyphens.
+// Final accept gated by Luhn check below.
+const PATTERN_CARD: &str = r"(?-u)\b(?:\d[ -]?){12,18}\d\b";
+const PATTERN_BEARER: &str = r"(?i-u)\bBearer\s+[A-Za-z0-9._\-+/=]{8,}";
+
 /// Default redactor patterns the [`validate_default_redactor_compiles`]
-/// startup hook re-checks. Kept in lockstep with the `LazyLock` blocks
-/// below; adding a new class without updating this list is caught by the
-/// `default_pattern_inventory_matches_lazylocks` test.
+/// startup hook re-checks. The `&str` entries point at the same
+/// `PATTERN_*` constants the runtime `LazyLock` instances below compile
+/// from, so the validator and the redactor hot path are guaranteed to
+/// stay in lockstep. Adding a new class without updating this list is
+/// caught by the `default_pattern_inventory_matches_lazylocks` test.
 const DEFAULT_PATTERNS: &[(&str, &str)] = &[
-    ("secrets.aws-key", r"(?-u)\bAKIA[0-9A-Z]{16}\b"),
-    (
-        "secrets.jwt",
-        r"(?-u)\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b",
-    ),
-    (
-        "secrets.stripe",
-        r"(?-u)\bsk_(?:live|test)_[0-9A-Za-z]{24,}\b",
-    ),
-    (
-        "secrets.stripe-pub",
-        r"(?-u)\bpk_(?:live|test)_[0-9A-Za-z]{24,}\b",
-    ),
-    ("secrets.high-entropy", r"(?-u)\b[A-Za-z0-9_]{32,}\b"),
-    (
-        "pii.email",
-        r"(?-u)\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
-    ),
-    (
-        "pii.phone-us",
-        r"(?-u)(?:\+?1[\s\-.])?(?:\(\d{3}\)|\d{3})[\s\-.]\d{3}[\s\-.]\d{4}\b",
-    ),
-    ("pii.ssn-us", r"(?-u)\b\d{3}-\d{2}-\d{4}\b"),
-    ("pii.credit-card", r"(?-u)\b(?:\d[ -]?){12,18}\d\b"),
-    (
-        "bearer.authorization",
-        r"(?i-u)\bBearer\s+[A-Za-z0-9._\-+/=]{8,}",
-    ),
+    ("secrets.aws-key", PATTERN_AWS_KEY),
+    ("secrets.jwt", PATTERN_JWT),
+    ("secrets.stripe", PATTERN_STRIPE),
+    ("secrets.stripe-pub", PATTERN_STRIPE_PUB),
+    ("secrets.high-entropy", PATTERN_HIGH_ENTROPY),
+    ("pii.email", PATTERN_EMAIL),
+    ("pii.phone-us", PATTERN_PHONE_US),
+    ("pii.ssn-us", PATTERN_SSN_US),
+    ("pii.credit-card", PATTERN_CARD),
+    ("bearer.authorization", PATTERN_BEARER),
 ];
 
 /// Re-check every default redactor pattern at startup so deployments
@@ -206,7 +215,10 @@ const DEFAULT_PATTERNS: &[(&str, &str)] = &[
 /// This complements the soft fallback in [`try_compile`]: callers that
 /// want the original silent-skip behaviour simply skip this hook,
 /// callers that want the strict load-time guarantee call it during
-/// service bootstrap.
+/// service bootstrap. Because the validator and the runtime
+/// `LazyLock` instances share the same `PATTERN_*` source strings,
+/// validating these patterns is equivalent to validating the runtime
+/// regexes themselves.
 pub fn validate_default_redactor_compiles() -> Result<(), Vec<String>> {
     let mut failures = Vec::new();
     for (label, pattern) in DEFAULT_PATTERNS {
@@ -221,33 +233,18 @@ pub fn validate_default_redactor_compiles() -> Result<(), Vec<String>> {
     }
 }
 
-static AWS_KEY: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\bAKIA[0-9A-Z]{16}\b"));
-static JWT: LazyLock<Option<Regex>> = LazyLock::new(|| {
-    try_compile(r"(?-u)\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
-});
-static STRIPE: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\bsk_(?:live|test)_[0-9A-Za-z]{24,}\b"));
-static STRIPE_PUB: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\bpk_(?:live|test)_[0-9A-Za-z]{24,}\b"));
-static HIGH_ENTROPY: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\b[A-Za-z0-9_]{32,}\b"));
+static AWS_KEY: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_AWS_KEY));
+static JWT: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_JWT));
+static STRIPE: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_STRIPE));
+static STRIPE_PUB: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_STRIPE_PUB));
+static HIGH_ENTROPY: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_HIGH_ENTROPY));
 
-static EMAIL: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"));
-// US phone: optional +1, then (xxx) xxx-xxxx OR xxx-xxx-xxxx OR xxx.xxx.xxxx OR xxx xxx xxxx.
-static PHONE_US: LazyLock<Option<Regex>> = LazyLock::new(|| {
-    try_compile(r"(?-u)(?:\+?1[\s\-.])?(?:\(\d{3}\)|\d{3})[\s\-.]\d{3}[\s\-.]\d{4}\b")
-});
-static SSN_US: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\b\d{3}-\d{2}-\d{4}\b"));
-// Credit-card candidate: 13-19 digits possibly broken by spaces/hyphens.
-// Final accept gated by Luhn check below.
-static CARD: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?-u)\b(?:\d[ -]?){12,18}\d\b"));
+static EMAIL: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_EMAIL));
+static PHONE_US: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_PHONE_US));
+static SSN_US: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_SSN_US));
+static CARD: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_CARD));
 
-static BEARER: LazyLock<Option<Regex>> =
-    LazyLock::new(|| try_compile(r"(?i-u)\bBearer\s+[A-Za-z0-9._\-+/=]{8,}"));
+static BEARER: LazyLock<Option<Regex>> = LazyLock::new(|| try_compile(PATTERN_BEARER));
 
 // -------------------------------------------------------------------------
 // Public API
@@ -661,6 +658,42 @@ mod tests {
             assert!(
                 entry.is_some(),
                 "live LazyLock pattern unexpectedly None; check `try_compile` warning on stderr"
+            );
+        }
+    }
+
+    #[test]
+    fn default_patterns_match_runtime_lazylock_sources() {
+        // Regression for the validator/runtime divergence concern: the
+        // startup validator must check the same patterns the runtime
+        // LazyLocks compile from. Asserting `DEFAULT_PATTERNS[i].1 ==
+        // <RUNTIME_REGEX>.as_str()` proves the validator and the
+        // hot-path regex compiled the same source string, even if a
+        // future edit nudges one constant and forgets the other.
+        let live: &[(&str, &LazyLock<Option<Regex>>)] = &[
+            ("secrets.aws-key", &AWS_KEY),
+            ("secrets.jwt", &JWT),
+            ("secrets.stripe", &STRIPE),
+            ("secrets.stripe-pub", &STRIPE_PUB),
+            ("secrets.high-entropy", &HIGH_ENTROPY),
+            ("pii.email", &EMAIL),
+            ("pii.phone-us", &PHONE_US),
+            ("pii.ssn-us", &SSN_US),
+            ("pii.credit-card", &CARD),
+            ("bearer.authorization", &BEARER),
+        ];
+        assert_eq!(DEFAULT_PATTERNS.len(), live.len());
+        for ((default_label, default_pattern), (live_label, lazy)) in
+            DEFAULT_PATTERNS.iter().zip(live.iter())
+        {
+            assert_eq!(default_label, live_label, "label order drift");
+            let runtime = lazy
+                .as_ref()
+                .expect("runtime LazyLock pattern unexpectedly None");
+            assert_eq!(
+                *default_pattern,
+                runtime.as_str(),
+                "DEFAULT_PATTERNS[{default_label}] diverged from the runtime LazyLock source"
             );
         }
     }
