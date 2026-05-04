@@ -1,6 +1,6 @@
 # Trajectory-4 Synthesis v1 — Internal-Only Code Trajectory
 
-**Status:** working synthesis from the 5-agent perspective debate (engineer-rigor, security-paranoid, compliance-vendor, customer-velocity, devil's-advocate), filtered to internal code work. **Pending wider brainstorm round before final scope-lock.**
+**Status:** working synthesis from the 5-agent perspective debate (engineer-rigor, security-paranoid, compliance-vendor, customer-velocity, devil's-advocate), filtered to internal code work. Superseded by `SYNTHESIS-V2-INTEGRATED-PLAN.md` after the wider brainstorm landed (and v2 was revised after reviewer feedback). Kept here as the perspective-debate record.
 
 ## Scope rule
 
