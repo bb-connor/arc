@@ -21,11 +21,17 @@
 - All 139 em-dash characters scrubbed.
 - Trailing-whitespace cleanup.
 
-**Round-3 fixes (this revision):**
+**Round-4 fixes (this revision):**
+- **`body_hash` definition pinned** to avoid self-reference. `BODY_HASH_INPUT = canonical(receipt_body_v2_struct \ {body_hash, signature, receipt_id})` (RFC 8785 JCS over the remaining fields after stripping those three). `body_hash := H(BODY_HASH_INPUT)`. Signature input is `BODY_HASH_INPUT || body_hash` so the signed payload commits to both. Legacy UUIDv7 `receipt_id` is retained on the v2 wire shape for tooling and replay-store keys but is non-cryptographic and excluded from the hash input. Three additional negative conformance cases pinned (mismatched `body_hash`, self-referential implementer error, and signature-without-body_hash-commit).
+- **Capability-token algorithm enum corrected**: T2.1 adds **`hybrid`** to the enum (matching `signature.v1.json` which already has it, and the Rust `SigningAlgorithm` serde shape), not the alg-set strings `ed25519+mldsa65`. The alg-set string lives inside the self-describing wire-value pattern `hybrid:<classical>:<pq>:<alg_set>` on `issuer` / `subject` / signature fields, which T2.1 also updates.
+- **Catalog convergence + C-3 + T-8 entries** updated: substrate primitives are `CapabilityToken.delegation_chain` + `Attenuation` + `validate_attenuation` behind `delegation_v2` (not the A2A bridge-fidelity `caveats: Vec<String>` strings); backend type is `HybridBackend` (not `HybridSigningBackend`); anchor-batch framing softened to "moves toward closure" with Evidence Gate references.
+- **Optional split clarified**: cargo-vet burn-down stays in T1.4 / trj4b unless explicitly lifted into Tier 0 at scope-lock time. trj4a description corrected so it does not double-count cargo-vet work.
+
+**Round-3 fixes:**
 - **Threat baseline corrected to live PASS state**: gate on the trj4-planning branch is now PASS at 11 covered / 9 pending-with-`deferred_to` / 0 uncovered. The 3 mobile rows already carry `deferred_to: trajectory-4.M07.real-attestation`, so they are pending-with-deferral, not uncovered. trj4 work is to flip 9 pending rows to covered and add one missing test linkage; gate already passes today.
 - **T1.1 reframed**: substrate already has `CapabilityToken.delegation_chain`, `Attenuation` (`crates/chio-core-types/src/delegation_receipt.rs`), `validate_attenuation` (`crates/chio-core-types/src/capability.rs:2452`) and a `delegation_v2` feature gate. The `chio-a2a-edge` `caveats: Vec<String>` strings are advisory bridge-fidelity prose, not authority-bearing primitives. T1.1 promotes and unifies the existing delegation primitives into the negotiated token schema; it does not lift A2A bridge caveats into `ToolGrant`.
 - **T1.2 receipt-id migration plan added**: kernel today uses `next_receipt_id("rcpt")` (UUIDv7), and lineage is v1 single-parent. T1.2 adds a signed `body_hash: H(canonical(receipt_body))` field and a content-addressed `receipt_id_v2` namespace, with legacy UUIDv7 IDs accepted in v1 receipts. Acyclicity invariants reference the new `body_hash`/`receipt_id_v2` lane.
-- **T2.1 hybrid PQ scope expanded**: backend type is `HybridBackend` (not `HybridSigningBackend`); `KernelTrustExchange` stores a concrete local `Keypair`. `spec/schemas/chio-wire/v1/capability/token.schema.json` allows only `ed25519`, `p256`, `p384`. T2.1 must include capability-token schema additions (e.g. `hybrid:ed25519+mldsa65`) and wire-format sync, not just making `KernelTrustExchange` generic.
+- **T2.1 hybrid PQ scope expanded**: backend type is `HybridBackend` (not `HybridSigningBackend`); `KernelTrustExchange` stores a concrete local `Keypair`. `spec/schemas/chio-wire/v1/capability/token.schema.json` enumerates only `["ed25519", "p256", "p384"]` while `signature.v1.json` already enumerates `["ed25519", "p256", "p384", "hybrid"]`. T2.1 must include capability-token schema additions (the `hybrid` enum variant per round-4 correction; the alg-set string `<classical>+<pq>` belongs inside the self-describing wire-value pattern, not the algorithm enum) and wire-format sync, not just making `KernelTrustExchange` generic.
 - **T1.3 anchor-batch overclaim softened**: changed from "closes the `audit_only` / `transparency_preview` ceiling" to "moves toward closure". Added explicit close-bar items for claim registry update, proof manifest update, public-witness semantics doc, and negative conformance tests.
 - **Closeout-blocker continuity**: `.planning/trajectory-3/CLOSEOUT-BLOCKERS.md` currently has only the M10 entries (AWS Marketplace, MCP Registry); `TRAJECTORY-FINAL.md` references a 10-blocker catalog. trj4 declares this as a deliberate scope reset and inlines the carry-forward list (below) rather than restoring the 10-row file.
 - **T0 reconciliation gate** added as mandatory prerequisite for any T1 work.
@@ -142,12 +148,13 @@ Result: sub-agents cannot re-amplify parent privileges; multi-org delegation is 
 
 Tighten the formal model first; otherwise the DAG is just a tree with extra fields.
 
-**Receipt-id migration (new in round-3)**: kernel today uses `next_receipt_id("rcpt")` which formats a UUIDv7 (`crates/chio-kernel/src/receipt_support.rs`); receipt lineage is currently v1 single-parent (`EdgeKind::ReceiptLineageParent`). The DAG and replay invariants below cannot rest on "receipt_id is already a content hash" - it isn't. Migration plan:
+**Receipt-id migration (new in round-3, refined in round-4)**: kernel today uses `next_receipt_id("rcpt")` which formats a UUIDv7 (`crates/chio-kernel/src/receipt_support.rs`); receipt lineage is currently v1 single-parent (`EdgeKind::ReceiptLineageParent`). The DAG and replay invariants below cannot rest on "receipt_id is already a content hash" - it isn't. Migration plan:
 
-- Add a signed `body_hash: H(canonical(receipt_body_minus_signature))` field on every `chio.receipt.v2`. Computed deterministically per RFC 8785; stored alongside the existing UUIDv7 `receipt_id` for legacy-compat.
-- `receipt_id_v2 = body_hash` becomes the addressing key in the DAG and replay-store layers; lookup APIs accept either UUIDv7 (legacy) or `body_hash` (v2) and resolve through a small index.
+- Define the **body-hash input set** precisely. `body_hash` must not include itself, the receipt's own signature, or the legacy UUIDv7 `receipt_id` (which is per-instance, not content). Concretely: let `BODY_HASH_INPUT = canonical(receipt_body_v2_struct \ {body_hash, signature, receipt_id})`, where `canonical` is RFC 8785 JCS over the remaining fields after stripping those three. `body_hash := H(BODY_HASH_INPUT)`. Documented in `spec/PROTOCOL.md` and pinned by a Lean theorem so the input set cannot drift.
+- The **signature input set** for `chio.receipt.v2` is `BODY_HASH_INPUT || body_hash` (so the signed payload commits to both the body and its hash). Equivalent encodings are forbidden; verifiers reject ambiguity.
+- `receipt_id_v2 := body_hash` becomes the addressing key in the DAG and replay-store layers. Lookup APIs accept either UUIDv7 (legacy) or `body_hash` (v2) and resolve through a small index. Legacy `receipt_id: String` (UUIDv7) is retained on the v2 wire shape for backward-compat tooling and for replay-store keys, but is not part of the cryptographic identity.
 - v1 receipts continue to verify; v2 receipts add the new lane. The negotiation handshake in T1.0 lets peers advertise `accepts_receipt_v2`.
-- Negative conformance test: `chio.receipt.v2` with `body_hash` not matching canonical body must fail closed.
+- Negative conformance tests: (a) v2 receipt where `body_hash` does not match the recomputed hash of `BODY_HASH_INPUT` must fail closed; (b) v2 receipt where `body_hash` is recomputed self-referentially (i.e. an implementer hashed the wrong field set) must fail closed against the canonical hash; (c) v2 receipt where the legacy `receipt_id` was tampered with but `body_hash` and signature remain valid must still verify (legacy field is non-cryptographic by design); (d) v2 receipt where signature does not commit to `body_hash` must fail closed.
 
 Cross-kernel ordering: this plan is multi-agent and cross-kernel, so a per-kernel `(epoch, seq)` cannot be used as a global parent-before-child predicate. The ordering proof has to live above the kernel-local clock.
 
@@ -198,10 +205,11 @@ In T1 because it makes the new receipt-DAG, attenuation failures, and close-bar 
 
 **T2.1 Trust-boundary plumbing + cross-surface conformance** *(in recommended scope-lock)*
 
-- **Hybrid PQ end-to-end** (T-8 expanded per round-3). Three coordinated changes:
+- **Hybrid PQ end-to-end** (T-8 expanded per round-3, algorithm-enum corrected per round-4). Three coordinated changes:
   - `KernelTrustExchange` accepts a generic `SigningBackend` (today it stores a concrete `Keypair`); accept `HybridBackend` instances at the Federation layer.
-  - `spec/schemas/chio-wire/v1/capability/token.schema.json` adds `hybrid:ed25519+mldsa65` (and any other hybrid format already declared in `spec/schemas/signature.v1.json`) to the algorithm enum, currently restricted to `["ed25519", "p256", "p384"]`.
-  - Wire-format encoder/decoder paths (capability token, federation handshake envelope, receipt signing) treat the hybrid string format `hybrid:<classical>:<mldsa65>:<alg_set>` as a first-class case, not a feature-gated branch.
+  - `spec/schemas/chio-wire/v1/capability/token.schema.json` adds **`hybrid`** to its `algorithm` enum (currently `["ed25519", "p256", "p384"]`) so it matches `spec/schemas/signature.v1.json` (already `["ed25519", "p256", "p384", "hybrid"]`) and the Rust `SigningAlgorithm` serde shape. The alg-set string `ed25519+mldsa65` does **not** belong in the enum; it lives inside the self-describing wire values.
+  - Capability-token wire patterns updated so `issuer`, `subject`, and signature fields accept the hybrid wire prefix `hybrid:<classical>:<pq>:<alg_set>` (per `signature.v1.json:12`) alongside the existing `ed25519` / `p256:<...>` / `p384:<...>` patterns. Today those regexes are `^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$` for keys and the analogous shape for signatures.
+  - Wire-format encoder/decoder paths (capability token, federation handshake envelope, receipt signing) treat the hybrid string format as a first-class case rather than a feature-gated branch.
 - Conformance-tier handshake gating (T-5, `Bronze/Silver/Gold`): derived from threat-coverage + mutation-kill + Kani harness completeness. Data already produced; bind into peer record.
 - **Cross-surface conformance** (new in round-3). T2.1 closes only when conformance tests pass on every advertised surface, not just one:
   - MCP wrapped mode (`chio-hosted-mcp`).
@@ -261,7 +269,7 @@ Total estimated calendar: **14-18 weeks with two parallel lanes** (substrate-har
 ### Optional split: trj4a vs trj4b
 
 If 14-18 weeks is too wide given available staffing, split into:
-- **trj4a (closeout, 8-10 wk)**: Tier 0 only. Substrate-hardening, mobile attestation, threat-coverage push to 20/20, cargo-vet burn-down. Tags as `v3.19.0-trj4a`.
+- **trj4a (closeout, 8-10 wk)**: Tier 0 only - substrate-hardening, mobile attestation, threat-coverage push to 20/20. Cargo-vet burn-down stays in T1.4 and ships in trj4b unless explicitly lifted into Tier 0 at scope-lock time. Tags as `v3.19.0-trj4a`.
 - **trj4b (multi-agent primitives, 6-8 wk)**: Tiers 1 + 2.1, gated on trj4a close. Tags as `v3.20.0-trj4b`.
 
 The split lets each half close independently, makes trj4a's "we earned credibility" claim explicit before primitives ship, and lets trj4b's evidence gates run against a known-clean substrate. Recommended if a single trajectory cannot get full parallel-lane staffing.
