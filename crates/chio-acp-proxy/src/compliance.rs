@@ -385,6 +385,7 @@ pub fn verify_compliance_certificate(
     let receipt_entries = receipts.unwrap_or(&[]);
     let mut reverified: u64 = 0;
     let mut failures: u64 = 0;
+    let mut key_mismatches: u64 = 0;
 
     for entry in receipt_entries {
         reverified += 1;
@@ -395,9 +396,12 @@ pub fn verify_compliance_certificate(
         if !ok {
             failures += 1;
         }
+        if entry.receipt.kernel_key != cert.body.kernel_key {
+            key_mismatches += 1;
+        }
     }
 
-    let passed = sig_valid && body_ok && failures == 0;
+    let passed = sig_valid && body_ok && failures == 0 && key_mismatches == 0;
     CertificateVerificationResult {
         certificate_signature_valid: sig_valid,
         body_consistent: body_ok,
@@ -416,6 +420,9 @@ pub fn verify_compliance_certificate(
             }
             if failures > 0 {
                 reasons.push(format!("{failures} receipt signature(s) failed"));
+            }
+            if key_mismatches > 0 {
+                reasons.push(format!("{key_mismatches} receipt kernel key mismatch(es)"));
             }
             format!("full-bundle verification failed: {}", reasons.join(", "))
         },

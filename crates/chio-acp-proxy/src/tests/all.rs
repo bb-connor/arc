@@ -3041,6 +3041,64 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
+    fn compliance_certificate_full_bundle_rejects_receipt_kernel_key_mismatch() {
+        let signer_a = Keypair::generate();
+        let signer_b = Keypair::generate();
+        assert_ne!(signer_a.public_key(), signer_b.public_key());
+        let config = ComplianceConfig::default();
+        let now = now_secs();
+        let receipts = vec![
+            ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer_a,
+                    "receipt-1",
+                    now,
+                    "fs/read_text_file",
+                    Decision::Allow,
+                    Vec::new(),
+                ),
+                seq: 0,
+            },
+            ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer_a,
+                    "receipt-2",
+                    now + 1,
+                    "fs/write_text_file",
+                    Decision::Allow,
+                    Vec::new(),
+                ),
+                seq: 1,
+            },
+        ];
+        let cert = generate_compliance_certificate("session-good", &receipts, &config, &signer_a)
+            .expect("certificate should generate");
+
+        let mut mixed_receipts = receipts.clone();
+        mixed_receipts[1].receipt = make_receipt(
+            &signer_b,
+            "receipt-2",
+            now + 1,
+            "fs/write_text_file",
+            Decision::Allow,
+            Vec::new(),
+        );
+
+        let full_bundle = verify_compliance_certificate(
+            &cert,
+            VerificationMode::FullBundle,
+            Some(&mixed_receipts),
+        );
+
+        assert!(!full_bundle.passed);
+        assert!(full_bundle.certificate_signature_valid);
+        assert!(full_bundle.body_consistent);
+        assert_eq!(full_bundle.receipts_reverified, 2);
+        assert_eq!(full_bundle.receipt_failures, 0);
+        assert!(full_bundle.summary.contains("receipt kernel key mismatch"));
+    }
+
+    #[test]
     fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
         let signer = Keypair::generate();
         let now = now_secs();
