@@ -7,7 +7,7 @@ Ideas raised during the 9-lens brainstorm or 5-perspective debate that the propo
 ### Lens 1: Developer experience
 
 - **AI-assisted policy authoring** ("describe the policy in English, get YAML"). Tempting, but policy correctness is the load-bearing thing in Chio; an LLM author with hidden mistakes is the worst possible outcome. The right move is the LSP playground (DX-5), not generation.
-- **Hosted dev sandbox / "chio.dev" cloud.** Trj4 is explicitly internal-only — no vendors, no design partners. A hosted surface violates that constraint and fragments effort against substrate hardening.
+- **Hosted dev sandbox / "chio.dev" cloud.** Trj4 is explicitly internal-only - no vendors, no design partners. A hosted surface violates that constraint and fragments effort against substrate hardening.
 
 ### Lens 2: Performance and scale
 
@@ -22,7 +22,7 @@ Ideas raised during the 9-lens brainstorm or 5-perspective debate that the propo
 ### Lens 4: Protocol evolution
 
 - **Switch native wire to CBOR or HTTP/3.** Tempting for size budgets, but `WIRE_PROTOCOL.md:48` pins canonical JSON (RFC 8785) precisely so signing/verification has one deterministic encoder. Re-canonicalizing under CBOR/COSE costs the entire formal-methods lane (Lean models, Kani harnesses on `sign_receipt`, `verify_capability`) for marginal payoff. Revisit only when PQ signature sizes (~3.9 KB per `signature.v1.json:12`) actually break a deployment.
-- **OCSP-shape revocation surface.** `chio-revocation-oracle` already has epoch + sparse-Merkle + gossip — that's CRL-shape with bounded staleness, which is the right answer. Adding a per-query OCSP responder duplicates work and adds an online-availability dependency the fail-closed posture (CLAUDE.md house rules) does not want.
+- **OCSP-shape revocation surface.** `chio-revocation-oracle` already has epoch + sparse-Merkle + gossip - that's CRL-shape with bounded staleness, which is the right answer. Adding a per-query OCSP responder duplicates work and adds an online-availability dependency the fail-closed posture (CLAUDE.md house rules) does not want.
 
 ### Lens 5: AI-frontier
 

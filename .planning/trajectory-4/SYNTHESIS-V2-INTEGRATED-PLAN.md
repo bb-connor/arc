@@ -1,15 +1,15 @@
-# Trajectory-4 Synthesis v2 — Integrated Plan
+# Trajectory-4 Synthesis v2 - Integrated Plan
 
 **Status**: revised after reviewer pass. Integrates `SYNTHESIS-V1-INTERNAL-ONLY.md` (substrate-hardening floor) with `BRAINSTORM-V1-FEATURE-CATALOG.md` (9-lens feature brainstorm). Reviewer-recommended scope adopted; full ladder retained as opt-in.
 
 **Reviewer fixes applied in this revision**:
-- Threat-count language made exact: 20 threats / 8 covered / 12 pending (6 stub `unimplemented!()` + 3 missing `coveredBy` JSON link + 3 mobile-pending).
+- Threat-count language made exact and aligned with the live gate (`scripts/check-threat-coverage.sh`, which keys on the `coverage_state` field, not `coveredBy`): **20 threats / 11 covered / 6 pending-with-deferred_to / 3 uncovered**. The 6 pending are the `unimplemented!()` stubs; the 3 uncovered are the mobile rows currently failing the gate (marked `coverage_state: pending` without `deferred_to`). Among the 11 covered, only `weights_hash_spoof` lacks any explicit `covered_by_tests` / `coveredBy` linkage; `pq_signature_downgrade` and `tee_quote_forgery` already carry `covered_by_tests`.
 - Capability-negotiation handshake (`chio.capabilities.v1`) and `CapabilityToken` schema-tag promoted to **T1.0** ahead of macaroon caveats (the hinge ordering).
 - Verdict cache key fully specified: composite of cap_hash + scope + tool + guard-set hash + policy version + tenant/agent identity + caveat state + revocation epoch + trust-root epoch. Demoted to T2 only after S-1 flame-graph profile lands. Pure-preflight-only; explicit invalidation contract required.
-- Receipt-DAG formal model expanded: node IDs, parent-set hashes, acyclicity invariants, fanout limits, join semantics, replay rules. Old "sliding `recent_chain_signatures` set" loop guard replaced with formal DAG-level acyclicity.
+- Receipt-DAG formal model expanded with explicit cross-kernel ordering: per-receipt `dag_ordinal` plus an HLC `(wall_seconds, logical, kernel_id)` triple replaces the per-kernel `(epoch, seq)` predicate that does not work across independent kernel clock domains. Acyclicity invariant is `child.dag_ordinal > max(parent.dag_ordinal)`. Old "sliding `recent_chain_signatures` set" loop guard replaced with this formal DAG-level invariant.
 - Anchor-batch reframed as additive: per-receipt local sign stays verifiable; batch root upgrades continuity + non-repudiation, does not replace per-receipt signing.
 - `BudgetSplit::PerChildShare(f32)` replaced with **fixed-point integer units (basis points or micros)**.
-- Narrow `chio explain <receipt-id>` CLI promoted from T3 into T1 (CLI only — full web explorer stays in T3).
+- Narrow `chio explain <receipt-id>` CLI promoted from T3 into T1 (CLI only - full web explorer stays in T3).
 - Cargo-vet debt added to plan with "no net-new exemptions plus top-risk burn-down" close bar.
 - "Three tiers" prose corrected to **four tiers** throughout (T0/T1/T2/T3).
 - Recommended scope-lock narrowed per reviewer: T0 + reordered T1 core + selected T2.1 + `chio explain` CLI + **one of {T1.5 SRE redaction/metrics, T2.3 trust-graph quorum/rotation}**, not both.
@@ -24,7 +24,7 @@ Trajectory-4 is internal-only code work. Out of scope: design partners, vendor c
 
 The 9-lens brainstorm produced one strong cross-cutting consensus and one subordinate one:
 
-1. **4-way consensus**: macaroon-style capability attenuation. Capability-extension #1, AI-frontier #4, protocol-evolution #2, trust-graph #1 — four independent lenses converged on the same primitive. The substrate already has `caveats: Vec<String>` placeholders in `chio-a2a-edge`; the structure is acknowledged but unbuilt.
+1. **4-way consensus**: macaroon-style capability attenuation. Capability-extension #1, AI-frontier #4, protocol-evolution #2, trust-graph #1 - four independent lenses converged on the same primitive. The substrate already has `caveats: Vec<String>` placeholders in `chio-a2a-edge`; the structure is acknowledged but unbuilt.
 2. **2-way consensus**: anchor-batch Merkle trees. Perf-scale (CPU savings) and protocol-evolution (public non-repudiation) want the same primitive for different reasons. **Reframing: additive over per-receipt signing, not a replacement.**
 
 These two combine naturally with the floor's mobile-attestation work to produce a coherent trajectory-4 narrative: **the trust boundary becomes multi-agent-aware, hardware-rooted, and publicly anchorable**.
@@ -33,7 +33,7 @@ These two combine naturally with the floor's mobile-attestation work to produce 
 
 The plan has **four tiers**. Scope-lock decision picks the boundary; each tier compounds on the prior.
 
-### Tier 0 — The floor (from synthesis-v1, 8-10 weeks single-track)
+### Tier 0 - The floor (from synthesis-v1, 8-10 weeks single-track)
 
 Required for any trj4 close. Earns the right to add anything else.
 
@@ -60,11 +60,11 @@ Required for any trj4 close. Earns the right to add anything else.
 
 **Phase D (W8-10): meta-improvements + threat-coverage push**
 - Threat-coverage cargo-mutants per-row gate.
-- **Threat-coverage finishing push** (X-2): fill the 6 `unimplemented!()` stubs (`agent_velocity_abuse`, `behavioral_sequence_attack`, `cumulative_data_exfiltration`, `pii_phi_exposure`, `ssrf_via_http_substrate`, `wasm_guard_resource_exhaustion`); update the 3 missing-`coveredBy` JSON links (`pq_signature_downgrade`, `tee_quote_forgery`, `weights_hash_spoof`). Combined with Phase C's 3 mobile flips, this lands 12 threats and brings coverage from 8/20 to 20/20.
+- **Threat-coverage finishing push** (X-2). Concretely: (a) fill the 6 `unimplemented!()` stubs (`agent_velocity_abuse`, `behavioral_sequence_attack`, `cumulative_data_exfiltration`, `pii_phi_exposure`, `ssrf_via_http_substrate`, `wasm_guard_resource_exhaustion`) and flip their `coverage_state` from `pending` to `covered`; (b) add explicit `covered_by_tests` linkage for `weights_hash_spoof` (the only currently-covered row with neither `covered_by_tests` nor `coveredBy` to point at). Phase C lands the 3 mobile rows (`mobile_attestation_replay`, `device_key_extraction`, `play_integrity_token_replay`) which today are gate-failing because they are `coverage_state: pending` without `deferred_to`. Combined: **11 -> 20 covered**, 0 pending, 0 uncovered.
 - Fail-closed philosophy audit doc.
 - CI-DEBT.md final pass.
 
-### Tier 1 — Multi-agent trust primitives (4-6 additional weeks)
+### Tier 1 - Multi-agent trust primitives (4-6 additional weeks)
 
 Targeted additions; each pulls weight in multiple lenses simultaneously. **Reordering**: T1.0 (capability negotiation + token versioning) ships first or atomic with T1.1 because macaroon caveats and `attenuation_proof` alter the signed capability surface and `CapabilityToken` has no schema field today.
 
@@ -85,19 +85,23 @@ Result: sub-agents cannot re-amplify parent privileges; multi-org delegation is 
 **T1.2 Multi-agent receipt DAG with fork/join (~2 weeks)**
 Tighten the formal model first; otherwise the DAG is just a tree with extra fields.
 
-- **Node IDs**: `receipt_id = H(canonical(receipt_body))` (already so today; pin behavior).
-- **Parent-set hash**: `parent_set_hash = H(canonical(sort(parent_receipt_ids)))` so a verifier can cheaply check parent-set integrity without walking individual edges.
-- **Acyclicity invariant**: every parent_receipt_id must have an earlier `(epoch, seq)` than the child; verifier rejects any receipt whose parent_set has same-or-later seq. Combined with monotone `(epoch, seq)` per kernel, this gives DAG acyclicity by construction.
-- **Fanout limit**: per-call-chain `fanout_max` advisory in policy; `AgentLoopBoundsGuard` (C-2) enforces depth + fan-out.
-- **Join semantics**: `chio.receipt_lineage_statement.v2` carries `parent_receipt_ids: Vec<String>`; canonical sort + dedupe; verifier requires every parent to exist and to share a common `chain_id` ancestor.
-- **Replay rules**: receipt with same `(chain_id, kernel_id, epoch, seq)` is rejected at the receipt store; if seen on the wire, fail-closed.
+**Cross-kernel ordering note**: this plan is explicitly multi-agent and cross-kernel, so a per-kernel `(epoch, seq)` cannot be used as a global parent-before-child predicate (parent from kernel A and child from kernel B inhabit independent sequence spaces). The ordering proof has to live above the kernel-local clock.
 
-The original A-15 loop-detection sliding `recent_chain_signatures` set is replaced by the acyclicity invariant above (formal, DAG-level, not local sliding).
+- **Node IDs**: `receipt_id = H(canonical(receipt_body))` (already so today; pin behavior). Hash-collision resistance + content-addressing means equal `receipt_id` implies equal body.
+- **Parent-set hash**: `parent_set_hash = H(canonical(sort(parent_receipt_ids)))` so a verifier can cheaply check parent-set integrity without walking individual edges.
+- **Per-kernel local sequence**: each kernel maintains its existing monotone `(epoch, seq)` per-kernel; this remains valid for in-kernel ordering only.
+- **Cross-kernel ordering (DAG ordinal)**: each receipt carries a `dag_ordinal: u64` plus an HLC-shape `(wall_seconds, logical, kernel_id)` triple. When a kernel signs a receipt with parents from foreign kernels, it sets `dag_ordinal = 1 + max(parent.dag_ordinal for parent in parent_receipt_ids)` and `(wall_seconds, logical) = max(local_now, max(parent.hlc.advance_logical()))`. Both are signed inputs of the receipt body. This is the standard HLC pattern and gives a total order over the receipt DAG that respects causality across independent kernel clock domains.
+- **Acyclicity invariant**: a verifier rejects any receipt whose `dag_ordinal <= max(parent.dag_ordinal)`. Because `dag_ordinal` increases strictly with each receipt and is bounded by the parents it ingests, any cycle would require some receipt to have an ordinal that is both `>` and `<=` its parent, which is impossible. Cross-kernel cycles are rejected by the same predicate without requiring a single global clock.
+- **Fanout limit**: per-call-chain `fanout_max` advisory in policy; `AgentLoopBoundsGuard` (C-2) enforces depth + fan-out.
+- **Join semantics**: `chio.receipt_lineage_statement.v2` carries `parent_receipt_ids: Vec<String>`; canonical sort + dedupe; verifier requires every parent to exist (locally or via a cross-org receipt-join artifact T-10), to share a common `chain_id` ancestor, and to satisfy the DAG-ordinal acyclicity invariant.
+- **Replay rules**: receipt with same `(chain_id, kernel_id, epoch, seq)` is rejected at the local receipt store; on the wire, a duplicate `receipt_id` is dropped fail-closed. Cross-kernel duplicate detection uses `receipt_id` (content hash), not `(kernel_id, epoch, seq)`.
+
+This replaces the original A-15 sliding `recent_chain_signatures` loop guard, which was per-kernel and therefore unsafe for cross-kernel joins. Out-of-scope but worth recording: a vector-clock variant `(map<kernel_id, seq>)` is more expressive but pays a per-receipt size cost that grows with federation participants; the HLC + `dag_ordinal` shape is the lighter-weight equivalent that the brainstorm and reviewer feedback both support.
 
 **T1.3 Anchor-batch Merkle trees with public-witness checkpoints (~2 weeks)**
 - New artifact `chio.anchor_batch.v1` carrying `{tree_root, checkpoint_ids[], witness: rekor|ots|solana_memo}` (P-4).
 - Coalesced batch root computation: build a Merkle tree over N receipts/checkpoints, attach inclusion proof per element (S-2).
-- **Reframing**: per-receipt local sign stays. The local receipt remains independently verifiable. The batch root is *additional* — it upgrades continuity (the batch attests N receipts as a set) and non-repudiation (the witness lane gives third-party timestamping).
+- **Reframing**: per-receipt local sign stays. The local receipt remains independently verifiable. The batch root is *additional* - it upgrades continuity (the batch attests N receipts as a set) and non-repudiation (the witness lane gives third-party timestamping).
 - Closes the `audit_only` / `transparency_preview` ceiling explicitly admitted in PROTOCOL.md:657.
 
 **T1.4 Archaeology finish-line (~2 weeks parallelizable)**
@@ -106,17 +110,17 @@ The original A-15 loop-detection sliding `recent_chain_signatures` set is replac
 - Provider-adapter-core extraction (X-4): shared SSE-gate orchestration + `LoadedWeights` impl helper + `Provider` trait. Cuts ~3 KLOC across 7 adapters; makes 8th adapter (xAI / DeepSeek / OpenRouter / Together) a 1-day job.
 - **Cargo-vet debt close-bar (X-10)**: trj4 enforces "no net-new exemptions" gate in CI; ship real audits for the top 50 highest-traffic dependencies (alloy-*, aws-sdk-*, tokio-*, hyper-*, tonic-*) to burn the count down by at least that 50.
 
-**T1.5 Foundational SRE (~3 weeks parallelizable)** — *one of T1.5 or T2.3 per reviewer scope cap*
+**T1.5 Foundational SRE (~3 weeks parallelizable)** - *one of T1.5 or T2.3 per reviewer scope cap*
 - `chio-metrics-spec` workspace-wide const-string registry (O-1). Compile-time enforced via `describe!` macro + CI golden snapshot.
 - Prometheus alert + recording rule pack in `deploy/prometheus/` (O-3). Burn-rate alerts (14.4x/1h + 6x/6h dual-window) for slo.md targets. Routes to OpsGenie/PagerDuty already wired in `chio-siem`.
 - `chio-log-redact` (O-14): `tracing_subscriber::Layer` running every event through receipt's redaction tree. `redacted!()` macro rejects raw-string formatting. Eliminates an entire class of P0 (PHI in PagerDuty).
 
 **T1.6 `chio explain <receipt-id>` CLI (~1 week, promoted from T3 per reviewer)**
-CLI only — not the full web explorer (DX-3 stays in T3 buffet). The CLI walks: which policy clause matched, which guards fired, scope diff, parent receipt(s) (DAG-aware after T1.2), batch witness lane (after T1.3), repair hint if denied. Pairs with A-12 ("why was this called?" trace).
+CLI only - not the full web explorer (DX-3 stays in T3 buffet). The CLI walks: which policy clause matched, which guards fired, scope diff, parent receipt(s) (DAG-aware after T1.2), batch witness lane (after T1.3), repair hint if denied. Pairs with A-12 ("why was this called?" trace).
 
 This is in T1 because it makes the new receipt-DAG, attenuation failures, and close-bar evidence legible while the team is still building them. Without it, debugging T1.1/T1.2/T1.3 is a JSON-grep exercise.
 
-### Tier 2 — Foundational improvements (2-4 additional weeks)
+### Tier 2 - Foundational improvements (2-4 additional weeks)
 
 **T2.1 Trust-boundary plumbing** *(in recommended scope-lock)*
 - Hybrid PQ handshake by default (T-8): make `KernelTrustExchange` generic over `SigningBackend`. Plumbing only; `HybridSigningBackend` already exists. **In scope per reviewer.**
@@ -124,7 +128,7 @@ This is in T1 because it makes the new receipt-DAG, attenuation failures, and cl
 
 **T2.2 Mediator hot path** *(stretch per reviewer)*
 - Dispatch profile baseline + flame-graph CI artifact (S-1). Solves "we claim a <50us SLO without a profile that proves where time is spent." **Profile must land before T2.2's cache work below.**
-- Lock-free verdict cache on kernel hot path: bounded LRU keyed by **fully-specified composite** `(cap_hash, scope, tool, guard_set_hash, policy_version, tenant_id, agent_id, caveat_state_hash, revocation_epoch, trust_root_epoch)`. Auto-invalidated on any component change. Pure-preflight-only — never caches a decision derived from a guard whose verdict depends on session state. Targets <5us p99 on hit. **Reviewer caution**: profile (S-1) before deciding whether the cache is worth the invariant-management cost.
+- Lock-free verdict cache on kernel hot path: bounded LRU keyed by **fully-specified composite** `(cap_hash, scope, tool, guard_set_hash, policy_version, tenant_id, agent_id, caveat_state_hash, revocation_epoch, trust_root_epoch)`. Auto-invalidated on any component change. Pure-preflight-only - never caches a decision derived from a guard whose verdict depends on session state. Targets <5us p99 on hit. **Reviewer caution**: profile (S-1) before deciding whether the cache is worth the invariant-management cost.
 - Tower load-shed middleware (S-7). `tower::LoadShed` + `tower::ConcurrencyLimit`. Translates the bounded signing queue into 503 + Retry-After at the HTTP edge.
 
 **T2.3 Trust-graph maturity** *(one of T1.5 or T2.3, per reviewer scope cap)*
@@ -132,7 +136,7 @@ This is in T1 because it makes the new receipt-DAG, attenuation failures, and cl
 - Trust-anchor rotation ceremony with rotation attestation (T-3). Ledger replicated across federation peers via existing `chio-anchor` lanes.
 - DID-bound agent identity in receipts (T-9). `did:chio` already exists but isn't flowed into federation surface.
 
-### Tier 3 — Frontier features (stretch buffet)
+### Tier 3 - Frontier features (stretch buffet)
 
 Pick 1-2 only if the recommended scope-lock lands fast. Listed here for catalog completeness; full descriptions in `BRAINSTORM-V1-FEATURE-CATALOG.md`.
 
@@ -168,8 +172,8 @@ Concrete:
 - **T1.4** (archaeology finish-line + cargo-vet debt close, ~2 wk).
 - **T1.6** (`chio explain` CLI, ~1 wk).
 - **One of**:
-  - **T1.5** (foundational SRE: metric taxonomy + alert pack + log-redact), **OR**
-  - **T2.3** (trust-graph maturity: quorum-signed receipts + trust-anchor rotation + DID-in-receipts).
+ - **T1.5** (foundational SRE: metric taxonomy + alert pack + log-redact), **OR**
+ - **T2.3** (trust-graph maturity: quorum-signed receipts + trust-anchor rotation + DID-in-receipts).
 - **T2.1** (hybrid PQ default + conformance-tier gating; small-effort plumbing).
 
 Total estimated calendar: **12-15 weeks with two parallel lanes** (substrate-hardening + trust-primitives), **18-20 weeks single-track**.
@@ -188,7 +192,7 @@ All must hold simultaneously, evidenced in `releases.toml` and reproducible from
 5. Equivalence property test passing 1M cases nightly, zero divergence.
 6. `trust_control_cluster_multi_region_partition_qualification` 100/100 runs at 20 partition/heal cycles.
 7. Mobile attestation entry points return real verdicts on real fixtures; xcframework binary in tree.
-8. **Threat-model coverage at 20/20**: 6 stubs filled, 3 missing-`coveredBy` JSON links updated, 3 mobile threats covered.
+8. **Threat-model coverage at 20/20** per `scripts/check-threat-coverage.sh`: starting from 11 covered / 6 pending-with-`deferred_to` / 3 uncovered (mobile), trj4 fills the 6 `unimplemented!()` stubs to flip them `pending -> covered`, lands tests for the 3 mobile rows so they go `uncovered -> covered`, and adds `covered_by_tests` linkage for `weights_hash_spoof` (the one currently-covered row with no test reference in JSON). End state: 20 covered, 0 pending, 0 uncovered.
 9. `v3.18.1-trj3.1` tag shipped with green release-binaries + slsa + reproducible-build artifacts.
 10. `TRAJECTORY-FINAL.md` committed with real close SHA.
 
@@ -197,8 +201,8 @@ All must hold simultaneously, evidenced in `releases.toml` and reproducible from
 12. `CapabilityToken` schema-tagged; v2 envelope reserved fields shipped.
 13. Macaroon-style typed caveats land; `CapabilityAttenuationGuard` enforces subset-of-parent at runtime.
 14. `SubAgentBudgetPropagation` enforced at join, using fixed-point integer share units.
-15. `call_chain` extended from tree to DAG with formal model: node IDs, parent-set hash, acyclicity invariant, canonical sort, replay rules. `chio.receipt_lineage_statement.v2` deployed.
-16. Anchor-batch Merkle trees published with at least one witness lane (Rekor or OTS) — additive over per-receipt signing, not replacing it.
+15. `call_chain` extended from tree to DAG with cross-kernel-safe formal model: node IDs, parent-set hash, signed `dag_ordinal` + HLC triple, acyclicity invariant `child.dag_ordinal > max(parent.dag_ordinal)`, canonical parent-set sort + dedupe, replay rules keyed on `receipt_id` (content hash). `chio.receipt_lineage_statement.v2` deployed.
+16. Anchor-batch Merkle trees published with at least one witness lane (Rekor or OTS) - additive over per-receipt signing, not replacing it.
 17. `chio-hosted-mcp` no longer `#[path]`-splices CLI internals.
 18. Provider-adapter-core extracted; existing 7 adapters refactored to consume it.
 19. **Cargo-vet exemption count**: no net-new exemptions added during trj4; top-50 dependency burn-down completed (target: 819 -> <= 769 exemptions).
@@ -229,7 +233,7 @@ If T2.3 was chosen (instead of T1.5):
 
 - Vendor-calendar items (HITRUST, NCC/ToB, AWS Marketplace, MCP Registry publication).
 - Design partner / customer outreach.
-- Real partner cosign-OIDC sig (M02) — needs partner.
+- Real partner cosign-OIDC sig (M02) - needs partner.
 - TestFlight / mobile alpha cohorts.
 - Multi-cloud marketplace listings.
 - Operator agent that watches its own metrics and remediates (autonomous fail-open risk).
