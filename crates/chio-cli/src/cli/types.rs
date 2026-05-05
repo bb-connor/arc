@@ -6,7 +6,7 @@ pub use chio_control_plane::{
     reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
     CliError,
 };
-pub use chio_hosted_mcp as remote_mcp;
+pub use chio_mcp_remote as remote_mcp;
 
 use std::fs;
 use std::io::Write;

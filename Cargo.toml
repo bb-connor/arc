@@ -41,11 +41,13 @@ members = [
     "crates/chio-groq-tools-adapter",
     "crates/chio-mcp-adapter",
     "crates/chio-mcp-edge",
+    "crates/chio-mcp-remote",
     "crates/chio-mistral-tools-adapter",
     "crates/chio-ollama-tools-adapter",
     "crates/chio-openai",
     "crates/chio-openapi",
     "crates/chio-openapi-mcp-bridge",
+    "crates/chio-provider-adapter-core",
     "crates/chio-provider-conformance",
     "crates/chio-tool-call-fabric",
     "crates/chio-tower",
@@ -167,6 +169,7 @@ rust_public_entrypoints = [
     "chio-manifest",
     "chio-mcp-adapter",
     "chio-mcp-edge",
+    "chio-mcp-remote",
     "chio-policy",
 ]
 
