@@ -472,6 +472,12 @@ fn capability_error_message(error: &chio_kernel_core::CapabilityError) -> String
         chio_kernel_core::CapabilityError::Expired => {
             "capability has expired (clock is at or after expires_at)".to_string()
         }
+        chio_kernel_core::CapabilityError::CryptoFloorRejected(reason) => {
+            let mut out =
+                String::from("capability signature was below the configured crypto floor: ");
+            out.push_str(reason);
+            out
+        }
         chio_kernel_core::CapabilityError::Internal(msg) => {
             let mut out = String::from("capability verification failed: ");
             out.push_str(msg);
