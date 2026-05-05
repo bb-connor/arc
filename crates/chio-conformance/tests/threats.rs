@@ -32,9 +32,15 @@
 //! - cumulative_data_exfiltration
 //! - behavioral_sequence_attack
 //! - wasm_guard_resource_exhaustion
+//! - mobile_attestation_replay
+//! - device_key_extraction
+//! - play_integrity_token_replay
 
 #[path = "threats/common.rs"]
 mod common;
+
+#[path = "threats/mobile_attestation_common.rs"]
+mod mobile_attestation_common;
 
 #[path = "threats/capability_token_theft.rs"]
 mod capability_token_theft;
@@ -86,3 +92,12 @@ mod behavioral_sequence_attack;
 
 #[path = "threats/wasm_guard_resource_exhaustion.rs"]
 mod wasm_guard_resource_exhaustion;
+
+#[path = "threats/mobile_attestation_replay.rs"]
+mod mobile_attestation_replay;
+
+#[path = "threats/device_key_extraction.rs"]
+mod device_key_extraction;
+
+#[path = "threats/play_integrity_token_replay.rs"]
+mod play_integrity_token_replay;
