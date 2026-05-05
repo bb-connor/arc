@@ -364,6 +364,9 @@ fn verify_capability_json_str(
             CapabilityError::Expired => {
                 KernelFfiError::InvalidCapability("capability has expired".to_string())
             }
+            CapabilityError::BudgetSplitRejected(err) => KernelFfiError::InvalidCapability(
+                format!("capability rejected by sibling-sum budget split: {err}"),
+            ),
             CapabilityError::Internal(message) => {
                 KernelFfiError::Internal(format!("capability verification failed: {message}"))
             }

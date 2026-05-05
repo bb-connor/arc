@@ -28,6 +28,7 @@ use chio_core_types::capability::{
 };
 use chio_core_types::crypto::PublicKey;
 
+use crate::budget_split::{BudgetRegistry, BudgetSplitError, NoopBudgetRegistry};
 use crate::clock::Clock;
 use crate::formal_core::{classify_time_window, TimeWindowStatus};
 use crate::normalized::{NormalizationError, NormalizedVerifiedCapability};
@@ -76,8 +77,16 @@ pub enum CapabilityError {
     NotYetValid,
     /// Token has expired.
     Expired,
+    /// Sibling-sum budget enforcement rejected this delegation.
+    BudgetSplitRejected(BudgetSplitError),
     /// An internal invariant was violated (e.g. canonical-JSON failure).
     Internal(String),
+}
+
+impl From<BudgetSplitError> for CapabilityError {
+    fn from(err: BudgetSplitError) -> Self {
+        CapabilityError::BudgetSplitRejected(err)
+    }
 }
 
 /// Verify the signature, issuer trust, and time-bounds of a capability token.
@@ -85,29 +94,47 @@ pub enum CapabilityError {
 /// Returns a [`VerifiedCapability`] when all three checks succeed. Delegation
 /// chain validation, revocation lookup, and subject-binding checks are the
 /// caller's responsibility (see module docs).
+///
+/// This wrapper uses a [`NoopBudgetRegistry`] internally; callers that need
+/// sibling-sum budget enforcement must use [`verify_capability_with_floor`]
+/// directly with their own [`BudgetRegistry`] instance.
 pub fn verify_capability(
     token: &CapabilityToken,
     trusted_issuers: &[PublicKey],
     clock: &dyn Clock,
 ) -> Result<VerifiedCapability, CapabilityError> {
+    let mut budgets = NoopBudgetRegistry;
     verify_capability_with_floor(
         token,
         trusted_issuers,
         clock,
         CapabilityCryptoFloor::AllowClassical,
+        &mut budgets,
     )
 }
 
-/// Verify a capability token while enforcing the configured crypto floor.
+/// Verify a capability token while enforcing the configured crypto floor and
+/// sibling-sum budget split.
 ///
 /// This is the floor-aware entry point for kernels that load
 /// `policy.crypto_floor`. The default [`verify_capability`] wrapper preserves
-/// legacy callers by using [`CapabilityCryptoFloor::AllowClassical`].
+/// legacy callers by using [`CapabilityCryptoFloor::AllowClassical`] and a
+/// [`NoopBudgetRegistry`].
+///
+/// Sibling-sum enforcement: when the token carries a non-empty
+/// `delegation_chain`, the verifier asks `budgets` to admit the new child
+/// under the immediate parent (the last entry in the chain). The proposed
+/// share is `token.budget_share_bps.unwrap_or(MAX_BUDGET_SHARE_BPS)`: a
+/// missing field is interpreted as a request for the full parent share, so
+/// the registry can still detect oversubscription. Per-token validation has
+/// already enforced the `<= 10_000` cap by the time the token reaches this
+/// function.
 pub fn verify_capability_with_floor(
     token: &CapabilityToken,
     trusted_issuers: &[PublicKey],
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
+    budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
     // Issuer trust check. The legacy kernel also trusts its own public key
     // and the set returned by the capability authority; callers must
@@ -139,6 +166,19 @@ pub fn verify_capability_with_floor(
         TimeWindowStatus::Expired => return Err(CapabilityError::Expired),
     }
 
+    // Sibling-sum budget split. Only fires for tokens that carry a
+    // delegation chain; root-issued tokens have nothing to split.
+    if let Some(parent_link) = token.delegation_chain.last() {
+        let proposed_share = token
+            .budget_share_bps
+            .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
+        budgets.try_admit_child(
+            parent_link.capability_id.as_str(),
+            token.id.clone(),
+            proposed_share,
+        )?;
+    }
+
     Ok(VerifiedCapability {
         id: token.id.clone(),
         subject_hex: token.subject.to_hex(),
@@ -165,7 +205,9 @@ where
 }
 
 /// Convenience wrapper around [`verify_capability_with_floor`] for callers that
-/// build the trusted issuer set lazily.
+/// build the trusted issuer set lazily. Uses a [`NoopBudgetRegistry`]; new
+/// callers that care about sibling-sum enforcement should call
+/// [`verify_capability_with_floor`] with their own registry.
 pub fn verify_capability_with_trusted_and_floor<I>(
     token: &CapabilityToken,
     trusted_issuers: I,
@@ -176,7 +218,8 @@ where
     I: IntoIterator<Item = PublicKey>,
 {
     let trusted: Vec<PublicKey> = trusted_issuers.into_iter().collect();
-    verify_capability_with_floor(token, &trusted, clock, crypto_floor)
+    let mut budgets = NoopBudgetRegistry;
+    verify_capability_with_floor(token, &trusted, clock, crypto_floor, &mut budgets)
 }
 
 #[cfg(test)]
@@ -203,11 +246,13 @@ mod tests {
         .expect("sign classical capability");
         let clock = crate::FixedClock::new(150);
 
+        let mut budgets = NoopBudgetRegistry;
         let err = verify_capability_with_floor(
             &token,
             &[issuer.public_key()],
             &clock,
             CapabilityCryptoFloor::PqRequired,
+            &mut budgets,
         )
         .expect_err("classical capability must fail under pq_required");
 
@@ -232,11 +277,13 @@ mod tests {
         .expect("sign classical capability");
         let clock = crate::FixedClock::new(150);
 
+        let mut budgets = NoopBudgetRegistry;
         let verified = verify_capability_with_floor(
             &token,
             &[issuer.public_key()],
             &clock,
             CapabilityCryptoFloor::AllowClassical,
+            &mut budgets,
         )
         .expect("classical capability is accepted under allow_classical");
 

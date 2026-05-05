@@ -350,6 +350,9 @@ pub fn verify_capability(
             CapabilityError::CryptoFloorRejected(message) => ChioMobileError::InvalidCapability {
                 message: format!("capability crypto floor rejected: {message}"),
             },
+            CapabilityError::BudgetSplitRejected(err) => ChioMobileError::InvalidCapability {
+                message: format!("capability rejected by sibling-sum budget split: {err}"),
+            },
             CapabilityError::Internal(msg) => ChioMobileError::Internal {
                 message: format!("capability verification failed: {msg}"),
             },
