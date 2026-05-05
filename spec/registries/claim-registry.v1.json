@@ -28,18 +28,18 @@
       "summary": "A delegated child capability scope is a subset of its parent (no privilege amplification).",
       "introduced_in": "trajectory-2.M04",
       "proof_manifest_ref": "manifest.attenuation.subset"
-    }
-  ],
-  "trj4_proposed_claims": [
+    },
     {
       "id": "claim.capability.attenuation_proof",
       "status": "enforced",
       "schema_artifact": "spec/schemas/chio-wire/v1/capability/token.v2.schema.json",
-      "summary": "A v2 CapabilityToken carries an on-the-wire attenuation_proof witness; verifiers check the witness hashes and subset relation fail closed.",
-      "introduced_by": "trajectory-4/T1.1",
+      "summary": "A v2 CapabilityToken carries an on-the-wire attenuation_proof witness; verifiers check the witness hashes and subset relation fail closed AND require attenuation_proof.parent_scope_hash to be bound to the trust-root scope hash (direct issue) or the last delegation link's signed scope_hash (delegated chain). Closes the W1.1 P0 inflated-parent-scope soundness gap.",
+      "introduced_in": "trajectory-4/W1.1",
       "depends_on_theorems": ["theorem.attenuation.witness_soundness"],
       "proof_manifest_ref": "manifest.capability.attenuation_proof"
-    },
+    }
+  ],
+  "trj4_proposed_claims": [
     {
       "id": "claim.receipt.body_hash_addressing",
       "status": "enforced",
