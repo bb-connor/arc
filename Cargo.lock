@@ -3341,11 +3341,13 @@ name = "chio-kernel-mobile"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-custody-hw",
  "chio-kernel-core",
  "getrandom 0.2.17",
  "hex",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "uniffi",
 ]
 
@@ -13141,6 +13143,7 @@ dependencies = [
  "lazy_static",
  "nom",
  "oid-registry 0.7.1",
+ "ring",
  "rusticata-macros",
  "thiserror 1.0.69",
  "time",
