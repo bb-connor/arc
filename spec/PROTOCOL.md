@@ -266,12 +266,22 @@ The v1 signed body is:
 | Field | Meaning |
 | --- | --- |
 | `id` | Stable capability identifier used for revocation |
-| `issuer` | Ed25519 public key of the authority or delegating issuer |
-| `subject` | Ed25519 public key bound to the caller |
+| `issuer` | Algorithm-aware public key of the authority or delegating issuer |
+| `subject` | Algorithm-aware public key bound to the caller |
 | `scope` | Tool, resource, and prompt grants |
 | `issued_at` | Unix timestamp seconds |
 | `expires_at` | Unix timestamp seconds |
 | `delegation_chain` | Ordered chain of delegation links |
+| `algorithm` | Optional envelope hint: `ed25519`, `p256`, `p384`, or `hybrid` |
+
+Capability public-key fields and signatures use the same self-describing
+encoding defined in section 4. Hybrid capability tokens set
+`algorithm: "hybrid"` and encode `issuer`, `subject`, delegation-link keys,
+and signatures as `hybrid:<classical>:<mldsa65-hex>:<alg_set>`. Verifiers
+MUST dispatch from the signature prefix, confirm any present `algorithm` hint
+matches that prefix, and reject mismatches fail-closed. The algorithm enum
+MUST NOT contain concrete algorithm-set strings such as `ed25519+mldsa65`;
+those strings live only inside the hybrid wire value.
 
 ### Capability Negotiation
 
@@ -2471,6 +2481,9 @@ existing operator-owned surfaces:
   scope, and one fail-closed import policy across operators
 - one signed federation-quorum report over origin, mirror, and indexer
   observations with explicit freshness, conflict, and anti-eclipse evidence
+- one signed federation kernel-trust handshake over a `SigningBackend`,
+  allowing Ed25519, P-256, P-384, or hybrid PQ signing identities to pin peers
+  through the same envelope and verification path
 - one signed federated open-admission policy plus one signed federated
   reputation-clearing artifact over stake or bond requirements, local
   weighting, independent-issuer diversity, and corroborated negative events
@@ -2482,6 +2495,25 @@ existing operator-owned surfaces:
   divergent, malformed, or otherwise unverifiable
 - explicit separation between listing visibility and any later trust-activation
   or admission decision
+
+Federation handshakes bind a `conformance_tier` into the signed challenge.
+The receiving kernel stores that tier on the pinned `FederationPeer`, and
+`QuorumPolicy.min_tier` rejects peers below the configured floor before the
+peer enters a quorum set. Tiers are derived from threat-coverage, mutation-kill,
+and Kani trust-boundary harness evidence:
+
+| Tier | Required evidence |
+| --- | --- |
+| `bronze` | Schema-valid evidence is present, but the peer does not meet Silver. |
+| `silver` | Threat coverage >= 90%, mutation kill >= 65%, and Kani harnesses on >= 4 trust-boundary crates. |
+| `gold` | Threat coverage = 100%, mutation kill >= 80%, and Kani harnesses on >= 8 trust-boundary crates. |
+
+Cross-surface conformance for T2.1 is mandatory before advertising a Silver or
+Gold federation posture. The same negative fixture family must run across MCP
+wrapped mode, hosted/native HTTP, and A2A or HTTP edge surfaces, and each
+surface must prove deny receipts emit, lineage class is preserved, revocation
+propagates, budget enforcement is real, and no adapter bypass can skip
+capability, scope, or guard checks.
 
 The current generic registry claim is intentionally bounded:
 

@@ -115,6 +115,14 @@
       "statement": "A hybrid:<classical>:<pq>:<alg_set> signature verifies if and only if BOTH the classical and the PQ signatures verify under their respective public keys. Forgery requires breaking either primitive.",
       "introduced_by": "trajectory-4/T2.1",
       "depends_on": []
+    },
+    {
+      "id": "theorem.federation.conformance_tier_gate",
+      "kind": "lean",
+      "status": "proposed",
+      "statement": "If QuorumPolicy.min_tier is T, any peer admitted through KernelTrustExchange has a signed conformance_tier >= T in its accepted handshake challenge.",
+      "introduced_by": "trajectory-4/T2.1",
+      "depends_on": ["theorem.handshake.negotiation_safety"]
     }
   ]
 }

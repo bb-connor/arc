@@ -79,11 +79,21 @@
     {
       "id": "claim.signature.hybrid_pq",
       "status": "proposed",
-      "schema_artifact_proposed": "spec/schemas/signature.v1.json",
+      "schema_artifact_proposed": "spec/schemas/chio-wire/v1/capability/token.schema.json",
+      "related_schema_artifacts": ["spec/schemas/signature.v1.json"],
       "summary": "Capability tokens, federation handshake envelopes, and receipts accept a hybrid:<classical>:<pq>:<alg_set> signature wire format with the algorithm enum value 'hybrid'.",
       "introduced_by": "trajectory-4/T2.1",
       "depends_on_theorems": ["theorem.signature.hybrid_soundness"],
       "proof_manifest_ref": "manifest.signature.hybrid_pq"
+    },
+    {
+      "id": "claim.federation.conformance_tier",
+      "status": "proposed",
+      "schema_artifact_proposed": "crates/chio-federation/src/trust_establishment.rs",
+      "summary": "Federation handshakes bind a Bronze, Silver, or Gold conformance tier into the signed challenge, and quorum policy rejects peers below min_tier before admission.",
+      "introduced_by": "trajectory-4/T2.1",
+      "depends_on_theorems": ["theorem.federation.conformance_tier_gate"],
+      "proof_manifest_ref": "manifest.federation.conformance_tier"
     }
   ]
 }
