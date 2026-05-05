@@ -87,6 +87,8 @@ path = "verdict_matrix/tests/verdict_matrix_cross_language.rs"
 # browser kernel through its native (non-wasm32) cargo test surface.
 chio-kernel-browser = { version = "0.1.0", path = "../chio-kernel-browser" }
 chio-http-core = { version = "0.1.0", path = "../chio-http-core" }
+chio-http-session = { version = "0.1.0", path = "../chio-http-session" }
+chio-guards = { version = "0.1.0", path = "../chio-guards" }
 chio-weights = { version = "0.1.0", path = "../chio-weights" }
 chrono = { workspace = true, features = ["clock"] }
 # M05.P5.T3: threat-model coverage tests load curated adversarial

@@ -2774,7 +2774,9 @@ version = "0.1.0"
 dependencies = [
  "chio-adversarial-suite",
  "chio-core-types",
+ "chio-guards",
  "chio-http-core",
+ "chio-http-session",
  "chio-kernel",
  "chio-kernel-browser",
  "chio-weights",
