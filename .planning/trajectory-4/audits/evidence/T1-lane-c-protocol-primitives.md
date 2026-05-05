@@ -15,6 +15,8 @@ Lane C owns T1.0, T1.1, T1.2, T1.3, and T1.6.
 - T1.3: `chio.anchor_batch.v1` Merkle batching, inclusion verification, and
   public-witness semantics documentation.
 - T1.6: `chio receipt explain <receipt-id>` CLI narrator for v1 and v2 receipts.
+  Lookup accepts `--input-file`, local `--receipt-db`, and remote
+  `--control-url` receipt query sources.
 
 ## Evidence Gate Pointers
 
@@ -36,4 +38,11 @@ Lane C owns T1.0, T1.1, T1.2, T1.3, and T1.6.
 
 `scripts/generate-proof-report.sh --no-run-gates` is the local non-gating
 generation path when the formal toolchain is unavailable. The formal generated
-report target remains `target/formal/proof-report.json`.
+report target remains `target/formal/proof-report.json`, and the tracked
+Lane C snapshot is committed at `evidence/TRJ4-180/proof-report.json`.
+
+## Focused validation
+
+- `cargo fmt --all -- --check`
+- `cargo test -p chio-cli receipt_explain_tests -- --nocapture`
+- `cargo clippy -p chio-cli --bin chio -- -D warnings`

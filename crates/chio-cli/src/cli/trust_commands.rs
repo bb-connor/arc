@@ -2471,16 +2471,32 @@ fn load_receipt_for_explain(
     receipt_id: &str,
     backend: &QueryBackend<'_>,
 ) -> Result<serde_json::Value, CliError> {
-    if backend.control_url.is_some() {
-        return Err(CliError::cli_other_error(
-            "receipt explain over --control-url is not wired yet; use --input-file or --receipt-db"
-                .to_string(),
-        ));
+    if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
+        let client = trust_control::build_client(url, token)?;
+        let query = trust_control::ReceiptQueryHttpQuery {
+            capability_id: None,
+            tool_server: None,
+            tool_name: None,
+            outcome: None,
+            since: None,
+            until: None,
+            min_cost: None,
+            max_cost: None,
+            cursor: None,
+            limit: Some(1000),
+            agent_subject: None,
+        };
+        let response = client.query_receipts(&query)?;
+        return select_receipt_for_explain(
+            receipt_id,
+            response.receipts,
+            "control plane receipt query",
+        );
     }
     let path = backend.receipt_db_path.ok_or_else(|| {
         CliError::cli_other_error(
-            "receipt explain requires --input-file, --receipt-db, or a future --control-url resolver"
-                .to_string(),
+            "receipt explain requires --input-file, --receipt-db, or --control-url".to_string(),
         )
     })?;
     let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
@@ -2498,12 +2514,23 @@ fn load_receipt_for_explain(
         agent_subject: None,
         tenant_filter: None,
     })?;
-    let mut matches = result
+    let receipts = result
         .receipts
         .into_iter()
-        .filter(|stored| stored.receipt.id == receipt_id)
         .map(|stored| serde_json::to_value(stored.receipt))
         .collect::<Result<Vec<_>, _>>()?;
+    select_receipt_for_explain(receipt_id, receipts, "local receipt store")
+}
+
+fn select_receipt_for_explain(
+    receipt_id: &str,
+    receipts: Vec<serde_json::Value>,
+    source: &str,
+) -> Result<serde_json::Value, CliError> {
+    let mut matches = receipts
+        .into_iter()
+        .filter(|receipt| receipt_value_matches_id(receipt, receipt_id))
+        .collect::<Vec<_>>();
     if matches.len() == 1 {
         return Ok(matches.remove(0));
     }
@@ -2513,8 +2540,35 @@ fn load_receipt_for_explain(
         )));
     }
     Err(CliError::cli_other_error(format!(
-        "receipt `{receipt_id}` not found in first 1000 receipt rows; use --input-file for direct v2 body_hash lookup"
+        "receipt `{receipt_id}` not found in first 1000 receipt rows from {source}; use --input-file for direct v2 body_hash lookup"
     )))
+}
+
+fn receipt_value_matches_id(value: &serde_json::Value, receipt_id: &str) -> bool {
+    let candidate_paths = [
+        ["id"].as_slice(),
+        ["receipt_id"].as_slice(),
+        ["receiptId"].as_slice(),
+        ["body_hash"].as_slice(),
+        ["bodyHash"].as_slice(),
+        ["receipt", "id"].as_slice(),
+        ["receipt", "receipt_id"].as_slice(),
+        ["receipt", "receiptId"].as_slice(),
+        ["receipt", "body_hash"].as_slice(),
+        ["receipt", "bodyHash"].as_slice(),
+    ];
+    candidate_paths
+        .iter()
+        .filter_map(|path| json_path_str(value, path))
+        .any(|candidate| candidate == receipt_id)
+}
+
+fn json_path_str<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a str> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_str()
 }
 
 fn explain_receipt_value(
@@ -2637,5 +2691,61 @@ fn repair_hint(decision: &chio_core::receipt::Decision) -> Option<&'static str> 
             Some("resume only if the caller still owns the request and session")
         }
         chio_core::receipt::Decision::Allow => None,
+    }
+}
+
+#[cfg(test)]
+mod receipt_explain_tests {
+    use super::*;
+
+    #[test]
+    fn receipt_value_matches_legacy_and_v2_ids() {
+        let legacy = serde_json::json!({
+            "id": "receipt-legacy",
+            "decision": {"type": "allow"}
+        });
+        let v2 = serde_json::json!({
+            "bodyHash": "body-hash-123",
+            "receiptId": "receipt-v2",
+            "body": {}
+        });
+        let nested = serde_json::json!({
+            "receipt": {
+                "body_hash": "nested-body-hash"
+            }
+        });
+
+        assert!(receipt_value_matches_id(&legacy, "receipt-legacy"));
+        assert!(receipt_value_matches_id(&v2, "receipt-v2"));
+        assert!(receipt_value_matches_id(&v2, "body-hash-123"));
+        assert!(receipt_value_matches_id(&nested, "nested-body-hash"));
+        assert!(!receipt_value_matches_id(&legacy, "missing"));
+    }
+
+    #[test]
+    fn select_receipt_for_explain_requires_one_match() -> Result<(), CliError> {
+        let receipt = serde_json::json!({"id": "receipt-a"});
+        let selected =
+            select_receipt_for_explain("receipt-a", vec![receipt.clone()], "test source")?;
+        assert_eq!(selected, receipt);
+
+        let duplicate = select_receipt_for_explain(
+            "receipt-a",
+            vec![
+                serde_json::json!({"id": "receipt-a"}),
+                serde_json::json!({"receiptId": "receipt-a"}),
+            ],
+            "test source",
+        );
+        assert!(duplicate.is_err());
+
+        let missing = select_receipt_for_explain(
+            "missing",
+            vec![serde_json::json!({"id": "receipt-a"})],
+            "test source",
+        );
+        assert!(missing.is_err());
+
+        Ok(())
     }
 }
