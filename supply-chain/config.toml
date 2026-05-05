@@ -260,58 +260,6 @@ criteria = "safe-to-deploy"
 version = "1.1.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.alloy]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-chains]]
-version = "0.2.33"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-contract]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-dyn-abi]]
-version = "1.5.7"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-eips]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-json-rpc]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-provider]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-rlp-derive]]
-version = "0.3.13"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-rpc-client]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-sol-type-parser]]
-version = "1.5.7"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-transport]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-transport-http]]
-version = "1.8.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.alloy-trie]]
-version = "0.9.5"
-criteria = "safe-to-deploy"
-
 [[exemptions.ansi_term]]
 version = "0.12.1"
 criteria = "safe-to-deploy"
@@ -444,10 +392,6 @@ criteria = "safe-to-deploy"
 version = "0.2.14"
 criteria = "safe-to-deploy"
 
-[[exemptions.aws-credential-types]]
-version = "1.2.14"
-criteria = "safe-to-deploy"
-
 [[exemptions.aws-lc-fips-sys]]
 version = "0.13.14"
 criteria = "safe-to-deploy"
@@ -458,10 +402,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.aws-lc-sys]]
 version = "0.39.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-runtime]]
-version = "1.7.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-sdk-bedrockruntime]]
@@ -478,26 +418,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.aws-sdk-sts]]
 version = "1.103.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-sigv4]]
-version = "1.4.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-smithy-eventstream]]
-version = "0.60.20"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-smithy-http-client]]
-version = "1.1.12"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-smithy-json]]
-version = "0.62.5"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-smithy-runtime]]
-version = "1.11.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-types]]
