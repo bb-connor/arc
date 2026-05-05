@@ -2657,6 +2657,20 @@ enum ReceiptCommands {
         #[arg(long)]
         cursor: Option<u64>,
     },
+    /// Explain why a receipt was allowed or denied.
+    Explain {
+        /// Legacy receipt ID (`rcpt_...`) or v2 body_hash.
+        receipt_id: String,
+        /// Optional JSON file containing one v1 or v2 receipt.
+        #[arg(long)]
+        input_file: Option<PathBuf>,
+        /// Maximum parent depth to render.
+        #[arg(long, default_value_t = 8)]
+        depth: usize,
+        /// Maximum fanout siblings to render per level.
+        #[arg(long, default_value_t = 32)]
+        fanout_limit: usize,
+    },
 }
 
 #[derive(Subcommand)]

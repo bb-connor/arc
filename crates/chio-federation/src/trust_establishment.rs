@@ -40,6 +40,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 
 use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::capability::CapabilityNegotiation;
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use serde::{Deserialize, Serialize};
 
@@ -69,6 +70,10 @@ pub struct FederationPeer {
     /// peer is treated as stale and MUST be re-handshaked before any
     /// federation-level operation is accepted against it.
     pub rotation_due: u64,
+    /// Peer-advertised protocol feature bitset. Missing on legacy peers
+    /// defaults to v1-only capability tokens.
+    #[serde(default)]
+    pub capabilities: CapabilityNegotiation,
 }
 
 impl FederationPeer {
@@ -88,6 +93,8 @@ pub struct HandshakeChallenge {
     pub remote_kernel_id: String,
     pub nonce: String,
     pub timestamp: u64,
+    #[serde(default, skip_serializing_if = "is_default_capability_negotiation")]
+    pub capabilities: CapabilityNegotiation,
 }
 
 impl HandshakeChallenge {
@@ -103,12 +110,26 @@ impl HandshakeChallenge {
             remote_kernel_id: remote_kernel_id.into(),
             nonce: nonce.into(),
             timestamp,
+            capabilities: CapabilityNegotiation::t1_default(),
         }
     }
 
+    #[must_use]
+    pub fn with_capabilities(mut self, capabilities: CapabilityNegotiation) -> Self {
+        self.capabilities = capabilities;
+        self
+    }
+
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, PeerHandshakeError> {
+        self.capabilities
+            .validate()
+            .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
         canonical_json_bytes(self).map_err(|e| PeerHandshakeError::CanonicalJson(e.to_string()))
     }
+}
+
+fn is_default_capability_negotiation(capabilities: &CapabilityNegotiation) -> bool {
+    *capabilities == CapabilityNegotiation::v1_default()
 }
 
 /// Envelope one kernel sends to the other during a handshake.
@@ -143,6 +164,33 @@ impl PeerHandshakeEnvelope {
         })
     }
 
+    /// Build a signed handshake envelope with an explicit feature bitset.
+    pub fn sign_with_capabilities(
+        local_kernel_id: &str,
+        remote_kernel_id: &str,
+        nonce: &str,
+        timestamp: u64,
+        local_keypair: &Keypair,
+        capabilities: CapabilityNegotiation,
+    ) -> Result<Self, PeerHandshakeError> {
+        capabilities
+            .validate()
+            .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
+        let challenge =
+            HandshakeChallenge::new(local_kernel_id, remote_kernel_id, nonce, timestamp)
+                .with_capabilities(capabilities);
+        let bytes = challenge.canonical_bytes()?;
+        let backend = Ed25519Backend::new(local_keypair.clone());
+        let signature = backend
+            .sign_bytes(&bytes)
+            .map_err(|e| PeerHandshakeError::SigningFailed(e.to_string()))?;
+        Ok(Self {
+            challenge,
+            declared_public_key: local_keypair.public_key(),
+            signature,
+        })
+    }
+
     /// Verify this envelope in isolation (signature valid for declared
     /// public key; schema is the expected version). Callers still need to
     /// confirm the envelope targets them and fits within the freshness
@@ -154,6 +202,10 @@ impl PeerHandshakeEnvelope {
                 self.challenge.schema.clone(),
             ));
         }
+        self.challenge
+            .capabilities
+            .validate()
+            .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
         let bytes = self.challenge.canonical_bytes()?;
         if !self.declared_public_key.verify(&bytes, &self.signature) {
             return Err(PeerHandshakeError::InvalidSignature);
@@ -177,6 +229,9 @@ pub enum PeerHandshakeError {
 
     #[error("remote handshake signature is invalid")]
     InvalidSignature,
+
+    #[error("capability negotiation failed closed: {0}")]
+    CapabilityNegotiation(String),
 
     #[error("remote envelope is addressed to kernel_id {addressed_to} but we are {actual}")]
     AddressMismatch {
@@ -297,6 +352,7 @@ pub struct KernelTrustExchange {
     config: KernelTrustExchangeConfig,
     store: Box<dyn FederationPeerStore>,
     trusted_peers: HashMap<String, PublicKey>,
+    local_capabilities: CapabilityNegotiation,
 }
 
 impl core::fmt::Debug for KernelTrustExchange {
@@ -316,6 +372,7 @@ impl KernelTrustExchange {
             config: KernelTrustExchangeConfig::default(),
             store: Box::new(InMemoryPeerStore::new()),
             trusted_peers: HashMap::new(),
+            local_capabilities: CapabilityNegotiation::t1_default(),
         }
     }
 
@@ -338,12 +395,21 @@ impl KernelTrustExchange {
         self
     }
 
+    pub fn with_capabilities(mut self, capabilities: CapabilityNegotiation) -> Self {
+        self.local_capabilities = capabilities;
+        self
+    }
+
     pub fn local_kernel_id(&self) -> &str {
         &self.local_kernel_id
     }
 
     pub fn local_public_key(&self) -> PublicKey {
         self.local_keypair.public_key()
+    }
+
+    pub fn local_capabilities(&self) -> &CapabilityNegotiation {
+        &self.local_capabilities
     }
 
     pub fn rotation_window_secs(&self) -> u64 {
@@ -357,12 +423,31 @@ impl KernelTrustExchange {
         nonce: &str,
         now: u64,
     ) -> Result<PeerHandshakeEnvelope, PeerHandshakeError> {
-        PeerHandshakeEnvelope::sign(
+        PeerHandshakeEnvelope::sign_with_capabilities(
             &self.local_kernel_id,
             remote_kernel_id,
             nonce,
             now,
             &self.local_keypair,
+            self.local_capabilities.clone(),
+        )
+    }
+
+    /// Build the local kernel's signed envelope with explicit capabilities.
+    pub fn local_envelope_with_capabilities(
+        &self,
+        remote_kernel_id: &str,
+        nonce: &str,
+        now: u64,
+        capabilities: CapabilityNegotiation,
+    ) -> Result<PeerHandshakeEnvelope, PeerHandshakeError> {
+        PeerHandshakeEnvelope::sign_with_capabilities(
+            &self.local_kernel_id,
+            remote_kernel_id,
+            nonce,
+            now,
+            &self.local_keypair,
+            capabilities,
         )
     }
 
@@ -425,6 +510,10 @@ impl KernelTrustExchange {
             public_key: envelope.declared_public_key.clone(),
             established_at: now,
             rotation_due: now.saturating_add(self.config.rotation_window_secs),
+            capabilities: self
+                .local_capabilities
+                .negotiated_with(&envelope.challenge.capabilities)
+                .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?,
         };
         self.store.insert(peer.clone())?;
         Ok(peer)

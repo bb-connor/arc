@@ -129,6 +129,13 @@ struct ReceiptListArgs<'a> {
     cursor: Option<u64>,
 }
 
+struct ReceiptExplainArgs<'a> {
+    receipt_id: &'a str,
+    input_file: Option<&'a Path>,
+    depth: usize,
+    fanout_limit: usize,
+}
+
 fn build_underwriting_policy_input_query(
     args: &UnderwritingPolicyInputArgs<'_>,
 ) -> chio_kernel::UnderwritingPolicyInputQuery {
@@ -2411,4 +2418,224 @@ fn cmd_receipt_list(
         }
     }
     Ok(())
+}
+
+fn cmd_receipt_explain(
+    args: ReceiptExplainArgs<'_>,
+    backend: QueryBackend<'_>,
+) -> Result<(), CliError> {
+    let value = if let Some(input_file) = args.input_file {
+        serde_json::from_slice::<serde_json::Value>(&fs::read(input_file)?)?
+    } else {
+        load_receipt_for_explain(args.receipt_id, &backend)?
+    };
+    let report = explain_receipt_value(args.receipt_id, value, args.depth, args.fanout_limit)?;
+    if backend.json_output {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("receipt: {}", report["receipt_id"].as_str().unwrap_or(args.receipt_id));
+        println!("schema: {}", report["schema"].as_str().unwrap_or("unknown"));
+        println!("identity: {}", report["identity"].as_str().unwrap_or("unknown"));
+        println!("decision: {}", report["decision"].as_str().unwrap_or("unknown"));
+        if let Some(reason) = report.get("reason").and_then(|value| value.as_str()) {
+            println!("reason: {reason}");
+        }
+        if let Some(guard) = report.get("guard").and_then(|value| value.as_str()) {
+            println!("guard: {guard}");
+        }
+        if let Some(policy_hash) = report.get("policy_hash").and_then(|value| value.as_str()) {
+            println!("policy_hash: {policy_hash}");
+        }
+        if let Some(scope) = report.get("scope_diff").and_then(|value| value.as_str()) {
+            println!("scope_diff: {scope}");
+        }
+        if let Some(parents) = report.get("parents").and_then(|value| value.as_array()) {
+            println!("parents: {}", parents.len());
+            for parent in parents.iter().take(args.fanout_limit) {
+                if let Some(parent) = parent.as_str() {
+                    println!("  {parent}");
+                }
+            }
+        }
+        if let Some(witness) = report.get("batch_witness").and_then(|value| value.as_str()) {
+            println!("batch_witness: {witness}");
+        }
+        if let Some(hint) = report.get("repair_hint").and_then(|value| value.as_str()) {
+            println!("repair_hint: {hint}");
+        }
+    }
+    Ok(())
+}
+
+fn load_receipt_for_explain(
+    receipt_id: &str,
+    backend: &QueryBackend<'_>,
+) -> Result<serde_json::Value, CliError> {
+    if backend.control_url.is_some() {
+        return Err(CliError::cli_other_error(
+            "receipt explain over --control-url is not wired yet; use --input-file or --receipt-db"
+                .to_string(),
+        ));
+    }
+    let path = backend.receipt_db_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "receipt explain requires --input-file, --receipt-db, or a future --control-url resolver"
+                .to_string(),
+        )
+    })?;
+    let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
+    let result = store.query_receipts(&chio_kernel::ReceiptQuery {
+        capability_id: None,
+        tool_server: None,
+        tool_name: None,
+        outcome: None,
+        since: None,
+        until: None,
+        min_cost: None,
+        max_cost: None,
+        cursor: None,
+        limit: 1000,
+        agent_subject: None,
+        tenant_filter: None,
+    })?;
+    let mut matches = result
+        .receipts
+        .into_iter()
+        .filter(|stored| stored.receipt.id == receipt_id)
+        .map(|stored| serde_json::to_value(stored.receipt))
+        .collect::<Result<Vec<_>, _>>()?;
+    if matches.len() == 1 {
+        return Ok(matches.remove(0));
+    }
+    if matches.len() > 1 {
+        return Err(CliError::cli_other_error(format!(
+            "receipt ID prefix `{receipt_id}` is ambiguous"
+        )));
+    }
+    Err(CliError::cli_other_error(format!(
+        "receipt `{receipt_id}` not found in first 1000 receipt rows; use --input-file for direct v2 body_hash lookup"
+    )))
+}
+
+fn explain_receipt_value(
+    requested_id: &str,
+    value: serde_json::Value,
+    depth: usize,
+    fanout_limit: usize,
+) -> Result<serde_json::Value, CliError> {
+    if value.get("bodyHash").is_some() && value.get("body").is_some() {
+        let receipt: chio_core::receipt::ChioReceiptV2 = serde_json::from_value(value)?;
+        let signature_ok = receipt.verify_signature()?;
+        let decision = explain_decision_label(&receipt.body.decision);
+        let (reason, guard) = decision_details(&receipt.body.decision);
+        let parents = receipt
+            .body
+            .parent_receipt_ids
+            .iter()
+            .take(fanout_limit)
+            .cloned()
+            .collect::<Vec<_>>();
+        let batch_witness = receipt
+            .body
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("batch_witness"))
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned);
+        return Ok(serde_json::json!({
+            "schema": receipt.body.schema,
+            "receipt_id": receipt.receipt_id,
+            "identity": receipt.body_hash,
+            "requested_id": requested_id,
+            "signature_ok": signature_ok,
+            "decision": decision,
+            "reason": reason,
+            "guard": guard,
+            "policy_hash": receipt.body.policy_hash,
+            "guards": receipt.body.evidence,
+            "scope_diff": "requested scope vs granted scope is not embedded in this receipt",
+            "parents": parents,
+            "depth_limit": depth,
+            "fanout_limit": fanout_limit,
+            "batch_witness": batch_witness,
+            "repair_hint": repair_hint(&receipt.body.decision),
+        }));
+    }
+
+    let receipt: chio_core::receipt::ChioReceipt = serde_json::from_value(value)?;
+    let signature_ok = receipt.verify_signature()?;
+    let decision = explain_decision_label(&receipt.decision);
+    let (reason, guard) = decision_details(&receipt.decision);
+    let parents = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("parent_receipt_ids"))
+        .and_then(|value| value.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(ToOwned::to_owned))
+                .take(fanout_limit)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let batch_witness = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("batch_witness"))
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    Ok(serde_json::json!({
+        "schema": "chio.receipt.v1",
+        "receipt_id": receipt.id,
+        "identity": "legacy_uuidv7_alias",
+        "requested_id": requested_id,
+        "signature_ok": signature_ok,
+        "decision": decision,
+        "reason": reason,
+        "guard": guard,
+        "policy_hash": receipt.policy_hash,
+        "guards": receipt.evidence,
+        "scope_diff": "requested scope vs granted scope is not embedded in this receipt",
+        "parents": parents,
+        "depth_limit": depth,
+        "fanout_limit": fanout_limit,
+        "batch_witness": batch_witness,
+        "repair_hint": repair_hint(&receipt.decision),
+    }))
+}
+
+fn explain_decision_label(decision: &chio_core::receipt::Decision) -> &'static str {
+    match decision {
+        chio_core::receipt::Decision::Allow => "allow",
+        chio_core::receipt::Decision::Deny { .. } => "deny",
+        chio_core::receipt::Decision::Cancelled { .. } => "cancelled",
+        chio_core::receipt::Decision::Incomplete { .. } => "incomplete",
+    }
+}
+
+fn decision_details(decision: &chio_core::receipt::Decision) -> (Option<&str>, Option<&str>) {
+    match decision {
+        chio_core::receipt::Decision::Deny { reason, guard } => {
+            (Some(reason.as_str()), Some(guard.as_str()))
+        }
+        chio_core::receipt::Decision::Cancelled { reason }
+        | chio_core::receipt::Decision::Incomplete { reason } => (Some(reason.as_str()), None),
+        chio_core::receipt::Decision::Allow => (None, None),
+    }
+}
+
+fn repair_hint(decision: &chio_core::receipt::Decision) -> Option<&'static str> {
+    match decision {
+        chio_core::receipt::Decision::Deny { .. } => {
+            Some("inspect the guard and policy_hash, then mint or narrow a matching capability")
+        }
+        chio_core::receipt::Decision::Incomplete { .. } => {
+            Some("retry after checking the parent receipt and terminal operation state")
+        }
+        chio_core::receipt::Decision::Cancelled { .. } => {
+            Some("resume only if the caller still owns the request and session")
+        }
+        chio_core::receipt::Decision::Allow => None,
+    }
 }

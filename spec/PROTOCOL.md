@@ -255,8 +255,13 @@ this release.
 The shipped capability token is `CapabilityToken` from
 `crates/chio-core/src/capability.rs`.
 
-Unlike several other Chio artifacts, capability tokens do not carry a `schema`
-field today. The signed body is:
+Capability tokens are now schema-tagged signed artifacts. Newly issued tokens
+carry `schema: "chio.capability.v1"` or `schema: "chio.capability.v2"` in the
+schema-aware signing input. Legacy v1 tokens that omit `schema` remain
+verifiable through an explicit compatibility fallback, but load-time and
+verify-time paths reject any unknown capability schema.
+
+The v1 signed body is:
 
 | Field | Meaning |
 | --- | --- |
@@ -267,6 +272,33 @@ field today. The signed body is:
 | `issued_at` | Unix timestamp seconds |
 | `expires_at` | Unix timestamp seconds |
 | `delegation_chain` | Ordered chain of delegation links |
+
+### Capability Negotiation
+
+Federated peers exchange `chio.capabilities.v1` during trust establishment.
+The envelope carries a string-keyed feature bitset and `maxCapabilitySchema`.
+Peers proceed only with the intersection of features both sides advertise.
+Malformed feature names and unsupported schema IDs fail closed before a peer can
+use a negotiated upgrade.
+
+Initial feature names are:
+
+- `accepts_capability_v2`
+- `accepts_receipt_v2`
+- `accepts_anchor_batch_v1`
+- `accepts_hybrid_signatures`
+
+Peers that do not advertise the bitset stay on the v1 default. This prevents a
+flag-day rollout for additive capability, receipt, anchor, and signature
+changes.
+
+### Signed-Artifact Registry
+
+`spec/schemas/registry.json` is the signed-artifact compatibility registry.
+Every signed artifact schema ID that a verifier accepts must be listed there.
+Verifier builds also expose the same IDs through
+`KNOWN_SIGNED_ARTIFACT_SCHEMAS`. Unknown signed-artifact schemas are rejected at
+load time and again at signature verification time.
 
 ### 5.1 Scope
 
@@ -290,6 +322,29 @@ The shipped scope model includes:
 The shipped `constraints` surface includes ordinary argument constraints plus
 governed-transaction controls such as `governed_intent_required`,
 `require_approval_above`, and `seller_exact`.
+
+### Capability v2 Attenuation
+
+`chio.capability.v2` promotes delegation and attenuation onto the negotiated
+wire shape:
+
+- typed first-party `caveats` with `{ kind, predicate, sig? }`
+- `scope_attenuations` carrying the narrowing operations
+- `attenuation_proof` with `parentScopeHash`, `childScopeHash`, and a
+  `normalizedSubsetProof`
+- optional `budget_share_bps`, a fixed-point child budget share capped at 10000
+
+The witness API is:
+
+```rust
+compute_attenuation_witness(parent: &ChioScope, child: &ChioScope)
+verify_attenuation_witness(parent_hash, child_hash, witness)
+```
+
+Minting and verification both check that the child scope hash in the proof
+matches the token scope, that the witness hashes match the normalized scopes,
+and that every recorded grant relation is a subset. Budget shares above 10000
+bps fail closed because they re-amplify parent authority.
 
 ### 5.2 Governed Transaction Extensions
 
@@ -494,6 +549,45 @@ The shipped receipt envelope is `ChioReceipt` from
 | `kernel_key` | Verifying public key |
 | `signature` | Ed25519 signature |
 
+### Receipt v2 Body Hash And DAG
+
+`chio.receipt.v2` adds a content-addressed lane while preserving the legacy
+`receiptId` as a non-authoritative tooling alias. The authoritative identity is
+`bodyHash`.
+
+`ReceiptV2BodyHashInput` contains every v2 body field except `bodyHash`,
+`signature`, and the legacy `receiptId`. The body hash is:
+
+```text
+bodyHash = H(canonical_jcs(ReceiptV2BodyHashInput))
+```
+
+The signature input is the typed wrapper:
+
+```text
+ReceiptV2SigningBody { bodyHash, body: ReceiptV2BodyHashInput }
+```
+
+Ad hoc byte concatenation is not a valid signing input. Verifiers reconstruct
+the typed wrapper and re-canonicalize it before signature verification.
+
+Replay and deduplication state keys exclusively on `bodyHash`. A tampered
+legacy `receiptId` cannot influence replay acceptance and does not change the
+receipt's cryptographic identity.
+
+For multi-parent lineage, v2 receipts carry:
+
+- `chainId`
+- sorted and deduplicated `parentReceiptIds`, each a parent `bodyHash`
+- `parentSetHash = H(canonical(parentReceiptIds))`
+- `dagOrdinal`
+- HLC triple `{ wallSeconds, logical, kernelId }`
+
+The verifier rejects a child unless its parent descriptors match the signed
+parent set, every parent shares the same `chainId`, and
+`child.dagOrdinal > max(parent.dagOrdinal)`. This rejects cross-kernel cycles
+without relying on one global clock.
+
 ### 6.1 Decisions
 
 The decision enum is part of the contract:
@@ -660,6 +754,33 @@ use public append-only or strong non-repudiation language until the published
 surface is claim-complete, child-receipt-complete, anti-equivocation-capable,
 and qualified under the declared verifier policy.
 
+### 6.4.1 Anchor Batch v1
+
+`chio.anchor_batch.v1` is an additive batch artifact. It builds a Merkle tree
+over receipt or checkpoint IDs, signs the batch root and inclusion proofs, and
+binds the root to a public witness lane:
+
+- `rekor`
+- `ots`
+- `solana_memo`
+
+Per-receipt local signatures remain the authority for individual receipts. A
+batch root upgrades continuity and public timestamping, but a witness outage
+does not invalidate locally verifiable receipts.
+
+Batch verifiers fail closed on:
+
+- forged batch roots
+- inclusion proofs that do not match the checkpoint at the same index
+- witness entries whose root differs from `treeRoot`
+- witness lanes outside the verifier allow-list
+
+When all witness lanes are unavailable beyond the configured freshness window,
+new batches degrade to `pending_public_witness`. Verifiers configured with
+`require_public_witness` reject those new batches while continuing to accept
+already-witnessed batches and locally valid receipts. The operational semantics
+are pinned in `docs/security/public-witness-semantics.md`.
+
 ### 6.5 HTTP Receipts
 
 The HTTP substrate (see [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md)) introduces
@@ -742,6 +863,7 @@ The repository ships these primary runtime entrypoints:
 - `chio mcp serve`
 - `chio mcp serve-http`
 - `chio trust serve`
+- `chio receipt explain`
 - `chio api protect` -- reverse proxy that enforces Chio policy over an HTTP API using an OpenAPI spec
 - `chio cert generate` -- generate TLS or signing certificates for Chio operator use
 - `chio cert verify` -- verify a certificate chain or signing material against Chio trust roots
@@ -749,6 +871,12 @@ The repository ships these primary runtime entrypoints:
 
 These surfaces intentionally share the same core receipt, capability,
 revocation, and policy primitives rather than defining separate trust models.
+
+`chio receipt explain <receipt-id>` accepts legacy receipt aliases and v2
+`bodyHash` values. It renders the signed decision, policy hash, guard evidence,
+parent receipt set, batch witness reference when present, and a repair hint for
+denials or incomplete receipts. It is a local CLI narrator, not a replacement
+for signature verification.
 
 ### 8.2 MCP Compatibility
 
