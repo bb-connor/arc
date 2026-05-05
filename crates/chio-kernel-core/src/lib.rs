@@ -69,8 +69,8 @@ pub mod scope;
 
 pub use capability_verify::{
     verify_capability, verify_capability_with_floor, verify_capability_with_floor_and_resolver,
-    verify_capability_with_floor_and_trust_root, CapabilityError, TrustRootResolver,
-    VerifiedCapability,
+    verify_capability_with_floor_and_trust_root, verify_capability_with_negotiated_floor,
+    CapabilityError, TrustRootResolver, VerifiedCapability,
 };
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{
