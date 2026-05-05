@@ -299,6 +299,11 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     let trust_resolver = move |issuer: &PublicKey| -> Option<ScopeHash> {
         trust_root_map.get(&issuer.to_hex()).cloned()
     };
+    // Per-request budget registry: the C++ FFI does not maintain
+    // long-lived sibling-sum state across calls. A fresh
+    // `InMemoryBudgetRegistry` keeps the verifier fail-closed without
+    // sharing cross-request state.
+    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
     let verdict = evaluate_with_full_floor(
         EvaluateInput {
             request: &portable_request,
@@ -311,6 +316,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         &trust_resolver,
+        &mut budgets,
     );
 
     let response = match verdict.verdict {
@@ -381,6 +387,7 @@ fn verify_capability_json_str(
     // entry point (see `evaluate` in this crate).
     let peer_profile = CapabilityNegotiation::t1_default();
     let trust_resolver = |_issuer: &PublicKey| -> Option<ScopeHash> { None };
+    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
     let verified = verify_capability_full(
         &token,
         &[authority],
@@ -388,39 +395,40 @@ fn verify_capability_json_str(
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         &trust_resolver,
+        &mut budgets,
     )
     .map_err(|error| match error {
-            CapabilityError::UntrustedIssuer => KernelFfiError::InvalidCapability(
-                "capability issuer is not in the trusted authority set".to_string(),
-            ),
-            CapabilityError::InvalidSignature => KernelFfiError::InvalidCapability(
-                "capability signature failed to verify".to_string(),
-            ),
-            CapabilityError::CryptoFloorRejected(message) => KernelFfiError::InvalidCapability(
-                format!("capability crypto floor rejected: {message}"),
-            ),
-            CapabilityError::NotYetValid => {
-                KernelFfiError::InvalidCapability("capability is not yet valid".to_string())
-            }
-            CapabilityError::Expired => {
-                KernelFfiError::InvalidCapability("capability has expired".to_string())
-            }
-            CapabilityError::AttenuationViolation(message) => KernelFfiError::InvalidCapability(
-                format!("capability rejected by chain binding: {message}"),
-            ),
-            CapabilityError::BudgetSplitRejected(err) => KernelFfiError::InvalidCapability(
-                format!("capability rejected by sibling-sum budget split: {err}"),
-            ),
-            CapabilityError::Internal(message) => {
-                KernelFfiError::Internal(format!("capability verification failed: {message}"))
-            }
-            CapabilityError::SchemaExceedsNegotiatedCeiling {
-                token_schema,
-                peer_max,
-            } => KernelFfiError::InvalidCapability(format!(
-                "capability token schema {token_schema} exceeds peer-negotiated ceiling {peer_max}"
-            )),
-        })?;
+        CapabilityError::UntrustedIssuer => KernelFfiError::InvalidCapability(
+            "capability issuer is not in the trusted authority set".to_string(),
+        ),
+        CapabilityError::InvalidSignature => {
+            KernelFfiError::InvalidCapability("capability signature failed to verify".to_string())
+        }
+        CapabilityError::CryptoFloorRejected(message) => KernelFfiError::InvalidCapability(
+            format!("capability crypto floor rejected: {message}"),
+        ),
+        CapabilityError::NotYetValid => {
+            KernelFfiError::InvalidCapability("capability is not yet valid".to_string())
+        }
+        CapabilityError::Expired => {
+            KernelFfiError::InvalidCapability("capability has expired".to_string())
+        }
+        CapabilityError::AttenuationViolation(message) => KernelFfiError::InvalidCapability(
+            format!("capability rejected by chain binding: {message}"),
+        ),
+        CapabilityError::BudgetSplitRejected(err) => KernelFfiError::InvalidCapability(format!(
+            "capability rejected by sibling-sum budget split: {err}"
+        )),
+        CapabilityError::Internal(message) => {
+            KernelFfiError::Internal(format!("capability verification failed: {message}"))
+        }
+        CapabilityError::SchemaExceedsNegotiatedCeiling {
+            token_schema,
+            peer_max,
+        } => KernelFfiError::InvalidCapability(format!(
+            "capability token schema {token_schema} exceeds peer-negotiated ceiling {peer_max}"
+        )),
+    })?;
 
     let scope_json = serde_json::to_string(&verified.scope)
         .map_err(|error| KernelFfiError::internal("serialize capability scope", error))?;

@@ -267,6 +267,11 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
         trust_root_map.get(&issuer.to_hex()).cloned()
     };
 
+    // Mobile per-request budget registry: the mobile FFI does not
+    // maintain long-lived sibling-sum state across calls. A fresh
+    // `InMemoryBudgetRegistry` keeps the verifier fail-closed without
+    // sharing cross-request state.
+    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
     let verdict = evaluate_with_full_floor(
         EvaluateInput {
             request: &portable_request,
@@ -279,6 +284,7 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         &trust_resolver,
+        &mut budgets,
     );
 
     let response = match verdict.verdict {
@@ -371,6 +377,7 @@ pub fn verify_capability(
     // point that accepts trust-root hashes per request).
     let peer_profile = CapabilityNegotiation::t1_default();
     let trust_resolver = |_issuer: &PublicKey| -> Option<ScopeHash> { None };
+    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
     let verified = verify_capability_full(
         &token,
         &[authority],
@@ -378,41 +385,42 @@ pub fn verify_capability(
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         &trust_resolver,
+        &mut budgets,
     )
     .map_err(|error| match error {
-            CapabilityError::UntrustedIssuer => ChioMobileError::InvalidCapability {
-                message: "capability issuer is not in the trusted authority set".to_string(),
-            },
-            CapabilityError::InvalidSignature => ChioMobileError::InvalidCapability {
-                message: "capability signature failed to verify".to_string(),
-            },
-            CapabilityError::NotYetValid => ChioMobileError::InvalidCapability {
-                message: "capability is not yet valid".to_string(),
-            },
-            CapabilityError::Expired => ChioMobileError::InvalidCapability {
-                message: "capability has expired".to_string(),
-            },
-            CapabilityError::CryptoFloorRejected(message) => ChioMobileError::InvalidCapability {
-                message: format!("capability crypto floor rejected: {message}"),
-            },
-            CapabilityError::AttenuationViolation(message) => ChioMobileError::InvalidCapability {
-                message: format!("capability rejected by chain binding: {message}"),
-            },
-            CapabilityError::BudgetSplitRejected(err) => ChioMobileError::InvalidCapability {
-                message: format!("capability rejected by sibling-sum budget split: {err}"),
-            },
-            CapabilityError::Internal(msg) => ChioMobileError::Internal {
-                message: format!("capability verification failed: {msg}"),
-            },
-            CapabilityError::SchemaExceedsNegotiatedCeiling {
-                token_schema,
-                peer_max,
-            } => ChioMobileError::InvalidCapability {
-                message: format!(
-                    "capability token schema {token_schema} exceeds peer-negotiated ceiling {peer_max}"
-                ),
-            },
-        })?;
+        CapabilityError::UntrustedIssuer => ChioMobileError::InvalidCapability {
+            message: "capability issuer is not in the trusted authority set".to_string(),
+        },
+        CapabilityError::InvalidSignature => ChioMobileError::InvalidCapability {
+            message: "capability signature failed to verify".to_string(),
+        },
+        CapabilityError::NotYetValid => ChioMobileError::InvalidCapability {
+            message: "capability is not yet valid".to_string(),
+        },
+        CapabilityError::Expired => ChioMobileError::InvalidCapability {
+            message: "capability has expired".to_string(),
+        },
+        CapabilityError::CryptoFloorRejected(message) => ChioMobileError::InvalidCapability {
+            message: format!("capability crypto floor rejected: {message}"),
+        },
+        CapabilityError::AttenuationViolation(message) => ChioMobileError::InvalidCapability {
+            message: format!("capability rejected by chain binding: {message}"),
+        },
+        CapabilityError::BudgetSplitRejected(err) => ChioMobileError::InvalidCapability {
+            message: format!("capability rejected by sibling-sum budget split: {err}"),
+        },
+        CapabilityError::Internal(msg) => ChioMobileError::Internal {
+            message: format!("capability verification failed: {msg}"),
+        },
+        CapabilityError::SchemaExceedsNegotiatedCeiling {
+            token_schema,
+            peer_max,
+        } => ChioMobileError::InvalidCapability {
+            message: format!(
+                "capability token schema {token_schema} exceeds peer-negotiated ceiling {peer_max}"
+            ),
+        },
+    })?;
 
     let scope_json =
         serde_json::to_string(&verified.scope).map_err(|error| ChioMobileError::Internal {

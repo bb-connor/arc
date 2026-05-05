@@ -396,6 +396,11 @@ pub fn verify_capability_pure(
         trust_root_map.get(&issuer.to_hex()).cloned()
     };
 
+    // Per-request budget registry: the browser kernel does not maintain
+    // long-lived sibling-sum state across calls, so a fresh
+    // `InMemoryBudgetRegistry` keeps the verifier fail-closed without
+    // sharing leaky cross-request state.
+    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
     let result = match input.clock_override_unix_secs {
         Some(pinned) => {
             let fixed = chio_kernel_core::FixedClock::new(pinned);
@@ -406,6 +411,7 @@ pub fn verify_capability_pure(
                 crypto_floor,
                 &peer_profile,
                 &trust_resolver,
+                &mut budgets,
             )
         }
         None => verify_capability_full(
@@ -415,6 +421,7 @@ pub fn verify_capability_pure(
             crypto_floor,
             &peer_profile,
             &trust_resolver,
+            &mut budgets,
         ),
     };
 

@@ -405,10 +405,26 @@ the issuer's actual upstream parent capability. Concretely:
 The portable verifier entrypoint
 `chio_kernel_core::verify_capability_with_floor_and_trust_root(token,
 trusted_issuers, clock, crypto_floor, trust_root_scope_hash)` enforces
-the rule and rejects with `CapabilityError::AttenuationViolation` when
-`parent_scope_hash` is unbound. The check costs a single hash comparison
-on the happy path and runs after the basic signature, time, and crypto-
-floor checks (the chain binding is meaningful only once those succeed).
+the rule in isolation. Production kernels SHOULD prefer the Wave 1.5
+composite entrypoint
+`chio_kernel_core::verify_capability_full(token, trusted_issuers,
+clock, crypto_floor, peer, trust_root, budgets)`, which chains the W1.3
+schema-ceiling check, the W1.1 chain-binding check, and the W1.2
+sibling-sum budget admission alongside signature, floor, and time-bound
+verification. Both rejection paths surface `CapabilityError::AttenuationViolation`
+with the offending hashes formatted as hex. The check costs a single hash
+comparison on the happy path and runs after the basic signature, time,
+and crypto-floor checks (the chain binding is meaningful only once those
+succeed).
+
+Worked example. An issuer with trust-root authority hash `H_root` mints
+a v2 capability directly (empty `delegation_chain`). The verifier accepts
+the token only if `attenuation_proof.parent_scope_hash == H_root`. If
+the issuer further delegates to Bob, the resulting hop's
+`DelegationLink.scope_hash` is `H_bob`, and Bob's downstream v2 token
+must carry `attenuation_proof.parent_scope_hash == H_bob`. A token that
+claims `parent_scope_hash == H_BIGGER` (any unbound hash) is rejected
+with `CapabilityError::AttenuationViolation`.
 
 The Lean theorem `theorem.attenuation.witness_soundness` in
 `formal/lean4/Chio/Chio/Proofs/AttenuationWitness.lean` models the

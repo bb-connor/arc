@@ -73,6 +73,18 @@
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/protocol_primitives_t1.rs::forged_attenuation_proof_rejected"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/attenuation_witness_rejects_inflated_parent_scope.rs::v2_token_with_inflated_parent_scope_hash_is_rejected"}
       ]
+    },
+    {
+      "id": "manifest.handshake.capability_negotiation",
+      "claim_ref": "claim.handshake.capability_negotiation",
+      "introduced_by": "trajectory-4/T1.0",
+      "promoted_by": "trajectory-4/wave-1.5",
+      "evidence": [
+        {"kind": "lean_theorem", "ref": "theorem.handshake.negotiation_safety"},
+        {"kind": "rust_test", "ref": "crates/chio-core-types/src/capability.rs::capability_negotiation_intersection_rejects_malformed_feature"},
+        {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/protocol_primitives_t1.rs::capability_v2_unknown_schema_rejected"},
+        {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/verify_rejects_v2_token_when_peer_negotiated_v1_only.rs::v2_token_rejected_when_peer_negotiated_v1_only"}
+      ]
     }
   ],
   "trj4_proposed_manifests": [
@@ -110,16 +122,6 @@
         {"kind": "lean_theorem", "ref": "theorem.anchor.public_witness_anti_equivocation"},
         {"kind": "rust_test", "ref": "crates/chio-anchor/src/batch.rs::anchor_batch_roundtrip_and_negative_roots"},
         {"kind": "doc", "ref": "docs/security/public-witness-semantics.md"}
-      ]
-    },
-    {
-      "id": "manifest.handshake.capability_negotiation",
-      "claim_ref": "claim.handshake.capability_negotiation",
-      "introduced_by": "trajectory-4/T1.0",
-      "evidence": [
-        {"kind": "lean_theorem", "ref": "theorem.handshake.negotiation_safety"},
-        {"kind": "rust_test", "ref": "crates/chio-core-types/src/capability.rs::capability_negotiation_intersection_rejects_malformed_feature"},
-        {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/protocol_primitives_t1.rs::capability_v2_unknown_schema_rejected"}
       ]
     },
     {

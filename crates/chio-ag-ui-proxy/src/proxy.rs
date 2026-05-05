@@ -216,6 +216,11 @@ impl AgUiProxy {
         let trust_resolver = |issuer: &PublicKey| -> Option<ScopeHash> {
             trust_roots.get(&issuer.to_hex()).cloned()
         };
+        // Per-event budget registry: the AG-UI proxy is event-driven and
+        // does not maintain long-lived sibling-sum state. A fresh
+        // `InMemoryBudgetRegistry` keeps the verifier fail-closed
+        // without sharing cross-event state.
+        let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
         if let Err(error) = verify_capability_full(
             capability,
             &self.config.trusted_issuers,
@@ -223,6 +228,7 @@ impl AgUiProxy {
             CapabilityCryptoFloor::AllowClassical,
             &self.config.peer_capabilities,
             &trust_resolver,
+            &mut budgets,
         ) {
             return ProxyDecision::Block {
                 reason: format!(

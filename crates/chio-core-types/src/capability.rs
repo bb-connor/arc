@@ -106,6 +106,14 @@ impl CapabilityNegotiation {
     }
 
     /// T1 peer profile: v2 capability, receipt v2, and anchor batches.
+    ///
+    /// Wave 1.5 hardening: the
+    /// [`capability_features::DELEGATION_V2_CHAIN_BINDING`] flag is
+    /// advertised as `true` so production peers exercise the W1.1
+    /// chain-binding check by default. Peers that need to interoperate
+    /// with a counterparty that has not rolled out chain-binding can
+    /// explicitly clear the flag in the intersected profile, but the
+    /// safe direction is to leave it on.
     #[must_use]
     pub fn t1_default() -> Self {
         let mut features = BTreeMap::new();
@@ -113,6 +121,10 @@ impl CapabilityNegotiation {
         features.insert(capability_features::ACCEPTS_RECEIPT_V2.to_string(), true);
         features.insert(
             capability_features::ACCEPTS_ANCHOR_BATCH_V1.to_string(),
+            true,
+        );
+        features.insert(
+            capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
             true,
         );
         Self {
@@ -598,6 +610,14 @@ impl CapabilityToken {
     /// witness that the verifier accepts.
     ///
     /// This check is a no-op for v1 tokens.
+    ///
+    /// Wave 1.5 note: production callers should prefer
+    /// [`Self::validate_chain_binding_with_features`], which gates the
+    /// v2 chain-binding enforcement on the
+    /// [`capability_features::DELEGATION_V2_CHAIN_BINDING`] feature flag.
+    /// This entry point preserves the legacy "always on" semantics that
+    /// existing callers (verifier hot path, FFI shells, conformance
+    /// tests) rely on.
     pub fn validate_chain_binding(&self, trust_root_scope_hash: &ScopeHash) -> Result<()> {
         if self.schema != CHIO_CAPABILITY_V2_SCHEMA {
             return Ok(());
@@ -643,6 +663,37 @@ impl CapabilityToken {
             }
         }
         Ok(())
+    }
+
+    /// Wave 1.5 feature-gated wrapper around [`Self::validate_chain_binding`].
+    ///
+    /// Consults `negotiated.delegation_v2_chain_binding`: if the feature
+    /// is enabled (the production default; see
+    /// [`CapabilityNegotiation::t1_default`]), the chain-binding check
+    /// runs as in the legacy entry point. If the peer has explicitly
+    /// disabled the feature in the negotiated bitset, the check is
+    /// skipped to preserve interoperability with peers that have not
+    /// yet rolled out v2 chain-binding (the conservative direction is
+    /// to leave the flag on).
+    ///
+    /// Production callers SHOULD prefer this wrapper; legacy callers
+    /// that have not plumbed a [`CapabilityNegotiation`] through their
+    /// boundary continue to invoke [`Self::validate_chain_binding`]
+    /// directly with the same semantics.
+    pub fn validate_chain_binding_with_features(
+        &self,
+        trust_root_scope_hash: &ScopeHash,
+        negotiated: &CapabilityNegotiation,
+    ) -> Result<()> {
+        let enabled = negotiated
+            .features
+            .get(capability_features::DELEGATION_V2_CHAIN_BINDING)
+            .copied()
+            .unwrap_or(true);
+        if !enabled {
+            return Ok(());
+        }
+        self.validate_chain_binding(trust_root_scope_hash)
     }
 
     /// Sign a capability token body with the given Ed25519 keypair.

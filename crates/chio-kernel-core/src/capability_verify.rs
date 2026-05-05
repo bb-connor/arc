@@ -320,7 +320,8 @@ pub fn verify_capability_with_floor_and_trust_root(
     trust_root_scope_hash: &ScopeHash,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let mut budgets = NoopBudgetRegistry;
-    let verified = verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)?;
+    let verified =
+        verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)?;
 
     if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
         token
@@ -344,7 +345,8 @@ pub fn verify_capability_with_floor_and_resolver(
     trust_root: &dyn TrustRootResolver,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let mut budgets = NoopBudgetRegistry;
-    let verified = verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)?;
+    let verified =
+        verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)?;
 
     if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
         let issuer_root = trust_root
@@ -407,7 +409,9 @@ pub fn verify_capability_full(
     // Step 2: W1.1 chain-binding check on v2 tokens. v1 tokens are admitted
     // unchanged (no attenuation_proof field exists in their schema). Run
     // chain-binding before the legacy signature/floor/issuer/budget pass so
-    // a witness mismatch fails closed before any budget mutation.
+    // a witness mismatch fails closed before any budget mutation. Use the
+    // feature-flag-gated wrapper so peers that have explicitly cleared
+    // `delegation_v2_chain_binding` skip the check; the default is enabled.
     if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
         let issuer_root = trust_root
             .trust_root_scope_hash(&token.issuer)
@@ -417,7 +421,7 @@ pub fn verify_capability_full(
                 )
             })?;
         token
-            .validate_chain_binding(&issuer_root)
+            .validate_chain_binding_with_features(&issuer_root, peer)
             .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
     }
 
