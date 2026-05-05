@@ -26,6 +26,7 @@
 //! - tee_quote_forgery
 //! - passkey_credential_theft
 //! - audience_confusion
+//! - ssrf_via_http_substrate
 
 #[path = "threats/common.rs"]
 mod common;
@@ -62,3 +63,6 @@ mod passkey_credential_theft;
 
 #[path = "threats/audience_confusion.rs"]
 mod audience_confusion;
+
+#[path = "threats/ssrf_via_http_substrate.rs"]
+mod ssrf_via_http_substrate;

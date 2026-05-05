@@ -250,9 +250,12 @@
           "control": "Deployments exposing HTTP substrate endpoints must enable the InternalNetworkGuard, add deployment-specific internal hostnames, and fail closed on address parse ambiguity."
         }
       ],
-      "residualRisk": "DNS time-of-check/time-of-use gaps and tool-execution redirects can still reach targets that were not visible in the guarded arguments.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.hosted-http-egress-hardening"
+      "residualRisk": "DNS time-of-check/time-of-use gaps remain deployment-sensitive, but substrate callers now require explicit scheme and authority allowlists, address-class denials, redirect ceilings, and response-size ceilings before outbound HTTP is accepted.",
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-http-core/tests/http_egress_contract.rs",
+        "crates/chio-conformance/tests/threats/ssrf_via_http_substrate.rs"
+      ]
     },
     {
       "id": "pii_phi_exposure",
@@ -532,7 +535,13 @@
         }
       ],
       "residualRisk": "Hosted providers that do not expose loaded model bytes cannot bind under this check; deployments must use local recomputation or a signed model-card bundle with a provider surface that can produce a recomputed loaded-weight digest.",
-      "coverage_state": "covered"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/weights_hash_spoof.rs",
+        "crates/chio-kernel/tests/weights_binding.rs",
+        "crates/chio-weights/tests/lineage_anchor.rs",
+        "crates/chio-weights/tests/equivalence.rs"
+      ]
     },
     {
       "id": "mobile_attestation_replay",
