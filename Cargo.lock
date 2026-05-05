@@ -3289,7 +3289,9 @@ dependencies = [
  "chio-kernel-core",
  "chio-link",
  "chio-listing",
+ "chio-log-redact",
  "chio-market",
+ "chio-metrics-spec",
  "chio-open-market",
  "chio-settle",
  "chio-store-sqlite",
@@ -3395,6 +3397,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-log-redact"
+version = "0.1.0"
+dependencies = [
+ "chio-data-guards-redactors-default",
+ "thiserror 1.0.69",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3521,6 +3533,10 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
 ]
+
+[[package]]
+name = "chio-metrics-spec"
+version = "0.1.0"
 
 [[package]]
 name = "chio-mistral-tools-adapter"
@@ -3745,6 +3761,7 @@ name = "chio-siem"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-log-redact",
  "reqwest 0.13.2",
  "rusqlite",
  "serde",
