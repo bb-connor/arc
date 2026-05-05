@@ -50,17 +50,17 @@ pub mod rng;
 pub use clock::BrowserClock;
 pub use rng::{WebCryptoRng, WebCryptoRngError};
 
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use chio_core_types::capability::CapabilityToken;
+use chio_core_types::capability::{CapabilityNegotiation, CapabilityToken, ScopeHash};
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_core_types::receipt::{ChioReceipt, ChioReceiptBody, Decision};
 use chio_kernel_core::{
-    evaluate as core_evaluate, sign_receipt as core_sign_receipt,
-    verify_capability as core_verify_capability, EvaluateInput, PortableToolCallRequest,
-    VerifiedCapability,
+    evaluate as core_evaluate, sign_receipt as core_sign_receipt, verify_capability_full,
+    EvaluateInput, PortableToolCallRequest, VerifiedCapability,
 };
 use serde::{Deserialize, Serialize};
 
@@ -187,6 +187,17 @@ pub struct VerifyCapabilityRequestJson {
     /// adapter reads `Date::now()` via [`BrowserClock`].
     #[serde(default)]
     pub clock_override_unix_secs: Option<u64>,
+    /// Optional W1.3 peer-negotiated capability profile. When omitted,
+    /// the browser kernel evaluates against `CapabilityNegotiation::t1_default()`
+    /// (local-loopback admits v2 tokens). When present, a v1-only profile
+    /// rejects v2 tokens before any signature work.
+    #[serde(default)]
+    pub peer_capabilities: Option<CapabilityNegotiation>,
+    /// Optional W1.1 chain-binding trust roots, keyed by issuer hex.
+    /// V2 tokens require an entry for their issuer; absent issuers
+    /// fail-closed. V1 tokens ignore this field.
+    #[serde(default)]
+    pub capability_trust_roots: BTreeMap<String, ScopeHash>,
 }
 
 /// Wire shape for [`verify_capability_pure`] outputs.
@@ -361,17 +372,50 @@ pub fn sign_receipt_pure(
 }
 
 /// Pure capability-verification helper.
+///
+/// Wave 1.5 hot-path wiring: routes through
+/// [`verify_capability_full`] so the W1.3 negotiated schema-ceiling
+/// rule and the W1.1 chain-binding rule are enforced alongside
+/// signature, floor, and time-bound checks. Callers that omit the
+/// peer profile inherit `CapabilityNegotiation::t1_default()` (the
+/// browser kernel acts as a local-loopback peer that admits v2 tokens);
+/// callers that omit `capability_trust_roots` fail-closed for v2
+/// tokens because no issuer has a registered authority hash.
 pub fn verify_capability_pure(
     input: VerifyCapabilityRequestJson,
     clock: &dyn chio_kernel_core::Clock,
 ) -> Result<VerifiedCapabilityJson, BindingError> {
     let trusted = decode_trusted_issuers(&input.trusted_issuers_hex)?;
+    let crypto_floor = chio_core_types::capability::CapabilityCryptoFloor::AllowClassical;
+    let peer_profile = input
+        .peer_capabilities
+        .clone()
+        .unwrap_or_else(CapabilityNegotiation::t1_default);
+    let trust_root_map = input.capability_trust_roots.clone();
+    let trust_resolver = move |issuer: &PublicKey| -> Option<ScopeHash> {
+        trust_root_map.get(&issuer.to_hex()).cloned()
+    };
+
     let result = match input.clock_override_unix_secs {
         Some(pinned) => {
             let fixed = chio_kernel_core::FixedClock::new(pinned);
-            core_verify_capability(&input.token, &trusted, &fixed)
+            verify_capability_full(
+                &input.token,
+                &trusted,
+                &fixed,
+                crypto_floor,
+                &peer_profile,
+                &trust_resolver,
+            )
         }
-        None => core_verify_capability(&input.token, &trusted, clock),
+        None => verify_capability_full(
+            &input.token,
+            &trusted,
+            clock,
+            crypto_floor,
+            &peer_profile,
+            &trust_resolver,
+        ),
     };
 
     match result {

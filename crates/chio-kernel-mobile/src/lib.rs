@@ -67,7 +67,9 @@ pub use rng::MobileRng;
 
 use serde::{Deserialize, Serialize};
 
-use chio_core_types::capability::CapabilityToken;
+use chio_core_types::capability::{
+    CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken, ScopeHash,
+};
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::ChioReceiptBody;
 use chio_custody_hw::{
@@ -76,9 +78,9 @@ use chio_custody_hw::{
 };
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
-    evaluate as core_evaluate, sign_receipt as core_sign_receipt,
-    verify_capability as core_verify_capability, CapabilityError, Clock, EvaluateInput, FixedClock,
-    Guard, PortableToolCallRequest, ReceiptSigningError, Verdict,
+    evaluate_with_full_floor, sign_receipt as core_sign_receipt, verify_capability_full,
+    CapabilityError, Clock, EvaluateInput, FixedClock, Guard, PortableToolCallRequest,
+    ReceiptSigningError, Verdict,
 };
 
 // ---------------------------------------------------------------------------
@@ -137,6 +139,16 @@ struct EvaluateRequest {
     /// [`MobileClock`].
     #[serde(default)]
     now_secs: Option<i64>,
+    /// Optional W1.3 peer-negotiated profile. When omitted, mobile
+    /// defaults to a single-trusted-CA `t1_default` profile (admits
+    /// v2 tokens). When supplied as v1-only, v2 tokens are rejected
+    /// before any signature work.
+    #[serde(default)]
+    peer_capabilities: Option<CapabilityNegotiation>,
+    /// Optional W1.1 chain-binding trust roots, keyed by issuer hex.
+    /// V2 tokens require an entry; absent issuers fail-closed.
+    #[serde(default)]
+    capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
 }
 
 /// Tool-call request payload.
@@ -243,14 +255,31 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
     // subject binding, scope) with an empty guard slice.
     let guards: &[&dyn Guard] = &[];
 
-    let verdict = core_evaluate(EvaluateInput {
-        request: &portable_request,
-        capability: &capability,
-        trusted_issuers: &trusted,
-        clock,
-        guards,
-        session_filesystem_roots: None,
-    });
+    // Wave 1.5 hot-path wiring: route through `evaluate_with_full_floor`
+    // so v2 tokens are bound to a registered trust-root scope hash and
+    // a v1-only peer profile rejects v2 tokens before signature work.
+    let peer_profile = parsed
+        .peer_capabilities
+        .clone()
+        .unwrap_or_else(CapabilityNegotiation::t1_default);
+    let trust_root_map = parsed.capability_trust_roots.clone();
+    let trust_resolver = move |issuer: &PublicKey| -> Option<ScopeHash> {
+        trust_root_map.get(&issuer.to_hex()).cloned()
+    };
+
+    let verdict = evaluate_with_full_floor(
+        EvaluateInput {
+            request: &portable_request,
+            capability: &capability,
+            trusted_issuers: &trusted,
+            clock,
+            guards,
+            session_filesystem_roots: None,
+        },
+        CapabilityCryptoFloor::AllowClassical,
+        &peer_profile,
+        &trust_resolver,
+    );
 
     let response = match verdict.verdict {
         Verdict::Allow => EvaluateResponse {
@@ -333,8 +362,24 @@ pub fn verify_capability(
         })?;
 
     let clock = MobileClock::new();
-    let verified =
-        core_verify_capability(&token, &[authority], &clock).map_err(|error| match error {
+    // Wave 1.5 hot-path wiring: route through `verify_capability_full`
+    // so the W1.3 schema-ceiling and W1.1 chain-binding rules run on
+    // the same hot path. Mobile kernels typically pin a single CA;
+    // the trust-root resolver here is intentionally empty so v2 tokens
+    // fail-closed unless the host plumbs explicit trust roots through
+    // a richer FFI surface (see `evaluate` for the JSON-driven entry
+    // point that accepts trust-root hashes per request).
+    let peer_profile = CapabilityNegotiation::t1_default();
+    let trust_resolver = |_issuer: &PublicKey| -> Option<ScopeHash> { None };
+    let verified = verify_capability_full(
+        &token,
+        &[authority],
+        &clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &peer_profile,
+        &trust_resolver,
+    )
+    .map_err(|error| match error {
             CapabilityError::UntrustedIssuer => ChioMobileError::InvalidCapability {
                 message: "capability issuer is not in the trusted authority set".to_string(),
             },

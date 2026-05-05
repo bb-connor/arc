@@ -1,9 +1,13 @@
 //! Core proxy logic for validating capability tokens on UI-facing events.
 
-use chio_core::capability::{CapabilityToken, Constraint, ToolGrant};
+use std::collections::BTreeMap;
+
+use chio_core::capability::{
+    CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken, Constraint, ScopeHash, ToolGrant,
+};
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel_core::scope::{resolve_capability_grants, ScopeMatchError};
-use chio_kernel_core::{verify_capability, CapabilityError, Clock};
+use chio_kernel_core::{verify_capability_full, CapabilityError, Clock};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -42,6 +46,25 @@ pub struct AgUiProxyConfig {
     /// authoritative revocation source when one is available.
     #[serde(default)]
     pub revoked_capability_ids: Vec<String>,
+
+    /// Wave 1.3 peer-negotiated capability profile. The proxy enforces
+    /// the negotiated schema ceiling on every capability token it
+    /// inspects: a v2 token presented across a v1-only-negotiated link
+    /// is rejected before any signature work. Defaults to
+    /// `CapabilityNegotiation::t1_default()`, which admits v2 tokens.
+    #[serde(default = "default_proxy_peer_capabilities")]
+    pub peer_capabilities: CapabilityNegotiation,
+
+    /// Wave 1.1 chain-binding trust roots, keyed by issuer public-key
+    /// hex. V2 tokens require an entry for their issuer; absent
+    /// issuers fail-closed. V1 tokens are unaffected. Operators feed
+    /// this from the kernel's trust-root registry.
+    #[serde(default)]
+    pub capability_trust_roots: BTreeMap<String, ScopeHash>,
+}
+
+fn default_proxy_peer_capabilities() -> CapabilityNegotiation {
+    CapabilityNegotiation::t1_default()
 }
 
 fn default_restricted_classifications() -> Vec<EventClassification> {
@@ -66,6 +89,8 @@ impl Default for AgUiProxyConfig {
             max_events_per_second: default_max_events_per_second(),
             trusted_issuers: Vec::new(),
             revoked_capability_ids: Vec::new(),
+            peer_capabilities: default_proxy_peer_capabilities(),
+            capability_trust_roots: BTreeMap::new(),
         }
     }
 }
@@ -184,7 +209,21 @@ impl AgUiProxy {
         }
 
         let clock = SystemClock;
-        if let Err(error) = verify_capability(capability, &self.config.trusted_issuers, &clock) {
+        // Wave 1.5 hot-path wiring: route through `verify_capability_full`
+        // so the W1.3 peer schema-ceiling check and the W1.1 chain-binding
+        // rule are enforced before forwarding any AG-UI event.
+        let trust_roots = &self.config.capability_trust_roots;
+        let trust_resolver = |issuer: &PublicKey| -> Option<ScopeHash> {
+            trust_roots.get(&issuer.to_hex()).cloned()
+        };
+        if let Err(error) = verify_capability_full(
+            capability,
+            &self.config.trusted_issuers,
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &self.config.peer_capabilities,
+            &trust_resolver,
+        ) {
             return ProxyDecision::Block {
                 reason: format!(
                     "capability verification failed: {}",

@@ -12,14 +12,16 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_core_types::capability::CapabilityToken;
+use chio_core_types::capability::{
+    CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken, ScopeHash,
+};
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::ChioReceiptBody;
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
-    evaluate as core_evaluate, sign_receipt as core_sign_receipt,
-    verify_capability as core_verify_capability, CapabilityError, Clock, EvaluateInput, FixedClock,
-    Guard, PortableToolCallRequest, ReceiptSigningError, Verdict,
+    evaluate_with_full_floor, sign_receipt as core_sign_receipt, verify_capability_full,
+    CapabilityError, Clock, EvaluateInput, FixedClock, Guard, PortableToolCallRequest,
+    ReceiptSigningError, Verdict,
 };
 use serde::{Deserialize, Serialize};
 
@@ -141,6 +143,14 @@ struct EvaluateRequestEnvelope {
     request: EvaluateRequestBody,
     #[serde(default)]
     now_secs: Option<u64>,
+    /// Optional W1.3 peer-negotiated profile. Defaults to `t1_default`
+    /// (admits v2 tokens) when omitted.
+    #[serde(default)]
+    peer_capabilities: Option<CapabilityNegotiation>,
+    /// Optional W1.1 chain-binding trust roots, keyed by issuer hex.
+    /// V2 tokens require an entry here; absent issuers fail-closed.
+    #[serde(default)]
+    capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -277,14 +287,31 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     };
     let guards: &[&dyn Guard] = &[];
 
-    let verdict = core_evaluate(EvaluateInput {
-        request: &portable_request,
-        capability: &capability,
-        trusted_issuers: &trusted,
-        clock,
-        guards,
-        session_filesystem_roots: None,
-    });
+    // Wave 1.5 hot-path wiring: route through `evaluate_with_full_floor`
+    // so the W1.3 schema-ceiling check and the W1.1 chain-binding rule
+    // are exercised on the same hot path that already enforces the
+    // crypto floor and time bounds.
+    let peer_profile = parsed
+        .peer_capabilities
+        .clone()
+        .unwrap_or_else(CapabilityNegotiation::t1_default);
+    let trust_root_map = parsed.capability_trust_roots.clone();
+    let trust_resolver = move |issuer: &PublicKey| -> Option<ScopeHash> {
+        trust_root_map.get(&issuer.to_hex()).cloned()
+    };
+    let verdict = evaluate_with_full_floor(
+        EvaluateInput {
+            request: &portable_request,
+            capability: &capability,
+            trusted_issuers: &trusted,
+            clock,
+            guards,
+            session_filesystem_roots: None,
+        },
+        CapabilityCryptoFloor::AllowClassical,
+        &peer_profile,
+        &trust_resolver,
+    );
 
     let response = match verdict.verdict {
         Verdict::Allow => EvaluateResponse {
@@ -347,8 +374,22 @@ fn verify_capability_json_str(
         None => &system_clock,
     };
 
-    let verified =
-        core_verify_capability(&token, &[authority], clock).map_err(|error| match error {
+    // Wave 1.5 hot-path wiring: route through `verify_capability_full`.
+    // The C ABI keeps the historical single-CA shape, so the trust-root
+    // resolver here returns `None`. v2 tokens fail-closed unless the
+    // host plumbs richer trust-root context through a JSON-driven
+    // entry point (see `evaluate` in this crate).
+    let peer_profile = CapabilityNegotiation::t1_default();
+    let trust_resolver = |_issuer: &PublicKey| -> Option<ScopeHash> { None };
+    let verified = verify_capability_full(
+        &token,
+        &[authority],
+        clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &peer_profile,
+        &trust_resolver,
+    )
+    .map_err(|error| match error {
             CapabilityError::UntrustedIssuer => KernelFfiError::InvalidCapability(
                 "capability issuer is not in the trusted authority set".to_string(),
             ),

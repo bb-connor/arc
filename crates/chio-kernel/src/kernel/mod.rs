@@ -1036,6 +1036,19 @@ pub struct ChioKernel {
     /// locally signing the receipt to obtain the origin kernel's
     /// co-signature. Absent in non-federated deployments.
     federation_peers: ArcSwap<HashMap<String, chio_federation::FederationPeer>>,
+    /// Wave 1.1 chain-binding trust-root registry. Maps a trusted
+    /// capability issuer's public key (hex form) to the SHA-256 hex of
+    /// its root authority scope. The hosted verifier consults this map
+    /// when a v2 capability token is presented: the token's
+    /// `attenuation_proof.parent_scope_hash` MUST match either the
+    /// registered root (direct issue) or the predecessor delegation
+    /// link's `scope_hash` (delegated). Issuers absent from the map
+    /// fail-closed for v2 tokens; v1 tokens are unaffected.
+    ///
+    /// `ArcSwap` so trust-root rotations can land without holding a
+    /// kernel mutex. Hex-keyed because `chio_core::PublicKey` does not
+    /// implement `Hash`.
+    capability_trust_roots: ArcSwap<HashMap<String, chio_core::capability::ScopeHash>>,
     /// Phase 20.3 bilateral co-signer. Separate from the peer set so
     /// runtime can install it independently -- for instance, a deployment
     /// can declare peers while still using a mock cosigner in tests.
@@ -1454,6 +1467,7 @@ impl ChioKernel {
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
             memory_provenance: None,
             federation_peers: ArcSwap::from_pointee(HashMap::new()),
+            capability_trust_roots: ArcSwap::from_pointee(HashMap::new()),
             federation_cosigner: None,
             federation_dual_receipts: DashMap::new(),
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
@@ -1708,6 +1722,89 @@ impl ChioKernel {
         }
         self.federation_peers.store(Arc::new(next));
         self
+    }
+
+    /// Wave 1.1 chain-binding trust-root registration. Each entry maps a
+    /// trusted capability issuer's public key to the canonical-JSON
+    /// SHA-256 hex of that issuer's root authority scope. The verifier
+    /// uses this to bind v2 `attenuation_proof.parent_scope_hash` to a
+    /// verifier-known authority hash on direct-issue tokens, closing
+    /// the W1.1 P0 soundness gap. Issuers without an entry fail-closed
+    /// for v2 tokens; v1 tokens remain unaffected.
+    ///
+    /// Builder-style so deployments can chain
+    /// `.with_capability_trust_roots(...)` onto `ChioKernel::new(config)`.
+    #[must_use]
+    pub fn with_capability_trust_roots(
+        self,
+        roots: Vec<(chio_core::PublicKey, chio_core::capability::ScopeHash)>,
+    ) -> Self {
+        let mut next: HashMap<String, chio_core::capability::ScopeHash> = HashMap::new();
+        for (issuer, root) in roots {
+            next.insert(issuer.to_hex(), root);
+        }
+        self.capability_trust_roots.store(Arc::new(next));
+        self
+    }
+
+    /// Install or update a single capability trust-root entry without
+    /// requiring builder-style construction. Returns the previous root
+    /// hash for that issuer, if any.
+    pub fn set_capability_trust_root(
+        &self,
+        issuer: chio_core::PublicKey,
+        root: chio_core::capability::ScopeHash,
+    ) -> Option<chio_core::capability::ScopeHash> {
+        let current = self.capability_trust_roots.load_full();
+        let mut next: HashMap<String, chio_core::capability::ScopeHash> = (*current).clone();
+        let prev = next.insert(issuer.to_hex(), root);
+        self.capability_trust_roots.store(Arc::new(next));
+        prev
+    }
+
+    /// Snapshot the currently registered capability trust-root registry.
+    /// Hot-path callers should prefer the resolver returned by
+    /// `capability_trust_root_resolver_snapshot`.
+    pub fn capability_trust_roots_snapshot(
+        &self,
+    ) -> HashMap<String, chio_core::capability::ScopeHash> {
+        (*self.capability_trust_roots.load_full()).clone()
+    }
+
+    /// Build an owned snapshot of the capability trust-root registry
+    /// suitable for use as a `chio_kernel_core::TrustRootResolver`. The
+    /// returned closure captures a frozen snapshot so concurrent
+    /// rotations cannot tear an in-flight verification.
+    pub(crate) fn capability_trust_root_resolver_snapshot(
+        &self,
+    ) -> impl Fn(&chio_core::PublicKey) -> Option<chio_core::capability::ScopeHash> + Send + Sync + 'static
+    {
+        let snapshot: Arc<HashMap<String, chio_core::capability::ScopeHash>> =
+            self.capability_trust_roots.load_full();
+        move |issuer: &chio_core::PublicKey| -> Option<chio_core::capability::ScopeHash> {
+            snapshot.get(&issuer.to_hex()).cloned()
+        }
+    }
+
+    /// Resolve the capability negotiation profile that should gate the
+    /// W1.3 schema-ceiling check on the hot path. When no remote
+    /// federation peer is in scope (the most common case for a hosted
+    /// kernel evaluating a local capability), the kernel's own v2
+    /// profile applies: v2 tokens are admitted, v1 tokens are admitted.
+    /// When a federation peer is identified by `remote_kernel_id`, the
+    /// peer's most recent negotiated profile is returned, which may
+    /// downgrade the ceiling to v1.
+    pub(crate) fn capability_negotiation_for_remote(
+        &self,
+        remote_kernel_id: Option<&str>,
+        now: u64,
+    ) -> chio_core::capability::CapabilityNegotiation {
+        if let Some(remote) = remote_kernel_id {
+            if let Some(peer) = self.federation_peer(remote, now) {
+                return peer.capabilities;
+            }
+        }
+        chio_core::capability::CapabilityNegotiation::t1_default()
     }
 
     /// Phase 20.3: install the bilateral cosigner responsible for
@@ -3606,10 +3703,25 @@ impl ChioKernel {
 
         match cap.verify_signature_with_floor(capability_crypto_floor(self.capability_crypto_floor))
         {
-            Ok(true) => Ok(()),
-            Ok(false) => Err("signature did not verify".to_string()),
-            Err(e) => Err(e.to_string()),
+            Ok(true) => {}
+            Ok(false) => return Err("signature did not verify".to_string()),
+            Err(e) => return Err(e.to_string()),
         }
+
+        // Wave 1.1 chain-binding: when a v2 token is presented, additionally
+        // require `attenuation_proof.parent_scope_hash` to bind to the
+        // registered trust-root scope hash (or the predecessor link).
+        // v1 tokens are unaffected (chain-binding is a v2-only check).
+        if cap.schema == chio_core::capability::CHIO_CAPABILITY_V2_SCHEMA {
+            let snapshot = self.capability_trust_roots.load_full();
+            let issuer_root = snapshot.get(&cap.issuer.to_hex()).cloned().ok_or_else(|| {
+                "v2 chain-binding: no trust-root scope hash registered for issuer".to_string()
+            })?;
+            cap.validate_chain_binding(&issuer_root)
+                .map_err(|err| err.to_string())?;
+        }
+
+        Ok(())
     }
 
     /// Phase 14.1 -- run the portable pure-compute verdict path provided by
@@ -3642,16 +3754,21 @@ impl ChioKernel {
         session_filesystem_roots: Option<&'a [String]>,
     ) -> chio_kernel_core::EvaluationVerdict {
         let trusted = self.trusted_issuer_keys();
-        // W1.2 sibling-sum enforcement: hold the budget-registry lock
+        // Wave 1.5 hot-path wiring: enforce the W1.3 negotiated schema
+        // ceiling and the W1.1 chain-binding rule on the same hot path
+        // that already enforces signature, floor, time bounds, and W1.2
+        // sibling-sum budget admission. Hold the budget-registry lock
         // for the duration of the verify step so two concurrent
         // delegations cannot both observe the same residual headroom
         // and admit beyond the parent's share. The registry is internally
         // a deterministic BTreeMap; no async work happens under the lock.
+        let peer_profile = self.capability_negotiation_for_remote(None, clock.now_unix_secs());
+        let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        chio_kernel_core::evaluate_with_crypto_floor_and_budgets(
+        chio_kernel_core::evaluate_with_full_floor(
             chio_kernel_core::EvaluateInput {
                 request,
                 capability,
@@ -3661,6 +3778,8 @@ impl ChioKernel {
                 session_filesystem_roots,
             },
             capability_crypto_floor(self.capability_crypto_floor),
+            &peer_profile,
+            &trust_resolver,
             &mut *budgets,
         )
     }

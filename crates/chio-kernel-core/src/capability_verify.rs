@@ -362,6 +362,73 @@ pub fn verify_capability_with_floor_and_resolver(
     Ok(verified)
 }
 
+/// Wave 1.5 maximum-flexibility verifier.
+///
+/// Composite entry point that chains all three Wave 1 defenses in a
+/// single fail-closed pass:
+///
+/// 1. W1.3 negotiated schema-ceiling check (rejects v2 tokens across a
+///    v1-only-negotiated link before any signature work).
+/// 2. Legacy issuer trust + canonical-JSON signature + crypto floor +
+///    time-window checks (the historical `verify_capability_with_floor`
+///    body).
+/// 3. W1.1 chain-binding check (v2 tokens must bind
+///    `attenuation_proof.parent_scope_hash` to either the issuer's
+///    trust-root scope hash or the last delegation link's `scope_hash`).
+///
+/// This is the verifier entry point production kernels SHOULD call
+/// going forward. The earlier partial entry points
+/// (`_with_negotiated_floor`, `_with_floor_and_trust_root`,
+/// `_with_floor_and_resolver`) remain available for callers that do
+/// not yet plumb every dependency through their boundary, but they
+/// each leave one Wave 1 defense un-wired and are therefore unsafe
+/// when used in isolation in production hot paths.
+pub fn verify_capability_full(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    peer: &CapabilityNegotiation,
+    trust_root: &dyn TrustRootResolver,
+    budgets: &mut dyn BudgetRegistry,
+) -> Result<VerifiedCapability, CapabilityError> {
+    // Step 1: W1.3 schema-ceiling check. Reject v2 tokens when the
+    // peer-negotiated ceiling is below v2 before doing any cryptographic
+    // work. Symmetric direction (v1 token across v2 link) still verifies.
+    if token.schema == CHIO_CAPABILITY_V2_SCHEMA
+        && peer.max_capability_schema != CHIO_CAPABILITY_V2_SCHEMA
+    {
+        return Err(CapabilityError::SchemaExceedsNegotiatedCeiling {
+            token_schema: token.schema.clone(),
+            peer_max: peer.max_capability_schema.clone(),
+        });
+    }
+
+    // Step 2: W1.1 chain-binding check on v2 tokens. v1 tokens are admitted
+    // unchanged (no attenuation_proof field exists in their schema). Run
+    // chain-binding before the legacy signature/floor/issuer/budget pass so
+    // a witness mismatch fails closed before any budget mutation.
+    if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
+        let issuer_root = trust_root
+            .trust_root_scope_hash(&token.issuer)
+            .ok_or_else(|| {
+                CapabilityError::AttenuationViolation(
+                    "v2 chain-binding: no trust-root scope hash registered for issuer".to_string(),
+                )
+            })?;
+        token
+            .validate_chain_binding(&issuer_root)
+            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+    }
+
+    // Step 3: legacy signature, issuer-trust, crypto-floor, time-bound
+    // verification, AND W1.2 sibling-sum budget admission. The legacy
+    // function chains issuer -> signature/floor -> time-window -> budget
+    // admit at the end (matching the W1.2 hook position). Returns a
+    // verified capability projection on success.
+    verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, budgets)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
