@@ -118,7 +118,21 @@
       "evidence_proposed": [
         {"kind": "lean_theorem", "ref": "theorem.signature.hybrid_soundness"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/capability_token_hybrid_round_trip.rs"},
+        {"kind": "schema_test", "ref": "crates/chio-core-types/tests/wire_protocol_schema.rs::capability_token_schema_accepts_live_hybrid_wire_values"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/cross_surface_hybrid_pq_interop.rs"}
+      ]
+    },
+    {
+      "id": "manifest.federation.conformance_tier",
+      "claim_ref": "claim.federation.conformance_tier",
+      "introduced_by": "trajectory-4/T2.1",
+      "evidence_proposed": [
+        {"kind": "lean_theorem", "ref": "theorem.federation.conformance_tier_gate"},
+        {"kind": "rust_test", "ref": "crates/chio-federation/tests/trust_establishment.rs::quorum_policy_rejects_peer_below_min_tier"},
+        {"kind": "rust_test", "ref": "crates/chio-federation/tests/trust_establishment.rs::conformance_tier_is_signed_and_pinned_at_handshake"},
+        {"kind": "conformance_fixture", "ref": "crates/chio-conformance/tests/cross_surface/t2_1_mcp_wrapped_no_bypass.json"},
+        {"kind": "conformance_fixture", "ref": "crates/chio-conformance/tests/cross_surface/t2_1_hosted_native_http_no_bypass.json"},
+        {"kind": "conformance_fixture", "ref": "crates/chio-conformance/tests/cross_surface/t2_1_a2a_http_edge_no_bypass.json"}
       ]
     }
   ]
