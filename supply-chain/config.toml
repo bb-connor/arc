@@ -154,6 +154,9 @@ audit-as-crates-io = true
 [policy.chio-mcp-edge]
 audit-as-crates-io = true
 
+[policy.chio-mcp-remote]
+audit-as-crates-io = true
+
 [policy.chio-mercury]
 audit-as-crates-io = true
 
@@ -182,6 +185,9 @@ audit-as-crates-io = true
 audit-as-crates-io = true
 
 [policy.chio-policy]
+audit-as-crates-io = true
+
+[policy.chio-provider-adapter-core]
 audit-as-crates-io = true
 
 [policy.chio-reputation]

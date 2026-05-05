@@ -2518,6 +2518,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-manifest",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -2643,6 +2644,7 @@ dependencies = [
  "aws-sdk-sts",
  "chio-attest-verify",
  "chio-core-types",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -2699,6 +2701,7 @@ dependencies = [
  "chio-lineage",
  "chio-listing",
  "chio-mcp-adapter",
+ "chio-mcp-remote",
  "chio-open-market",
  "chio-policy",
  "chio-replay-corpus",
@@ -2751,6 +2754,7 @@ name = "chio-cohere-tools-adapter"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -3120,6 +3124,7 @@ name = "chio-gemini-tools-adapter"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -3142,6 +3147,7 @@ name = "chio-groq-tools-adapter"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -3216,6 +3222,7 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-mcp-adapter",
+ "chio-mcp-remote",
  "chio-siem",
  "chio-store-sqlite",
  "p256 0.13.2",
@@ -3475,6 +3482,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-mcp-remote"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "axum 0.8.8",
+ "base64 0.22.1",
+ "chio-control-plane",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-mcp-adapter",
+ "chio-siem",
+ "chio-store-sqlite",
+ "p256 0.13.2",
+ "p384",
+ "reqwest 0.13.2",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "tokio",
+ "tracing",
+ "ureq 2.12.1",
+ "url",
+]
+
+[[package]]
 name = "chio-mercury"
 version = "0.1.0"
 dependencies = [
@@ -3516,6 +3551,7 @@ name = "chio-mistral-tools-adapter"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -3527,6 +3563,7 @@ name = "chio-ollama-tools-adapter"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -3621,6 +3658,15 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 1.0.69",
  "uuid",
+]
+
+[[package]]
+name = "chio-provider-adapter-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-tool-call-fabric",
+ "serde_json",
 ]
 
 [[package]]

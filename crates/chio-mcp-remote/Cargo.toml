@@ -1,23 +1,21 @@
 [package]
-name = "chio-hosted-mcp"
-description = "Hosted MCP runtime surface for Chio"
+name = "chio-mcp-remote"
+description = "Remote hosted MCP runtime surface for Chio"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-readme = "README.md"
 publish = false
 
 [lib]
-name = "chio_hosted_mcp"
+name = "chio_mcp_remote"
 
 [dependencies]
 chio-control-plane = { path = "../chio-control-plane" }
 chio-core = { package = "chio-core-types", path = "../chio-core-types" }
 chio-kernel = { path = "../chio-kernel" }
 chio-mcp-adapter = { path = "../chio-mcp-adapter" }
-chio-mcp-remote = { path = "../chio-mcp-remote" }
 chio-store-sqlite = { path = "../chio-store-sqlite" }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -187,6 +187,18 @@ criteria = "safe-to-deploy"
 version = "1.0.4"
 notes = "Conditional compilation helper macro; trivial code, no IO or unsafe."
 
+[[audits.chio-mcp-remote]]
+who = "@bb-connor"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "TRJ4-150 first-party extraction of the hosted MCP remote runtime from chio-cli. Reviewed the moved source boundary, dependency set, and public reexports; the change removes source splicing without introducing new external supplier code."
+
+[[audits.chio-provider-adapter-core]]
+who = "@bb-connor"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "TRJ4-151 first-party provider adapter core. Reviewed that it centralizes SSE parsing, stream verdict helpers, provider identity, and loaded-weights helpers for existing in-tree adapters without adding network IO, unsafe code, or new external supplier code."
+
 [[audits.chrono]]
 who = "@bb-connor"
 criteria = "safe-to-deploy"
