@@ -55,12 +55,13 @@ The Evidence Gate ticket must close before its parent T1.x slice is considered c
 
 | Ticket | Title | Lane | Effort | Depends on |
 |---|---|---|---|---|
-| TRJ4-001 | Drive remaining trj3.2 PRs through CI cascade-merge | A | S | - |
-| TRJ4-002 | Tag `v3.18.1-trj3.1`; trigger `release-binaries.yml` + `slsa.yml` + `reproducible-build.yml` | A | S | TRJ4-001 |
-| TRJ4-003 | Commit `releases/provenance/v3.18.1-trj3.1.intoto.jsonl`, `releases/reproducible-builds/v3.18.1-trj3.1.json`, `supply-chain/checksums/v3.18.1-trj3.1.txt` | A | S | TRJ4-002 |
-| TRJ4-004 | Replace TODO markers in `TRAJECTORY-FINAL.md` + `CI-DEBT.md` with real close SHA + run URLs | A | S | TRJ4-003 |
+| TRJ4-000 | **Bootstrap pre-flight infrastructure**: `spec/registries/{claim-registry,proof-manifest,theorem-inventory}.v1.json` + README seeded with existing trj1-3 claims/manifests/theorems; `.planning/trajectory-4/audits/evidence/` directory live; `scripts/trj4-preflight.sh` runnable. Pre-flight gate (the automated half of TRJ4-006) returns exit 0. | A | S | - |
+| TRJ4-001 | Drive remaining trj3.2 PRs through CI cascade-merge (verify zero open `trj3.2/*` PRs) | A | S | TRJ4-000 |
+| TRJ4-002 | **Ratify release-tag policy** (operator decision; see audit T0.A "release-tag policy" section), then tag `v<chosen-version>-trj3.1` and trigger `release-binaries.yml` + `slsa.yml` + `reproducible-build.yml` | A | S | TRJ4-001 |
+| TRJ4-003 | Commit produced provenance / reproducible-build / checksum artifacts under `releases/provenance/<tag>.intoto.jsonl`, `releases/reproducible-builds/<tag>.json`, `supply-chain/checksums/<tag>.txt` | A | S | TRJ4-002 |
+| TRJ4-004 | Replace TODO markers in `.planning/trajectory-3/TRAJECTORY-FINAL.md` + `.planning/trajectory-3/work/CI-DEBT.md` with real close SHA + run URLs | A | S | TRJ4-003 |
 | TRJ4-005 | Drain remaining trj3.2 P2 backlog | A | M | - |
-| TRJ4-006 | **T0 reconciliation gate**: confirm CI-DEBT TODOs at zero; trj3 carry-forward catalog stated; release anchors live; deferred Kani/mutants/TLA tickets enumerated; threat baseline confirmed at 11/9/0 PASS | A | S | TRJ4-001..005 |
+| TRJ4-006 | **T0 reconciliation gate**: `bash scripts/trj4-preflight.sh` returns exit 0 (machine half); trj3 carry-forward catalog re-stated in `SYNTHESIS-V2-INTEGRATED-PLAN.md` (manual half); deferred Kani/mutants/TLA tickets enumerated under TRJ4-012..018; release-tag policy ratified; scope-lock decision made; lane owners assigned | A | S | TRJ4-000..005 |
 
 **Phase A bar**: TRJ4-006 passes. No T1 work begins until then.
 

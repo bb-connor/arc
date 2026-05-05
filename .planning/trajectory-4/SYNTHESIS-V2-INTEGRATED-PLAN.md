@@ -91,7 +91,7 @@ The reconciliation gate (new in round-3) is mandatory before Phase B. No T1 work
 - Drive remaining trj3.2 PRs through CI cascade-merge.
 - Tag `v3.18.1-trj3.1`; trigger release-binaries + slsa + reproducible-build workflows.
 - Commit produced artifacts to `releases/provenance/`, `releases/reproducible-builds/`, `supply-chain/checksums/`.
-- Replace TODO markers in `TRAJECTORY-FINAL.md` + `CI-DEBT.md` with real close SHA + run URLs.
+- Replace TODO markers in `TRAJECTORY-FINAL.md` + `.planning/trajectory-3/work/CI-DEBT.md` with real close SHA + run URLs.
 - Drain remaining trj3.2 P2 backlog.
 - **Reconciliation gate** (T0.gate): CI-DEBT TODOs at zero; trj3 carry-forward catalog re-stated in this plan; release anchors (`v3.18.1-trj3.1`) live; deferred Kani/mutants/TLA tickets enumerated; threat baseline confirmed at 11/9/0 PASS.
 
