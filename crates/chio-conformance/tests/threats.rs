@@ -26,6 +26,12 @@
 //! - tee_quote_forgery
 //! - passkey_credential_theft
 //! - audience_confusion
+//! - ssrf_via_http_substrate
+//! - pii_phi_exposure
+//! - agent_velocity_abuse
+//! - cumulative_data_exfiltration
+//! - behavioral_sequence_attack
+//! - wasm_guard_resource_exhaustion
 
 #[path = "threats/common.rs"]
 mod common;
@@ -62,3 +68,21 @@ mod passkey_credential_theft;
 
 #[path = "threats/audience_confusion.rs"]
 mod audience_confusion;
+
+#[path = "threats/ssrf_via_http_substrate.rs"]
+mod ssrf_via_http_substrate;
+
+#[path = "threats/pii_phi_exposure.rs"]
+mod pii_phi_exposure;
+
+#[path = "threats/agent_velocity_abuse.rs"]
+mod agent_velocity_abuse;
+
+#[path = "threats/cumulative_data_exfiltration.rs"]
+mod cumulative_data_exfiltration;
+
+#[path = "threats/behavioral_sequence_attack.rs"]
+mod behavioral_sequence_attack;
+
+#[path = "threats/wasm_guard_resource_exhaustion.rs"]
+mod wasm_guard_resource_exhaustion;

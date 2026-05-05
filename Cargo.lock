@@ -2774,6 +2774,9 @@ version = "0.1.0"
 dependencies = [
  "chio-adversarial-suite",
  "chio-core-types",
+ "chio-guards",
+ "chio-http-core",
+ "chio-http-session",
  "chio-kernel",
  "chio-kernel-browser",
  "chio-weights",
@@ -3250,6 +3253,7 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 1.0.69",
  "tokio",
+ "url",
  "uuid",
 ]
 
@@ -3811,7 +3815,9 @@ dependencies = [
 name = "chio-tee-frame"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chio-core-types",
+ "chrono",
  "proptest",
  "serde",
  "serde_json",

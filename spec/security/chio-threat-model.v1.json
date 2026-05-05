@@ -250,9 +250,12 @@
           "control": "Deployments exposing HTTP substrate endpoints must enable the InternalNetworkGuard, add deployment-specific internal hostnames, and fail closed on address parse ambiguity."
         }
       ],
-      "residualRisk": "DNS time-of-check/time-of-use gaps and tool-execution redirects can still reach targets that were not visible in the guarded arguments.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.hosted-http-egress-hardening"
+      "residualRisk": "DNS time-of-check/time-of-use gaps remain deployment-sensitive, but substrate callers now require explicit scheme and authority allowlists, address-class denials, redirect ceilings, and response-size ceilings before outbound HTTP is accepted.",
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-http-core/tests/http_egress_contract.rs",
+        "crates/chio-conformance/tests/threats/ssrf_via_http_substrate.rs"
+      ]
     },
     {
       "id": "pii_phi_exposure",
@@ -275,8 +278,10 @@
         }
       ],
       "residualRisk": "Regex-based pattern detection is incomplete, may false-positive in non-medical contexts, and does not scan image or binary response content.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.healthcare-phi-data-guard-validation"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/pii_phi_exposure.rs"
+      ]
     },
     {
       "id": "agent_velocity_abuse",
@@ -302,8 +307,10 @@
         }
       ],
       "residualRisk": "Rate limits are process-local, and an attacker controlling multiple agent identities can multiply the effective allowed rate.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.distributed-rate-limit-store"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/agent_velocity_abuse.rs"
+      ]
     },
     {
       "id": "cumulative_data_exfiltration",
@@ -326,8 +333,10 @@
         }
       ],
       "residualRisk": "Per-session accounting can be bypassed through many short sessions, and byte counts do not measure semantic information density or compression.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.cross-session-data-flow-accounting"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/cumulative_data_exfiltration.rs"
+      ]
     },
     {
       "id": "behavioral_sequence_attack",
@@ -350,8 +359,10 @@
         }
       ],
       "residualRisk": "The guard cannot prevent cross-session dangerous sequences, non-adjacent forbidden transitions, or semantically dangerous invocations hidden behind benign tool names.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.behavioral-policy-compiler"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/behavioral_sequence_attack.rs"
+      ]
     },
     {
       "id": "wasm_guard_resource_exhaustion",
@@ -374,8 +385,10 @@
         }
       ],
       "residualRisk": "Linear memory pressure within the runtime limit and compilation CPU for pathologically complex modules are not fully capped by Chio fuel metering.",
-      "coverage_state": "pending",
-      "deferred_to": "trajectory-4.wasm-runtime-quota-hardening"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/wasm_guard_resource_exhaustion.rs"
+      ]
     },
     {
       "id": "pq_signature_downgrade",
@@ -532,7 +545,13 @@
         }
       ],
       "residualRisk": "Hosted providers that do not expose loaded model bytes cannot bind under this check; deployments must use local recomputation or a signed model-card bundle with a provider surface that can produce a recomputed loaded-weight digest.",
-      "coverage_state": "covered"
+      "coverage_state": "covered",
+      "coveredBy": [
+        "crates/chio-conformance/tests/threats/weights_hash_spoof.rs",
+        "crates/chio-kernel/tests/weights_binding.rs",
+        "crates/chio-weights/tests/lineage_anchor.rs",
+        "crates/chio-weights/tests/equivalence.rs"
+      ]
     },
     {
       "id": "mobile_attestation_replay",
