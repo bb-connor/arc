@@ -145,6 +145,11 @@ impl KernelCoreError {
                 }
                 CapabilityError::NotYetValid => "capability not yet valid".to_string(),
                 CapabilityError::Expired => "capability has expired".to_string(),
+                CapabilityError::AttenuationViolation(msg) => {
+                    let mut out = String::from("capability rejected by chain binding: ");
+                    out.push_str(msg);
+                    out
+                }
                 CapabilityError::BudgetSplitRejected(err) => {
                     let mut out = String::from("capability budget split rejected: ");
                     // alloc::fmt is available; use core formatting.
@@ -155,6 +160,16 @@ impl KernelCoreError {
                 CapabilityError::Internal(msg) => {
                     let mut out = String::from("capability verification failed: ");
                     out.push_str(msg);
+                    out
+                }
+                CapabilityError::SchemaExceedsNegotiatedCeiling {
+                    token_schema,
+                    peer_max,
+                } => {
+                    let mut out = String::from("capability token schema ");
+                    out.push_str(token_schema);
+                    out.push_str(" exceeds peer-negotiated ceiling ");
+                    out.push_str(peer_max);
                     out
                 }
             },

@@ -73,7 +73,9 @@ pub use budget_split::{
     MAX_BUDGET_SHARE_BPS,
 };
 pub use capability_verify::{
-    verify_capability, verify_capability_with_floor, CapabilityError, VerifiedCapability,
+    verify_capability, verify_capability_with_floor, verify_capability_with_floor_and_resolver,
+    verify_capability_with_floor_and_trust_root, verify_capability_with_negotiated_floor,
+    CapabilityError, TrustRootResolver, VerifiedCapability,
 };
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{

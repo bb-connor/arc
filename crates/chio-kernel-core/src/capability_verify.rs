@@ -24,7 +24,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use chio_core_types::capability::{
-    CapabilityCryptoFloor, CapabilityFloorVerifyError, CapabilityToken, ChioScope,
+    CapabilityCryptoFloor, CapabilityFloorVerifyError, CapabilityNegotiation, CapabilityToken,
+    ChioScope, ScopeHash, CHIO_CAPABILITY_V2_SCHEMA,
 };
 use chio_core_types::crypto::PublicKey;
 
@@ -77,10 +78,24 @@ pub enum CapabilityError {
     NotYetValid,
     /// Token has expired.
     Expired,
+    /// W1.1: V2 capability token violated the chain-binding rule.
+    /// `attenuation_proof.parent_scope_hash` did not match either the
+    /// issuer's trust-root scope hash (direct issue) or the last
+    /// delegation link's `scope_hash` (delegated chain).
+    AttenuationViolation(String),
     /// Sibling-sum budget enforcement rejected this delegation.
     BudgetSplitRejected(BudgetSplitError),
     /// An internal invariant was violated (e.g. canonical-JSON failure).
     Internal(String),
+    /// Token's declared schema is above the schema ceiling negotiated with
+    /// the federated peer. This blocks a v1-only Mallory from forcing a
+    /// v2-aware Alice to accept v2-only fields (downgrade-attack defense).
+    SchemaExceedsNegotiatedCeiling {
+        /// The schema ID declared on the inbound token.
+        token_schema: String,
+        /// The peer-negotiated maximum capability schema ID.
+        peer_max: String,
+    },
 }
 
 impl From<BudgetSplitError> for CapabilityError {
@@ -190,6 +205,43 @@ pub fn verify_capability_with_floor(
     })
 }
 
+/// Verify a capability token while enforcing both the configured crypto
+/// floor and the schema ceiling negotiated with the federated peer.
+///
+/// Closes the W1.3 downgrade attack: a v1-only Mallory must not be able
+/// to force a v2-aware Alice to accept v2-only fields. The peer's
+/// `max_capability_schema` (populated by
+/// [`CapabilityNegotiation::negotiated_with`]) acts as a ceiling: a v2
+/// token presented across a v1-negotiated link is rejected before any
+/// signature, time, or floor check runs.
+///
+/// Symmetric direction is preserved: a v1 token presented across a
+/// v2-negotiated link still verifies, because v1 remains the universal
+/// floor of the schema lattice.
+pub fn verify_capability_with_negotiated_floor(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    peer: &CapabilityNegotiation,
+) -> Result<VerifiedCapability, CapabilityError> {
+    // Schema-ceiling check: reject v2 tokens when the peer-negotiated
+    // ceiling is below v2. This runs before signature verification so a
+    // v1-only Mallory cannot force a v2-aware Alice to parse v2-only
+    // fields. v1 tokens are always admitted regardless of peer ceiling.
+    if token.schema == CHIO_CAPABILITY_V2_SCHEMA
+        && peer.max_capability_schema != CHIO_CAPABILITY_V2_SCHEMA
+    {
+        return Err(CapabilityError::SchemaExceedsNegotiatedCeiling {
+            token_schema: token.schema.clone(),
+            peer_max: peer.max_capability_schema.clone(),
+        });
+    }
+
+    let mut budgets = NoopBudgetRegistry;
+    verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)
+}
+
 /// Convenience wrapper around [`verify_capability`] that returns the
 /// trusted-issuer list as a `Vec` so adapters can build it lazily.
 pub fn verify_capability_with_trusted<I>(
@@ -220,6 +272,94 @@ where
     let trusted: Vec<PublicKey> = trusted_issuers.into_iter().collect();
     let mut budgets = NoopBudgetRegistry;
     verify_capability_with_floor(token, &trusted, clock, crypto_floor, &mut budgets)
+}
+
+/// Resolver returning the trust-root scope hash bound to a given issuer
+/// public key. Kernels supply this so the verifier can bind
+/// `attenuation_proof.parent_scope_hash` to the issuing CA's authority
+/// hash on direct-issue tokens (W1.1 chain-binding rule).
+pub trait TrustRootResolver {
+    /// Resolve the trust-root scope hash for `issuer`, returning `None`
+    /// when the issuer has no registered authority hash. The verifier
+    /// treats `None` as a fail-closed deny for v2 tokens that require
+    /// chain binding.
+    fn trust_root_scope_hash(&self, issuer: &PublicKey) -> Option<ScopeHash>;
+}
+
+impl<F> TrustRootResolver for F
+where
+    F: Fn(&PublicKey) -> Option<ScopeHash>,
+{
+    fn trust_root_scope_hash(&self, issuer: &PublicKey) -> Option<ScopeHash> {
+        (self)(issuer)
+    }
+}
+
+/// W1.1 chain-binding entry point. Verify a capability token while also
+/// enforcing the v2 chain-binding rule that closes the P0 soundness gap.
+///
+/// In addition to the checks in [`verify_capability_with_floor`], this
+/// entry point requires that v2 tokens carry an `attenuation_proof`
+/// whose `parent_scope_hash` matches either:
+///
+/// - `trust_root_scope_hash` (when the delegation chain is empty: a
+///   direct issue from the trust-root authority binds the witness to the
+///   verifier-known authority hash); or
+/// - `delegation_chain.last().scope_hash` (when delegation has occurred:
+///   the witness binds to the predecessor's signed scope_hash).
+///
+/// V1 tokens are accepted unchanged. Callers that have not yet plumbed
+/// trust roots through their kernel should keep using
+/// [`verify_capability_with_floor`] but MUST NOT accept v2 tokens via
+/// that legacy entry point in production.
+pub fn verify_capability_with_floor_and_trust_root(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    trust_root_scope_hash: &ScopeHash,
+) -> Result<VerifiedCapability, CapabilityError> {
+    let mut budgets = NoopBudgetRegistry;
+    let verified = verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)?;
+
+    if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
+        token
+            .validate_chain_binding(trust_root_scope_hash)
+            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+    }
+
+    Ok(verified)
+}
+
+/// Resolver-driven variant of [`verify_capability_with_floor_and_trust_root`].
+///
+/// Kernels that maintain a per-issuer trust-root registry pass a
+/// [`TrustRootResolver`] so the verifier can pick the correct authority
+/// hash without leaking the registry shape into the verifier surface.
+pub fn verify_capability_with_floor_and_resolver(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    trust_root: &dyn TrustRootResolver,
+) -> Result<VerifiedCapability, CapabilityError> {
+    let mut budgets = NoopBudgetRegistry;
+    let verified = verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)?;
+
+    if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
+        let issuer_root = trust_root
+            .trust_root_scope_hash(&token.issuer)
+            .ok_or_else(|| {
+                CapabilityError::AttenuationViolation(
+                    "v2 chain-binding: no trust-root scope hash registered for issuer".to_string(),
+                )
+            })?;
+        token
+            .validate_chain_binding(&issuer_root)
+            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+    }
+
+    Ok(verified)
 }
 
 #[cfg(test)]

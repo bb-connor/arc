@@ -302,6 +302,32 @@ Peers that do not advertise the bitset stay on the v1 default. This prevents a
 flag-day rollout for additive capability, receipt, anchor, and signature
 changes.
 
+#### Negotiated Schema Ceiling (W1.3)
+
+The negotiated `maxCapabilitySchema` is enforced by the verifier as a
+schema ceiling on every inbound capability token. Concretely:
+
+- `FederationTrustExchange.negotiated_with(...)` derives the per-peer
+  ceiling and stores it on `FederationPeer.capabilities`.
+- The portable verifier entrypoint
+  `chio_kernel_core::verify_capability_with_negotiated_floor(token,
+  trusted_issuers, clock, crypto_floor, peer)` rejects with
+  `CapabilityError::SchemaExceedsNegotiatedCeiling { token_schema,
+  peer_max }` when `token.schema == chio.capability.v2` and
+  `peer.max_capability_schema != chio.capability.v2`.
+- The check runs before signature, time, and crypto-floor checks. It
+  costs nothing on the happy path and closes the downgrade attack
+  where a v1-only Mallory presents a v2 token to a v2-aware Alice in
+  order to force Alice to parse v2-only fields.
+- The symmetric direction (a v1 token presented to a v2-aware peer) is
+  always admitted: v1 is the universal floor of the schema lattice and
+  raising the ceiling never invalidates legacy tokens.
+
+The Lean theorem `theorem.handshake.negotiation_safety` in
+`formal/lean4/Chio/Chio/Proofs/HandshakeNegotiation.lean` models the
+ceiling check, and the Rust shell is exercised by
+`crates/chio-conformance/tests/verify_rejects_v2_token_when_peer_negotiated_v1_only.rs`.
+
 ### Signed-Artifact Registry
 
 `spec/schemas/registry.json` is the signed-artifact compatibility registry.
@@ -355,6 +381,39 @@ Minting and verification both check that the child scope hash in the proof
 matches the token scope, that the witness hashes match the normalized scopes,
 and that every recorded grant relation is a subset. Budget shares above 10000
 bps fail closed because they re-amplify parent authority.
+
+#### Chain-Binding Rule (W1.1)
+
+The `attenuation_proof.parent_scope_hash` field MUST be bound to the token's
+upstream lineage. Without this rule an issuer with true authority `scope_X`
+could mint a v2 token claiming `parent_scope = scope_BIGGER` and supply an
+internally consistent witness, because nothing tied `parent_scope_hash` to
+the issuer's actual upstream parent capability. Concretely:
+
+- Every v2 delegation hop carries a signed `DelegationLink.scope_hash` that
+  records the canonical hash of the scope authorized at that step.
+- A direct-issue v2 token (empty `delegation_chain`) MUST have
+  `attenuation_proof.parent_scope_hash` equal to the verifier's
+  trust-root scope hash for the issuing authority.
+- A delegated v2 token MUST have `attenuation_proof.parent_scope_hash`
+  equal to `delegation_chain.last().scope_hash`. The chain-link signature
+  binds that hash to the predecessor's key, transitively rooting the
+  witness in the trust-root authority.
+- A v2 chain whose hops omit `scope_hash` is rejected fail-closed; legacy
+  v1 hops do not carry it and v2 verifiers therefore reject mixed chains.
+
+The portable verifier entrypoint
+`chio_kernel_core::verify_capability_with_floor_and_trust_root(token,
+trusted_issuers, clock, crypto_floor, trust_root_scope_hash)` enforces
+the rule and rejects with `CapabilityError::AttenuationViolation` when
+`parent_scope_hash` is unbound. The check costs a single hash comparison
+on the happy path and runs after the basic signature, time, and crypto-
+floor checks (the chain binding is meaningful only once those succeed).
+
+The Lean theorem `theorem.attenuation.witness_soundness` in
+`formal/lean4/Chio/Chio/Proofs/AttenuationWitness.lean` models the
+chain-binding check, and the Rust shell is exercised by
+`crates/chio-conformance/tests/attenuation_witness_rejects_inflated_parent_scope.rs`.
 
 #### Sibling-Sum Budget Enforcement (W1.2)
 
