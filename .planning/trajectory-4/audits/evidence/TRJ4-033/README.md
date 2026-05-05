@@ -1,8 +1,8 @@
 # TRJ4-033 Evidence - Mobile Threat Coverage
 
-## PR1 status
+## PR2 status
 
-Partial. PR1 adds deterministic fail-closed tests that exercise the mobile attestation replay classes, but does not flip threat-model JSON coverage because real-device fixtures are still absent.
+Covered. PR2 adds conformance tests under `crates/chio-conformance/tests/threats/` and flips the three mobile threat-model rows from `pending` to `covered`.
 
 ## Deterministic coverage added
 
@@ -24,7 +24,8 @@ Partial. PR1 adds deterministic fail-closed tests that exercise the mobile attes
 - `cargo test -p chio-custody-hw -- --nocapture` passed.
 - `cargo test -p chio-kernel-mobile --test ffi_roundtrip -- --nocapture` passed.
 - `cargo clippy -p chio-kernel-mobile --lib --test ffi_roundtrip -- -D warnings` passed.
+- `cargo test -p chio-conformance --test threats` covers the three mobile rows in PR2.
 
-## Remaining gap
+## Limitation
 
-The threat-model rows `mobile_attestation_replay`, `device_key_extraction`, and `play_integrity_token_replay` remain pending in PR1. They should flip only after real App Attest and Play Integrity device fixtures are captured and wired into conformance tests.
+The committed conformance tests use deterministic verifier fixtures, not field-captured device fixture packs. They are suitable for CI fail-closed coverage of parser, binding, and verdict behavior; field fixture packs remain a higher-assurance follow-up.

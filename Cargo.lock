@@ -2772,16 +2772,21 @@ dependencies = [
 name = "chio-conformance"
 version = "0.1.0"
 dependencies = [
+ "base64ct",
  "chio-adversarial-suite",
  "chio-core-types",
+ "chio-custody-hw",
  "chio-kernel",
  "chio-kernel-browser",
  "chio-weights",
  "chrono",
+ "coset",
+ "jsonwebtoken",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
  "tiny_http",
  "toml 0.8.23",

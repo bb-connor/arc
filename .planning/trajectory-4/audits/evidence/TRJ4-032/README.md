@@ -1,19 +1,19 @@
 # TRJ4-032 Evidence - ChioKernel.xcframework
 
-## PR1 status
+## PR2 status
 
-Not completed in PR1. This remains a documented slip.
+Completed for the local trajectory-4 framework artifact.
 
 ## Validation attempted
 
-- `bash scripts/build-ios-framework.sh --test-only` passed.
-- `rustup target add x86_64-apple-ios` completed.
-- A local UniFFI CLI shim was built under `/tmp/chio-uniffi-cli` because the repo expects a `uniffi-bindgen` binary but the `uniffi` and `uniffi_bindgen` crates do not publish installable binaries for 0.28.3.
-- Full `scripts/build-ios-framework.sh` was attempted with `PATH=/tmp/chio-uniffi-bin:$PATH`.
+- `bash scripts/build-ios-framework.sh --test-only` passed in PR1.
+- `bash scripts/build-ios-framework.sh` passed in PR2.
+- `sdks/swift/Frameworks/ChioKernel.xcframework` is present in the tree.
+- Static archives are tracked through Git LFS.
 
-## Blocker
+## Prior blocker closed
 
-The full iOS staticlib build failed during the aarch64 iOS target build in `openssl-sys`:
+PR1 failed during the aarch64 iOS target build in `openssl-sys`:
 
 ```text
 Could not find directory of OpenSSL installation
@@ -22,6 +22,6 @@ OPENSSL_DIR unset
 pkg-config has not been configured to support cross-compilation
 ```
 
-## Remaining gap
+PR2 closes this by compiling `chio-kernel-mobile` against `chio-custody-hw` with default features disabled. The mobile target does not need the OpenSSL-backed `webauthn-rs` passkey verifier path.
 
-`target/release-qualification/mobile-kernel/ios/ChioKernel.xcframework` and reproducible-build `.intoto.jsonl` were not produced. The next PR must either provision an iOS OpenSSL sysroot and target-specific OpenSSL env vars, or remove OpenSSL from the mobile staticlib dependency graph before producing the xcframework.
+See `xcframework-build.md` for hashes and build metadata.

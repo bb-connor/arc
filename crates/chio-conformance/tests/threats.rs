@@ -26,9 +26,15 @@
 //! - tee_quote_forgery
 //! - passkey_credential_theft
 //! - audience_confusion
+//! - mobile_attestation_replay
+//! - device_key_extraction
+//! - play_integrity_token_replay
 
 #[path = "threats/common.rs"]
 mod common;
+
+#[path = "threats/mobile_attestation_common.rs"]
+mod mobile_attestation_common;
 
 #[path = "threats/capability_token_theft.rs"]
 mod capability_token_theft;
@@ -62,3 +68,12 @@ mod passkey_credential_theft;
 
 #[path = "threats/audience_confusion.rs"]
 mod audience_confusion;
+
+#[path = "threats/mobile_attestation_replay.rs"]
+mod mobile_attestation_replay;
+
+#[path = "threats/device_key_extraction.rs"]
+mod device_key_extraction;
+
+#[path = "threats/play_integrity_token_replay.rs"]
+mod play_integrity_token_replay;
