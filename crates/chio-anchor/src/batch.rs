@@ -59,12 +59,14 @@ pub struct AnchorBatchBody {
     pub witness: AnchorBatchWitness,
     pub issued_at: u64,
     pub signer_key: PublicKey,
-    #[serde(default, skip_serializing_if = "is_pending_witness_state")]
+    /// Always serialized. A non-Rust signer that emits explicit
+    /// `witnessState: {"kind":"pending"}` produces canonical bytes
+    /// that Rust verification must match. Stripping the field on
+    /// the Rust side via `skip_serializing_if` would canonicalize
+    /// to a different byte sequence and reject otherwise-valid
+    /// cross-SDK batches.
+    #[serde(default)]
     pub witness_state: WitnessState,
-}
-
-fn is_pending_witness_state(state: &WitnessState) -> bool {
-    matches!(state, WitnessState::Pending)
 }
 
 /// Signed anchor batch artifact.
