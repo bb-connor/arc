@@ -107,6 +107,12 @@ chrono = { workspace = true, features = ["clock"] }
 # vectors and assert each of the six initial threat IDs is backed
 # by at least one non-pending DENY-asserted case.
 chio-adversarial-suite = { version = "0.1.0", path = "../chio-adversarial-suite" }
+# W2.1: kernel-mints-v2 integration test persists a v2 receipt through
+# the SqliteReceiptStore to prove the chio_receipts_v2 table is wired
+# from the production hot path.
+chio-store-sqlite = { version = "0.1.0", path = "../chio-store-sqlite" }
+rusqlite = { workspace = true }
+tempfile = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"

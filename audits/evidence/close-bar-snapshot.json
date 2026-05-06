@@ -1205,12 +1205,12 @@
     {
       "id": "T1.2.E",
       "title": "Evidence Gate for T1.2 multi-agent receipt DAG + receipt-id migration",
-      "bucket": "NONE",
-      "wired_runtime_path": "n",
-      "negative_conformance_test": "NONE",
-      "theorem_status": "n-a",
+      "bucket": "PARTIAL",
+      "wired_runtime_path": "y",
+      "negative_conformance_test": "crates/chio-conformance/tests/v2_receipt_kernel_round_trip.rs",
+      "theorem_status": "assumed",
       "wave": "04",
-      "notes": "T1.2 Evidence Gate not yet closed"
+      "notes": "W2.1: claim.receipt.body_hash_addressing promoted to active; manifest.receipt.body_hash_addressing promoted to active; theorem.receipt.body_hash_input_set_pinned promoted (status=assumed); kernel hot path mints ChioReceiptV2 alongside v1; chio_receipts_v2 sqlite migration ships; multi-parent DAG (close-bar-#18) and theorem.receipt.dag_acyclicity remain open"
     },
     {
       "id": "T1.3.E",
@@ -1395,12 +1395,12 @@
     {
       "id": "close-bar-#17",
       "title": "chio.receipt.v2 ships with signed body_hash; receipt_id_v2 = body_hash; legacy UUIDv7 verifies on v1; v1->v2 negotiation works",
-      "bucket": "NONE",
-      "wired_runtime_path": "n",
-      "negative_conformance_test": "NONE",
-      "theorem_status": "n-a",
+      "bucket": "DONE",
+      "wired_runtime_path": "y",
+      "negative_conformance_test": "crates/chio-conformance/tests/v2_receipt_kernel_round_trip.rs",
+      "theorem_status": "assumed",
       "wave": "04",
-      "notes": "receipt_id today is UUIDv7 prefixed rcpt_; body_hash field absent"
+      "notes": "W2.1: kernel mints ChioReceiptV2 on the production hot path (record_chio_receipt_with_federation) when the negotiated peer profile advertises ACCEPTS_RECEIPT_V2; chio_receipts_v2 table persists body_hash + non-authoritative legacy alias; ReceiptV2ReplaySet keys exclusively on body_hash; integration test mints, replays, tampers with alias, mismatches body_hash, and asserts v1-only fallback through ChioKernel::evaluate_tool_call_blocking"
     },
     {
       "id": "close-bar-#18",

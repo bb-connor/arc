@@ -711,6 +711,34 @@ parent set, every parent shares the same `chainId`, and
 `child.dagOrdinal > max(parent.dagOrdinal)`. This rejects cross-kernel cycles
 without relying on one global clock.
 
+#### Receipt v2 body_hash addressing (W2.1)
+
+Wave 2.1 closes the audit's "types-only, hot path unwired" finding on T1.2 by
+wiring the producer side. The verifier-side check landed in Wave 1; the kernel
+now mints v2 receipts at production mint time when peer negotiation selects v2.
+
+- **Mint path.** `ChioKernel::record_chio_receipt_with_federation` is the
+  hot-path entry that all governed dispatches funnel through. When the
+  `ACCEPTS_RECEIPT_V2` capability feature is advertised on the negotiated peer
+  profile (per `chio.capabilities.v1`), the kernel mints a `ChioReceiptV2`
+  alongside the legacy v1 receipt. The legacy UUIDv7 alias on the v2 receipt
+  is set to the v1 receipt's id so external readers can correlate; replay
+  identity is exclusively `bodyHash`.
+- **Replay store key.** The kernel maintains an in-memory `ReceiptV2ReplaySet`
+  keyed on `bodyHash`. A persistent `chio_receipts_v2` table mirrors the same
+  key. Both stores reject the second insertion of any `bodyHash` fail-closed.
+  The persistent row carries `legacy_receipt_id` only as a non-authoritative
+  tooling alias; tampering with the alias never changes a replay decision.
+- **Verifier rule.** A v2 receipt is admitted only when
+  `bodyHash == H(canonical_jcs(ReceiptV2BodyHashInput))`. The signature is
+  computed over the typed `ReceiptV2SigningBody { bodyHash, body }` wrapper.
+  Either form of mismatch (wrong `bodyHash` field, signature over the wrong
+  body) fails closed. This matches the T1.2 audit closure.
+- **Negotiation downgrade.** When the peer profile is v1-only or when no
+  federation peer is pinned fresh for the request, the kernel falls back to
+  minting only the v1 UUIDv7 receipt. The downgrade emits a structured
+  warning so operators can see receipt-version regressions in observability.
+
 ### 6.1 Decisions
 
 The decision enum is part of the contract:
