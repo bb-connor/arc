@@ -1582,7 +1582,41 @@ fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
     harden_python_provenance_verdict_link(
         &root_dir.join("provenance").join("verdict_link_schema.py"),
     )?;
+    harden_python_capability_negotiation(
+        &root_dir.join("capability").join("capabilities_schema.py"),
+    )?;
     Ok(())
+}
+
+/// Inject a `model_validator` on `ChioCapabilityNegotiationV1` that
+/// enforces the schema's `propertyNames` regex pattern on each feature
+/// key. `datamodel-code-generator` drops `propertyNames` constraints,
+/// which would let a Python peer accept negotiation payloads that the
+/// Rust verifier rejects (`CapabilityNegotiation::validate`). Mirror
+/// the wire-side check here so cross-language consumers fail closed
+/// in the same place.
+fn harden_python_capability_negotiation(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from pydantic import BaseModel, ConfigDict, Field",
+        "import re\n\nfrom pydantic import BaseModel, ConfigDict, Field, model_validator",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from pydantic import BaseModel, ConfigDict, Field, model_validator\n",
+        "from pydantic import BaseModel, ConfigDict, Field, model_validator\n\n_CHIO_FEATURE_NAME_RE = re.compile(r\"^[a-z0-9_.-]{1,96}$\")\n",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    maxCapabilitySchema: MaxCapabilitySchema\n",
+        "    maxCapabilitySchema: MaxCapabilitySchema\n\n    @model_validator(mode=\"after\")\n    def _validate_feature_names(self) -> \"ChioCapabilityNegotiationV1\":\n        if self.features is None:\n            return self\n        for name in self.features:\n            if not _CHIO_FEATURE_NAME_RE.match(name):\n                raise ValueError(\n                    f\"capability feature name {name!r} does not match \"\n                    f\"propertyNames pattern ^[a-z0-9_.-]{{1,96}}$\"\n                )\n        return self\n",
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
 }
 
 fn harden_python_jsonrpc_response(path: &Path) -> Result<(), XtaskError> {
