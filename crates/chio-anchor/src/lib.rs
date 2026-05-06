@@ -38,10 +38,12 @@ pub use automation::{
     AnchorAutomationExecutionOutcome, AnchorAutomationForwarder, AnchorAutomationJob,
     AnchorAutomationTriggerKind, CHIO_ANCHOR_AUTOMATION_JOB_SCHEMA,
 };
-pub use batch::verify_anchor_batch_with_witness_policy;
 pub use batch::{
     build_anchor_batch, build_anchor_batch_body, verify_anchor_batch, AnchorBatch, AnchorBatchBody,
     AnchorBatchInclusion, AnchorBatchWitness, AnchorBatchWitnessKind,
+};
+pub use batch::{
+    verify_anchor_batch_with_witness_policy, verify_anchor_batch_with_witness_policy_async,
 };
 pub use bitcoin::{
     attach_bitcoin_anchor, inspect_ots_proof, prepare_ots_submission,
@@ -90,10 +92,12 @@ pub use witness::ots::{
 };
 pub use witness::rekor::{
     build_rekor_entry_body_b64, build_rekor_entry_body_b64_with_hash, build_rekor_publish_response,
-    RekorClient,
+    build_rekor_publish_response_with_set, sign_set_with_test_key, verifying_key_to_pem,
+    RekorClient, REKOR_PUBLIC_KEY_PEM,
 };
 pub use witness::{
-    batch_body_hash, evaluate_witness_policy, AnchorWitnessClient, AnchorWitnessError,
+    batch_body_hash, batch_body_hash_from_body, evaluate_witness_policy,
+    evaluate_witness_policy_with_verifier, AnchorWitnessClient, AnchorWitnessError, BatchHashInput,
     WitnessPolicy, WitnessPolicyError, WitnessReceipt, WitnessState,
 };
 

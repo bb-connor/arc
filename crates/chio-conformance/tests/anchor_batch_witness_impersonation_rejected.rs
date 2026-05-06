@@ -1,16 +1,23 @@
 //! W2.3 negative conformance test: witness-lane impersonation.
 //!
-//! Threat: a malicious or compromised Rekor mirror returns an
-//! `getEntryByUUID` response whose `body.spec.content.hash.value`
-//! does NOT match `sha256(canonical_jcs(batch.body))`. The verifier
-//! looks up the receipt's UUID, gets a "valid-looking" entry back,
-//! and would accept the batch if it short-circuits on UUID presence.
+//! Threats covered:
 //!
-//! This test stages a tiny_http mock that responds to
-//! `GET /api/v1/log/entries/<uuid>` with a Rekor entry whose body
-//! commits to a DIFFERENT digest than the one the receipt claims.
-//! The real `RekorClient::verify_inclusion` MUST detect the mismatch
-//! and return `AnchorWitnessError::BodyHashMismatch`.
+//! - Body-hash substitution: a malicious mirror returns an entry
+//!   whose `body.spec.content.hash.value` does NOT match
+//!   `sha256(canonical_jcs(batch.body))`. The verifier must reject
+//!   on `BodyHashMismatch`.
+//! - UUID substitution: the mirror responds to GET <uuid-X> with an
+//!   entry keyed under <uuid-Y>. The verifier must reject on
+//!   `Decode("rekor returned no entry for uuid ...")`.
+//! - SET forgery: the mirror returns a syntactically-valid Rekor
+//!   entry with a `signedEntryTimestamp` signed by an attacker-held
+//!   key (NOT the pinned Sigstore key). The verifier must reject on
+//!   `SignatureInvalid`. Added in PR #594 review (HIGH-3).
+//!
+//! Test scaffolding: a `tiny_http` mock binds 127.0.0.1:0 and a
+//! `RekorClient::new(...).with_trusted_keys(...)` is configured with
+//! the test's ephemeral P-256 key so the honest path works without
+//! reaching the production Sigstore log.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -21,11 +28,14 @@ use std::time::Duration;
 
 use chio_anchor::{
     batch_body_hash, build_anchor_batch, build_rekor_entry_body_b64,
-    build_rekor_entry_body_b64_with_hash, build_rekor_publish_response, AnchorBatchWitness,
-    AnchorBatchWitnessKind, AnchorWitnessClient, AnchorWitnessError, RekorClient, WitnessReceipt,
+    build_rekor_entry_body_b64_with_hash, build_rekor_publish_response,
+    build_rekor_publish_response_with_set, sign_set_with_test_key, verifying_key_to_pem,
+    AnchorBatchWitness, AnchorBatchWitnessKind, AnchorWitnessClient, AnchorWitnessError,
+    RekorClient, WitnessReceipt,
 };
 use chio_core::hashing::{sha256, Hash};
 use chio_core::Keypair;
+use p256::ecdsa::SigningKey;
 use tiny_http::{Method, Response, Server};
 
 struct MockServer {
@@ -99,14 +109,49 @@ fn sample_batch() -> chio_anchor::AnchorBatch {
     .unwrap()
 }
 
+/// Test fixture: an ephemeral P-256 keypair plus the matching
+/// trusted-key PEM string. The mock server signs SETs with the
+/// SigningKey; the RekorClient is configured (via with_trusted_keys)
+/// to trust the matching VerifyingKey PEM.
+struct TestRekorKey {
+    signing: SigningKey,
+    pem: String,
+}
+
+fn fresh_test_rekor_key() -> TestRekorKey {
+    let mut rng = rand::rngs::OsRng;
+    let signing = SigningKey::random(&mut rng);
+    let pem = verifying_key_to_pem(signing.verifying_key()).unwrap();
+    TestRekorKey { signing, pem }
+}
+
 #[test]
 fn rekor_publish_round_trips_a_batch_against_a_faithful_mock() {
     let batch = sample_batch();
     let body_b64 = build_rekor_entry_body_b64(&batch).unwrap();
     let body_b64_owned = body_b64.clone();
+    let test_key = fresh_test_rekor_key();
+    let pem = test_key.pem.clone();
+    let log_id = "0".repeat(64);
+    let log_id_for_handler = log_id.clone();
+    let signing_for_handler = test_key.signing.clone();
+
     let server = MockServer::start(move |req| {
-        let body =
-            build_rekor_publish_response("uuid-honest-1", &body_b64_owned, 1_700_000_010, 12345);
+        let set = sign_set_with_test_key(
+            &body_b64_owned,
+            1_700_000_010,
+            &log_id_for_handler,
+            12345,
+            &signing_for_handler,
+        )
+        .unwrap();
+        let body = build_rekor_publish_response_with_set(
+            "uuid-honest-1",
+            &body_b64_owned,
+            1_700_000_010,
+            12345,
+            &set,
+        );
         let payload = serde_json::to_vec(&body).unwrap();
         let _ = req.method();
         Response::from_data(payload)
@@ -114,10 +159,12 @@ fn rekor_publish_round_trips_a_batch_against_a_faithful_mock() {
     });
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0).unwrap();
+    let client = RekorClient::new(server.base_url.clone(), 0)
+        .unwrap()
+        .with_trusted_keys(vec![pem]);
     let receipt = runtime
         .block_on(client.publish(&batch))
-        .expect("honest mock must produce a witness receipt");
+        .expect("honest mock with valid SET must produce a witness receipt");
     assert_eq!(receipt.kind, AnchorBatchWitnessKind::Rekor);
     assert_eq!(receipt.witness_root, batch.body.tree_root);
     assert_eq!(receipt.body_hash, batch_body_hash(&batch).unwrap());
@@ -127,8 +174,9 @@ fn rekor_publish_round_trips_a_batch_against_a_faithful_mock() {
 fn rekor_publish_rejects_lane_that_returns_a_forged_body_hash() {
     let batch = sample_batch();
     // Lane returns a Rekor body that commits to sha256("imposter")
-    // instead of sha256(canonical(batch.body)). The real client MUST
-    // detect this on the publish path itself.
+    // instead of sha256(canonical(batch.body)). The body-hash check
+    // fires BEFORE the SET check on the publish path, so the test
+    // doesn't need a valid SET.
     let forged_hash_hex = sha256(b"chio.anchor_batch.imposter").to_hex();
     let forged_b64 = build_rekor_entry_body_b64_with_hash(&batch, &forged_hash_hex).unwrap();
     let forged_b64_owned = forged_b64.clone();
@@ -255,4 +303,129 @@ fn rekor_verify_inclusion_rejects_uuid_substitution() {
 
     // Required by `tiny_http::Method` import lint.
     let _ = Method::Get;
+}
+
+/// HIGH-3: a malicious mirror returns a SET signed by an attacker-held
+/// key. Even though the body-hash matches our batch, the verifier
+/// must refuse the entry because the SET does not verify under any
+/// pinned Rekor public key.
+#[test]
+fn rekor_verify_inclusion_rejects_set_signed_by_untrusted_key() {
+    let batch = sample_batch();
+    let real_body_hash = batch_body_hash(&batch).unwrap();
+    let receipt = WitnessReceipt {
+        kind: AnchorBatchWitnessKind::Rekor,
+        external_uuid: "uuid-set-forgery".to_string(),
+        published_at: 1_700_000_010,
+        inclusion_proof: vec![],
+        witness_root: batch.body.tree_root,
+        body_hash: real_body_hash,
+    };
+
+    let body_b64 = build_rekor_entry_body_b64(&batch).unwrap();
+    let body_b64_owned = body_b64.clone();
+    // Attacker key: NOT the production Rekor key, NOT the verifier's
+    // pinned key. The attacker can produce a syntactically valid SET
+    // but it must fail verification under the trusted set.
+    let attacker = fresh_test_rekor_key();
+    let attacker_signing = attacker.signing.clone();
+    let log_id = "0".repeat(64);
+    let log_id_for_handler = log_id.clone();
+
+    let server = MockServer::start(move |req| {
+        let forged_set = sign_set_with_test_key(
+            &body_b64_owned,
+            1_700_000_010,
+            &log_id_for_handler,
+            42,
+            &attacker_signing,
+        )
+        .unwrap();
+        let response_body = build_rekor_publish_response_with_set(
+            "uuid-set-forgery",
+            &body_b64_owned,
+            1_700_000_010,
+            42,
+            &forged_set,
+        );
+        let payload = serde_json::to_vec(&response_body).unwrap();
+        let _ = req.method();
+        Response::from_data(payload)
+            .with_header(tiny_http::Header::from_bytes("Content-Type", "application/json").unwrap())
+    });
+
+    // Verifier client trusts an unrelated key (a freshly-minted one,
+    // standing in for the pinned Sigstore key). The forged SET must
+    // not verify under it.
+    let trusted = fresh_test_rekor_key();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let client = RekorClient::new(server.base_url.clone(), 0)
+        .unwrap()
+        .with_trusted_keys(vec![trusted.pem.clone()]);
+    let err = runtime
+        .block_on(client.verify_inclusion(&receipt))
+        .expect_err("verify_inclusion must reject SET signed by untrusted key");
+    match err {
+        AnchorWitnessError::SignatureInvalid(msg) => {
+            assert!(
+                msg.contains("rekor SET signature did not verify"),
+                "expected SET-signature rejection, got: {msg}"
+            );
+        }
+        other => panic!("expected SignatureInvalid on SET forgery, got {other:?}"),
+    }
+}
+
+/// HIGH-3 (positive control): when the SET is signed by a key in the
+/// client's trusted set, verify_inclusion accepts the entry. Pairs
+/// with the negative test above so a regression in either direction
+/// is observable.
+#[test]
+fn rekor_verify_inclusion_accepts_set_signed_by_trusted_key() {
+    let batch = sample_batch();
+    let real_body_hash = batch_body_hash(&batch).unwrap();
+    let receipt = WitnessReceipt {
+        kind: AnchorBatchWitnessKind::Rekor,
+        external_uuid: "uuid-set-honest".to_string(),
+        published_at: 1_700_000_010,
+        inclusion_proof: vec![],
+        witness_root: batch.body.tree_root,
+        body_hash: real_body_hash,
+    };
+    let body_b64 = build_rekor_entry_body_b64(&batch).unwrap();
+    let body_b64_owned = body_b64.clone();
+    let test_key = fresh_test_rekor_key();
+    let signing_for_handler = test_key.signing.clone();
+    let log_id = "0".repeat(64);
+    let log_id_for_handler = log_id.clone();
+
+    let server = MockServer::start(move |req| {
+        let set = sign_set_with_test_key(
+            &body_b64_owned,
+            1_700_000_010,
+            &log_id_for_handler,
+            42,
+            &signing_for_handler,
+        )
+        .unwrap();
+        let response_body = build_rekor_publish_response_with_set(
+            "uuid-set-honest",
+            &body_b64_owned,
+            1_700_000_010,
+            42,
+            &set,
+        );
+        let payload = serde_json::to_vec(&response_body).unwrap();
+        let _ = req.method();
+        Response::from_data(payload)
+            .with_header(tiny_http::Header::from_bytes("Content-Type", "application/json").unwrap())
+    });
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let client = RekorClient::new(server.base_url.clone(), 0)
+        .unwrap()
+        .with_trusted_keys(vec![test_key.pem.clone()]);
+    runtime
+        .block_on(client.verify_inclusion(&receipt))
+        .expect("SET signed by a trusted key must verify");
 }

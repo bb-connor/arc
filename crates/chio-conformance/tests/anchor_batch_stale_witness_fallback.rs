@@ -11,17 +11,32 @@
 //! - `require_public_witness: true` and B0 is `WitnessState::Stale`
 //!   with `now - last_verified > stale_window_seconds` -> reject.
 //! - `require_public_witness: true` and B0 is `WitnessState::Stale`
-//!   with `now - last_verified <= stale_window_seconds` -> accept
-//!   (already-witnessed receipt remains usable through a brief lane
-//!   outage).
+//!   with `now - last_verified <= stale_window_seconds` AND the
+//!   receipt's `external_uuid` is in the verifier's
+//!   `previously_verified_receipts` set -> accept.
+//! - `require_public_witness: true` and B0 is `WitnessState::Stale`
+//!   with `now - last_verified <= stale_window_seconds` BUT the
+//!   receipt is NOT in `previously_verified_receipts` -> reject
+//!   (a producer cannot bootstrap themselves into the verified set).
+//!   Added in PR #594 review (HIGH-2).
 //! - `require_public_witness: false` -> accept all states (advisory
 //!   mode for partner integrations that have not yet wired the lane).
+//!
+//! HIGH-2 from the PR review: when `require_public_witness=true` and
+//! state is `Witnessed`, the load-bearing path now requires a real
+//! `AnchorWitnessClient::verify_inclusion` call. The advisory
+//! `verify_anchor_batch_with_witness_policy` (sync) only checks
+//! structural invariants (root binding, body-hash binding); the
+//! lane-verifying path is `verify_anchor_batch_with_witness_policy_async`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::collections::HashSet;
+
 use chio_anchor::{
-    build_anchor_batch, verify_anchor_batch_with_witness_policy, AnchorBatchWitness,
-    AnchorBatchWitnessKind, WitnessPolicy, WitnessReceipt, WitnessState,
+    build_anchor_batch, verify_anchor_batch_with_witness_policy,
+    verify_anchor_batch_with_witness_policy_async, AnchorBatchWitness, AnchorBatchWitnessKind,
+    AnchorWitnessClient, AnchorWitnessError, WitnessPolicy, WitnessReceipt, WitnessState,
 };
 use chio_core::hashing::Hash;
 use chio_core::Keypair;
@@ -60,6 +75,45 @@ fn fresh_witnessed_state(batch: &chio_anchor::AnchorBatch, observed_at: i64) -> 
             body_hash: chio_anchor::batch_body_hash(batch).unwrap(),
         },
         observed_at,
+    }
+}
+
+/// Stub `AnchorWitnessClient` whose `verify_inclusion` always
+/// succeeds. Used in the positive-control tests that exercise the
+/// load-bearing async path with a (notional) lane round-trip.
+struct AlwaysOkClient;
+
+#[async_trait::async_trait]
+impl AnchorWitnessClient for AlwaysOkClient {
+    async fn publish(
+        &self,
+        _: &chio_anchor::AnchorBatch,
+    ) -> Result<WitnessReceipt, AnchorWitnessError> {
+        unreachable!("publish is not exercised by stale-fallback tests")
+    }
+    async fn verify_inclusion(&self, _: &WitnessReceipt) -> Result<(), AnchorWitnessError> {
+        Ok(())
+    }
+}
+
+/// Stub whose `verify_inclusion` always rejects. Used to confirm
+/// that a self-asserted Witnessed state with `require_public_witness`
+/// is rejected by the load-bearing async path even when the
+/// structural invariants hold.
+struct AlwaysFailClient;
+
+#[async_trait::async_trait]
+impl AnchorWitnessClient for AlwaysFailClient {
+    async fn publish(
+        &self,
+        _: &chio_anchor::AnchorBatch,
+    ) -> Result<WitnessReceipt, AnchorWitnessError> {
+        unreachable!("publish is not exercised by stale-fallback tests")
+    }
+    async fn verify_inclusion(&self, _: &WitnessReceipt) -> Result<(), AnchorWitnessError> {
+        Err(AnchorWitnessError::SignatureInvalid(
+            "test client rejecting all receipts".to_string(),
+        ))
     }
 }
 
@@ -144,8 +198,24 @@ fn require_public_witness_accepts_already_witnessed_during_lane_outage() {
         require_public_witness: true,
         stale_window_seconds: 60 * 60,
     };
+    // The advisory entry-point only checks structural invariants;
+    // the load-bearing async path additionally requires a successful
+    // verify_inclusion round-trip. We exercise both.
     verify_anchor_batch_with_witness_policy(&signed, &policy, 1_700_000_500)
-        .expect("already-witnessed receipt must remain usable");
+        .expect("structural invariants alone admit a Witnessed batch (advisory)");
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let client = AlwaysOkClient;
+    let verified: HashSet<String> = HashSet::new();
+    runtime
+        .block_on(verify_anchor_batch_with_witness_policy_async(
+            &signed,
+            &policy,
+            1_700_000_500,
+            Some(&client),
+            &verified,
+        ))
+        .expect("load-bearing path admits a Witnessed batch when verify_inclusion succeeds");
 }
 
 #[test]
@@ -215,4 +285,146 @@ fn require_public_witness_rejects_already_witnessed_with_root_mismatch() {
         msg.contains("does not match") || msg.contains("WitnessReceiptRootMismatch"),
         "expected witness-root mismatch, got: {msg}"
     );
+}
+
+/// HIGH-2: a self-asserted Witnessed state must NOT satisfy the
+/// load-bearing policy on structural invariants alone. The async
+/// path must call AnchorWitnessClient::verify_inclusion and reject
+/// when the lane refuses the receipt.
+#[test]
+fn require_public_witness_rejects_self_asserted_witnessed_under_async_path() {
+    let kp = Keypair::generate();
+    let witness = AnchorBatchWitness {
+        kind: AnchorBatchWitnessKind::Rekor,
+        witness_id: "rekor:uuid-self-asserted".to_string(),
+        root: Hash::zero(),
+        observed_at: Some(1_700_000_000),
+    };
+    let unsigned = build_anchor_batch(
+        vec!["ck-SA-1".to_string(), "ck-SA-2".to_string()],
+        witness,
+        1_700_000_000,
+        &kp,
+    )
+    .unwrap();
+    // Honest-looking Witnessed state: receipt root and body_hash
+    // both bind to this batch (so the structural invariants hold).
+    let prior_state = fresh_witnessed_state(&unsigned, 1_700_000_010);
+    let mut body = unsigned.body.clone();
+    body.witness_state = prior_state;
+    let signed = chio_anchor::AnchorBatch::sign(body, &kp).unwrap();
+
+    let policy = WitnessPolicy {
+        require_public_witness: true,
+        stale_window_seconds: 60 * 60,
+    };
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let client = AlwaysFailClient;
+    let verified: HashSet<String> = HashSet::new();
+    let err = runtime
+        .block_on(verify_anchor_batch_with_witness_policy_async(
+            &signed,
+            &policy,
+            1_700_000_500,
+            Some(&client),
+            &verified,
+        ))
+        .expect_err("self-asserted Witnessed must be rejected by the verifier client");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("witness lane verification failed")
+            || msg.contains("VerifierRejected")
+            || msg.contains("test client rejecting"),
+        "expected lane-verifier rejection, got: {msg}"
+    );
+}
+
+/// HIGH-2: a Stale state without a prior verified record must be
+/// rejected when require_public_witness=true, even within the
+/// stale window. The previously_verified_receipts set is the
+/// authoritative source.
+#[test]
+fn require_public_witness_rejects_stale_without_previous_verification() {
+    let kp = Keypair::generate();
+    let witness = AnchorBatchWitness {
+        kind: AnchorBatchWitnessKind::Rekor,
+        witness_id: "rekor:uuid-no-prior".to_string(),
+        root: Hash::zero(),
+        observed_at: Some(1_700_000_000),
+    };
+    let mut unsigned = build_anchor_batch(
+        vec!["ck-NP-1".to_string(), "ck-NP-2".to_string()],
+        witness,
+        1_700_000_000,
+        &kp,
+    )
+    .unwrap();
+    unsigned.body.witness_state = WitnessState::Stale {
+        last_verified: 1_700_000_000,
+        error: "rekor 503".to_string(),
+    };
+    let signed = chio_anchor::AnchorBatch::sign(unsigned.body, &kp).unwrap();
+    let policy = WitnessPolicy {
+        require_public_witness: true,
+        stale_window_seconds: 60 * 60,
+    };
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let verified: HashSet<String> = HashSet::new();
+    let err = runtime
+        .block_on(verify_anchor_batch_with_witness_policy_async(
+            &signed,
+            &policy,
+            1_700_000_500,
+            None,
+            &verified,
+        ))
+        .expect_err("stale without prior verification must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("StaleNotPreviouslyVerified")
+            || msg.contains("not in the previously_verified set"),
+        "expected stale-not-previously-verified rejection, got: {msg}"
+    );
+}
+
+/// HIGH-2 (positive control): a Stale state IS admitted when the
+/// receipt's identifier is in the caller's
+/// previously_verified_receipts set and the stale window is open.
+#[test]
+fn require_public_witness_admits_stale_when_previously_verified() {
+    let kp = Keypair::generate();
+    let witness = AnchorBatchWitness {
+        kind: AnchorBatchWitnessKind::Rekor,
+        witness_id: "rekor:uuid-with-prior".to_string(),
+        root: Hash::zero(),
+        observed_at: Some(1_700_000_000),
+    };
+    let mut unsigned = build_anchor_batch(
+        vec!["ck-WP-1".to_string(), "ck-WP-2".to_string()],
+        witness,
+        1_700_000_000,
+        &kp,
+    )
+    .unwrap();
+    unsigned.body.witness_state = WitnessState::Stale {
+        last_verified: 1_700_000_000,
+        error: "rekor 503".to_string(),
+    };
+    let signed = chio_anchor::AnchorBatch::sign(unsigned.body, &kp).unwrap();
+    let policy = WitnessPolicy {
+        require_public_witness: true,
+        stale_window_seconds: 60 * 60,
+    };
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let mut verified: HashSet<String> = HashSet::new();
+    verified.insert("rekor:uuid-with-prior".to_string());
+    runtime
+        .block_on(verify_anchor_batch_with_witness_policy_async(
+            &signed,
+            &policy,
+            1_700_000_500,
+            None,
+            &verified,
+        ))
+        .expect("previously-verified stale receipt is admissible");
 }

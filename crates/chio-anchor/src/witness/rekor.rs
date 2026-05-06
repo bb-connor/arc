@@ -3,9 +3,21 @@
 //! `RekorClient::publish` POSTs the canonical-JSON encoding of
 //! `batch.body` to `${endpoint}/api/v1/log/entries` with a Sigstore
 //! "intoto" envelope shape; `verify_inclusion` GETs
-//! `${endpoint}/api/v1/log/entries/${uuid}` and asserts that the
-//! returned `body.spec.data.hash.value` matches
-//! `sha256_hex(batch.body)`.
+//! `${endpoint}/api/v1/log/entries/${uuid}` and asserts that:
+//!
+//! 1. The returned `body.spec.content.hash.value` matches
+//!    `sha256(canonical(batch.body))` (lane substitution defense).
+//! 2. The `verification.signedEntryTimestamp` (SET) is a valid
+//!    ECDSA P-256/SHA-256 signature, by Rekor's pinned public key,
+//!    over the canonical JSON of `{body, integratedTime, logID,
+//!    logIndex}` (Rekor SET spec).
+//!
+//! HIGH-3 in PR #594 review: previously the client only inspected the
+//! body hash and treated any well-formed JSON response as valid,
+//! letting a malicious mirror forge inclusion responses. The SET
+//! signature check fixes that. Inclusion-proof Merkle verification
+//! against the log root is a follow-up (see TODO at hard expiry
+//! 2026-08-01 below).
 //!
 //! This module makes a real HTTP call (via `reqwest`). The negative
 //! conformance test
@@ -17,11 +29,23 @@ use std::time::Duration;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use chio_core::canonical_json_bytes;
-use chio_core::hashing::sha256;
+use p256::ecdsa::signature::Verifier;
+use p256::ecdsa::{Signature as P256Signature, VerifyingKey};
+use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
 
 use crate::batch::{AnchorBatch, AnchorBatchWitnessKind};
 use crate::witness::{batch_body_hash, AnchorWitnessClient, AnchorWitnessError, WitnessReceipt};
+
+/// Rekor public key (Sigstore production log) in PKIX/SubjectPublicKeyInfo PEM.
+///
+/// Sourced from `https://rekor.sigstore.dev/api/v1/log/publicKey`. Pinned
+/// here so a man-in-the-middle on the API endpoint cannot substitute
+/// their own key. ECDSA P-256.
+pub const REKOR_PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
+     MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2G2Y+2tabdTV5BcGiBIx0a9fAFwr\n\
+     kBbmLSGtks4L3qX6yYY0zufBnhC8Ur/iy55GhWP/9A/bY2LhC30M9+RYtw==\n\
+     -----END PUBLIC KEY-----\n";
 
 /// Production Rekor client. The endpoint is configurable so tests can
 /// point at a local mock; production wiring uses
@@ -34,12 +58,18 @@ pub struct RekorClient {
     /// than this are reported as `AnchorWitnessError::Stale` on
     /// `verify_inclusion`.
     max_witness_age_seconds: i64,
+    /// Trusted Rekor public keys (PEM-encoded ECDSA P-256). The
+    /// production set defaults to [`REKOR_PUBLIC_KEY_PEM`]; tests
+    /// substitute their own ephemeral key via [`Self::with_trusted_keys`].
+    trusted_keys: Vec<String>,
 }
 
 impl RekorClient {
     /// `endpoint` example: `"https://rekor.sigstore.dev"` (no
     /// trailing slash). `max_witness_age_seconds` MUST be
-    /// non-negative.
+    /// non-negative. The client trusts only the production Rekor
+    /// public key by default; use [`Self::with_trusted_keys`] to
+    /// override (e.g. for test mocks).
     pub fn new(
         endpoint: impl Into<String>,
         max_witness_age_seconds: i64,
@@ -64,7 +94,17 @@ impl RekorClient {
             endpoint: endpoint.trim_end_matches('/').to_string(),
             http,
             max_witness_age_seconds,
+            trusted_keys: vec![REKOR_PUBLIC_KEY_PEM.to_string()],
         })
+    }
+
+    /// Replace the trusted-public-key set. The default constructor
+    /// pins [`REKOR_PUBLIC_KEY_PEM`]. Tests use this to inject an
+    /// ephemeral P-256 key whose private half they hold so they can
+    /// mint valid SETs in their `tiny_http` mock.
+    pub fn with_trusted_keys(mut self, keys: Vec<String>) -> Self {
+        self.trusted_keys = keys;
+        self
     }
 
     fn entries_url(&self) -> String {
@@ -119,27 +159,36 @@ struct RekorPublishResponse {
     entries: std::collections::BTreeMap<String, RekorEntry>,
 }
 
-/// A single Rekor entry (subset of fields). `body` is base64-JCS of
-/// the original `RekorEntryRequest`; we re-decode and pull
+/// A single Rekor entry. `body` is base64-JCS of the original
+/// `RekorEntryRequest`; we re-decode and pull
 /// `spec.content.hash.value` to detect lane-side substitution.
-#[derive(Debug, Deserialize)]
+///
+/// The SET (signedEntryTimestamp) is the Rekor-key-signed envelope
+/// over `{body, integratedTime, logID, logIndex}` in canonical JSON.
+/// We rebuild that envelope locally, hash it under SHA-256, and
+/// verify the ECDSA signature against [`REKOR_PUBLIC_KEY_PEM`].
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RekorEntry {
     body: String,
     integrated_time: i64,
-    log_id: Option<String>,
-    log_index: Option<i64>,
+    #[serde(rename = "logID")]
+    log_id: String,
+    log_index: i64,
+    #[serde(default)]
     verification: Option<RekorVerification>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RekorVerification {
+    #[serde(default)]
     inclusion_proof: Option<RekorInclusionProof>,
+    #[serde(default)]
     signed_entry_timestamp: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RekorInclusionProof {
     log_index: Option<i64>,
@@ -190,13 +239,96 @@ fn extract_lane_body_hash(entry: &RekorEntry) -> Result<String, AnchorWitnessErr
     Ok(parsed.spec.content.hash.value.to_ascii_lowercase())
 }
 
+/// Re-canonicalize the SET-signed envelope per Rekor's spec.
+///
+/// Per `pkg/api/rekor_pubsub.go` and the OpenAPI spec, the SET is an
+/// ECDSA signature (DER, P-256/SHA-256) over the canonical JSON of:
+///
+/// ```text
+/// { "body": <body_b64>, "integratedTime": <i64>, "logID": <hex>, "logIndex": <i64> }
+/// ```
+///
+/// Field order must match the canonical key ordering RFC 8785 / JCS
+/// produces (alphabetical at every level). We use the workspace's
+/// existing JCS canonicalizer to stay byte-equivalent with Rekor's
+/// implementation.
+fn build_set_canonical_envelope(entry: &RekorEntry) -> Result<Vec<u8>, AnchorWitnessError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SetCanonical<'a> {
+        body: &'a str,
+        integrated_time: i64,
+        #[serde(rename = "logID")]
+        log_id: &'a str,
+        log_index: i64,
+    }
+    let payload = SetCanonical {
+        body: entry.body.as_str(),
+        integrated_time: entry.integrated_time,
+        log_id: entry.log_id.as_str(),
+        log_index: entry.log_index,
+    };
+    canonical_json_bytes(&payload)
+        .map_err(|error| AnchorWitnessError::Decode(format!("rekor SET canonicalize: {error}")))
+}
+
+fn verify_set_signature(
+    entry: &RekorEntry,
+    trusted_keys_pem: &[String],
+) -> Result<(), AnchorWitnessError> {
+    let verification = entry.verification.as_ref().ok_or_else(|| {
+        AnchorWitnessError::SignatureInvalid(
+            "rekor entry has no verification block (no SET to validate)".to_string(),
+        )
+    })?;
+    let set_b64 = verification
+        .signed_entry_timestamp
+        .as_deref()
+        .ok_or_else(|| {
+            AnchorWitnessError::SignatureInvalid(
+                "rekor entry verification block has no signedEntryTimestamp".to_string(),
+            )
+        })?;
+    let set_bytes = BASE64_STANDARD
+        .decode(set_b64.as_bytes())
+        .map_err(|error| AnchorWitnessError::Decode(format!("rekor SET base64: {error}")))?;
+    let signature = P256Signature::from_der(&set_bytes).map_err(|error| {
+        AnchorWitnessError::SignatureInvalid(format!("rekor SET ECDSA DER decode: {error}"))
+    })?;
+    let envelope = build_set_canonical_envelope(entry)?;
+
+    let mut last_error: Option<String> = None;
+    for pem_str in trusted_keys_pem {
+        match VerifyingKey::from_public_key_pem(pem_str) {
+            Ok(key) => match key.verify(&envelope, &signature) {
+                Ok(()) => return Ok(()),
+                Err(error) => last_error = Some(error.to_string()),
+            },
+            Err(error) => {
+                last_error = Some(format!("trusted key PEM parse: {error}"));
+            }
+        }
+    }
+    Err(AnchorWitnessError::SignatureInvalid(format!(
+        "rekor SET signature did not verify against any pinned key: {}",
+        last_error.unwrap_or_else(|| "no trusted keys configured".to_string())
+    )))
+    // TODO(2026-08-01): also verify `verification.inclusionProof`
+    // (rebuild the Merkle root from leaf_hash + audit_path; assert it
+    // equals `inclusionProof.rootHash`; verify the checkpoint signed
+    // by the Rekor log key). Until then we accept the SET as the
+    // authoritative authentication of the entry. A malicious mirror
+    // that controls the Rekor private key is out-of-scope for this
+    // PR; that's the threat model the SET pinning addresses.
+}
+
 #[async_trait::async_trait]
 impl AnchorWitnessClient for RekorClient {
     async fn publish(&self, batch: &AnchorBatch) -> Result<WitnessReceipt, AnchorWitnessError> {
+        let body_hash = batch_body_hash(batch)?;
+        let body_hash_hex = body_hash.to_hex();
         let body_bytes = canonical_json_bytes(&batch.body)
             .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
-        let body_hash = sha256(&body_bytes);
-        let body_hash_hex = body_hash.to_hex();
         let payload_b64 = BASE64_STANDARD.encode(&body_bytes);
         let request = RekorEntryRequest {
             api_version: "0.0.1",
@@ -245,6 +377,10 @@ impl AnchorWitnessClient for RekorClient {
                 batch: body_hash_hex,
             });
         }
+        // Rekor's publish response carries a SET; verify it now so we
+        // never persist a Witnessed receipt that fails the lane-pinned
+        // signature check.
+        verify_set_signature(&entry, &self.trusted_keys)?;
         let inclusion_proof_bytes = entry
             .verification
             .as_ref()
@@ -301,6 +437,12 @@ impl AnchorWitnessClient for RekorClient {
                 batch: expected_hex,
             });
         }
+        // SET signature against the pinned Rekor public key. This is
+        // the substantive authentication of the inclusion response;
+        // without it, a malicious mirror could forge any
+        // body+integratedTime triple. (HIGH-3 fix.)
+        verify_set_signature(entry, &self.trusted_keys)?;
+
         let now = chrono_now_unix();
         if self.max_witness_age_seconds > 0
             && now.saturating_sub(entry.integrated_time) > self.max_witness_age_seconds
@@ -311,8 +453,6 @@ impl AnchorWitnessClient for RekorClient {
                 max_age_seconds: self.max_witness_age_seconds,
             });
         }
-        let _ = entry.log_id.as_deref();
-        let _ = entry.log_index;
         Ok(())
     }
 }
@@ -391,6 +531,13 @@ pub fn build_rekor_entry_body_b64_with_hash(
 /// Build a synthetic Rekor publish response payload. Tests use this
 /// to stage mock-server responses that look indistinguishable from
 /// production Rekor.
+///
+/// The `signed_entry_timestamp_b64` argument carries the
+/// pre-computed SET (base64 ECDSA-DER over the canonical envelope).
+/// Tests that want to exercise the SET-verification path generate it
+/// with [`sign_set_with_test_key`]. Tests that want to exercise the
+/// SET-rejection path pass a SET signed by a non-pinned key, or
+/// `None` for "no SET at all".
 pub fn build_rekor_publish_response(
     uuid: &str,
     body_b64: &str,
@@ -405,6 +552,71 @@ pub fn build_rekor_publish_response(
             "logIndex": log_index,
         }
     })
+}
+
+/// Like [`build_rekor_publish_response`] but also embeds a
+/// pre-computed signed-entry-timestamp under
+/// `verification.signedEntryTimestamp`. Tests use this to stage a
+/// faithful response that the SET-aware verifier will accept (when
+/// the SET was signed by a key in the client's trusted set).
+pub fn build_rekor_publish_response_with_set(
+    uuid: &str,
+    body_b64: &str,
+    integrated_time: i64,
+    log_index: i64,
+    signed_entry_timestamp_b64: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        uuid: {
+            "body": body_b64,
+            "integratedTime": integrated_time,
+            "logID": "0".repeat(64),
+            "logIndex": log_index,
+            "verification": {
+                "signedEntryTimestamp": signed_entry_timestamp_b64,
+            }
+        }
+    })
+}
+
+/// Sign the canonical SET envelope `{body, integratedTime, logID,
+/// logIndex}` with a P-256 signing key and return the base64-DER
+/// signature. Exposed for tests; production code never calls this.
+pub fn sign_set_with_test_key(
+    body_b64: &str,
+    integrated_time: i64,
+    log_id_hex: &str,
+    log_index: i64,
+    signing_key: &p256::ecdsa::SigningKey,
+) -> Result<String, AnchorWitnessError> {
+    use p256::ecdsa::signature::Signer;
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SetCanonical<'a> {
+        body: &'a str,
+        integrated_time: i64,
+        #[serde(rename = "logID")]
+        log_id: &'a str,
+        log_index: i64,
+    }
+    let payload = SetCanonical {
+        body: body_b64,
+        integrated_time,
+        log_id: log_id_hex,
+        log_index,
+    };
+    let envelope = canonical_json_bytes(&payload)
+        .map_err(|error| AnchorWitnessError::Decode(format!("test SET canonicalize: {error}")))?;
+    let signature: P256Signature = signing_key.sign(&envelope);
+    Ok(BASE64_STANDARD.encode(signature.to_der().as_bytes()))
+}
+
+/// Tests-only: encode a `p256::ecdsa::VerifyingKey` to PEM so it can
+/// be installed via [`RekorClient::with_trusted_keys`].
+pub fn verifying_key_to_pem(key: &p256::ecdsa::VerifyingKey) -> Result<String, AnchorWitnessError> {
+    use p256::pkcs8::EncodePublicKey;
+    key.to_public_key_pem(p256::pkcs8::LineEnding::LF)
+        .map_err(|error| AnchorWitnessError::Decode(format!("test pubkey PEM: {error}")))
 }
 
 #[cfg(test)]
@@ -447,5 +659,38 @@ mod tests {
     fn rekor_client_rejects_blank_endpoint() {
         let err = RekorClient::new("", 60).unwrap_err();
         assert!(matches!(err, AnchorWitnessError::Config(_)));
+    }
+
+    /// SET signature round-trip: a SET signed by a known P-256 key
+    /// verifies under the same key but is rejected under any other
+    /// key (including the pinned production Rekor key).
+    #[test]
+    fn rekor_set_signature_round_trips() {
+        use p256::ecdsa::SigningKey;
+        let mut rng = rand::rngs::OsRng;
+        let signing = SigningKey::random(&mut rng);
+        let verifying_pem = verifying_key_to_pem(signing.verifying_key()).unwrap();
+
+        let body_b64 = "ZHVtbXktYm9keQ==";
+        let log_id = "0".repeat(64);
+        let set_b64 =
+            sign_set_with_test_key(body_b64, 1_700_000_010, &log_id, 42, &signing).unwrap();
+
+        let entry = RekorEntry {
+            body: body_b64.to_string(),
+            integrated_time: 1_700_000_010,
+            log_id: log_id.clone(),
+            log_index: 42,
+            verification: Some(RekorVerification {
+                inclusion_proof: None,
+                signed_entry_timestamp: Some(set_b64),
+            }),
+        };
+        verify_set_signature(&entry, &[verifying_pem]).expect("SET must verify under signer key");
+        // A different key (the pinned production key) must NOT
+        // verify the test SET.
+        let err = verify_set_signature(&entry, &[REKOR_PUBLIC_KEY_PEM.to_string()])
+            .expect_err("SET must be rejected under a non-signing key");
+        assert!(matches!(err, AnchorWitnessError::SignatureInvalid(_)));
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chio_core::canonical_json_bytes;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{leaf_hash, MerkleProof, MerkleTree};
@@ -5,7 +7,10 @@ use chio_core::signed_artifact::CHIO_ANCHOR_BATCH_V1_SCHEMA;
 use chio_core::{Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
-use crate::witness::{evaluate_witness_policy, WitnessPolicy, WitnessPolicyError, WitnessState};
+use crate::witness::{
+    evaluate_witness_policy, evaluate_witness_policy_with_verifier, AnchorWitnessClient,
+    WitnessPolicy, WitnessPolicyError, WitnessState,
+};
 use crate::AnchorError;
 
 /// Public witness lane for an anchor batch root.
@@ -154,11 +159,21 @@ pub fn verify_anchor_batch(batch: &AnchorBatch) -> Result<(), AnchorError> {
 }
 
 /// Verify the batch and apply [`WitnessPolicy`] using `now` (UNIX
-/// seconds) as the wall clock.
+/// seconds) as the wall clock. ADVISORY variant: does NOT call out to
+/// the witness lane.
 ///
-/// Used by the conformance tests in
-/// `anchor_batch_stale_witness_fallback.rs` and by production
-/// verifiers that load a config-supplied policy.
+/// When `policy.require_public_witness=true` and the state is
+/// `Witnessed`, this function only checks the receipt's structural
+/// invariants (root binding, body-hash binding). It will accept a
+/// self-asserted Witnessed state. To honor the policy with real
+/// public-witness verification (Rekor SET signature, OTS Bitcoin
+/// attestation, etc.), use
+/// [`verify_anchor_batch_with_witness_policy_async`].
+///
+/// This advisory entry-point remains for the existing sync verifiers
+/// (e.g. config validators that haven't wired an async runtime). If
+/// `require_public_witness` is set, callers SHOULD prefer the async
+/// path.
 pub fn verify_anchor_batch_with_witness_policy(
     batch: &AnchorBatch,
     policy: &WitnessPolicy,
@@ -167,6 +182,40 @@ pub fn verify_anchor_batch_with_witness_policy(
     verify_anchor_batch(batch)?;
     evaluate_witness_policy(batch, &batch.body.witness_state, policy, now)
         .map_err(witness_policy_to_anchor_error)
+}
+
+/// Verify the batch and apply [`WitnessPolicy`] WITH live
+/// witness-lane verification when `require_public_witness=true`.
+///
+/// `client`: the [`AnchorWitnessClient`] backing the lane named in
+/// `batch.body.witness.kind`. Required when the policy is
+/// load-bearing AND the state is `Witnessed`.
+///
+/// `previously_verified_receipts`: the set of `external_uuid`
+/// (Rekor UUID, OTS digest, etc.) that some prior call to
+/// `client.verify_inclusion` accepted. Used for `Stale` admission
+/// when the lane is currently down: the verifier remembers a
+/// previously-verified receipt and tolerates a brief lane outage.
+/// Producers cannot bootstrap themselves into this set; the caller
+/// (verifier daemon, CI gate, ...) is the authoritative source.
+pub async fn verify_anchor_batch_with_witness_policy_async(
+    batch: &AnchorBatch,
+    policy: &WitnessPolicy,
+    now: i64,
+    client: Option<&dyn AnchorWitnessClient>,
+    previously_verified_receipts: &HashSet<String>,
+) -> Result<(), AnchorError> {
+    verify_anchor_batch(batch)?;
+    evaluate_witness_policy_with_verifier(
+        batch,
+        &batch.body.witness_state,
+        policy,
+        now,
+        client,
+        previously_verified_receipts,
+    )
+    .await
+    .map_err(witness_policy_to_anchor_error)
 }
 
 fn witness_policy_to_anchor_error(error: WitnessPolicyError) -> AnchorError {
