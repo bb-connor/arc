@@ -171,7 +171,7 @@ theorem witness_soundness
     | some lastHash =>
       simp [h_scope] at h_admit
       by_cases h_eq : token.proof.parentScopeHash = lastHash
-      · exact ⟨lastHash, h_scope, h_eq⟩
+      · exact ⟨lastHash, rfl, h_eq⟩
       · simp [h_eq] at h_admit
 
 end Chio.Proofs.AttenuationWitness
