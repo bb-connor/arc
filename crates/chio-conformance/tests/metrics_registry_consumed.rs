@@ -11,9 +11,10 @@
 //! is exactly the gap T1.5 left open.
 
 use chio_metrics_spec::{
-    is_registered_metric, CHIO_ANCHOR_ROUND_LATENCY_SECONDS, CHIO_FEDERATION_HOP_TOTAL,
-    CHIO_GUARD_EVALUATIONS_TOTAL, CHIO_GUARD_POOL_CHECKOUT_TOTAL, CHIO_GUARD_POOL_EVICT_TOTAL,
-    CHIO_GUARD_POOL_WARM_SIZE, CHIO_KERNEL_DECISION_LATENCY_SECONDS, CHIO_RECEIPT_WRITE_TOTAL,
+    is_registered_metric, CHIO_ANCHOR_ROUND_LATENCY_SECONDS, CHIO_FEDERATION_HOP_LATENCY_SECONDS,
+    CHIO_FEDERATION_HOP_TOTAL, CHIO_GUARD_EVALUATIONS_TOTAL, CHIO_GUARD_POOL_CHECKOUT_TOTAL,
+    CHIO_GUARD_POOL_EVICT_TOTAL, CHIO_GUARD_POOL_WARM_SIZE, CHIO_KERNEL_DECISION_LATENCY_SECONDS,
+    CHIO_RECEIPT_WRITE_TOTAL,
 };
 
 #[test]
@@ -24,6 +25,7 @@ fn registry_constants_are_registered_in_spec() {
         CHIO_KERNEL_DECISION_LATENCY_SECONDS,
         CHIO_ANCHOR_ROUND_LATENCY_SECONDS,
         CHIO_FEDERATION_HOP_TOTAL,
+        CHIO_FEDERATION_HOP_LATENCY_SECONDS,
         CHIO_GUARD_POOL_CHECKOUT_TOTAL,
         CHIO_GUARD_POOL_WARM_SIZE,
         CHIO_GUARD_POOL_EVICT_TOTAL,
@@ -128,6 +130,23 @@ fn federation_emits_chio_federation_hop_total() {
     let body = chio_federation::render_federation_metrics_prometheus();
     assert!(body.contains(CHIO_FEDERATION_HOP_TOTAL));
     assert!(body.contains("result=\"ok\""));
+}
+
+#[test]
+fn federation_emits_chio_federation_hop_latency_seconds() {
+    // The histogram must move in lockstep with the counter so the
+    // `chio:federation_hop_latency:histogram_quantile_p95_5m` recording
+    // rule has both `_count` and `_sum` series to scrape.
+    let before = chio_federation::federation_hop_latency_count();
+    chio_federation::observe_federation_hop_latency_nanos(chio_federation::HOP_RESULT_OK, 125_000);
+    let after = chio_federation::federation_hop_latency_count();
+    assert!(
+        after > before,
+        "federation hop latency count must advance after an observation"
+    );
+    let body = chio_federation::render_federation_metrics_prometheus();
+    assert!(body.contains(CHIO_FEDERATION_HOP_LATENCY_SECONDS));
+    assert!(body.contains("_count"));
 }
 
 #[test]

@@ -298,9 +298,12 @@ pub fn co_sign_with_origin(
     receipt: ChioReceipt,
     cosigner: &dyn BilateralCoSigningProtocol,
 ) -> Result<DualSignedReceipt, BilateralCoSigningError> {
-    // W2.4: emit `chio_federation_hop_total` at the federation-hop
-    // boundary. The recorder fires before any fallible call so even
-    // signature-failure paths surface in the registry.
+    // W2.4: emit `chio_federation_hop_total` and observe
+    // `chio_federation_hop_latency_seconds` at the federation-hop boundary.
+    // The recorder fires before returning so even signature-failure paths
+    // surface in the registry, matching the counter/histogram pair the
+    // chio-recording-rules.yml alert pack expects.
+    let started = std::time::Instant::now();
     let outcome = co_sign_with_origin_inner(
         origin_kernel_id,
         origin_public_key,
@@ -314,7 +317,8 @@ pub fn co_sign_with_origin(
     } else {
         crate::metrics::HOP_RESULT_ERROR
     };
-    crate::metrics::record_federation_hop(result);
+    let elapsed_nanos = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    crate::metrics::observe_federation_hop_latency_nanos(result, elapsed_nanos);
     outcome
 }
 

@@ -15,8 +15,10 @@ pub mod revocation_gossip;
 pub mod trust_establishment;
 
 pub use metrics::{
-    federation_hop_total, record_federation_hop, render_federation_metrics_prometheus,
-    CHIO_FEDERATION_HOP_TOTAL, HOP_RESULT_ERROR, HOP_RESULT_OK,
+    federation_hop_latency_count, federation_hop_total, observe_federation_hop_latency_nanos,
+    record_federation_hop, render_federation_metrics_prometheus,
+    CHIO_FEDERATION_HOP_LATENCY_SECONDS, CHIO_FEDERATION_HOP_TOTAL, HOP_RESULT_ERROR,
+    HOP_RESULT_OK,
 };
 
 pub use bilateral::{
