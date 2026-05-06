@@ -88,6 +88,9 @@ pub const CHIO_GUARD_EVALUATIONS_TOTAL: &str = "chio_guard_evaluations_total";
 pub const CHIO_GUARD_FUEL_CONSUMED_TOTAL: &str = "chio_guard_fuel_consumed_total";
 pub const CHIO_GUARD_HOST_CALL_DURATION_SECONDS: &str = "chio_guard_host_call_duration_seconds";
 pub const CHIO_GUARD_MODULE_BYTES: &str = "chio_guard_module_bytes";
+pub const CHIO_GUARD_POOL_CHECKOUT_TOTAL: &str = "chio_guard_pool_checkout_total";
+pub const CHIO_GUARD_POOL_EVICT_TOTAL: &str = "chio_guard_pool_evict_total";
+pub const CHIO_GUARD_POOL_WARM_SIZE: &str = "chio_guard_pool_warm_size";
 pub const CHIO_GUARD_RELOAD_TOTAL: &str = "chio_guard_reload_total";
 pub const CHIO_GUARD_VERDICT_TOTAL: &str = "chio_guard_verdict_total";
 pub const CHIO_KERNEL_DECISION_LATENCY_SECONDS: &str = "chio_kernel_decision_latency_seconds";
@@ -217,6 +220,24 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         help = "Loaded WASM guard module size in bytes.",
         kind = Gauge,
         labels = ["guard_id", "epoch"]
+    ),
+    describe!(
+        name = CHIO_GUARD_POOL_CHECKOUT_TOTAL,
+        help = "Total WASM guard pool checkout outcomes by tenant.",
+        kind = Counter,
+        labels = ["guard_id", "tenant_id"]
+    ),
+    describe!(
+        name = CHIO_GUARD_POOL_EVICT_TOTAL,
+        help = "Total WASM guard pool evictions by tenant.",
+        kind = Counter,
+        labels = ["guard_id", "tenant_id"]
+    ),
+    describe!(
+        name = CHIO_GUARD_POOL_WARM_SIZE,
+        help = "Warm WASM guard pool size by tenant.",
+        kind = Gauge,
+        labels = ["guard_id", "tenant_id"]
     ),
     describe!(
         name = CHIO_GUARD_RELOAD_TOTAL,

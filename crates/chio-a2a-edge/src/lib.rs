@@ -20,6 +20,13 @@
 //! `task/get` resolves the terminal receipt-bearing result, and `task/cancel`
 //! can cancel a deferred task before execution.
 
+pub mod metrics;
+pub use metrics::{
+    receipt_write_total, record_receipt_write, render_a2a_edge_metrics_prometheus,
+    CHIO_RECEIPT_WRITE_TOTAL, RECEIPT_WRITE_OUTCOME_ALLOW, RECEIPT_WRITE_OUTCOME_DENY,
+    RECEIPT_WRITE_OUTCOME_ERROR,
+};
+
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1354,6 +1361,15 @@ fn task_response_from_orchestrated(
     let response = orchestrated.response;
     annotate_authoritative_a2a_metadata(&mut metadata, response.output.as_ref());
     let receipt_metadata = Some(metadata);
+
+    // W2.4: emit `chio_receipt_write_total` at the A2A receipt-sink
+    // boundary. The kernel verdict drives the `outcome` label.
+    let outcome = match response.verdict {
+        KernelVerdict::Allow => crate::metrics::RECEIPT_WRITE_OUTCOME_ALLOW,
+        KernelVerdict::Deny => crate::metrics::RECEIPT_WRITE_OUTCOME_DENY,
+        KernelVerdict::PendingApproval => crate::metrics::RECEIPT_WRITE_OUTCOME_ERROR,
+    };
+    crate::metrics::record_receipt_write(outcome);
 
     match response.verdict {
         KernelVerdict::Allow => TaskResponse {

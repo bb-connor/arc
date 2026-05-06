@@ -259,6 +259,16 @@ fn bridge_mcp_tool_call_from_response(
         related_task_id: None,
     });
 
+    // W2.4: emit `chio_receipt_write_total` at the MCP receipt-sink
+    // boundary. The kernel verdict drives the `outcome` label so deny
+    // receipts are visible to operators alongside allow receipts.
+    let outcome = match response.verdict {
+        Verdict::Allow => crate::metrics::RECEIPT_WRITE_OUTCOME_ALLOW,
+        Verdict::Deny => crate::metrics::RECEIPT_WRITE_OUTCOME_DENY,
+        Verdict::PendingApproval => crate::metrics::RECEIPT_WRITE_OUTCOME_ERROR,
+    };
+    crate::metrics::record_receipt_write(outcome);
+
     Ok(BridgeMcpToolCall {
         response,
         mcp_result,

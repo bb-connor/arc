@@ -305,13 +305,37 @@ impl HttpAuthority {
         &self,
         input: HttpAuthorityInput<'_>,
     ) -> Result<HttpAuthorityEvaluation, HttpAuthorityError> {
-        let prepared = self.prepare(input)?;
-        let receipt = self.sign_decision_receipt(&prepared)?;
-        Ok(HttpAuthorityEvaluation {
-            verdict: prepared.verdict.clone(),
-            receipt,
-            evidence: prepared.evidence.clone(),
-        })
+        // W2.4: emit `chio_guard_evaluations_total` and observe
+        // `chio_kernel_decision_latency_seconds` at the verdict-edge
+        // dispatch boundary. Errors emerging from `prepare` or
+        // `sign_decision_receipt` are recorded under the error counter so
+        // operators can spot fail-closed paths.
+        let started_at = std::time::Instant::now();
+        let result = self.prepare(input).and_then(|prepared| {
+            let receipt = self.sign_decision_receipt(&prepared)?;
+            Ok((prepared, receipt))
+        });
+        let elapsed_nanos = u64::try_from(started_at.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        crate::metrics::observe_decision_latency_nanos(elapsed_nanos);
+        match result {
+            Ok((prepared, receipt)) => {
+                let outcome = if prepared.verdict.is_allowed() {
+                    crate::metrics::GUARD_OUTCOME_ALLOW
+                } else {
+                    crate::metrics::GUARD_OUTCOME_DENY
+                };
+                crate::metrics::record_guard_evaluation(outcome);
+                Ok(HttpAuthorityEvaluation {
+                    verdict: prepared.verdict.clone(),
+                    receipt,
+                    evidence: prepared.evidence.clone(),
+                })
+            }
+            Err(error) => {
+                crate::metrics::record_guard_evaluation(crate::metrics::GUARD_OUTCOME_ERROR);
+                Err(error)
+            }
+        }
     }
 
     pub fn prepare(

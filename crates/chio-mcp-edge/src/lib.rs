@@ -8,11 +8,17 @@ use chio_core::{
 use chio_kernel::NestedFlowBridge;
 use serde::{Deserialize, Serialize};
 
+pub mod metrics;
 mod runtime;
 
 #[cfg(feature = "otel")]
 pub mod otel;
 
+pub use metrics::{
+    receipt_write_total, record_receipt_write, render_mcp_edge_metrics_prometheus,
+    CHIO_RECEIPT_WRITE_TOTAL, RECEIPT_WRITE_OUTCOME_ALLOW, RECEIPT_WRITE_OUTCOME_DENY,
+    RECEIPT_WRITE_OUTCOME_ERROR,
+};
 pub use runtime::{
     execute_bridge_mcp_tool_call_async, BridgeMcpToolCall, BridgeMcpToolCallRequest, ChioMcpEdge,
     McpEdgeConfig, McpExposedTool, McpTargetExecutor,

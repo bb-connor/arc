@@ -22,6 +22,13 @@
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 
+pub mod metrics;
+pub use metrics::{
+    receipt_write_total, record_receipt_write, render_acp_edge_metrics_prometheus,
+    CHIO_RECEIPT_WRITE_TOTAL, RECEIPT_WRITE_OUTCOME_ALLOW, RECEIPT_WRITE_OUTCOME_DENY,
+    RECEIPT_WRITE_OUTCOME_ERROR,
+};
+
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -1348,6 +1355,16 @@ fn acp_invocation_result_from_orchestrated(
     let metadata = Some(orchestrated.metadata());
     let response = orchestrated.response;
     let success = matches!(response.verdict, KernelVerdict::Allow);
+
+    // W2.4: emit `chio_receipt_write_total` at the ACP receipt-sink
+    // boundary. Allow/deny verdicts both surface; PendingApproval is
+    // recorded under the error counter so partial flows are visible.
+    let outcome = match response.verdict {
+        KernelVerdict::Allow => crate::metrics::RECEIPT_WRITE_OUTCOME_ALLOW,
+        KernelVerdict::Deny => crate::metrics::RECEIPT_WRITE_OUTCOME_DENY,
+        KernelVerdict::PendingApproval => crate::metrics::RECEIPT_WRITE_OUTCOME_ERROR,
+    };
+    crate::metrics::record_receipt_write(outcome);
 
     AcpInvocationResult {
         success,

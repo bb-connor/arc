@@ -1,0 +1,74 @@
+//! A2A edge metrics surfaced through the workspace `chio-metrics-spec`
+//! registry. Wave 2.4 of the trj4 closeout wires the A2A edge into the
+//! workspace registry: every A2A task response emerging from the kernel
+//! boundary increments [`CHIO_RECEIPT_WRITE_TOTAL`] with an `outcome`
+//! label.
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+pub use chio_metrics_spec::CHIO_RECEIPT_WRITE_TOTAL;
+
+pub const RECEIPT_WRITE_OUTCOME_ALLOW: &str = "allow";
+pub const RECEIPT_WRITE_OUTCOME_DENY: &str = "deny";
+pub const RECEIPT_WRITE_OUTCOME_ERROR: &str = "error";
+
+static RECEIPT_WRITE_ALLOW: AtomicU64 = AtomicU64::new(0);
+static RECEIPT_WRITE_DENY: AtomicU64 = AtomicU64::new(0);
+static RECEIPT_WRITE_ERROR: AtomicU64 = AtomicU64::new(0);
+
+pub fn record_receipt_write(outcome: &str) {
+    match outcome {
+        RECEIPT_WRITE_OUTCOME_ALLOW => {
+            RECEIPT_WRITE_ALLOW.fetch_add(1, Ordering::Relaxed);
+        }
+        RECEIPT_WRITE_OUTCOME_DENY => {
+            RECEIPT_WRITE_DENY.fetch_add(1, Ordering::Relaxed);
+        }
+        _ => {
+            RECEIPT_WRITE_ERROR.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+#[must_use]
+pub fn receipt_write_total(outcome: &str) -> u64 {
+    match outcome {
+        RECEIPT_WRITE_OUTCOME_ALLOW => RECEIPT_WRITE_ALLOW.load(Ordering::Relaxed),
+        RECEIPT_WRITE_OUTCOME_DENY => RECEIPT_WRITE_DENY.load(Ordering::Relaxed),
+        _ => RECEIPT_WRITE_ERROR.load(Ordering::Relaxed),
+    }
+}
+
+#[must_use]
+pub fn render_a2a_edge_metrics_prometheus() -> String {
+    let mut output = String::new();
+    output.push_str("# HELP ");
+    output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
+    output.push_str(" Total receipt write outcomes after policy or guard evaluation.\n");
+    output.push_str("# TYPE ");
+    output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
+    output.push_str(" counter\n");
+    for outcome in [
+        RECEIPT_WRITE_OUTCOME_ALLOW,
+        RECEIPT_WRITE_OUTCOME_DENY,
+        RECEIPT_WRITE_OUTCOME_ERROR,
+    ] {
+        output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
+        output.push_str("{outcome=\"");
+        output.push_str(outcome);
+        output.push_str("\"} ");
+        output.push_str(&receipt_write_total(outcome).to_string());
+        output.push('\n');
+    }
+    output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registry_constant_matches_spec() {
+        assert_eq!(CHIO_RECEIPT_WRITE_TOTAL, "chio_receipt_write_total");
+    }
+}
