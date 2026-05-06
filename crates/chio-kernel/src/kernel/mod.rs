@@ -2851,7 +2851,13 @@ impl ChioKernel {
 
         let cap = &request.capability;
 
-        if let Err(reason) = self.verify_capability_signature(cap) {
+        // Wave 1.5 hot-path wiring: route through the budget-aware
+        // verifier so the W1.2 sibling-sum admit step enforces against
+        // the kernel's persistent registry, matching the portable
+        // `evaluate_with_full_floor` path. Pre-Wave-1.5 hosted hot
+        // paths bypassed sibling-sum enforcement because they called
+        // the non-budget-aware `verify_capability_signature` directly.
+        if let Err(reason) = self.verify_capability_with_budget_admit(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
             return self.build_deny_response_with_metadata(
@@ -3310,7 +3316,12 @@ impl ChioKernel {
 
         let cap = &request.capability;
 
-        if let Err(reason) = self.verify_capability_signature(cap) {
+        // Wave 1.5 hot-path wiring: route through the budget-aware
+        // verifier so the nested-flow path also enforces W1.2 sibling
+        // budgets against the kernel's persistent registry, matching
+        // the main hosted hot path and the portable
+        // `evaluate_with_full_floor` path.
+        if let Err(reason) = self.verify_capability_with_budget_admit(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
             return self.build_deny_response(request, &msg, now, None);
@@ -3906,6 +3917,56 @@ impl ChioKernel {
                 "v2 chain-binding: no trust-root scope hash registered for issuer".to_string()
             })?;
             cap.validate_chain_binding(&issuer_root)
+                .map_err(|err| err.to_string())?;
+        }
+
+        Ok(())
+    }
+
+    /// Wave 1.5 hot-path wiring: signature + chain-binding verification
+    /// with W1.2 sibling-sum budget admission against the kernel's
+    /// persistent registry.
+    ///
+    /// The hosted `evaluate_tool_call_*` paths historically called
+    /// [`Self::verify_capability_signature`], which only enforced the
+    /// signature, crypto-floor, and v2 chain-binding rule. The
+    /// portable verdict path
+    /// ([`chio_kernel_core::evaluate_with_full_floor`]) additionally
+    /// runs the sibling-sum admit step, so production hosted tool
+    /// calls bypassed budget enforcement. This wrapper closes that
+    /// gap by invoking the same admit step that
+    /// [`Self::evaluate_portable_verdict`] uses, threading the
+    /// kernel's long-lived `budget_registry` through. The lock is
+    /// held only for the duration of the admit call, matching the
+    /// portable hot path.
+    ///
+    /// Errors are returned as plain strings so the caller can route
+    /// them through the existing deny-response paths without taking
+    /// a `KernelError` dependency on the verifier shape.
+    fn verify_capability_with_budget_admit(&self, cap: &CapabilityToken) -> Result<(), String> {
+        self.verify_capability_signature(cap)?;
+
+        // W1.2 sibling-sum admit. Only fires for tokens that carry a
+        // delegation chain; root-issued tokens have nothing to split.
+        // The proposed share matches the portable hot path: a missing
+        // `budget_share_bps` is interpreted as a request for the full
+        // parent share so oversubscription is still detected.
+        if let Some(parent_link) = cap.delegation_chain.last() {
+            use chio_kernel_core::BudgetRegistry;
+            let proposed_share = cap
+                .budget_share_bps
+                .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
+            let mut budgets = match self.budget_registry.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            budgets
+                .try_admit_child(
+                    parent_link.capability_id.as_str(),
+                    chio_kernel_core::MAX_BUDGET_SHARE_BPS,
+                    cap.id.clone(),
+                    proposed_share,
+                )
                 .map_err(|err| err.to_string())?;
         }
 

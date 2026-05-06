@@ -34,6 +34,49 @@ pub const CHIO_CAPABILITY_V1_SCHEMA: &str = "chio.capability.v1";
 /// Capability-token v2 schema with typed caveats and attenuation witnesses.
 pub const CHIO_CAPABILITY_V2_SCHEMA: &str = "chio.capability.v2";
 
+/// Total ordering over the known capability-token schema versions.
+///
+/// The W1.3 schema-ceiling check needs an ordering relation (token schema
+/// must be `<=` the peer's negotiated maximum), not bare string equality.
+/// String equality fails-closed when the peer advertises a strictly newer
+/// ceiling that is still backwards-compatible with the inbound token's
+/// schema, which is the wrong direction in the lattice.
+///
+/// New schema versions append a variant; serialization uses the existing
+/// `chio.capability.v1` / `chio.capability.v2` constants so wire shapes do
+/// not change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CapabilitySchemaVersion {
+    /// Frozen v1 capability-token schema.
+    V1,
+    /// v2 capability-token schema with typed caveats and attenuation witnesses.
+    V2,
+}
+
+impl CapabilitySchemaVersion {
+    /// Parse a capability schema id into the ordered enum, returning
+    /// `None` for unknown identifiers. Unknown values must fail-closed
+    /// at higher layers (`CapabilityNegotiation::validate` already
+    /// rejects them on the negotiation surface).
+    #[must_use]
+    pub fn parse(schema: &str) -> Option<Self> {
+        match schema {
+            CHIO_CAPABILITY_V1_SCHEMA => Some(Self::V1),
+            CHIO_CAPABILITY_V2_SCHEMA => Some(Self::V2),
+            _ => None,
+        }
+    }
+
+    /// Return the wire-form schema identifier for this version.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::V1 => CHIO_CAPABILITY_V1_SCHEMA,
+            Self::V2 => CHIO_CAPABILITY_V2_SCHEMA,
+        }
+    }
+}
+
 fn default_capability_schema() -> String {
     CHIO_CAPABILITY_V1_SCHEMA.to_string()
 }

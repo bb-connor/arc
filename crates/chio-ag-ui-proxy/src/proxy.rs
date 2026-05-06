@@ -1,13 +1,14 @@
 //! Core proxy logic for validating capability tokens on UI-facing events.
 
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use chio_core::capability::{
     CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken, Constraint, ScopeHash, ToolGrant,
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel_core::scope::{resolve_capability_grants, ScopeMatchError};
-use chio_kernel_core::{verify_capability_full, CapabilityError, Clock};
+use chio_kernel_core::{verify_capability_full, CapabilityError, Clock, InMemoryBudgetRegistry};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -108,6 +109,16 @@ pub enum ProxyDecision {
 pub struct AgUiProxy {
     config: AgUiProxyConfig,
     signing_key: Keypair,
+    /// Wave 1.5 hot-path wiring: persistent W1.2 sibling-sum budget
+    /// registry. Hoisted onto the proxy so siblings on a delegated
+    /// chain can be tracked across AG-UI events for the lifetime of
+    /// the proxy. A fresh per-event registry would let two siblings
+    /// on different events both see the same residual headroom and
+    /// admit beyond the parent's share. Wrapped in `Mutex` because
+    /// the underlying `InMemoryBudgetRegistry` interface takes
+    /// `&mut dyn BudgetRegistry`; the lock is held only for the
+    /// duration of one verify step inside a single event.
+    budget_registry: Mutex<InMemoryBudgetRegistry>,
 }
 
 impl AgUiProxy {
@@ -116,6 +127,7 @@ impl AgUiProxy {
         Self {
             config,
             signing_key,
+            budget_registry: Mutex::new(InMemoryBudgetRegistry::new()),
         }
     }
 
@@ -216,11 +228,15 @@ impl AgUiProxy {
         let trust_resolver = |issuer: &PublicKey| -> Option<ScopeHash> {
             trust_roots.get(&issuer.to_hex()).cloned()
         };
-        // Per-event budget registry: the AG-UI proxy is event-driven and
-        // does not maintain long-lived sibling-sum state. A fresh
-        // `InMemoryBudgetRegistry` keeps the verifier fail-closed
-        // without sharing cross-event state.
-        let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
+        // Hoisted budget registry: siblings on a delegated chain are
+        // tracked across AG-UI events for the lifetime of the proxy.
+        // The lock is held only for the duration of this verify step
+        // so two concurrent events cannot both observe the same
+        // residual headroom and admit beyond the parent's share.
+        let mut budgets = match self.budget_registry.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Err(error) = verify_capability_full(
             capability,
             &self.config.trusted_issuers,
@@ -228,7 +244,7 @@ impl AgUiProxy {
             CapabilityCryptoFloor::AllowClassical,
             &self.config.peer_capabilities,
             &trust_resolver,
-            &mut budgets,
+            &mut *budgets,
         ) {
             return ProxyDecision::Block {
                 reason: format!(

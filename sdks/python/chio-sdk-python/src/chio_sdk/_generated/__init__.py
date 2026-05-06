@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 168c92102b530411f244aeff273362ff27544e7ce7b3c6623f51c9ecb4d58e62
+# Schema sha256: e22b26006c4ad64cb91683eb774882242236c16e94fa59e56793f01203f2304c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -22,7 +22,7 @@ from __future__ import annotations
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "168c92102b530411f244aeff273362ff27544e7ce7b3c6623f51c9ecb4d58e62"
+SCHEMA_SHA256 = "e22b26006c4ad64cb91683eb774882242236c16e94fa59e56793f01203f2304c"
 
 from .agent import ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, Constraint, DelegationChainItem, Grant, MaxCostPerInvocation, MaxTotalCost, Operation, PromptGrant, ResourceGrant, Scope
 from .anchor import Body, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind, Witness

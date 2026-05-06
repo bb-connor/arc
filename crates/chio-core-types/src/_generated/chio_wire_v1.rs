@@ -4817,7 +4817,6 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityRevocationEntryCapabilityI
 ///    "id",
 ///    "issued_at",
 ///    "issuer",
-///    "schema",
 ///    "scope",
 ///    "signature",
 ///    "subject"
@@ -4861,7 +4860,8 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityRevocationEntryCapabilityI
 ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
 ///    },
 ///    "schema": {
-///      "description": "Signed-artifact schema ID. Legacy wire tokens that omitted this field are interpreted as chio.capability.v1 by compatibility verifiers, but newly issued tokens carry it in the schema-aware signing input.",
+///      "description": "Signed-artifact schema ID. Optional on the wire: legacy v1 tokens persisted before this field was introduced omit it entirely, and verifiers default the missing value to `chio.capability.v1` so those tokens deserialize unchanged. Newly issued tokens carry it in the schema-aware signing input.",
+///      "default": "chio.capability.v1",
 ///      "type": "string",
 ///      "const": "chio.capability.v1"
 ///    },
@@ -4900,7 +4900,8 @@ pub struct ChioCapabilityToken {
     pub issued_at: u64,
     ///Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding), or `hybrid:<classical-public-key>:<mldsa65-public-key-hex>:<alg_set>` for hybrid PQ.
     pub issuer: ChioCapabilityTokenIssuer,
-    ///Signed-artifact schema ID. Legacy wire tokens that omitted this field are interpreted as chio.capability.v1 by compatibility verifiers, but newly issued tokens carry it in the schema-aware signing input.
+    ///Signed-artifact schema ID. Optional on the wire: legacy v1 tokens persisted before this field was introduced omit it entirely, and verifiers default the missing value to `chio.capability.v1` so those tokens deserialize unchanged. Newly issued tokens carry it in the schema-aware signing input.
+    #[serde(default = "defaults::chio_capability_token_schema")]
     pub schema: ::std::string::String,
     pub scope: ChioScope,
     ///Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms, or `hybrid:<classical-signature>:<mldsa65-signature-hex>:<alg_set>` for hybrid PQ. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
@@ -27858,5 +27859,11 @@ impl<'de> ::serde::Deserialize<'de> for WitnessWitnessId {
             .map_err(|e: self::error::ConversionError| {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
+    }
+}
+/// Generation of default values for serde.
+pub mod defaults {
+    pub(super) fn chio_capability_token_schema() -> ::std::string::String {
+        "chio.capability.v1".to_string()
     }
 }

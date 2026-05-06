@@ -24,8 +24,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use chio_core_types::capability::{
-    CapabilityCryptoFloor, CapabilityFloorVerifyError, CapabilityNegotiation, CapabilityToken,
-    ChioScope, ScopeHash, CHIO_CAPABILITY_V2_SCHEMA,
+    CapabilityCryptoFloor, CapabilityFloorVerifyError, CapabilityNegotiation,
+    CapabilitySchemaVersion, CapabilityToken, ChioScope, ScopeHash, CHIO_CAPABILITY_V2_SCHEMA,
 };
 use chio_core_types::crypto::PublicKey;
 
@@ -234,13 +234,20 @@ pub fn verify_capability_with_negotiated_floor(
     crypto_floor: CapabilityCryptoFloor,
     peer: &CapabilityNegotiation,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    // Schema-ceiling check: reject v2 tokens when the peer-negotiated
-    // ceiling is below v2. This runs before signature verification so a
-    // v1-only Mallory cannot force a v2-aware Alice to parse v2-only
-    // fields. v1 tokens are always admitted regardless of peer ceiling.
-    if token.schema == CHIO_CAPABILITY_V2_SCHEMA
-        && peer.max_capability_schema != CHIO_CAPABILITY_V2_SCHEMA
-    {
+    // Schema-ceiling check: reject tokens whose declared schema is
+    // strictly above the peer-negotiated ceiling. Comparison is
+    // ordering-aware over `CapabilitySchemaVersion`, not string
+    // equality, so a v2 token across a future v3-or-higher peer
+    // ceiling is admitted. v1 tokens are always admitted regardless
+    // of the peer ceiling.
+    let token_version = CapabilitySchemaVersion::parse(&token.schema);
+    let peer_ceiling = CapabilitySchemaVersion::parse(&peer.max_capability_schema);
+    let exceeds_ceiling = match (token_version, peer_ceiling) {
+        (Some(token_v), Some(peer_v)) => token_v > peer_v,
+        (Some(token_v), None) => token_v > CapabilitySchemaVersion::V1,
+        (None, _) => false,
+    };
+    if exceeds_ceiling {
         return Err(CapabilityError::SchemaExceedsNegotiatedCeiling {
             token_schema: token.schema.clone(),
             peer_max: peer.max_capability_schema.clone(),
@@ -403,12 +410,29 @@ pub fn verify_capability_full(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    // Step 1: W1.3 schema-ceiling check. Reject v2 tokens when the
-    // peer-negotiated ceiling is below v2 before doing any cryptographic
-    // work. Symmetric direction (v1 token across v2 link) still verifies.
-    if token.schema == CHIO_CAPABILITY_V2_SCHEMA
-        && peer.max_capability_schema != CHIO_CAPABILITY_V2_SCHEMA
-    {
+    // Step 1: W1.3 schema-ceiling check. Reject tokens whose declared
+    // schema is strictly above the peer-negotiated ceiling before doing
+    // any cryptographic work. The comparison is ordering-aware (a v2
+    // token across a v3-or-higher peer ceiling is admitted because v2
+    // <= v3) rather than bare equality, so adding a future v3 schema
+    // does not regress already-deployed v2 callers.
+    //
+    // Unknown schema identifiers fail-closed: the negotiation surface
+    // already rejects unknown values via `CapabilityNegotiation::validate`,
+    // and per-token validation rejects unknown token schemas. Treating
+    // an unparseable peer ceiling as `None` here keeps the ceiling at
+    // its safest interpretation (deny anything we cannot order).
+    let token_version = CapabilitySchemaVersion::parse(&token.schema);
+    let peer_ceiling = CapabilitySchemaVersion::parse(&peer.max_capability_schema);
+    let exceeds_ceiling = match (token_version, peer_ceiling) {
+        (Some(token_v), Some(peer_v)) => token_v > peer_v,
+        // Unknown peer ceiling -> fail-closed for any v2-or-higher token.
+        // v1 tokens remain the universal floor and are always admitted.
+        (Some(token_v), None) => token_v > CapabilitySchemaVersion::V1,
+        // Unknown token schema -> let downstream validation handle it.
+        (None, _) => false,
+    };
+    if exceeds_ceiling {
         return Err(CapabilityError::SchemaExceedsNegotiatedCeiling {
             token_schema: token.schema.clone(),
             peer_max: peer.max_capability_schema.clone(),
@@ -426,7 +450,11 @@ pub fn verify_capability_full(
     // would fail-closed on a peer that disabled the feature but had no
     // registered trust-root entry, breaking interoperability with peers
     // that have not yet rolled out v2 chain-binding. Reading the flag
-    // first and bailing out preserves the negotiated semantics.
+    // first and bailing out preserves the negotiated semantics. Once
+    // the flag is observed enabled here, call the non-feature-gated
+    // `validate_chain_binding` directly: routing through
+    // `validate_chain_binding_with_features` would re-read the same
+    // bit and add an unreachable branch.
     if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
         let chain_binding_enabled = peer
             .features
@@ -443,7 +471,7 @@ pub fn verify_capability_full(
                     )
                 })?;
             token
-                .validate_chain_binding_with_features(&issuer_root, peer)
+                .validate_chain_binding(&issuer_root)
                 .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
         }
     }
