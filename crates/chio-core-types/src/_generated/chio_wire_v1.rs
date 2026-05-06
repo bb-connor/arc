@@ -519,6 +519,9 @@ impl<'de> ::serde::Deserialize<'de> for AttenuationWitnessNormalizedParentScope 
 ///    },
 ///    "witness": {
 ///      "$ref": "#/$defs/witness"
+///    },
+///    "witnessState": {
+///      "$ref": "#/$defs/witnessState"
 ///    }
 ///  },
 ///  "additionalProperties": false
@@ -539,6 +542,12 @@ pub struct Body {
     #[serde(rename = "treeRoot")]
     pub tree_root: BodyTreeRoot,
     pub witness: Witness,
+    #[serde(
+        rename = "witnessState",
+        default,
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub witness_state: ::std::option::Option<WitnessState>,
 }
 impl ::std::convert::From<&Body> for Body {
     fn from(value: &Body) -> Self {
@@ -27781,6 +27790,91 @@ impl<'de> ::serde::Deserialize<'de> for WitnessRoot {
             .map_err(|e: self::error::ConversionError| {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
+    }
+}
+///W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.",
+///  "oneOf": [
+///    {
+///      "type": "object",
+///      "required": [
+///        "kind"
+///      ],
+///      "properties": {
+///        "kind": {
+///          "type": "string",
+///          "const": "pending"
+///        }
+///      },
+///      "additionalProperties": false
+///    },
+///    {
+///      "type": "object",
+///      "required": [
+///        "kind",
+///        "observed_at",
+///        "receipt"
+///      ],
+///      "properties": {
+///        "kind": {
+///          "type": "string",
+///          "const": "witnessed"
+///        },
+///        "observed_at": {
+///          "type": "integer"
+///        },
+///        "receipt": {
+///          "type": "object"
+///        }
+///      },
+///      "additionalProperties": false
+///    },
+///    {
+///      "type": "object",
+///      "required": [
+///        "error",
+///        "kind",
+///        "last_verified"
+///      ],
+///      "properties": {
+///        "error": {
+///          "type": "string"
+///        },
+///        "kind": {
+///          "type": "string",
+///          "const": "stale"
+///        },
+///        "last_verified": {
+///          "type": "integer"
+///        }
+///      },
+///      "additionalProperties": false
+///    }
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+#[serde(tag = "kind", deny_unknown_fields)]
+pub enum WitnessState {
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "witnessed")]
+    Witnessed {
+        observed_at: i64,
+        receipt: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+    },
+    #[serde(rename = "stale")]
+    Stale { error: ::std::string::String, last_verified: i64 },
+}
+impl ::std::convert::From<&Self> for WitnessState {
+    fn from(value: &WitnessState) -> Self {
+        value.clone()
     }
 }
 ///`WitnessWitnessId`
