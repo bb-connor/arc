@@ -245,9 +245,11 @@ impl OpenApiMcpBridge {
             let url = format!("{}{}", self.config.base_url, binding.path);
             // HttpEgressContract: gate the dispatcher invocation on the typed
             // egress contract. The bridge stays transport-agnostic, so we
-            // validate URL only; the dispatcher implementation is responsible
-            // for redirect and response-size enforcement on the underlying
-            // transport.
+            // validate URL pre-flight, then enforce the response-byte ceiling
+            // post-dispatch via `enforce_attempt`. The dispatcher remains
+            // responsible for redirect handling on the underlying transport;
+            // an oversized body returned by the dispatcher is denied here
+            // before reaching the caller.
             if let Some(contract) = self.config.egress_contract.as_ref() {
                 contract.enforce_url(&url, 0).map_err(|err| {
                     BridgeError::UpstreamError(format!(
@@ -256,6 +258,18 @@ impl OpenApiMcpBridge {
                 })?;
             }
             let response = dispatcher(&binding.method, &url, &arguments)?;
+            if let Some(contract) = self.config.egress_contract.as_ref() {
+                let body_bytes = serde_json::to_vec(&response.body)
+                    .map(|bytes| bytes.len() as u64)
+                    .unwrap_or(0);
+                contract
+                    .enforce_attempt(&url, 0, Some(body_bytes))
+                    .map_err(|err| {
+                        BridgeError::UpstreamError(format!(
+                            "HttpEgressContract rejects bridge response: {err}"
+                        ))
+                    })?;
+            }
             Ok(json!({
                 "content": [{
                     "type": "text",
@@ -351,8 +365,9 @@ impl OwnedBridgeToolServer {
 
         if let Some(dispatcher) = &self.dispatcher {
             let url = format!("{}{}", self.config.base_url, binding.path);
-            // HttpEgressContract: gate the dispatcher invocation on the typed
-            // egress contract before the dispatcher receives the URL.
+            // HttpEgressContract: validate URL pre-flight and enforce the
+            // response-byte ceiling post-dispatch via `enforce_attempt` so
+            // oversized responses are denied before reaching the caller.
             if let Some(contract) = self.config.egress_contract.as_ref() {
                 contract.enforce_url(&url, 0).map_err(|err| {
                     BridgeError::UpstreamError(format!(
@@ -361,6 +376,18 @@ impl OwnedBridgeToolServer {
                 })?;
             }
             let response = dispatcher(&binding.method, &url, &arguments)?;
+            if let Some(contract) = self.config.egress_contract.as_ref() {
+                let body_bytes = serde_json::to_vec(&response.body)
+                    .map(|bytes| bytes.len() as u64)
+                    .unwrap_or(0);
+                contract
+                    .enforce_attempt(&url, 0, Some(body_bytes))
+                    .map_err(|err| {
+                        BridgeError::UpstreamError(format!(
+                            "HttpEgressContract rejects bridge response: {err}"
+                        ))
+                    })?;
+            }
             Ok(json!({
                 "content": [{
                     "type": "text",

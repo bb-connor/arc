@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use chio_egress_contract::HttpEgressContract;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 use crate::PriceOracleError;
@@ -263,6 +265,11 @@ pub struct PriceOracleConfig {
     pub pyth: PythNetworkConfig,
     pub pairs: Vec<PairConfig>,
     pub operator: OperatorConfig,
+    /// Typed HTTP egress contract that gates every outbound oracle dispatch
+    /// (Chainlink RPC reads, Pyth Hermes fetches, sequencer uptime probes).
+    /// Required in production; the `*_default` constructors derive a contract
+    /// scoped to the configured Pyth and chain RPC authorities.
+    pub egress_contract: HttpEgressContract,
 }
 
 impl PriceOracleConfig {
@@ -338,24 +345,28 @@ impl PriceOracleConfig {
                 policy: PairPolicy::volatile_default(),
             },
         ];
+        let pyth = PythNetworkConfig {
+            hermes_url: "https://hermes.pyth.network".to_string(),
+        };
+        let chains = vec![
+            ChainlinkNetworkConfig::base_mainnet(base_rpc_endpoint),
+            ChainlinkNetworkConfig::arbitrum_one(arbitrum_rpc_endpoint),
+        ];
+        let egress_contract = build_default_egress_contract(&pyth, &chains);
         Self {
             primary: OracleBackendKind::Chainlink,
             fallback: Some(OracleBackendKind::Pyth),
             refresh_interval_seconds: DEFAULT_REFRESH_INTERVAL_SECONDS,
-            pyth: PythNetworkConfig {
-                hermes_url: "https://hermes.pyth.network".to_string(),
-            },
+            pyth,
             operator: OperatorConfig {
                 global_pause: false,
                 pause_reason: None,
-                chains: vec![
-                    ChainlinkNetworkConfig::base_mainnet(base_rpc_endpoint),
-                    ChainlinkNetworkConfig::arbitrum_one(arbitrum_rpc_endpoint),
-                ],
+                chains,
                 pair_overrides: pairs.iter().map(PairRuntimeOverride::from_pair).collect(),
                 monitoring: MonitoringConfig::default(),
             },
             pairs,
+            egress_contract,
         }
     }
 
@@ -507,6 +518,50 @@ impl PriceOracleConfig {
         let mut pairs = self.pairs.iter().map(PairConfig::pair).collect::<Vec<_>>();
         pairs.sort();
         pairs
+    }
+}
+
+/// Build a default `HttpEgressContract` whose authority allow-list spans
+/// the configured Pyth Hermes URL and every chain RPC endpoint. This
+/// keeps production wiring fail-closed: dispatches to any other host are
+/// rejected by the typed contract before bytes leave the substrate.
+#[must_use]
+pub fn build_default_egress_contract(
+    pyth: &PythNetworkConfig,
+    chains: &[ChainlinkNetworkConfig],
+) -> HttpEgressContract {
+    let mut allowed_schemes = BTreeSet::new();
+    let mut allowed_authority_set = BTreeSet::new();
+    for url in std::iter::once(pyth.hermes_url.as_str())
+        .chain(chains.iter().map(|chain| chain.rpc_endpoint.as_str()))
+    {
+        if let Ok(parsed) = Url::parse(url) {
+            allowed_schemes.insert(parsed.scheme().to_ascii_lowercase());
+            if let Some(host) = parsed.host_str() {
+                let authority = match parsed.port() {
+                    Some(port) => format!("{}:{port}", host.to_ascii_lowercase()),
+                    None => host.to_ascii_lowercase(),
+                };
+                allowed_authority_set.insert(authority);
+            }
+        }
+    }
+    if allowed_schemes.is_empty() {
+        allowed_schemes.insert("https".to_string());
+    }
+    if allowed_authority_set.is_empty() {
+        // Fail-closed sentinel that the production validator rejects.
+        allowed_authority_set.insert("invalid.localhost".to_string());
+    }
+    HttpEgressContract {
+        tenant_egress_namespace: "chio-link".to_string(),
+        allowed_schemes,
+        allowed_authority_set,
+        deny_loopback: true,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 1,
+        max_response_bytes: 1 << 22,
     }
 }
 

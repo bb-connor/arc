@@ -465,7 +465,7 @@ impl ChioLinkOracle {
             };
         }
 
-        match read_sequencer_status(chain, now).await {
+        match read_sequencer_status(chain, now, &self.config.egress_contract).await {
             Ok(Some(status)) => {
                 let (health, note) = match status.availability {
                     SequencerAvailability::Up => (ChainHealthStatus::Healthy, None),
@@ -701,7 +701,9 @@ impl ChioLinkOracle {
             });
         }
 
-        if let Some(status) = read_sequencer_status(chain, now).await? {
+        if let Some(status) =
+            read_sequencer_status(chain, now, &self.config.egress_contract).await?
+        {
             match status.availability {
                 SequencerAvailability::Up => {}
                 SequencerAvailability::Down => {
@@ -803,7 +805,10 @@ fn build_backend(
         OracleBackendKind::Chainlink => {
             #[cfg(feature = "web3")]
             {
-                Arc::new(ChainlinkFeedReader::new(config.operator.chains.clone()))
+                Arc::new(ChainlinkFeedReader::new(
+                    config.operator.chains.clone(),
+                    config.egress_contract.clone(),
+                ))
             }
             #[cfg(not(feature = "web3"))]
             {
@@ -813,7 +818,10 @@ fn build_backend(
                 ));
             }
         }
-        OracleBackendKind::Pyth => Arc::new(PythHermesClient::new(config.pyth.hermes_url.clone())?),
+        OracleBackendKind::Pyth => Arc::new(PythHermesClient::new(
+            config.pyth.hermes_url.clone(),
+            config.egress_contract.clone(),
+        )?),
     };
     Ok(backend)
 }

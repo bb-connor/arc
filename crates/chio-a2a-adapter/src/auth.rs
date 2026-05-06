@@ -113,6 +113,72 @@ fn enforce_egress_contract(
     Ok(())
 }
 
+/// Manually drive a ureq request and validate every redirect target via
+/// the typed `HttpEgressContract`. The closure returns a fresh ureq
+/// `Response` for each URL hop; when the response is a 3xx, we extract
+/// the `Location` header, run it through the contract, and re-issue the
+/// request against the redirect target. This stops an attacker who
+/// controls an A2A endpoint from redirecting our dispatch into an
+/// internal address that the initial pre-flight check did not see.
+///
+/// `redirects(0)` on the agent means ureq returns 3xx responses directly
+/// rather than following them. When no contract is wired, redirect
+/// handling falls back to ureq's default behavior via the agent
+/// configuration in `build_agent`.
+fn dispatch_with_redirect_validation<F>(
+    initial_url: &str,
+    transport_config: &A2aTransportConfig,
+    mut send: F,
+) -> Result<ureq::Response, AdapterError>
+where
+    F: FnMut(&str) -> Result<ureq::Response, ureq::Error>,
+{
+    let Some(contract) = transport_config.egress_contract.as_ref() else {
+        return send(initial_url).map_err(map_ureq_error);
+    };
+    let max_chain = contract.max_redirect_chain;
+    let mut current_url = initial_url.to_string();
+    let mut chain_len: u8 = 0;
+    loop {
+        let response = match send(&current_url) {
+            Ok(response) => response,
+            Err(ureq::Error::Status(status, response)) if (300..400).contains(&status) => response,
+            Err(error) => return Err(map_ureq_error(error)),
+        };
+        let status = response.status();
+        if !(300..400).contains(&status) {
+            return Ok(response);
+        }
+        let Some(location) = response.header("Location") else {
+            return Ok(response);
+        };
+        if chain_len >= max_chain {
+            return Err(AdapterError::InvalidUrl(format!(
+                "HttpEgressContract redirect limit exceeded ({max_chain}) following A2A redirect from {current_url}"
+            )));
+        }
+        chain_len = chain_len.saturating_add(1);
+        let next_url = match Url::parse(location) {
+            Ok(absolute) => absolute,
+            Err(_) => Url::parse(&current_url)
+                .and_then(|base| base.join(location))
+                .map_err(|error| {
+                    AdapterError::InvalidUrl(format!(
+                        "invalid A2A redirect target `{location}`: {error}"
+                    ))
+                })?,
+        };
+        contract
+            .enforce_attempt(next_url.as_str(), chain_len, None)
+            .map_err(|err| {
+                AdapterError::InvalidUrl(format!(
+                    "HttpEgressContract rejects A2A redirect target: {err}"
+                ))
+            })?;
+        current_url = next_url.into();
+    }
+}
+
 fn fetch_json<T: for<'de> Deserialize<'de>>(
     url: &Url,
     request_auth: &A2aResolvedRequestAuth,
@@ -122,11 +188,17 @@ fn fetch_json<T: for<'de> Deserialize<'de>>(
     let agent = build_agent(timeout, transport_config, request_auth.tls_mode)?;
     let request_url = apply_request_auth_url(url.clone(), request_auth);
     enforce_egress_contract(transport_config, request_url.as_str())?;
-    let request = agent
-        .get(request_url.as_str())
-        .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
-    let request = apply_request_auth(request, request_auth);
-    let response = request.call().map_err(map_ureq_error)?;
+    let response = dispatch_with_redirect_validation(
+        request_url.as_str(),
+        transport_config,
+        |target| {
+            let request = agent
+                .get(target)
+                .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
+            let request = apply_request_auth(request, request_auth);
+            request.call()
+        },
+    )?;
     response.into_json().map_err(|error| {
         AdapterError::Protocol(format!(
             "failed to decode A2A JSON from {}: {error}",
@@ -144,11 +216,17 @@ fn delete_empty(
     let agent = build_agent(timeout, transport_config, request_auth.tls_mode)?;
     let request_url = apply_request_auth_url(url.clone(), request_auth);
     enforce_egress_contract(transport_config, request_url.as_str())?;
-    let request = agent
-        .delete(request_url.as_str())
-        .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
-    let request = apply_request_auth(request, request_auth);
-    request.call().map_err(map_ureq_error)?;
+    dispatch_with_redirect_validation(
+        request_url.as_str(),
+        transport_config,
+        |target| {
+            let request = agent
+                .delete(target)
+                .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
+            let request = apply_request_auth(request, request_auth);
+            request.call()
+        },
+    )?;
     Ok(())
 }
 
@@ -165,12 +243,18 @@ where
     let agent = build_agent(timeout, transport_config, request_auth.tls_mode)?;
     let request_url = apply_request_auth_url(url.clone(), request_auth);
     enforce_egress_contract(transport_config, request_url.as_str())?;
-    let request = agent
-        .get(request_url.as_str())
-        .set("Accept", SSE_CONTENT_TYPE)
-        .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
-    let request = apply_request_auth(request, request_auth);
-    let response = request.call().map_err(map_ureq_error)?;
+    let response = dispatch_with_redirect_validation(
+        request_url.as_str(),
+        transport_config,
+        |target| {
+            let request = agent
+                .get(target)
+                .set("Accept", SSE_CONTENT_TYPE)
+                .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
+            let request = apply_request_auth(request, request_auth);
+            request.call()
+        },
+    )?;
     let content_type = response.header("Content-Type").unwrap_or_default();
     if !content_type.to_ascii_lowercase().contains(SSE_CONTENT_TYPE) {
         return Err(AdapterError::Protocol(format!(
@@ -193,17 +277,23 @@ fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
         request_auth,
     );
     enforce_egress_contract(transport_config, request_url.as_str())?;
-    let request = agent
-        .post(request_url.as_str())
-        .set("Content-Type", "application/json")
-        .set("Accept", "application/json")
-        .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
-    let request = apply_request_auth(request, request_auth);
-    let response = request.send_json(serde_json::to_value(body).map_err(|error| {
+    let body_value = serde_json::to_value(body).map_err(|error| {
         AdapterError::Protocol(format!("failed to serialize A2A request: {error}"))
-    })?);
+    })?;
+    let response = dispatch_with_redirect_validation(
+        request_url.as_str(),
+        transport_config,
+        |target| {
+            let request = agent
+                .post(target)
+                .set("Content-Type", "application/json")
+                .set("Accept", "application/json")
+                .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
+            let request = apply_request_auth(request, request_auth);
+            request.send_json(body_value.clone())
+        },
+    )?;
     response
-        .map_err(map_ureq_error)?
         .into_json()
         .map_err(|error| AdapterError::Protocol(format!("failed to decode A2A response: {error}")))
 }
@@ -218,21 +308,24 @@ fn post_form_json<T: for<'de> Deserialize<'de>>(
 ) -> Result<T, AdapterError> {
     let agent = build_agent(timeout, transport_config, tls_mode)?;
     enforce_egress_contract(transport_config, url.as_str())?;
-    let request = agent
-        .post(url.as_str())
-        .set("Content-Type", "application/x-www-form-urlencoded")
-        .set("Accept", "application/json");
-    let request = apply_request_headers(request, request_headers);
-    request
-        .send_string(body)
-        .map_err(map_ureq_error)?
-        .into_json()
-        .map_err(|error| {
-            AdapterError::Protocol(format!(
-                "failed to decode OAuth token response from {}: {error}",
-                url
-            ))
-        })
+    let response = dispatch_with_redirect_validation(
+        url.as_str(),
+        transport_config,
+        |target| {
+            let request = agent
+                .post(target)
+                .set("Content-Type", "application/x-www-form-urlencoded")
+                .set("Accept", "application/json");
+            let request = apply_request_headers(request, request_headers);
+            request.send_string(body)
+        },
+    )?;
+    response.into_json().map_err(|error| {
+        AdapterError::Protocol(format!(
+            "failed to decode OAuth token response from {}: {error}",
+            url
+        ))
+    })
 }
 
 fn post_sse_json<T: Serialize, F>(
@@ -252,16 +345,22 @@ where
         request_auth,
     );
     enforce_egress_contract(transport_config, request_url.as_str())?;
-    let request = agent
-        .post(request_url.as_str())
-        .set("Content-Type", "application/json")
-        .set("Accept", SSE_CONTENT_TYPE)
-        .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
-    let request = apply_request_auth(request, request_auth);
-    let response = request.send_json(serde_json::to_value(body).map_err(|error| {
+    let body_value = serde_json::to_value(body).map_err(|error| {
         AdapterError::Protocol(format!("failed to serialize A2A request: {error}"))
-    })?);
-    let response = response.map_err(map_ureq_error)?;
+    })?;
+    let response = dispatch_with_redirect_validation(
+        request_url.as_str(),
+        transport_config,
+        |target| {
+            let request = agent
+                .post(target)
+                .set("Content-Type", "application/json")
+                .set("Accept", SSE_CONTENT_TYPE)
+                .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
+            let request = apply_request_auth(request, request_auth);
+            request.send_json(body_value.clone())
+        },
+    )?;
     let content_type = response.header("Content-Type").unwrap_or_default();
     if !content_type.to_ascii_lowercase().contains(SSE_CONTENT_TYPE) {
         return Err(AdapterError::Protocol(format!(
@@ -378,7 +477,13 @@ fn build_agent(
     transport_config: &A2aTransportConfig,
     tls_mode: A2aTlsMode,
 ) -> Result<ureq::Agent, AdapterError> {
-    let builder = ureq::AgentBuilder::new().timeout(timeout);
+    let mut builder = ureq::AgentBuilder::new().timeout(timeout);
+    // HttpEgressContract: when a contract is wired, suppress ureq's
+    // built-in redirect follow so `dispatch_with_redirect_validation`
+    // can validate every hop through the contract before re-issuing.
+    if transport_config.egress_contract.is_some() {
+        builder = builder.redirects(0);
+    }
     let builder = match tls_mode {
         A2aTlsMode::Default => match transport_config.default_tls_config.as_ref() {
             Some(tls_config) => builder.tls_config(Arc::clone(tls_config)),

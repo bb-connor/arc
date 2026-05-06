@@ -2778,6 +2778,7 @@ name = "chio-conformance"
 version = "0.1.0"
 dependencies = [
  "base64ct",
+ "chio-a2a-adapter",
  "chio-adversarial-suite",
  "chio-core-types",
  "chio-custody-hw",
@@ -2789,6 +2790,7 @@ dependencies = [
  "chio-kernel-browser",
  "chio-kernel-core",
  "chio-link",
+ "chio-mcp-remote",
  "chio-openapi-mcp-bridge",
  "chio-siem",
  "chio-weights",
@@ -2804,6 +2806,7 @@ dependencies = [
  "tiny_http",
  "tokio",
  "toml 0.8.23",
+ "url",
  "zeroize",
 ]
 

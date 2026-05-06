@@ -23,30 +23,30 @@ sol! {
 
 pub struct ChainlinkFeedReader {
     networks: Vec<ChainlinkNetworkConfig>,
-    egress_contract: Option<HttpEgressContract>,
+    egress_contract: HttpEgressContract,
 }
 
 impl ChainlinkFeedReader {
+    /// Construct a [`ChainlinkFeedReader`] that enforces the supplied
+    /// [`HttpEgressContract`] on every RPC endpoint URL before any HTTP
+    /// connect through `alloy`. The contract is required: the typed
+    /// egress gate is the only thing standing between substrate
+    /// dispatches and unconstrained RPC URLs.
     #[must_use]
-    pub fn new(networks: Vec<ChainlinkNetworkConfig>) -> Self {
+    pub fn new(networks: Vec<ChainlinkNetworkConfig>, egress_contract: HttpEgressContract) -> Self {
         Self {
             networks,
-            egress_contract: None,
+            egress_contract,
         }
     }
 
-    /// Construct a [`ChainlinkFeedReader`] that enforces the supplied
-    /// [`HttpEgressContract`] on every RPC endpoint URL before any HTTP
-    /// connect through `alloy`. Production callers must use this constructor.
+    /// Backwards-compatible alias for [`ChainlinkFeedReader::new`].
     #[must_use]
     pub fn with_contract(
         networks: Vec<ChainlinkNetworkConfig>,
         egress_contract: HttpEgressContract,
     ) -> Self {
-        Self {
-            networks,
-            egress_contract: Some(egress_contract),
-        }
+        Self::new(networks, egress_contract)
     }
 
     fn network_for_pair(
@@ -83,15 +83,15 @@ impl OracleBackend for ChainlinkFeedReader {
             let network = self.network_for_pair(pair)?;
             // HttpEgressContract: validate the RPC endpoint URL through the
             // typed egress contract before alloy opens an HTTP connection.
-            if let Some(contract) = self.egress_contract.as_ref() {
-                contract
-                    .enforce_url(&network.rpc_endpoint, 0)
-                    .map_err(|err| {
-                        PriceOracleError::InvalidConfiguration(format!(
-                            "HttpEgressContract rejects Chainlink RPC endpoint: {err}"
-                        ))
-                    })?;
-            }
+            // The contract is non-optional in production paths; bypass is
+            // not possible without recompiling.
+            self.egress_contract
+                .enforce_url(&network.rpc_endpoint, 0)
+                .map_err(|err| {
+                    PriceOracleError::InvalidConfiguration(format!(
+                        "HttpEgressContract rejects Chainlink RPC endpoint: {err}"
+                    ))
+                })?;
             read_chainlink_rate(&network.rpc_endpoint, pair, feed, now).await
         })
     }
@@ -253,7 +253,10 @@ mod tests {
 
     #[test]
     fn rejects_pairs_without_a_configured_network() {
-        let reader = ChainlinkFeedReader::new(vec![base_network("https://rpc.example")]);
+        let reader = ChainlinkFeedReader::new(
+            vec![base_network("https://rpc.example")],
+            chio_egress_contract::HttpEgressContract::permissive_for_tests("rpc.example"),
+        );
         let mut pair = pair_with_chainlink("0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70");
         pair.chain_id = 1;
 
@@ -288,7 +291,10 @@ mod tests {
 
     #[tokio::test]
     async fn backend_rejects_pairs_without_chainlink_feeds() {
-        let reader = ChainlinkFeedReader::new(vec![base_network("https://rpc.example")]);
+        let reader = ChainlinkFeedReader::new(
+            vec![base_network("https://rpc.example")],
+            chio_egress_contract::HttpEgressContract::permissive_for_tests("rpc.example"),
+        );
         let pair = PairConfig {
             base: "ETH".to_string(),
             quote: "USD".to_string(),

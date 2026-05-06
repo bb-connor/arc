@@ -936,10 +936,42 @@ fn derive_oidc_discovery_url_from_issuer(issuer: &str) -> Result<Url, CliError> 
     Ok(discovery)
 }
 
+/// Test-friendly entry point that runs the typed `HttpEgressContract`
+/// gate against an OIDC discovery or JWKS URL using the same code path
+/// as production OIDC discovery. Returns `Ok(())` when the URL passes
+/// the contract; surfaces a `CliError` when it is denied. This lets
+/// negative-conformance tests assert that loopback / link-local targets
+/// are rejected before a TCP connect is attempted.
+pub fn enforce_oidc_egress_contract(
+    url: &Url,
+    egress_contract: &HttpEgressContract,
+) -> Result<(), CliError> {
+    egress_contract
+        .enforce_url(url.as_str(), 0)
+        .map(|_| ())
+        .map_err(|err| {
+            CliError::cli_other_error(format!(
+                "HttpEgressContract rejects OIDC fetch `{url}`: {err}"
+            ))
+        })
+}
+
 fn fetch_identity_provider_json<T: DeserializeOwned>(
     url: &Url,
     field_name: &str,
+    egress_contract: Option<&HttpEgressContract>,
 ) -> Result<T, CliError> {
+    // HttpEgressContract: gate every OIDC discovery and JWKS fetch through
+    // the typed contract. The remote MCP runtime shares the same outbound
+    // egress posture as the rest of the substrate; without the contract
+    // these fetches would bypass the SSRF gate entirely.
+    if let Some(contract) = egress_contract {
+        contract.enforce_url(url.as_str(), 0).map_err(|err| {
+            CliError::cli_other_error(format!(
+                "HttpEgressContract rejects {field_name} `{url}`: {err}"
+            ))
+        })?;
+    }
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS))
         .build();
@@ -972,8 +1004,13 @@ fn resolve_identity_provider_discovery_url(
     Ok(None)
 }
 
-fn resolve_jwks_key_set(jwks_uri: &Url, field_name: &str) -> Result<JwtJwksKeySet, CliError> {
-    let document: JwksDocument = fetch_identity_provider_json(jwks_uri, field_name)?;
+fn resolve_jwks_key_set(
+    jwks_uri: &Url,
+    field_name: &str,
+    egress_contract: Option<&HttpEgressContract>,
+) -> Result<JwtJwksKeySet, CliError> {
+    let document: JwksDocument =
+        fetch_identity_provider_json(jwks_uri, field_name, egress_contract)?;
     let mut keys_by_kid = HashMap::new();
     let mut anonymous_keys = Vec::new();
     for key in document.keys {
@@ -1122,8 +1159,12 @@ fn resolve_discovered_identity_provider(
     let Some(discovery_url) = resolve_identity_provider_discovery_url(config)? else {
         return Ok(None);
     };
-    let document: OidcDiscoveryDocument =
-        fetch_identity_provider_json(&discovery_url, "--auth-jwt-discovery-url")?;
+    let egress_contract = config.egress_contract.as_ref();
+    let document: OidcDiscoveryDocument = fetch_identity_provider_json(
+        &discovery_url,
+        "--auth-jwt-discovery-url",
+        egress_contract,
+    )?;
     let issuer_url = parse_identity_provider_url(&document.issuer, "discovered OIDC issuer")?;
     let issuer = canonicalize_federated_issuer(issuer_url.as_str());
     if let Some(expected_issuer) = config.auth_jwt_issuer.as_deref() {
@@ -1154,7 +1195,11 @@ fn resolve_discovered_identity_provider(
                     .to_string(),
             )
         })?;
-        Some(resolve_jwks_key_set(jwks_uri, "discovered OIDC jwks_uri")?)
+        Some(resolve_jwks_key_set(
+            jwks_uri,
+            "discovered OIDC jwks_uri",
+            egress_contract,
+        )?)
     } else {
         None
     };

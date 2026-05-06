@@ -507,9 +507,11 @@ fn splunk_hec_accepts_https_endpoint() {
         sourcetype: "chio:receipt".to_string(),
         index: None,
         host: None,
-        egress_contract: Some(chio_egress_contract::HttpEgressContract::permissive_for_tests(
-            "splunk.example.com:8088",
-        )),
+        egress_contract: Some(
+            chio_egress_contract::HttpEgressContract::permissive_for_tests(
+                "splunk.example.com:8088",
+            ),
+        ),
         ..SplunkConfig::default()
     };
     // Construction should succeed; no network call is made here.

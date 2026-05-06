@@ -45,7 +45,7 @@ fn pyth_contract_rejects_ipv6_ula_target() {
     // client carries the contract through its dispatch layer.
     let _client = PythHermesClient::with_contract(
         "http://[fc00::1]".to_string(),
-        Some(strict_contract_excluding_ula()),
+        strict_contract_excluding_ula(),
     )
     .expect("hermes client builds even with disallowed base url");
 }

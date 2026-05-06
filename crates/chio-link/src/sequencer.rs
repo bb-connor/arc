@@ -36,33 +36,26 @@ pub struct SequencerStatus {
     pub availability: SequencerAvailability,
 }
 
+/// Read the L2 sequencer-uptime status while enforcing the supplied
+/// [`HttpEgressContract`] on the chain RPC endpoint URL before any HTTP
+/// connect. The contract is required: production paths must thread the
+/// tenant-scoped contract through this entry point so SSRF gates apply
+/// uniformly.
 pub async fn read_sequencer_status(
     chain: &ChainlinkNetworkConfig,
     now: u64,
-) -> Result<Option<SequencerStatus>, PriceOracleError> {
-    read_sequencer_status_with_contract(chain, now, None).await
-}
-
-/// Variant of [`read_sequencer_status`] that enforces the supplied
-/// [`HttpEgressContract`] on the chain RPC endpoint URL before any HTTP
-/// connect. Production callers must use this entry point.
-pub async fn read_sequencer_status_with_contract(
-    chain: &ChainlinkNetworkConfig,
-    now: u64,
-    egress_contract: Option<&HttpEgressContract>,
+    egress_contract: &HttpEgressContract,
 ) -> Result<Option<SequencerStatus>, PriceOracleError> {
     let Some(feed_address) = chain.sequencer_uptime_feed.as_ref() else {
         return Ok(None);
     };
-    if let Some(contract) = egress_contract {
-        contract
-            .enforce_url(&chain.rpc_endpoint, 0)
-            .map_err(|err| {
-                PriceOracleError::InvalidConfiguration(format!(
-                    "HttpEgressContract rejects sequencer RPC endpoint: {err}"
-                ))
-            })?;
-    }
+    egress_contract
+        .enforce_url(&chain.rpc_endpoint, 0)
+        .map_err(|err| {
+            PriceOracleError::InvalidConfiguration(format!(
+                "HttpEgressContract rejects sequencer RPC endpoint: {err}"
+            ))
+        })?;
     let url = chain.rpc_endpoint.parse::<Url>().map_err(|err| {
         PriceOracleError::InvalidConfiguration(format!(
             "invalid RPC endpoint {} for chain {}: {err}",
@@ -137,11 +130,19 @@ mod tests {
         }
     }
 
+    fn permissive_contract() -> HttpEgressContract {
+        HttpEgressContract::permissive_for_tests("rpc.example")
+    }
+
     #[tokio::test]
     async fn returns_none_when_no_sequencer_feed_is_configured() {
-        let result = read_sequencer_status(&base_chain("https://rpc.example", None), 1_743_292_780)
-            .await
-            .test_unwrap("no feed configured");
+        let result = read_sequencer_status(
+            &base_chain("https://rpc.example", None),
+            1_743_292_780,
+            &permissive_contract(),
+        )
+        .await
+        .test_unwrap("no feed configured");
 
         assert_eq!(result, None);
     }
@@ -154,6 +155,7 @@ mod tests {
                 Some("0xFdB631F5EE196F0ed6FAa767959853A9F217697D"),
             ),
             1_743_292_780,
+            &permissive_contract(),
         )
         .await
         .test_unwrap_err("invalid rpc endpoint");
@@ -166,6 +168,7 @@ mod tests {
         let error = read_sequencer_status(
             &base_chain("https://rpc.example", Some("not-an-address")),
             1_743_292_780,
+            &permissive_contract(),
         )
         .await
         .test_unwrap_err("invalid sequencer feed");

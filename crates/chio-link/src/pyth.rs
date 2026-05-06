@@ -9,21 +9,18 @@ use crate::{ExchangeRate, OracleBackend, OracleBackendKind, OracleFuture, PriceO
 pub struct PythHermesClient {
     base_url: String,
     http_client: Client,
-    egress_contract: Option<HttpEgressContract>,
+    egress_contract: HttpEgressContract,
 }
 
 impl PythHermesClient {
-    pub fn new(base_url: impl Into<String>) -> Result<Self, PriceOracleError> {
-        Self::with_contract(base_url, None)
-    }
-
-    /// Construct a [`PythHermesClient`] with an optional
-    /// [`HttpEgressContract`]. When supplied, every Hermes dispatch routes
-    /// through `send_with_contract` so the URL, every redirect target, and
-    /// the response body size are validated by the contract.
-    pub fn with_contract(
+    /// Construct a [`PythHermesClient`] bound to a typed
+    /// [`HttpEgressContract`]. The contract is required: every Hermes
+    /// dispatch routes through `send_with_contract` so the URL, every
+    /// redirect target, and the response body size are validated before
+    /// bytes leave the substrate.
+    pub fn new(
         base_url: impl Into<String>,
-        egress_contract: Option<HttpEgressContract>,
+        egress_contract: HttpEgressContract,
     ) -> Result<Self, PriceOracleError> {
         let base_url = base_url.into();
         let http_client = Client::builder().build().map_err(|err| {
@@ -34,6 +31,17 @@ impl PythHermesClient {
             http_client,
             egress_contract,
         })
+    }
+
+    /// Backwards-compatible alias for [`PythHermesClient::new`]. The
+    /// contract is required in production paths; tests that need a
+    /// permissive contract should use
+    /// [`HttpEgressContract::permissive_for_tests`].
+    pub fn with_contract(
+        base_url: impl Into<String>,
+        egress_contract: HttpEgressContract,
+    ) -> Result<Self, PriceOracleError> {
+        Self::new(base_url, egress_contract)
     }
 }
 
@@ -57,7 +65,7 @@ impl OracleBackend for PythHermesClient {
                 pair,
                 feed,
                 now,
-                self.egress_contract.as_ref(),
+                &self.egress_contract,
             )
             .await
         })
@@ -70,34 +78,25 @@ async fn read_pyth_rate(
     pair: &PairConfig,
     feed: &PythFeedConfig,
     now: u64,
-    egress_contract: Option<&HttpEgressContract>,
+    egress_contract: &HttpEgressContract,
 ) -> Result<ExchangeRate, PriceOracleError> {
     let url = build_latest_price_url(base_url, &feed.id)?;
     // HttpEgressContract: route every Hermes dispatch through
     // send_with_contract so the URL, redirect chain, and response size are
-    // validated by the typed egress contract.
-    let response = if let Some(contract) = egress_contract {
-        let request = http_client.get(url).build().map_err(|err| {
-            PriceOracleError::Unavailable(format!("building Hermes request failed: {err}"))
-        })?;
-        send_with_contract(contract, http_client, request)
-            .await
-            .map_err(|err| {
-                PriceOracleError::Unavailable(format!(
-                    "Hermes request rejected by HttpEgressContract for {} id {}: {err}",
-                    pair.pair(),
-                    feed.id
-                ))
-            })?
-    } else {
-        http_client.get(url).send().await.map_err(|err| {
+    // validated by the typed egress contract before bytes leave the
+    // substrate.
+    let request = http_client.get(url).build().map_err(|err| {
+        PriceOracleError::Unavailable(format!("building Hermes request failed: {err}"))
+    })?;
+    let response = send_with_contract(egress_contract, http_client, request)
+        .await
+        .map_err(|err| {
             PriceOracleError::Unavailable(format!(
-                "Hermes request failed for {} id {}: {err}",
+                "Hermes request rejected by HttpEgressContract for {} id {}: {err}",
                 pair.pair(),
                 feed.id
             ))
-        })?
-    };
+        })?;
     let status = response.status();
     if !status.is_success() {
         return Err(PriceOracleError::Unavailable(format!(
@@ -386,7 +385,10 @@ mod tests {
 
     #[tokio::test]
     async fn backend_rejects_pairs_without_pyth_feeds() {
-        let backend = PythHermesClient::new("https://hermes.pyth.network").test_unwrap("client");
+        let contract =
+            chio_egress_contract::HttpEgressContract::permissive_for_tests("hermes.pyth.network");
+        let backend =
+            PythHermesClient::new("https://hermes.pyth.network", contract).test_unwrap("client");
         let pair = PairConfig {
             base: "ETH".to_string(),
             quote: "USD".to_string(),
