@@ -677,6 +677,8 @@ pub mod wasm {
             token,
             trusted_issuers_hex,
             clock_override_unix_secs: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
         };
         let clock = BrowserClock::new();
         let verified = verify_capability_pure(request, &clock).map_err(|err| to_js_error(&err))?;
@@ -868,6 +870,8 @@ mod tests {
             token: capability,
             trusted_issuers_hex: std::vec![other.public_key().to_hex()],
             clock_override_unix_secs: Some(ISSUED_AT + 1),
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
         };
         let clock = FixedClock::new(ISSUED_AT + 1);
 
