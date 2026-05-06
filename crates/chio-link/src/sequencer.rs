@@ -1,6 +1,7 @@
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use alloy_sol_types::sol;
+use chio_egress_contract::HttpEgressContract;
 use reqwest::Url;
 
 use crate::config::ChainlinkNetworkConfig;
@@ -39,9 +40,29 @@ pub async fn read_sequencer_status(
     chain: &ChainlinkNetworkConfig,
     now: u64,
 ) -> Result<Option<SequencerStatus>, PriceOracleError> {
+    read_sequencer_status_with_contract(chain, now, None).await
+}
+
+/// Variant of [`read_sequencer_status`] that enforces the supplied
+/// [`HttpEgressContract`] on the chain RPC endpoint URL before any HTTP
+/// connect. Production callers must use this entry point.
+pub async fn read_sequencer_status_with_contract(
+    chain: &ChainlinkNetworkConfig,
+    now: u64,
+    egress_contract: Option<&HttpEgressContract>,
+) -> Result<Option<SequencerStatus>, PriceOracleError> {
     let Some(feed_address) = chain.sequencer_uptime_feed.as_ref() else {
         return Ok(None);
     };
+    if let Some(contract) = egress_contract {
+        contract
+            .enforce_url(&chain.rpc_endpoint, 0)
+            .map_err(|err| {
+                PriceOracleError::InvalidConfiguration(format!(
+                    "HttpEgressContract rejects sequencer RPC endpoint: {err}"
+                ))
+            })?;
+    }
     let url = chain.rpc_endpoint.parse::<Url>().map_err(|err| {
         PriceOracleError::InvalidConfiguration(format!(
             "invalid RPC endpoint {} for chain {}: {err}",

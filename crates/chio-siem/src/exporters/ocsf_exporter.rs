@@ -25,6 +25,7 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::ocsf::receipt_to_ocsf;
 use crate::redaction::redact_for_operator_log;
+use chio_egress_contract::{send_with_contract, HttpEgressContract};
 
 const DEFAULT_OCSF_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -58,6 +59,9 @@ pub struct OcsfExporterConfig {
     pub content_type: Option<String>,
     /// HTTP request timeout.
     pub timeout: Duration,
+    /// Typed HTTP egress contract enforced before every dispatch and on
+    /// every redirect hop. Required when `endpoint` is non-empty.
+    pub egress_contract: Option<HttpEgressContract>,
 }
 
 impl Default for OcsfExporterConfig {
@@ -68,6 +72,7 @@ impl Default for OcsfExporterConfig {
             payload_format: OcsfPayloadFormat::default(),
             content_type: None,
             timeout: DEFAULT_OCSF_TIMEOUT,
+            egress_contract: None,
         }
     }
 }
@@ -88,6 +93,19 @@ impl OcsfExporter {
     pub fn new(config: OcsfExporterConfig) -> Result<Self, ExportError> {
         Self::validate_endpoint_security(&config)?;
 
+        // HttpEgressContract: when endpoint is configured, OCSF dispatch
+        // must run through the typed egress contract.
+        if !config.endpoint.trim().is_empty() {
+            let contract = config.egress_contract.as_ref().ok_or_else(|| {
+                ExportError::HttpError(
+                    "OCSF exporter with endpoint requires an HttpEgressContract".to_string(),
+                )
+            })?;
+            contract.enforce_url(&config.endpoint, 0).map_err(|err| {
+                ExportError::HttpError(format!("HttpEgressContract rejects OCSF URL: {err}"))
+            })?;
+        }
+
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
             .build()
@@ -100,7 +118,18 @@ impl OcsfExporter {
     /// This constructor is intended for integration tests that run against a
     /// local mock server over plain HTTP. Do NOT use this in production code:
     /// it bypasses the HTTPS enforcement that protects receipt export.
-    pub fn new_plaintext_for_tests(config: OcsfExporterConfig) -> Result<Self, ExportError> {
+    pub fn new_plaintext_for_tests(mut config: OcsfExporterConfig) -> Result<Self, ExportError> {
+        if !config.endpoint.trim().is_empty() && config.egress_contract.is_none() {
+            let url = url::Url::parse(&config.endpoint).map_err(|e| {
+                ExportError::HttpError(format!("invalid OCSF endpoint for test contract: {e}"))
+            })?;
+            let host = url.host_str().unwrap_or("localhost");
+            let authority = match url.port() {
+                Some(port) => format!("{host}:{port}"),
+                None => host.to_string(),
+            };
+            config.egress_contract = Some(HttpEgressContract::permissive_for_tests(&authority));
+        }
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
             .build()
@@ -202,10 +231,21 @@ impl Exporter for OcsfExporter {
                 request = request.header("Authorization", format!("Bearer {token}"));
             }
 
-            let response = request
-                .send()
+            // HttpEgressContract: every dispatch routes through send_with_contract.
+            let contract = self.config.egress_contract.as_ref().ok_or_else(|| {
+                ExportError::HttpError(
+                    "OCSF exporter is missing HttpEgressContract; substrate fails closed"
+                        .to_string(),
+                )
+            })?;
+            let raw_request = request.build().map_err(|e| {
+                ExportError::HttpError(format!("failed to build OCSF request: {e}"))
+            })?;
+            let response = send_with_contract(contract, &self.client, raw_request)
                 .await
-                .map_err(|e| ExportError::HttpError(format!("OCSF sink request failed: {e}")))?;
+                .map_err(|err| {
+                    ExportError::HttpError(format!("OCSF sink request failed: {err}"))
+                })?;
 
             let status = response.status();
             if !status.is_success() {

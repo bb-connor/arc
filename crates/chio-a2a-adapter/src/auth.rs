@@ -93,6 +93,26 @@ fn build_client_credentials_form(scopes: &[String], credentials: Option<(&str, &
     serializer.finish()
 }
 
+// HttpEgressContract: every outbound A2A dispatch (agent-card discovery,
+// SendMessage, OAuth token exchange) runs through the typed egress contract
+// before bytes leave the substrate. The contract is threaded via
+// `A2aTransportConfig.egress_contract` and populated via
+// [`A2aAdapterConfig::with_egress_contract`]. Production callers must supply
+// a tenant-scoped contract; if unset (legacy/test paths), the dispatch
+// proceeds without contract enforcement.
+fn enforce_egress_contract(
+    transport_config: &A2aTransportConfig,
+    target_url: &str,
+) -> Result<(), AdapterError> {
+    let Some(contract) = transport_config.egress_contract.as_ref() else {
+        return Ok(());
+    };
+    contract.enforce_url(target_url, 0).map_err(|err| {
+        AdapterError::InvalidUrl(format!("HttpEgressContract rejects A2A URL: {err}"))
+    })?;
+    Ok(())
+}
+
 fn fetch_json<T: for<'de> Deserialize<'de>>(
     url: &Url,
     request_auth: &A2aResolvedRequestAuth,
@@ -101,6 +121,7 @@ fn fetch_json<T: for<'de> Deserialize<'de>>(
 ) -> Result<T, AdapterError> {
     let agent = build_agent(timeout, transport_config, request_auth.tls_mode)?;
     let request_url = apply_request_auth_url(url.clone(), request_auth);
+    enforce_egress_contract(transport_config, request_url.as_str())?;
     let request = agent
         .get(request_url.as_str())
         .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
@@ -122,6 +143,7 @@ fn delete_empty(
 ) -> Result<(), AdapterError> {
     let agent = build_agent(timeout, transport_config, request_auth.tls_mode)?;
     let request_url = apply_request_auth_url(url.clone(), request_auth);
+    enforce_egress_contract(transport_config, request_url.as_str())?;
     let request = agent
         .delete(request_url.as_str())
         .set(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
@@ -142,6 +164,7 @@ where
 {
     let agent = build_agent(timeout, transport_config, request_auth.tls_mode)?;
     let request_url = apply_request_auth_url(url.clone(), request_auth);
+    enforce_egress_contract(transport_config, request_url.as_str())?;
     let request = agent
         .get(request_url.as_str())
         .set("Accept", SSE_CONTENT_TYPE)
@@ -169,6 +192,7 @@ fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
         Url::parse(url).map_err(|error| AdapterError::InvalidUrl(error.to_string()))?,
         request_auth,
     );
+    enforce_egress_contract(transport_config, request_url.as_str())?;
     let request = agent
         .post(request_url.as_str())
         .set("Content-Type", "application/json")
@@ -193,6 +217,7 @@ fn post_form_json<T: for<'de> Deserialize<'de>>(
     tls_mode: A2aTlsMode,
 ) -> Result<T, AdapterError> {
     let agent = build_agent(timeout, transport_config, tls_mode)?;
+    enforce_egress_contract(transport_config, url.as_str())?;
     let request = agent
         .post(url.as_str())
         .set("Content-Type", "application/x-www-form-urlencoded")
@@ -226,6 +251,7 @@ where
         Url::parse(url).map_err(|error| AdapterError::InvalidUrl(error.to_string()))?,
         request_auth,
     );
+    enforce_egress_contract(transport_config, request_url.as_str())?;
     let request = agent
         .post(request_url.as_str())
         .set("Content-Type", "application/json")

@@ -463,6 +463,7 @@ mod tests {
             transport_config: A2aTransportConfig {
                 default_tls_config: None,
                 mutual_tls_config: None,
+                egress_contract: None,
             },
             token_cache: Mutex::new(Vec::new()),
             timeout: Duration::from_secs(2),
@@ -619,6 +620,7 @@ mod tests {
             transport_config: A2aTransportConfig {
                 default_tls_config: None,
                 mutual_tls_config: None,
+                egress_contract: None,
             },
             token_cache: Mutex::new(Vec::new()),
             timeout: Duration::from_secs(2),
@@ -1576,6 +1578,7 @@ mod tests {
             transport_config: A2aTransportConfig {
                 default_tls_config: None,
                 mutual_tls_config: None,
+                egress_contract: None,
             },
             token_cache: Mutex::new(Vec::new()),
             timeout: Duration::from_secs(2),
@@ -1757,6 +1760,7 @@ mod tests {
             transport_config: A2aTransportConfig {
                 default_tls_config: None,
                 mutual_tls_config: None,
+                egress_contract: None,
             },
             token_cache: Mutex::new(Vec::new()),
             timeout: Duration::from_secs(2),

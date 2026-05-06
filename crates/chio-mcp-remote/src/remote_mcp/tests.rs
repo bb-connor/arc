@@ -166,6 +166,7 @@ mod tests {
             enterprise_provider_registry: None,
             sender_dpop_nonce_store,
             sender_dpop_config,
+            egress_contract: None,
         }
     }
 
@@ -243,6 +244,8 @@ mod tests {
             shared_hosted_owner: false,
             wrapped_command: "python3".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
+            egress_contract: None,
+
         }
     }
 
@@ -1454,6 +1457,8 @@ mod tests {
             shared_hosted_owner: false,
             wrapped_command: "python3".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
+            egress_contract: None,
+
         };
 
         let discovery_url = resolve_identity_provider_discovery_url(&config)
@@ -1535,6 +1540,8 @@ mod tests {
             shared_hosted_owner: false,
             wrapped_command: "python3".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
+            egress_contract: None,
+
         };
 
         let error = build_remote_auth_state(&config, "127.0.0.1:0".parse().unwrap(), None, None)

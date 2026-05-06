@@ -45,6 +45,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use chio_egress_contract::HttpEgressContract;
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
 use reqwest::Client as HttpClient;
@@ -174,6 +175,11 @@ pub struct RemoteServeHttpConfig {
     pub shared_hosted_owner: bool,
     pub wrapped_command: String,
     pub wrapped_args: Vec<String>,
+    /// Typed HTTP egress contract that gates outbound HTTP from the remote
+    /// MCP runtime (most prominently the OAuth introspection endpoint).
+    /// Production deployments must populate this; absence falls back to
+    /// substrate fail-closed at dispatch.
+    pub egress_contract: Option<HttpEgressContract>,
 }
 
 #[derive(Clone)]
@@ -594,6 +600,12 @@ struct IntrospectionBearerVerifier {
     enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     sender_dpop_nonce_store: Arc<DpopNonceStore>,
     sender_dpop_config: DpopConfig,
+    /// Typed HTTP egress contract that gates every introspection-endpoint
+    /// dispatch. Production deployments must populate this; without a
+    /// contract the verifier substrate will fail closed if introspection is
+    /// invoked.
+    #[allow(dead_code)]
+    egress_contract: Option<HttpEgressContract>,
 }
 
 #[derive(Clone)]

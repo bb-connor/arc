@@ -107,6 +107,16 @@ chrono = { workspace = true, features = ["clock"] }
 # vectors and assert each of the six initial threat IDs is backed
 # by at least one non-pending DENY-asserted case.
 chio-adversarial-suite = { version = "0.1.0", path = "../chio-adversarial-suite" }
+# W2.2: SSRF negative-conformance tests exercise typed HttpEgressContract
+# enforcement through real production callers (chio-siem WebhookExporter,
+# chio-siem SplunkHecExporter, chio-siem DatadogExporter, chio-link
+# PythHermesClient, chio-openapi-mcp-bridge OpenApiMcpBridge).
+chio-egress-contract = { version = "0.1.0", path = "../chio-egress-contract" }
+chio-siem = { version = "0.1.0", path = "../chio-siem" }
+chio-link = { version = "0.1.0", path = "../chio-link" }
+chio-openapi-mcp-bridge = { version = "0.1.0", path = "../chio-openapi-mcp-bridge" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+zeroize = "1"
 
 [lints.clippy]
 unwrap_used = "deny"

@@ -9,6 +9,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
 use chio_core::sha256_hex;
+use chio_egress_contract::HttpEgressContract;
 use chio_kernel::{
     KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream, ToolServerConnection,
     ToolServerStreamResult,

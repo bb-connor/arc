@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 
+use chio_egress_contract::HttpEgressContract;
 use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
 use chio_manifest::ToolManifest;
 use chio_mcp_edge::McpToolInfo;
@@ -75,6 +76,11 @@ pub struct BridgeConfig {
     pub public_key: String,
     /// Base URL for the upstream HTTP API.
     pub base_url: String,
+    /// Typed HTTP egress contract that gates every dispatcher invocation.
+    /// Enforced at `invoke_tool` time before the dispatcher receives the URL.
+    /// Production callers must populate this field; `None` falls back to
+    /// substrate-default fail-closed behavior at dispatch time.
+    pub egress_contract: Option<HttpEgressContract>,
 }
 
 /// An HTTP method and path pair identifying an API route.
@@ -237,6 +243,18 @@ impl OpenApiMcpBridge {
 
         if let Some(dispatcher) = &self.dispatcher {
             let url = format!("{}{}", self.config.base_url, binding.path);
+            // HttpEgressContract: gate the dispatcher invocation on the typed
+            // egress contract. The bridge stays transport-agnostic, so we
+            // validate URL only; the dispatcher implementation is responsible
+            // for redirect and response-size enforcement on the underlying
+            // transport.
+            if let Some(contract) = self.config.egress_contract.as_ref() {
+                contract.enforce_url(&url, 0).map_err(|err| {
+                    BridgeError::UpstreamError(format!(
+                        "HttpEgressContract rejects bridge URL: {err}"
+                    ))
+                })?;
+            }
             let response = dispatcher(&binding.method, &url, &arguments)?;
             Ok(json!({
                 "content": [{
@@ -333,6 +351,15 @@ impl OwnedBridgeToolServer {
 
         if let Some(dispatcher) = &self.dispatcher {
             let url = format!("{}{}", self.config.base_url, binding.path);
+            // HttpEgressContract: gate the dispatcher invocation on the typed
+            // egress contract before the dispatcher receives the URL.
+            if let Some(contract) = self.config.egress_contract.as_ref() {
+                contract.enforce_url(&url, 0).map_err(|err| {
+                    BridgeError::UpstreamError(format!(
+                        "HttpEgressContract rejects bridge URL: {err}"
+                    ))
+                })?;
+            }
             let response = dispatcher(&binding.method, &url, &arguments)?;
             Ok(json!({
                 "content": [{
@@ -492,6 +519,7 @@ mod tests {
             server_version: "1.0.0".to_string(),
             public_key: "aabbccdd".to_string(),
             base_url: "https://api.example.com".to_string(),
+            egress_contract: None,
         }
     }
 

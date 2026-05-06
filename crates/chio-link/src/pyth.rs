@@ -1,3 +1,4 @@
+use chio_egress_contract::{send_with_contract, HttpEgressContract};
 use reqwest::{Client, Url};
 use serde::Deserialize;
 
@@ -8,10 +9,22 @@ use crate::{ExchangeRate, OracleBackend, OracleBackendKind, OracleFuture, PriceO
 pub struct PythHermesClient {
     base_url: String,
     http_client: Client,
+    egress_contract: Option<HttpEgressContract>,
 }
 
 impl PythHermesClient {
     pub fn new(base_url: impl Into<String>) -> Result<Self, PriceOracleError> {
+        Self::with_contract(base_url, None)
+    }
+
+    /// Construct a [`PythHermesClient`] with an optional
+    /// [`HttpEgressContract`]. When supplied, every Hermes dispatch routes
+    /// through `send_with_contract` so the URL, every redirect target, and
+    /// the response body size are validated by the contract.
+    pub fn with_contract(
+        base_url: impl Into<String>,
+        egress_contract: Option<HttpEgressContract>,
+    ) -> Result<Self, PriceOracleError> {
         let base_url = base_url.into();
         let http_client = Client::builder().build().map_err(|err| {
             PriceOracleError::Unavailable(format!("building Hermes client failed: {err}"))
@@ -19,6 +32,7 @@ impl PythHermesClient {
         Ok(Self {
             base_url,
             http_client,
+            egress_contract,
         })
     }
 }
@@ -37,7 +51,15 @@ impl OracleBackend for PythHermesClient {
                     base: pair.base.clone(),
                     quote: pair.quote.clone(),
                 })?;
-            read_pyth_rate(&self.http_client, &self.base_url, pair, feed, now).await
+            read_pyth_rate(
+                &self.http_client,
+                &self.base_url,
+                pair,
+                feed,
+                now,
+                self.egress_contract.as_ref(),
+            )
+            .await
         })
     }
 }
@@ -48,15 +70,34 @@ async fn read_pyth_rate(
     pair: &PairConfig,
     feed: &PythFeedConfig,
     now: u64,
+    egress_contract: Option<&HttpEgressContract>,
 ) -> Result<ExchangeRate, PriceOracleError> {
     let url = build_latest_price_url(base_url, &feed.id)?;
-    let response = http_client.get(url).send().await.map_err(|err| {
-        PriceOracleError::Unavailable(format!(
-            "Hermes request failed for {} id {}: {err}",
-            pair.pair(),
-            feed.id
-        ))
-    })?;
+    // HttpEgressContract: route every Hermes dispatch through
+    // send_with_contract so the URL, redirect chain, and response size are
+    // validated by the typed egress contract.
+    let response = if let Some(contract) = egress_contract {
+        let request = http_client.get(url).build().map_err(|err| {
+            PriceOracleError::Unavailable(format!("building Hermes request failed: {err}"))
+        })?;
+        send_with_contract(contract, http_client, request)
+            .await
+            .map_err(|err| {
+                PriceOracleError::Unavailable(format!(
+                    "Hermes request rejected by HttpEgressContract for {} id {}: {err}",
+                    pair.pair(),
+                    feed.id
+                ))
+            })?
+    } else {
+        http_client.get(url).send().await.map_err(|err| {
+            PriceOracleError::Unavailable(format!(
+                "Hermes request failed for {} id {}: {err}",
+                pair.pair(),
+                feed.id
+            ))
+        })?
+    };
     let status = response.status();
     if !status.is_success() {
         return Err(PriceOracleError::Unavailable(format!(

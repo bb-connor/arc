@@ -1599,6 +1599,22 @@ fn build_remote_auth_mode(
     }
 
     if let Some(introspection_url) = config.auth_introspection_url.as_deref() {
+        // HttpEgressContract: every introspection-endpoint dispatch must run
+        // through the typed egress contract. We thread the kernel-level
+        // contract here; without one the verifier substrate fails closed at
+        // dispatch time.
+        let parsed_introspection_url =
+            parse_identity_provider_url(introspection_url, "--auth-introspection-url")?;
+        let egress_contract = config.egress_contract.clone();
+        if let Some(contract) = egress_contract.as_ref() {
+            contract
+                .enforce_url(parsed_introspection_url.as_str(), 0)
+                .map_err(|err| {
+                    CliError::cli_other_error(format!(
+                        "HttpEgressContract rejects introspection URL: {err}"
+                    ))
+                })?;
+        }
         return Ok(RemoteAuthMode::IntrospectionBearer {
             verifier: Arc::new(IntrospectionBearerVerifier {
                 client: HttpClient::builder()
@@ -1609,10 +1625,7 @@ fn build_remote_auth_mode(
                             "failed to build token introspection client: {error}"
                         ))
                     })?,
-                introspection_url: parse_identity_provider_url(
-                    introspection_url,
-                    "--auth-introspection-url",
-                )?,
+                introspection_url: parsed_introspection_url,
                 client_id: config.auth_introspection_client_id.clone(),
                 client_secret: config.auth_introspection_client_secret.clone(),
                 issuer: config
@@ -1637,6 +1650,7 @@ fn build_remote_auth_mode(
                 enterprise_provider_registry: enterprise_provider_registry.clone(),
                 sender_dpop_nonce_store,
                 sender_dpop_config,
+                egress_contract,
             }),
         });
     }

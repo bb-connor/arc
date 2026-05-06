@@ -47,6 +47,7 @@ use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::redaction::redact_for_operator_log;
 use chio_core::receipt::{ChioReceipt, Decision, GuardEvidence};
+use chio_egress_contract::{send_with_contract, HttpEgressContract};
 
 // -- Severity -----------------------------------------------------------------
 
@@ -203,6 +204,7 @@ pub struct PagerDutyBackend {
     routing_key: Zeroizing<String>,
     endpoint: String,
     client: reqwest::Client,
+    egress_contract: Option<HttpEgressContract>,
 }
 
 impl PagerDutyBackend {
@@ -224,6 +226,17 @@ impl PagerDutyBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(routing_key: String, endpoint: String) -> Result<Self, ExportError> {
+        Self::with_endpoint_and_contract(routing_key, endpoint, None)
+    }
+
+    /// Construct a PagerDuty backend with an optional [`HttpEgressContract`].
+    /// When `None`, dispatch fails closed; production callers must thread a
+    /// tenant-scoped contract through here.
+    pub fn with_endpoint_and_contract(
+        routing_key: String,
+        endpoint: String,
+        egress_contract: Option<HttpEgressContract>,
+    ) -> Result<Self, ExportError> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -232,10 +245,21 @@ impl PagerDutyBackend {
                     "failed to build PagerDuty HTTP client (timeout=30s): {e}"
                 ))
             })?;
+        // HttpEgressContract: when supplied, validate the configured endpoint
+        // up front so misconfiguration surfaces at construction.
+        if let Some(contract) = egress_contract.as_ref() {
+            let probe_url = format!("{}/v2/enqueue", endpoint.trim_end_matches('/'));
+            contract.enforce_url(&probe_url, 0).map_err(|err| {
+                ExportError::HttpError(format!(
+                    "HttpEgressContract rejects PagerDuty endpoint: {err}"
+                ))
+            })?;
+        }
         Ok(Self {
             routing_key: Zeroizing::new(routing_key),
             endpoint,
             client,
+            egress_contract,
         })
     }
 }
@@ -267,14 +291,27 @@ impl AlertBackend for PagerDutyBackend {
                 }
             });
 
-            let response = self
+            // HttpEgressContract: every dispatch routes through send_with_contract.
+            let contract = self.egress_contract.as_ref().ok_or_else(|| {
+                ExportError::HttpError(
+                    "PagerDuty backend is missing HttpEgressContract; substrate fails closed"
+                        .to_string(),
+                )
+            })?;
+            let raw_request = self
                 .client
                 .post(&url)
                 .header("Content-Type", "application/json")
                 .json(&payload)
-                .send()
+                .build()
+                .map_err(|e| {
+                    ExportError::HttpError(format!("failed to build PagerDuty request: {e}"))
+                })?;
+            let response = send_with_contract(contract, &self.client, raw_request)
                 .await
-                .map_err(|e| ExportError::HttpError(format!("PagerDuty request failed: {e}")))?;
+                .map_err(|err| {
+                    ExportError::HttpError(format!("PagerDuty request failed: {err}"))
+                })?;
 
             let status = response.status();
             if status.is_success() || status.as_u16() == 202 {
@@ -302,6 +339,7 @@ pub struct OpsGenieBackend {
     endpoint: String,
     client: reqwest::Client,
     tags: Vec<String>,
+    egress_contract: Option<HttpEgressContract>,
 }
 
 impl OpsGenieBackend {
@@ -323,6 +361,17 @@ impl OpsGenieBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(api_key: String, endpoint: String) -> Result<Self, ExportError> {
+        Self::with_endpoint_and_contract(api_key, endpoint, None)
+    }
+
+    /// Construct an OpsGenie backend with an optional [`HttpEgressContract`].
+    /// When `None`, dispatch fails closed; production callers must thread a
+    /// tenant-scoped contract through here.
+    pub fn with_endpoint_and_contract(
+        api_key: String,
+        endpoint: String,
+        egress_contract: Option<HttpEgressContract>,
+    ) -> Result<Self, ExportError> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -331,11 +380,20 @@ impl OpsGenieBackend {
                     "failed to build OpsGenie HTTP client (timeout=30s): {e}"
                 ))
             })?;
+        if let Some(contract) = egress_contract.as_ref() {
+            let probe_url = format!("{}/v2/alerts", endpoint.trim_end_matches('/'));
+            contract.enforce_url(&probe_url, 0).map_err(|err| {
+                ExportError::HttpError(format!(
+                    "HttpEgressContract rejects OpsGenie endpoint: {err}"
+                ))
+            })?;
+        }
         Ok(Self {
             api_key: Zeroizing::new(api_key),
             endpoint,
             client,
             tags: Vec::new(),
+            egress_contract,
         })
     }
 
@@ -374,7 +432,14 @@ impl AlertBackend for OpsGenieBackend {
                 "details": alert.receipt_json,
             });
 
-            let response = self
+            // HttpEgressContract: every dispatch routes through send_with_contract.
+            let contract = self.egress_contract.as_ref().ok_or_else(|| {
+                ExportError::HttpError(
+                    "OpsGenie backend is missing HttpEgressContract; substrate fails closed"
+                        .to_string(),
+                )
+            })?;
+            let raw_request = self
                 .client
                 .post(&url)
                 .header("Content-Type", "application/json")
@@ -383,9 +448,13 @@ impl AlertBackend for OpsGenieBackend {
                     format!("GenieKey {}", self.api_key.as_str()),
                 )
                 .json(&body)
-                .send()
+                .build()
+                .map_err(|e| {
+                    ExportError::HttpError(format!("failed to build OpsGenie request: {e}"))
+                })?;
+            let response = send_with_contract(contract, &self.client, raw_request)
                 .await
-                .map_err(|e| ExportError::HttpError(format!("OpsGenie request failed: {e}")))?;
+                .map_err(|err| ExportError::HttpError(format!("OpsGenie request failed: {err}")))?;
 
             let status = response.status();
             if status.is_success() || status.as_u16() == 202 {

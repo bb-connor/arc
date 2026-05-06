@@ -624,6 +624,7 @@ fn cmd_mcp_serve_http(
         shared_hosted_owner,
         wrapped_command: wrapped_cmd.clone(),
         wrapped_args: wrapped_args.to_vec(),
+        egress_contract: None,
     })
 }
 

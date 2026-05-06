@@ -22,6 +22,7 @@ web3 = [
 
 [dependencies]
 chio-core = { path = "../chio-core" }
+chio-egress-contract = { path = "../chio-egress-contract", features = ["reqwest-egress"] }
 alloy-contract = { version = "1.8.3", default-features = false, optional = true }
 alloy-primitives = { version = "1.5.7", default-features = false, features = ["std"], optional = true }
 alloy-provider = { version = "1.8.3", default-features = false, features = ["reqwest", "reqwest-rustls-tls"], optional = true }

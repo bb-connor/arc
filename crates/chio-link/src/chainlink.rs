@@ -1,6 +1,7 @@
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use alloy_sol_types::sol;
+use chio_egress_contract::HttpEgressContract;
 use reqwest::Url;
 
 use crate::config::{ChainlinkFeedConfig, ChainlinkNetworkConfig, PairConfig};
@@ -22,12 +23,30 @@ sol! {
 
 pub struct ChainlinkFeedReader {
     networks: Vec<ChainlinkNetworkConfig>,
+    egress_contract: Option<HttpEgressContract>,
 }
 
 impl ChainlinkFeedReader {
     #[must_use]
     pub fn new(networks: Vec<ChainlinkNetworkConfig>) -> Self {
-        Self { networks }
+        Self {
+            networks,
+            egress_contract: None,
+        }
+    }
+
+    /// Construct a [`ChainlinkFeedReader`] that enforces the supplied
+    /// [`HttpEgressContract`] on every RPC endpoint URL before any HTTP
+    /// connect through `alloy`. Production callers must use this constructor.
+    #[must_use]
+    pub fn with_contract(
+        networks: Vec<ChainlinkNetworkConfig>,
+        egress_contract: HttpEgressContract,
+    ) -> Self {
+        Self {
+            networks,
+            egress_contract: Some(egress_contract),
+        }
     }
 
     fn network_for_pair(
@@ -62,6 +81,17 @@ impl OracleBackend for ChainlinkFeedReader {
                         quote: pair.quote.clone(),
                     })?;
             let network = self.network_for_pair(pair)?;
+            // HttpEgressContract: validate the RPC endpoint URL through the
+            // typed egress contract before alloy opens an HTTP connection.
+            if let Some(contract) = self.egress_contract.as_ref() {
+                contract
+                    .enforce_url(&network.rpc_endpoint, 0)
+                    .map_err(|err| {
+                        PriceOracleError::InvalidConfiguration(format!(
+                            "HttpEgressContract rejects Chainlink RPC endpoint: {err}"
+                        ))
+                    })?;
+            }
             read_chainlink_rate(&network.rpc_endpoint, pair, feed, now).await
         })
     }
