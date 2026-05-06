@@ -3,7 +3,11 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
+<<<<<<< HEAD
 // Schema SHA: 30de931de1f17bd8605ca6f46fcafedb47fb596be748a54c6cf1fd24379b1580
+=======
+// Schema SHA: 904380d542bd424c37b3fdbb97584f602133593a68fa378d3536d7ef645d9a6f
+>>>>>>> 41493c3a3 (fix(spec): make schema field optional in v1 token schema)
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -399,7 +403,7 @@ export namespace Capability_TokenV1 {
     /**
      * Signed-artifact schema ID. Legacy wire tokens that omitted this field are interpreted as chio.capability.v1 by compatibility verifiers, but newly issued tokens carry it in the schema-aware signing input.
      */
-    schema: "chio.capability.v1";
+    schema?: "chio.capability.v1";
     /**
      * Unique token ID (UUIDv7 recommended), used for revocation.
      */
