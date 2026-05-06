@@ -103,7 +103,7 @@ theorem chain_binding_admits_honest_direct_issue
 theorem chain_binding_rejects_inflated_parent_scope_direct_issue
     (scopeX scopeBigger childHash : ScopeHash)
     (witness : Bool)
-    (h_distinct : scopeX <> scopeBigger) :
+    (h_distinct : scopeX ≠ scopeBigger) :
     chainBindingCheck
       { proof := { parentScopeHash := scopeBigger
                  , childScopeHash := childHash
@@ -173,7 +173,7 @@ theorem witness_soundness
     | some lastHash =>
       simp [h_scope] at h_admit
       by_cases h_eq : token.proof.parentScopeHash = lastHash
-      · exact <lastHash, h_scope, h_eq>
+      · exact ⟨lastHash, h_scope, h_eq⟩
       · simp [h_eq] at h_admit
 
 end Chio.Proofs.AttenuationWitness
