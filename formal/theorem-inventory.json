@@ -751,10 +751,10 @@
     },
     {
       "id": "theorem.receipt.body_hash_input_set_pinned",
-      "leanName": "Chio.Proofs.Receipt.body_hash_input_set_pinned",
+      "leanName": "Chio.Proofs.body_hash_input_set_pinned",
       "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
-      "rootImported": false,
+      "rootImported": true,
       "claimClass": "bounded_model",
       "status": "assumed",
       "mapsTo": ["P4"],
