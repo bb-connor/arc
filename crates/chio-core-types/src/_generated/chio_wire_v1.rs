@@ -5363,7 +5363,6 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityTokenSubject {
 ///    "id",
 ///    "issued_at",
 ///    "issuer",
-///    "schema",
 ///    "scope",
 ///    "signature",
 ///    "subject"
@@ -5446,7 +5445,8 @@ pub struct ChioCapabilityTokenV1 {
     ///Public key of the Capability Authority (or delegating agent) that issued this token. Bare 64-char lowercase hex for Ed25519, or `p256:<130-char hex>` / `p384:<194-char hex>` for FIPS algorithms (uncompressed SEC1 encoding).
     pub issuer: ChioCapabilityTokenV1Issuer,
     ///Signed-artifact schema ID. Legacy wire tokens that omitted this field are interpreted as chio.capability.v1 by compatibility verifiers, but newly issued tokens carry it in the schema-aware signing input.
-    pub schema: ::std::string::String,
+    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+    pub schema: ::std::option::Option<::std::string::String>,
     pub scope: ChioScope,
     ///Hex-encoded signature over the canonical JSON of the token body. Bare 128-char hex for Ed25519, or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
     pub signature: ChioCapabilityTokenV1Signature,
