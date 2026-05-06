@@ -71,6 +71,15 @@
       "introduced_by": "trajectory-4/T1.2",
       "promoted_by": "trajectory-4/wave-1.5",
       "depends_on": []
+    },
+    {
+      "id": "theorem.receipt.body_hash_input_set_pinned",
+      "kind": "lean",
+      "status": "assumed",
+      "statement": "For any chio.receipt.v2 body B, the set of fields contributing to body_hash is exactly fields(B) \\\\ {body_hash, signature, receipt_id}. The Lean proof regenerates from the JSON schema; any drift fails the proof. W2.1 hot-path extension: the kernel mints `ChioReceiptV2` whose `body_hash` field equals H(canonical_jcs(ReceiptV2BodyHashInput)) at production mint time, and the replay store keys on body_hash exclusively (the legacy UUIDv7 alias is non-authoritative).",
+      "introduced_by": "trajectory-4/T1.2",
+      "promoted_by": "trajectory-4/W2.1",
+      "depends_on": []
     }
   ],
   "trj4_proposed_theorems": [
@@ -81,14 +90,6 @@
       "statement": "If child.is_subset_of(parent) holds, then compute_attenuation_witness(parent, child) returns Ok with a witness w such that verify_attenuation_witness(H(canonical(parent)), H(canonical(child)), w) returns Ok.",
       "introduced_by": "trajectory-4/T1.1",
       "depends_on": ["theorem.attenuation.witness_soundness"]
-    },
-    {
-      "id": "theorem.receipt.body_hash_input_set_pinned",
-      "kind": "lean",
-      "status": "proposed",
-      "statement": "For any chio.receipt.v2 body B, the set of fields contributing to body_hash is exactly fields(B) \\\\ {body_hash, signature, receipt_id}. The Lean proof regenerates from the JSON schema; any drift fails the proof.",
-      "introduced_by": "trajectory-4/T1.2",
-      "depends_on": []
     },
     {
       "id": "theorem.receipt.body_hash_collision_resistance",

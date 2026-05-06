@@ -1093,6 +1093,65 @@ pub struct ChioKernel {
     /// because the lock is held only for the duration of one
     /// `try_admit_child` call inside the verifier.
     budget_registry: Mutex<chio_kernel_core::InMemoryBudgetRegistry>,
+    /// W2.1 receipt-version default. When `true`, the kernel mints a
+    /// `ChioReceiptV2` body_hash-addressed receipt alongside the v1
+    /// receipt that callers continue to receive in the `ToolCallResponse`.
+    /// The legacy UUIDv7 alias on the v2 receipt is set to the v1
+    /// receipt's id; replay identity is exclusively `body_hash`.
+    ///
+    /// Defaults to `true` so a freshly-constructed kernel that has not
+    /// yet observed peer feature bitsets still mints v2 receipts.
+    /// Operators that need the previous v1-only behavior call
+    /// [`ChioKernel::set_receipt_v2_default`] with `false`.
+    kernel_receipt_v2_default: AtomicBool,
+    /// W2.1 in-memory v2 replay set keyed exclusively on `body_hash`.
+    /// The legacy UUIDv7 alias is non-authoritative and never consulted
+    /// by `insert`. Wrapped in `Mutex` because the type is small and
+    /// contention is bounded by the receipt mint rate; persistent
+    /// stores additionally enforce uniqueness on the `body_hash`
+    /// column.
+    receipt_v2_replay: Mutex<chio_core::receipt::ReceiptV2ReplaySet>,
+    /// W2.1 monotonic counter that supplies the `dag_ordinal` field on
+    /// every minted v2 receipt. Initialized at zero on kernel start;
+    /// rotation across kernel restarts is fine because the v2 chain_id
+    /// is the federation kernel id, which uniquely scopes ordinals.
+    receipt_v2_dag_ordinal: AtomicU64,
+}
+
+/// W2.1 per-session receipt-version selector populated from the
+/// negotiation handshake at receipt-mint time. The kernel branches on
+/// this value when constructing a receipt: `V1Legacy` mints only the
+/// existing v1 UUIDv7 receipt while `V2BodyHash` additionally mints a
+/// signed `ChioReceiptV2` and persists it in the v2 replay store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelReceiptVersion {
+    /// Peer is v1-only or no negotiation profile is in scope: emit
+    /// only the legacy UUIDv7 receipt.
+    V1Legacy,
+    /// Peer advertises `ACCEPTS_RECEIPT_V2`: emit a body_hash-addressed
+    /// `ChioReceiptV2` alongside the v1 fallback.
+    V2BodyHash,
+}
+
+impl KernelReceiptVersion {
+    /// Whether the v2 (body_hash-addressed) receipt should be minted
+    /// for this session.
+    #[must_use]
+    pub fn mints_v2(self) -> bool {
+        matches!(self, Self::V2BodyHash)
+    }
+
+    /// Resolve from a [`chio_core::capability::CapabilityNegotiation`]
+    /// peer profile. The peer-advertised `ACCEPTS_RECEIPT_V2` feature
+    /// flag selects v2; absence selects v1 fallback.
+    #[must_use]
+    pub fn from_capabilities(capabilities: &chio_core::capability::CapabilityNegotiation) -> Self {
+        if capabilities.supports(chio_core::capability::capability_features::ACCEPTS_RECEIPT_V2) {
+            Self::V2BodyHash
+        } else {
+            Self::V1Legacy
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -1475,7 +1534,136 @@ impl ChioKernel {
             settlement_observer: None,
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
+            kernel_receipt_v2_default: AtomicBool::new(true),
+            receipt_v2_replay: Mutex::new(chio_core::receipt::ReceiptV2ReplaySet::default()),
+            receipt_v2_dag_ordinal: AtomicU64::new(0),
         }
+    }
+
+    /// W2.1: configure whether this kernel defaults to minting
+    /// body_hash-addressed v2 receipts when no per-session peer profile
+    /// is in scope. Tests and v1-only deployments can flip this off so
+    /// the kernel falls back to UUIDv7-only minting.
+    pub fn set_receipt_v2_default(&self, accepts_v2: bool) {
+        self.kernel_receipt_v2_default
+            .store(accepts_v2, Ordering::SeqCst);
+    }
+
+    /// W2.1: read the kernel-level receipt-version default.
+    #[must_use]
+    pub fn receipt_v2_default(&self) -> bool {
+        self.kernel_receipt_v2_default.load(Ordering::SeqCst)
+    }
+
+    /// W2.1: resolve the [`KernelReceiptVersion`] for a request.
+    ///
+    /// The resolution order is:
+    /// 1. If a federated peer is named on the request, the peer's
+    ///    negotiated `accepts_receipt_v2` feature flag wins.
+    /// 2. Otherwise, the kernel-level default
+    ///    (`kernel_receipt_v2_default`) supplies the answer.
+    pub fn kernel_receipt_version_for_remote(
+        &self,
+        remote_kernel_id: Option<&str>,
+        now: u64,
+    ) -> KernelReceiptVersion {
+        if let Some(remote) = remote_kernel_id {
+            if let Some(peer) = self.federation_peer(remote, now) {
+                return KernelReceiptVersion::from_capabilities(&peer.capabilities);
+            }
+            // Named peer that isn't pinned fresh: fall back to v1 with
+            // a warning log so operators see the negotiation downgrade.
+            tracing::warn!(
+                target: "chio_kernel.receipt_v2",
+                remote_kernel_id = remote,
+                "v2 receipt minting falling back to v1 because federation peer is not pinned fresh"
+            );
+            return KernelReceiptVersion::V1Legacy;
+        }
+        if self.receipt_v2_default() {
+            KernelReceiptVersion::V2BodyHash
+        } else {
+            KernelReceiptVersion::V1Legacy
+        }
+    }
+
+    /// W2.1: probe the in-memory v2 replay set for a body_hash. The
+    /// persistent store may also contain the body_hash; both are
+    /// consulted by [`ChioKernel::record_chio_receipt_v2`] before a
+    /// new v2 receipt is admitted.
+    pub fn contains_chio_receipt_v2_body_hash(&self, body_hash: &str) -> bool {
+        match self.receipt_v2_replay.lock() {
+            Ok(replay) => replay.contains_body_hash(body_hash),
+            Err(poisoned) => poisoned.into_inner().contains_body_hash(body_hash),
+        }
+    }
+
+    /// W2.1: snapshot a v2 receipt body_hash for tooling lookups
+    /// (returns true if present in either the in-memory replay set or
+    /// the persistent store). Replay-rejection in the mint path uses
+    /// [`Self::record_chio_receipt_v2`] which performs the
+    /// fail-closed insert.
+    pub fn chio_receipt_v2_seen(&self, body_hash: &str) -> Result<bool, KernelError> {
+        if self.contains_chio_receipt_v2_body_hash(body_hash) {
+            return Ok(true);
+        }
+        if let Some(found) = self.with_receipt_store(|store| {
+            store
+                .contains_chio_receipt_v2_body_hash(body_hash)
+                .map_err(|error| {
+                    KernelError::Internal(format!("v2 receipt store probe failed: {error}"))
+                })
+        })? {
+            return Ok(found);
+        }
+        Ok(false)
+    }
+
+    /// W2.1: record a v2 receipt fail-closed.
+    ///
+    /// Inserts into the in-memory replay set first; replay rejection
+    /// short-circuits the persistent write so a tampered alias on a
+    /// previously-seen body_hash cannot resurface as a fresh receipt.
+    /// The legacy UUIDv7 alias is forwarded to the persistent store
+    /// for tooling lookups but is non-authoritative for replay.
+    pub fn record_chio_receipt_v2(
+        &self,
+        receipt: &chio_core::receipt::ChioReceiptV2,
+        legacy_receipt_id_alias: Option<&str>,
+    ) -> Result<(), KernelError> {
+        let inserted = {
+            let mut replay = match self.receipt_v2_replay.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            replay
+                .insert(receipt)
+                .map_err(|error| KernelError::Internal(format!("v2 replay insert: {error}")))?
+        };
+        if !inserted {
+            return Err(KernelError::Internal(format!(
+                "receipt v2 replay rejected: body_hash {} already admitted",
+                receipt.body_hash
+            )));
+        }
+        // Persistent store mirror. Failure here is fatal (fail-closed)
+        // because the in-memory set has already admitted the body_hash;
+        // surfacing an error keeps the persistent and in-memory stores
+        // consistent on the next attempt.
+        let _ = self.with_receipt_store(|store| {
+            store
+                .append_chio_receipt_v2(receipt, legacy_receipt_id_alias)
+                .map_err(|error| {
+                    KernelError::Internal(format!("v2 receipt persistence failed: {error}"))
+                })
+        })?;
+        Ok(())
+    }
+
+    /// W2.1: monotonic dag_ordinal allocator. Increments on every
+    /// admitted v2 receipt minted by this kernel.
+    pub(crate) fn next_v2_dag_ordinal(&self) -> u64 {
+        self.receipt_v2_dag_ordinal.fetch_add(1, Ordering::SeqCst)
     }
 
     /// Install (or replace) the recursive-delegation oracle handle.
