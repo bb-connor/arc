@@ -19,6 +19,7 @@ mod evm;
 mod functions;
 mod ops;
 mod solana;
+mod witness;
 
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
@@ -37,6 +38,7 @@ pub use automation::{
     AnchorAutomationExecutionOutcome, AnchorAutomationForwarder, AnchorAutomationJob,
     AnchorAutomationTriggerKind, CHIO_ANCHOR_AUTOMATION_JOB_SCHEMA,
 };
+pub use batch::verify_anchor_batch_with_witness_policy;
 pub use batch::{
     build_anchor_batch, build_anchor_batch_body, verify_anchor_batch, AnchorBatch, AnchorBatchBody,
     AnchorBatchInclusion, AnchorBatchWitness, AnchorBatchWitnessKind,
@@ -81,6 +83,18 @@ pub use ops::{
 pub use solana::{
     prepare_solana_memo_publication, verify_solana_anchor, PreparedSolanaMemoPublication,
     SolanaMemoAnchorRecord, SOLANA_MEMO_PROGRAM_ID,
+};
+pub use witness::ots::{
+    build_ots_inclusion_proof, build_ots_inclusion_proof_b64,
+    build_ots_inclusion_proof_with_forged_digest, OtsClient,
+};
+pub use witness::rekor::{
+    build_rekor_entry_body_b64, build_rekor_entry_body_b64_with_hash, build_rekor_publish_response,
+    RekorClient,
+};
+pub use witness::{
+    batch_body_hash, evaluate_witness_policy, AnchorWitnessClient, AnchorWitnessError,
+    WitnessPolicy, WitnessPolicyError, WitnessReceipt, WitnessState,
 };
 
 #[derive(Debug, thiserror::Error)]

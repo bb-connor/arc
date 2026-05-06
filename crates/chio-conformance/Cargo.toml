@@ -107,6 +107,13 @@ chrono = { workspace = true, features = ["clock"] }
 # vectors and assert each of the six initial threat IDs is backed
 # by at least one non-pending DENY-asserted case.
 chio-adversarial-suite = { version = "0.1.0", path = "../chio-adversarial-suite" }
+# W2.3: anchor-batch witness-lane conformance tests exercise
+# AnchorWitnessClient (RekorClient + OtsClient) and the WitnessState
+# state machine via the chio-anchor crate. tokio drives the async
+# trait surface; tiny_http stages the mock Rekor server.
+chio-anchor = { version = "0.1.0", path = "../chio-anchor" }
+tokio = { workspace = true }
+async-trait = "0.1"
 
 [lints.clippy]
 unwrap_used = "deny"

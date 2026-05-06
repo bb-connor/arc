@@ -62,6 +62,9 @@
         "signerKey": {
           "type": "string",
           "minLength": 64
+        },
+        "witnessState": {
+          "$ref": "#/$defs/witnessState"
         }
       }
     },
@@ -106,6 +109,39 @@
           "minimum": 0
         }
       }
+    },
+    "witnessState": {
+      "description": "W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"type": "string", "const": "pending"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "receipt", "observed_at"],
+          "properties": {
+            "kind": {"type": "string", "const": "witnessed"},
+            "receipt": {"type": "object"},
+            "observed_at": {"type": "integer"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "last_verified", "error"],
+          "properties": {
+            "kind": {"type": "string", "const": "stale"},
+            "last_verified": {"type": "integer"},
+            "error": {"type": "string"}
+          }
+        }
+      ]
     }
   }
 }

@@ -2498,6 +2498,7 @@ dependencies = [
  "alloy-primitives 1.5.7",
  "alloy-sol-types 1.5.7",
  "arbitrary",
+ "async-trait",
  "base64 0.22.1",
  "chio-core",
  "chio-kernel",
@@ -2776,8 +2777,10 @@ dependencies = [
 name = "chio-conformance"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "base64ct",
  "chio-adversarial-suite",
+ "chio-anchor",
  "chio-core-types",
  "chio-custody-hw",
  "chio-guards",
@@ -2797,6 +2800,7 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 1.0.69",
  "tiny_http",
+ "tokio",
  "toml 0.8.23",
 ]
 

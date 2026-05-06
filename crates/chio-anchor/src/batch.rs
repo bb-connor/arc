@@ -5,6 +5,7 @@ use chio_core::signed_artifact::CHIO_ANCHOR_BATCH_V1_SCHEMA;
 use chio_core::{Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
+use crate::witness::{evaluate_witness_policy, WitnessPolicy, WitnessPolicyError, WitnessState};
 use crate::AnchorError;
 
 /// Public witness lane for an anchor batch root.
@@ -37,6 +38,12 @@ pub struct AnchorBatchInclusion {
 }
 
 /// Signed anchor-batch body. Per-receipt local signatures remain authoritative.
+///
+/// `witness_state` carries the lane lifecycle introduced by W2.3
+/// (`Pending` -> `Witnessed` -> `Stale`). The field defaults to
+/// [`WitnessState::Pending`] for older artifacts that pre-date the
+/// state machine, preserving wire compatibility for v1 batches that
+/// never went through a public-witness lane.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AnchorBatchBody {
@@ -47,6 +54,12 @@ pub struct AnchorBatchBody {
     pub witness: AnchorBatchWitness,
     pub issued_at: u64,
     pub signer_key: PublicKey,
+    #[serde(default, skip_serializing_if = "is_pending_witness_state")]
+    pub witness_state: WitnessState,
+}
+
+fn is_pending_witness_state(state: &WitnessState) -> bool {
+    matches!(state, WitnessState::Pending)
 }
 
 /// Signed anchor batch artifact.
@@ -126,6 +139,7 @@ pub fn build_anchor_batch_body(
         witness,
         issued_at,
         signer_key,
+        witness_state: WitnessState::Pending,
     })
 }
 
@@ -137,6 +151,26 @@ pub fn verify_anchor_batch(batch: &AnchorBatch) -> Result<(), AnchorError> {
         ));
     }
     Ok(())
+}
+
+/// Verify the batch and apply [`WitnessPolicy`] using `now` (UNIX
+/// seconds) as the wall clock.
+///
+/// Used by the conformance tests in
+/// `anchor_batch_stale_witness_fallback.rs` and by production
+/// verifiers that load a config-supplied policy.
+pub fn verify_anchor_batch_with_witness_policy(
+    batch: &AnchorBatch,
+    policy: &WitnessPolicy,
+    now: i64,
+) -> Result<(), AnchorError> {
+    verify_anchor_batch(batch)?;
+    evaluate_witness_policy(batch, &batch.body.witness_state, policy, now)
+        .map_err(witness_policy_to_anchor_error)
+}
+
+fn witness_policy_to_anchor_error(error: WitnessPolicyError) -> AnchorError {
+    AnchorError::Verification(format!("witness policy violation: {error}"))
 }
 
 fn validate_anchor_batch_body(body: &AnchorBatchBody) -> Result<(), AnchorError> {
