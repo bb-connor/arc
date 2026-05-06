@@ -1335,12 +1335,12 @@
     {
       "id": "close-bar-#11",
       "title": "HttpEgressContract enforced on every kernel/guard/adapter outbound HTTP path; SSRF negative conformance tests pass",
-      "bucket": "NONE",
-      "wired_runtime_path": "n",
-      "negative_conformance_test": "NONE",
-      "theorem_status": "n-a",
+      "bucket": "DONE",
+      "wired_runtime_path": "y",
+      "negative_conformance_test": "crates/chio-conformance/tests/ssrf_loopback_rejected.rs",
+      "theorem_status": "proposed",
       "wave": "02",
-      "notes": "HttpEgressContract not yet defined in chio-http-core"
+      "notes": "W2.2: HttpEgressContract extracted into chio-egress-contract; 16 production callers across chio-link, chio-siem, chio-a2a-adapter, chio-openapi-mcp-bridge, chio-mcp-remote thread the contract through their dispatch path; workspace lint at scripts/check-http-egress-contract.sh + self-test scripts/tests/check-http-egress-contract.test.sh catches regressions; SSRF negative-conformance pack: tests/ssrf_loopback_rejected.rs, tests/ssrf_link_local_rejected.rs, tests/ssrf_ipv6_ula_rejected.rs, tests/ssrf_redirect_overflow_rejected.rs, tests/ssrf_oversize_response_rejected.rs (theorem.egress.contract_enforcement at status=assumed in spec/registries/theorem-inventory.v1.json)"
     },
     {
       "id": "close-bar-#12",
@@ -1358,9 +1358,9 @@
       "bucket": "DONE",
       "wired_runtime_path": "y",
       "negative_conformance_test": "crates/chio-conformance/tests/verify_rejects_v2_token_when_peer_negotiated_v1_only.rs",
-      "theorem_status": "assumed",
+      "theorem_status": "proposed",
       "wave": "02",
-      "notes": "W1.3 wired the negotiated max_capability_schema as a verifier ceiling. FederationTrustExchange.negotiated_with stores the per-peer ceiling on FederationPeer.capabilities; verify_capability_with_negotiated_floor enforces it before signature/time/floor checks. Lean theorem theorem.handshake.negotiation_safety models the ceiling check (status assumed pending Lean toolchain in CI)."
+      "notes": "W1.3 wired the negotiated max_capability_schema as a verifier ceiling. FederationTrustExchange.negotiated_with stores the per-peer ceiling on FederationPeer.capabilities; verify_capability_with_negotiated_floor enforces it before signature/time/floor checks. Lean theorem theorem.handshake.negotiation_safety models the ceiling check (status proposed pending Lean toolchain in CI)."
     },
     {
       "id": "close-bar-#14",
@@ -1368,7 +1368,7 @@
       "bucket": "DONE",
       "wired_runtime_path": "y",
       "negative_conformance_test": "crates/chio-conformance/tests/verify_rejects_v2_token_when_peer_negotiated_v1_only.rs",
-      "theorem_status": "assumed",
+      "theorem_status": "proposed",
       "wave": "02",
       "notes": "CapabilityToken carries a schema-tag; chio.capability.v1 and chio.capability.v2 are recognized; the verifier rejects any v2 token whose declared schema exceeds the peer-negotiated ceiling, closing the W1.3 downgrade attack."
     },
