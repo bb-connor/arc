@@ -14,7 +14,11 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+import re
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+_CHIO_FEATURE_NAME_RE = re.compile(r"^[a-z0-9_.-]{1,96}$")
 
 
 class MaxCapabilitySchema(Enum):
@@ -36,3 +40,15 @@ class ChioCapabilityNegotiationV1(BaseModel):
         description="String-keyed feature bitset. Peers proceed only with the intersection of true values advertised by both sides.",
     )
     maxCapabilitySchema: MaxCapabilitySchema
+
+    @model_validator(mode="after")
+    def _validate_feature_names(self) -> "ChioCapabilityNegotiationV1":
+        if self.features is None:
+            return self
+        for name in self.features:
+            if not _CHIO_FEATURE_NAME_RE.match(name):
+                raise ValueError(
+                    f"capability feature name {name!r} does not match "
+                    f"propertyNames pattern ^[a-z0-9_.-]{{1,96}}$"
+                )
+        return self
