@@ -2857,7 +2857,14 @@ impl ChioKernel {
         // `evaluate_with_full_floor` path. Pre-Wave-1.5 hosted hot
         // paths bypassed sibling-sum enforcement because they called
         // the non-budget-aware `verify_capability_signature` directly.
-        if let Err(reason) = self.verify_capability_with_budget_admit(cap) {
+        //
+        // Round-3 codex P2 fix: signature is verified first (no budget
+        // mutation); the actual `admit_capability_budget` call is
+        // deferred until all subsequent checks (time, revocation,
+        // delegation-admission, subject, scope, guards) have passed.
+        // Otherwise a denied call would still consume the parent's
+        // share, starving later valid siblings.
+        if let Err(reason) = self.verify_capability_signature(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
             return self.build_deny_response_with_metadata(
@@ -3123,6 +3130,23 @@ impl ChioKernel {
             );
         }
 
+        // Round-3 codex P2 fix: now that signature, time, revocation,
+        // delegation-admission, subject, scope, and guards have all
+        // passed, commit the W1.2 sibling-sum budget admission. Doing
+        // this here (rather than upfront with signature verification)
+        // means a denied call no longer consumes the parent's share.
+        if let Err(reason) = self.admit_capability_budget(cap) {
+            let msg = format!("sibling-sum budget admission failed: {reason}");
+            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                Some(matched_grant_index),
+                extra_metadata.clone(),
+            );
+        }
+
         let payment_authorization = match self
             .authorize_payment_if_needed(request, charge_result.as_ref())
         {
@@ -3321,7 +3345,11 @@ impl ChioKernel {
         // budgets against the kernel's persistent registry, matching
         // the main hosted hot path and the portable
         // `evaluate_with_full_floor` path.
-        if let Err(reason) = self.verify_capability_with_budget_admit(cap) {
+        //
+        // Round-3 codex P2 fix: signature first; the budget admission
+        // is deferred until after all subsequent checks pass, so a
+        // denied call no longer consumes the parent's share.
+        if let Err(reason) = self.verify_capability_signature(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
             return self.build_deny_response(request, &msg, now, None);
@@ -3507,6 +3535,15 @@ impl ChioKernel {
                     ),
                 );
             }
+            return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+        }
+
+        // Round-3 codex P2 fix: nested-flow path also defers W1.2 budget
+        // admission until after all preceding checks pass, mirroring the
+        // main hosted hot path.
+        if let Err(reason) = self.admit_capability_budget(cap) {
+            let msg = format!("sibling-sum budget admission failed: {reason}");
+            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
             return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
         }
 
@@ -3943,9 +3980,15 @@ impl ChioKernel {
     /// Errors are returned as plain strings so the caller can route
     /// them through the existing deny-response paths without taking
     /// a `KernelError` dependency on the verifier shape.
-    fn verify_capability_with_budget_admit(&self, cap: &CapabilityToken) -> Result<(), String> {
-        self.verify_capability_signature(cap)?;
-
+    /// Idempotently admit `cap`'s budget share against its parent in the
+    /// kernel's persistent registry. Split from
+    /// [`Self::verify_capability_with_budget_admit`] so hosted call sites
+    /// can defer admission until after time-bound, revocation, subject,
+    /// scope, and guard checks have all passed. Otherwise a token that
+    /// is signed but expired/revoked/scope-mismatched still consumed the
+    /// parent's share when the request was about to be denied, starving
+    /// later valid siblings (PR #593 round-3 codex P2).
+    fn admit_capability_budget(&self, cap: &CapabilityToken) -> Result<(), String> {
         // W1.2 sibling-sum admit. Only fires for tokens that carry a
         // delegation chain; root-issued tokens have nothing to split.
         // The proposed share matches the portable hot path: a missing
