@@ -8,25 +8,19 @@
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
 
-from typing import Literal
+from .batch_schema import Body, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind, Witness, WitnessState, WitnessState1, WitnessState2, WitnessState3
 
-from pydantic import BaseModel, ConfigDict, constr
-
-
-class Detail(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    guard: constr(min_length=1)
-    reason: constr(min_length=1)
-
-
-class ChioToolcallerrorPolicyDenied(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    code: Literal["policy_denied"]
-    detail: Detail
+__all__ = [
+    "Body",
+    "CheckpointId",
+    "ChioAnchorBatchV1",
+    "Inclusion",
+    "Kind",
+    "Witness",
+    "WitnessState",
+    "WitnessState1",
+    "WitnessState2",
+    "WitnessState3",
+]
