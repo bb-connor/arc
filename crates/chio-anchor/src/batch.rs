@@ -191,19 +191,24 @@ pub fn verify_anchor_batch_with_witness_policy(
 /// `batch.body.witness.kind`. Required when the policy is
 /// load-bearing AND the state is `Witnessed`.
 ///
-/// `previously_verified_receipts`: the set of `external_uuid`
-/// (Rekor UUID, OTS digest, etc.) that some prior call to
+/// `previously_verified_batch_hashes`: the set of recomputed
+/// `batch_body_hash` values (witness-state-excluded) for batches
+/// whose witness receipts some prior call to
 /// `client.verify_inclusion` accepted. Used for `Stale` admission
-/// when the lane is currently down: the verifier remembers a
-/// previously-verified receipt and tolerates a brief lane outage.
-/// Producers cannot bootstrap themselves into this set; the caller
-/// (verifier daemon, CI gate, ...) is the authoritative source.
+/// when the lane is currently down: the verifier remembers the
+/// content hash of a previously-verified batch and tolerates a
+/// brief lane outage. Binding to the batch body hash, not the
+/// receipt id, prevents an attacker from replaying a previously
+/// observed receipt id against a different batch's content
+/// (HIGH-1 fix in PR #594 review). Producers cannot bootstrap
+/// themselves into this set; the caller (verifier daemon, CI
+/// gate, ...) is the authoritative source.
 pub async fn verify_anchor_batch_with_witness_policy_async(
     batch: &AnchorBatch,
     policy: &WitnessPolicy,
     now: i64,
     client: Option<&dyn AnchorWitnessClient>,
-    previously_verified_receipts: &HashSet<String>,
+    previously_verified_batch_hashes: &HashSet<Hash>,
 ) -> Result<(), AnchorError> {
     verify_anchor_batch(batch)?;
     evaluate_witness_policy_with_verifier(
@@ -212,7 +217,7 @@ pub async fn verify_anchor_batch_with_witness_policy_async(
         policy,
         now,
         client,
-        previously_verified_receipts,
+        previously_verified_batch_hashes,
     )
     .await
     .map_err(witness_policy_to_anchor_error)

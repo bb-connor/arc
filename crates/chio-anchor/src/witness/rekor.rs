@@ -130,11 +130,46 @@ struct RekorIntotoContent<'a> {
     hash: RekorHash<'a>,
 }
 
+/// DSSE in-toto statement envelope per the sigstore Rekor schema.
+///
+/// Rekor's `intoto` (v0.0.1+) entry expects a real DSSE envelope:
+///
+/// ```text
+/// { "payloadType": "application/vnd.in-toto+json",
+///   "payload": <base64(body)>,
+///   "signatures": [{"keyid": <hex|empty>, "sig": <base64>}] }
+/// ```
+///
+/// HIGH-2 (PR #594 round-2 review): the previous shape serialized
+/// `payload_type` (snake_case) instead of Rekor's canonical
+/// `payloadType` (camelCase). Real Rekor would either reject the
+/// envelope or canonicalize it to a shape that would no longer
+/// match the SET signature input. The `rename_all` annotation
+/// fixes the wire shape.
+///
+/// P1 (PR #594 round-2 review): the previous shape carried a
+/// custom `payload_type` of `application/vnd.chio.anchor_batch+json`
+/// and no `signatures` array. The intoto schema requires a DSSE
+/// envelope with `payloadType: application/vnd.in-toto+json` and a
+/// (possibly empty) `signatures` array. The shape now matches the
+/// schema so a real Rekor server would accept it.
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RekorIntotoEnvelope<'a> {
     payload: &'a str,
     payload_type: &'a str,
+    signatures: Vec<RekorIntotoSignature<'a>>,
 }
+
+#[derive(Debug, Serialize)]
+struct RekorIntotoSignature<'a> {
+    keyid: &'a str,
+    sig: &'a str,
+}
+
+/// DSSE payload-type constant for in-toto statements, per the
+/// sigstore intoto schema (v0.0.1).
+pub const REKOR_INTOTO_PAYLOAD_TYPE: &str = "application/vnd.in-toto+json";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct RekorHash<'a> {
@@ -337,7 +372,15 @@ impl AnchorWitnessClient for RekorClient {
                 content: RekorIntotoContent {
                     envelope: RekorIntotoEnvelope {
                         payload: &payload_b64,
-                        payload_type: "application/vnd.chio.anchor_batch+json",
+                        payload_type: REKOR_INTOTO_PAYLOAD_TYPE,
+                        // Chio's anchor batch carries its own producer
+                        // signature inside the body; the DSSE envelope
+                        // wraps the body but does not double-sign here.
+                        // An empty signatures array satisfies the
+                        // schema's array requirement (non-empty in real
+                        // production wiring; left empty for the
+                        // out-of-band-signed batch protocol).
+                        signatures: Vec::new(),
                     },
                     hash: RekorHash {
                         algorithm: "sha256",
@@ -482,7 +525,8 @@ pub fn build_rekor_entry_body_b64(batch: &AnchorBatch) -> Result<String, AnchorW
             content: RekorIntotoContent {
                 envelope: RekorIntotoEnvelope {
                     payload: &payload_b64,
-                    payload_type: "application/vnd.chio.anchor_batch+json",
+                    payload_type: REKOR_INTOTO_PAYLOAD_TYPE,
+                    signatures: Vec::new(),
                 },
                 hash: RekorHash {
                     algorithm: "sha256",
@@ -514,7 +558,8 @@ pub fn build_rekor_entry_body_b64_with_hash(
             content: RekorIntotoContent {
                 envelope: RekorIntotoEnvelope {
                     payload: &payload_b64,
-                    payload_type: "application/vnd.chio.anchor_batch+json",
+                    payload_type: REKOR_INTOTO_PAYLOAD_TYPE,
+                    signatures: Vec::new(),
                 },
                 hash: RekorHash {
                     algorithm: "sha256",
@@ -653,6 +698,47 @@ mod tests {
         let parsed: RekorEntryBody = serde_json::from_slice(&raw).unwrap();
         let expected = batch_body_hash(&batch).unwrap().to_hex();
         assert_eq!(parsed.spec.content.hash.value, expected);
+    }
+
+    /// HIGH-2 (PR #594 round-2 review): the DSSE envelope wire shape
+    /// MUST use Rekor's canonical camelCase keys (`payloadType`,
+    /// `apiVersion`) and the in-toto payload type. Inspect the raw
+    /// JSON bytes to catch any future serde drift.
+    #[test]
+    fn rekor_intoto_envelope_uses_camel_case_wire_shape() {
+        let batch = sample_batch();
+        let body_b64 = build_rekor_entry_body_b64(&batch).unwrap();
+        let raw = BASE64_STANDARD.decode(body_b64.as_bytes()).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+
+        // apiVersion, not api_version, at the top level.
+        assert!(
+            value.get("apiVersion").is_some(),
+            "expected apiVersion key, got: {value}"
+        );
+        assert!(
+            value.get("api_version").is_none(),
+            "snake_case api_version leaked into wire shape: {value}"
+        );
+
+        // payloadType, not payload_type, inside the envelope.
+        let envelope = &value["spec"]["content"]["envelope"];
+        assert_eq!(
+            envelope["payloadType"].as_str(),
+            Some(REKOR_INTOTO_PAYLOAD_TYPE),
+            "expected DSSE in-toto payloadType, got: {envelope}"
+        );
+        assert!(
+            envelope.get("payload_type").is_none(),
+            "snake_case payload_type leaked into wire shape: {envelope}"
+        );
+        // P1: signatures array MUST be present (DSSE schema
+        // requires the field, even if it is empty for the
+        // out-of-band-signed batch protocol).
+        assert!(
+            envelope["signatures"].is_array(),
+            "DSSE envelope must carry a signatures array: {envelope}"
+        );
     }
 
     #[test]

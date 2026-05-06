@@ -29,15 +29,14 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use chio_core::canonical_json_bytes;
-use chio_core::hashing::{sha256, Hash};
+use chio_core::hashing::Hash;
 use opentimestamps::attestation::Attestation;
 use opentimestamps::ser::{Deserializer, DigestType};
 use opentimestamps::timestamp::{Step, StepData, Timestamp};
 use opentimestamps::DetachedTimestampFile;
 
 use crate::batch::{AnchorBatch, AnchorBatchWitnessKind};
-use crate::witness::{AnchorWitnessClient, AnchorWitnessError, WitnessReceipt};
+use crate::witness::{batch_body_hash, AnchorWitnessClient, AnchorWitnessError, WitnessReceipt};
 
 /// Production OpenTimestamps client. `calendar_url` example:
 /// `https://alice.btc.calendar.opentimestamps.org`. The calendar's
@@ -99,9 +98,14 @@ impl OtsClient {
 #[async_trait::async_trait]
 impl AnchorWitnessClient for OtsClient {
     async fn publish(&self, batch: &AnchorBatch) -> Result<WitnessReceipt, AnchorWitnessError> {
-        let body_bytes = canonical_json_bytes(&batch.body)
-            .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
-        let body_hash = sha256(&body_bytes);
+        // P2 fix (PR #594 round-2 review, codex): hash the
+        // witness-state-excluded BatchHashInput view, not the full
+        // body. Hashing the full body creates a circular reference
+        // through `witness_state` (the receipt embeds the body_hash
+        // and the body embeds the receipt). The Rekor lane already
+        // routes through `batch_body_hash`; OTS must do the same so
+        // both lanes commit to the same canonical pre-witness view.
+        let body_hash = batch_body_hash(batch)?;
         let body_hash_bytes = body_hash.as_bytes().to_vec();
 
         let response = self
@@ -345,7 +349,7 @@ mod tests {
 
     #[test]
     fn ots_inclusion_proof_round_trips_through_parser() {
-        let payload_hash = sha256(b"chio-anchor-batch-test");
+        let payload_hash = chio_core::hashing::sha256(b"chio-anchor-batch-test");
         let blob = build_ots_inclusion_proof(&payload_hash, 900_000).unwrap();
         let parsed = DetachedTimestampFile::from_reader(blob.as_slice()).unwrap();
         assert_eq!(

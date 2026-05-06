@@ -12,13 +12,17 @@
 //!   with `now - last_verified > stale_window_seconds` -> reject.
 //! - `require_public_witness: true` and B0 is `WitnessState::Stale`
 //!   with `now - last_verified <= stale_window_seconds` AND the
-//!   receipt's `external_uuid` is in the verifier's
-//!   `previously_verified_receipts` set -> accept.
+//!   batch's recomputed body_hash is in the verifier's
+//!   `previously_verified_batch_hashes` set -> accept.
 //! - `require_public_witness: true` and B0 is `WitnessState::Stale`
 //!   with `now - last_verified <= stale_window_seconds` BUT the
-//!   receipt is NOT in `previously_verified_receipts` -> reject
-//!   (a producer cannot bootstrap themselves into the verified set).
-//!   Added in PR #594 review (HIGH-2).
+//!   batch hash is NOT in `previously_verified_batch_hashes` ->
+//!   reject (a producer cannot bootstrap themselves into the
+//!   verified set, and an attacker who has observed a
+//!   previously-verified receipt id cannot replay that id against
+//!   different batch content). Added in PR #594 review (HIGH-2),
+//!   strengthened in round-2 review (HIGH-1) by binding to the
+//!   batch body hash.
 //! - `require_public_witness: false` -> accept all states (advisory
 //!   mode for partner integrations that have not yet wired the lane).
 //!
@@ -206,7 +210,7 @@ fn require_public_witness_accepts_already_witnessed_during_lane_outage() {
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let client = AlwaysOkClient;
-    let verified: HashSet<String> = HashSet::new();
+    let verified: HashSet<Hash> = HashSet::new();
     runtime
         .block_on(verify_anchor_batch_with_witness_policy_async(
             &signed,
@@ -320,7 +324,7 @@ fn require_public_witness_rejects_self_asserted_witnessed_under_async_path() {
     };
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let client = AlwaysFailClient;
-    let verified: HashSet<String> = HashSet::new();
+    let verified: HashSet<Hash> = HashSet::new();
     let err = runtime
         .block_on(verify_anchor_batch_with_witness_policy_async(
             &signed,
@@ -369,7 +373,7 @@ fn require_public_witness_rejects_stale_without_previous_verification() {
         stale_window_seconds: 60 * 60,
     };
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let verified: HashSet<String> = HashSet::new();
+    let verified: HashSet<Hash> = HashSet::new();
     let err = runtime
         .block_on(verify_anchor_batch_with_witness_policy_async(
             &signed,
@@ -388,8 +392,11 @@ fn require_public_witness_rejects_stale_without_previous_verification() {
 }
 
 /// HIGH-2 (positive control): a Stale state IS admitted when the
-/// receipt's identifier is in the caller's
-/// previously_verified_receipts set and the stale window is open.
+/// recomputed batch body_hash is in the caller's
+/// previously_verified_batch_hashes set and the stale window is open.
+/// HIGH-1 (round-2): the set is keyed by body_hash, not receipt id,
+/// so an attacker cannot replay a previously-observed receipt id
+/// against a different batch's content.
 #[test]
 fn require_public_witness_admits_stale_when_previously_verified() {
     let kp = Keypair::generate();
@@ -416,8 +423,8 @@ fn require_public_witness_admits_stale_when_previously_verified() {
         stale_window_seconds: 60 * 60,
     };
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let mut verified: HashSet<String> = HashSet::new();
-    verified.insert("rekor:uuid-with-prior".to_string());
+    let mut verified: HashSet<Hash> = HashSet::new();
+    verified.insert(chio_anchor::batch_body_hash(&signed).unwrap());
     runtime
         .block_on(verify_anchor_batch_with_witness_policy_async(
             &signed,
@@ -427,4 +434,57 @@ fn require_public_witness_admits_stale_when_previously_verified() {
             &verified,
         ))
         .expect("previously-verified stale receipt is admissible");
+}
+
+/// P2 (round-2 review, codex): a Stale state with `last_verified`
+/// in the future of the verifier's clock is fail-closed, even if
+/// the recomputed batch body_hash is in the
+/// previously_verified_batch_hashes set. The verifier clock is
+/// authoritative; a producer cannot fabricate a future-stamped
+/// admission.
+#[test]
+fn require_public_witness_rejects_stale_with_future_last_verified() {
+    let kp = Keypair::generate();
+    let witness = AnchorBatchWitness {
+        kind: AnchorBatchWitnessKind::Rekor,
+        witness_id: "rekor:uuid-future".to_string(),
+        root: Hash::zero(),
+        observed_at: Some(1_700_000_000),
+    };
+    let mut unsigned = build_anchor_batch(
+        vec!["ck-FUT-1".to_string(), "ck-FUT-2".to_string()],
+        witness,
+        1_700_000_000,
+        &kp,
+    )
+    .unwrap();
+    unsigned.body.witness_state = WitnessState::Stale {
+        // 1_000s in the future of the verifier clock below.
+        last_verified: 1_700_001_000,
+        error: "rekor 503".to_string(),
+    };
+    let signed = chio_anchor::AnchorBatch::sign(unsigned.body, &kp).unwrap();
+    let policy = WitnessPolicy {
+        require_public_witness: true,
+        stale_window_seconds: 60 * 60,
+    };
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    // Even with the body_hash present, the future timestamp must
+    // fail-closed.
+    let mut verified: HashSet<Hash> = HashSet::new();
+    verified.insert(chio_anchor::batch_body_hash(&signed).unwrap());
+    let err = runtime
+        .block_on(verify_anchor_batch_with_witness_policy_async(
+            &signed,
+            &policy,
+            1_700_000_500,
+            None,
+            &verified,
+        ))
+        .expect_err("stale with future last_verified must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("StaleLastVerifiedInFuture") || msg.contains("later than verifier clock"),
+        "expected future-last-verified rejection, got: {msg}"
+    );
 }
