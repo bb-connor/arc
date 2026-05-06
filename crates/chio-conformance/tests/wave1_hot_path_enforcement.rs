@@ -19,9 +19,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chio_core::capability::{
-    compute_attenuation_witness, scope_hash, AttenuationProof, CapabilityCryptoFloor,
-    CapabilityNegotiation, CapabilityToken, CapabilityTokenBody, CapabilityTokenV2Body, ChioScope,
-    DelegationLink, DelegationLinkBody, Operation, ToolGrant, CHIO_CAPABILITY_V1_SCHEMA,
+    capability_features, compute_attenuation_witness, scope_hash, AttenuationProof,
+    CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken, CapabilityTokenBody,
+    CapabilityTokenV2Body, ChioScope, DelegationLink, DelegationLinkBody, Operation, ToolGrant,
+    CHIO_CAPABILITY_V1_SCHEMA,
 };
 use chio_core::crypto::Keypair;
 use chio_kernel::{
@@ -342,4 +343,261 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             || reason.contains("budget_split"),
         "expected sibling-sum diagnostic, got: {reason}"
     );
+}
+
+/// Wave 1.5 PR #593 review fix: a delegated child token must verify
+/// successfully through `verify_capability_full` even when the parent
+/// was never explicitly registered in the budget registry. The
+/// per-request `InMemoryBudgetRegistry` now auto-registers the parent
+/// at `MAX_BUDGET_SHARE_BPS` on the first `try_admit_child` call so the
+/// hot path does not fail-closed on every delegated token.
+#[test]
+fn delegated_child_verifies_without_pre_registered_parent() {
+    let parent_scope = scope_with(vec![grant(vec![
+        Operation::Invoke,
+        Operation::Delegate,
+        Operation::ReadResult,
+    ])]);
+    let child_scope = scope_with(vec![grant(vec![Operation::Invoke])]);
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let parent_id = "cap-parent-autoreg";
+
+    let chain = {
+        let body = DelegationLinkBody {
+            capability_id: parent_id.to_string(),
+            delegator: issuer.public_key(),
+            delegatee: subject.public_key(),
+            attenuations: vec![],
+            timestamp: 100,
+            scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+        };
+        vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
+    };
+
+    let witness = compute_attenuation_witness(&parent_scope, &child_scope).unwrap();
+    let proof = AttenuationProof {
+        parent_scope_hash: scope_hash(&parent_scope).unwrap(),
+        child_scope_hash: scope_hash(&child_scope).unwrap(),
+        normalized_subset_proof: witness,
+    };
+    let body = CapabilityTokenBody {
+        id: "cap-child-autoreg".to_string(),
+        issuer: issuer.public_key(),
+        subject: subject.public_key(),
+        scope: child_scope,
+        issued_at: 100,
+        expires_at: 200,
+        delegation_chain: chain,
+    };
+    let token = CapabilityToken::sign_v2(
+        CapabilityTokenV2Body {
+            body,
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: proof,
+            budget_share_bps: Some(4_000),
+        },
+        &issuer,
+    )
+    .expect("child token signs");
+
+    let peer = CapabilityNegotiation::t1_default();
+    let trust_resolver = |k: &chio_core::PublicKey| -> Option<chio_core::capability::ScopeHash> {
+        if k == &issuer.public_key() {
+            Some(scope_hash(&parent_scope).unwrap())
+        } else {
+            None
+        }
+    };
+    let clock = FixedClock::new(150);
+
+    // Fresh per-request registry: no register_parent call before
+    // verify. With the pre-fix behavior the child would have been
+    // rejected with `UnknownParent`. The auto-register fix lets it
+    // verify.
+    let mut budgets = InMemoryBudgetRegistry::new();
+    let verified = verify_capability_full(
+        &token,
+        &[issuer.public_key()],
+        &clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &peer,
+        &trust_resolver,
+        &mut budgets,
+    )
+    .expect("auto-register lets a delegated child verify on a fresh per-request registry");
+    assert_eq!(verified.id, "cap-child-autoreg");
+}
+
+/// Wave 1.5 PR #593 review fix: two siblings whose `budget_share_bps`
+/// running sum exceeds the per-token cap (`MAX_BUDGET_SHARE_BPS = 10000`)
+/// are rejected even when they are presented in separate verify calls
+/// against the same per-request registry. This proves the auto-register
+/// path still enforces sibling-sum across calls.
+#[test]
+fn auto_registered_parent_rejects_oversubscribed_siblings_across_calls() {
+    let parent_scope = scope_with(vec![grant(vec![
+        Operation::Invoke,
+        Operation::Delegate,
+        Operation::ReadResult,
+    ])]);
+    let child_scope = scope_with(vec![grant(vec![Operation::Invoke])]);
+
+    let issuer = Keypair::generate();
+    let subject_a = Keypair::generate();
+    let subject_b = Keypair::generate();
+    let parent_id = "cap-parent-autoreg-siblings";
+
+    let mk_chain = |delegatee: chio_core::PublicKey| {
+        let body = DelegationLinkBody {
+            capability_id: parent_id.to_string(),
+            delegator: issuer.public_key(),
+            delegatee,
+            attenuations: vec![],
+            timestamp: 100,
+            scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+        };
+        vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
+    };
+
+    let mk_child = |id: &str, delegatee: chio_core::PublicKey, share: u16| {
+        let witness = compute_attenuation_witness(&parent_scope, &child_scope).unwrap();
+        let proof = AttenuationProof {
+            parent_scope_hash: scope_hash(&parent_scope).unwrap(),
+            child_scope_hash: scope_hash(&child_scope).unwrap(),
+            normalized_subset_proof: witness,
+        };
+        let body = CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer.public_key(),
+            subject: delegatee.clone(),
+            scope: child_scope.clone(),
+            issued_at: 100,
+            expires_at: 200,
+            delegation_chain: mk_chain(delegatee),
+        };
+        CapabilityToken::sign_v2(
+            CapabilityTokenV2Body {
+                body,
+                caveats: vec![],
+                scope_attenuations: vec![],
+                attenuation_proof: proof,
+                budget_share_bps: Some(share),
+            },
+            &issuer,
+        )
+        .expect("child token signs")
+    };
+
+    // Two siblings whose sum (6000 + 5000 = 11000) exceeds the cap
+    // (10000). The first verifies; the second must fail with a
+    // sibling-sum diagnostic.
+    let child_a = mk_child("cap-child-a-siblings", subject_a.public_key(), 6_000);
+    let child_b = mk_child("cap-child-b-siblings", subject_b.public_key(), 5_000);
+
+    let peer = CapabilityNegotiation::t1_default();
+    let trust_resolver = |k: &chio_core::PublicKey| -> Option<chio_core::capability::ScopeHash> {
+        if k == &issuer.public_key() {
+            Some(scope_hash(&parent_scope).unwrap())
+        } else {
+            None
+        }
+    };
+    let clock = FixedClock::new(150);
+
+    let mut budgets = InMemoryBudgetRegistry::new();
+    verify_capability_full(
+        &child_a,
+        &[issuer.public_key()],
+        &clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &peer,
+        &trust_resolver,
+        &mut budgets,
+    )
+    .expect("first sibling fits under auto-registered parent (6000 <= 10000)");
+
+    let err = verify_capability_full(
+        &child_b,
+        &[issuer.public_key()],
+        &clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &peer,
+        &trust_resolver,
+        &mut budgets,
+    )
+    .expect_err("second sibling must oversubscribe (6000 + 5000 > 10000)");
+    assert!(
+        matches!(err, CapabilityError::BudgetSplitRejected(_)),
+        "expected BudgetSplitRejected, got: {err:?}"
+    );
+}
+
+/// Wave 1.5 PR #593 review fix: when the negotiated peer profile
+/// disables `delegation_v2_chain_binding`, the verifier must skip
+/// trust-root resolution entirely. A v2 token whose chain would not
+/// satisfy chain-binding (no registered trust root for its issuer)
+/// still verifies because the feature flag is off.
+#[test]
+fn chain_binding_disabled_skips_trust_root_resolution() {
+    let scope = scope_with(vec![grant(vec![Operation::Invoke])]);
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+
+    let witness = compute_attenuation_witness(&scope, &scope).unwrap();
+    let proof = AttenuationProof {
+        parent_scope_hash: scope_hash(&scope).unwrap(),
+        child_scope_hash: scope_hash(&scope).unwrap(),
+        normalized_subset_proof: witness,
+    };
+    let body = CapabilityTokenBody {
+        id: "cap-v2-chain-binding-disabled".to_string(),
+        issuer: issuer.public_key(),
+        subject: subject.public_key(),
+        scope: scope.clone(),
+        issued_at: 100,
+        expires_at: 200,
+        delegation_chain: vec![],
+    };
+    let token = CapabilityToken::sign_v2(
+        CapabilityTokenV2Body {
+            body,
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: proof,
+            budget_share_bps: None,
+        },
+        &issuer,
+    )
+    .expect("v2 token signs");
+
+    // Peer profile with chain-binding explicitly disabled.
+    let mut peer = CapabilityNegotiation::t1_default();
+    peer.features.insert(
+        capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
+        false,
+    );
+
+    // Empty trust resolver: no issuer has a registered authority hash.
+    // Pre-fix, the verifier would resolve the trust root before
+    // checking the feature flag and fail-closed here. After the fix,
+    // the flag is checked first and trust-root resolution is skipped.
+    let trust_resolver =
+        |_k: &chio_core::PublicKey| -> Option<chio_core::capability::ScopeHash> { None };
+    let clock = FixedClock::new(150);
+    let mut budgets = InMemoryBudgetRegistry::new();
+
+    let verified = verify_capability_full(
+        &token,
+        &[issuer.public_key()],
+        &clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &peer,
+        &trust_resolver,
+        &mut budgets,
+    )
+    .expect("disabled chain-binding skips trust-root resolution and admits the v2 token");
+    assert_eq!(verified.id, "cap-v2-chain-binding-disabled");
 }

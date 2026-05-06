@@ -183,12 +183,21 @@ pub fn verify_capability_with_floor(
 
     // Sibling-sum budget split. Only fires for tokens that carry a
     // delegation chain; root-issued tokens have nothing to split.
+    //
+    // Wave 1.5 self-bootstrapping: pass `MAX_BUDGET_SHARE_BPS` as the
+    // parent-share default so per-request registries auto-register the
+    // parent the first time a child is admitted. The cap matches the
+    // per-token validator's ceiling, so siblings whose running sum
+    // exceeds 100% are still rejected; long-lived registries that have
+    // pre-registered tighter parent shares ignore the default and use
+    // their own value.
     if let Some(parent_link) = token.delegation_chain.last() {
         let proposed_share = token
             .budget_share_bps
             .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
         budgets.try_admit_child(
             parent_link.capability_id.as_str(),
+            crate::budget_split::MAX_BUDGET_SHARE_BPS,
             token.id.clone(),
             proposed_share,
         )?;
@@ -409,20 +418,34 @@ pub fn verify_capability_full(
     // Step 2: W1.1 chain-binding check on v2 tokens. v1 tokens are admitted
     // unchanged (no attenuation_proof field exists in their schema). Run
     // chain-binding before the legacy signature/floor/issuer/budget pass so
-    // a witness mismatch fails closed before any budget mutation. Use the
-    // feature-flag-gated wrapper so peers that have explicitly cleared
-    // `delegation_v2_chain_binding` skip the check; the default is enabled.
+    // a witness mismatch fails closed before any budget mutation.
+    //
+    // Wave 1.5: short-circuit the trust-root resolution when the peer has
+    // explicitly disabled `delegation_v2_chain_binding`. The historical
+    // ordering (resolve trust root, then call the feature-gated wrapper)
+    // would fail-closed on a peer that disabled the feature but had no
+    // registered trust-root entry, breaking interoperability with peers
+    // that have not yet rolled out v2 chain-binding. Reading the flag
+    // first and bailing out preserves the negotiated semantics.
     if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
-        let issuer_root = trust_root
-            .trust_root_scope_hash(&token.issuer)
-            .ok_or_else(|| {
-                CapabilityError::AttenuationViolation(
-                    "v2 chain-binding: no trust-root scope hash registered for issuer".to_string(),
-                )
-            })?;
-        token
-            .validate_chain_binding_with_features(&issuer_root, peer)
-            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+        let chain_binding_enabled = peer
+            .features
+            .get(chio_core_types::capability::capability_features::DELEGATION_V2_CHAIN_BINDING)
+            .copied()
+            .unwrap_or(true);
+        if chain_binding_enabled {
+            let issuer_root = trust_root
+                .trust_root_scope_hash(&token.issuer)
+                .ok_or_else(|| {
+                    CapabilityError::AttenuationViolation(
+                        "v2 chain-binding: no trust-root scope hash registered for issuer"
+                            .to_string(),
+                    )
+                })?;
+            token
+                .validate_chain_binding_with_features(&issuer_root, peer)
+                .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+        }
     }
 
     // Step 3: legacy signature, issuer-trust, crypto-floor, time-bound
