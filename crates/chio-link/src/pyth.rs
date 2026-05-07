@@ -1,4 +1,4 @@
-use chio_egress_contract::{send_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 use reqwest::{Client, Url};
 use serde::Deserialize;
 
@@ -23,9 +23,11 @@ impl PythHermesClient {
         egress_contract: HttpEgressContract,
     ) -> Result<Self, PriceOracleError> {
         let base_url = base_url.into();
-        let http_client = Client::builder().build().map_err(|err| {
-            PriceOracleError::Unavailable(format!("building Hermes client failed: {err}"))
-        })?;
+        let http_client = client_builder_with_contract(&egress_contract)
+            .build()
+            .map_err(|err| {
+                PriceOracleError::Unavailable(format!("building Hermes client failed: {err}"))
+            })?;
         Ok(Self {
             base_url,
             http_client,

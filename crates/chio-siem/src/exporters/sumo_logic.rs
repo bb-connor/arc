@@ -24,7 +24,7 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
 use chio_core::receipt::Decision;
-use chio_egress_contract::{send_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 /// On-the-wire format for the Sumo Logic batch body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -115,7 +115,7 @@ impl SumoLogicExporter {
                 ExportError::HttpError(format!("HttpEgressContract rejects Sumo URL: {err}"))
             })?;
 
-        let client = reqwest::Client::builder()
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
@@ -148,7 +148,12 @@ impl SumoLogicExporter {
             };
             config.egress_contract = Some(HttpEgressContract::permissive_for_tests(&authority));
         }
-        let client = reqwest::Client::builder()
+        let contract = config.egress_contract.as_ref().ok_or_else(|| {
+            ExportError::HttpError(
+                "Sumo Logic test exporter requires an HttpEgressContract".to_string(),
+            )
+        })?;
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;

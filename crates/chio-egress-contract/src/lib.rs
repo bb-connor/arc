@@ -5,7 +5,7 @@
 //! malformed contract state fails closed.
 
 use std::collections::BTreeSet;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
@@ -69,6 +69,10 @@ pub enum HttpEgressError {
     LinkLocalDenied { host: String },
     #[error("IPv6 unique-local egress target denied: {host}")]
     Ipv6UlaDenied { host: String },
+    #[error("private network egress target denied: {host}")]
+    PrivateNetworkDenied { host: String },
+    #[error("failed to resolve egress target {host}: {details}")]
+    DnsResolutionFailed { host: String, details: String },
     #[error("redirect chain length {observed} exceeds maximum {max}")]
     RedirectLimitExceeded { observed: u8, max: u8 },
     #[error("response size {observed} exceeds maximum {max}")]
@@ -139,6 +143,20 @@ impl HttpEgressContract {
             scheme,
             authority,
         })
+    }
+
+    /// Enforce target URL, redirect hop constraints, and DNS post-resolution
+    /// address-class denials for domain targets.
+    pub fn enforce_url_with_dns(
+        &self,
+        target_url: &str,
+        redirect_chain_len: u8,
+    ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
+        let target = self.enforce_url(target_url, redirect_chain_len)?;
+        let url = Url::parse(target_url)
+            .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
+        self.enforce_domain_resolution(&url)?;
+        Ok(target)
     }
 
     /// Enforce the response-byte ceiling after headers or streaming counters
@@ -237,6 +255,64 @@ impl HttpEgressContract {
         Ok(())
     }
 
+    /// Enforce address-class denials after a domain has resolved to an IP.
+    pub fn enforce_resolved_ip(&self, host: &str, address: IpAddr) -> Result<(), HttpEgressError> {
+        match address {
+            IpAddr::V4(address) => {
+                self.enforce_ipv4_class(address)?;
+                if address.is_private() {
+                    return Err(HttpEgressError::PrivateNetworkDenied {
+                        host: format!("{host} resolved to {address}"),
+                    });
+                }
+            }
+            IpAddr::V6(address) => {
+                self.enforce_ipv6_class(address)?;
+                if is_ipv6_unique_local(&address) {
+                    return Err(HttpEgressError::PrivateNetworkDenied {
+                        host: format!("{host} resolved to {address}"),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn enforce_domain_resolution(&self, url: &Url) -> Result<(), HttpEgressError> {
+        let Some(Host::Domain(domain)) = url.host() else {
+            return Ok(());
+        };
+        let normalized = domain.trim_end_matches('.').to_ascii_lowercase();
+        if self.deny_loopback
+            && matches!(normalized.as_str(), "localhost" | "localhost.localdomain")
+        {
+            return Err(HttpEgressError::LoopbackDenied { host: normalized });
+        }
+        let port = url.port_or_known_default().ok_or_else(|| {
+            HttpEgressError::InvalidUrl(format!(
+                "cannot resolve domain target `{normalized}` without a known port"
+            ))
+        })?;
+        let resolved = (normalized.as_str(), port)
+            .to_socket_addrs()
+            .map_err(|error| HttpEgressError::DnsResolutionFailed {
+                host: normalized.clone(),
+                details: error.to_string(),
+            })?;
+        let mut saw_address = false;
+        for socket_addr in resolved {
+            saw_address = true;
+            self.enforce_resolved_ip(&normalized, socket_addr.ip())?;
+        }
+        if !saw_address {
+            return Err(HttpEgressError::DnsResolutionFailed {
+                host: normalized,
+                details: "no addresses returned".to_string(),
+            });
+        }
+        Ok(())
+    }
+
     fn authority_is_allowed(&self, url: &Url, authority: &str) -> Result<bool, HttpEgressError> {
         if self.allowed_authority_set.contains(authority) {
             return Ok(true);
@@ -246,6 +322,157 @@ impl HttpEgressContract {
             return Ok(self.allowed_authority_set.contains(&default_port_authority));
         }
         Ok(false)
+    }
+}
+
+#[cfg(all(test, feature = "reqwest-egress"))]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod reqwest_egress_tests {
+    use super::reqwest_helper::{client_builder_with_contract, send_with_contract};
+    use super::{HttpEgressContract, HttpEgressError};
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpListener, TcpStream};
+    use std::sync::mpsc::{self, Receiver};
+    use std::thread::{self, JoinHandle};
+    use std::time::Duration;
+
+    fn authority(addr: SocketAddr) -> String {
+        format!("{}:{}", addr.ip(), addr.port())
+    }
+
+    fn read_http_request(stream: &mut TcpStream) -> String {
+        let mut request = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        loop {
+            let read = stream.read(&mut buffer).expect("read request");
+            if read == 0 {
+                break;
+            }
+            request.extend_from_slice(&buffer[..read]);
+            if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                break;
+            }
+        }
+        String::from_utf8_lossy(&request).into_owned()
+    }
+
+    fn spawn_single_response_server<F>(
+        response_for_request: F,
+    ) -> (SocketAddr, Receiver<String>, JoinHandle<()>)
+    where
+        F: FnOnce(String) -> String + Send + 'static,
+    {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let addr = listener.local_addr().expect("read local addr");
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            let request = read_http_request(&mut stream);
+            tx.send(request.clone()).expect("send captured request");
+            let response = response_for_request(request);
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+        });
+        (addr, rx, handle)
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_validates_redirect_before_following() {
+        let denied_target = "http://127.0.0.1:9/final";
+        let (start_addr, _start_rx, start_handle) = spawn_single_response_server({
+            let denied_target = denied_target.to_string();
+            move |_| {
+                format!(
+                    "HTTP/1.1 302 Found\r\nLocation: {denied_target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            }
+        });
+        let contract = HttpEgressContract::permissive_for_tests(&authority(start_addr));
+        let client = client_builder_with_contract(&contract)
+            .build()
+            .expect("build client");
+        let request = client
+            .get(format!("http://{}/start", authority(start_addr)))
+            .build()
+            .expect("build request");
+
+        let error = send_with_contract(&contract, &client, request)
+            .await
+            .expect_err("redirect target should be denied before follow");
+        assert!(matches!(error, HttpEgressError::AuthorityDenied { .. }));
+        start_handle.join().expect("join start server");
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_strips_sensitive_headers_on_cross_origin_redirect() {
+        let (final_addr, final_rx, final_handle) = spawn_single_response_server(|_| {
+            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_string()
+        });
+        let final_url = format!("http://{}/final", authority(final_addr));
+        let (start_addr, _start_rx, start_handle) = spawn_single_response_server({
+            let final_url = final_url.clone();
+            move |_| {
+                format!(
+                    "HTTP/1.1 302 Found\r\nLocation: {final_url}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            }
+        });
+
+        let mut contract = HttpEgressContract::permissive_for_tests(&authority(start_addr));
+        contract.allowed_authority_set.insert(authority(final_addr));
+        let client = client_builder_with_contract(&contract)
+            .build()
+            .expect("build client");
+        let request = client
+            .get(format!("http://{}/start", authority(start_addr)))
+            .header(reqwest::header::AUTHORIZATION, "Bearer secret")
+            .header(reqwest::header::COOKIE, "sid=secret")
+            .build()
+            .expect("build request");
+
+        let response = send_with_contract(&contract, &client, request)
+            .await
+            .expect("follow redirect");
+        assert_eq!(response.body(), b"ok");
+
+        let final_request = final_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("capture final request");
+        let final_request = final_request.to_ascii_lowercase();
+        assert!(!final_request.contains("authorization:"));
+        assert!(!final_request.contains("cookie:"));
+
+        start_handle.join().expect("join start server");
+        final_handle.join().expect("join final server");
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_denies_oversized_response_body() {
+        let (addr, _rx, handle) = spawn_single_response_server(|_| {
+            "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\nabcdef".to_string()
+        });
+        let mut contract = HttpEgressContract::permissive_for_tests(&authority(addr));
+        contract.max_response_bytes = 5;
+        let client = client_builder_with_contract(&contract)
+            .build()
+            .expect("build client");
+        let request = client
+            .get(format!("http://{}/body", authority(addr)))
+            .build()
+            .expect("build request");
+
+        let error = send_with_contract(&contract, &client, request)
+            .await
+            .expect_err("oversized response should be rejected");
+        assert!(matches!(
+            error,
+            HttpEgressError::ResponseTooLarge {
+                observed: 6,
+                max: 5
+            }
+        ));
+        handle.join().expect("join server");
     }
 }
 
@@ -311,80 +538,256 @@ fn is_ipv6_unique_local(address: &Ipv6Addr) -> bool {
 #[cfg(feature = "reqwest-egress")]
 pub mod reqwest_helper {
     use super::{HttpEgressContract, HttpEgressError};
+    use reqwest::header::{
+        HeaderMap, HeaderName, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION,
+        PROXY_AUTHORIZATION,
+    };
+    use reqwest::{Method, StatusCode, Url};
+    use serde::de::DeserializeOwned;
+
+    /// Response returned by [`send_with_contract`] after the full response body
+    /// has been read under the contract byte ceiling.
+    #[derive(Debug, Clone)]
+    pub struct ContractResponse {
+        status: StatusCode,
+        url: Url,
+        headers: HeaderMap,
+        body: Vec<u8>,
+    }
+
+    impl ContractResponse {
+        #[must_use]
+        pub fn status(&self) -> StatusCode {
+            self.status
+        }
+
+        #[must_use]
+        pub fn url(&self) -> &Url {
+            &self.url
+        }
+
+        #[must_use]
+        pub fn headers(&self) -> &HeaderMap {
+            &self.headers
+        }
+
+        #[must_use]
+        pub fn body(&self) -> &[u8] {
+            &self.body
+        }
+
+        pub async fn text(self) -> Result<String, std::string::FromUtf8Error> {
+            String::from_utf8(self.body)
+        }
+
+        pub async fn json<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
+            serde_json::from_slice(&self.body)
+        }
+    }
 
     /// Wrap a `reqwest::Client::execute` call with [`HttpEgressContract`]
-    /// enforcement on the initial URL, the post-redirect final URL, and the
-    /// response body size. Redirect chain length is bounded by
-    /// `contract.max_redirect_chain` via the client's redirect policy: the
-    /// recommended pattern is to construct the `reqwest::Client` with
-    /// [`client_builder_with_contract`] so every hop runs through the contract,
-    /// then call `send_with_contract` for per-request URL and response checks.
+    /// enforcement before each network hop and while reading the response body.
+    /// The supplied client must be built with [`client_builder_with_contract`],
+    /// which disables reqwest's automatic redirect following so this helper can
+    /// validate each `Location` target before issuing the next request.
     pub async fn send_with_contract(
         contract: &HttpEgressContract,
         client: &reqwest::Client,
         request: reqwest::Request,
-    ) -> Result<reqwest::Response, HttpEgressError> {
-        let url_string = request.url().to_string();
-        contract.enforce_url(&url_string, 0)?;
+    ) -> Result<ContractResponse, HttpEgressError> {
+        let mut request = request;
+        let mut redirect_chain_len = 0_u8;
 
-        let response = client.execute(request).await.map_err(|err| {
-            let kind = if err.is_timeout() {
-                "timeout"
-            } else if err.is_connect() {
-                "connect error"
-            } else if err.is_request() {
-                "request error"
-            } else if err.is_body() {
-                "body error"
-            } else if err.is_decode() {
-                "decode error"
-            } else {
-                "transport error"
-            };
-            HttpEgressError::InvalidUrl(format!("dispatch failed ({kind}): {err}"))
-        })?;
+        loop {
+            let request_url = request.url().clone();
+            contract.enforce_url_with_dns(request_url.as_str(), redirect_chain_len)?;
+            let reusable_request = request.try_clone();
+            let request_method = request.method().clone();
+            let request_headers = request.headers().clone();
 
-        let final_url = response.url().to_string();
-        if final_url != url_string {
-            contract.enforce_url(&final_url, 0)?;
+            let response = client.execute(request).await.map_err(map_reqwest_error)?;
+            if response.url() != &request_url {
+                return Err(HttpEgressError::InvalidUrl(
+                    "reqwest client followed a redirect internally; build it with client_builder_with_contract"
+                        .to_string(),
+                ));
+            }
+
+            let status = response.status();
+            if is_redirect_status(status) {
+                if let Some(location) = response.headers().get(LOCATION).cloned() {
+                    if redirect_chain_len >= contract.max_redirect_chain {
+                        return Err(HttpEgressError::RedirectLimitExceeded {
+                            observed: redirect_chain_len.saturating_add(1),
+                            max: contract.max_redirect_chain,
+                        });
+                    }
+                    let location = location.to_str().map_err(|error| {
+                        HttpEgressError::InvalidUrl(format!(
+                            "invalid redirect Location header from {request_url}: {error}"
+                        ))
+                    })?;
+                    let next_url = request_url.join(location).map_err(|error| {
+                        HttpEgressError::InvalidUrl(format!(
+                            "invalid redirect target `{location}` from {request_url}: {error}"
+                        ))
+                    })?;
+                    let next_chain_len = redirect_chain_len.saturating_add(1);
+                    contract.enforce_url_with_dns(next_url.as_str(), next_chain_len)?;
+                    let cross_origin = !same_origin(&request_url, &next_url);
+                    request = build_redirect_request(
+                        client,
+                        reusable_request,
+                        request_method,
+                        request_headers,
+                        status,
+                        next_url,
+                        cross_origin,
+                    )?;
+                    redirect_chain_len = next_chain_len;
+                    continue;
+                }
+            }
+
+            return collect_capped_response(contract, response).await;
+        }
+    }
+
+    fn is_redirect_status(status: StatusCode) -> bool {
+        matches!(
+            status,
+            StatusCode::MOVED_PERMANENTLY
+                | StatusCode::FOUND
+                | StatusCode::SEE_OTHER
+                | StatusCode::TEMPORARY_REDIRECT
+                | StatusCode::PERMANENT_REDIRECT
+        )
+    }
+
+    /// Build a `reqwest::ClientBuilder` whose redirect policy applies the
+    /// supplied [`HttpEgressContract`] by disabling reqwest's automatic redirect
+    /// handling. [`send_with_contract`] manually follows redirects after
+    /// validating each hop and stripping sensitive headers on cross-origin hops.
+    pub fn client_builder_with_contract(_contract: &HttpEgressContract) -> reqwest::ClientBuilder {
+        reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
+    }
+
+    fn build_redirect_request(
+        client: &reqwest::Client,
+        reusable_request: Option<reqwest::Request>,
+        method: Method,
+        headers: HeaderMap,
+        status: StatusCode,
+        next_url: Url,
+        cross_origin: bool,
+    ) -> Result<reqwest::Request, HttpEgressError> {
+        let rewrite_to_get = status == StatusCode::SEE_OTHER && method != Method::HEAD
+            || matches!(status, StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND)
+                && method == Method::POST;
+        if rewrite_to_get {
+            let mut builder = client.request(Method::GET, next_url);
+            for (name, value) in &headers {
+                if should_drop_redirect_header(name, cross_origin, true) {
+                    continue;
+                }
+                builder = builder.header(name, value);
+            }
+            return builder.build().map_err(map_reqwest_error);
         }
 
+        let mut request = reusable_request.ok_or_else(|| {
+            HttpEgressError::InvalidUrl(
+                "redirect requires a cloneable request body to replay safely".to_string(),
+            )
+        })?;
+        *request.url_mut() = next_url;
+        strip_redirect_headers(request.headers_mut(), cross_origin, false);
+        Ok(request)
+    }
+
+    fn should_drop_redirect_header(
+        name: &HeaderName,
+        cross_origin: bool,
+        body_was_dropped: bool,
+    ) -> bool {
+        *name == HOST
+            || body_was_dropped && (*name == CONTENT_LENGTH || *name == CONTENT_TYPE)
+            || cross_origin && is_sensitive_request_header(name)
+    }
+
+    fn strip_redirect_headers(headers: &mut HeaderMap, cross_origin: bool, body_was_dropped: bool) {
+        let names = headers.keys().cloned().collect::<Vec<_>>();
+        for name in names {
+            if should_drop_redirect_header(&name, cross_origin, body_was_dropped) {
+                headers.remove(name);
+            }
+        }
+    }
+
+    fn is_sensitive_request_header(name: &HeaderName) -> bool {
+        *name == AUTHORIZATION || *name == COOKIE || *name == PROXY_AUTHORIZATION
+    }
+
+    fn same_origin(left: &Url, right: &Url) -> bool {
+        left.scheme() == right.scheme()
+            && left.host_str().map(str::to_ascii_lowercase)
+                == right.host_str().map(str::to_ascii_lowercase)
+            && left.port_or_known_default() == right.port_or_known_default()
+    }
+
+    async fn collect_capped_response(
+        contract: &HttpEgressContract,
+        mut response: reqwest::Response,
+    ) -> Result<ContractResponse, HttpEgressError> {
         if let Some(content_length) = response.content_length() {
             contract.enforce_response_bytes(content_length)?;
         }
 
-        Ok(response)
+        let status = response.status();
+        let url = response.url().clone();
+        let headers = response.headers().clone();
+        let mut observed = 0_u64;
+        let mut body = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(map_reqwest_error)? {
+            observed = observed.checked_add(chunk.len() as u64).ok_or(
+                HttpEgressError::ResponseTooLarge {
+                    observed: u64::MAX,
+                    max: contract.max_response_bytes,
+                },
+            )?;
+            contract.enforce_response_bytes(observed)?;
+            body.extend_from_slice(&chunk);
+        }
+
+        Ok(ContractResponse {
+            status,
+            url,
+            headers,
+            body,
+        })
     }
 
-    /// Build a `reqwest::ClientBuilder` whose redirect policy applies the
-    /// supplied [`HttpEgressContract`] to every hop. Callers compose their
-    /// own timeouts, TLS config, and default headers on top of this builder.
-    /// Combined with [`send_with_contract`], every URL the client touches
-    /// (initial request and all redirect targets) is validated by the
-    /// contract before bytes leave the substrate.
-    pub fn client_builder_with_contract(contract: &HttpEgressContract) -> reqwest::ClientBuilder {
-        let contract = contract.clone();
-        let max_chain = contract.max_redirect_chain;
-        reqwest::Client::builder().redirect(reqwest::redirect::Policy::custom(move |attempt| {
-            let chain_len = attempt.previous().len();
-            if chain_len > max_chain as usize {
-                return attempt.error(HttpEgressError::RedirectLimitExceeded {
-                    observed: chain_len.min(u8::MAX as usize) as u8,
-                    max: max_chain,
-                });
-            }
-            let target = attempt.url().to_string();
-            match contract.enforce_url(&target, chain_len.min(u8::MAX as usize) as u8) {
-                Ok(_) => attempt.follow(),
-                Err(err) => attempt.error(err),
-            }
-        }))
+    fn map_reqwest_error(err: reqwest::Error) -> HttpEgressError {
+        let kind = if err.is_timeout() {
+            "timeout"
+        } else if err.is_connect() {
+            "connect error"
+        } else if err.is_request() {
+            "request error"
+        } else if err.is_body() {
+            "body error"
+        } else if err.is_decode() {
+            "decode error"
+        } else {
+            "transport error"
+        };
+        HttpEgressError::InvalidUrl(format!("dispatch failed ({kind}): {err}"))
     }
 }
 
 #[cfg(feature = "reqwest-egress")]
 #[allow(unused_imports)]
-pub use reqwest_helper::{client_builder_with_contract, send_with_contract};
+pub use reqwest_helper::{client_builder_with_contract, send_with_contract, ContractResponse};
 
 impl HttpEgressContract {
     /// Construct a permissive contract suitable for tests that exercise a

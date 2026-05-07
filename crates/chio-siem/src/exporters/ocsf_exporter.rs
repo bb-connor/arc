@@ -25,7 +25,7 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::ocsf::receipt_to_ocsf;
 use crate::redaction::redact_for_operator_log;
-use chio_egress_contract::{send_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 const DEFAULT_OCSF_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -95,18 +95,26 @@ impl OcsfExporter {
 
         // HttpEgressContract: when endpoint is configured, OCSF dispatch
         // must run through the typed egress contract.
-        if !config.endpoint.trim().is_empty() {
-            let contract = config.egress_contract.as_ref().ok_or_else(|| {
+        let contract = if !config.endpoint.trim().is_empty() {
+            Some(config.egress_contract.as_ref().ok_or_else(|| {
                 ExportError::HttpError(
                     "OCSF exporter with endpoint requires an HttpEgressContract".to_string(),
                 )
-            })?;
+            })?)
+        } else {
+            None
+        };
+        if let Some(contract) = contract {
             contract.enforce_url(&config.endpoint, 0).map_err(|err| {
                 ExportError::HttpError(format!("HttpEgressContract rejects OCSF URL: {err}"))
             })?;
         }
 
-        let client = reqwest::Client::builder()
+        let mut client_builder = reqwest::Client::builder();
+        if let Some(contract) = contract {
+            client_builder = client_builder_with_contract(contract);
+        }
+        let client = client_builder
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
@@ -130,7 +138,10 @@ impl OcsfExporter {
             };
             config.egress_contract = Some(HttpEgressContract::permissive_for_tests(&authority));
         }
-        let client = reqwest::Client::builder()
+        let contract = config.egress_contract.as_ref().ok_or_else(|| {
+            ExportError::HttpError("OCSF test exporter requires an HttpEgressContract".to_string())
+        })?;
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;

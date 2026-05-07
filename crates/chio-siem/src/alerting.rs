@@ -47,7 +47,7 @@ use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::redaction::redact_for_operator_log;
 use chio_core::receipt::{ChioReceipt, Decision, GuardEvidence};
-use chio_egress_contract::{send_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 // -- Severity -----------------------------------------------------------------
 
@@ -237,7 +237,11 @@ impl PagerDutyBackend {
         endpoint: String,
         egress_contract: Option<HttpEgressContract>,
     ) -> Result<Self, ExportError> {
-        let client = reqwest::Client::builder()
+        let mut client_builder = reqwest::Client::builder();
+        if let Some(contract) = egress_contract.as_ref() {
+            client_builder = client_builder_with_contract(contract);
+        }
+        let client = client_builder
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
@@ -372,7 +376,11 @@ impl OpsGenieBackend {
         endpoint: String,
         egress_contract: Option<HttpEgressContract>,
     ) -> Result<Self, ExportError> {
-        let client = reqwest::Client::builder()
+        let mut client_builder = reqwest::Client::builder();
+        if let Some(contract) = egress_contract.as_ref() {
+            client_builder = client_builder_with_contract(contract);
+        }
+        let client = client_builder
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {

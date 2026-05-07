@@ -13,6 +13,7 @@ name = "chio_egress_contract"
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 reqwest = { workspace = true, default-features = false, features = ["rustls"], optional = true }
@@ -22,10 +23,11 @@ default = []
 # Opt-in helper that wraps a `reqwest` dispatch with `HttpEgressContract`
 # enforcement on the initial URL, on every redirect, and on observed response
 # size. Callers that depend on this feature get `send_with_contract`.
-reqwest-egress = ["dep:reqwest"]
+reqwest-egress = ["dep:reqwest", "dep:serde_json"]
 
 [dev-dependencies]
 reqwest = { workspace = true, default-features = false, features = ["rustls"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints.clippy]
 unwrap_used = "deny"

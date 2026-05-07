@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -45,7 +45,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
 use reqwest::Client as HttpClient;
@@ -947,7 +947,7 @@ pub fn enforce_oidc_egress_contract(
     egress_contract: &HttpEgressContract,
 ) -> Result<(), CliError> {
     egress_contract
-        .enforce_url(url.as_str(), 0)
+        .enforce_url_with_dns(url.as_str(), 0)
         .map(|_| ())
         .map_err(|err| {
             CliError::cli_other_error(format!(
@@ -965,20 +965,60 @@ fn fetch_identity_provider_json<T: DeserializeOwned>(
     // the typed contract. The remote MCP runtime shares the same outbound
     // egress posture as the rest of the substrate; without the contract
     // these fetches would bypass the SSRF gate entirely.
-    if let Some(contract) = egress_contract {
-        contract.enforce_url(url.as_str(), 0).map_err(|err| {
-            CliError::cli_other_error(format!(
-                "HttpEgressContract rejects {field_name} `{url}`: {err}"
-            ))
-        })?;
-    }
+    let contract = egress_contract.ok_or_else(|| {
+        CliError::cli_other_error(format!(
+            "{field_name} `{url}` requires an HttpEgressContract; substrate fails closed"
+        ))
+    })?;
+    contract.enforce_url_with_dns(url.as_str(), 0).map_err(|err| {
+        CliError::cli_other_error(format!(
+            "HttpEgressContract rejects {field_name} `{url}`: {err}"
+        ))
+    })?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS))
+        .redirects(0)
         .build();
     let response = agent.get(url.as_str()).call().map_err(|error| {
         CliError::cli_other_error(format!("failed to fetch {field_name} `{}`: {error}", url))
     })?;
-    response.into_json::<T>().map_err(|error| {
+    if (300..400).contains(&response.status()) {
+        return Err(CliError::cli_other_error(format!(
+            "{field_name} `{url}` returned a redirect; redirects require explicit egress-contract handling"
+        )));
+    }
+    if let Some(content_length) = response.header("Content-Length") {
+        let content_length = content_length.trim().parse::<u64>().map_err(|error| {
+            CliError::cli_other_error(format!(
+                "invalid Content-Length from {field_name} `{url}`: {error}"
+            ))
+        })?;
+        contract.enforce_response_bytes(content_length).map_err(|err| {
+            CliError::cli_other_error(format!(
+                "HttpEgressContract rejects {field_name} `{url}` response: {err}"
+            ))
+        })?;
+    }
+    let mut body = Vec::new();
+    let read_limit = contract.max_response_bytes.saturating_add(1);
+    response
+        .into_reader()
+        .take(read_limit)
+        .read_to_end(&mut body)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to read JSON from {field_name} `{}`: {error}",
+                url
+            ))
+        })?;
+    contract
+        .enforce_response_bytes(body.len() as u64)
+        .map_err(|err| {
+            CliError::cli_other_error(format!(
+                "HttpEgressContract rejects {field_name} `{url}` response: {err}"
+            ))
+        })?;
+    serde_json::from_slice::<T>(&body).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse JSON from {field_name} `{}`: {error}",
             url

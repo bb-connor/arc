@@ -59,7 +59,10 @@ ALLOW_LIST=(
 # only declare a non-dispatching helper are reported.
 
 # Initial sweep: any reference to reqwest::Client or reqwest::ClientBuilder.
-mapfile -t CANDIDATE_FILES < <(
+CANDIDATE_FILES=()
+while IFS= read -r candidate_file; do
+    CANDIDATE_FILES+=("$candidate_file")
+done < <(
     grep -rln -E "reqwest::Client|reqwest::ClientBuilder" --include='*.rs' \
         crates/ 2>/dev/null || true
 )
@@ -80,7 +83,11 @@ done < <(grep -rn -E "use[[:space:]]+reqwest[[:space:]]+as[[:space:]]+[A-Za-z_]"
 
 # De-duplicate.
 if [[ ${#CANDIDATE_FILES[@]} -gt 0 ]]; then
-    mapfile -t CANDIDATE_FILES < <(printf '%s\n' "${CANDIDATE_FILES[@]}" | awk '!seen[$0]++')
+    DEDUPED_CANDIDATE_FILES=()
+    while IFS= read -r candidate_file; do
+        DEDUPED_CANDIDATE_FILES+=("$candidate_file")
+    done < <(printf '%s\n' "${CANDIDATE_FILES[@]}" | awk '!seen[$0]++')
+    CANDIDATE_FILES=("${DEDUPED_CANDIDATE_FILES[@]}")
 fi
 
 DISPATCH_REGEX="\\.execute\\(|\\.send\\(\\)|\\.send_string\\(|\\.send_json\\(|\\.call\\(\\)|\\.send\\(.+\\)\\.await"
@@ -110,10 +117,11 @@ for file in "${CANDIDATE_FILES[@]}"; do
             ;;
     esac
 
-    # Production file references reqwest::Client / ClientBuilder. Accept
-    # the file when it pairs the reference with the egress contract or the
-    # blessed helper functions.
-    if grep -qE "HttpEgressContract|send_with_contract|client_builder_with_contract" "$file"; then
+    # Any send_with_contract caller must also construct the reqwest client via
+    # client_builder_with_contract so automatic redirects are disabled.
+    if grep -qE "\\bsend_with_contract\\b" "$file" \
+        && ! grep -qE "\\bclient_builder_with_contract\\b" "$file"; then
+        failed+=("$file")
         continue
     fi
 
@@ -133,7 +141,15 @@ for file in "${CANDIDATE_FILES[@]}"; do
         continue
     fi
 
-    failed+=("$file")
+    # Production dispatches must use the blessed helper. A file cannot pass
+    # merely by mentioning HttpEgressContract while still calling reqwest
+    # directly.
+    if ! grep -qE "\\bsend_with_contract\\b" "$file"; then
+        failed+=("$file")
+        continue
+    fi
+
+    continue
 done
 
 if [[ ${#failed[@]} -gt 0 ]]; then

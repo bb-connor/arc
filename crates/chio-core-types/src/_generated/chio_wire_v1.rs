@@ -1173,6 +1173,7 @@ for ChioAgentMessageListCapabilities {
 ///        "id",
 ///        "issued_at",
 ///        "issuer",
+///        "schema",
 ///        "scope",
 ///        "signature",
 ///        "subject"
@@ -1235,6 +1236,10 @@ for ChioAgentMessageListCapabilities {
 ///        "issuer": {
 ///          "type": "string",
 ///          "pattern": "^[0-9a-f]{64}$"
+///        },
+///        "schema": {
+///          "type": "string",
+///          "const": "chio.capability.v1"
 ///        },
 ///        "scope": {
 ///          "type": "object",
@@ -1460,6 +1465,7 @@ for ChioAgentMessageToolCallRequest {
 ///    "id",
 ///    "issued_at",
 ///    "issuer",
+///    "schema",
 ///    "scope",
 ///    "signature",
 ///    "subject"
@@ -1522,6 +1528,10 @@ for ChioAgentMessageToolCallRequest {
 ///    "issuer": {
 ///      "type": "string",
 ///      "pattern": "^[0-9a-f]{64}$"
+///    },
+///    "schema": {
+///      "type": "string",
+///      "const": "chio.capability.v1"
 ///    },
 ///    "scope": {
 ///      "type": "object",
@@ -1710,6 +1720,7 @@ pub struct ChioAgentMessageToolCallRequestCapabilityToken {
     pub id: ChioAgentMessageToolCallRequestCapabilityTokenId,
     pub issued_at: u64,
     pub issuer: ChioAgentMessageToolCallRequestCapabilityTokenIssuer,
+    pub schema: ::std::string::String,
     pub scope: ChioAgentMessageToolCallRequestCapabilityTokenScope,
     pub signature: ChioAgentMessageToolCallRequestCapabilityTokenSignature,
     pub subject: ChioAgentMessageToolCallRequestCapabilityTokenSubject,
@@ -7583,6 +7594,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioJsonRpc20ResponseVariant1IdVariant1 
 ///          "id",
 ///          "issued_at",
 ///          "issuer",
+///          "schema",
 ///          "scope",
 ///          "signature",
 ///          "subject"
@@ -7645,6 +7657,10 @@ impl<'de> ::serde::Deserialize<'de> for ChioJsonRpc20ResponseVariant1IdVariant1 
 ///          "issuer": {
 ///            "type": "string",
 ///            "pattern": "^[0-9a-f]{64}$"
+///          },
+///          "schema": {
+///            "type": "string",
+///            "const": "chio.capability.v1"
 ///          },
 ///          "scope": {
 ///            "type": "object",
@@ -7854,6 +7870,7 @@ for ChioKernelMessageCapabilityList {
 ///    "id",
 ///    "issued_at",
 ///    "issuer",
+///    "schema",
 ///    "scope",
 ///    "signature",
 ///    "subject"
@@ -7916,6 +7933,10 @@ for ChioKernelMessageCapabilityList {
 ///    "issuer": {
 ///      "type": "string",
 ///      "pattern": "^[0-9a-f]{64}$"
+///    },
+///    "schema": {
+///      "type": "string",
+///      "const": "chio.capability.v1"
 ///    },
 ///    "scope": {
 ///      "type": "object",
@@ -8104,6 +8125,7 @@ pub struct ChioKernelMessageCapabilityListCapabilitiesItem {
     pub id: ChioKernelMessageCapabilityListCapabilitiesItemId,
     pub issued_at: u64,
     pub issuer: ChioKernelMessageCapabilityListCapabilitiesItemIssuer,
+    pub schema: ::std::string::String,
     pub scope: ChioKernelMessageCapabilityListCapabilitiesItemScope,
     pub signature: ChioKernelMessageCapabilityListCapabilitiesItemSignature,
     pub subject: ChioKernelMessageCapabilityListCapabilitiesItemSubject,
@@ -24627,7 +24649,9 @@ impl<'de> ::serde::Deserialize<'de> for DelegationLinkSignature {
 ///    },
 ///    "subset": {
 ///      "type": "boolean",
-///      "const": true
+///      "enum": [
+///        true
+///      ]
 ///    }
 ///  },
 ///  "additionalProperties": false

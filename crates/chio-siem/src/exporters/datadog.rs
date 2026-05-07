@@ -22,7 +22,7 @@ use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::redaction::redact_for_operator_log;
 use chio_core::receipt::Decision;
-use chio_egress_contract::{send_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 /// Configuration for the Datadog Logs exporter.
 #[derive(Debug, Clone)]
@@ -107,7 +107,7 @@ impl DatadogExporter {
             ExportError::HttpError(format!("HttpEgressContract rejects Datadog URL: {err}"))
         })?;
 
-        let client = reqwest::Client::builder()
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
@@ -147,7 +147,12 @@ impl DatadogExporter {
             config.egress_contract = Some(HttpEgressContract::permissive_for_tests(&authority));
         }
 
-        let client = reqwest::Client::builder()
+        let contract = config.egress_contract.as_ref().ok_or_else(|| {
+            ExportError::HttpError(
+                "Datadog test exporter requires an HttpEgressContract".to_string(),
+            )
+        })?;
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;

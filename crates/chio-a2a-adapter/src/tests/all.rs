@@ -56,6 +56,31 @@ mod tests {
         }
     }
 
+    fn test_adapter_config(base_url: &str, public_key: String) -> A2aAdapterConfig {
+        A2aAdapterConfig::new(base_url, public_key)
+            .with_egress_contract(test_egress_contract(base_url))
+    }
+
+    fn test_egress_contract(base_url: &str) -> HttpEgressContract {
+        let url = Url::parse(base_url).expect("test base URL parses");
+        let host = url.host_str().expect("test base URL has host");
+        let authority = match url.port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host.to_string(),
+        };
+        HttpEgressContract::permissive_for_tests(&authority)
+    }
+
+    fn insert_test_egress_authority(contract: &mut HttpEgressContract, base_url: &str) {
+        let url = Url::parse(base_url).expect("test base URL parses");
+        let host = url.host_str().expect("test base URL has host");
+        let authority = match url.port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host.to_string(),
+        };
+        contract.allowed_authority_set.insert(authority);
+    }
+
     #[test]
     fn adapter_discovers_jsonrpc_and_invokes_skill() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
@@ -63,7 +88,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_bearer_token("secret-token")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -100,13 +125,150 @@ mod tests {
     }
 
     #[test]
+    fn adapter_strips_auth_and_cookie_on_cross_origin_redirect() {
+        let Some(target_listener) = bind_fake_a2a_listener("redirect target A2A listener") else {
+            return;
+        };
+        let target_address = target_listener.local_addr().expect("target listener address");
+        let target_base_url = format!("http://{target_address}");
+        let target_requests = Arc::new(Mutex::new(Vec::new()));
+        let target_requests_for_thread = Arc::clone(&target_requests);
+        let target_handle = thread::spawn(move || {
+            let (mut stream, _) = target_listener.accept().expect("accept target request");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("set target read timeout");
+            let request = read_http_request(&mut stream);
+            target_requests_for_thread
+                .lock()
+                .expect("lock target request log")
+                .push(request);
+            write_http_json_response(
+                &mut stream,
+                200,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": {
+                        "message": {
+                            "messageId": "msg-out",
+                            "contextId": "ctx-1",
+                            "taskId": "task-1",
+                            "role": "ROLE_AGENT",
+                            "parts": [{
+                                "text": "completed research request",
+                                "mediaType": "text/plain"
+                            }]
+                        }
+                    }
+                }),
+            );
+        });
+
+        let Some(initial_listener) = bind_fake_a2a_listener("redirect initial A2A listener") else {
+            return;
+        };
+        let initial_address = initial_listener
+            .local_addr()
+            .expect("initial listener address");
+        let initial_base_url = format!("http://{initial_address}");
+        let initial_base_url_for_thread = initial_base_url.clone();
+        let target_base_url_for_thread = target_base_url.clone();
+        let initial_handle = thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut stream, _) = initial_listener.accept().expect("accept initial request");
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .expect("set initial read timeout");
+                let request = read_http_request(&mut stream);
+                let first_line = request.lines().next().unwrap_or_default();
+                if first_line.starts_with("GET /.well-known/agent-card.json") {
+                    write_http_json_response(
+                        &mut stream,
+                        200,
+                        &json!({
+                            "name": "Research Agent",
+                            "description": "Answers research questions over A2A",
+                            "supportedInterfaces": [{
+                                "url": format!("{initial_base_url_for_thread}/rpc"),
+                                "protocolBinding": "JSONRPC",
+                                "protocolVersion": "1.0"
+                            }],
+                            "version": "1.0.0",
+                            "capabilities": {
+                                "streaming": false,
+                                "pushNotifications": false,
+                                "stateTransitionHistory": true
+                            },
+                            "defaultInputModes": ["text/plain", "application/json"],
+                            "defaultOutputModes": ["application/json"],
+                            "skills": [{
+                                "id": "research",
+                                "name": "Research",
+                                "description": "Search and synthesize results",
+                                "tags": ["search"],
+                                "inputModes": ["text/plain", "application/json"],
+                                "outputModes": ["application/json"]
+                            }]
+                        }),
+                    );
+                } else if first_line.starts_with("POST /rpc") {
+                    write!(
+                        stream,
+                        "HTTP/1.1 302 Found\r\nLocation: {target_base_url_for_thread}/rpc\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .expect("write redirect response");
+                } else {
+                    write_http_json_response(
+                        &mut stream,
+                        500,
+                        &json!({"error": format!("unexpected request: {first_line}")}),
+                    );
+                }
+            }
+        });
+
+        let manifest_key = Keypair::generate();
+        let mut contract = test_egress_contract(&initial_base_url);
+        insert_test_egress_authority(&mut contract, &target_base_url);
+        let adapter = A2aAdapter::discover(
+            A2aAdapterConfig::new(&initial_base_url, manifest_key.public_key().to_hex())
+                .with_egress_contract(contract)
+                .with_bearer_token("secret-token")
+                .with_request_cookie("partner_session", "cookie-alpha")
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover redirecting JSONRPC adapter");
+
+        let result = adapter
+            .invoke(
+                "research",
+                json!({"message": "follow redirect without leaking auth"}),
+                None,
+            )
+            .expect("invoke through redirect");
+        assert_eq!(
+            result["message"]["parts"][0]["text"],
+            "completed research request"
+        );
+
+        initial_handle.join().expect("join initial redirect server");
+        target_handle.join().expect("join target redirect server");
+        let requests = target_requests.lock().expect("lock target requests");
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].contains("POST /rpc HTTP/1.1"));
+        assert!(!requests[0].contains("Authorization:"));
+        assert!(!requests[0].contains("Cookie:"));
+    }
+
+    #[test]
     fn adapter_generic_request_auth_surfaces_apply_to_discovery_and_invoke() {
         let Some(server) = FakeA2aServer::spawn_http_json() else {
             return;
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_request_header("X-Partner", "partner-alpha")
                 .with_request_query_param("partner", "alpha")
                 .with_request_cookie("partner_session", "cookie-alpha")
@@ -146,7 +308,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let error = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_partner_policy(
                     A2aPartnerPolicy::new("partner-alpha").with_required_tenant("tenant-required"),
                 )
@@ -168,7 +330,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_task_registry_file(&registry_path)
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -245,7 +407,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover HTTP+JSON adapter");
@@ -287,7 +449,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -339,7 +501,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover HTTP+JSON adapter");
@@ -758,7 +920,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -792,7 +954,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -840,7 +1002,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover HTTP+JSON adapter");
@@ -880,7 +1042,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -941,6 +1103,18 @@ mod tests {
     }
 
     #[test]
+    fn sse_parser_enforces_contract_response_limit() {
+        let working = json!({
+            "task": task_payload("TASK_STATE_WORKING", false)
+        });
+        let body = format!("data: {}\n\n", serde_json::to_string(&working).unwrap());
+
+        let error = parse_sse_stream_with_limit(body.as_bytes(), 8, Ok).unwrap_err();
+
+        assert!(error.to_string().contains("response bytes"));
+    }
+
+    #[test]
     fn sse_parser_rejects_too_many_chunks() {
         let working = json!({
             "task": task_payload("TASK_STATE_WORKING", false)
@@ -964,7 +1138,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -1003,7 +1177,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover HTTP+JSON adapter");
@@ -1042,7 +1216,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -1073,7 +1247,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -1108,7 +1282,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover HTTP+JSON adapter");
@@ -1143,7 +1317,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -1239,7 +1413,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover HTTP+JSON adapter");
@@ -1336,7 +1510,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover JSONRPC adapter");
@@ -1367,7 +1541,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_oauth_client_credentials("client-id", "client-secret")
                 .with_oauth_scope("offline_access")
                 .with_timeout(Duration::from_secs(2)),
@@ -1420,7 +1594,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_oauth_client_credentials("client-id", "client-secret")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -1457,7 +1631,7 @@ mod tests {
             return;
         };
         let manifest_key = Keypair::generate();
-        let adapter = A2aAdapter::discover(A2aAdapterConfig::new(
+        let adapter = A2aAdapter::discover(test_adapter_config(
             server.base_url(),
             manifest_key.public_key().to_hex(),
         ))
@@ -1484,7 +1658,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_http_basic_auth("a2a-user", "secret-pass")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -1600,7 +1774,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_api_key_header("X-A2A-Key", "secret-key")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -1634,7 +1808,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_api_key_query_param("a2a_key", "secret-key")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -1668,7 +1842,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_api_key_cookie("a2a_session", "secret-cookie")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -1783,7 +1957,7 @@ mod tests {
             return;
         };
         let manifest_key = Keypair::generate();
-        let adapter = A2aAdapter::discover(A2aAdapterConfig::new(
+        let adapter = A2aAdapter::discover(test_adapter_config(
             server.base_url(),
             manifest_key.public_key().to_hex(),
         ))
@@ -1811,7 +1985,7 @@ mod tests {
         };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_tls_root_ca_pem(server.root_ca_pem())
                 .with_mtls_client_auth_pem(
                     server.client_cert_chain_pem(),
@@ -1851,7 +2025,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -1943,7 +2117,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_api_key_query_param("a2a_key", "secret-key")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -2008,7 +2182,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_http_basic_auth("a2a-user", "secret-pass")
                 .with_timeout(Duration::from_secs(2)),
         )
@@ -2077,7 +2251,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_tls_root_ca_pem(server.root_ca_pem())
                 .with_mtls_client_auth_pem(
                     server.client_cert_chain_pem(),
@@ -2147,7 +2321,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -2271,7 +2445,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -2337,7 +2511,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -2400,7 +2574,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -2466,7 +2640,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -2528,7 +2702,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_timeout(Duration::from_secs(2)),
         )
         .expect("discover adapter");
@@ -2596,7 +2770,7 @@ mod tests {
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
-        let adapter = A2aAdapter::discover(A2aAdapterConfig::new(
+        let adapter = A2aAdapter::discover(test_adapter_config(
             server.base_url(),
             manifest_key.public_key().to_hex(),
         ))
@@ -2659,7 +2833,7 @@ mod tests {
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
-            A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
                 .with_oauth_client_credentials("client-id", "client-secret")
                 .with_timeout(Duration::from_secs(2)),
         )

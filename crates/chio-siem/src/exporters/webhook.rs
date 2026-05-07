@@ -27,7 +27,7 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
 use chio_core::receipt::Decision;
-use chio_egress_contract::{send_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 /// Authentication mode for the webhook exporter.
 ///
@@ -166,7 +166,7 @@ impl WebhookExporter {
             ExportError::HttpError(format!("HttpEgressContract rejects webhook URL: {err}"))
         })?;
 
-        let client = reqwest::Client::builder()
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
@@ -202,7 +202,12 @@ impl WebhookExporter {
             config.egress_contract = Some(HttpEgressContract::permissive_for_tests(&authority));
         }
 
-        let client = reqwest::Client::builder()
+        let contract = config.egress_contract.as_ref().ok_or_else(|| {
+            ExportError::HttpError(
+                "Webhook test exporter requires an HttpEgressContract".to_string(),
+            )
+        })?;
+        let client = client_builder_with_contract(contract)
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;

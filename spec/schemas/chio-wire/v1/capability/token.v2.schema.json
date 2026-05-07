@@ -184,7 +184,7 @@
         },
         "subset": {
           "type": "boolean",
-          "const": true
+          "enum": [true]
         }
       }
     }

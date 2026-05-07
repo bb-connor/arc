@@ -13,8 +13,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "issuer", "subject", "scope", "issued_at", "expires_at", "signature"],
+        "required": ["schema", "id", "issuer", "subject", "scope", "issued_at", "expires_at", "signature"],
         "properties": {
+          "schema": {
+            "type": "string",
+            "const": "chio.capability.v1"
+          },
           "id": {
             "type": "string",
             "minLength": 1
