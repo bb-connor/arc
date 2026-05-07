@@ -1994,13 +1994,16 @@ impl ChioKernel {
         &self,
         remote_kernel_id: Option<&str>,
         now: u64,
-    ) -> chio_core::capability::CapabilityNegotiation {
+    ) -> Result<chio_core::capability::CapabilityNegotiation, String> {
         if let Some(remote) = remote_kernel_id {
             if let Some(peer) = self.federation_peer(remote, now) {
-                return peer.capabilities;
+                return Ok(peer.capabilities);
             }
+            return Err(format!(
+                "no fresh federation peer negotiation profile pinned for remote kernel {remote}"
+            ));
         }
-        chio_core::capability::CapabilityNegotiation::t1_default()
+        Ok(chio_core::capability::CapabilityNegotiation::t1_default())
     }
 
     /// Phase 20.3: install the bilateral cosigner responsible for
@@ -2859,12 +2862,11 @@ impl ChioKernel {
 
         let cap = &request.capability;
 
-        // Wave 1.5 hot-path wiring: route through the budget-aware
-        // verifier so the W1.2 sibling-sum admit step enforces against
-        // the kernel's persistent registry, matching the portable
-        // `evaluate_with_full_floor` path. Pre-Wave-1.5 hosted hot
-        // paths bypassed sibling-sum enforcement because they called
-        // the non-budget-aware `verify_capability_signature` directly.
+        // Wave 1.5 hot-path wiring: route through the full verifier so
+        // hosted requests enforce the W1.3 schema ceiling and W1.1
+        // chain-binding feature negotiation from the pinned federation peer.
+        // The sibling-sum registry mutation is still deferred below so
+        // earlier denial paths do not consume the parent's share.
         //
         // Round-3 codex P2 fix: signature is verified first (no budget
         // mutation); the actual `admit_capability_budget` call is
@@ -2872,8 +2874,12 @@ impl ChioKernel {
         // delegation-admission, subject, scope, guards) have passed.
         // Otherwise a denied call would still consume the parent's
         // share, starving later valid siblings.
-        if let Err(reason) = self.verify_capability_signature(cap) {
-            let msg = format!("signature verification failed: {reason}");
+        if let Err(reason) = self.verify_capability_full_without_budget_admit(
+            cap,
+            request.federated_origin_kernel_id.as_deref(),
+            now,
+        ) {
+            let msg = format!("capability verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
             return self.build_deny_response_with_metadata(
                 request,
@@ -3146,6 +3152,24 @@ impl ChioKernel {
         if let Err(reason) = self.admit_capability_budget(cap) {
             let msg = format!("sibling-sum budget admission failed: {reason}");
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+            if let Some(ref charge) = charge_result {
+                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                return self.build_pre_execution_monetary_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    charge,
+                    reverse.committed_cost_units_after,
+                    cap,
+                    self.merge_budget_receipt_metadata(
+                        extra_metadata.clone(),
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", &reverse)),
+                        ),
+                    ),
+                );
+            }
             return self.build_deny_response_with_metadata(
                 request,
                 &msg,
@@ -3348,17 +3372,19 @@ impl ChioKernel {
 
         let cap = &request.capability;
 
-        // Wave 1.5 hot-path wiring: route through the budget-aware
-        // verifier so the nested-flow path also enforces W1.2 sibling
-        // budgets against the kernel's persistent registry, matching
-        // the main hosted hot path and the portable
-        // `evaluate_with_full_floor` path.
+        // Wave 1.5 hot-path wiring: route through the full verifier so
+        // nested hosted requests enforce the same W1.3 schema ceiling and
+        // W1.1 chain-binding feature negotiation as the main hosted path.
         //
         // Round-3 codex P2 fix: signature first; the budget admission
         // is deferred until after all subsequent checks pass, so a
         // denied call no longer consumes the parent's share.
-        if let Err(reason) = self.verify_capability_signature(cap) {
-            let msg = format!("signature verification failed: {reason}");
+        if let Err(reason) = self.verify_capability_full_without_budget_admit(
+            cap,
+            request.federated_origin_kernel_id.as_deref(),
+            now,
+        ) {
+            let msg = format!("capability verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
             return self.build_deny_response(request, &msg, now, None);
         }
@@ -3552,6 +3578,23 @@ impl ChioKernel {
         if let Err(reason) = self.admit_capability_budget(cap) {
             let msg = format!("sibling-sum budget admission failed: {reason}");
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+            if let Some(ref charge) = charge_result {
+                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                return self.build_pre_execution_monetary_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    charge,
+                    reverse.committed_cost_units_after,
+                    cap,
+                    Some(
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", &reverse)),
+                        ),
+                    ),
+                );
+            }
             return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
         }
 
@@ -3968,6 +4011,31 @@ impl ChioKernel {
         Ok(())
     }
 
+    fn verify_capability_full_without_budget_admit(
+        &self,
+        cap: &CapabilityToken,
+        remote_kernel_id: Option<&str>,
+        now: u64,
+    ) -> Result<(), String> {
+        let trusted = self.trusted_issuer_keys();
+        let clock = chio_kernel_core::FixedClock::new(now);
+        let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
+        let trust_resolver = self.capability_trust_root_resolver_snapshot();
+        let mut budgets = chio_kernel_core::NoopBudgetRegistry;
+
+        chio_kernel_core::verify_capability_full(
+            cap,
+            &trusted,
+            &clock,
+            capability_crypto_floor(self.capability_crypto_floor),
+            &peer_profile,
+            &trust_resolver,
+            &mut budgets,
+        )
+        .map(|_| ())
+        .map_err(|error| chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason())
+    }
+
     /// Wave 1.5 hot-path wiring: signature + chain-binding verification
     /// with W1.2 sibling-sum budget admission against the kernel's
     /// persistent registry.
@@ -4061,7 +4129,9 @@ impl ChioKernel {
         // delegations cannot both observe the same residual headroom
         // and admit beyond the parent's share. The registry is internally
         // a deterministic BTreeMap; no async work happens under the lock.
-        let peer_profile = self.capability_negotiation_for_remote(None, clock.now_unix_secs());
+        let peer_profile = self
+            .capability_negotiation_for_remote(None, clock.now_unix_secs())
+            .unwrap_or_else(|_| chio_core::capability::CapabilityNegotiation::t1_default());
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,

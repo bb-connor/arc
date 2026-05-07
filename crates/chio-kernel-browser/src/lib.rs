@@ -60,7 +60,8 @@ use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend
 use chio_core_types::receipt::{ChioReceipt, ChioReceiptBody, Decision};
 use chio_kernel_core::{
     evaluate_with_full_floor as core_evaluate_with_full_floor, sign_receipt as core_sign_receipt,
-    verify_capability_full, EvaluateInput, PortableToolCallRequest, VerifiedCapability,
+    verify_capability_full, BudgetRegistry, BudgetSplitError, EvaluateInput,
+    InMemoryBudgetRegistry, PortableToolCallRequest, VerifiedCapability,
 };
 use serde::{Deserialize, Serialize};
 
@@ -126,6 +127,33 @@ pub struct EvaluateRequestJson {
     /// fail closed. V1 tokens ignore this field.
     #[serde(default)]
     pub capability_trust_roots: BTreeMap<String, ScopeHash>,
+    /// Optional parent-budget snapshots used to seed sibling-sum
+    /// enforcement before evaluating delegated tokens.
+    #[serde(default)]
+    pub parent_budget_snapshots: Vec<ParentBudgetSnapshotJson>,
+}
+
+/// Parent budget state supplied by portable callers before a delegated
+/// child token is evaluated.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParentBudgetSnapshotJson {
+    /// Parent capability id that appears in the delegated token's last
+    /// delegation link.
+    pub parent_token_id: String,
+    /// Parent share in basis points.
+    pub parent_share_bps: u16,
+    /// Siblings already admitted under this parent.
+    #[serde(default)]
+    pub admitted_children: Vec<AdmittedChildBudgetJson>,
+}
+
+/// Already-admitted child budget share in a parent snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdmittedChildBudgetJson {
+    /// Child capability id already admitted under the parent.
+    pub child_token_id: String,
+    /// Child share in basis points.
+    pub share_bps: u16,
 }
 
 /// Wire shape for the result of [`evaluate_pure`]. Flattens the fields
@@ -207,6 +235,10 @@ pub struct VerifyCapabilityRequestJson {
     /// fail-closed. V1 tokens ignore this field.
     #[serde(default)]
     pub capability_trust_roots: BTreeMap<String, ScopeHash>,
+    /// Optional parent-budget snapshots used to seed sibling-sum
+    /// enforcement before verifying delegated tokens.
+    #[serde(default)]
+    pub parent_budget_snapshots: Vec<ParentBudgetSnapshotJson>,
 }
 
 /// Wire shape for [`verify_capability_pure`] outputs.
@@ -307,6 +339,31 @@ fn decode_trusted_issuers(hex_list: &[String]) -> Result<Vec<PublicKey>, Binding
         .collect()
 }
 
+fn seed_budget_registry(
+    budgets: &mut InMemoryBudgetRegistry,
+    snapshots: &[ParentBudgetSnapshotJson],
+) -> Result<(), BindingError> {
+    for snapshot in snapshots {
+        budgets
+            .register_parent(snapshot.parent_token_id.clone(), snapshot.parent_share_bps)
+            .map_err(|error| budget_seed_error("parent budget snapshot", &error))?;
+        for child in &snapshot.admitted_children {
+            budgets
+                .try_admit_child(
+                    snapshot.parent_token_id.as_str(),
+                    child.child_token_id.clone(),
+                    child.share_bps,
+                )
+                .map_err(|error| budget_seed_error("admitted child budget snapshot", &error))?;
+        }
+    }
+    Ok(())
+}
+
+fn budget_seed_error(context: &str, error: &BudgetSplitError) -> BindingError {
+    BindingError::new("invalid_budget_snapshot", format!("{context}: {error}"))
+}
+
 /// Pure in-process evaluation used by both the wasm binding and the
 /// native unit tests. The clock is injected by the caller so the
 /// browser adapter can wire `Date::now()` while tests pin a fixed
@@ -325,7 +382,8 @@ pub fn evaluate_pure(
     let trust_resolver = move |issuer: &PublicKey| -> Option<ScopeHash> {
         trust_root_map.get(&issuer.to_hex()).cloned()
     };
-    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
+    let mut budgets = InMemoryBudgetRegistry::new();
+    seed_budget_registry(&mut budgets, &input.parent_budget_snapshots)?;
 
     // If the caller pinned a clock override, honour it; otherwise use
     // the injected browser/test clock. We can't return a `&dyn Clock`
@@ -426,11 +484,11 @@ pub fn verify_capability_pure(
         trust_root_map.get(&issuer.to_hex()).cloned()
     };
 
-    // Per-request budget registry: the browser kernel does not maintain
-    // long-lived sibling-sum state across calls, so a fresh
-    // `InMemoryBudgetRegistry` keeps the verifier fail-closed without
-    // sharing leaky cross-request state.
-    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
+    // Seed the per-request registry from caller-owned parent snapshots
+    // so delegated tokens can be verified without fabricating missing
+    // parent shares.
+    let mut budgets = InMemoryBudgetRegistry::new();
+    seed_budget_registry(&mut budgets, &input.parent_budget_snapshots)?;
     let result = match input.clock_override_unix_secs {
         Some(pinned) => {
             let fixed = chio_kernel_core::FixedClock::new(pinned);
@@ -760,7 +818,23 @@ pub mod wasm {
             clock_override_unix_secs: None,
             peer_capabilities: None,
             capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: Vec::new(),
         };
+        let clock = BrowserClock::new();
+        let verified = verify_capability_pure(request, &clock).map_err(|err| to_js_error(&err))?;
+        encode_result(&verified)
+    }
+
+    /// Verify a capability token with full portable context.
+    ///
+    /// Accepts the JSON serialization of [`VerifyCapabilityRequestJson`],
+    /// including trust roots and parent-budget snapshots for delegated
+    /// tokens. The legacy [`verify_capability`] helper remains available
+    /// for single-authority v1 checks.
+    #[wasm_bindgen]
+    pub fn verify_capability_with_context(request_json: &str) -> Result<JsValue, JsValue> {
+        let request: VerifyCapabilityRequestJson =
+            parse_json("verify_capability request", request_json)?;
         let clock = BrowserClock::new();
         let verified = verify_capability_pure(request, &clock).map_err(|err| to_js_error(&err))?;
         encode_result(&verified)
@@ -846,7 +920,8 @@ mod tests {
     use super::*;
     use chio_core_types::capability::{
         compute_attenuation_witness, scope_hash, AttenuationProof, CapabilityToken,
-        CapabilityTokenBody, CapabilityTokenV2Body, ChioScope, Operation, ToolGrant,
+        CapabilityTokenBody, CapabilityTokenV2Body, ChioScope, DelegationLink, DelegationLinkBody,
+        Operation, ToolGrant,
     };
     use chio_core_types::crypto::Keypair;
     use chio_core_types::receipt::{ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
@@ -857,6 +932,48 @@ mod tests {
 
     fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
         CapabilityToken::sign(make_capability_body("cap-1", subject, issuer), issuer).unwrap()
+    }
+
+    fn make_delegated_capability(
+        id: &str,
+        parent_id: &str,
+        subject: &Keypair,
+        issuer: &Keypair,
+    ) -> CapabilityToken {
+        let parent_link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: parent_id.to_string(),
+                delegator: issuer.public_key(),
+                delegatee: subject.public_key(),
+                attenuations: std::vec![],
+                timestamp: ISSUED_AT,
+                scope_hash: None,
+            },
+            issuer,
+        )
+        .unwrap();
+        let mut body = make_capability_body(id, subject, issuer);
+        body.delegation_chain = std::vec![parent_link];
+        CapabilityToken::sign(body, issuer).unwrap()
+    }
+
+    fn parent_budget_snapshot(parent_id: &str) -> ParentBudgetSnapshotJson {
+        ParentBudgetSnapshotJson {
+            parent_token_id: parent_id.to_string(),
+            parent_share_bps: 10_000,
+            admitted_children: std::vec![],
+        }
+    }
+
+    fn oversubscribed_budget_snapshot(parent_id: &str) -> ParentBudgetSnapshotJson {
+        ParentBudgetSnapshotJson {
+            parent_token_id: parent_id.to_string(),
+            parent_share_bps: 10_000,
+            admitted_children: std::vec![AdmittedChildBudgetJson {
+                child_token_id: "cap-sibling".to_string(),
+                share_bps: 1,
+            }],
+        }
     }
 
     fn make_capability_body(id: &str, subject: &Keypair, issuer: &Keypair) -> CapabilityTokenBody {
@@ -931,6 +1048,7 @@ mod tests {
             session_filesystem_roots: None,
             peer_capabilities: None,
             capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![],
         };
         let clock = FixedClock::new(ISSUED_AT + 1);
 
@@ -957,6 +1075,7 @@ mod tests {
             session_filesystem_roots: None,
             peer_capabilities: None,
             capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![],
         };
         let clock = FixedClock::new(EXPIRES_AT + 1);
 
@@ -984,6 +1103,7 @@ mod tests {
             session_filesystem_roots: None,
             peer_capabilities: None,
             capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![],
         };
         let clock = FixedClock::new(ISSUED_AT + 1);
 
@@ -994,6 +1114,60 @@ mod tests {
             .as_deref()
             .unwrap_or_default()
             .contains("no trust-root scope hash"));
+    }
+
+    #[test]
+    fn evaluate_pure_allows_delegated_token_with_parent_budget_snapshot() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+        let request = make_request_json(&subject);
+
+        let input = EvaluateRequestJson {
+            request,
+            capability,
+            trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+            clock_override_unix_secs: Some(ISSUED_AT + 1),
+            session_filesystem_roots: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![parent_budget_snapshot("cap-parent")],
+        };
+        let clock = FixedClock::new(ISSUED_AT + 1);
+
+        let verdict = evaluate_pure(input, &clock).expect("evaluate_pure");
+
+        assert_eq!(verdict.verdict, "allow");
+        assert_eq!(verdict.capability_id.as_deref(), Some("cap-child"));
+    }
+
+    #[test]
+    fn evaluate_pure_rejects_oversubscribed_delegated_sibling() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+        let request = make_request_json(&subject);
+
+        let input = EvaluateRequestJson {
+            request,
+            capability,
+            trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+            clock_override_unix_secs: Some(ISSUED_AT + 1),
+            session_filesystem_roots: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![oversubscribed_budget_snapshot("cap-parent")],
+        };
+        let clock = FixedClock::new(ISSUED_AT + 1);
+
+        let verdict = evaluate_pure(input, &clock).expect("evaluate_pure");
+
+        assert_eq!(verdict.verdict, "deny");
+        assert!(verdict
+            .reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("budget split rejected"));
     }
 
     #[test]
@@ -1009,12 +1183,57 @@ mod tests {
             clock_override_unix_secs: Some(ISSUED_AT + 1),
             peer_capabilities: None,
             capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![],
         };
         let clock = FixedClock::new(ISSUED_AT + 1);
 
         let err = verify_capability_pure(input, &clock).expect_err("must reject untrusted issuer");
         assert_eq!(err.code, "capability_verification_failed");
         assert!(err.message.contains("not in the trusted set"));
+    }
+
+    #[test]
+    fn verify_capability_pure_allows_delegated_token_with_parent_budget_snapshot() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+
+        let input = VerifyCapabilityRequestJson {
+            token: capability,
+            trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+            clock_override_unix_secs: Some(ISSUED_AT + 1),
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![parent_budget_snapshot("cap-parent")],
+        };
+        let clock = FixedClock::new(ISSUED_AT + 1);
+
+        let verified = verify_capability_pure(input, &clock).expect("verify delegated token");
+
+        assert_eq!(verified.id, "cap-child");
+    }
+
+    #[test]
+    fn verify_capability_pure_rejects_oversubscribed_delegated_sibling() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+
+        let input = VerifyCapabilityRequestJson {
+            token: capability,
+            trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+            clock_override_unix_secs: Some(ISSUED_AT + 1),
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![oversubscribed_budget_snapshot("cap-parent")],
+        };
+        let clock = FixedClock::new(ISSUED_AT + 1);
+
+        let err = verify_capability_pure(input, &clock)
+            .expect_err("oversubscribed sibling must be rejected");
+
+        assert_eq!(err.code, "capability_verification_failed");
+        assert!(err.message.contains("sibling-sum budget split"));
     }
 
     #[test]

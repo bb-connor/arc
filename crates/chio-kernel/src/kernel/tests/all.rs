@@ -8,9 +8,10 @@ use std::sync::{mpsc, Mutex, MutexGuard};
 use std::thread;
 
 use chio_core::capability::{
-    ChioScope, CallChainContinuationAudience, CallChainContinuationToken,
-    CallChainContinuationTokenBody, CapabilityToken, CapabilityTokenBody, Constraint,
-    DelegationLink, DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken,
+    compute_attenuation_witness, scope_hash, AttenuationProof, CallChainContinuationAudience,
+    CallChainContinuationToken, CallChainContinuationTokenBody, CapabilityToken,
+    CapabilityTokenBody, CapabilityTokenV2Body, ChioScope, Constraint, DelegationLink,
+    DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken,
     GovernedApprovalTokenBody, GovernedAutonomyContext, GovernedAutonomyTier,
     GovernedCallChainContext, GovernedTransactionIntent, GovernedUpstreamCallChainProof,
     GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation, PromptGrant, ResourceGrant,
@@ -928,6 +929,57 @@ fn make_delegation_link(
             scope_hash: None,
         },
         delegator_kp,
+    )
+    .unwrap()
+}
+
+fn make_v2_delegated_child(
+    kernel: &ChioKernel,
+    parent: &CapabilityToken,
+    parent_kp: &Keypair,
+    child_kp: &Keypair,
+    parent_scope: &ChioScope,
+    child_scope: ChioScope,
+    id: &str,
+    share_bps: u16,
+) -> CapabilityToken {
+    let parent_scope_hash = scope_hash(parent_scope).unwrap();
+    let child_scope_hash = scope_hash(&child_scope).unwrap();
+    let proof = AttenuationProof {
+        parent_scope_hash: parent_scope_hash.clone(),
+        child_scope_hash,
+        normalized_subset_proof: compute_attenuation_witness(parent_scope, &child_scope).unwrap(),
+    };
+    let link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: parent.id.clone(),
+            delegator: parent_kp.public_key(),
+            delegatee: child_kp.public_key(),
+            attenuations: vec![],
+            timestamp: current_unix_timestamp(),
+            scope_hash: Some(parent_scope_hash),
+        },
+        parent_kp,
+    )
+    .unwrap();
+
+    CapabilityToken::sign_v2(
+        CapabilityTokenV2Body {
+            body: CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: kernel.config.keypair.public_key(),
+                subject: child_kp.public_key(),
+                scope: child_scope,
+                issued_at: current_unix_timestamp(),
+                expires_at: current_unix_timestamp() + 300,
+                delegation_chain: vec![link],
+            },
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: proof,
+            budget_share_bps: Some(share_bps),
+        },
+        &kernel.config.keypair,
     )
     .unwrap()
 }
@@ -5176,6 +5228,75 @@ fn make_monetary_config() -> KernelConfig {
     }
 }
 
+struct SiblingSumMonetaryFixture {
+    kernel: ChioKernel,
+    child_a: CapabilityToken,
+    child_b: CapabilityToken,
+    child_a_kp: Keypair,
+    child_b_kp: Keypair,
+    path: PathBuf,
+}
+
+fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture {
+    let path = unique_receipt_db_path(prefix);
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut kernel = ChioKernel::new(make_monetary_config());
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+    let parent_kp = make_keypair();
+    let child_a_kp = make_keypair();
+    let child_b_kp = make_keypair();
+    let mut parent_grant = make_monetary_grant("cost-srv", "compute", 100, 1_000, "USD");
+    parent_grant.operations.push(Operation::Delegate);
+    let parent_scope = make_scope(vec![parent_grant]);
+    let child_scope = make_scope(vec![make_monetary_grant(
+        "cost-srv", "compute", 100, 1_000, "USD",
+    )]);
+    let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
+    seed_store
+        .record_capability_snapshot(&parent, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+    kernel
+        .register_budget_parent(parent.id.clone(), 5_000)
+        .unwrap();
+    kernel.set_capability_trust_root(
+        kernel.config.keypair.public_key(),
+        scope_hash(&parent_scope).unwrap(),
+    );
+
+    let child_a = make_v2_delegated_child(
+        &kernel,
+        &parent,
+        &parent_kp,
+        &child_a_kp,
+        &parent_scope,
+        child_scope.clone(),
+        &format!("cap-{prefix}-child-a"),
+        4_000,
+    );
+    let child_b = make_v2_delegated_child(
+        &kernel,
+        &parent,
+        &parent_kp,
+        &child_b_kp,
+        &parent_scope,
+        child_scope,
+        &format!("cap-{prefix}-child-b"),
+        4_000,
+    );
+
+    SiblingSumMonetaryFixture {
+        kernel,
+        child_a,
+        child_b,
+        child_a_kp,
+        child_b_kp,
+        path,
+    }
+}
+
 fn spawn_payment_test_server(
     status_code: u16,
     body: serde_json::Value,
@@ -8289,6 +8410,242 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
     assert_eq!(governed["autonomy"]["tier"], "delegated");
     assert_eq!(governed["autonomy"]["delegationBondId"], bond_id);
     assert_eq!(governed["runtime_assurance"]["tier"], "verified");
+}
+
+#[test]
+fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
+    let fixture = make_sibling_sum_monetary_fixture("sibling-sum-rollback");
+    let kernel = fixture.kernel;
+
+    let allow_response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-sibling-sum-rollback-a".to_string(),
+            capability: fixture.child_a.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: fixture.child_a_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(allow_response.verdict, Verdict::Allow);
+
+    let deny_response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-sibling-sum-rollback-b".to_string(),
+            capability: fixture.child_b.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: fixture.child_b_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(deny_response.verdict, Verdict::Deny);
+    assert!(deny_response.reason.as_deref().is_some_and(|reason| {
+        reason.contains("sibling-sum") || reason.contains("sibling sum")
+    }));
+
+    let metadata = deny_response
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("deny receipt should carry rollback metadata");
+    let financial = metadata
+        .get("financial")
+        .expect("deny receipt should carry financial metadata");
+    assert_eq!(financial["cost_charged"].as_u64(), Some(0));
+    assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
+    assert_eq!(financial["budget_remaining"].as_u64(), Some(1_000));
+
+    let usage = kernel
+        .budget_store
+        .get_usage(&fixture.child_b.id, 0)
+        .unwrap()
+        .unwrap();
+    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
+    let fixture = make_sibling_sum_monetary_fixture("nested-sibling-sum-rollback");
+    let kernel = fixture.kernel;
+    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new());
+    kernel.activate_session(&session_id).unwrap();
+    let parent_context = make_operation_context(
+        &session_id,
+        "req-nested-sibling-sum-parent",
+        "nested-parent-agent",
+    );
+    kernel
+        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
+        .unwrap();
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "unused" }),
+            model: "unused".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+
+    let allow_response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-nested-sibling-sum-rollback-a".to_string(),
+                capability: fixture.child_a.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: fixture.child_a_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+        )
+        .unwrap();
+    assert_eq!(allow_response.verdict, Verdict::Allow);
+
+    let deny_response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-nested-sibling-sum-rollback-b".to_string(),
+                capability: fixture.child_b.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: fixture.child_b_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+        )
+        .unwrap();
+    assert_eq!(deny_response.verdict, Verdict::Deny);
+    assert!(deny_response.reason.as_deref().is_some_and(|reason| {
+        reason.contains("sibling-sum") || reason.contains("sibling sum")
+    }));
+
+    let metadata = deny_response
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("deny receipt should carry rollback metadata");
+    let financial = metadata
+        .get("financial")
+        .expect("deny receipt should carry financial metadata");
+    assert_eq!(financial["cost_charged"].as_u64(), Some(0));
+    assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
+    assert_eq!(financial["budget_remaining"].as_u64(), Some(1_000));
+
+    let usage = kernel
+        .budget_store
+        .get_usage(&fixture.child_b.id, 0)
+        .unwrap()
+        .unwrap();
+    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
+    let fixture = make_sibling_sum_monetary_fixture("missing-remote-peer");
+    let kernel = fixture.kernel;
+
+    let result = kernel.evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-missing-remote-peer".to_string(),
+            capability: fixture.child_a.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: fixture.child_a_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: Some("stale-or-missing-peer".to_string()),
+        });
+
+    let err = result.expect_err("missing peer should fail closed before dispatch can allow");
+    assert!(
+        err.to_string().contains("federation cosigner missing")
+            || err
+                .to_string()
+                .contains("no fresh federation peer negotiation profile"),
+        "unexpected error: {err}"
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn portable_subject_denial_does_not_consume_sibling_budget() {
+    let fixture = make_sibling_sum_monetary_fixture("portable-subject-deny-budget");
+    let kernel = fixture.kernel;
+    let clock = chio_kernel_core::FixedClock::new(current_unix_timestamp());
+    let guards: [&dyn chio_kernel_core::Guard; 0] = [];
+
+    let wrong_subject = chio_kernel_core::PortableToolCallRequest {
+        request_id: "req-portable-wrong-subject".to_string(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: fixture.child_b_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+    };
+    let denied = kernel.evaluate_portable_verdict(
+        &fixture.child_a,
+        &wrong_subject,
+        &guards,
+        &clock,
+        None,
+    );
+    assert_eq!(denied.verdict, chio_kernel_core::Verdict::Deny);
+
+    let valid_sibling = chio_kernel_core::PortableToolCallRequest {
+        request_id: "req-portable-valid-sibling".to_string(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: fixture.child_b_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+    };
+    let allowed = kernel.evaluate_portable_verdict(
+        &fixture.child_b,
+        &valid_sibling,
+        &guards,
+        &clock,
+        None,
+    );
+    assert_eq!(allowed.verdict, chio_kernel_core::Verdict::Allow);
+
+    let _ = std::fs::remove_file(fixture.path);
 }
 
 #[test]

@@ -25,13 +25,15 @@ use chio_core::capability::{
     CHIO_CAPABILITY_V1_SCHEMA,
 };
 use chio_core::crypto::Keypair;
+use chio_federation::{ConformanceTier, FederationPeer, InProcessCoSigner};
+use chio_kernel::runtime::{NestedFlowBridge, ToolCallRequest, ToolServerConnection};
 use chio_kernel::{
-    ChioKernel, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ChioKernel, KernelConfig, KernelError, Verdict as HostedVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_kernel_core::{
-    verify_capability_full, CapabilityError, FixedClock, InMemoryBudgetRegistry,
-    PortableToolCallRequest, Verdict,
+    verify_capability_full, BudgetSplitError, CapabilityError, FixedClock, InMemoryBudgetRegistry,
+    PortableToolCallRequest, Verdict as PortableVerdict,
 };
 
 fn grant(operations: Vec<Operation>) -> ToolGrant {
@@ -76,6 +78,88 @@ fn make_kernel(issuer: Keypair) -> ChioKernel {
     ChioKernel::new(config)
 }
 
+struct EchoToolServer;
+
+impl ToolServerConnection for EchoToolServer {
+    fn server_id(&self) -> &str {
+        "srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["tool".to_string()]
+    }
+
+    fn invoke(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Ok(serde_json::json!({
+            "tool": tool_name,
+            "echo": arguments,
+        }))
+    }
+}
+
+fn now_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn direct_v2_token(
+    id: &str,
+    issuer: &Keypair,
+    subject: &Keypair,
+    scope: ChioScope,
+    issued_at: u64,
+    expires_at: u64,
+) -> CapabilityToken {
+    let witness = compute_attenuation_witness(&scope, &scope).unwrap();
+    let proof = AttenuationProof {
+        parent_scope_hash: scope_hash(&scope).unwrap(),
+        child_scope_hash: scope_hash(&scope).unwrap(),
+        normalized_subset_proof: witness,
+    };
+    CapabilityToken::sign_v2(
+        CapabilityTokenV2Body {
+            body: CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope,
+                issued_at,
+                expires_at,
+                delegation_chain: vec![],
+            },
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: proof,
+            budget_share_bps: None,
+        },
+        issuer,
+    )
+    .expect("v2 token signs")
+}
+
+fn peer(
+    kernel_id: &str,
+    keypair: &Keypair,
+    capabilities: CapabilityNegotiation,
+    now: u64,
+) -> FederationPeer {
+    FederationPeer {
+        kernel_id: kernel_id.to_string(),
+        public_key: keypair.public_key(),
+        conformance_tier: ConformanceTier::Bronze,
+        established_at: now,
+        rotation_due: now + 3_600,
+        capabilities,
+    }
+}
+
 fn portable_request(request_id: &str, capability: &CapabilityToken) -> PortableToolCallRequest {
     PortableToolCallRequest {
         request_id: request_id.to_string(),
@@ -83,6 +167,22 @@ fn portable_request(request_id: &str, capability: &CapabilityToken) -> PortableT
         server_id: "srv".to_string(),
         agent_id: capability.subject.to_hex(),
         arguments: serde_json::Value::Null,
+    }
+}
+
+fn hosted_request(request_id: &str, capability: &CapabilityToken) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: capability.clone(),
+        tool_name: "tool".to_string(),
+        server_id: "srv".to_string(),
+        agent_id: capability.subject.to_hex(),
+        arguments: serde_json::Value::Null,
+        dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
     }
 }
 
@@ -147,7 +247,7 @@ fn kernel_hot_path_rejects_inflated_parent_scope() {
 
     assert_eq!(
         verdict.verdict,
-        Verdict::Deny,
+        PortableVerdict::Deny,
         "W1.1 chain-binding must DENY the inflated parent_scope_hash attack at the kernel hot path; got verdict {:?} reason {:?}",
         verdict.verdict, verdict.reason
     );
@@ -322,7 +422,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
     let verdict_a = kernel.evaluate_portable_verdict(&child_a, &req_a, guards, &clock, None);
     assert_eq!(
         verdict_a.verdict,
-        Verdict::Allow,
+        PortableVerdict::Allow,
         "first child must be admitted (4000 bps fits 5000 bps parent share); got verdict {:?} reason {:?}",
         verdict_a.verdict, verdict_a.reason
     );
@@ -332,7 +432,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
     let verdict_b = kernel.evaluate_portable_verdict(&child_b, &req_b, guards, &clock, None);
     assert_eq!(
         verdict_b.verdict,
-        Verdict::Deny,
+        PortableVerdict::Deny,
         "W1.2 sibling-sum must DENY oversubscribed second child at the kernel hot path; got verdict {:?} reason {:?}",
         verdict_b.verdict, verdict_b.reason
     );
@@ -345,14 +445,12 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
     );
 }
 
-/// Wave 1.5 PR #593 review fix: a delegated child token must verify
-/// successfully through `verify_capability_full` even when the parent
-/// was never explicitly registered in the budget registry. The
-/// per-request `InMemoryBudgetRegistry` now auto-registers the parent
-/// at `MAX_BUDGET_SHARE_BPS` on the first `try_admit_child` call so the
-/// hot path does not fail-closed on every delegated token.
+/// Wave 1.5 PR #593 review fix: a delegated child token whose parent
+/// was never explicitly registered in the budget registry must fail
+/// closed. The verifier must not fabricate a missing parent share at
+/// `MAX_BUDGET_SHARE_BPS`.
 #[test]
-fn delegated_child_verifies_without_pre_registered_parent() {
+fn delegated_child_without_pre_registered_parent_fails_closed() {
     let parent_scope = scope_with(vec![grant(vec![
         Operation::Invoke,
         Operation::Delegate,
@@ -413,12 +511,11 @@ fn delegated_child_verifies_without_pre_registered_parent() {
     };
     let clock = FixedClock::new(150);
 
-    // Fresh per-request registry: no register_parent call before
-    // verify. With the pre-fix behavior the child would have been
-    // rejected with `UnknownParent`. The auto-register fix lets it
-    // verify.
+    // Fresh per-request registry: no register_parent call before verify.
+    // Unknown parents must stay fail-closed so the verifier does not
+    // fabricate a parent share.
     let mut budgets = InMemoryBudgetRegistry::new();
-    let verified = verify_capability_full(
+    let err = verify_capability_full(
         &token,
         &[issuer.public_key()],
         &clock,
@@ -427,17 +524,21 @@ fn delegated_child_verifies_without_pre_registered_parent() {
         &trust_resolver,
         &mut budgets,
     )
-    .expect("auto-register lets a delegated child verify on a fresh per-request registry");
-    assert_eq!(verified.id, "cap-child-autoreg");
+    .expect_err("unknown parent must fail closed on a fresh registry");
+    assert!(
+        matches!(
+            err,
+            CapabilityError::BudgetSplitRejected(BudgetSplitError::UnknownParent { .. })
+        ),
+        "expected UnknownParent budget split rejection, got: {err:?}"
+    );
 }
 
-/// Wave 1.5 PR #593 review fix: two siblings whose `budget_share_bps`
-/// running sum exceeds the per-token cap (`MAX_BUDGET_SHARE_BPS = 10000`)
-/// are rejected even when they are presented in separate verify calls
-/// against the same per-request registry. This proves the auto-register
-/// path still enforces sibling-sum across calls.
+/// Wave 1.5 PR #593 review fix: sibling-sum checks require a registered
+/// parent. A fresh registry must reject the first delegated child with
+/// `UnknownParent` instead of auto-registering a fabricated parent share.
 #[test]
-fn auto_registered_parent_rejects_oversubscribed_siblings_across_calls() {
+fn unregistered_parent_rejects_first_sibling_fail_closed() {
     let parent_scope = scope_with(vec![grant(vec![
         Operation::Invoke,
         Operation::Delegate,
@@ -447,7 +548,6 @@ fn auto_registered_parent_rejects_oversubscribed_siblings_across_calls() {
 
     let issuer = Keypair::generate();
     let subject_a = Keypair::generate();
-    let subject_b = Keypair::generate();
     let parent_id = "cap-parent-autoreg-siblings";
 
     let mk_chain = |delegatee: chio_core::PublicKey| {
@@ -491,11 +591,10 @@ fn auto_registered_parent_rejects_oversubscribed_siblings_across_calls() {
         .expect("child token signs")
     };
 
-    // Two siblings whose sum (6000 + 5000 = 11000) exceeds the cap
-    // (10000). The first verifies; the second must fail with a
-    // sibling-sum diagnostic.
+    // The first sibling would fit under a fabricated 10000-bps parent,
+    // but no verifier-owned parent snapshot has been registered. It must
+    // fail closed with UnknownParent.
     let child_a = mk_child("cap-child-a-siblings", subject_a.public_key(), 6_000);
-    let child_b = mk_child("cap-child-b-siblings", subject_b.public_key(), 5_000);
 
     let peer = CapabilityNegotiation::t1_default();
     let trust_resolver = |k: &chio_core::PublicKey| -> Option<chio_core::capability::ScopeHash> {
@@ -508,7 +607,7 @@ fn auto_registered_parent_rejects_oversubscribed_siblings_across_calls() {
     let clock = FixedClock::new(150);
 
     let mut budgets = InMemoryBudgetRegistry::new();
-    verify_capability_full(
+    let err = verify_capability_full(
         &child_a,
         &[issuer.public_key()],
         &clock,
@@ -517,31 +616,22 @@ fn auto_registered_parent_rejects_oversubscribed_siblings_across_calls() {
         &trust_resolver,
         &mut budgets,
     )
-    .expect("first sibling fits under auto-registered parent (6000 <= 10000)");
-
-    let err = verify_capability_full(
-        &child_b,
-        &[issuer.public_key()],
-        &clock,
-        CapabilityCryptoFloor::AllowClassical,
-        &peer,
-        &trust_resolver,
-        &mut budgets,
-    )
-    .expect_err("second sibling must oversubscribe (6000 + 5000 > 10000)");
+    .expect_err("unknown parent must reject the first sibling");
     assert!(
-        matches!(err, CapabilityError::BudgetSplitRejected(_)),
-        "expected BudgetSplitRejected, got: {err:?}"
+        matches!(
+            err,
+            CapabilityError::BudgetSplitRejected(BudgetSplitError::UnknownParent { .. })
+        ),
+        "expected UnknownParent, got: {err:?}"
     );
 }
 
 /// Wave 1.5 PR #593 review fix: when the negotiated peer profile
-/// disables `delegation_v2_chain_binding`, the verifier must skip
-/// trust-root resolution entirely. A v2 token whose chain would not
-/// satisfy chain-binding (no registered trust root for its issuer)
-/// still verifies because the feature flag is off.
+/// disables `delegation_v2_chain_binding`, the verifier must reject v2
+/// tokens fail-closed. It must not skip trust-root resolution and allow
+/// v2 without chain binding.
 #[test]
-fn chain_binding_disabled_skips_trust_root_resolution() {
+fn chain_binding_disabled_rejects_v2_token() {
     let scope = scope_with(vec![grant(vec![Operation::Invoke])]);
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -581,15 +671,14 @@ fn chain_binding_disabled_skips_trust_root_resolution() {
     );
 
     // Empty trust resolver: no issuer has a registered authority hash.
-    // Pre-fix, the verifier would resolve the trust root before
-    // checking the feature flag and fail-closed here. After the fix,
-    // the flag is checked first and trust-root resolution is skipped.
+    // The verifier should reject because the peer explicitly disabled
+    // chain binding for v2 capabilities.
     let trust_resolver =
         |_k: &chio_core::PublicKey| -> Option<chio_core::capability::ScopeHash> { None };
     let clock = FixedClock::new(150);
     let mut budgets = InMemoryBudgetRegistry::new();
 
-    let verified = verify_capability_full(
+    let err = verify_capability_full(
         &token,
         &[issuer.public_key()],
         &clock,
@@ -598,6 +687,109 @@ fn chain_binding_disabled_skips_trust_root_resolution() {
         &trust_resolver,
         &mut budgets,
     )
-    .expect("disabled chain-binding skips trust-root resolution and admits the v2 token");
-    assert_eq!(verified.id, "cap-v2-chain-binding-disabled");
+    .expect_err("disabled chain-binding must reject v2 token fail-closed");
+    match err {
+        CapabilityError::AttenuationViolation(message) => assert!(
+            message.contains("delegation_v2_chain_binding") || message.contains("disabled"),
+            "expected disabled chain-binding diagnostic, got: {message}"
+        ),
+        other => panic!("expected AttenuationViolation, got: {other:?}"),
+    }
+}
+
+#[test]
+#[allow(deprecated)]
+fn hosted_path_rejects_v2_token_to_v1_only_peer() {
+    let now = now_unix_secs();
+    let scope = scope_with(vec![grant(vec![Operation::Invoke])]);
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let token = direct_v2_token(
+        "cap-hosted-v2-to-v1-peer",
+        &issuer,
+        &subject,
+        scope.clone(),
+        now.saturating_sub(1),
+        now + 300,
+    );
+    let origin_kernel_id = "kernel.v1-only";
+    let origin_keypair = Keypair::generate();
+    let mut kernel = make_kernel(issuer.clone())
+        .with_capability_trust_roots(vec![(issuer.public_key(), scope_hash(&scope).unwrap())])
+        .with_federation_peers(vec![peer(
+            origin_kernel_id,
+            &origin_keypair,
+            CapabilityNegotiation::v1_default(),
+            now,
+        )]);
+    kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
+        origin_kernel_id,
+        origin_keypair,
+        issuer.public_key(),
+    )));
+    kernel.register_tool_server(Box::new(EchoToolServer));
+
+    let mut request = hosted_request("req-hosted-v2-to-v1-peer", &token);
+    request.federated_origin_kernel_id = Some(origin_kernel_id.to_string());
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("schema-ceiling denial should return a signed deny response");
+    assert_eq!(response.verdict, HostedVerdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("schema") && reason.contains("ceiling"),
+        "expected schema-ceiling denial, got: {reason}"
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn hosted_path_rejects_v2_when_peer_disables_chain_binding() {
+    let now = now_unix_secs();
+    let scope = scope_with(vec![grant(vec![Operation::Invoke])]);
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let token = direct_v2_token(
+        "cap-hosted-chain-binding-disabled",
+        &issuer,
+        &subject,
+        scope.clone(),
+        now.saturating_sub(1),
+        now + 300,
+    );
+    let origin_kernel_id = "kernel.no-chain-binding";
+    let origin_keypair = Keypair::generate();
+    let mut capabilities = CapabilityNegotiation::t1_default();
+    capabilities.features.insert(
+        capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
+        false,
+    );
+    let mut kernel = make_kernel(issuer.clone())
+        .with_capability_trust_roots(vec![(issuer.public_key(), scope_hash(&scope).unwrap())])
+        .with_federation_peers(vec![peer(
+            origin_kernel_id,
+            &origin_keypair,
+            capabilities,
+            now,
+        )]);
+    kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
+        origin_kernel_id,
+        origin_keypair,
+        issuer.public_key(),
+    )));
+    kernel.register_tool_server(Box::new(EchoToolServer));
+
+    let mut request = hosted_request("req-hosted-chain-binding-disabled", &token);
+    request.federated_origin_kernel_id = Some(origin_kernel_id.to_string());
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("chain-binding denial should return a signed deny response");
+    assert_eq!(response.verdict, HostedVerdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("chain") || reason.contains("delegation_v2_chain_binding"),
+        "expected chain-binding denial, got: {reason}"
+    );
 }

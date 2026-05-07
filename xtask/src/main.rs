@@ -1718,10 +1718,20 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
         ));
         all_names.extend(import_classes.iter().cloned());
     }
-    if subpackages.iter().any(|(subpkg, classes)| {
+    let has_capability_token = subpackages.iter().any(|(subpkg, classes)| {
         subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytoken")
-    }) {
-        imports.push_str("\nCapabilityToken = ChioCapabilitytoken\n");
+    });
+    let has_capability_token_v2 = subpackages.iter().any(|(subpkg, classes)| {
+        subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytokenV2")
+    });
+    if has_capability_token {
+        if has_capability_token_v2 {
+            imports.push_str(
+                "\nclass _CapabilityTokenMeta(type):\n    def __instancecheck__(cls, instance):\n        return isinstance(instance, (ChioCapabilitytoken, ChioCapabilitytokenV2))\n\n\nclass CapabilityToken(metaclass=_CapabilityTokenMeta):\n    \"\"\"Version-aware facade for canonical Chio capability tokens.\"\"\"\n\n    def __new__(cls, *args, **kwargs):\n        if len(args) > 1:\n            raise TypeError(\"CapabilityToken accepts at most one positional value\")\n        if args and kwargs:\n            raise TypeError(\"CapabilityToken accepts a value or keyword fields, not both\")\n        obj = args[0] if args else kwargs\n        return cls.model_validate(obj)\n\n    @classmethod\n    def __get_pydantic_core_schema__(cls, source_type, handler):\n        return core_schema.union_schema(\n            [\n                handler.generate_schema(ChioCapabilitytokenV2),\n                handler.generate_schema(ChioCapabilitytoken),\n            ]\n        )\n\n    @classmethod\n    def __get_pydantic_json_schema__(cls, schema, handler):\n        return handler(schema)\n\n    @classmethod\n    def _adapter(cls):\n        return TypeAdapter(cls)\n\n    @classmethod\n    def model_validate(cls, obj, *args, **kwargs):\n        return cls._adapter().validate_python(obj, *args, **kwargs)\n\n    @classmethod\n    def model_validate_json(cls, json_data, *args, **kwargs):\n        return cls._adapter().validate_json(json_data, *args, **kwargs)\n\n    @classmethod\n    def model_json_schema(cls, *args, **kwargs):\n        return cls._adapter().json_schema(*args, **kwargs)\n",
+            );
+        } else {
+            imports.push_str("\nCapabilityToken = ChioCapabilitytoken\n");
+        }
         all_names.push("CapabilityToken".to_string());
     }
     all_names.sort();
@@ -1745,6 +1755,9 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
          \"\"\"\n\
          \n\
          from __future__ import annotations\n\
+         \n\
+         from pydantic import TypeAdapter\n\
+         from pydantic_core import core_schema\n\
          \n\
          #: SHA-256 of the lexicographically sorted concatenation of every\n\
          #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was\n\

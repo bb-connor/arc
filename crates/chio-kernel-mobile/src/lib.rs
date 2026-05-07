@@ -79,8 +79,8 @@ use chio_custody_hw::{
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
     evaluate_with_full_floor, sign_receipt as core_sign_receipt, verify_capability_full,
-    CapabilityError, Clock, EvaluateInput, FixedClock, Guard, PortableToolCallRequest,
-    ReceiptSigningError, Verdict,
+    BudgetRegistry, BudgetSplitError, CapabilityError, Clock, EvaluateInput, FixedClock, Guard,
+    InMemoryBudgetRegistry, PortableToolCallRequest, ReceiptSigningError, Verdict,
 };
 
 // ---------------------------------------------------------------------------
@@ -149,6 +149,47 @@ struct EvaluateRequest {
     /// V2 tokens require an entry; absent issuers fail-closed.
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
+    /// Optional parent-budget snapshots used to seed sibling-sum
+    /// enforcement before delegated tokens are evaluated.
+    #[serde(default)]
+    parent_budget_snapshots: Vec<ParentBudgetSnapshot>,
+}
+
+/// Shape of the JSON object accepted by [`verify_capability_with_context`].
+#[derive(Debug, Deserialize)]
+struct VerifyCapabilityRequest {
+    /// Capability token JSON (serialized `CapabilityToken`).
+    token: serde_json::Value,
+    /// Trusted issuer public keys, lowercase hex (Ed25519).
+    trusted_issuers: Vec<String>,
+    /// Optional Unix timestamp. `None` / missing / < 0 falls back to
+    /// [`MobileClock`].
+    #[serde(default)]
+    now_secs: Option<i64>,
+    /// Optional W1.3 peer-negotiated profile.
+    #[serde(default)]
+    peer_capabilities: Option<CapabilityNegotiation>,
+    /// Optional W1.1 chain-binding trust roots, keyed by issuer hex.
+    #[serde(default)]
+    capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
+    /// Optional parent-budget snapshots used to seed sibling-sum
+    /// enforcement before delegated tokens are verified.
+    #[serde(default)]
+    parent_budget_snapshots: Vec<ParentBudgetSnapshot>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ParentBudgetSnapshot {
+    parent_token_id: String,
+    parent_share_bps: u16,
+    #[serde(default)]
+    admitted_children: Vec<AdmittedChildBudget>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct AdmittedChildBudget {
+    child_token_id: String,
+    share_bps: u16,
 }
 
 /// Tool-call request payload.
@@ -199,6 +240,52 @@ fn chio_hash(bytes: &[u8]) -> [u8; 32] {
     Sha256::digest(bytes).into()
 }
 
+fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
+    if now_secs < 0 {
+        None
+    } else {
+        Some(FixedClock::new(now_secs as u64))
+    }
+}
+
+fn seed_budget_registry(
+    budgets: &mut InMemoryBudgetRegistry,
+    snapshots: &[ParentBudgetSnapshot],
+) -> Result<(), ChioMobileError> {
+    for snapshot in snapshots {
+        budgets
+            .register_parent(snapshot.parent_token_id.clone(), snapshot.parent_share_bps)
+            .map_err(|error| budget_seed_error("parent budget snapshot", &error))?;
+        for child in &snapshot.admitted_children {
+            budgets
+                .try_admit_child(
+                    snapshot.parent_token_id.as_str(),
+                    child.child_token_id.clone(),
+                    child.share_bps,
+                )
+                .map_err(|error| budget_seed_error("admitted child budget snapshot", &error))?;
+        }
+    }
+    Ok(())
+}
+
+fn budget_seed_error(context: &str, error: &BudgetSplitError) -> ChioMobileError {
+    ChioMobileError::InvalidCapability {
+        message: format!("{context}: {error}"),
+    }
+}
+
+fn decode_trusted_issuers(values: &[String]) -> Result<Vec<PublicKey>, ChioMobileError> {
+    values
+        .iter()
+        .map(|hex_str| {
+            PublicKey::from_hex(hex_str).map_err(|error| ChioMobileError::InvalidHex {
+                message: format!("trusted issuer: {error}"),
+            })
+        })
+        .collect()
+}
+
 /// Evaluate a tool-call request against a capability token.
 ///
 /// Input: a JSON object matching [`EvaluateRequest`]. Output: a JSON
@@ -219,15 +306,7 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
             }
         })?;
 
-    let trusted: Vec<PublicKey> = parsed
-        .trusted_issuers
-        .iter()
-        .map(|hex_str| {
-            PublicKey::from_hex(hex_str).map_err(|error| ChioMobileError::InvalidHex {
-                message: format!("trusted issuer: {error}"),
-            })
-        })
-        .collect::<Result<_, _>>()?;
+    let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
 
     let portable_request = PortableToolCallRequest {
         request_id: parsed.request.request_id,
@@ -267,11 +346,11 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
         trust_root_map.get(&issuer.to_hex()).cloned()
     };
 
-    // Mobile per-request budget registry: the mobile FFI does not
-    // maintain long-lived sibling-sum state across calls. A fresh
-    // `InMemoryBudgetRegistry` keeps the verifier fail-closed without
-    // sharing cross-request state.
-    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
+    // Seed the per-request registry from caller-owned parent snapshots
+    // so delegated tokens can be evaluated without fabricating missing
+    // parent shares.
+    let mut budgets = InMemoryBudgetRegistry::new();
+    seed_budget_registry(&mut budgets, &parsed.parent_budget_snapshots)?;
     let verdict = evaluate_with_full_floor(
         EvaluateInput {
             request: &portable_request,
@@ -367,21 +446,71 @@ pub fn verify_capability(
             message: format!("authority public key: {error}"),
         })?;
 
-    let clock = MobileClock::new();
-    // Wave 1.5 hot-path wiring: route through `verify_capability_full`
-    // so the W1.3 schema-ceiling and W1.1 chain-binding rules run on
-    // the same hot path. Mobile kernels typically pin a single CA;
-    // the trust-root resolver here is intentionally empty so v2 tokens
-    // fail-closed unless the host plumbs explicit trust roots through
-    // a richer FFI surface (see `evaluate` for the JSON-driven entry
-    // point that accepts trust-root hashes per request).
-    let peer_profile = CapabilityNegotiation::t1_default();
-    let trust_resolver = |_issuer: &PublicKey| -> Option<ScopeHash> { None };
-    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
+    verify_capability_with_parts(
+        token,
+        vec![authority],
+        None,
+        CapabilityNegotiation::t1_default(),
+        std::collections::BTreeMap::new(),
+        &[],
+    )
+}
+
+/// Verify a capability token with the full portable JSON context.
+///
+/// This entry point preserves the legacy [`verify_capability`] function
+/// while giving mobile hosts a way to pass trust roots and parent-budget
+/// snapshots for delegated tokens.
+pub fn verify_capability_with_context(
+    request_json: String,
+) -> Result<VerifiedCapability, ChioMobileError> {
+    let parsed: VerifyCapabilityRequest =
+        serde_json::from_str(&request_json).map_err(|error| ChioMobileError::InvalidJson {
+            message: format!("verify capability request: {error}"),
+        })?;
+    let token: CapabilityToken =
+        serde_json::from_value(parsed.token).map_err(|error| ChioMobileError::InvalidJson {
+            message: format!("capability token: {error}"),
+        })?;
+    let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
+    let peer_profile = parsed
+        .peer_capabilities
+        .clone()
+        .unwrap_or_else(CapabilityNegotiation::t1_default);
+
+    verify_capability_with_parts(
+        token,
+        trusted,
+        parsed.now_secs,
+        peer_profile,
+        parsed.capability_trust_roots,
+        &parsed.parent_budget_snapshots,
+    )
+}
+
+fn verify_capability_with_parts(
+    token: CapabilityToken,
+    trusted: Vec<PublicKey>,
+    now_secs: Option<i64>,
+    peer_profile: CapabilityNegotiation,
+    capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
+    parent_budget_snapshots: &[ParentBudgetSnapshot],
+) -> Result<VerifiedCapability, ChioMobileError> {
+    let fixed_clock = now_secs.and_then(fixed_clock_from_secs);
+    let mobile_clock = MobileClock::new();
+    let clock: &dyn Clock = match &fixed_clock {
+        Some(clock) => clock,
+        None => &mobile_clock,
+    };
+    let trust_resolver = |issuer: &PublicKey| -> Option<ScopeHash> {
+        capability_trust_roots.get(&issuer.to_hex()).cloned()
+    };
+    let mut budgets = InMemoryBudgetRegistry::new();
+    seed_budget_registry(&mut budgets, parent_budget_snapshots)?;
     let verified = verify_capability_full(
         &token,
-        &[authority],
-        &clock,
+        &trusted,
+        clock,
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         &trust_resolver,

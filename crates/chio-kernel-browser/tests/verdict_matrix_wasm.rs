@@ -369,6 +369,7 @@ fn evaluate_browser_scenario(scenario: &VerdictScenario) -> DriverOutcome {
         session_filesystem_roots: None,
         peer_capabilities: None,
         capability_trust_roots: Default::default(),
+        parent_budget_snapshots: Vec::new(),
     };
     let browser_clock = BrowserClock::new();
     let core = match evaluate_pure(input, &browser_clock) {

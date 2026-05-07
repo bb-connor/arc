@@ -382,7 +382,12 @@ pub fn evaluate_with_full_floor(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
-    // Step 1: capability verification with all Wave 1 defenses.
+    // Step 1: capability verification with all Wave 1 defenses except
+    // persistent sibling-sum admission. Admission mutates the supplied
+    // registry, so defer it until subject, scope, and guard checks have
+    // passed. Otherwise a validly signed token for the wrong request can
+    // consume sibling share and starve later valid siblings.
+    let mut verify_only_budgets = NoopBudgetRegistry;
     let verified = match verify_capability_full(
         input.capability,
         input.trusted_issuers,
@@ -390,7 +395,7 @@ pub fn evaluate_with_full_floor(
         crypto_floor,
         peer,
         trust_root,
-        budgets,
+        &mut verify_only_budgets,
     ) {
         Ok(verified) => verified,
         Err(error) => {
@@ -467,6 +472,23 @@ pub fn evaluate_with_full_floor(
                 };
                 return deny(core_err, Some(matched_grant_index), Some(verified));
             }
+        }
+    }
+
+    if let Some(parent_link) = input.capability.delegation_chain.last() {
+        let proposed_share = input
+            .capability
+            .budget_share_bps
+            .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
+        if let Err(error) = budgets.try_admit_child(
+            parent_link.capability_id.as_str(),
+            input.capability.id.clone(),
+            proposed_share,
+        ) {
+            let core_err = KernelCoreError::InvalidCapability(
+                crate::capability_verify::CapabilityError::BudgetSplitRejected(error),
+            );
+            return deny(core_err, Some(matched_grant_index), Some(verified));
         }
     }
 

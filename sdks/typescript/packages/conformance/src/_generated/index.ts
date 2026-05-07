@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 30de931de1f17bd8605ca6f46fcafedb47fb596be748a54c6cf1fd24379b1580
+// Schema SHA: e7e973231d70421da0f833d7f7f63f0822ee51ac3e9071f67557d95ba0cf5728
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -35,6 +35,7 @@ export namespace Agent_ToolCallRequest {
     type: "tool_call_request";
     id: string;
     capability_token: {
+      schema?: "chio.capability.v1" | "chio.capability.v2";
       id: string;
       issuer: string;
       subject: string;
@@ -736,6 +737,7 @@ export namespace Kernel_CapabilityList {
   export interface ChioKernelMessageCapabilityList {
     type: "capability_list";
     capabilities: {
+      schema?: "chio.capability.v1" | "chio.capability.v2";
       id: string;
       issuer: string;
       subject: string;
