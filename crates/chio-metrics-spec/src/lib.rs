@@ -119,6 +119,8 @@ pub const ALERT_DISPATCH_LATENCY_BUCKETS_SECONDS: &[&str] =
 pub const EXPORT_LAG_BUCKETS_SECONDS: &[&str] = &["30", "60", "120", "300", "600", "1800"];
 pub const ANCHOR_ROUND_LATENCY_BUCKETS_SECONDS: &[&str] =
     &["0.1", "0.5", "1.0", "2.5", "5.0", "10.0"];
+pub const FEDERATION_HOP_LATENCY_BUCKETS_SECONDS: &[&str] =
+    &["0.01", "0.025", "0.05", "0.1", "0.25", "0.5", "1.0"];
 
 pub const REGISTRY: &[MetricDescriptor] = &[
     describe!(

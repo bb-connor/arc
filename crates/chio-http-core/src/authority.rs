@@ -316,7 +316,6 @@ impl HttpAuthority {
             Ok((prepared, receipt))
         });
         let elapsed_nanos = u64::try_from(started_at.elapsed().as_nanos()).unwrap_or(u64::MAX);
-        crate::metrics::observe_decision_latency_nanos(elapsed_nanos);
         match result {
             Ok((prepared, receipt)) => {
                 let outcome = if prepared.verdict.is_allowed() {
@@ -324,6 +323,7 @@ impl HttpAuthority {
                 } else {
                     crate::metrics::GUARD_OUTCOME_DENY
                 };
+                crate::metrics::observe_decision_latency_nanos_for_outcome(outcome, elapsed_nanos);
                 crate::metrics::record_guard_evaluation(outcome);
                 Ok(HttpAuthorityEvaluation {
                     verdict: prepared.verdict.clone(),
@@ -332,6 +332,10 @@ impl HttpAuthority {
                 })
             }
             Err(error) => {
+                crate::metrics::observe_decision_latency_nanos_for_outcome(
+                    crate::metrics::GUARD_OUTCOME_ERROR,
+                    elapsed_nanos,
+                );
                 crate::metrics::record_guard_evaluation(crate::metrics::GUARD_OUTCOME_ERROR);
                 Err(error)
             }

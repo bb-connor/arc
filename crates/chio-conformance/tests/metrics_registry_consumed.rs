@@ -101,7 +101,40 @@ fn http_core_emits_kernel_decision_latency_and_guard_evaluations() {
     let body = chio_http_core::render_http_core_metrics_prometheus();
     assert!(body.contains(CHIO_GUARD_EVALUATIONS_TOTAL));
     assert!(body.contains(CHIO_KERNEL_DECISION_LATENCY_SECONDS));
+    assert!(body.contains("chio_kernel_decision_latency_seconds_bucket"));
+    assert!(body.contains("chio_kernel_decision_latency_seconds_sum"));
+    assert!(body.contains("chio_kernel_decision_latency_seconds_count"));
+    assert!(body.contains("le=\"+Inf\""));
     assert!(body.contains("guard=\"http_authority\""));
+}
+
+#[test]
+fn receipt_write_recording_rules_only_count_infrastructure_errors() {
+    let rules = include_str!("../../../deploy/prometheus/chio-recording-rules.yml");
+    assert!(
+        rules.contains("chio_receipt_write_total{outcome=\"error\"}"),
+        "receipt-write burn-rate rules must count only infrastructure errors"
+    );
+    assert!(
+        !rules.contains("chio_receipt_write_total{outcome!=\"success\"}"),
+        "receipt-write allow or deny outcomes must not be counted as write errors"
+    );
+    assert!(
+        !rules.contains("chio_receipt_write_latency_seconds_bucket"),
+        "receipt-write latency has no emitted histogram family yet"
+    );
+    for expected in [
+        "sum by (surface, outcome, le) (rate(chio_kernel_decision_latency_seconds_bucket[5m]))",
+        "sum by (witness, outcome, le) (rate(chio_anchor_round_latency_seconds_bucket[5m]))",
+        "sum by (result, le) (rate(chio_federation_hop_latency_seconds_bucket[5m]))",
+        "sum by (guard_id, verdict, le) (rate(chio_guard_eval_duration_seconds_bucket[5m]))",
+        "sum by (route, outcome, le) (rate(chio_alert_dispatch_latency_seconds_bucket[5m]))",
+    ] {
+        assert!(
+            rules.contains(expected),
+            "histogram recording rules must preserve SRE routing labels: {expected}"
+        );
+    }
 }
 
 #[test]
@@ -115,6 +148,8 @@ fn anchor_emits_chio_anchor_round_latency_seconds() {
     );
     let body = chio_anchor::render_anchor_metrics_prometheus();
     assert!(body.contains(CHIO_ANCHOR_ROUND_LATENCY_SECONDS));
+    assert!(body.contains("chio_anchor_round_latency_seconds_bucket"));
+    assert!(body.contains("chio_anchor_round_latency_seconds_sum"));
     assert!(body.contains("_count"));
 }
 
@@ -146,6 +181,8 @@ fn federation_emits_chio_federation_hop_latency_seconds() {
     );
     let body = chio_federation::render_federation_metrics_prometheus();
     assert!(body.contains(CHIO_FEDERATION_HOP_LATENCY_SECONDS));
+    assert!(body.contains("chio_federation_hop_latency_seconds_bucket"));
+    assert!(body.contains("chio_federation_hop_latency_seconds_sum"));
     assert!(body.contains("_count"));
 }
 

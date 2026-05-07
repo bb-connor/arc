@@ -1749,9 +1749,16 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
             names = entries.join(", ")
         ));
     }
-    if subpackages.iter().any(|(subpkg, classes)| {
+    let has_capability_v1 = subpackages.iter().any(|(subpkg, classes)| {
         subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytoken")
-    }) {
+    });
+    let has_capability_v2 = subpackages.iter().any(|(subpkg, classes)| {
+        subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytokenV2")
+    });
+    if has_capability_v1 && has_capability_v2 {
+        imports.push_str("\nCapabilityToken = ChioCapabilitytoken | ChioCapabilitytokenV2\n");
+        all_names.push("CapabilityToken".to_string());
+    } else if has_capability_v1 {
         imports.push_str("\nCapabilityToken = ChioCapabilitytoken\n");
         all_names.push("CapabilityToken".to_string());
     }
@@ -1770,7 +1777,7 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
          \n\
          Re-exports every subpackage so callers can write\n\
          ``from chio_sdk._generated import CapabilityToken`` for the canonical\n\
-         capability token shape without knowing the per-subpackage layout. Class\n\
+         capability token shapes without knowing the per-subpackage layout. Class\n\
          names that collide across subpackages (for example ``Kind`` defined in\n\
          both ``anchor`` and ``capability``) are re-exported under a\n\
          ``<Subpkg><Class>`` alias (``AnchorKind``, ``CapabilityKind``) so\n\
