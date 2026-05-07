@@ -9,21 +9,19 @@
 //! `WitnessState`. If admission were keyed by receipt id, the
 //! attacker's bogus batch would slip through during a lane outage.
 //!
-//! Required behaviour: the `previously_verified_batch_hashes` set is
-//! keyed by the recomputed `batch_body_hash` (the witness-state-
-//! excluded view). Two batches with the same receipt id but
-//! different content produce different body hashes, so the
-//! attacker's batch is rejected on
+//! Required behaviour: the verifier-owned cache is keyed by the
+//! recomputed `batch_body_hash` (the witness-state-excluded view) and
+//! stores the verifier's own `verified_at` timestamp. Two batches with
+//! the same receipt id but different content produce different body
+//! hashes, so the attacker's batch is rejected on
 //! `WitnessPolicyError::StaleNotPreviouslyVerified` even though the
 //! receipt id matches.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::collections::HashSet;
-
 use chio_anchor::{
     batch_body_hash, build_anchor_batch, verify_anchor_batch_with_witness_policy_async,
-    AnchorBatchWitness, AnchorBatchWitnessKind, WitnessPolicy, WitnessState,
+    AnchorBatchWitness, AnchorBatchWitnessKind, VerifiedWitnessCache, WitnessPolicy, WitnessState,
 };
 use chio_core::hashing::Hash;
 use chio_core::Keypair;
@@ -90,8 +88,8 @@ fn stale_admission_rejects_replay_of_receipt_id_against_different_content() {
     };
     // Verifier remembers ONLY batch A's body hash (the one that
     // legitimately round-tripped against verify_inclusion).
-    let mut verified: HashSet<Hash> = HashSet::new();
-    verified.insert(body_hash_a);
+    let mut verified = VerifiedWitnessCache::new();
+    verified.insert(body_hash_a, 1_700_000_000);
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -105,7 +103,7 @@ fn stale_admission_rejects_replay_of_receipt_id_against_different_content() {
             None,
             &verified,
         ))
-        .expect("batch A admitted: body_hash present in previously_verified_batch_hashes");
+        .expect("batch A admitted: body_hash present in verifier-owned cache");
 
     // Negative case: batch B (same receipt id, different content)
     // must be rejected. Without the HIGH-1 fix this would slip
@@ -122,7 +120,7 @@ fn stale_admission_rejects_replay_of_receipt_id_against_different_content() {
     let msg = err.to_string();
     assert!(
         msg.contains("StaleNotPreviouslyVerified")
-            || msg.contains("not in the previously_verified set"),
+            || msg.contains("not in the verifier-owned previously_verified cache"),
         "expected stale-not-previously-verified rejection, got: {msg}"
     );
 }

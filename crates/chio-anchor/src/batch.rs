@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use chio_core::canonical_json_bytes;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{leaf_hash, MerkleProof, MerkleTree};
@@ -9,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::witness::{
     evaluate_witness_policy, evaluate_witness_policy_with_verifier, AnchorWitnessClient,
-    WitnessPolicy, WitnessPolicyError, WitnessState,
+    VerifiedWitnessCache, WitnessPolicy, WitnessPolicyError, WitnessState,
 };
 use crate::AnchorError;
 
@@ -88,10 +86,51 @@ impl AnchorBatch {
 
     pub fn verify_signature(&self) -> Result<bool, AnchorError> {
         validate_anchor_batch_body(&self.body)?;
-        self.body
+        if self
+            .body
             .signer_key
             .verify_canonical(&self.body, &self.signature)
+            .map_err(|error| AnchorError::Verification(error.to_string()))?
+        {
+            return Ok(true);
+        }
+        if self.body.witness_state != WitnessState::Pending {
+            return Ok(false);
+        }
+        let legacy = LegacyAnchorBatchBody::from_body(&self.body);
+        self.body
+            .signer_key
+            .verify_canonical(&legacy, &self.signature)
             .map_err(|error| AnchorError::Verification(error.to_string()))
+    }
+}
+
+/// Canonical signing view for v1 batches produced before `witnessState`
+/// was added to the body. Deserialization still defaults the field to
+/// `Pending`; verification falls back to this view only for that state.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyAnchorBatchBody<'a> {
+    schema: &'a str,
+    tree_root: &'a Hash,
+    checkpoint_ids: &'a [String],
+    inclusions: &'a [AnchorBatchInclusion],
+    witness: &'a AnchorBatchWitness,
+    issued_at: u64,
+    signer_key: &'a PublicKey,
+}
+
+impl<'a> LegacyAnchorBatchBody<'a> {
+    fn from_body(body: &'a AnchorBatchBody) -> Self {
+        Self {
+            schema: &body.schema,
+            tree_root: &body.tree_root,
+            checkpoint_ids: &body.checkpoint_ids,
+            inclusions: &body.inclusions,
+            witness: &body.witness,
+            issued_at: body.issued_at,
+            signer_key: &body.signer_key,
+        }
     }
 }
 
@@ -161,21 +200,15 @@ pub fn verify_anchor_batch(batch: &AnchorBatch) -> Result<(), AnchorError> {
 }
 
 /// Verify the batch and apply [`WitnessPolicy`] using `now` (UNIX
-/// seconds) as the wall clock. ADVISORY variant: does NOT call out to
-/// the witness lane.
+/// seconds) as the wall clock. This sync entry point does NOT call out
+/// to the witness lane and has no verifier-owned stale cache.
 ///
-/// When `policy.require_public_witness=true` and the state is
-/// `Witnessed`, this function only checks the receipt's structural
-/// invariants (root binding, body-hash binding). It will accept a
-/// self-asserted Witnessed state. To honor the policy with real
-/// public-witness verification (Rekor SET signature, OTS Bitcoin
-/// attestation, etc.), use
-/// [`verify_anchor_batch_with_witness_policy_async`].
-///
-/// This advisory entry-point remains for the existing sync verifiers
-/// (e.g. config validators that haven't wired an async runtime). If
-/// `require_public_witness` is set, callers SHOULD prefer the async
-/// path.
+/// When `policy.require_public_witness=true`, this function fails
+/// closed for `Witnessed` and `Stale` states after structural checks.
+/// Use [`verify_anchor_batch_with_witness_policy_async`] for
+/// load-bearing public-witness verification and stale fallback.
+/// Advisory mode (`require_public_witness=false`) remains available
+/// for callers that intentionally treat witness state as non-binding.
 pub fn verify_anchor_batch_with_witness_policy(
     batch: &AnchorBatch,
     policy: &WitnessPolicy,
@@ -193,24 +226,19 @@ pub fn verify_anchor_batch_with_witness_policy(
 /// `batch.body.witness.kind`. Required when the policy is
 /// load-bearing AND the state is `Witnessed`.
 ///
-/// `previously_verified_batch_hashes`: the set of recomputed
-/// `batch_body_hash` values (witness-state-excluded) for batches
-/// whose witness receipts some prior call to
-/// `client.verify_inclusion` accepted. Used for `Stale` admission
-/// when the lane is currently down: the verifier remembers the
-/// content hash of a previously-verified batch and tolerates a
-/// brief lane outage. Binding to the batch body hash, not the
-/// receipt id, prevents an attacker from replaying a previously
-/// observed receipt id against a different batch's content
-/// (HIGH-1 fix in PR #594 review). Producers cannot bootstrap
-/// themselves into this set; the caller (verifier daemon, CI
-/// gate, ...) is the authoritative source.
+/// `previously_verified_witnesses`: verifier-owned cache from
+/// recomputed `batch_body_hash` (witness-state-excluded) to the
+/// verifier's own successful `verify_inclusion` timestamp. Used for
+/// `Stale` admission when the lane is currently down. Binding to the
+/// batch body hash and verifier timestamp, not the receipt id or
+/// producer-signed `last_verified`, prevents replay and fabricated
+/// freshness.
 pub async fn verify_anchor_batch_with_witness_policy_async(
     batch: &AnchorBatch,
     policy: &WitnessPolicy,
     now: i64,
     client: Option<&dyn AnchorWitnessClient>,
-    previously_verified_batch_hashes: &HashSet<Hash>,
+    previously_verified_witnesses: &VerifiedWitnessCache,
 ) -> Result<(), AnchorError> {
     verify_anchor_batch(batch)?;
     evaluate_witness_policy_with_verifier(
@@ -219,7 +247,7 @@ pub async fn verify_anchor_batch_with_witness_policy_async(
         policy,
         now,
         client,
-        previously_verified_batch_hashes,
+        previously_verified_witnesses,
     )
     .await
     .map_err(witness_policy_to_anchor_error)
@@ -328,5 +356,28 @@ mod tests {
         let mut impersonated = batch;
         impersonated.body.witness.root = Hash::zero();
         assert!(verify_anchor_batch(&impersonated).is_err());
+    }
+
+    #[test]
+    fn verifies_legacy_signature_that_omitted_pending_witness_state() {
+        let kp = Keypair::generate();
+        let witness = AnchorBatchWitness {
+            kind: AnchorBatchWitnessKind::Rekor,
+            witness_id: "rekor:legacy".to_string(),
+            root: Hash::zero(),
+            observed_at: Some(1710000000),
+        };
+        let body = build_anchor_batch_body(
+            vec!["checkpoint-legacy".to_string()],
+            witness,
+            1710000000,
+            kp.public_key(),
+        )
+        .unwrap();
+        let legacy_view = LegacyAnchorBatchBody::from_body(&body);
+        let (signature, _) = kp.sign_canonical(&legacy_view).unwrap();
+        let batch = AnchorBatch { body, signature };
+
+        verify_anchor_batch(&batch).expect("legacy omitted witnessState signature verifies");
     }
 }

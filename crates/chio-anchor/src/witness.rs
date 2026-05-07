@@ -20,17 +20,16 @@
 //!   [`AnchorWitnessClient::verify_inclusion`]. Self-carried
 //!   `Witnessed` states are not sufficient.
 //! - `WitnessState::Stale` is admitted only if the recomputed
-//!   [`batch_body_hash`] of the current batch is in the caller-supplied
-//!   `previously_verified_batch_hashes` set. Producers cannot bootstrap
-//!   themselves into the verified set, and an attacker who has
-//!   observed a single previously-verified receipt id cannot reuse
-//!   that id to admit a different batch's content (HIGH-1 fix in PR
-//!   #594 review).
+//!   [`batch_body_hash`] of the current batch maps to a verifier-owned
+//!   `verified_at` timestamp inside the caller-supplied
+//!   [`VerifiedWitnessCache`]. Producers cannot bootstrap themselves
+//!   into the verified cache or refresh it by signing a fresh
+//!   `last_verified` value.
 
 pub mod ots;
 pub mod rekor;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use chio_core::canonical_json_bytes;
 use chio_core::hashing::{sha256, Hash};
@@ -131,6 +130,15 @@ pub trait AnchorWitnessClient: Send + Sync {
     async fn verify_inclusion(&self, receipt: &WitnessReceipt) -> Result<(), AnchorWitnessError>;
 }
 
+/// Verifier-owned witness cache keyed by [`batch_body_hash`].
+///
+/// The value is the verifier's own UNIX-second timestamp from the
+/// successful `AnchorWitnessClient::verify_inclusion` round-trip. It
+/// is intentionally separate from producer-signed
+/// `WitnessState::Stale::last_verified`, which remains telemetry only
+/// and is not trusted for stale admission.
+pub type VerifiedWitnessCache = HashMap<Hash, i64>;
+
 /// Stable hash-input view of [`AnchorBatchBody`] used to compute the
 /// receipt's `body_hash`.
 ///
@@ -194,10 +202,12 @@ pub fn batch_body_hash_from_body(body: &AnchorBatchBody) -> Result<Hash, AnchorW
 /// whose `witness_root == batch.body.tree_root` and whose
 /// `body_hash == batch_body_hash(batch)`.
 ///
-/// `Stale`: the witness lane was last verified at `last_verified` and
-/// re-verification returned an error. Verifier policy
-/// `require_public_witness=true` rejects new batches but tolerates
-/// already-witnessed receipts up to `stale_window_seconds`.
+/// `Stale`: the producer reports that the witness lane was last
+/// verified at `last_verified` and re-verification returned an error.
+/// Verifier policy `require_public_witness=true` treats
+/// `last_verified` as untrusted telemetry and admits stale batches
+/// only when the verifier-owned [`VerifiedWitnessCache`] has a fresh
+/// `verified_at` timestamp for the recomputed batch body hash.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum WitnessState {
@@ -218,9 +228,11 @@ pub enum WitnessState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WitnessPolicy {
-    /// When true, batches in [`WitnessState::Pending`] are rejected
-    /// and `Stale` batches with `now - last_verified > stale_window`
-    /// are rejected. When false, all states are accepted (advisory).
+    /// When true, batches in [`WitnessState::Pending`] are rejected,
+    /// self-asserted [`WitnessState::Witnessed`] requires the async
+    /// verifier path, and [`WitnessState::Stale`] requires a
+    /// verifier-owned cache entry. When false, all states are accepted
+    /// after structural checks (advisory).
     pub require_public_witness: bool,
     /// Tolerance window for already-witnessed-but-temporarily-down
     /// lanes. Only consulted when `require_public_witness=true`.
@@ -241,9 +253,9 @@ impl Default for WitnessPolicy {
 pub enum WitnessPolicyError {
     #[error("require_public_witness=true but batch is in Pending state")]
     PendingNotAllowed,
-    #[error("require_public_witness=true and stale window exceeded: last_verified={last_verified} now={now} stale_window_seconds={stale_window_seconds}")]
-    StaleWindowExceeded {
-        last_verified: i64,
+    #[error("require_public_witness=true and stale verifier cache window exceeded: verified_at={verified_at} now={now} stale_window_seconds={stale_window_seconds}")]
+    StaleVerifierCacheWindowExceeded {
+        verified_at: i64,
         now: i64,
         stale_window_seconds: i64,
     },
@@ -259,12 +271,14 @@ pub enum WitnessPolicyError {
     },
     #[error("require_public_witness=true requires an AnchorWitnessClient verifier but none was supplied")]
     VerifierRequired,
+    #[error("require_public_witness=true rejects self-asserted Witnessed without a live AnchorWitnessClient verifier")]
+    SelfAssertedWitnessed,
     #[error("witness lane verification failed: {0}")]
     VerifierRejected(String),
-    #[error("require_public_witness=true and stale batch body_hash is not in the previously_verified set: batch_body_hash={batch_body_hash}")]
+    #[error("require_public_witness=true and stale batch body_hash is not in the verifier-owned previously_verified cache: batch_body_hash={batch_body_hash}")]
     StaleNotPreviouslyVerified { batch_body_hash: String },
-    #[error("require_public_witness=true and stale receipt last_verified={last_verified} is later than verifier clock now={now}")]
-    StaleLastVerifiedInFuture { last_verified: i64, now: i64 },
+    #[error("require_public_witness=true and stale verifier cache timestamp verified_at={verified_at} is later than verifier clock now={now}")]
+    StaleVerifierCacheInFuture { verified_at: i64, now: i64 },
 }
 
 /// Apply [`WitnessPolicy`] without performing live witness-lane
@@ -281,12 +295,16 @@ pub fn evaluate_witness_policy(
     batch: &AnchorBatch,
     state: &WitnessState,
     policy: &WitnessPolicy,
-    now: i64,
+    _now: i64,
 ) -> Result<(), WitnessPolicyError> {
     match state {
         WitnessState::Witnessed { receipt, .. } => {
             check_witnessed_invariants(batch, receipt)?;
-            Ok(())
+            if policy.require_public_witness {
+                Err(WitnessPolicyError::SelfAssertedWitnessed)
+            } else {
+                Ok(())
+            }
         }
         WitnessState::Pending => {
             if policy.require_public_witness {
@@ -295,19 +313,18 @@ pub fn evaluate_witness_policy(
                 Ok(())
             }
         }
-        WitnessState::Stale { last_verified, .. } => {
+        WitnessState::Stale { .. } => {
             if !policy.require_public_witness {
                 return Ok(());
             }
-            if now.saturating_sub(*last_verified) > policy.stale_window_seconds {
-                Err(WitnessPolicyError::StaleWindowExceeded {
-                    last_verified: *last_verified,
-                    now,
-                    stale_window_seconds: policy.stale_window_seconds,
-                })
-            } else {
-                Ok(())
-            }
+            let candidate = batch_body_hash(batch).map_err(|error| {
+                WitnessPolicyError::VerifierRejected(format!(
+                    "recompute batch_body_hash for stale admission: {error}"
+                ))
+            })?;
+            Err(WitnessPolicyError::StaleNotPreviouslyVerified {
+                batch_body_hash: candidate.to_hex_prefixed(),
+            })
         }
     }
 }
@@ -343,17 +360,14 @@ fn check_witnessed_invariants(
 ///   `body_hash == batch_body_hash(batch)`) are checked first, then
 ///   `client.verify_inclusion(receipt)` is invoked. The receipt is
 ///   not honored unless both pass.
-/// - `Stale`: `last_verified` MUST be in the past
-///   (`last_verified <= now`); a future timestamp is fail-closed.
-///   The recomputed [`batch_body_hash`] of the current batch MUST
-///   appear in `previously_verified_batch_hashes` (i.e. some prior
-///   call to `client.verify_inclusion` succeeded against the SAME
-///   batch content). Binding to the batch hash, not the witness id,
-///   prevents an attacker from re-issuing arbitrary stale batches
-///   under a previously-observed receipt id (HIGH-1 fix in PR #594
-///   review). Producers cannot fake their way into the
-///   previously-verified set; the caller (a verifier daemon, a CI
-///   gate) is the authoritative source.
+/// - `Stale`: the recomputed [`batch_body_hash`] of the current batch
+///   MUST map to a verifier-owned `verified_at` timestamp in
+///   `previously_verified_witnesses` (i.e. some prior call to
+///   `client.verify_inclusion` succeeded against the SAME batch
+///   content at that verifier time). Binding to the batch hash and
+///   verifier timestamp, not the witness id or producer-signed
+///   `last_verified`, prevents an attacker from re-issuing arbitrary
+///   stale batches under a fresh self-asserted timestamp.
 /// - `Pending`: rejected outright.
 ///
 /// When `require_public_witness=false` this function delegates to the
@@ -364,7 +378,7 @@ pub async fn evaluate_witness_policy_with_verifier(
     policy: &WitnessPolicy,
     now: i64,
     client: Option<&dyn AnchorWitnessClient>,
-    previously_verified_batch_hashes: &HashSet<Hash>,
+    previously_verified_witnesses: &VerifiedWitnessCache,
 ) -> Result<(), WitnessPolicyError> {
     if !policy.require_public_witness {
         return evaluate_witness_policy(batch, state, policy, now);
@@ -380,47 +394,28 @@ pub async fn evaluate_witness_policy_with_verifier(
                 .map_err(|error| WitnessPolicyError::VerifierRejected(error.to_string()))?;
             Ok(())
         }
-        WitnessState::Stale { last_verified, .. } => {
-            // P2 fix: a stale state whose last-verified timestamp
-            // claims to be in the future is fail-closed. The verifier
-            // clock is authoritative and a producer cannot fabricate
-            // a future-stamped admission.
-            if *last_verified > now {
-                return Err(WitnessPolicyError::StaleLastVerifiedInFuture {
-                    last_verified: *last_verified,
-                    now,
-                });
-            }
-            if now.saturating_sub(*last_verified) > policy.stale_window_seconds {
-                return Err(WitnessPolicyError::StaleWindowExceeded {
-                    last_verified: *last_verified,
-                    now,
-                    stale_window_seconds: policy.stale_window_seconds,
-                });
-            }
-            // HIGH-1 fix: stale admission binds to the recomputed
-            // batch body hash, not the witness id. The same receipt
-            // id cannot be replayed against a different batch's
-            // content because the previously-verified set is keyed
-            // by the witness-state-excluded body hash.
-            //
-            // Production callers wire the previously-verified set
-            // from the durable store of batch hashes that completed a
-            // verify_inclusion round-trip. If the set is empty (as
-            // for a brand-new verifier), Stale admission is denied:
-            // fail-closed.
+        WitnessState::Stale { .. } => {
             let candidate = batch_body_hash(batch).map_err(|error| {
                 WitnessPolicyError::VerifierRejected(format!(
                     "recompute batch_body_hash for stale admission: {error}"
                 ))
             })?;
-            if previously_verified_batch_hashes.contains(&candidate) {
-                Ok(())
-            } else {
-                Err(WitnessPolicyError::StaleNotPreviouslyVerified {
+            let Some(verified_at) = previously_verified_witnesses.get(&candidate).copied() else {
+                return Err(WitnessPolicyError::StaleNotPreviouslyVerified {
                     batch_body_hash: candidate.to_hex_prefixed(),
-                })
+                });
+            };
+            if verified_at > now {
+                return Err(WitnessPolicyError::StaleVerifierCacheInFuture { verified_at, now });
             }
+            if now.saturating_sub(verified_at) > policy.stale_window_seconds {
+                return Err(WitnessPolicyError::StaleVerifierCacheWindowExceeded {
+                    verified_at,
+                    now,
+                    stale_window_seconds: policy.stale_window_seconds,
+                });
+            }
+            Ok(())
         }
     }
 }
@@ -473,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn witness_policy_rejects_stale_outside_window() {
+    fn witness_policy_rejects_stale_without_verifier_cache() {
         let batch = sample_batch();
         let state = WitnessState::Stale {
             last_verified: 1_700_000_000,
@@ -486,7 +481,7 @@ mod tests {
         let err = evaluate_witness_policy(&batch, &state, &policy, 1_700_000_500).unwrap_err();
         assert!(matches!(
             err,
-            WitnessPolicyError::StaleWindowExceeded { .. }
+            WitnessPolicyError::StaleNotPreviouslyVerified { .. }
         ));
     }
 
@@ -525,6 +520,48 @@ mod tests {
             err,
             WitnessPolicyError::WitnessReceiptRootMismatch { .. }
         ));
+    }
+
+    #[test]
+    fn sync_require_public_witness_rejects_self_asserted_witnessed() {
+        let batch = sample_batch();
+        let receipt = WitnessReceipt {
+            kind: AnchorBatchWitnessKind::Rekor,
+            external_uuid: "uuid-self-asserted".to_string(),
+            published_at: 1_700_000_010,
+            inclusion_proof: vec![1, 2, 3],
+            witness_root: batch.body.tree_root,
+            body_hash: batch_body_hash(&batch).unwrap(),
+        };
+        let state = WitnessState::Witnessed {
+            receipt,
+            observed_at: 1_700_000_010,
+        };
+        let policy = WitnessPolicy {
+            require_public_witness: true,
+            stale_window_seconds: 60,
+        };
+        let err = evaluate_witness_policy(&batch, &state, &policy, 1_700_000_100).unwrap_err();
+        assert!(matches!(err, WitnessPolicyError::SelfAssertedWitnessed));
+    }
+
+    #[test]
+    fn advisory_mode_accepts_witnessed_with_structural_invariants() {
+        let batch = sample_batch();
+        let receipt = WitnessReceipt {
+            kind: AnchorBatchWitnessKind::Rekor,
+            external_uuid: "uuid-advisory".to_string(),
+            published_at: 1_700_000_010,
+            inclusion_proof: vec![1, 2, 3],
+            witness_root: batch.body.tree_root,
+            body_hash: batch_body_hash(&batch).unwrap(),
+        };
+        let state = WitnessState::Witnessed {
+            receipt,
+            observed_at: 1_700_000_010,
+        };
+        evaluate_witness_policy(&batch, &state, &WitnessPolicy::default(), 1_700_000_100)
+            .expect("advisory mode still accepts structurally-valid Witnessed state");
     }
 
     /// HIGH-1 regression: the body_hash bound by a receipt MUST be
@@ -615,7 +652,7 @@ mod tests {
             &policy,
             1_700_000_100,
             Some(&client),
-            &HashSet::new(),
+            &VerifiedWitnessCache::new(),
         )
         .await
         .expect_err("self-asserted Witnessed must be rejected by the verifier client");
@@ -644,7 +681,7 @@ mod tests {
             &policy,
             1_700_000_100,
             None,
-            &HashSet::new(),
+            &VerifiedWitnessCache::new(),
         )
         .await
         .expect_err("stale without prior verification must be rejected");
@@ -668,8 +705,8 @@ mod tests {
             require_public_witness: true,
             stale_window_seconds: 60 * 60,
         };
-        let mut verified = HashSet::new();
-        verified.insert(batch_body_hash(&signed).unwrap());
+        let mut verified = VerifiedWitnessCache::new();
+        verified.insert(batch_body_hash(&signed).unwrap(), 1_700_000_000);
         evaluate_witness_policy_with_verifier(
             &signed,
             &signed.body.witness_state,
@@ -740,8 +777,8 @@ mod tests {
             stale_window_seconds: 60 * 60,
         };
         // Verifier remembers ONLY batch A's body hash.
-        let mut verified = HashSet::new();
-        verified.insert(body_hash_a);
+        let mut verified = VerifiedWitnessCache::new();
+        verified.insert(body_hash_a, 1_700_000_000);
 
         // Batch B (same receipt id, different content) must be
         // rejected even though the receipt id appears identical.
@@ -761,41 +798,41 @@ mod tests {
         ));
     }
 
-    /// P2 (round-2 review, codex): a Stale state with `last_verified`
-    /// in the future of the verifier clock is fail-closed. A producer
-    /// cannot fabricate a future-stamped admission.
+    /// P0 regression: stale admission uses the verifier-owned
+    /// `verified_at` cache timestamp, not the producer-signed
+    /// `last_verified` value. A producer cannot refresh a stale cache
+    /// by signing a fresh artifact timestamp.
     #[tokio::test]
-    async fn require_public_witness_rejects_stale_with_future_last_verified() {
+    async fn require_public_witness_rejects_stale_with_fresh_producer_timestamp_but_stale_cache() {
         let kp = Keypair::generate();
         let mut batch = sample_batch();
-        batch.body.witness.witness_id = "rekor:uuid-future-stamp".to_string();
+        batch.body.witness.witness_id = "rekor:uuid-stale-cache".to_string();
         batch.body.witness_state = WitnessState::Stale {
-            // 500s in the future of the verifier clock below.
+            // Producer claims freshness. This value is not trusted for
+            // stale admission.
             last_verified: 1_700_000_500,
             error: "rekor 503".to_string(),
         };
         let signed = AnchorBatch::sign(batch.body, &kp).unwrap();
         let policy = WitnessPolicy {
             require_public_witness: true,
-            stale_window_seconds: 60 * 60,
+            stale_window_seconds: 60,
         };
-        // Even with the body hash present, a future last_verified is
-        // fail-closed.
-        let mut verified = HashSet::new();
-        verified.insert(batch_body_hash(&signed).unwrap());
+        let mut verified = VerifiedWitnessCache::new();
+        verified.insert(batch_body_hash(&signed).unwrap(), 1_700_000_000);
         let err = evaluate_witness_policy_with_verifier(
             &signed,
             &signed.body.witness_state,
             &policy,
-            1_700_000_000,
+            1_700_000_500,
             None,
             &verified,
         )
         .await
-        .expect_err("stale with future last_verified must be rejected");
+        .expect_err("stale verifier cache timestamp must control admission");
         assert!(matches!(
             err,
-            WitnessPolicyError::StaleLastVerifiedInFuture { .. }
+            WitnessPolicyError::StaleVerifierCacheWindowExceeded { .. }
         ));
     }
 }

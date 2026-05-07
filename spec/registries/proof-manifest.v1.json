@@ -106,10 +106,10 @@
       "claim_ref": "claim.anchor.batch_continuity",
       "introduced_by": "trajectory-4/W2.3",
       "evidence": [
-        {"kind": "lean_theorem", "ref": "theorem.anchor.merkle_inclusion"},
-        {"kind": "lean_theorem", "ref": "theorem.anchor.public_witness_anti_equivocation"},
         {"kind": "rust_test", "ref": "crates/chio-anchor/src/batch.rs::anchor_batch_roundtrip_and_negative_roots"},
+        {"kind": "rust_test", "ref": "crates/chio-anchor/src/batch.rs::verifies_legacy_signature_that_omitted_pending_witness_state"},
         {"kind": "rust_test", "ref": "crates/chio-anchor/src/witness.rs::witness_policy_rejects_pending_when_required"},
+        {"kind": "rust_test", "ref": "crates/chio-anchor/src/witness.rs::sync_require_public_witness_rejects_self_asserted_witnessed"},
         {"kind": "rust_test", "ref": "crates/chio-anchor/src/witness/rekor.rs::rekor_body_b64_round_trips_real_batch_hash"},
         {"kind": "rust_test", "ref": "crates/chio-anchor/src/witness/ots.rs::ots_inclusion_proof_round_trips_through_parser"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/anchor_batch_forged_root_rejected.rs"},
@@ -118,6 +118,9 @@
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/anchor_batch_stale_witness_fallback.rs"}
       ],
       "evidence_proposed": [
+        {"kind": "lean_theorem", "ref": "theorem.anchor.merkle_inclusion"},
+        {"kind": "lean_theorem", "ref": "theorem.anchor.public_witness_anti_equivocation"},
+        {"kind": "rekor_merkle_inclusion_verifier", "ref": "crates/chio-anchor/src/witness/rekor.rs"},
         {"kind": "doc", "ref": "docs/security/public-witness-semantics.md"}
       ]
     },

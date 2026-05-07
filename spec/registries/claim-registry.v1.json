@@ -60,9 +60,8 @@
       "id": "claim.anchor.batch_continuity",
       "status": "enforced",
       "schema_artifact": "spec/schemas/chio-wire/v1/anchor/batch.schema.json",
-      "summary": "A chio.anchor_batch.v1 publishes a Merkle root over N receipts/checkpoints to a public witness lane (Rekor / OTS / Solana memo) via the AnchorWitnessClient trait (RekorClient + OtsClient). Per-receipt local sign stays unchanged; the batch upgrades continuity and non-repudiation, additive over per-receipt verification. The WitnessState state machine (Pending -> Witnessed -> Stale) is consulted by verify_anchor_batch_with_witness_policy to fail-close pending batches when require_public_witness is true. Closes the W2.3 P0 type-substrate-only audit finding on T1.3.",
+      "summary": "A chio.anchor_batch.v1 signs a Merkle root over N receipts/checkpoints and can bind that root to a public witness lane (Rekor / OTS / Solana memo) through AnchorWitnessClient. Per-receipt local signatures stay authoritative. The enforced subset recomputes Merkle roots/proofs, checks witness root/body-hash binding, verifies Rekor signed-entry timestamps, rejects sync self-asserted Witnessed under require_public_witness, and admits Stale only from a verifier-owned batch_body_hash -> verified_at cache. Rekor Merkle inclusion-proof checking and formal public-witness anti-equivocation remain proposed evidence.",
       "introduced_in": "trajectory-4/W2.3",
-      "depends_on_theorems": ["theorem.anchor.merkle_inclusion", "theorem.anchor.public_witness_anti_equivocation"],
       "proof_manifest_ref": "manifest.anchor.batch_continuity"
     }
   ],

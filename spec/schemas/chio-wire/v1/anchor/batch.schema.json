@@ -127,7 +127,7 @@
           "required": ["kind", "receipt", "observed_at"],
           "properties": {
             "kind": {"type": "string", "const": "witnessed"},
-            "receipt": {"type": "object"},
+            "receipt": {"$ref": "#/$defs/witnessReceipt"},
             "observed_at": {"type": "integer"}
           }
         },
@@ -142,6 +142,43 @@
           }
         }
       ]
+    },
+    "witnessReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "externalUuid",
+        "publishedAt",
+        "inclusionProof",
+        "witnessRoot",
+        "bodyHash"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["rekor", "ots", "solana_memo"]
+        },
+        "externalUuid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publishedAt": {
+          "type": "integer"
+        },
+        "inclusionProof": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "witnessRoot": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-f]{64}$"
+        },
+        "bodyHash": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-f]{64}$"
+        }
+      }
     }
   }
 }

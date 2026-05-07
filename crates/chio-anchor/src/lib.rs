@@ -98,7 +98,7 @@ pub use witness::rekor::{
 pub use witness::{
     batch_body_hash, batch_body_hash_from_body, evaluate_witness_policy,
     evaluate_witness_policy_with_verifier, AnchorWitnessClient, AnchorWitnessError, BatchHashInput,
-    WitnessPolicy, WitnessPolicyError, WitnessReceipt, WitnessState,
+    VerifiedWitnessCache, WitnessPolicy, WitnessPolicyError, WitnessReceipt, WitnessState,
 };
 
 #[derive(Debug, thiserror::Error)]
