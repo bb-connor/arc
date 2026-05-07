@@ -262,9 +262,9 @@ EXPLICIT_BUCKETS = {
             "signature.v1.json declares hybrid; federation handshake not yet hybrid-by-default; SAS missing"),
     # SRE pack is mandatory T1.5; not yet shipped.
     "O-1": ("DONE", "y", "crates/chio-conformance/tests/metrics_registry_consumed.rs", "n-a", "02",
-            "W2.4 wired chio-metrics-spec into chio-mcp-edge, chio-acp-edge, chio-a2a-edge, chio-http-core, chio-anchor, chio-federation, chio-wasm-guards; gate scope expanded; smoke test asserts emission"),
-    "O-3": ("NONE", "n", "NONE", "n-a", "06",
-            "no burn-rate alert pack in deploy/prometheus/; ships with T1.5"),
+            "W2.4 wired chio-metrics-spec into chio-mcp-edge, chio-acp-edge, chio-a2a-edge, chio-http-core, chio-anchor, chio-federation, chio-wasm-guards; gate scope expanded; smoke test drives production emission boundaries where feasible"),
+    "O-3": ("PARTIAL", "y", "crates/chio-conformance/tests/metrics_registry_consumed.rs", "n-a", "06",
+            "deploy/prometheus/ has SRE alert and recording-rule artifacts; W2.4 fixes receipt-write error ratios to count only outcome=\"error\", labels HITL PendingApproval as outcome=\"pending_approval\", and keeps histogram_quantile rules on emitted _bucket families with routing labels. Deployment proof and full T1.5 rollout remain pending."),
     "O-14": ("NONE", "n", "NONE", "n-a", "06",
              "PHI logging only enforced by review; chio-log-redact not yet a tracing layer"),
     # chio explain CLI: NONE today.
@@ -331,7 +331,7 @@ EXPLICIT_CLOSE_BAR = {
     23: ("NONE", "n", "NONE", "n-a", "16",
          "spec/registries/* present; per-T1 slice gate enforcement comes online with each slice close"),
     24: ("PARTIAL", "y", "crates/chio-conformance/tests/metrics_registry_consumed.rs", "n-a", "02",
-         "W2.4 closed the consumption part: 6 edges + chio-wasm-guards consume the registry; chio-metrics-spec dep present in 9 Cargo.toml files; gate scope expanded; burn-rate alert pack still pending Wave 6"),
+         "W2.4 closes registry consumption and SRE-recording correctness for the touched metrics: 6 edges + chio-wasm-guards consume the registry through production emission boundaries where feasible, receipt-write burn ratios count only outcome=\"error\", HITL PendingApproval is outcome=\"pending_approval\", and histogram quantiles target emitted _bucket families. Deployment proof and full T1.5 alert-pack rollout remain pending Wave 6."),
     25: ("NONE", "n", "NONE", "n-a", "06",
          "chio-log-redact crate not yet authored; redacted!() macro not yet defined"),
     26: ("NONE", "n", "NONE", "n-a", "08",

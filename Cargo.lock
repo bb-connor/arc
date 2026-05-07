@@ -2793,8 +2793,10 @@ dependencies = [
  "chio-kernel",
  "chio-kernel-browser",
  "chio-kernel-core",
+ "chio-manifest",
  "chio-mcp-edge",
  "chio-metrics-spec",
+ "chio-wasm-guards",
  "chio-weights",
  "chrono",
  "coset",
@@ -2807,6 +2809,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tiny_http",
  "toml 0.8.23",
+ "wat",
 ]
 
 [[package]]
