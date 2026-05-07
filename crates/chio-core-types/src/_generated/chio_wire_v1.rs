@@ -5947,7 +5947,7 @@ impl<'de> ::serde::Deserialize<'de> for ChioCapabilityTokenV1Subject {
 ///    "delegation_chain": {
 ///      "type": "array",
 ///      "items": {
-///        "type": "object"
+///        "$ref": "#/$defs/delegationLink"
 ///      }
 ///    },
 ///    "expires_at": {
@@ -6016,9 +6016,7 @@ pub struct ChioCapabilityTokenV2 {
     #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
     pub caveats: ::std::vec::Vec<Caveat>,
     #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
-    pub delegation_chain: ::std::vec::Vec<
-        ::serde_json::Map<::std::string::String, ::serde_json::Value>,
-    >,
+    pub delegation_chain: ::std::vec::Vec<DelegationLink>,
     pub expires_at: u64,
     pub id: ChioCapabilityTokenV2Id,
     pub issued_at: u64,
@@ -24166,6 +24164,87 @@ impl ::std::convert::From<&DelegationLink> for DelegationLink {
         value.clone()
     }
 }
+///A single v2 delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "A single v2 delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.",
+///  "type": "object",
+///  "required": [
+///    "capability_id",
+///    "delegatee",
+///    "delegator",
+///    "scope_hash",
+///    "signature",
+///    "timestamp"
+///  ],
+///  "properties": {
+///    "attenuations": {
+///      "type": "array",
+///      "items": {
+///        "type": "object",
+///        "required": [
+///          "type"
+///        ],
+///        "properties": {
+///          "type": {
+///            "type": "string",
+///            "minLength": 1
+///          }
+///        },
+///        "additionalProperties": true
+///      }
+///    },
+///    "capability_id": {
+///      "type": "string",
+///      "minLength": 1
+///    },
+///    "delegatee": {
+///      "type": "string",
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
+///    },
+///    "delegator": {
+///      "type": "string",
+///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
+///    },
+///    "scope_hash": {
+///      "description": "RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.",
+///      "type": "string",
+///      "pattern": "^[0-9a-f]{64}$"
+///    },
+///    "signature": {
+///      "type": "string",
+///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+:[0-9a-f]+)$"
+///    },
+///    "timestamp": {
+///      "type": "integer",
+///      "minimum": 0.0
+///    }
+///  },
+///  "additionalProperties": false
+///}
+/// ```
+/// </details>
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DelegationLink {
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub attenuations: ::std::vec::Vec<DelegationLinkAttenuationsItem>,
+    pub capability_id: DelegationLinkCapabilityId,
+    pub delegatee: DelegationLinkDelegatee,
+    pub delegator: DelegationLinkDelegator,
+    ///RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.
+    pub scope_hash: DelegationLinkScopeHash,
+    pub signature: DelegationLinkSignature,
+    pub timestamp: u64,
+}
+impl ::std::convert::From<&DelegationLink> for DelegationLink {
+    fn from(value: &DelegationLink) -> Self {
+        value.clone()
+    }
+}
 ///`DelegationLinkAttenuationsItem`
 ///
 /// <details><summary>JSON schema</summary>
@@ -24518,6 +24597,86 @@ impl ::std::convert::TryFrom<::std::string::String> for DelegationLinkDelegator 
     }
 }
 impl<'de> ::serde::Deserialize<'de> for DelegationLinkDelegator {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "description": "RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.",
+///  "type": "string",
+///  "pattern": "^[0-9a-f]{64}$"
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct DelegationLinkScopeHash(::std::string::String);
+impl ::std::ops::Deref for DelegationLinkScopeHash {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<DelegationLinkScopeHash> for ::std::string::String {
+    fn from(value: DelegationLinkScopeHash) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<&DelegationLinkScopeHash> for DelegationLinkScopeHash {
+    fn from(value: &DelegationLinkScopeHash) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr for DelegationLinkScopeHash {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+        { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for DelegationLinkScopeHash {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for DelegationLinkScopeHash {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for DelegationLinkScopeHash {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DelegationLinkScopeHash {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,

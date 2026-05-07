@@ -110,14 +110,13 @@ impl OcsfExporter {
             })?;
         }
 
-        let mut client_builder = reqwest::Client::builder();
-        if let Some(contract) = contract {
-            client_builder = client_builder_with_contract(contract);
+        let client = match contract {
+            Some(contract) => client_builder_with_contract(contract)
+                .timeout(config.timeout)
+                .build(),
+            None => reqwest::Client::builder().timeout(config.timeout).build(),
         }
-        let client = client_builder
-            .timeout(config.timeout)
-            .build()
-            .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
+        .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
         Ok(Self { config, client })
     }
 

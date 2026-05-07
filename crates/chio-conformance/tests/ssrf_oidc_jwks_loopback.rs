@@ -20,8 +20,21 @@ fn idp_only_contract() -> HttpEgressContract {
     HttpEgressContract {
         tenant_egress_namespace: "tenant-w22.prod".to_string(),
         allowed_schemes: BTreeSet::from(["https".to_string()]),
-        allowed_authority_set: BTreeSet::from(["idp.example.com".to_string()]),
+        allowed_authority_set: BTreeSet::from(["hermetic-idp.test".to_string()]),
         deny_loopback: true,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 1,
+        max_response_bytes: 64 * 1024,
+    }
+}
+
+fn hermetic_loopback_idp_contract() -> HttpEgressContract {
+    HttpEgressContract {
+        tenant_egress_namespace: "tenant-w22.prod".to_string(),
+        allowed_schemes: BTreeSet::from(["https".to_string()]),
+        allowed_authority_set: BTreeSet::from(["127.0.0.1:9443".to_string()]),
+        deny_loopback: false,
         deny_link_local: true,
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
@@ -31,7 +44,7 @@ fn idp_only_contract() -> HttpEgressContract {
 
 #[test]
 fn oidc_discovery_loopback_target_is_denied() {
-    let url = Url::parse("http://127.0.0.1:18080/.well-known/openid-configuration")
+    let url = Url::parse("https://127.0.0.1:18080/.well-known/openid-configuration")
         .expect("loopback discovery url");
     let contract = idp_only_contract();
     let err = enforce_oidc_egress_contract(&url, &contract)
@@ -46,7 +59,7 @@ fn oidc_discovery_loopback_target_is_denied() {
 
 #[test]
 fn jwks_link_local_target_is_denied() {
-    let url = Url::parse("http://169.254.169.254/jwks.json").expect("link-local jwks url");
+    let url = Url::parse("https://169.254.169.254/jwks.json").expect("link-local jwks url");
     let contract = idp_only_contract();
     let err = enforce_oidc_egress_contract(&url, &contract)
         .expect_err("link-local JWKS fetch must be denied");
@@ -60,8 +73,8 @@ fn jwks_link_local_target_is_denied() {
 
 #[test]
 fn allow_listed_idp_passes_contract() {
-    let url = Url::parse("https://idp.example.com/.well-known/openid-configuration")
+    let url = Url::parse("https://127.0.0.1:9443/.well-known/openid-configuration")
         .expect("allow-listed discovery url");
-    let contract = idp_only_contract();
+    let contract = hermetic_loopback_idp_contract();
     enforce_oidc_egress_contract(&url, &contract).expect("allow-listed OIDC discovery must pass");
 }

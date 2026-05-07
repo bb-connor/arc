@@ -5,11 +5,15 @@
 # `reqwest` dispatch call site in production code is paired with an
 # `HttpEgressContract` invocation (or its `send_with_contract` helper).
 #
-# This lint detects four reqwest patterns:
+# This lint detects six reqwest patterns:
 #   1. Direct: `reqwest::Client::*`
 #   2. Direct: `reqwest::ClientBuilder::*`
-#   3. Aliased: `use reqwest as foo;` followed by `foo::Client::*`
-#   4. Indirect: a value bound from `reqwest::Client::builder()` (or
+#   3. Blocking direct: `reqwest::blocking::Client::*`
+#   4. Imported: `use reqwest::{blocking::Client, Client};` followed by
+#      `Client::builder()`, `Client::new()`, or `Client::default()`
+#   5. Aliased: `use reqwest as foo;` or `use reqwest::blocking as foo;`
+#      followed by `foo::Client::*`
+#   6. Indirect: a value bound from `reqwest::Client::builder()` (or
 #      `reqwest::ClientBuilder::*`) that subsequently invokes a dispatch
 #      method (`.get(`, `.post(`, `.put(`, `.delete(`, `.patch(`,
 #      `.head(`, `.execute(`, `.send()`).
@@ -37,34 +41,50 @@ ALLOW_LIST=(
     "crates/chio-egress-contract/"
     "crates/chio-http-core/"
     "crates/chio-mcp-adapter/"
-    # Out-of-scope follow-up wiring. Each item below is a TODO tracked in the
-    # close-bar tracker; the lint is configured to allow them while the W2.2
-    # PR covers the 16 highest-priority callers (chio-link, chio-siem,
-    # chio-a2a-adapter, chio-openapi-mcp-bridge, chio-mcp-remote).
-    "crates/chio-api-protect/"
-    "crates/chio-settle/"
-    "crates/chio-anchor/"
-    "crates/chio-guards/src/external/"
 )
 
 # Compose a regex that catches:
 #   - reqwest::Client::*
 #   - reqwest::ClientBuilder::*
+#   - reqwest::blocking::Client::*
+#   - imported Client::builder() call sites from reqwest or
+#     reqwest::blocking imports
 #   - any `use reqwest as <alias>;` followed by `<alias>::Client::*` /
-#     `<alias>::ClientBuilder::*` (we materialise the alias by scanning the
-#     source for a `use reqwest as <alias>;` declaration and union the
-#     resulting per-file pattern).
+#     `<alias>::ClientBuilder::*`, and `use reqwest::blocking as <alias>;`
+#     followed by `<alias>::Client::*`.
 #
 # Files that match the regex but do not pair with a contract reference or
 # only declare a non-dispatching helper are reported.
 
-# Initial sweep: any reference to reqwest::Client or reqwest::ClientBuilder.
+# Initial sweep: any direct reference to reqwest Client or ClientBuilder,
+# including blocking clients.
 CANDIDATE_FILES=()
 while IFS= read -r candidate_file; do
     CANDIDATE_FILES+=("$candidate_file")
 done < <(
-    grep -rln -E "reqwest::Client|reqwest::ClientBuilder" --include='*.rs' \
+    grep -rln -E "reqwest(::blocking)?::(Client|ClientBuilder)" --include='*.rs' \
         crates/ 2>/dev/null || true
+)
+
+# Top-level reqwest dispatch helpers such as `reqwest::get(...)` are also
+# production egress even when no explicit Client value appears in the file.
+while IFS= read -r candidate_file; do
+    CANDIDATE_FILES+=("$candidate_file")
+done < <(
+    grep -rln -E "reqwest(::blocking)?::(get|post|put|delete|patch|head)\\(" --include='*.rs' \
+        crates/ 2>/dev/null || true
+)
+
+# Imported Client builders, including `use reqwest::blocking::Client;`,
+# `use reqwest::blocking::{Client, ...};`, and `use reqwest::{Client, ...};`.
+while IFS= read -r import_match; do
+    file="${import_match%%:*}"
+    if grep -qE "\\b(Client|ClientBuilder)::(builder|new|default)\\(" "$file" \
+        || grep -qE "\\bClientBuilder::" "$file"; then
+        CANDIDATE_FILES+=("$file")
+    fi
+done < <(
+    grep -rn -E "use[[:space:]]+reqwest(::blocking)?(::[A-Za-z_][A-Za-z0-9_]*|::\\{[^;]*\\b(Client|ClientBuilder)\\b|[[:space:]]+as[[:space:]]+[A-Za-z_][A-Za-z0-9_]*)" --include='*.rs' crates/ 2>/dev/null || true
 )
 
 # Aliased imports: scan for `use reqwest as foo;` and expand the candidate
@@ -72,14 +92,16 @@ done < <(
 while IFS= read -r alias_match; do
     file="${alias_match%%:*}"
     rest="${alias_match#*:}"
-    # Extract the alias name from a line like `use reqwest as foo;`.
-    alias=$(echo "$rest" | sed -nE 's/.*use[[:space:]]+reqwest[[:space:]]+as[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;.*/\1/p')
+    # Extract the alias name from a line like `use reqwest as foo;` or
+    # `use reqwest::blocking as foo;`.
+    alias=$(echo "$rest" | sed -nE 's/.*use[[:space:]]+reqwest(::blocking)?[[:space:]]+as[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;.*/\2/p')
     if [[ -n "$alias" ]]; then
-        if grep -qE "\b${alias}::(Client|ClientBuilder)" "$file"; then
+        if grep -qE "\b${alias}::(Client|ClientBuilder)" "$file" \
+            || grep -qE "\b${alias}::(get|post|put|delete|patch|head)\\(" "$file"; then
             CANDIDATE_FILES+=("$file")
         fi
     fi
-done < <(grep -rn -E "use[[:space:]]+reqwest[[:space:]]+as[[:space:]]+[A-Za-z_]" --include='*.rs' crates/ 2>/dev/null || true)
+done < <(grep -rn -E "use[[:space:]]+reqwest(::blocking)?[[:space:]]+as[[:space:]]+[A-Za-z_]" --include='*.rs' crates/ 2>/dev/null || true)
 
 # De-duplicate.
 if [[ ${#CANDIDATE_FILES[@]} -gt 0 ]]; then
@@ -90,9 +112,43 @@ if [[ ${#CANDIDATE_FILES[@]} -gt 0 ]]; then
     CANDIDATE_FILES=("${DEDUPED_CANDIDATE_FILES[@]}")
 fi
 
-DISPATCH_REGEX="\\.execute\\(|\\.send\\(\\)|\\.send_string\\(|\\.send_json\\(|\\.call\\(\\)|\\.send\\(.+\\)\\.await"
-INDIRECT_BINDING_REGEX="let[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*(reqwest::Client::builder|reqwest::ClientBuilder::|[A-Za-z_][A-Za-z0-9_]*::Client::builder|[A-Za-z_][A-Za-z0-9_]*::ClientBuilder::)"
+DISPATCH_REGEX="\\.execute\\(|\\.send\\(\\)|\\.send_string\\(|\\.send_json\\(|\\.call\\(\\)|\\.send\\(.+\\)\\.await|reqwest(::blocking)?::(get|post|put|delete|patch|head)\\("
+INDIRECT_BINDING_REGEX="let[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*(reqwest(::blocking)?::Client::(builder|new|default)|reqwest(::blocking)?::ClientBuilder::|Client::(builder|new|default)|ClientBuilder::|[A-Za-z_][A-Za-z0-9_]*::Client::(builder|new|default)|[A-Za-z_][A-Za-z0-9_]*::ClientBuilder::)"
 INDIRECT_DISPATCH_REGEX="\\.(get|post|put|delete|patch|head|execute|send)\\("
+CLASSIFICATION_MARKER="CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST:"
+REQWEST_GAP_LINE_REGEX="reqwest(::blocking)?::(Client|ClientBuilder)::(builder|new|default)\\(|reqwest(::blocking)?::(get|post|put|delete|patch|head)\\(|(^|[^A-Za-z0-9_])(Client|ClientBuilder)::(builder|new|default)\\(|(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*::(Client|ClientBuilder)::(builder|new|default)\\(|(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*::(get|post|put|delete|patch|head)\\(|\\.send\\(\\)"
+REQWEST_EXECUTE_GAP_LINE_REGEX="(^|[^A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*\\.)*([A-Za-z_][A-Za-z0-9_]*_)?client[A-Za-z0-9_]*\\.execute\\("
+
+line_is_classified() {
+    local file="$1"
+    local line_no="$2"
+    awk -v line_no="$line_no" -v marker="$CLASSIFICATION_MARKER" '
+        NR >= line_no - 4 && NR <= line_no {
+            if (index($0, marker) > 0) {
+                found = 1
+            }
+        }
+        END {
+            exit(found ? 0 : 1)
+        }
+    ' "$file"
+}
+
+unclassified_reqwest_lines() {
+    local file="$1"
+    while IFS= read -r match; do
+        line_no="${match%%:*}"
+        if ! line_is_classified "$file" "$line_no"; then
+            printf '%s\n' "$match"
+        fi
+    done < <(grep -nE "$REQWEST_GAP_LINE_REGEX" "$file" 2>/dev/null || true)
+    while IFS= read -r match; do
+        line_no="${match%%:*}"
+        if ! line_is_classified "$file" "$line_no"; then
+            printf '%s\n' "$match"
+        fi
+    done < <(grep -nE "$REQWEST_EXECUTE_GAP_LINE_REGEX" "$file" 2>/dev/null || true)
+}
 
 failed=()
 for file in "${CANDIDATE_FILES[@]}"; do
@@ -141,11 +197,15 @@ for file in "${CANDIDATE_FILES[@]}"; do
         continue
     fi
 
-    # Production dispatches must use the blessed helper. A file cannot pass
-    # merely by mentioning HttpEgressContract while still calling reqwest
-    # directly.
-    if ! grep -qE "\\bsend_with_contract\\b" "$file"; then
-        failed+=("$file")
+    # Production dispatches must use the blessed helper for each reqwest
+    # dispatch. A mixed file cannot pass merely because one call path uses
+    # send_with_contract while another still calls reqwest directly.
+    gap_count=0
+    while IFS= read -r gap; do
+        failed+=("$file:$gap")
+        gap_count=$((gap_count + 1))
+    done < <(unclassified_reqwest_lines "$file")
+    if [[ $gap_count -gt 0 ]]; then
         continue
     fi
 

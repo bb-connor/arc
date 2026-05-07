@@ -2501,6 +2501,7 @@ dependencies = [
  "arbitrary",
  "base64 0.22.1",
  "chio-core",
+ "chio-egress-contract",
  "chio-kernel",
  "chio-web3",
  "chio-web3-bindings",
@@ -2780,9 +2781,11 @@ dependencies = [
  "base64ct",
  "chio-a2a-adapter",
  "chio-adversarial-suite",
+ "chio-api-protect",
  "chio-core-types",
  "chio-custody-hw",
  "chio-egress-contract",
+ "chio-external-guards",
  "chio-guards",
  "chio-http-core",
  "chio-http-session",
@@ -3110,6 +3113,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-core-types",
+ "chio-egress-contract",
  "chio-guards",
  "chio-kernel",
  "reqwest 0.13.2",
@@ -3410,9 +3414,12 @@ name = "chio-link"
 version = "0.1.0"
 dependencies = [
  "alloy-contract",
+ "alloy-json-rpc",
  "alloy-primitives 1.5.7",
  "alloy-provider",
+ "alloy-rpc-client",
  "alloy-sol-types 1.5.7",
+ "alloy-transport",
  "chio-core",
  "chio-egress-contract",
  "reqwest 0.13.2",
@@ -3420,6 +3427,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "tower 0.5.3",
 ]
 
 [[package]]
@@ -3555,7 +3563,6 @@ dependencies = [
  "subtle",
  "tokio",
  "tracing",
- "ureq 2.12.1",
  "url",
 ]
 
@@ -3816,6 +3823,7 @@ dependencies = [
  "chio-anchor",
  "chio-core",
  "chio-credit",
+ "chio-egress-contract",
  "chio-kernel",
  "chio-link",
  "chio-web3",

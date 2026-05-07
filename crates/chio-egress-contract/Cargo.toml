@@ -17,13 +17,14 @@ serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 reqwest = { workspace = true, default-features = false, features = ["rustls"], optional = true }
+tokio = { workspace = true, features = ["net"], optional = true }
 
 [features]
 default = []
 # Opt-in helper that wraps a `reqwest` dispatch with `HttpEgressContract`
 # enforcement on the initial URL, on every redirect, and on observed response
 # size. Callers that depend on this feature get `send_with_contract`.
-reqwest-egress = ["dep:reqwest", "dep:serde_json"]
+reqwest-egress = ["dep:reqwest", "dep:serde_json", "dep:tokio"]
 
 [dev-dependencies]
 reqwest = { workspace = true, default-features = false, features = ["rustls"] }

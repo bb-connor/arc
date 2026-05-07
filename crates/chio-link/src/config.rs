@@ -391,6 +391,20 @@ impl PriceOracleConfig {
                 "operator config must define at least one chain".to_string(),
             ));
         }
+        self.egress_contract
+            .validate_dispatchable_with_pinned_dns()
+            .map_err(|error| {
+                PriceOracleError::InvalidConfiguration(format!(
+                    "price oracle HttpEgressContract is not dispatchable with pinned DNS: {error}"
+                ))
+            })?;
+        self.egress_contract
+            .enforce_url_with_dns(&self.pyth.hermes_url, 0)
+            .map_err(|error| {
+                PriceOracleError::InvalidConfiguration(format!(
+                    "HttpEgressContract rejects Pyth Hermes URL: {error}"
+                ))
+            })?;
         let mut seen_chains = BTreeSet::new();
         for chain in &self.operator.chains {
             if !seen_chains.insert(chain.chain_id) {
@@ -411,6 +425,14 @@ impl PriceOracleConfig {
                     chain.chain_id
                 )));
             }
+            self.egress_contract
+                .enforce_url_with_dns(&chain.rpc_endpoint, 0)
+                .map_err(|error| {
+                    PriceOracleError::InvalidConfiguration(format!(
+                        "HttpEgressContract rejects chain {} RPC endpoint: {error}",
+                        chain.chain_id
+                    ))
+                })?;
             if chain.sequencer_uptime_feed.is_some() && chain.sequencer_grace_period_seconds == 0 {
                 return Err(PriceOracleError::InvalidConfiguration(format!(
                     "chain {} sequencer_grace_period_seconds must be non-zero",
@@ -550,10 +572,9 @@ pub fn build_default_egress_contract(
         allowed_schemes.insert("https".to_string());
     }
     if allowed_authority_set.is_empty() {
-        // Fail-closed sentinel that the production validator rejects.
-        allowed_authority_set.insert("invalid.localhost".to_string());
+        return fail_closed_default_egress_contract(allowed_schemes);
     }
-    HttpEgressContract {
+    let contract = HttpEgressContract {
         tenant_egress_namespace: "chio-link".to_string(),
         allowed_schemes,
         allowed_authority_set,
@@ -562,6 +583,31 @@ pub fn build_default_egress_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 1 << 22,
+    };
+    if contract.validate_dispatchable_with_pinned_dns().is_ok() {
+        contract
+    } else {
+        fail_closed_default_egress_contract(contract.allowed_schemes.clone())
+    }
+}
+
+fn fail_closed_default_egress_contract(
+    mut allowed_schemes: BTreeSet<String>,
+) -> HttpEgressContract {
+    if allowed_schemes.is_empty() {
+        allowed_schemes.insert("https".to_string());
+    }
+    let mut allowed_authority_set = BTreeSet::new();
+    allowed_authority_set.insert("invalid.localhost".to_string());
+    HttpEgressContract {
+        tenant_egress_namespace: "chio-link".to_string(),
+        allowed_schemes,
+        allowed_authority_set,
+        deny_loopback: true,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 0,
+        max_response_bytes: 1,
     }
 }
 
@@ -580,9 +626,21 @@ mod tests {
     use crate::test_support::TestUnwrap;
 
     use super::{
-        pair_key, PriceOracleConfig, ARBITRUM_ONE_CAIP2, ARBITRUM_ONE_CHAIN_ID, BASE_MAINNET_CAIP2,
-        BASE_MAINNET_CHAIN_ID,
+        build_default_egress_contract, pair_key, PriceOracleConfig, ARBITRUM_ONE_CAIP2,
+        ARBITRUM_ONE_CHAIN_ID, BASE_MAINNET_CAIP2, BASE_MAINNET_CHAIN_ID,
     };
+
+    fn local_dispatchable_config() -> PriceOracleConfig {
+        let mut config = PriceOracleConfig::base_arbitrum_default(
+            "http://127.0.0.1:8545",
+            "http://127.0.0.1:9545",
+        );
+        config.pyth.hermes_url = "http://127.0.0.1:9000".to_string();
+        config.egress_contract =
+            build_default_egress_contract(&config.pyth, &config.operator.chains);
+        config.egress_contract.deny_loopback = false;
+        config
+    }
 
     #[test]
     fn base_mainnet_default_exposes_supported_pairs() {
@@ -618,5 +676,19 @@ mod tests {
     #[test]
     fn pair_key_normalizes_symbols() {
         assert_eq!(pair_key(" eth ", "usd"), "ETH/USD");
+    }
+
+    #[test]
+    fn validate_accepts_default_hostname_egress_with_pinned_resolver() {
+        let config = PriceOracleConfig::base_mainnet_default("https://example.invalid");
+        config
+            .validate()
+            .test_unwrap("default hostname egress is resolver-enforced at dispatch");
+    }
+
+    #[test]
+    fn validate_accepts_literal_ip_egress_contract() {
+        let config = local_dispatchable_config();
+        config.validate().test_unwrap("literal IP egress config");
     }
 }

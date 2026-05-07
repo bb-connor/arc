@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 971aba6eaf211b6d06bf55b76ac19e7c6dc58f91fc733e9f6972d4b022be04e8
+# Schema sha256: 95e1bc47142b6b7f138be42872fee664e9833abfc0214512cf5057d9701def40
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -51,6 +51,39 @@ class Caveat(BaseModel):
         )
         | None
     ) = None
+
+
+class Attenuation(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    type: constr(min_length=1)
+
+
+class DelegationLink(BaseModel):
+    """
+    A single v2 delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    capability_id: constr(min_length=1)
+    delegator: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
+    )
+    delegatee: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
+    )
+    attenuations: list[Attenuation] | None = None
+    timestamp: conint(ge=0)
+    signature: constr(
+        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+:[0-9a-f]+)$"
+    )
+    scope_hash: constr(pattern=r"^[0-9a-f]{64}$") = Field(
+        ...,
+        description="RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.",
+    )
 
 
 class GrantKind(Enum):
@@ -114,7 +147,7 @@ class ChioCapabilitytokenV2(BaseModel):
     )
     issued_at: conint(ge=0)
     expires_at: conint(ge=0)
-    delegation_chain: list[dict[str, Any]] | None = None
+    delegation_chain: list[DelegationLink] | None = None
     algorithm: Algorithm | None = None
     caveats: list[Caveat] | None = None
     scope_attenuations: list[ScopeAttenuation] | None = None

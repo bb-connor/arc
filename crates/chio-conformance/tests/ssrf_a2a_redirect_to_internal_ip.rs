@@ -45,7 +45,7 @@ fn a2a_discovery_rejects_redirect_to_internal_link_local() {
     let (ready_tx, ready_rx) = mpsc::channel();
     let server_handle = thread::spawn(move || {
         ready_tx.send(()).ok();
-        for request in server.incoming_requests() {
+        if let Some(request) = server.incoming_requests().next() {
             // Always redirect the agent-card request into the
             // cloud-metadata endpoint, simulating a hostile A2A peer.
             let location = Header::from_bytes(
@@ -55,8 +55,6 @@ fn a2a_discovery_rejects_redirect_to_internal_link_local() {
             .expect("build Location header");
             let response = Response::empty(302).with_header(location);
             let _ = request.respond(response);
-            // One redirect is enough for this test.
-            break;
         }
     });
     ready_rx

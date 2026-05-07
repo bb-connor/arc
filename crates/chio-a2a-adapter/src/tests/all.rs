@@ -125,45 +125,12 @@ mod tests {
     }
 
     #[test]
-    fn adapter_strips_auth_and_cookie_on_cross_origin_redirect() {
+    fn adapter_rejects_json_tool_body_on_cross_origin_redirect() {
         let Some(target_listener) = bind_fake_a2a_listener("redirect target A2A listener") else {
             return;
         };
         let target_address = target_listener.local_addr().expect("target listener address");
         let target_base_url = format!("http://{target_address}");
-        let target_requests = Arc::new(Mutex::new(Vec::new()));
-        let target_requests_for_thread = Arc::clone(&target_requests);
-        let target_handle = thread::spawn(move || {
-            let (mut stream, _) = target_listener.accept().expect("accept target request");
-            stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .expect("set target read timeout");
-            let request = read_http_request(&mut stream);
-            target_requests_for_thread
-                .lock()
-                .expect("lock target request log")
-                .push(request);
-            write_http_json_response(
-                &mut stream,
-                200,
-                &json!({
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "result": {
-                        "message": {
-                            "messageId": "msg-out",
-                            "contextId": "ctx-1",
-                            "taskId": "task-1",
-                            "role": "ROLE_AGENT",
-                            "parts": [{
-                                "text": "completed research request",
-                                "mediaType": "text/plain"
-                            }]
-                        }
-                    }
-                }),
-            );
-        });
 
         let Some(initial_listener) = bind_fake_a2a_listener("redirect initial A2A listener") else {
             return;
@@ -240,25 +207,233 @@ mod tests {
         )
         .expect("discover redirecting JSONRPC adapter");
 
-        let result = adapter
+        let error = adapter
             .invoke(
                 "research",
-                json!({"message": "follow redirect without leaking auth"}),
+                json!({"message": "do not replay this tool body"}),
                 None,
             )
-            .expect("invoke through redirect");
-        assert_eq!(
-            result["message"]["parts"][0]["text"],
-            "completed research request"
-        );
+            .expect_err("JSON tool body must not be replayed to cross-origin redirect target");
 
         initial_handle.join().expect("join initial redirect server");
-        target_handle.join().expect("join target redirect server");
-        let requests = target_requests.lock().expect("lock target requests");
-        assert_eq!(requests.len(), 1);
-        assert!(requests[0].contains("POST /rpc HTTP/1.1"));
-        assert!(!requests[0].contains("Authorization:"));
-        assert!(!requests[0].contains("Cookie:"));
+        let message = error.to_string();
+        assert!(
+            message.contains("body-bearing request rejected cross-origin redirect"),
+            "expected body-bearing redirect rejection, got: {message}"
+        );
+    }
+
+    #[test]
+    fn adapter_rejects_http_json_tool_body_on_cross_origin_redirect() {
+        let Some(target_listener) = bind_fake_a2a_listener("api key redirect target A2A listener")
+        else {
+            return;
+        };
+        let target_address = target_listener.local_addr().expect("target listener address");
+        let target_base_url = format!("http://{target_address}");
+
+        let Some(initial_listener) =
+            bind_fake_a2a_listener("api key redirect initial A2A listener")
+        else {
+            return;
+        };
+        let initial_address = initial_listener
+            .local_addr()
+            .expect("initial listener address");
+        let initial_base_url = format!("http://{initial_address}");
+        let initial_base_url_for_thread = initial_base_url.clone();
+        let target_base_url_for_thread = target_base_url.clone();
+        let initial_handle = thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut stream, _) = initial_listener.accept().expect("accept initial request");
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .expect("set initial read timeout");
+                let request = read_http_request(&mut stream);
+                let first_line = request.lines().next().unwrap_or_default();
+                if first_line.starts_with("GET /.well-known/agent-card.json") {
+                    let (security_schemes, security_requirements) =
+                        agent_card_security_metadata(TestScenario::ApiKeyRequired, &initial_base_url_for_thread);
+                    write_http_json_response(
+                        &mut stream,
+                        200,
+                        &json!({
+                            "name": "Research Agent",
+                            "description": "Answers research questions over A2A",
+                            "supportedInterfaces": [{
+                                "url": initial_base_url_for_thread,
+                                "protocolBinding": "HTTP+JSON",
+                                "protocolVersion": "1.0"
+                            }],
+                            "version": "1.0.0",
+                            "capabilities": {
+                                "streaming": false,
+                                "pushNotifications": false,
+                                "stateTransitionHistory": true
+                            },
+                            "defaultInputModes": ["text/plain", "application/json"],
+                            "defaultOutputModes": ["application/json"],
+                            "securitySchemes": security_schemes,
+                            "securityRequirements": security_requirements,
+                            "skills": [{
+                                "id": "research",
+                                "name": "Research",
+                                "description": "Search and synthesize results",
+                                "tags": ["search"],
+                                "inputModes": ["text/plain", "application/json"],
+                                "outputModes": ["application/json"]
+                            }]
+                        }),
+                    );
+                } else if first_line.starts_with("POST /message:send") {
+                    write!(
+                        stream,
+                        "HTTP/1.1 302 Found\r\nLocation: {target_base_url_for_thread}/message:send\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .expect("write redirect response");
+                } else {
+                    write_http_json_response(
+                        &mut stream,
+                        500,
+                        &json!({"error": format!("unexpected request: {first_line}")}),
+                    );
+                }
+            }
+        });
+
+        let manifest_key = Keypair::generate();
+        let mut contract = test_egress_contract(&initial_base_url);
+        insert_test_egress_authority(&mut contract, &target_base_url);
+        let adapter = A2aAdapter::discover(
+            A2aAdapterConfig::new(&initial_base_url, manifest_key.public_key().to_hex())
+                .with_egress_contract(contract)
+                .with_api_key_header("X-A2A-Key", "secret-key")
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover API key redirecting HTTP+JSON adapter");
+
+        let error = adapter
+            .invoke(
+                "research",
+                json!({"message": "do not replay this HTTP JSON body"}),
+                None,
+            )
+            .expect_err("HTTP+JSON tool body must not be replayed cross-origin");
+
+        initial_handle.join().expect("join initial redirect server");
+        let message = error.to_string();
+        assert!(
+            message.contains("body-bearing request rejected cross-origin redirect"),
+            "expected body-bearing redirect rejection, got: {message}"
+        );
+    }
+
+    #[test]
+    fn adapter_rejects_json_tool_body_before_cross_origin_redirect_chain() {
+        let Some(initial_listener) =
+            bind_fake_a2a_listener("multi-hop redirect initial A2A listener")
+        else {
+            return;
+        };
+        let Some(middle_listener) =
+            bind_fake_a2a_listener("multi-hop redirect middle A2A listener")
+        else {
+            return;
+        };
+
+        let initial_address = initial_listener
+            .local_addr()
+            .expect("initial listener address");
+        let initial_base_url = format!("http://{initial_address}");
+        let middle_address = middle_listener
+            .local_addr()
+            .expect("middle listener address");
+        let middle_base_url = format!("http://{middle_address}");
+
+        let initial_base_url_for_thread = initial_base_url.clone();
+        let middle_base_url_for_thread = middle_base_url.clone();
+        let initial_handle = thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut stream, _) = initial_listener.accept().expect("accept initial request");
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .expect("set initial read timeout");
+                let request = read_http_request(&mut stream);
+                let first_line = request.lines().next().unwrap_or_default();
+                if first_line.starts_with("GET /.well-known/agent-card.json") {
+                    write_http_json_response(
+                        &mut stream,
+                        200,
+                        &json!({
+                            "name": "Research Agent",
+                            "description": "Answers research questions over A2A",
+                            "supportedInterfaces": [{
+                                "url": format!("{initial_base_url_for_thread}/rpc"),
+                                "protocolBinding": "JSONRPC",
+                                "protocolVersion": "1.0"
+                            }],
+                            "version": "1.0.0",
+                            "capabilities": {
+                                "streaming": false,
+                                "pushNotifications": false,
+                                "stateTransitionHistory": true
+                            },
+                            "defaultInputModes": ["text/plain", "application/json"],
+                            "defaultOutputModes": ["application/json"],
+                            "skills": [{
+                                "id": "research",
+                                "name": "Research",
+                                "description": "Search and synthesize results",
+                                "tags": ["search"],
+                                "inputModes": ["text/plain", "application/json"],
+                                "outputModes": ["application/json"]
+                            }]
+                        }),
+                    );
+                } else if first_line.starts_with("POST /rpc") {
+                    write!(
+                        stream,
+                        "HTTP/1.1 302 Found\r\nLocation: {middle_base_url_for_thread}/relay\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .expect("write cross-origin redirect response");
+                } else {
+                    write_http_json_response(
+                        &mut stream,
+                        500,
+                        &json!({"error": format!("unexpected request: {first_line}")}),
+                    );
+                }
+            }
+        });
+
+        let manifest_key = Keypair::generate();
+        let mut contract = test_egress_contract(&initial_base_url);
+        insert_test_egress_authority(&mut contract, &middle_base_url);
+        let adapter = A2aAdapter::discover(
+            A2aAdapterConfig::new(&initial_base_url, manifest_key.public_key().to_hex())
+                .with_egress_contract(contract)
+                .with_bearer_token("secret-token")
+                .with_request_cookie("partner_session", "cookie-alpha")
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover multi-hop redirecting JSONRPC adapter");
+
+        let error = adapter
+            .invoke(
+                "research",
+                json!({"message": "do not replay across redirect chain"}),
+                None,
+            )
+            .expect_err("JSON tool body must not enter cross-origin redirect chain");
+
+        initial_handle
+            .join()
+            .expect("join initial redirect server");
+        let message = error.to_string();
+        assert!(
+            message.contains("body-bearing request rejected cross-origin redirect"),
+            "expected body-bearing redirect rejection, got: {message}"
+        );
     }
 
     #[test]
@@ -1585,6 +1760,82 @@ mod tests {
         assert!(requests[2].contains("Authorization: Bearer oauth-access-token"));
         assert!(requests[3].contains("Authorization: Bearer oauth-access-token"));
         server.join();
+    }
+
+    #[test]
+    fn oauth_client_credentials_form_fallback_rejects_cross_origin_redirect() {
+        let Some(target_listener) = bind_fake_a2a_listener("OAuth redirect target listener") else {
+            return;
+        };
+        let target_address = target_listener.local_addr().expect("target listener address");
+        let target_base_url = format!("http://{target_address}");
+
+        let Some(initial_listener) = bind_fake_a2a_listener("OAuth redirect initial listener")
+        else {
+            return;
+        };
+        let initial_address = initial_listener
+            .local_addr()
+            .expect("initial listener address");
+        let initial_base_url = format!("http://{initial_address}");
+        let target_base_url_for_thread = target_base_url.clone();
+        let initial_handle = thread::spawn(move || {
+            for request_index in 0..2 {
+                let (mut stream, _) = initial_listener.accept().expect("accept token request");
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .expect("set token read timeout");
+                let request = read_http_request(&mut stream);
+                assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
+                if request_index == 0 {
+                    assert!(request.contains("Authorization: Basic "));
+                    assert!(!request.contains("client_secret=client-secret"));
+                    write!(
+                        stream,
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .expect("write 401 token response");
+                } else {
+                    assert!(request.contains("client_id=client-id"));
+                    assert!(request.contains("client_secret=client-secret"));
+                    write!(
+                        stream,
+                        "HTTP/1.1 302 Found\r\nLocation: {target_base_url_for_thread}/oauth/token\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .expect("write cross-origin token redirect");
+                }
+            }
+        });
+
+        let mut contract = test_egress_contract(&initial_base_url);
+        insert_test_egress_authority(&mut contract, &target_base_url);
+        let transport_config = A2aTransportConfig {
+            default_tls_config: None,
+            mutual_tls_config: None,
+            egress_contract: Some(contract),
+        };
+        let token_endpoint =
+            Url::parse(&format!("{initial_base_url}/oauth/token")).expect("token endpoint URL");
+        let credentials = A2aOAuthClientCredentials {
+            client_id: "client-id".to_string(),
+            client_secret: "client-secret".to_string(),
+        };
+
+        let error = request_client_credentials_token(
+            &token_endpoint,
+            &credentials,
+            &["a2a.invoke".to_string()],
+            Duration::from_secs(2),
+            &transport_config,
+        )
+        .expect_err("OAuth form secret body must not be replayed cross-origin");
+
+        initial_handle.join().expect("join OAuth redirect server");
+        let message = error.to_string();
+        assert!(
+            message.contains("body-bearing request rejected cross-origin redirect"),
+            "expected body-bearing redirect rejection, got: {message}"
+        );
     }
 
     #[test]

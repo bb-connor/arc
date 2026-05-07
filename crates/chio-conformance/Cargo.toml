@@ -118,6 +118,8 @@ chio-link = { version = "0.1.0", path = "../chio-link" }
 chio-openapi-mcp-bridge = { version = "0.1.0", path = "../chio-openapi-mcp-bridge" }
 chio-a2a-adapter = { version = "0.1.0", path = "../chio-a2a-adapter" }
 chio-mcp-remote = { version = "0.1.0", path = "../chio-mcp-remote" }
+chio-api-protect = { version = "0.1.0", path = "../chio-api-protect" }
+chio-external-guards = { version = "0.1.0", path = "../chio-external-guards" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 url = "2"
 zeroize = "1"

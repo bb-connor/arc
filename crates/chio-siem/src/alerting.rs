@@ -237,18 +237,19 @@ impl PagerDutyBackend {
         endpoint: String,
         egress_contract: Option<HttpEgressContract>,
     ) -> Result<Self, ExportError> {
-        let mut client_builder = reqwest::Client::builder();
-        if let Some(contract) = egress_contract.as_ref() {
-            client_builder = client_builder_with_contract(contract);
+        let client = match egress_contract.as_ref() {
+            Some(contract) => client_builder_with_contract(contract)
+                .timeout(Duration::from_secs(30))
+                .build(),
+            None => reqwest::Client::builder()
+                .timeout(Duration::from_secs(30))
+                .build(),
         }
-        let client = client_builder
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| {
-                ExportError::HttpError(format!(
-                    "failed to build PagerDuty HTTP client (timeout=30s): {e}"
-                ))
-            })?;
+        .map_err(|e| {
+            ExportError::HttpError(format!(
+                "failed to build PagerDuty HTTP client (timeout=30s): {e}"
+            ))
+        })?;
         // HttpEgressContract: when supplied, validate the configured endpoint
         // up front so misconfiguration surfaces at construction.
         if let Some(contract) = egress_contract.as_ref() {
@@ -376,18 +377,19 @@ impl OpsGenieBackend {
         endpoint: String,
         egress_contract: Option<HttpEgressContract>,
     ) -> Result<Self, ExportError> {
-        let mut client_builder = reqwest::Client::builder();
-        if let Some(contract) = egress_contract.as_ref() {
-            client_builder = client_builder_with_contract(contract);
+        let client = match egress_contract.as_ref() {
+            Some(contract) => client_builder_with_contract(contract)
+                .timeout(Duration::from_secs(30))
+                .build(),
+            None => reqwest::Client::builder()
+                .timeout(Duration::from_secs(30))
+                .build(),
         }
-        let client = client_builder
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| {
-                ExportError::HttpError(format!(
-                    "failed to build OpsGenie HTTP client (timeout=30s): {e}"
-                ))
-            })?;
+        .map_err(|e| {
+            ExportError::HttpError(format!(
+                "failed to build OpsGenie HTTP client (timeout=30s): {e}"
+            ))
+        })?;
         if let Some(contract) = egress_contract.as_ref() {
             let probe_url = format!("{}/v2/alerts", endpoint.trim_end_matches('/'));
             contract.enforce_url(&probe_url, 0).map_err(|err| {

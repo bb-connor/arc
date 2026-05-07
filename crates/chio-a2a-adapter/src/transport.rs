@@ -158,7 +158,9 @@ fn apply_request_headers(
     strip_sensitive_headers: bool,
 ) -> ureq::Request {
     for header in request_headers {
-        if strip_sensitive_headers && is_sensitive_redirect_header(&header.name) {
+        if strip_sensitive_headers
+            && (header.sensitive || is_sensitive_redirect_header(&header.name))
+        {
             continue;
         }
         request = request.set(header.name.as_str(), header.value.as_str());

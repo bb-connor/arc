@@ -8,13 +8,14 @@ use std::sync::{mpsc, Mutex, MutexGuard};
 use std::thread;
 
 use chio_core::capability::{
-    ChioScope, CallChainContinuationAudience, CallChainContinuationToken,
-    CallChainContinuationTokenBody, CapabilityToken, CapabilityTokenBody, Constraint,
-    DelegationLink, DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken,
-    GovernedApprovalTokenBody, GovernedAutonomyContext, GovernedAutonomyTier,
-    GovernedCallChainContext, GovernedTransactionIntent, GovernedUpstreamCallChainProof,
-    GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation, PromptGrant, ResourceGrant,
-    ToolGrant, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
+    compute_attenuation_witness, scope_hash, AttenuationProof, ChioScope,
+    CallChainContinuationAudience, CallChainContinuationToken, CallChainContinuationTokenBody,
+    CapabilityToken, CapabilityTokenBody, CapabilityTokenV2Body, Constraint, DelegationLink,
+    DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
+    GovernedTransactionIntent, GovernedUpstreamCallChainProof, GovernedUpstreamCallChainProofBody,
+    MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant,
+    GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
     GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY,
 };
 use chio_core::credit::{
@@ -682,6 +683,37 @@ fn kernel_rejects_classical_capability_under_pq_required_floor() {
     );
 }
 
+#[test]
+fn production_evaluate_rejects_direct_v2_without_trust_root_resolver() {
+    let issuer = make_keypair();
+    let subject = make_keypair();
+    let mut config = make_config();
+    config.ca_public_keys = vec![issuer.public_key()];
+    let mut kernel = ChioKernel::new(config);
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let capability = make_direct_v2_capability(
+        &issuer,
+        &subject.public_key(),
+        make_scope(vec![make_grant("srv-a", "read_file")]),
+    );
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-direct-v2",
+            &capability,
+            "read_file",
+            "srv-a",
+        ))
+        .expect("v2 rejection should produce a deny receipt");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("v2 chain-binding requires a trust-root resolver"),
+        "expected v2 chain-binding deny, got: {reason}"
+    );
+}
+
 fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -730,6 +762,40 @@ fn make_capability(
     kernel
         .issue_capability(&subject_kp.public_key(), scope, ttl)
         .unwrap()
+}
+
+fn make_direct_v2_capability(
+    issuer: &Keypair,
+    subject: &PublicKey,
+    scope: ChioScope,
+) -> CapabilityToken {
+    let now = current_unix_timestamp();
+    let parent_hash = scope_hash(&scope).expect("hash parent scope");
+    let child_hash = scope_hash(&scope).expect("hash child scope");
+    let witness = compute_attenuation_witness(&scope, &scope).expect("compute attenuation witness");
+    CapabilityToken::sign_v2(
+        CapabilityTokenV2Body {
+            body: CapabilityTokenBody {
+                id: "cap-direct-v2".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.clone(),
+                scope,
+                issued_at: now.saturating_sub(60),
+                expires_at: now.saturating_add(300),
+                delegation_chain: Vec::new(),
+            },
+            caveats: Vec::new(),
+            scope_attenuations: Vec::new(),
+            attenuation_proof: AttenuationProof {
+                parent_scope_hash: parent_hash,
+                child_scope_hash: child_hash,
+                normalized_subset_proof: witness,
+            },
+            budget_share_bps: None,
+        },
+        issuer,
+    )
+    .expect("sign v2 capability")
 }
 
 fn make_request(

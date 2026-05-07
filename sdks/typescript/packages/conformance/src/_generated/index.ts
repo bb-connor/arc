@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: c1afd851d5e1c25ceeb36e85b2edc4c38df5ee8101d19e351ee4ad1338fc95fd
+// Schema SHA: 6483fdb46c1aca61303de5c1f22dc910b58d04a61386c768571a721306fbbb40
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -545,7 +545,7 @@ export namespace Capability_TokenV2 {
     };
     issued_at: number;
     expires_at: number;
-    delegation_chain?: {}[];
+    delegation_chain?: DelegationLink[];
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     caveats?: Caveat[];
     scope_attenuations?: {
@@ -558,6 +558,24 @@ export namespace Capability_TokenV2 {
      */
     budget_share_bps?: number;
     signature: string;
+  }
+  /**
+   * A single v2 delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.
+   */
+  export interface DelegationLink {
+    capability_id: string;
+    delegator: string;
+    delegatee: string;
+    attenuations?: {
+      type: string;
+      [k: string]: unknown;
+    }[];
+    timestamp: number;
+    signature: string;
+    /**
+     * RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.
+     */
+    scope_hash: string;
   }
   export interface Caveat {
     kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";

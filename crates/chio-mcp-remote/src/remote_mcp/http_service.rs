@@ -119,7 +119,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         config.enterprise_providers_file.as_deref(),
         "remote_mcp",
     )?;
-    let discovered_identity_provider = resolve_discovered_identity_provider(&config)?;
+    let discovered_identity_provider = resolve_discovered_identity_provider(&config).await?;
     let (auth_mode, admin_token) = build_remote_auth_state(
         &config,
         local_addr,

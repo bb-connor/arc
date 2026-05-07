@@ -32,9 +32,9 @@ const MINIMAL_OPENAPI_SPEC: &str = r#"{
 fn tight_response_size_contract() -> HttpEgressContract {
     HttpEgressContract {
         tenant_egress_namespace: "tenant-w22.prod".to_string(),
-        allowed_schemes: BTreeSet::from(["http".to_string(), "https".to_string()]),
-        allowed_authority_set: BTreeSet::from(["api.example.com".to_string()]),
-        deny_loopback: true,
+        allowed_schemes: BTreeSet::from(["http".to_string()]),
+        allowed_authority_set: BTreeSet::from(["127.0.0.1:18080".to_string()]),
+        deny_loopback: false,
         deny_link_local: true,
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
@@ -49,7 +49,7 @@ fn bridge_rejects_oversize_dispatcher_response_via_enforce_attempt() {
         server_name: "svc".to_string(),
         server_version: "1.0".to_string(),
         public_key: "00".to_string(),
-        base_url: "https://api.example.com".to_string(),
+        base_url: "http://127.0.0.1:18080".to_string(),
         egress_contract: Some(tight_response_size_contract()),
     };
     let mut bridge = OpenApiMcpBridge::from_spec(MINIMAL_OPENAPI_SPEC, cfg)

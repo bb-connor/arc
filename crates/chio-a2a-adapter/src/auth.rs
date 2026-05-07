@@ -2,6 +2,7 @@ fn bearer_request_header(access_token: String) -> A2aRequestHeader {
     A2aRequestHeader {
         name: "Authorization".to_string(),
         value: format!("Bearer {access_token}"),
+        sensitive: true,
     }
 }
 
@@ -49,6 +50,7 @@ fn request_client_credentials_token(
                 credentials.client_id, credentials.client_secret
             ))
         ),
+        sensitive: true,
     };
     let basic_body = build_client_credentials_form(scopes, None);
     match post_form_json::<A2aOAuthTokenResponse>(
@@ -127,6 +129,7 @@ fn enforce_egress_contract(
 fn dispatch_with_redirect_validation<F>(
     initial_url: &str,
     transport_config: &A2aTransportConfig,
+    allow_cross_origin_redirects: bool,
     mut send: F,
 ) -> Result<ureq::Response, AdapterError>
 where
@@ -180,7 +183,13 @@ where
         let previous_url = Url::parse(&current_url).map_err(|error| {
             AdapterError::InvalidUrl(format!("invalid A2A redirect source `{current_url}`: {error}"))
         })?;
-        strip_sensitive_headers = !same_origin(&previous_url, &next_url);
+        let cross_origin = !same_origin(&previous_url, &next_url);
+        if cross_origin && !allow_cross_origin_redirects {
+            return Err(AdapterError::InvalidUrl(format!(
+                "A2A body-bearing request rejected cross-origin redirect from {previous_url} to {next_url}"
+            )));
+        }
+        strip_sensitive_headers = strip_sensitive_headers || cross_origin;
         current_url = next_url.into();
     }
 }
@@ -240,6 +249,7 @@ fn fetch_json<T: for<'de> Deserialize<'de>>(
     let response = dispatch_with_redirect_validation(
         request_url.as_str(),
         transport_config,
+        true,
         |target, strip_sensitive_headers| {
             let request = agent
                 .get(target)
@@ -263,6 +273,7 @@ fn delete_empty(
     dispatch_with_redirect_validation(
         request_url.as_str(),
         transport_config,
+        true,
         |target, strip_sensitive_headers| {
             let request = agent
                 .delete(target)
@@ -290,6 +301,7 @@ where
     let response = dispatch_with_redirect_validation(
         request_url.as_str(),
         transport_config,
+        true,
         |target, strip_sensitive_headers| {
             let request = agent
                 .get(target)
@@ -327,6 +339,7 @@ fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
     let response = dispatch_with_redirect_validation(
         request_url.as_str(),
         transport_config,
+        false,
         |target, strip_sensitive_headers| {
             let request = agent
                 .post(target)
@@ -353,6 +366,7 @@ fn post_form_json<T: for<'de> Deserialize<'de>>(
     let response = dispatch_with_redirect_validation(
         url.as_str(),
         transport_config,
+        false,
         |target, strip_sensitive_headers| {
             let request = agent
                 .post(target)
@@ -389,6 +403,7 @@ where
     let response = dispatch_with_redirect_validation(
         request_url.as_str(),
         transport_config,
+        false,
         |target, strip_sensitive_headers| {
             let request = agent
                 .post(target)

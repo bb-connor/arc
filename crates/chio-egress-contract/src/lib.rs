@@ -5,7 +5,7 @@
 //! malformed contract state fails closed.
 
 use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
@@ -145,8 +145,12 @@ impl HttpEgressContract {
         })
     }
 
-    /// Enforce target URL, redirect hop constraints, and DNS post-resolution
-    /// address-class denials for domain targets.
+    /// Enforce target URL, redirect hop constraints, and DNS safety.
+    ///
+    /// Literal IPs and localhost names are enforced directly. Domain names are
+    /// accepted here after authority allow-list checks; reqwest dispatchers
+    /// must use `client_builder_with_contract` so DNS resolution and
+    /// address-class checks happen inside the connector that opens the socket.
     pub fn enforce_url_with_dns(
         &self,
         target_url: &str,
@@ -199,6 +203,17 @@ impl HttpEgressContract {
         }
         for authority in &self.allowed_authority_set {
             validate_authority_token(authority)?;
+        }
+        Ok(())
+    }
+
+    /// Validate that this contract can be used by the reqwest-backed
+    /// dispatcher whose resolver enforces address-class policy at connect
+    /// time.
+    pub fn validate_dispatchable_with_pinned_dns(&self) -> Result<(), HttpEgressError> {
+        self.validate()?;
+        for authority in &self.allowed_authority_set {
+            validate_dispatchable_authority(authority)?;
         }
         Ok(())
     }
@@ -260,7 +275,7 @@ impl HttpEgressContract {
         match address {
             IpAddr::V4(address) => {
                 self.enforce_ipv4_class(address)?;
-                if address.is_private() {
+                if is_ipv4_private_or_special_use(&address) {
                     return Err(HttpEgressError::PrivateNetworkDenied {
                         host: format!("{host} resolved to {address}"),
                     });
@@ -268,7 +283,7 @@ impl HttpEgressContract {
             }
             IpAddr::V6(address) => {
                 self.enforce_ipv6_class(address)?;
-                if is_ipv6_unique_local(&address) {
+                if is_ipv6_private_or_special_use(&address) {
                     return Err(HttpEgressError::PrivateNetworkDenied {
                         host: format!("{host} resolved to {address}"),
                     });
@@ -288,28 +303,6 @@ impl HttpEgressContract {
         {
             return Err(HttpEgressError::LoopbackDenied { host: normalized });
         }
-        let port = url.port_or_known_default().ok_or_else(|| {
-            HttpEgressError::InvalidUrl(format!(
-                "cannot resolve domain target `{normalized}` without a known port"
-            ))
-        })?;
-        let resolved = (normalized.as_str(), port)
-            .to_socket_addrs()
-            .map_err(|error| HttpEgressError::DnsResolutionFailed {
-                host: normalized.clone(),
-                details: error.to_string(),
-            })?;
-        let mut saw_address = false;
-        for socket_addr in resolved {
-            saw_address = true;
-            self.enforce_resolved_ip(&normalized, socket_addr.ip())?;
-        }
-        if !saw_address {
-            return Err(HttpEgressError::DnsResolutionFailed {
-                host: normalized,
-                details: "no addresses returned".to_string(),
-            });
-        }
         Ok(())
     }
 
@@ -323,6 +316,27 @@ impl HttpEgressContract {
         }
         Ok(false)
     }
+
+    fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
+        self.validate_dispatchable_with_pinned_dns()?;
+        let normalized = normalize_domain_name(host);
+        if normalized.is_empty() {
+            return Err(HttpEgressError::MissingAuthority);
+        }
+        if self.deny_loopback
+            && matches!(normalized.as_str(), "localhost" | "localhost.localdomain")
+        {
+            return Err(HttpEgressError::LoopbackDenied { host: normalized });
+        }
+        for authority in &self.allowed_authority_set {
+            if normalized_authority_host(authority)? == normalized {
+                return Ok(());
+            }
+        }
+        Err(HttpEgressError::AuthorityDenied {
+            authority: normalized,
+        })
+    }
 }
 
 #[cfg(all(test, feature = "reqwest-egress"))]
@@ -330,11 +344,11 @@ impl HttpEgressContract {
 mod reqwest_egress_tests {
     use super::reqwest_helper::{client_builder_with_contract, send_with_contract};
     use super::{HttpEgressContract, HttpEgressError};
-    use std::io::{Read, Write};
-    use std::net::{SocketAddr, TcpListener, TcpStream};
+    use std::io::{ErrorKind, Read, Write};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
     use std::sync::mpsc::{self, Receiver};
     use std::thread::{self, JoinHandle};
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     fn authority(addr: SocketAddr) -> String {
         format!("{}:{}", addr.ip(), addr.port())
@@ -373,6 +387,75 @@ mod reqwest_egress_tests {
             stream
                 .write_all(response.as_bytes())
                 .expect("write response");
+        });
+        (addr, rx, handle)
+    }
+
+    fn spawn_single_localhost_response_server<F>(
+        response_for_request: F,
+    ) -> (SocketAddr, Receiver<String>, JoinHandle<()>)
+    where
+        F: FnOnce(String) -> String + Send + 'static,
+    {
+        let bind_ip = ("localhost", 0)
+            .to_socket_addrs()
+            .expect("resolve localhost")
+            .next()
+            .map(|addr| addr.ip())
+            .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        let listener = TcpListener::bind(SocketAddr::new(bind_ip, 0)).expect("bind test server");
+        let addr = listener.local_addr().expect("read local addr");
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            let request = read_http_request(&mut stream);
+            tx.send(request.clone()).expect("send captured request");
+            let response = response_for_request(request);
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+        });
+        (addr, rx, handle)
+    }
+
+    fn spawn_optional_response_server<F>(
+        response_for_request: F,
+    ) -> (SocketAddr, Receiver<Option<String>>, JoinHandle<()>)
+    where
+        F: FnOnce(String) -> String + Send + 'static,
+    {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        listener
+            .set_nonblocking(true)
+            .expect("configure nonblocking test server");
+        let addr = listener.local_addr().expect("read local addr");
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_millis(500);
+            loop {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        let request = read_http_request(&mut stream);
+                        tx.send(Some(request.clone()))
+                            .expect("send captured request");
+                        let response = response_for_request(request);
+                        stream
+                            .write_all(response.as_bytes())
+                            .expect("write response");
+                        return;
+                    }
+                    Err(error)
+                        if error.kind() == ErrorKind::WouldBlock && Instant::now() < deadline =>
+                    {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                        tx.send(None).expect("send no request observation");
+                        return;
+                    }
+                    Err(error) => panic!("accept request: {error}"),
+                }
+            }
         });
         (addr, rx, handle)
     }
@@ -447,6 +530,76 @@ mod reqwest_egress_tests {
         final_handle.join().expect("join final server");
     }
 
+    async fn assert_cross_origin_post_preserving_redirect_is_denied(status_line: &str) {
+        let (final_addr, final_rx, final_handle) = spawn_optional_response_server(|_| {
+            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_string()
+        });
+        let final_url = format!("http://{}/final", authority(final_addr));
+        let (start_addr, _start_rx, start_handle) = spawn_single_response_server({
+            let final_url = final_url.clone();
+            let status_line = status_line.to_string();
+            move |_| {
+                format!(
+                    "HTTP/1.1 {status_line}\r\nLocation: {final_url}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            }
+        });
+
+        let mut contract = HttpEgressContract::permissive_for_tests(&authority(start_addr));
+        contract.allowed_authority_set.insert(authority(final_addr));
+        let client = client_builder_with_contract(&contract)
+            .build()
+            .expect("build client");
+        let request = client
+            .post(format!("http://{}/start", authority(start_addr)))
+            .body("mutation=true")
+            .build()
+            .expect("build request");
+
+        let error = send_with_contract(&contract, &client, request)
+            .await
+            .expect_err("cross-origin POST redirect preserving body should be denied");
+        assert!(
+            error
+                .to_string()
+                .contains("cross-origin redirect method/body denied"),
+            "unexpected redirect denial: {error}"
+        );
+
+        let observed = final_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("final server observation");
+        assert!(observed.is_none(), "forbidden redirect target was reached");
+
+        start_handle.join().expect("join start server");
+        final_handle.join().expect("join final server");
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_denies_cross_origin_post_301_before_rewrite() {
+        assert_cross_origin_post_preserving_redirect_is_denied("301 Moved Permanently").await;
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_denies_cross_origin_post_302_before_rewrite() {
+        assert_cross_origin_post_preserving_redirect_is_denied("302 Found").await;
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_denies_cross_origin_post_303_before_rewrite() {
+        assert_cross_origin_post_preserving_redirect_is_denied("303 See Other").await;
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_denies_cross_origin_post_307_before_replay() {
+        assert_cross_origin_post_preserving_redirect_is_denied("307 Temporary Redirect").await;
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_denies_cross_origin_post_308_before_replay() {
+        assert_cross_origin_post_preserving_redirect_is_denied("308 Permanent Redirect").await;
+    }
+
     #[tokio::test]
     async fn send_with_contract_denies_oversized_response_body() {
         let (addr, _rx, handle) = spawn_single_response_server(|_| {
@@ -473,6 +626,107 @@ mod reqwest_egress_tests {
             }
         ));
         handle.join().expect("join server");
+    }
+
+    #[test]
+    fn validate_dispatchable_accepts_production_domain_hostnames_for_pinned_resolver() {
+        let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
+        contract.deny_loopback = true;
+        contract.deny_link_local = true;
+        contract.deny_ipv6_ula = true;
+
+        contract
+            .validate_dispatchable_with_pinned_dns()
+            .expect("domain hostnames are dispatchable through the pinned resolver");
+        client_builder_with_contract(&contract)
+            .build()
+            .expect("hostname contract builds a resolver-backed reqwest client");
+    }
+
+    #[test]
+    fn resolved_hostname_private_address_fails_closed() {
+        let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
+        contract.deny_loopback = true;
+        contract.deny_link_local = true;
+        contract.deny_ipv6_ula = true;
+
+        let error = contract
+            .enforce_resolved_ip("rebind.test", IpAddr::V4(Ipv4Addr::new(10, 0, 0, 8)))
+            .expect_err("private DNS answers must fail closed");
+        assert!(matches!(
+            error,
+            HttpEgressError::PrivateNetworkDenied { .. }
+        ));
+    }
+
+    #[test]
+    fn resolved_hostname_special_use_addresses_fail_closed() {
+        let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
+        contract.deny_loopback = true;
+        contract.deny_link_local = true;
+        contract.deny_ipv6_ula = true;
+
+        for address in [
+            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            IpAddr::V4(Ipv4Addr::new(169, 254, 169, 254)),
+            IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)),
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+            IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            IpAddr::V6("fe80::1".parse().expect("parse link-local")),
+            IpAddr::V6("fc00::1".parse().expect("parse unique-local")),
+            IpAddr::V6("::ffff:10.0.0.8".parse().expect("parse mapped private")),
+            IpAddr::V6("::ffff:0.0.0.0".parse().expect("parse mapped zero")),
+            IpAddr::V6(
+                "::ffff:255.255.255.255"
+                    .parse()
+                    .expect("parse mapped broadcast"),
+            ),
+        ] {
+            let error = contract
+                .enforce_resolved_ip("rebind.test", address)
+                .expect_err("special-use DNS answers must fail closed");
+            assert!(
+                matches!(
+                    error,
+                    HttpEgressError::LoopbackDenied { .. }
+                        | HttpEgressError::LinkLocalDenied { .. }
+                        | HttpEgressError::Ipv6UlaDenied { .. }
+                        | HttpEgressError::PrivateNetworkDenied { .. }
+                ),
+                "unexpected special-use denial for {address}: {error}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn send_with_contract_dispatches_localhost_through_contract_resolver() {
+        let (addr, _rx, handle) = spawn_single_localhost_response_server(|_| {
+            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_string()
+        });
+        let contract =
+            HttpEgressContract::permissive_for_tests(&format!("localhost:{}", addr.port()));
+        let client = client_builder_with_contract(&contract)
+            .build()
+            .expect("build client");
+        let request = client
+            .get(format!("http://localhost:{}/health", addr.port()))
+            .build()
+            .expect("build request");
+
+        let response = send_with_contract(&contract, &client, request)
+            .await
+            .expect("localhost dispatch goes through contract resolver");
+        assert_eq!(response.body(), b"ok");
+        handle.join().expect("join server");
+    }
+
+    #[test]
+    fn enforce_url_with_dns_preserves_localhost_when_loopback_is_allowed() {
+        let contract = HttpEgressContract::permissive_for_tests("localhost:8080");
+        contract
+            .enforce_url_with_dns("http://localhost:8080/health", 0)
+            .expect("localhost remains available for explicit loopback contracts");
     }
 }
 
@@ -510,6 +764,31 @@ fn validate_authority_token(authority: &str) -> Result<(), HttpEgressError> {
     Ok(())
 }
 
+fn validate_dispatchable_authority(authority: &str) -> Result<(), HttpEgressError> {
+    let _ = normalized_authority_host(authority)?;
+    Ok(())
+}
+
+fn normalized_authority_host(authority: &str) -> Result<String, HttpEgressError> {
+    let parsed = Url::parse(&format!("http://{authority}/")).map_err(|error| {
+        HttpEgressError::InvalidContract(format!(
+            "invalid allowed authority {authority:?}: {error}"
+        ))
+    })?;
+    let host = parsed.host().ok_or_else(|| {
+        HttpEgressError::InvalidContract(format!("invalid allowed authority {authority:?}"))
+    })?;
+    Ok(match host {
+        Host::Domain(domain) => normalize_domain_name(domain),
+        Host::Ipv4(address) => address.to_string(),
+        Host::Ipv6(address) => address.to_string(),
+    })
+}
+
+fn normalize_domain_name(host: &str) -> String {
+    host.trim_end_matches('.').to_ascii_lowercase()
+}
+
 fn normalized_url_authority(url: &Url) -> Result<String, HttpEgressError> {
     let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
     let host = match host {
@@ -531,6 +810,31 @@ fn is_ipv6_unique_local(address: &Ipv6Addr) -> bool {
     address.segments()[0] & 0xfe00 == 0xfc00
 }
 
+fn is_ipv4_private_or_special_use(address: &Ipv4Addr) -> bool {
+    let octets = address.octets();
+    address.is_private()
+        || address.is_broadcast()
+        || address.is_multicast()
+        || octets[0] == 0
+        || (octets[0] == 100 && (64..=127).contains(&octets[1]))
+        || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
+        || (octets[0] == 192 && octets[1] == 0 && octets[2] == 2)
+        || (octets[0] == 198 && (18..=19).contains(&octets[1]))
+        || (octets[0] == 198 && octets[1] == 51 && octets[2] == 100)
+        || (octets[0] == 203 && octets[1] == 0 && octets[2] == 113)
+        || octets[0] >= 240
+}
+
+fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
+    if let Some(mapped) = address.to_ipv4_mapped() {
+        return is_ipv4_private_or_special_use(&mapped);
+    }
+    let segments = address.segments();
+    address.is_unspecified()
+        || address.is_multicast()
+        || (segments[0] == 0x2001 && segments[1] == 0x0db8)
+}
+
 /// Optional helper that pairs a `reqwest::Client` dispatch with
 /// `HttpEgressContract` enforcement. Behind the `reqwest-egress` feature so
 /// callers that already depend on `reqwest` get a single fail-closed entry
@@ -544,6 +848,8 @@ pub mod reqwest_helper {
     };
     use reqwest::{Method, StatusCode, Url};
     use serde::de::DeserializeOwned;
+    use std::error::Error;
+    use std::sync::Arc;
 
     /// Response returned by [`send_with_contract`] after the full response body
     /// has been read under the contract byte ceiling.
@@ -602,8 +908,11 @@ pub mod reqwest_helper {
             let request_url = request.url().clone();
             contract.enforce_url_with_dns(request_url.as_str(), redirect_chain_len)?;
             let reusable_request = request.try_clone();
-            let request_method = request.method().clone();
-            let request_headers = request.headers().clone();
+            let redirect_request = RedirectRequestParts {
+                method: request.method().clone(),
+                headers: request.headers().clone(),
+                has_body: request.body().is_some(),
+            };
 
             let response = client.execute(request).await.map_err(map_reqwest_error)?;
             if response.url() != &request_url {
@@ -638,8 +947,7 @@ pub mod reqwest_helper {
                     request = build_redirect_request(
                         client,
                         reusable_request,
-                        request_method,
-                        request_headers,
+                        redirect_request,
                         status,
                         next_url,
                         cross_origin,
@@ -664,29 +972,119 @@ pub mod reqwest_helper {
         )
     }
 
-    /// Build a `reqwest::ClientBuilder` whose redirect policy applies the
-    /// supplied [`HttpEgressContract`] by disabling reqwest's automatic redirect
-    /// handling. [`send_with_contract`] manually follows redirects after
-    /// validating each hop and stripping sensitive headers on cross-origin hops.
-    pub fn client_builder_with_contract(_contract: &HttpEgressContract) -> reqwest::ClientBuilder {
-        reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
+    /// Builder for a contract-backed reqwest client. It deliberately exposes
+    /// only safe tuning knobs so callers cannot override the DNS resolver,
+    /// proxy policy, or redirect policy after contract protections are applied.
+    pub struct ContractClientBuilder {
+        inner: reqwest::ClientBuilder,
+    }
+
+    impl ContractClientBuilder {
+        #[must_use]
+        pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+            self.inner = self.inner.timeout(timeout);
+            self
+        }
+
+        pub fn build(self) -> Result<reqwest::Client, reqwest::Error> {
+            self.inner.build()
+        }
+    }
+
+    /// Build a contract-backed reqwest client builder. [`send_with_contract`]
+    /// manually follows redirects after validating each hop and stripping
+    /// sensitive headers on cross-origin hops.
+    pub fn client_builder_with_contract(contract: &HttpEgressContract) -> ContractClientBuilder {
+        ContractClientBuilder {
+            inner: reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .no_proxy()
+                .dns_resolver(Arc::new(ContractDnsResolver::new(contract.clone()))),
+        }
+    }
+
+    #[derive(Clone)]
+    struct ContractDnsResolver {
+        contract: HttpEgressContract,
+    }
+
+    impl ContractDnsResolver {
+        fn new(contract: HttpEgressContract) -> Self {
+            Self { contract }
+        }
+    }
+
+    impl reqwest::dns::Resolve for ContractDnsResolver {
+        fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+            let contract = self.contract.clone();
+            let host = name.as_str().to_string();
+            Box::pin(async move {
+                if let Err(error) = contract.enforce_resolver_hostname(&host) {
+                    return Err(boxed_egress_error(error));
+                }
+
+                let lookup = match tokio::net::lookup_host((host.as_str(), 0)).await {
+                    Ok(lookup) => lookup,
+                    Err(error) => {
+                        return Err(boxed_egress_error(HttpEgressError::DnsResolutionFailed {
+                            host: host.clone(),
+                            details: error.to_string(),
+                        }));
+                    }
+                };
+
+                let mut addrs = Vec::new();
+                for mut addr in lookup {
+                    if let Err(error) = contract.enforce_resolved_ip(&host, addr.ip()) {
+                        return Err(boxed_egress_error(error));
+                    }
+                    addr.set_port(0);
+                    addrs.push(addr);
+                }
+
+                if addrs.is_empty() {
+                    return Err(boxed_egress_error(HttpEgressError::DnsResolutionFailed {
+                        host: host.clone(),
+                        details: "resolver returned no addresses".to_string(),
+                    }));
+                }
+
+                Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+            })
+        }
+    }
+
+    fn boxed_egress_error(error: HttpEgressError) -> Box<dyn Error + Send + Sync> {
+        Box::new(error)
+    }
+
+    struct RedirectRequestParts {
+        method: Method,
+        headers: HeaderMap,
+        has_body: bool,
     }
 
     fn build_redirect_request(
         client: &reqwest::Client,
         reusable_request: Option<reqwest::Request>,
-        method: Method,
-        headers: HeaderMap,
+        original: RedirectRequestParts,
         status: StatusCode,
         next_url: Url,
         cross_origin: bool,
     ) -> Result<reqwest::Request, HttpEgressError> {
-        let rewrite_to_get = status == StatusCode::SEE_OTHER && method != Method::HEAD
+        if cross_origin && (original.has_body || !is_idempotent_method(&original.method)) {
+            return Err(HttpEgressError::InvalidUrl(format!(
+                "cross-origin redirect method/body denied for {} {status} to {next_url}",
+                original.method
+            )));
+        }
+
+        let rewrite_to_get = status == StatusCode::SEE_OTHER && original.method != Method::HEAD
             || matches!(status, StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND)
-                && method == Method::POST;
+                && original.method == Method::POST;
         if rewrite_to_get {
             let mut builder = client.request(Method::GET, next_url);
-            for (name, value) in &headers {
+            for (name, value) in &original.headers {
                 if should_drop_redirect_header(name, cross_origin, true) {
                     continue;
                 }
@@ -703,6 +1101,18 @@ pub mod reqwest_helper {
         *request.url_mut() = next_url;
         strip_redirect_headers(request.headers_mut(), cross_origin, false);
         Ok(request)
+    }
+
+    fn is_idempotent_method(method: &Method) -> bool {
+        matches!(
+            *method,
+            Method::GET
+                | Method::HEAD
+                | Method::PUT
+                | Method::DELETE
+                | Method::OPTIONS
+                | Method::TRACE
+        )
     }
 
     fn should_drop_redirect_header(
@@ -787,7 +1197,9 @@ pub mod reqwest_helper {
 
 #[cfg(feature = "reqwest-egress")]
 #[allow(unused_imports)]
-pub use reqwest_helper::{client_builder_with_contract, send_with_contract, ContractResponse};
+pub use reqwest_helper::{
+    client_builder_with_contract, send_with_contract, ContractClientBuilder, ContractResponse,
+};
 
 impl HttpEgressContract {
     /// Construct a permissive contract suitable for tests that exercise a

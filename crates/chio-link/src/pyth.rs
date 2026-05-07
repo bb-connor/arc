@@ -23,6 +23,13 @@ impl PythHermesClient {
         egress_contract: HttpEgressContract,
     ) -> Result<Self, PriceOracleError> {
         let base_url = base_url.into();
+        egress_contract
+            .validate_dispatchable_with_pinned_dns()
+            .map_err(|err| {
+                PriceOracleError::InvalidConfiguration(format!(
+                    "Pyth Hermes HttpEgressContract is not dispatchable with pinned DNS: {err}"
+                ))
+            })?;
         let http_client = client_builder_with_contract(&egress_contract)
             .build()
             .map_err(|err| {
@@ -388,9 +395,9 @@ mod tests {
     #[tokio::test]
     async fn backend_rejects_pairs_without_pyth_feeds() {
         let contract =
-            chio_egress_contract::HttpEgressContract::permissive_for_tests("hermes.pyth.network");
+            chio_egress_contract::HttpEgressContract::permissive_for_tests("127.0.0.1:8080");
         let backend =
-            PythHermesClient::new("https://hermes.pyth.network", contract).test_unwrap("client");
+            PythHermesClient::new("http://127.0.0.1:8080", contract).test_unwrap("client");
         let pair = PairConfig {
             base: "ETH".to_string(),
             quote: "USD".to_string(),
@@ -409,5 +416,16 @@ mod tests {
             error,
             crate::PriceOracleError::NoPairAvailable { .. }
         ));
+    }
+
+    #[test]
+    fn new_accepts_hostname_contract_with_pinned_dns() {
+        let client = PythHermesClient::new(
+            "https://hermes.pyth.network",
+            chio_egress_contract::HttpEgressContract::permissive_for_tests("hermes.pyth.network"),
+        )
+        .test_unwrap("hostname contract is resolver-enforced at dispatch");
+
+        assert_eq!(client.base_url, "https://hermes.pyth.network");
     }
 }

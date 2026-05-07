@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 971aba6eaf211b6d06bf55b76ac19e7c6dc58f91fc733e9f6972d4b022be04e8
+# Schema sha256: 95e1bc47142b6b7f138be42872fee664e9833abfc0214512cf5057d9701def40
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -15,7 +15,7 @@ from .grant_schema import ChioCapabilityGrant, Constraint, MonetaryAmount, Opera
 from .revocation_schema import ChioCapabilityRevocationEntry
 from .token_schema import Algorithm, Attenuation, ChioCapabilitytoken, ChioScope, Constraint, DelegationLink, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
 from .token_v1_schema import Algorithm, Attenuation, ChioCapabilitytokenV1, ChioScope, Constraint, DelegationLink, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
-from .token_v2_schema import Algorithm, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytokenV2, GrantKind, GrantSubsetRelation, Kind, ScopeAttenuation, Subset
+from .token_v2_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytokenV2, DelegationLink, GrantKind, GrantSubsetRelation, Kind, ScopeAttenuation, Subset
 
 __all__ = [
     "Algorithm",

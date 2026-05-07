@@ -1010,7 +1010,9 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::config::{DegradedModePolicy, PriceOracleConfig, BASE_MAINNET_CHAIN_ID};
+    use crate::config::{
+        build_default_egress_contract, DegradedModePolicy, PriceOracleConfig, BASE_MAINNET_CHAIN_ID,
+    };
 
     trait TestUnwrap<T> {
         fn test_unwrap(self, context: &str) -> T;
@@ -1103,10 +1105,17 @@ mod tests {
     }
 
     fn test_config() -> PriceOracleConfig {
-        let mut config = PriceOracleConfig::base_mainnet_default("https://example.invalid");
+        let mut config = PriceOracleConfig::base_arbitrum_default(
+            "http://127.0.0.1:8545",
+            "http://127.0.0.1:9545",
+        );
+        config.pyth.hermes_url = "http://127.0.0.1:9000".to_string();
         for chain in &mut config.operator.chains {
             chain.sequencer_uptime_feed = None;
         }
+        config.egress_contract =
+            build_default_egress_contract(&config.pyth, &config.operator.chains);
+        config.egress_contract.deny_loopback = false;
         config
     }
 

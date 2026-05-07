@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -956,69 +956,38 @@ pub fn enforce_oidc_egress_contract(
         })
 }
 
-fn fetch_identity_provider_json<T: DeserializeOwned>(
+async fn fetch_identity_provider_json<T: DeserializeOwned>(
     url: &Url,
     field_name: &str,
     egress_contract: Option<&HttpEgressContract>,
 ) -> Result<T, CliError> {
-    // HttpEgressContract: gate every OIDC discovery and JWKS fetch through
-    // the typed contract. The remote MCP runtime shares the same outbound
-    // egress posture as the rest of the substrate; without the contract
-    // these fetches would bypass the SSRF gate entirely.
+    // HttpEgressContract: every OIDC discovery and JWKS fetch goes through
+    // send_with_contract so target URL, DNS answers, redirects, and response
+    // body size are enforced before bytes cross the substrate boundary.
     let contract = egress_contract.ok_or_else(|| {
         CliError::cli_other_error(format!(
             "{field_name} `{url}` requires an HttpEgressContract; substrate fails closed"
         ))
     })?;
-    contract.enforce_url_with_dns(url.as_str(), 0).map_err(|err| {
-        CliError::cli_other_error(format!(
-            "HttpEgressContract rejects {field_name} `{url}`: {err}"
-        ))
-    })?;
-    let agent = ureq::AgentBuilder::new()
+    let client = client_builder_with_contract(contract)
         .timeout(Duration::from_secs(IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS))
-        .redirects(0)
-        .build();
-    let response = agent.get(url.as_str()).call().map_err(|error| {
-        CliError::cli_other_error(format!("failed to fetch {field_name} `{}`: {error}", url))
-    })?;
-    if (300..400).contains(&response.status()) {
-        return Err(CliError::cli_other_error(format!(
-            "{field_name} `{url}` returned a redirect; redirects require explicit egress-contract handling"
-        )));
-    }
-    if let Some(content_length) = response.header("Content-Length") {
-        let content_length = content_length.trim().parse::<u64>().map_err(|error| {
-            CliError::cli_other_error(format!(
-                "invalid Content-Length from {field_name} `{url}`: {error}"
-            ))
-        })?;
-        contract.enforce_response_bytes(content_length).map_err(|err| {
-            CliError::cli_other_error(format!(
-                "HttpEgressContract rejects {field_name} `{url}` response: {err}"
-            ))
-        })?;
-    }
-    let mut body = Vec::new();
-    let read_limit = contract.max_response_bytes.saturating_add(1);
-    response
-        .into_reader()
-        .take(read_limit)
-        .read_to_end(&mut body)
+        .build()
         .map_err(|error| {
             CliError::cli_other_error(format!(
-                "failed to read JSON from {field_name} `{}`: {error}",
-                url
+                "failed to build {field_name} HTTP client for `{url}`: {error}"
             ))
         })?;
-    contract
-        .enforce_response_bytes(body.len() as u64)
+    let request = client.get(url.as_str()).build().map_err(|error| {
+        CliError::cli_other_error(format!("failed to build {field_name} request `{url}`: {error}"))
+    })?;
+    let response = send_with_contract(contract, &client, request)
+        .await
         .map_err(|err| {
             CliError::cli_other_error(format!(
-                "HttpEgressContract rejects {field_name} `{url}` response: {err}"
+                "HttpEgressContract rejects {field_name} `{url}`: {err}"
             ))
         })?;
-    serde_json::from_slice::<T>(&body).map_err(|error| {
+    response.json::<T>().await.map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse JSON from {field_name} `{}`: {error}",
             url
@@ -1044,13 +1013,13 @@ fn resolve_identity_provider_discovery_url(
     Ok(None)
 }
 
-fn resolve_jwks_key_set(
+async fn resolve_jwks_key_set(
     jwks_uri: &Url,
     field_name: &str,
     egress_contract: Option<&HttpEgressContract>,
 ) -> Result<JwtJwksKeySet, CliError> {
     let document: JwksDocument =
-        fetch_identity_provider_json(jwks_uri, field_name, egress_contract)?;
+        fetch_identity_provider_json(jwks_uri, field_name, egress_contract).await?;
     let mut keys_by_kid = HashMap::new();
     let mut anonymous_keys = Vec::new();
     for key in document.keys {
@@ -1193,7 +1162,7 @@ fn resolve_jwk_public_key(
     }))
 }
 
-fn resolve_discovered_identity_provider(
+async fn resolve_discovered_identity_provider(
     config: &RemoteServeHttpConfig,
 ) -> Result<Option<DiscoveredIdentityProvider>, CliError> {
     let Some(discovery_url) = resolve_identity_provider_discovery_url(config)? else {
@@ -1204,7 +1173,8 @@ fn resolve_discovered_identity_provider(
         &discovery_url,
         "--auth-jwt-discovery-url",
         egress_contract,
-    )?;
+    )
+    .await?;
     let issuer_url = parse_identity_provider_url(&document.issuer, "discovered OIDC issuer")?;
     let issuer = canonicalize_federated_issuer(issuer_url.as_str());
     if let Some(expected_issuer) = config.auth_jwt_issuer.as_deref() {
@@ -1239,7 +1209,8 @@ fn resolve_discovered_identity_provider(
             jwks_uri,
             "discovered OIDC jwks_uri",
             egress_contract,
-        )?)
+        )
+        .await?)
     } else {
         None
     };

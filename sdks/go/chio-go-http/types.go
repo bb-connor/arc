@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 137fe94d31853309f9392796a4a59271f59f462a9b8d8c17cbdc650bed1ada62
+// Schema content SHA-256: 1206be57b00c9388c70a2c4cca9dca84590d1050d9a0530555ef90aedbd28e3a
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -997,14 +997,14 @@ type CapabilityTokenV2 struct {
 	AttenuationProof CapabilityTokenV2AttenuationProof `json:"attenuation_proof"`
 
 	// BudgetShareBps Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
-	BudgetShareBps  *int64                     `json:"budget_share_bps,omitempty"`
-	Caveats         *[]CapabilityTokenV2Caveat `json:"caveats,omitempty"`
-	DelegationChain *[]map[string]interface{}  `json:"delegation_chain,omitempty"`
-	ExpiresAt       int64                      `json:"expires_at"`
-	Id              string                     `json:"id"`
-	IssuedAt        int64                      `json:"issued_at"`
-	Issuer          string                     `json:"issuer"`
-	Schema          CapabilityTokenV2Schema    `json:"schema"`
+	BudgetShareBps  *int64                             `json:"budget_share_bps,omitempty"`
+	Caveats         *[]CapabilityTokenV2Caveat         `json:"caveats,omitempty"`
+	DelegationChain *[]CapabilityTokenV2DelegationLink `json:"delegation_chain,omitempty"`
+	ExpiresAt       int64                              `json:"expires_at"`
+	Id              string                             `json:"id"`
+	IssuedAt        int64                              `json:"issued_at"`
+	Issuer          string                             `json:"issuer"`
+	Schema          CapabilityTokenV2Schema            `json:"schema"`
 
 	// Scope ChioScope. The Rust verifier hashes the RFC 8785 canonical form for attenuation_proof.childScopeHash.
 	Scope             map[string]interface{}                      `json:"scope"`
@@ -1049,6 +1049,25 @@ type CapabilityTokenV2Caveat struct {
 
 // CapabilityTokenV2CaveatKind defines model for CapabilityTokenV2Caveat.Kind.
 type CapabilityTokenV2CaveatKind string
+
+// CapabilityTokenV2DelegationLink A single v2 delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.
+type CapabilityTokenV2DelegationLink struct {
+	Attenuations *[]CapabilityTokenV2DelegationLink_Attenuations_Item `json:"attenuations,omitempty"`
+	CapabilityId string                                               `json:"capability_id"`
+	Delegatee    string                                               `json:"delegatee"`
+	Delegator    string                                               `json:"delegator"`
+
+	// ScopeHash RFC 8785 canonical scope hash for this delegation hop. Runtime v2 verification rejects links that omit it.
+	ScopeHash string `json:"scope_hash"`
+	Signature string `json:"signature"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// CapabilityTokenV2DelegationLink_Attenuations_Item defines model for CapabilityTokenV2DelegationLink.attenuations.Item.
+type CapabilityTokenV2DelegationLink_Attenuations_Item struct {
+	Type                 string                 `json:"type"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
 
 // CapabilityTokenV2GrantSubsetRelation defines model for CapabilityTokenV2GrantSubsetRelation.
 type CapabilityTokenV2GrantSubsetRelation struct {
@@ -2188,6 +2207,72 @@ func (a *CapabilityTokenV2_ScopeAttenuations_Item) UnmarshalJSON(b []byte) error
 
 // Override default JSON handling for CapabilityTokenV2_ScopeAttenuations_Item to handle AdditionalProperties
 func (a CapabilityTokenV2_ScopeAttenuations_Item) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["type"], err = json.Marshal(a.Type)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'type': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for CapabilityTokenV2DelegationLink_Attenuations_Item. Returns the specified
+// element and whether it was found
+func (a CapabilityTokenV2DelegationLink_Attenuations_Item) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CapabilityTokenV2DelegationLink_Attenuations_Item
+func (a *CapabilityTokenV2DelegationLink_Attenuations_Item) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CapabilityTokenV2DelegationLink_Attenuations_Item to handle AdditionalProperties
+func (a *CapabilityTokenV2DelegationLink_Attenuations_Item) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["type"]; found {
+		err = json.Unmarshal(raw, &a.Type)
+		if err != nil {
+			return fmt.Errorf("error reading 'type': %w", err)
+		}
+		delete(object, "type")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CapabilityTokenV2DelegationLink_Attenuations_Item to handle AdditionalProperties
+func (a CapabilityTokenV2DelegationLink_Attenuations_Item) MarshalJSON() ([]byte, error) {
 	var err error
 	object := make(map[string]json.RawMessage)
 

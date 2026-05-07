@@ -2,6 +2,7 @@
 struct A2aRequestHeader {
     name: String,
     value: String,
+    sensitive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,6 +120,7 @@ impl A2aAdapterConfig {
             &mut self.request_headers,
             "Authorization".to_string(),
             format!("Bearer {}", token.into()),
+            true,
         );
         self
     }
@@ -133,6 +135,7 @@ impl A2aAdapterConfig {
             &mut self.request_headers,
             "Authorization".to_string(),
             basic_request_header_value(username.into(), password.into()),
+            true,
         );
         self
     }
@@ -143,7 +146,9 @@ impl A2aAdapterConfig {
         header_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Self {
-        upsert_request_header(&mut self.request_headers, header_name.into(), value.into());
+        let header_name = header_name.into();
+        let sensitive = is_sensitive_redirect_header(header_name.as_str());
+        upsert_request_header(&mut self.request_headers, header_name, value.into(), sensitive);
         self
     }
 
@@ -153,7 +158,7 @@ impl A2aAdapterConfig {
         header_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Self {
-        upsert_request_header(&mut self.request_headers, header_name.into(), value.into());
+        upsert_request_header(&mut self.request_headers, header_name.into(), value.into(), true);
         self
     }
 
