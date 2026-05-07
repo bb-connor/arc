@@ -8,17 +8,19 @@
 //!
 //! This module's `OtsClient`:
 //!
-//! 1. computes `body_hash := SHA-256(canonical_jcs(batch.body))`,
+//! 1. computes `body_hash := SHA-256(canonical_jcs(BatchHashInput))`,
 //! 2. POSTs `body_hash` to the configured calendar URL,
 //! 3. parses the returned blob through the existing
 //!    `opentimestamps` crate (already a chio-anchor dependency for
 //!    the legacy super-root path),
-//! 4. returns a [`WitnessReceipt`] whose `inclusion_proof` carries
-//!    the OTS blob and whose `witness_root == batch.body.tree_root`.
+//! 4. parses the returned OTS blob as advisory timestamp material.
 //!
-//! `verify_inclusion` decodes the blob, asserts the start digest
-//! matches `body_hash`, and rejects on missing Bitcoin attestation
-//! beyond the configured staleness window.
+//! Important: a local OTS parse plus a Bitcoin attestation marker is
+//! not enough to satisfy `require_public_witness`. Until the receipt
+//! schema carries trusted Bitcoin block-header evidence or an
+//! independently verified calendar commitment, this client fails
+//! closed instead of reporting OTS receipts as load-bearing public
+//! witnesses.
 //!
 //! W2.3 step 3 also moves the legacy `verify_*` helpers from
 //! `chio-anchor/src/bitcoin.rs` to take an `&AnchorBatch` rather
@@ -38,7 +40,7 @@ use opentimestamps::DetachedTimestampFile;
 use crate::batch::{AnchorBatch, AnchorBatchWitnessKind};
 use crate::witness::{batch_body_hash, AnchorWitnessClient, AnchorWitnessError, WitnessReceipt};
 
-/// Production OpenTimestamps client. `calendar_url` example:
+/// OpenTimestamps advisory client. `calendar_url` example:
 /// `https://alice.btc.calendar.opentimestamps.org`. The calendar's
 /// `/digest` endpoint accepts a 32-byte SHA-256 payload and returns a
 /// serialised `Timestamp`.
@@ -50,10 +52,10 @@ pub struct OtsClient {
     /// whose attestation is older than this are reported as
     /// `AnchorWitnessError::Stale` on `verify_inclusion`.
     max_witness_age_seconds: i64,
-    /// When set, treats receipts that lack a Bitcoin attestation
-    /// (calendar-only, still pending block confirmation) as
-    /// acceptable. Default is false: the lane requires a real
-    /// Bitcoin commitment before reporting `Witnessed`.
+    /// When set, parses receipts that lack a Bitcoin attestation
+    /// (calendar-only, still pending block confirmation) instead of
+    /// rejecting them immediately. OTS remains advisory either way and
+    /// does not satisfy `require_public_witness`.
     pub accept_pending_attestation: bool,
 }
 
@@ -88,10 +90,6 @@ impl OtsClient {
 
     fn digest_url(&self) -> String {
         format!("{}/digest", self.calendar_url)
-    }
-
-    fn timestamp_url(&self, digest_hex: &str) -> String {
-        format!("{}/timestamp/{}", self.calendar_url, digest_hex)
     }
 }
 
@@ -140,39 +138,15 @@ impl AnchorWitnessClient for OtsClient {
         collect_attestations(&timestamp.first_step, &mut bitcoin_heights, &mut pending);
 
         if bitcoin_heights.is_empty() && !self.accept_pending_attestation {
-            // Include the calendar response as a still-pending blob so
-            // the caller can re-run `verify_inclusion` later, but
-            // refuse to declare the batch witnessed.
+            // Pending calendar material has no Bitcoin marker and
+            // cannot be treated as witnessed.
             return Err(AnchorWitnessError::Decode(
                 "ots calendar returned a pending timestamp without Bitcoin attestation".to_string(),
             ));
         }
 
-        // Wrap into a detached timestamp file so verify_inclusion can
-        // reuse the standard parser path.
-        let detached = DetachedTimestampFile {
-            digest_type: DigestType::Sha256,
-            timestamp,
-        };
-        let mut serialized = Vec::new();
-        detached
-            .to_writer(&mut serialized)
-            .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
-
-        let external_uuid = body_hash.to_hex();
-        let published_at = bitcoin_heights
-            .first()
-            .map(|height| height_to_unix_lower_bound(*height))
-            .unwrap_or_else(chrono_now_unix);
-
-        Ok(WitnessReceipt {
-            kind: AnchorBatchWitnessKind::Ots,
-            external_uuid,
-            published_at,
-            inclusion_proof: serialized,
-            witness_root: batch.body.tree_root,
-            body_hash,
-        })
+        reject_stale_bitcoin_attestation(&bitcoin_heights, self.max_witness_age_seconds)?;
+        Err(ots_advisory_only_error())
     }
 
     async fn verify_inclusion(&self, receipt: &WitnessReceipt) -> Result<(), AnchorWitnessError> {
@@ -199,11 +173,6 @@ impl AnchorWitnessClient for OtsClient {
             });
         }
 
-        // Optionally re-fetch the upgraded timestamp from the
-        // calendar to refresh pending entries. We do not require the
-        // network call to succeed if `inclusion_proof` already carries
-        // a Bitcoin attestation; production deployments may disable
-        // network access in the verifier.
         let mut bitcoin_heights = Vec::new();
         let mut pending = Vec::new();
         collect_attestations(
@@ -213,51 +182,43 @@ impl AnchorWitnessClient for OtsClient {
         );
 
         if bitcoin_heights.is_empty() && !self.accept_pending_attestation {
-            // Try a refresh against the calendar.
-            let url = self.timestamp_url(&expected_hex);
-            let refreshed = self.http.get(url).send().await;
-            if let Ok(response) = refreshed {
-                if response.status().is_success() {
-                    if let Ok(blob) = response.bytes().await {
-                        let mut deser = Deserializer::new(blob.as_ref());
-                        if let Ok(refreshed_ts) = Timestamp::deserialize(
-                            &mut deser,
-                            receipt.body_hash.as_bytes().to_vec(),
-                        ) {
-                            collect_attestations(
-                                &refreshed_ts.first_step,
-                                &mut bitcoin_heights,
-                                &mut pending,
-                            );
-                        }
-                    }
-                }
-            }
-            if bitcoin_heights.is_empty() {
-                return Err(AnchorWitnessError::Decode(
-                    "ots receipt has no Bitcoin attestation and refresh did not produce one"
-                        .to_string(),
-                ));
-            }
+            return Err(AnchorWitnessError::Decode(
+                "ots receipt has no Bitcoin attestation".to_string(),
+            ));
         }
 
-        let now = chrono_now_unix();
-        if self.max_witness_age_seconds > 0 {
-            let earliest = bitcoin_heights
-                .iter()
-                .map(|height| height_to_unix_lower_bound(*height))
-                .min()
-                .unwrap_or(receipt.published_at);
-            if now.saturating_sub(earliest) > self.max_witness_age_seconds {
-                return Err(AnchorWitnessError::Stale {
-                    published_at: earliest,
-                    now,
-                    max_age_seconds: self.max_witness_age_seconds,
-                });
-            }
-        }
-        Ok(())
+        reject_stale_bitcoin_attestation(&bitcoin_heights, self.max_witness_age_seconds)?;
+        Err(ots_advisory_only_error())
     }
+}
+
+fn ots_advisory_only_error() -> AnchorWitnessError {
+    AnchorWitnessError::SignatureInvalid(
+        "ots receipt lacks trusted Bitcoin header or calendar-backed commitment evidence; OTS is advisory-only for require_public_witness".to_string(),
+    )
+}
+
+fn reject_stale_bitcoin_attestation(
+    bitcoin_heights: &[u64],
+    max_witness_age_seconds: i64,
+) -> Result<(), AnchorWitnessError> {
+    if max_witness_age_seconds <= 0 {
+        return Ok(());
+    }
+    let now = chrono_now_unix();
+    let earliest = bitcoin_heights
+        .iter()
+        .map(|height| height_to_unix_lower_bound(*height))
+        .min()
+        .unwrap_or(now);
+    if now.saturating_sub(earliest) > max_witness_age_seconds {
+        return Err(AnchorWitnessError::Stale {
+            published_at: earliest,
+            now,
+            max_age_seconds: max_witness_age_seconds,
+        });
+    }
+    Ok(())
 }
 
 fn collect_attestations(
@@ -368,5 +329,30 @@ mod tests {
     fn ots_client_rejects_negative_max_age() {
         let err = OtsClient::new("https://example.com", -1).unwrap_err();
         assert!(matches!(err, AnchorWitnessError::Config(_)));
+    }
+
+    #[tokio::test]
+    async fn ots_verify_inclusion_rejects_bitcoin_marker_without_trusted_evidence() {
+        let payload_hash = chio_core::hashing::sha256(b"chio-anchor-batch-test");
+        let blob = build_ots_inclusion_proof(&payload_hash, 900_000).unwrap();
+        let receipt = WitnessReceipt {
+            kind: AnchorBatchWitnessKind::Ots,
+            external_uuid: payload_hash.to_hex(),
+            published_at: 1_700_000_010,
+            inclusion_proof: blob,
+            witness_root: Hash::zero(),
+            body_hash: payload_hash,
+        };
+        let client = OtsClient::new("http://127.0.0.1:9", 0).unwrap();
+        let err = client.verify_inclusion(&receipt).await.unwrap_err();
+        match err {
+            AnchorWitnessError::SignatureInvalid(message) => {
+                assert!(
+                    message.contains("advisory-only"),
+                    "expected OTS advisory-only rejection, got: {message}"
+                );
+            }
+            other => panic!("expected SignatureInvalid, got {other:?}"),
+        }
     }
 }

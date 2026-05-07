@@ -20,7 +20,11 @@ signatures, receipt body hashes, or checkpoint inclusion proofs.
   checkpoint at the same index.
 - Witness impersonation: reject the batch when the witness entry resolves to a
   different root or to a lane outside the verifier allow-list.
-- Stale witness: when Rekor, OTS, or Solana memo publication is unavailable for
+- OTS marker-only receipt: an OTS blob that locally decodes and contains a
+  Bitcoin attestation marker is advisory only. It does not satisfy
+  `require_public_witness` until the receipt contract carries trusted Bitcoin
+  block-header evidence or independently verified calendar commitment evidence.
+- Stale witness: when Rekor or another trusted public-witness lane is unavailable for
   longer than the verifier freshness window, mark new batches as
   `pending_public_witness`. Verifiers configured with `require_public_witness`
   reject those new batches, reject sync self-asserted `Witnessed` states, and

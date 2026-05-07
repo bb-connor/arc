@@ -27,11 +27,12 @@ use std::thread;
 use std::time::Duration;
 
 use chio_anchor::{
-    batch_body_hash, build_anchor_batch, build_rekor_entry_body_b64,
+    batch_body_hash, build_anchor_batch, build_ots_inclusion_proof, build_rekor_entry_body_b64,
     build_rekor_entry_body_b64_with_hash, build_rekor_publish_response,
-    build_rekor_publish_response_with_set, sign_set_with_test_key, verifying_key_to_pem,
-    AnchorBatchWitness, AnchorBatchWitnessKind, AnchorWitnessClient, AnchorWitnessError,
-    RekorClient, WitnessReceipt,
+    build_rekor_publish_response_with_set, sign_set_with_test_key,
+    verify_anchor_batch_with_witness_policy_async, verifying_key_to_pem, AnchorBatchWitness,
+    AnchorBatchWitnessKind, AnchorWitnessClient, AnchorWitnessError, OtsClient, RekorClient,
+    VerifiedWitnessCache, WitnessPolicy, WitnessReceipt, WitnessState,
 };
 use chio_core::hashing::{sha256, Hash};
 use chio_core::Keypair;
@@ -428,4 +429,56 @@ fn rekor_verify_inclusion_accepts_set_signed_by_trusted_key() {
     runtime
         .block_on(client.verify_inclusion(&receipt))
         .expect("SET signed by a trusted key must verify");
+}
+
+#[test]
+fn require_public_witness_rejects_ots_marker_without_trusted_bitcoin_evidence() {
+    let kp = Keypair::generate();
+    let witness = AnchorBatchWitness {
+        kind: AnchorBatchWitnessKind::Ots,
+        witness_id: "ots:self-asserted".to_string(),
+        root: Hash::zero(),
+        observed_at: Some(1_700_000_000),
+    };
+    let mut batch = build_anchor_batch(
+        vec!["ck-ots-1".to_string(), "ck-ots-2".to_string()],
+        witness,
+        1_700_000_000,
+        &kp,
+    )
+    .unwrap();
+    let body_hash = batch_body_hash(&batch).unwrap();
+    let inclusion_proof = build_ots_inclusion_proof(&body_hash, 900_000).unwrap();
+    batch.body.witness_state = WitnessState::Witnessed {
+        receipt: WitnessReceipt {
+            kind: AnchorBatchWitnessKind::Ots,
+            external_uuid: body_hash.to_hex(),
+            published_at: 1_700_000_010,
+            inclusion_proof,
+            witness_root: batch.body.tree_root,
+            body_hash,
+        },
+        observed_at: 1_700_000_010,
+    };
+    let signed = chio_anchor::AnchorBatch::sign(batch.body, &kp).unwrap();
+    let policy = WitnessPolicy {
+        require_public_witness: true,
+        stale_window_seconds: 60 * 60,
+    };
+    let client = OtsClient::new("http://127.0.0.1:9", 0).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let err = runtime
+        .block_on(verify_anchor_batch_with_witness_policy_async(
+            &signed,
+            &policy,
+            1_700_000_100,
+            Some(&client),
+            &VerifiedWitnessCache::new(),
+        ))
+        .expect_err("OTS marker-only receipts must not satisfy require_public_witness");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("advisory-only") || msg.contains("trusted Bitcoin header"),
+        "expected OTS trusted-evidence rejection, got: {msg}"
+    );
 }

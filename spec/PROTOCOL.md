@@ -908,11 +908,12 @@ remain proposed evidence until implemented. The relevant artifacts live under
   HTTP non-2xx, network failures, invalid signed-entry timestamps, and entries
   past `max_witness_age_seconds` are reported as fail-closed errors.
 - `OtsClient`: OpenTimestamps client. `publish` POSTs `body_hash` to
-  `<calendar>/digest`, parses the returned timestamp through the
-  `opentimestamps` crate, and refuses to declare a batch witnessed without a
-  Bitcoin attestation (unless `accept_pending_attestation` is explicitly
-  enabled). `verify_inclusion` re-decodes the inclusion proof and refreshes
-  pending attestations against `<calendar>/timestamp/<digest>`.
+  `<calendar>/digest` and parses the returned timestamp through the
+  `opentimestamps` crate, but OTS is advisory for the W2.3 public-witness
+  requirement. A local parse plus a Bitcoin attestation marker is self-assertable
+  without trusted Bitcoin block-header evidence or independently verified
+  calendar commitment evidence, so `verify_inclusion` fails closed and OTS
+  receipts do not satisfy `require_public_witness`.
 
 Each batch carries a `WitnessState` lifecycle:
 
@@ -952,6 +953,10 @@ Rejection criteria the W2.3 negative-conformance suite exercises:
   already-witnessed receipts usable inside the configured stale window only
   when the verifier's own cache has a fresh `verified_at` timestamp for the
   batch body hash.
+- OTS marker-only witness receipts: an OTS proof that decodes, matches the batch
+  body hash, and contains a Bitcoin attestation marker is still rejected under
+  `require_public_witness` until trusted Bitcoin header or calendar-backed
+  commitment evidence is present in the receipt contract.
 
 The negative tests live as standalone files at
 `crates/chio-conformance/tests/anchor_batch_{forged_root,misordered_proof,witness_impersonation,stale_witness_fallback}_rejected.rs`

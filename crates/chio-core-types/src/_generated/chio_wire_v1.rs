@@ -27713,12 +27713,14 @@ impl ::std::convert::TryFrom<::std::string::String> for WitnessKind {
         value.parse()
     }
 }
-///`WitnessReceipt`
+///Verifier-bound receipt returned by a public-witness lane. OTS receipts remain advisory until the lane carries trusted Bitcoin header or calendar-backed commitment evidence.
 ///
 /// <details><summary>JSON schema</summary>
 ///
 /// ```json
 ///{
+///  "title": "WitnessReceipt",
+///  "description": "Verifier-bound receipt returned by a public-witness lane. OTS receipts remain advisory until the lane carries trusted Bitcoin header or calendar-backed commitment evidence.",
 ///  "type": "object",
 ///  "required": [
 ///    "bodyHash",
@@ -27739,6 +27741,7 @@ impl ::std::convert::TryFrom<::std::string::String> for WitnessKind {
 ///    },
 ///    "inclusionProof": {
 ///      "type": "string",
+///      "pattern": "^$|^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
 ///      "contentEncoding": "base64"
 ///    },
 ///    "kind": {
@@ -27750,7 +27753,8 @@ impl ::std::convert::TryFrom<::std::string::String> for WitnessKind {
 ///      ]
 ///    },
 ///    "publishedAt": {
-///      "type": "integer"
+///      "type": "integer",
+///      "minimum": 0.0
 ///    },
 ///    "witnessRoot": {
 ///      "type": "string",
@@ -27769,10 +27773,10 @@ pub struct WitnessReceipt {
     #[serde(rename = "externalUuid")]
     pub external_uuid: WitnessReceiptExternalUuid,
     #[serde(rename = "inclusionProof")]
-    pub inclusion_proof: ::std::string::String,
+    pub inclusion_proof: WitnessReceiptInclusionProof,
     pub kind: WitnessReceiptKind,
     #[serde(rename = "publishedAt")]
-    pub published_at: i64,
+    pub published_at: u64,
     #[serde(rename = "witnessRoot")]
     pub witness_root: WitnessReceiptWitnessRoot,
 }
@@ -27926,6 +27930,95 @@ impl ::std::convert::TryFrom<::std::string::String> for WitnessReceiptExternalUu
     }
 }
 impl<'de> ::serde::Deserialize<'de> for WitnessReceiptExternalUuid {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///`WitnessReceiptInclusionProof`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "string",
+///  "pattern": "^$|^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+///  "contentEncoding": "base64"
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct WitnessReceiptInclusionProof(::std::string::String);
+impl ::std::ops::Deref for WitnessReceiptInclusionProof {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<WitnessReceiptInclusionProof> for ::std::string::String {
+    fn from(value: WitnessReceiptInclusionProof) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<&WitnessReceiptInclusionProof>
+for WitnessReceiptInclusionProof {
+    fn from(value: &WitnessReceiptInclusionProof) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr for WitnessReceiptInclusionProof {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+        {
+            ::regress::Regex::new(
+                    "^$|^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+                )
+                .unwrap()
+        });
+        if PATTERN.find(value).is_none() {
+            return Err(
+                "doesn't match pattern \"^$|^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$\""
+                    .into(),
+            );
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for WitnessReceiptInclusionProof {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for WitnessReceiptInclusionProof {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for WitnessReceiptInclusionProof {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for WitnessReceiptInclusionProof {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -28215,7 +28308,8 @@ impl<'de> ::serde::Deserialize<'de> for WitnessRoot {
 ///          "const": "witnessed"
 ///        },
 ///        "observed_at": {
-///          "type": "integer"
+///          "type": "integer",
+///          "minimum": 0.0
 ///        },
 ///        "receipt": {
 ///          "$ref": "#/$defs/witnessReceipt"
@@ -28232,14 +28326,16 @@ impl<'de> ::serde::Deserialize<'de> for WitnessRoot {
 ///      ],
 ///      "properties": {
 ///        "error": {
-///          "type": "string"
+///          "type": "string",
+///          "minLength": 1
 ///        },
 ///        "kind": {
 ///          "type": "string",
 ///          "const": "stale"
 ///        },
 ///        "last_verified": {
-///          "type": "integer"
+///          "type": "integer",
+///          "minimum": 0.0
 ///        }
 ///      },
 ///      "additionalProperties": false
@@ -28254,13 +28350,90 @@ pub enum WitnessState {
     #[serde(rename = "pending")]
     Pending,
     #[serde(rename = "witnessed")]
-    Witnessed { observed_at: i64, receipt: WitnessReceipt },
+    Witnessed { observed_at: u64, receipt: WitnessReceipt },
     #[serde(rename = "stale")]
-    Stale { error: ::std::string::String, last_verified: i64 },
+    Stale { error: WitnessStateError, last_verified: u64 },
 }
 impl ::std::convert::From<&Self> for WitnessState {
     fn from(value: &WitnessState) -> Self {
         value.clone()
+    }
+}
+///`WitnessStateError`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "type": "string",
+///  "minLength": 1
+///}
+/// ```
+/// </details>
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct WitnessStateError(::std::string::String);
+impl ::std::ops::Deref for WitnessStateError {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<WitnessStateError> for ::std::string::String {
+    fn from(value: WitnessStateError) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<&WitnessStateError> for WitnessStateError {
+    fn from(value: &WitnessStateError) -> Self {
+        value.clone()
+    }
+}
+impl ::std::str::FromStr for WitnessStateError {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for WitnessStateError {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String> for WitnessStateError {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for WitnessStateError {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for WitnessStateError {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
     }
 }
 ///`WitnessWitnessId`

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: b19835a4fd903558f9e41676f141163e3ecaa8a786254ae07a7f587bce59b00d
+// Schema SHA: 96383baeb07b4792fa9b5695043a3c51ddc1f814a3582f446a314fdfd81857eb
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -115,7 +115,7 @@ export namespace Anchor_Batch {
       }
     | {
         kind: "witnessed";
-        receipt: {};
+        receipt: WitnessReceipt;
         observed_at: number;
       }
     | {
@@ -159,6 +159,17 @@ export namespace Anchor_Batch {
     witnessId: string;
     root: string;
     observedAt?: number;
+  }
+  /**
+   * Verifier-bound receipt returned by a public-witness lane. OTS receipts remain advisory until the lane carries trusted Bitcoin header or calendar-backed commitment evidence.
+   */
+  export interface WitnessReceipt {
+    kind: "rekor" | "ots" | "solana_memo";
+    externalUuid: string;
+    publishedAt: number;
+    inclusionProof: string;
+    witnessRoot: string;
+    bodyHash: string;
   }
 }
 

@@ -1,13 +1,13 @@
 //! Public-witness lane clients for `chio.anchor_batch.v1`.
 //!
 //! W2.3 closes the audit P0 on T1.3 by providing a real
-//! [`AnchorWitnessClient`] trait, two production submodules
-//! ([`rekor`] and [`ots`]), and the [`WitnessState`] state machine
-//! consumed by `verify_anchor_batch_with_witness_policy`.
+//! [`AnchorWitnessClient`] trait, Rekor production verification, OTS
+//! advisory parsing, and the [`WitnessState`] state machine consumed by
+//! `verify_anchor_batch_with_witness_policy`.
 //!
-//! The clients implement the actual HTTP (Rekor REST) and process
-//! (`ots-cli`) protocols. Tests substitute a mock HTTP server or a
-//! stubbed binary; production builds reach the live endpoint.
+//! The clients implement the actual HTTP protocols used by Rekor REST
+//! and OpenTimestamps calendars. Tests substitute mock servers where
+//! load-bearing verification is available.
 //!
 //! # Soundness notes (PR #594 review fixes)
 //!
@@ -118,8 +118,10 @@ pub enum AnchorWitnessError {
     SignatureInvalid(String),
 }
 
-/// Production witness-lane interface. Both [`rekor::RekorClient`] and
-/// [`ots::OtsClient`] implement this trait.
+/// Witness-lane interface. [`rekor::RekorClient`] can satisfy
+/// load-bearing public-witness policy; [`ots::OtsClient`] currently
+/// fails closed for that policy until trusted Bitcoin evidence is part
+/// of the receipt contract.
 ///
 /// Implementations MUST be fail-closed: a failed publish or a failed
 /// inclusion-verify returns `Err(_)`, never silently downgrades the

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d9f25d4d67f90381de69fe049b2499f80286e51de707cee0c3ea3acc18de36ec
+# Schema sha256: 43af020113d32a9c561cfd72d7f4246781e6a143ddd622899296902e406775ca
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -57,19 +57,6 @@ class WitnessState1(BaseModel):
     kind: Literal["pending"]
 
 
-class WitnessState2(BaseModel):
-    """
-    W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: Literal["witnessed"]
-    receipt: dict[str, Any]
-    observed_at: int
-
-
 class WitnessState3(BaseModel):
     """
     W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
@@ -79,8 +66,39 @@ class WitnessState3(BaseModel):
         extra="forbid",
     )
     kind: Literal["stale"]
-    last_verified: int
-    error: str
+    last_verified: conint(ge=0)
+    error: constr(min_length=1)
+
+
+class WitnessReceipt(BaseModel):
+    """
+    Verifier-bound receipt returned by a public-witness lane. OTS receipts remain advisory until the lane carries trusted Bitcoin header or calendar-backed commitment evidence.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Kind
+    externalUuid: constr(min_length=1)
+    publishedAt: conint(ge=0)
+    inclusionProof: constr(
+        pattern=r"^$|^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    )
+    witnessRoot: constr(pattern=r"^(0x)?[0-9a-f]{64}$")
+    bodyHash: constr(pattern=r"^(0x)?[0-9a-f]{64}$")
+
+
+class WitnessState2(BaseModel):
+    """
+    W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["witnessed"]
+    receipt: WitnessReceipt
+    observed_at: conint(ge=0)
 
 
 class WitnessState(RootModel[WitnessState1 | WitnessState2 | WitnessState3]):

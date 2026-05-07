@@ -60,7 +60,7 @@
       "id": "claim.anchor.batch_continuity",
       "status": "enforced",
       "schema_artifact": "spec/schemas/chio-wire/v1/anchor/batch.schema.json",
-      "summary": "A chio.anchor_batch.v1 signs a Merkle root over N receipts/checkpoints and can bind that root to a public witness lane (Rekor / OTS / Solana memo) through AnchorWitnessClient. Per-receipt local signatures stay authoritative. The enforced subset recomputes Merkle roots/proofs, checks witness root/body-hash binding, verifies Rekor signed-entry timestamps, rejects sync self-asserted Witnessed under require_public_witness, and admits Stale only from a verifier-owned batch_body_hash -> verified_at cache. Rekor Merkle inclusion-proof checking and formal public-witness anti-equivocation remain proposed evidence.",
+      "summary": "A chio.anchor_batch.v1 signs a Merkle root over N receipts/checkpoints and can bind that root to a public witness lane through AnchorWitnessClient. Per-receipt local signatures stay authoritative. The enforced subset recomputes Merkle roots/proofs, checks witness root/body-hash binding, verifies Rekor signed-entry timestamps, rejects sync self-asserted Witnessed under require_public_witness, rejects OTS marker-only receipts as advisory until trusted Bitcoin header or calendar-backed commitment evidence exists, and admits Stale only from a verifier-owned batch_body_hash -> verified_at cache. Rekor Merkle inclusion-proof checking, OTS trusted-header verification, and formal public-witness anti-equivocation remain proposed evidence.",
       "introduced_in": "trajectory-4/W2.3",
       "proof_manifest_ref": "manifest.anchor.batch_continuity"
     }
