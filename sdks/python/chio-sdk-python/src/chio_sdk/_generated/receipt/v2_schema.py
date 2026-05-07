@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a5352aaa71e428a0935ffe1a631fd6ccaed661b859eab23f3c0198e3827ab1b5
+# Schema sha256: bc02beb22e700f6dcb4ff8bacf886190c87ed37499a515db8e09dfd0f87c2e00
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -67,7 +67,9 @@ class ReceiptV2BodyHashInput(BaseModel):
     parentSetHash: constr(pattern=r"^[0-9a-f]{64}$")
     dagOrdinal: conint(ge=0)
     hlc: Hlc
-    kernelKey: constr(min_length=64)
+    kernelKey: constr(
+        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
+    )
 
 
 class ChioReceiptV2(BaseModel):
@@ -83,5 +85,5 @@ class ChioReceiptV2(BaseModel):
     body: ReceiptV2BodyHashInput
     algorithm: Algorithm | None = None
     signature: constr(
-        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+:[0-9a-f]+)$"
+        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
     )

@@ -816,7 +816,7 @@ pub mod wasm {
             token,
             trusted_issuers_hex,
             clock_override_unix_secs: None,
-            peer_capabilities: None,
+            peer_capabilities: Some(CapabilityNegotiation::v1_default()),
             capability_trust_roots: BTreeMap::new(),
             parent_budget_snapshots: Vec::new(),
         };

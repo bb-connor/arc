@@ -510,6 +510,7 @@ impl SqliteReceiptStore {
             -- W2.1: v2 receipts addressed by body_hash. Replay identity is
             -- exclusively body_hash; legacy_receipt_id is a non-authoritative
             -- tooling alias kept for cross-version correlation only.
+            DROP INDEX IF EXISTS idx_chio_receipts_v2_legacy_alias;
             CREATE TABLE IF NOT EXISTS chio_receipts_v2 (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
                 body_hash TEXT NOT NULL UNIQUE,
@@ -526,7 +527,7 @@ impl SqliteReceiptStore {
                 tenant_id TEXT,
                 raw_json TEXT NOT NULL
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_receipts_v2_legacy_alias
+            CREATE INDEX IF NOT EXISTS idx_chio_receipts_v2_legacy_alias
                 ON chio_receipts_v2(legacy_receipt_id)
                 WHERE legacy_receipt_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_chio_receipts_v2_chain

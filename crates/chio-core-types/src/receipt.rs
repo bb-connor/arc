@@ -734,7 +734,7 @@ pub fn signed_receipt_v2(
 }
 
 /// Verify DAG acyclicity and common-chain constraints for a v2 receipt.
-pub fn verify_receipt_v2_dag(receipt: &ChioReceiptV2, parents: &[ReceiptDagParent]) -> Result<()> {
+pub fn verify_receipt_v2_dag(receipt: &ChioReceiptV2, parents: &[ChioReceiptV2]) -> Result<()> {
     if !receipt.verify_signature()? {
         return Err(Error::SignatureVerificationFailed);
     }
@@ -752,12 +752,25 @@ pub fn verify_receipt_v2_dag(receipt: &ChioReceiptV2, parents: &[ReceiptDagParen
     let max_parent_ordinal = parents
         .iter()
         .map(|parent| {
-            if parent.chain_id != receipt.body.chain_id {
+            if parent.body_hash == receipt.body_hash {
+                return Err(Error::CanonicalJson(
+                    "receipt v2 must not list itself as a parent".to_string(),
+                ));
+            }
+            if !parent.verify_signature()? {
+                return Err(Error::SignatureVerificationFailed);
+            }
+            if parent.body.chain_id != receipt.body.chain_id {
                 return Err(Error::CanonicalJson(
                     "receipt v2 parent does not share child chain_id".to_string(),
                 ));
             }
-            Ok(parent.dag_ordinal)
+            if !receipt_hlc_exceeds_parent(&receipt.body.hlc, &parent.body.hlc) {
+                return Err(Error::CanonicalJson(
+                    "receipt v2 HLC must exceed every parent HLC".to_string(),
+                ));
+            }
+            Ok(parent.body.dag_ordinal)
         })
         .try_fold(0_u64, |max_seen, item| {
             item.map(|value| max_seen.max(value))
@@ -768,6 +781,14 @@ pub fn verify_receipt_v2_dag(receipt: &ChioReceiptV2, parents: &[ReceiptDagParen
         ));
     }
     Ok(())
+}
+
+fn receipt_hlc_exceeds_parent(
+    child: &ReceiptHybridLogicalClock,
+    parent: &ReceiptHybridLogicalClock,
+) -> bool {
+    child.wall_seconds > parent.wall_seconds
+        || (child.wall_seconds == parent.wall_seconds && child.logical > parent.logical)
 }
 
 impl ChildRequestReceipt {
@@ -1841,11 +1862,6 @@ mod tests {
     fn receipt_v2_dag_rejects_non_increasing_ordinal() {
         let kp = Keypair::generate();
         let parent = make_receipt_v2(&kp, "rcpt_parent", 1);
-        let parent_descriptor = ReceiptDagParent {
-            body_hash: parent.body_hash.clone(),
-            chain_id: parent.body.chain_id.clone(),
-            dag_ordinal: parent.body.dag_ordinal,
-        };
         let mut child_body = ReceiptV2BodyHashInput::from_v1_body(
             make_receipt_body(&kp),
             parent.body.chain_id.clone(),
@@ -1860,7 +1876,45 @@ mod tests {
         child_body.capability_id = "cap-child".to_string();
         let child = ChioReceiptV2::sign("rcpt_child", child_body, &kp).unwrap();
 
-        assert!(verify_receipt_v2_dag(&child, &[parent_descriptor]).is_err());
+        assert!(verify_receipt_v2_dag(&child, &[parent]).is_err());
+    }
+
+    #[test]
+    fn receipt_v2_dag_rederives_parent_ordinal_from_signed_body() {
+        let kp = Keypair::generate();
+        let parent = make_receipt_v2(&kp, "rcpt_parent", 10);
+        let mut child_body = ReceiptV2BodyHashInput::from_v1_body(
+            make_receipt_body(&kp),
+            parent.body.chain_id.clone(),
+            vec![parent.body_hash.clone()],
+            1,
+            ReceiptHybridLogicalClock {
+                wall_seconds: 1710000011,
+                logical: 0,
+                kernel_id: "kernel-b".to_string(),
+            },
+        );
+        child_body.capability_id = "cap-child".to_string();
+        let child = ChioReceiptV2::sign("rcpt_child", child_body, &kp).unwrap();
+
+        assert!(verify_receipt_v2_dag(&child, &[parent]).is_err());
+    }
+
+    #[test]
+    fn receipt_v2_dag_rejects_non_monotone_hlc() {
+        let kp = Keypair::generate();
+        let parent = make_receipt_v2(&kp, "rcpt_parent", 1);
+        let mut child_body = ReceiptV2BodyHashInput::from_v1_body(
+            make_receipt_body(&kp),
+            parent.body.chain_id.clone(),
+            vec![parent.body_hash.clone()],
+            2,
+            parent.body.hlc.clone(),
+        );
+        child_body.capability_id = "cap-child".to_string();
+        let child = ChioReceiptV2::sign("rcpt_child", child_body, &kp).unwrap();
+
+        assert!(verify_receipt_v2_dag(&child, &[parent]).is_err());
     }
 
     #[test]

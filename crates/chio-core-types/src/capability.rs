@@ -210,9 +210,20 @@ impl CapabilityNegotiation {
         self.validate()?;
         remote.validate()?;
         let mut features = BTreeMap::new();
-        for (feature, enabled) in &self.features {
-            if *enabled && remote.features.get(feature).copied().unwrap_or(false) {
-                features.insert(feature.clone(), true);
+        for feature in self.features.keys().chain(remote.features.keys()) {
+            if features.contains_key(feature) {
+                continue;
+            }
+            let local = self.features.get(feature).copied();
+            let remote = remote.features.get(feature).copied();
+            match (local, remote) {
+                (Some(true), Some(true)) => {
+                    features.insert(feature.clone(), true);
+                }
+                (Some(false), _) | (_, Some(false)) => {
+                    features.insert(feature.clone(), false);
+                }
+                _ => {}
             }
         }
         let max_capability_schema = if self.max_capability_schema == CHIO_CAPABILITY_V2_SCHEMA
@@ -726,6 +737,9 @@ impl CapabilityToken {
         trust_root_scope_hash: &ScopeHash,
         negotiated: &CapabilityNegotiation,
     ) -> Result<()> {
+        if self.schema != CHIO_CAPABILITY_V2_SCHEMA {
+            return Ok(());
+        }
         let enabled = negotiated
             .features
             .get(capability_features::DELEGATION_V2_CHAIN_BINDING)
@@ -3955,6 +3969,58 @@ mod tests {
         let mut malformed = CapabilityNegotiation::t1_default();
         malformed.features.insert("bad feature".to_string(), true);
         assert!(local.negotiated_with(&malformed).is_err());
+    }
+
+    #[test]
+    fn capability_negotiation_preserves_explicit_disabled_features() {
+        let local = CapabilityNegotiation::t1_default();
+        let mut remote = CapabilityNegotiation::t1_default();
+        remote.features.insert(
+            capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
+            false,
+        );
+
+        let negotiated = local.negotiated_with(&remote).unwrap();
+
+        assert_eq!(negotiated.max_capability_schema, CHIO_CAPABILITY_V2_SCHEMA);
+        assert_eq!(
+            negotiated
+                .features
+                .get(capability_features::DELEGATION_V2_CHAIN_BINDING)
+                .copied(),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn chain_binding_disabled_does_not_reject_v1_tokens() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-v1".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 10,
+                expires_at: 20,
+                delegation_chain: vec![],
+            },
+            &issuer,
+        )
+        .unwrap();
+        let mut negotiated = CapabilityNegotiation::t1_default();
+        negotiated.features.insert(
+            capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
+            false,
+        );
+
+        token
+            .validate_chain_binding_with_features(
+                &scope_hash(&ChioScope::default()).unwrap(),
+                &negotiated,
+            )
+            .unwrap();
     }
 
     fn make_signed_link(

@@ -1408,8 +1408,6 @@ impl ChioKernel {
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
         self.apply_federation_cosign(request, receipt)?;
-        self.record_chio_receipt(receipt)?;
-
         let now = current_unix_timestamp();
         let version = self
             .kernel_receipt_version_for_remote(request.federated_origin_kernel_id.as_deref(), now);
@@ -1424,6 +1422,7 @@ impl ChioKernel {
                 })?;
             self.record_chio_receipt_v2(&v2, Some(receipt.id.as_str()))?;
         }
+        self.record_chio_receipt(receipt)?;
         Ok(())
     }
 

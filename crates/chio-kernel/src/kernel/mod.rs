@@ -1049,6 +1049,9 @@ pub struct ChioKernel {
     /// kernel mutex. Hex-keyed because `chio_core::PublicKey` does not
     /// implement `Hash`.
     capability_trust_roots: ArcSwap<HashMap<String, chio_core::capability::ScopeHash>>,
+    /// Serializes read-modify-write updates to `capability_trust_roots`.
+    /// Snapshot reads remain lock-free through ArcSwap.
+    capability_trust_roots_write_lock: Mutex<()>,
     /// Phase 20.3 bilateral co-signer. Separate from the peer set so
     /// runtime can install it independently -- for instance, a deployment
     /// can declare peers while still using a mock cosigner in tests.
@@ -1527,6 +1530,7 @@ impl ChioKernel {
             memory_provenance: None,
             federation_peers: ArcSwap::from_pointee(HashMap::new()),
             capability_trust_roots: ArcSwap::from_pointee(HashMap::new()),
+            capability_trust_roots_write_lock: Mutex::new(()),
             federation_cosigner: None,
             federation_dual_receipts: DashMap::new(),
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
@@ -1651,11 +1655,18 @@ impl ChioKernel {
         // receipt after a transient store failure is not poisoned by a
         // body_hash that never became durable.
         let persisted = self.with_receipt_store(|store| {
-            store
+            let seq = store
                 .append_chio_receipt_v2(receipt, legacy_receipt_id_alias)
                 .map_err(|error| {
                     KernelError::Internal(format!("v2 receipt persistence failed: {error}"))
-                })
+                })?;
+            if seq == 0 {
+                return Err(KernelError::Internal(format!(
+                    "v2 receipt persistence failed: body_hash {} already exists",
+                    receipt.body_hash
+                )));
+            }
+            Ok(())
         });
         if let Err(error) = persisted {
             let mut replay = match self.receipt_v2_replay.lock() {
@@ -1935,11 +1946,17 @@ impl ChioKernel {
         self,
         roots: Vec<(chio_core::PublicKey, chio_core::capability::ScopeHash)>,
     ) -> Self {
-        let mut next: HashMap<String, chio_core::capability::ScopeHash> = HashMap::new();
-        for (issuer, root) in roots {
-            next.insert(issuer.to_hex(), root);
+        {
+            let _guard = self
+                .capability_trust_roots_write_lock
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut next: HashMap<String, chio_core::capability::ScopeHash> = HashMap::new();
+            for (issuer, root) in roots {
+                next.insert(issuer.to_hex(), root);
+            }
+            self.capability_trust_roots.store(Arc::new(next));
         }
-        self.capability_trust_roots.store(Arc::new(next));
         self
     }
 
@@ -1951,6 +1968,10 @@ impl ChioKernel {
         issuer: chio_core::PublicKey,
         root: chio_core::capability::ScopeHash,
     ) -> Option<chio_core::capability::ScopeHash> {
+        let _guard = self
+            .capability_trust_roots_write_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let current = self.capability_trust_roots.load_full();
         let mut next: HashMap<String, chio_core::capability::ScopeHash> = (*current).clone();
         let prev = next.insert(issuer.to_hex(), root);

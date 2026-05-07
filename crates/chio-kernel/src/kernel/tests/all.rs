@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Mutex, MutexGuard};
 use std::thread;
 
@@ -731,6 +731,60 @@ fn receipt_v2_replay_set_rolls_back_when_persistence_fails() {
     assert!(
         !kernel.contains_chio_receipt_v2_body_hash(&v2.body_hash),
         "failed persistence must not poison the in-memory replay set"
+    );
+}
+
+#[test]
+fn receipt_v2_zero_seq_replay_conflict_rolls_back() {
+    let keypair = make_keypair();
+    let mut config = make_config();
+    config.keypair = keypair.clone();
+    let mut kernel = ChioKernel::new(config);
+    kernel.set_receipt_store(Box::new(ZeroSeqV2ReceiptStore));
+    let receipt = make_signed_receipt(&keypair, "rcpt-v2-zero-seq");
+    let v2 = kernel
+        .mint_chio_receipt_v2_from_v1_for_test(&receipt)
+        .expect("mint v2 receipt");
+
+    let err = kernel
+        .record_chio_receipt_v2(&v2, Some(receipt.id.as_str()))
+        .expect_err("zero seq means durable replay conflict");
+    assert!(
+        format!("{err}").contains("already exists"),
+        "unexpected error: {err}"
+    );
+    assert!(
+        !kernel.contains_chio_receipt_v2_body_hash(&v2.body_hash),
+        "durable replay conflict must not poison the in-memory replay set"
+    );
+}
+
+#[test]
+fn receipt_v2_failure_prevents_v1_persistence() {
+    let keypair = make_keypair();
+    let mut config = make_config();
+    config.keypair = keypair.clone();
+    let mut kernel = ChioKernel::new(config);
+    let v1_called = std::sync::Arc::new(AtomicBool::new(false));
+    kernel.set_receipt_store(Box::new(V2FailsBeforeV1Store {
+        v1_called: std::sync::Arc::clone(&v1_called),
+    }));
+    let subject = Keypair::generate();
+    let capability = make_capability(&kernel, &subject, ChioScope::default(), 60);
+    let request = make_request("req-v2-before-v1", &capability, "echo", "srv");
+    let receipt = make_signed_receipt(&keypair, "rcpt-v2-before-v1");
+
+    let err = kernel
+        .record_chio_receipt_with_federation(&request, &receipt)
+        .expect_err("v2 persistence failure must abort before v1 append");
+
+    assert!(
+        format!("{err}").contains("v2 receipt persistence failed"),
+        "unexpected error: {err}"
+    );
+    assert!(
+        !v1_called.load(Ordering::SeqCst),
+        "v1 receipt append must not happen after v2 persistence fails"
     );
 }
 
@@ -1635,6 +1689,58 @@ struct FailingV2ReceiptStore;
 
 impl ReceiptStore for FailingV2ReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_chio_receipt_v2(
+        &self,
+        _receipt: &ChioReceiptV2,
+        _legacy_receipt_id_alias: Option<&str>,
+    ) -> Result<u64, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "v2 receipt write failed".to_string(),
+        ))
+    }
+}
+
+#[derive(Default)]
+struct ZeroSeqV2ReceiptStore;
+
+impl ReceiptStore for ZeroSeqV2ReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_chio_receipt_v2(
+        &self,
+        _receipt: &ChioReceiptV2,
+        _legacy_receipt_id_alias: Option<&str>,
+    ) -> Result<u64, ReceiptStoreError> {
+        Ok(0)
+    }
+}
+
+struct V2FailsBeforeV1Store {
+    v1_called: std::sync::Arc<AtomicBool>,
+}
+
+impl ReceiptStore for V2FailsBeforeV1Store {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.v1_called.store(true, Ordering::SeqCst);
         Ok(())
     }
 

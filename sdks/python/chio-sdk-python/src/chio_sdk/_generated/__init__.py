@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a5352aaa71e428a0935ffe1a631fd6ccaed661b859eab23f3c0198e3827ab1b5
+# Schema sha256: bc02beb22e700f6dcb4ff8bacf886190c87ed37499a515db8e09dfd0f87c2e00
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,9 +12,13 @@
 
 Re-exports every subpackage so callers can write
 ``from chio_sdk._generated import CapabilityToken`` for the canonical
-capability token shape without knowing the per-subpackage layout. The
-SCHEMA_SHA256 constant pins the schema set this build was generated from;
-the spec-drift CI lane reads it to detect tampering.
+capability token shapes without knowing the per-subpackage layout. Class
+names that collide across subpackages (for example ``Kind`` defined in
+both ``anchor`` and ``capability``) are re-exported under a
+``<Subpkg><Class>`` alias (``AnchorKind``, ``CapabilityKind``) so
+neither definition silently shadows the other. The SCHEMA_SHA256
+constant pins the schema set this build was generated from; the
+spec-drift CI lane reads it to detect tampering.
 """
 
 from __future__ import annotations
@@ -25,18 +29,18 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "a5352aaa71e428a0935ffe1a631fd6ccaed661b859eab23f3c0198e3827ab1b5"
+SCHEMA_SHA256 = "bc02beb22e700f6dcb4ff8bacf886190c87ed37499a515db8e09dfd0f87c2e00"
 
-from .agent import ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, Constraint, DelegationChainItem, Grant, MaxCostPerInvocation, MaxTotalCost, Operation, PromptGrant, ResourceGrant, Schema, Scope
-from .anchor import Body, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind, Witness
-from .capability import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitytoken, ChioCapabilitytokenV1, ChioCapabilitytokenV2, ChioScope, Constraint, DelegationLink, GrantKind, GrantSubsetRelation, Kind, MaxCapabilitySchema, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ScopeAttenuation, ToolGrant
-from .error import ChioToolcallerrorCapabilityDenied, ChioToolcallerrorCapabilityExpired, ChioToolcallerrorCapabilityRevoked, ChioToolcallerrorInternalError, ChioToolcallerrorPolicyDenied, ChioToolcallerrorToolServerError, Detail
-from .jsonrpc import ChioJsonRpc20Notification, ChioJsonRpc20Request, ChioJsonRpc20Response, ChioJsonRpc20Response1, ChioJsonRpc20Response2, Error
-from .kernel import Action, Capability, ChioKernelmessageCapabilityList, ChioKernelmessageCapabilityRevoked, ChioKernelmessageHeartbeat, ChioKernelmessageToolCallChunk, ChioKernelmessageToolCallResponse, Constraint, Decision, Decision6, Decision7, Decision8, DelegationChainItem, Detail, Error, Error10, Error11, Error12, Error13, Error9, EvidenceItem, Grant, MaxCostPerInvocation, MaxTotalCost, Operation, PromptGrant, Receipt, ResourceGrant, Result, Result1, Result2, Result3, Result4, Schema, Scope
-from .provenance import ChioProvenanceAttestationBundle, ChioProvenanceCallChainContext, ChioProvenanceStamp, ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, CredentialKind, EvidenceClass, Scheme, Statement, Tier, Verdict, WorkloadIdentity
-from .receipt import Algorithm, ChioReceiptLineageStatementV2, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, ChioReceiptV2, Decision, Decision1, Decision2, Decision3, Decision4, GuardEvidence, Hlc, ParentReceiptId, ReceiptV2BodyHashInput, ToolCallAction, TrustLevel
-from .result import ChioToolcallresultCancelled, ChioToolcallresultErr, ChioToolcallresultIncomplete, ChioToolcallresultOk, ChioToolcallresultStreamComplete, Detail, Error, Error1, Error2, Error3, Error4, Error5
-from .trust_control import ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, CredentialKind, Reason, Scheme, Tier, WorkloadIdentity
+from .agent import Algorithm as AgentAlgorithm, AttenuationProof as AgentAttenuationProof, CapabilityToken1, Caveat as AgentCaveat, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, Constraint as AgentConstraint, DelegationChainItem as AgentDelegationChainItem, Grant as AgentGrant, Grant3, MaxCostPerInvocation as AgentMaxCostPerInvocation, MaxTotalCost as AgentMaxTotalCost, Operation as AgentOperation, PromptGrant as AgentPromptGrant, PromptGrant3, ResourceGrant as AgentResourceGrant, ResourceGrant3, Schema as AgentSchema, Scope as AgentScope, Scope3, ScopeAttenuation as AgentScopeAttenuation
+from .anchor import Body, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness
+from .capability import Algorithm as CapabilityAlgorithm, Attenuation, AttenuationProof as CapabilityAttenuationProof, AttenuationWitness, Caveat as CapabilityCaveat, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitytoken, ChioCapabilitytokenV1, ChioCapabilitytokenV2, ChioScope, Constraint as CapabilityConstraint, DelegationLink, GrantKind, GrantSubsetRelation, Kind as CapabilityKind, MaxCapabilitySchema, MonetaryAmount, Operation as CapabilityOperation, PromptGrant as CapabilityPromptGrant, ResourceGrant as CapabilityResourceGrant, ScopeAttenuation as CapabilityScopeAttenuation, ToolGrant
+from .error import ChioToolcallerrorCapabilityDenied, ChioToolcallerrorCapabilityExpired, ChioToolcallerrorCapabilityRevoked, ChioToolcallerrorInternalError, ChioToolcallerrorPolicyDenied, ChioToolcallerrorToolServerError, Detail as ErrorDetail
+from .jsonrpc import ChioJsonRpc20Notification, ChioJsonRpc20Request, ChioJsonRpc20Response, ChioJsonRpc20Response1, ChioJsonRpc20Response2, Error as JsonrpcError
+from .kernel import Action, Algorithm as KernelAlgorithm, AttenuationProof as KernelAttenuationProof, Capabilities, Capabilities1, Caveat as KernelCaveat, ChioKernelmessageCapabilityList, ChioKernelmessageCapabilityRevoked, ChioKernelmessageHeartbeat, ChioKernelmessageToolCallChunk, ChioKernelmessageToolCallResponse, Constraint as KernelConstraint, Decision as KernelDecision, Decision6, Decision7, Decision8, DelegationChainItem as KernelDelegationChainItem, Detail as KernelDetail, Error as KernelError, Error10, Error11, Error12, Error13, Error9, EvidenceItem, Grant as KernelGrant, Grant1, MaxCostPerInvocation as KernelMaxCostPerInvocation, MaxTotalCost as KernelMaxTotalCost, Operation as KernelOperation, PromptGrant as KernelPromptGrant, PromptGrant1, Receipt, ResourceGrant as KernelResourceGrant, ResourceGrant1, Result, Result1, Result2, Result3, Result4, Schema as KernelSchema, Scope as KernelScope, Scope1, ScopeAttenuation as KernelScopeAttenuation
+from .provenance import ChioProvenanceAttestationBundle, ChioProvenanceCallChainContext, ChioProvenanceStamp, ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, CredentialKind as ProvenanceCredentialKind, EvidenceClass, Scheme as ProvenanceScheme, Statement, Tier as ProvenanceTier, Verdict, WorkloadIdentity as ProvenanceWorkloadIdentity
+from .receipt import Algorithm as ReceiptAlgorithm, ChioReceiptLineageStatementV2, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, ChioReceiptV2, Decision as ReceiptDecision, Decision1, Decision2, Decision3, Decision4, GuardEvidence, Hlc, ParentReceiptId, ReceiptV2BodyHashInput, ToolCallAction, TrustLevel
+from .result import ChioToolcallresultCancelled, ChioToolcallresultErr, ChioToolcallresultIncomplete, ChioToolcallresultOk, ChioToolcallresultStreamComplete, Detail as ResultDetail, Error as ResultError, Error1, Error2, Error3, Error4, Error5
+from .trust_control import ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, CredentialKind as TrustControlCredentialKind, Reason, Scheme as TrustControlScheme, Tier as TrustControlTier, WorkloadIdentity as TrustControlWorkloadIdentity
 
 class _CapabilityTokenMeta(type):
     def __instancecheck__(cls, instance):
@@ -85,14 +89,37 @@ class CapabilityToken(metaclass=_CapabilityTokenMeta):
 
 __all__ = [
     "Action",
-    "Algorithm",
+    "AgentAlgorithm",
+    "AgentAttenuationProof",
+    "AgentCaveat",
+    "AgentConstraint",
+    "AgentDelegationChainItem",
+    "AgentGrant",
+    "AgentMaxCostPerInvocation",
+    "AgentMaxTotalCost",
+    "AgentOperation",
+    "AgentPromptGrant",
+    "AgentResourceGrant",
+    "AgentSchema",
+    "AgentScope",
+    "AgentScopeAttenuation",
+    "AnchorKind",
     "Attenuation",
-    "AttenuationProof",
     "AttenuationWitness",
     "Body",
-    "Capability",
+    "Capabilities",
+    "Capabilities1",
+    "CapabilityAlgorithm",
+    "CapabilityAttenuationProof",
+    "CapabilityCaveat",
+    "CapabilityConstraint",
+    "CapabilityKind",
+    "CapabilityOperation",
+    "CapabilityPromptGrant",
+    "CapabilityResourceGrant",
+    "CapabilityScopeAttenuation",
     "CapabilityToken",
-    "Caveat",
+    "CapabilityToken1",
     "CheckpointId",
     "ChioAgentmessageHeartbeat",
     "ChioAgentmessageListCapabilities",
@@ -142,9 +169,6 @@ __all__ = [
     "ChioTrustControlLeaseHeartbeat",
     "ChioTrustControlLeaseTermination",
     "ChioTrustControlRuntimeAttestationEvidence",
-    "Constraint",
-    "CredentialKind",
-    "Decision",
     "Decision1",
     "Decision2",
     "Decision3",
@@ -152,10 +176,7 @@ __all__ = [
     "Decision6",
     "Decision7",
     "Decision8",
-    "DelegationChainItem",
     "DelegationLink",
-    "Detail",
-    "Error",
     "Error1",
     "Error10",
     "Error11",
@@ -166,42 +187,68 @@ __all__ = [
     "Error4",
     "Error5",
     "Error9",
+    "ErrorDetail",
     "EvidenceClass",
     "EvidenceItem",
-    "Grant",
+    "Grant1",
+    "Grant3",
     "GrantKind",
     "GrantSubsetRelation",
     "GuardEvidence",
     "Hlc",
     "Inclusion",
-    "Kind",
+    "JsonrpcError",
+    "KernelAlgorithm",
+    "KernelAttenuationProof",
+    "KernelCaveat",
+    "KernelConstraint",
+    "KernelDecision",
+    "KernelDelegationChainItem",
+    "KernelDetail",
+    "KernelError",
+    "KernelGrant",
+    "KernelMaxCostPerInvocation",
+    "KernelMaxTotalCost",
+    "KernelOperation",
+    "KernelPromptGrant",
+    "KernelResourceGrant",
+    "KernelSchema",
+    "KernelScope",
+    "KernelScopeAttenuation",
     "MaxCapabilitySchema",
-    "MaxCostPerInvocation",
-    "MaxTotalCost",
     "MonetaryAmount",
-    "Operation",
     "ParentReceiptId",
-    "PromptGrant",
+    "PromptGrant1",
+    "PromptGrant3",
+    "ProvenanceCredentialKind",
+    "ProvenanceScheme",
+    "ProvenanceTier",
+    "ProvenanceWorkloadIdentity",
     "Reason",
     "Receipt",
+    "ReceiptAlgorithm",
+    "ReceiptDecision",
     "ReceiptV2BodyHashInput",
-    "ResourceGrant",
+    "ResourceGrant1",
+    "ResourceGrant3",
     "Result",
     "Result1",
     "Result2",
     "Result3",
     "Result4",
+    "ResultDetail",
+    "ResultError",
     "SCHEMA_SHA256",
-    "Schema",
-    "Scheme",
-    "Scope",
-    "ScopeAttenuation",
+    "Scope1",
+    "Scope3",
     "Statement",
-    "Tier",
     "ToolCallAction",
     "ToolGrant",
+    "TrustControlCredentialKind",
+    "TrustControlScheme",
+    "TrustControlTier",
+    "TrustControlWorkloadIdentity",
     "TrustLevel",
     "Verdict",
     "Witness",
-    "WorkloadIdentity",
 ]

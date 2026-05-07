@@ -454,7 +454,10 @@ impl SqliteReceiptStore {
             .optional()?;
         match inserted_seq {
             Some(seq) => sqlite_u64(seq, "v2 receipt seq"),
-            None => Ok(0),
+            None => Err(ReceiptStoreError::Conflict(format!(
+                "v2 receipt replay rejected: body_hash {} already exists",
+                receipt.body_hash
+            ))),
         }
     }
 
