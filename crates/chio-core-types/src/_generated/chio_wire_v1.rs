@@ -1236,6 +1236,14 @@ for ChioAgentMessageListCapabilities {
 ///          "type": "string",
 ///          "pattern": "^[0-9a-f]{64}$"
 ///        },
+///        "schema": {
+///          "default": "chio.capability.v1",
+///          "type": "string",
+///          "enum": [
+///            "chio.capability.v1",
+///            "chio.capability.v2"
+///          ]
+///        },
 ///        "scope": {
 ///          "type": "object",
 ///          "properties": {
@@ -1523,6 +1531,14 @@ for ChioAgentMessageToolCallRequest {
 ///      "type": "string",
 ///      "pattern": "^[0-9a-f]{64}$"
 ///    },
+///    "schema": {
+///      "default": "chio.capability.v1",
+///      "type": "string",
+///      "enum": [
+///        "chio.capability.v1",
+///        "chio.capability.v2"
+///      ]
+///    },
 ///    "scope": {
 ///      "type": "object",
 ///      "properties": {
@@ -1710,6 +1726,10 @@ pub struct ChioAgentMessageToolCallRequestCapabilityToken {
     pub id: ChioAgentMessageToolCallRequestCapabilityTokenId,
     pub issued_at: u64,
     pub issuer: ChioAgentMessageToolCallRequestCapabilityTokenIssuer,
+    #[serde(
+        default = "defaults::chio_agent_message_tool_call_request_capability_token_schema"
+    )]
+    pub schema: ChioAgentMessageToolCallRequestCapabilityTokenSchema,
     pub scope: ChioAgentMessageToolCallRequestCapabilityTokenScope,
     pub signature: ChioAgentMessageToolCallRequestCapabilityTokenSignature,
     pub subject: ChioAgentMessageToolCallRequestCapabilityTokenSubject,
@@ -2331,6 +2351,97 @@ for ChioAgentMessageToolCallRequestCapabilityTokenIssuer {
             .map_err(|e: self::error::ConversionError| {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
+    }
+}
+///`ChioAgentMessageToolCallRequestCapabilityTokenSchema`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "default": "chio.capability.v1",
+///  "type": "string",
+///  "enum": [
+///    "chio.capability.v1",
+///    "chio.capability.v2"
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+pub enum ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    #[serde(rename = "chio.capability.v1")]
+    ChioCapabilityV1,
+    #[serde(rename = "chio.capability.v2")]
+    ChioCapabilityV2,
+}
+impl ::std::convert::From<&Self>
+for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    fn from(value: &ChioAgentMessageToolCallRequestCapabilityTokenSchema) -> Self {
+        value.clone()
+    }
+}
+impl ::std::fmt::Display for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::ChioCapabilityV1 => f.write_str("chio.capability.v1"),
+            Self::ChioCapabilityV2 => f.write_str("chio.capability.v2"),
+        }
+    }
+}
+impl ::std::str::FromStr for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "chio.capability.v1" => Ok(Self::ChioCapabilityV1),
+            "chio.capability.v2" => Ok(Self::ChioCapabilityV2),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::default::Default for ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+    fn default() -> Self {
+        ChioAgentMessageToolCallRequestCapabilityTokenSchema::ChioCapabilityV1
     }
 }
 ///`ChioAgentMessageToolCallRequestCapabilityTokenScope`
@@ -7647,6 +7758,14 @@ impl<'de> ::serde::Deserialize<'de> for ChioJsonRpc20ResponseVariant1IdVariant1 
 ///            "type": "string",
 ///            "pattern": "^[0-9a-f]{64}$"
 ///          },
+///          "schema": {
+///            "default": "chio.capability.v1",
+///            "type": "string",
+///            "enum": [
+///              "chio.capability.v1",
+///              "chio.capability.v2"
+///            ]
+///          },
 ///          "scope": {
 ///            "type": "object",
 ///            "properties": {
@@ -7918,6 +8037,14 @@ for ChioKernelMessageCapabilityList {
 ///      "type": "string",
 ///      "pattern": "^[0-9a-f]{64}$"
 ///    },
+///    "schema": {
+///      "default": "chio.capability.v1",
+///      "type": "string",
+///      "enum": [
+///        "chio.capability.v1",
+///        "chio.capability.v2"
+///      ]
+///    },
 ///    "scope": {
 ///      "type": "object",
 ///      "properties": {
@@ -8105,6 +8232,10 @@ pub struct ChioKernelMessageCapabilityListCapabilitiesItem {
     pub id: ChioKernelMessageCapabilityListCapabilitiesItemId,
     pub issued_at: u64,
     pub issuer: ChioKernelMessageCapabilityListCapabilitiesItemIssuer,
+    #[serde(
+        default = "defaults::chio_kernel_message_capability_list_capabilities_item_schema"
+    )]
+    pub schema: ChioKernelMessageCapabilityListCapabilitiesItemSchema,
     pub scope: ChioKernelMessageCapabilityListCapabilitiesItemScope,
     pub signature: ChioKernelMessageCapabilityListCapabilitiesItemSignature,
     pub subject: ChioKernelMessageCapabilityListCapabilitiesItemSubject,
@@ -8727,6 +8858,97 @@ for ChioKernelMessageCapabilityListCapabilitiesItemIssuer {
             .map_err(|e: self::error::ConversionError| {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
+    }
+}
+///`ChioKernelMessageCapabilityListCapabilitiesItemSchema`
+///
+/// <details><summary>JSON schema</summary>
+///
+/// ```json
+///{
+///  "default": "chio.capability.v1",
+///  "type": "string",
+///  "enum": [
+///    "chio.capability.v1",
+///    "chio.capability.v2"
+///  ]
+///}
+/// ```
+/// </details>
+#[derive(
+    ::serde::Deserialize,
+    ::serde::Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
+pub enum ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    #[serde(rename = "chio.capability.v1")]
+    ChioCapabilityV1,
+    #[serde(rename = "chio.capability.v2")]
+    ChioCapabilityV2,
+}
+impl ::std::convert::From<&Self>
+for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    fn from(value: &ChioKernelMessageCapabilityListCapabilitiesItemSchema) -> Self {
+        value.clone()
+    }
+}
+impl ::std::fmt::Display for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::ChioCapabilityV1 => f.write_str("chio.capability.v1"),
+            Self::ChioCapabilityV2 => f.write_str("chio.capability.v2"),
+        }
+    }
+}
+impl ::std::str::FromStr for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "chio.capability.v1" => Ok(Self::ChioCapabilityV1),
+            "chio.capability.v2" => Ok(Self::ChioCapabilityV2),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str>
+for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<&::std::string::String>
+for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String>
+for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::default::Default for ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+    fn default() -> Self {
+        ChioKernelMessageCapabilityListCapabilitiesItemSchema::ChioCapabilityV1
     }
 }
 ///`ChioKernelMessageCapabilityListCapabilitiesItemScope`
@@ -27863,7 +28085,13 @@ impl<'de> ::serde::Deserialize<'de> for WitnessWitnessId {
 }
 /// Generation of default values for serde.
 pub mod defaults {
+    pub(super) fn chio_agent_message_tool_call_request_capability_token_schema() -> super::ChioAgentMessageToolCallRequestCapabilityTokenSchema {
+        super::ChioAgentMessageToolCallRequestCapabilityTokenSchema::ChioCapabilityV1
+    }
     pub(super) fn chio_capability_token_schema() -> ::std::string::String {
         "chio.capability.v1".to_string()
+    }
+    pub(super) fn chio_kernel_message_capability_list_capabilities_item_schema() -> super::ChioKernelMessageCapabilityListCapabilitiesItemSchema {
+        super::ChioKernelMessageCapabilityListCapabilitiesItemSchema::ChioCapabilityV1
     }
 }

@@ -670,6 +670,10 @@ impl ReceiptV2ReplaySet {
         Ok(self.body_hashes.insert(receipt.body_hash.clone()))
     }
 
+    pub fn remove_body_hash(&mut self, body_hash: &str) -> bool {
+        self.body_hashes.remove(body_hash)
+    }
+
     #[must_use]
     pub fn contains_body_hash(&self, body_hash: &str) -> bool {
         self.body_hashes.contains(body_hash)

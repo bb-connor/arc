@@ -1646,17 +1646,25 @@ impl ChioKernel {
                 receipt.body_hash
             )));
         }
-        // Persistent store mirror. Failure here is fatal (fail-closed)
-        // because the in-memory set has already admitted the body_hash;
-        // surfacing an error keeps the persistent and in-memory stores
-        // consistent on the next attempt.
-        let _ = self.with_receipt_store(|store| {
+        // Persistent store mirror. Failure here is fatal (fail-closed), but
+        // the in-memory replay admission is rolled back so retrying the same
+        // receipt after a transient store failure is not poisoned by a
+        // body_hash that never became durable.
+        let persisted = self.with_receipt_store(|store| {
             store
                 .append_chio_receipt_v2(receipt, legacy_receipt_id_alias)
                 .map_err(|error| {
                     KernelError::Internal(format!("v2 receipt persistence failed: {error}"))
                 })
-        })?;
+        });
+        if let Err(error) = persisted {
+            let mut replay = match self.receipt_v2_replay.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            let _ = replay.remove_body_hash(&receipt.body_hash);
+            return Err(error);
+        }
         Ok(())
     }
 
@@ -4006,7 +4014,6 @@ impl ChioKernel {
             budgets
                 .try_admit_child(
                     parent_link.capability_id.as_str(),
-                    chio_kernel_core::MAX_BUDGET_SHARE_BPS,
                     cap.id.clone(),
                     proposed_share,
                 )

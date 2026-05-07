@@ -24,7 +24,9 @@ use chio_core::credit::{
     CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
 };
 use chio_core::crypto::{Keypair, PublicKey};
-use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction};
+use chio_core::receipt::{
+    ChioReceipt, ChioReceiptBody, ChioReceiptV2, Decision, ToolCallAction,
+};
 use chio_core::session::{
     CompleteOperation, CompletionArgument, CompletionReference, CreateMessageOperation,
     GetPromptOperation, OperationContext, RequestId, SamplingMessage, SamplingTool,
@@ -651,6 +653,30 @@ fn make_config() -> KernelConfig {
     }
 }
 
+fn make_signed_receipt(kp: &Keypair, id: &str) -> ChioReceipt {
+    ChioReceipt::sign(
+        ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1_700_000_100,
+            capability_id: "cap-receipt-v2".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "echo".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({"message": "hello"}))
+                .expect("tool action"),
+            decision: Decision::Allow,
+            content_hash: "0".repeat(64),
+            policy_hash: "1".repeat(64),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: chio_core::receipt::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: kp.public_key(),
+        },
+        kp,
+    )
+    .expect("sign receipt")
+}
+
 #[test]
 fn kernel_rejects_classical_capability_under_pq_required_floor() {
     let keypair = make_keypair();
@@ -679,6 +705,31 @@ fn kernel_rejects_classical_capability_under_pq_required_floor() {
     assert!(
         error.contains("crypto_floor=pq_required"),
         "expected crypto floor rejection, got {error}"
+    );
+}
+
+#[test]
+fn receipt_v2_replay_set_rolls_back_when_persistence_fails() {
+    let keypair = make_keypair();
+    let mut config = make_config();
+    config.keypair = keypair.clone();
+    let mut kernel = ChioKernel::new(config);
+    kernel.set_receipt_store(Box::new(FailingV2ReceiptStore));
+    let receipt = make_signed_receipt(&keypair, "rcpt-v2-rollback");
+    let v2 = kernel
+        .mint_chio_receipt_v2_from_v1_for_test(&receipt)
+        .expect("mint v2 receipt");
+
+    let err = kernel
+        .record_chio_receipt_v2(&v2, Some(receipt.id.as_str()))
+        .expect_err("v2 persistence failure must surface");
+    assert!(
+        format!("{err}").contains("v2 receipt persistence failed"),
+        "unexpected error: {err}"
+    );
+    assert!(
+        !kernel.contains_chio_receipt_v2_body_hash(&v2.body_hash),
+        "failed persistence must not poison the in-memory replay set"
     );
 }
 
@@ -1523,6 +1574,32 @@ impl ReceiptStore for FailingRequestLineageReceiptStore {
     ) -> Result<(), ReceiptStoreError> {
         Err(ReceiptStoreError::Conflict(
             "request lineage write failed".to_string(),
+        ))
+    }
+}
+
+#[derive(Default)]
+struct FailingV2ReceiptStore;
+
+impl ReceiptStore for FailingV2ReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_chio_receipt_v2(
+        &self,
+        _receipt: &ChioReceiptV2,
+        _legacy_receipt_id_alias: Option<&str>,
+    ) -> Result<u64, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "v2 receipt write failed".to_string(),
         ))
     }
 }

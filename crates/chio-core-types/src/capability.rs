@@ -714,10 +714,8 @@ impl CapabilityToken {
     /// is enabled (the production default; see
     /// [`CapabilityNegotiation::t1_default`]), the chain-binding check
     /// runs as in the legacy entry point. If the peer has explicitly
-    /// disabled the feature in the negotiated bitset, the check is
-    /// skipped to preserve interoperability with peers that have not
-    /// yet rolled out v2 chain-binding (the conservative direction is
-    /// to leave the flag on).
+    /// disabled the feature in the negotiated bitset, v2 tokens fail
+    /// closed instead of skipping the binding check.
     ///
     /// Production callers SHOULD prefer this wrapper; legacy callers
     /// that have not plumbed a [`CapabilityNegotiation`] through their
@@ -734,7 +732,10 @@ impl CapabilityToken {
             .copied()
             .unwrap_or(true);
         if !enabled {
-            return Ok(());
+            return Err(Error::AttenuationViolation {
+                reason: "delegation_v2_chain_binding is disabled; v2 tokens are rejected"
+                    .to_string(),
+            });
         }
         self.validate_chain_binding(trust_root_scope_hash)
     }
@@ -3794,6 +3795,51 @@ mod tests {
             &issuer,
         );
         assert!(bad_budget.is_err());
+    }
+
+    #[test]
+    fn capability_v2_chain_binding_feature_disabled_fails_closed() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let scope = ChioScope::default();
+        let proof = AttenuationProof {
+            parent_scope_hash: scope_hash(&scope).unwrap(),
+            child_scope_hash: scope_hash(&scope).unwrap(),
+            normalized_subset_proof: compute_attenuation_witness(&scope, &scope).unwrap(),
+        };
+        let body = CapabilityTokenBody {
+            id: "cap-v2-disabled-chain-binding".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope,
+            issued_at: 10,
+            expires_at: 20,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_v2(
+            CapabilityTokenV2Body {
+                body,
+                caveats: vec![],
+                scope_attenuations: vec![],
+                attenuation_proof: proof,
+                budget_share_bps: None,
+            },
+            &issuer,
+        )
+        .unwrap();
+        let mut negotiated = CapabilityNegotiation::t1_default();
+        negotiated.features.insert(
+            capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
+            false,
+        );
+
+        let err = token
+            .validate_chain_binding_with_features(
+                &scope_hash(&ChioScope::default()).unwrap(),
+                &negotiated,
+            )
+            .expect_err("disabled chain binding must reject v2 tokens");
+        assert!(matches!(err, Error::AttenuationViolation { .. }));
     }
 
     #[test]

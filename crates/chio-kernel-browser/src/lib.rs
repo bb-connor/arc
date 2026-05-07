@@ -59,8 +59,8 @@ use chio_core_types::capability::{CapabilityNegotiation, CapabilityToken, ScopeH
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_core_types::receipt::{ChioReceipt, ChioReceiptBody, Decision};
 use chio_kernel_core::{
-    evaluate as core_evaluate, sign_receipt as core_sign_receipt, verify_capability_full,
-    EvaluateInput, PortableToolCallRequest, VerifiedCapability,
+    evaluate_with_full_floor as core_evaluate_with_full_floor, sign_receipt as core_sign_receipt,
+    verify_capability_full, EvaluateInput, PortableToolCallRequest, VerifiedCapability,
 };
 use serde::{Deserialize, Serialize};
 
@@ -117,6 +117,15 @@ pub struct EvaluateRequestJson {
     /// Optional session filesystem roots, forwarded to guards.
     #[serde(default)]
     pub session_filesystem_roots: Option<Vec<String>>,
+    /// Optional W1.3 peer-negotiated capability profile. When omitted,
+    /// the browser kernel evaluates against `CapabilityNegotiation::t1_default()`.
+    #[serde(default)]
+    pub peer_capabilities: Option<CapabilityNegotiation>,
+    /// Optional W1.1 chain-binding trust roots, keyed by issuer hex.
+    /// V2 tokens require an entry for their issuer; absent issuers
+    /// fail closed. V1 tokens ignore this field.
+    #[serde(default)]
+    pub capability_trust_roots: BTreeMap<String, ScopeHash>,
 }
 
 /// Wire shape for the result of [`evaluate_pure`]. Flattens the fields
@@ -308,6 +317,15 @@ pub fn evaluate_pure(
 ) -> Result<EvaluationVerdictJson, BindingError> {
     let trusted = decode_trusted_issuers(&input.trusted_issuers_hex)?;
     let portable_request: PortableToolCallRequest = input.request.into();
+    let peer_profile = input
+        .peer_capabilities
+        .clone()
+        .unwrap_or_else(CapabilityNegotiation::t1_default);
+    let trust_root_map = input.capability_trust_roots.clone();
+    let trust_resolver = move |issuer: &PublicKey| -> Option<ScopeHash> {
+        trust_root_map.get(&issuer.to_hex()).cloned()
+    };
+    let mut budgets = chio_kernel_core::InMemoryBudgetRegistry::new();
 
     // If the caller pinned a clock override, honour it; otherwise use
     // the injected browser/test clock. We can't return a `&dyn Clock`
@@ -315,23 +333,35 @@ pub fn evaluate_pure(
     let verdict = match input.clock_override_unix_secs {
         Some(pinned) => {
             let fixed = chio_kernel_core::FixedClock::new(pinned);
-            core_evaluate(EvaluateInput {
+            core_evaluate_with_full_floor(
+                EvaluateInput {
+                    request: &portable_request,
+                    capability: &input.capability,
+                    trusted_issuers: &trusted,
+                    clock: &fixed,
+                    guards: &[],
+                    session_filesystem_roots: input.session_filesystem_roots.as_deref(),
+                },
+                chio_core_types::capability::CapabilityCryptoFloor::AllowClassical,
+                &peer_profile,
+                &trust_resolver,
+                &mut budgets,
+            )
+        }
+        None => core_evaluate_with_full_floor(
+            EvaluateInput {
                 request: &portable_request,
                 capability: &input.capability,
                 trusted_issuers: &trusted,
-                clock: &fixed,
+                clock,
                 guards: &[],
                 session_filesystem_roots: input.session_filesystem_roots.as_deref(),
-            })
-        }
-        None => core_evaluate(EvaluateInput {
-            request: &portable_request,
-            capability: &input.capability,
-            trusted_issuers: &trusted,
-            clock,
-            guards: &[],
-            session_filesystem_roots: input.session_filesystem_roots.as_deref(),
-        }),
+            },
+            chio_core_types::capability::CapabilityCryptoFloor::AllowClassical,
+            &peer_profile,
+            &trust_resolver,
+            &mut budgets,
+        ),
     };
 
     Ok(EvaluationVerdictJson::from_core(verdict))
@@ -815,7 +845,8 @@ pub mod wasm {
 mod tests {
     use super::*;
     use chio_core_types::capability::{
-        CapabilityToken, CapabilityTokenBody, ChioScope, Operation, ToolGrant,
+        compute_attenuation_witness, scope_hash, AttenuationProof, CapabilityToken,
+        CapabilityTokenBody, CapabilityTokenV2Body, ChioScope, Operation, ToolGrant,
     };
     use chio_core_types::crypto::Keypair;
     use chio_core_types::receipt::{ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
@@ -825,6 +856,10 @@ mod tests {
     const EXPIRES_AT: u64 = 1_700_100_000;
 
     fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+        CapabilityToken::sign(make_capability_body("cap-1", subject, issuer), issuer).unwrap()
+    }
+
+    fn make_capability_body(id: &str, subject: &Keypair, issuer: &Keypair) -> CapabilityTokenBody {
         let scope = ChioScope {
             grants: std::vec![ToolGrant {
                 server_id: "srv-a".to_string(),
@@ -839,16 +874,36 @@ mod tests {
             resource_grants: std::vec![],
             prompt_grants: std::vec![],
         };
-        let body = CapabilityTokenBody {
-            id: "cap-1".to_string(),
+        CapabilityTokenBody {
+            id: id.to_string(),
             issuer: issuer.public_key(),
             subject: subject.public_key(),
             scope,
             issued_at: ISSUED_AT,
             expires_at: EXPIRES_AT,
             delegation_chain: std::vec![],
+        }
+    }
+
+    fn make_v2_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+        let body = make_capability_body("cap-v2", subject, issuer);
+        let proof = AttenuationProof {
+            parent_scope_hash: scope_hash(&body.scope).expect("parent scope hash"),
+            child_scope_hash: scope_hash(&body.scope).expect("child scope hash"),
+            normalized_subset_proof: compute_attenuation_witness(&body.scope, &body.scope)
+                .expect("attenuation witness"),
         };
-        CapabilityToken::sign(body, issuer).unwrap()
+        CapabilityToken::sign_v2(
+            CapabilityTokenV2Body {
+                body,
+                caveats: std::vec![],
+                scope_attenuations: std::vec![],
+                attenuation_proof: proof,
+                budget_share_bps: None,
+            },
+            issuer,
+        )
+        .unwrap()
     }
 
     fn make_request_json(subject: &Keypair) -> ToolCallRequestJson {
@@ -874,6 +929,8 @@ mod tests {
             trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
             clock_override_unix_secs: Some(ISSUED_AT + 1),
             session_filesystem_roots: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
         };
         let clock = FixedClock::new(ISSUED_AT + 1);
 
@@ -898,6 +955,8 @@ mod tests {
             trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
             clock_override_unix_secs: Some(EXPIRES_AT + 1),
             session_filesystem_roots: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
         };
         let clock = FixedClock::new(EXPIRES_AT + 1);
 
@@ -908,6 +967,33 @@ mod tests {
             .as_deref()
             .unwrap_or_default()
             .contains("expired"));
+    }
+
+    #[test]
+    fn evaluate_pure_v2_without_trust_root_fails_closed() {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_v2_capability(&subject, &issuer);
+        let request = make_request_json(&subject);
+
+        let input = EvaluateRequestJson {
+            request,
+            capability,
+            trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+            clock_override_unix_secs: Some(ISSUED_AT + 1),
+            session_filesystem_roots: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
+        };
+        let clock = FixedClock::new(ISSUED_AT + 1);
+
+        let verdict = evaluate_pure(input, &clock).expect("evaluate_pure");
+        assert_eq!(verdict.verdict, "deny");
+        assert!(verdict
+            .reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("no trust-root scope hash"));
     }
 
     #[test]

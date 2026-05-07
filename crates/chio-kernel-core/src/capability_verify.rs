@@ -140,10 +140,11 @@ pub fn verify_capability(
 /// `delegation_chain`, the verifier asks `budgets` to admit the new child
 /// under the immediate parent (the last entry in the chain). The proposed
 /// share is `token.budget_share_bps.unwrap_or(MAX_BUDGET_SHARE_BPS)`: a
-/// missing field is interpreted as a request for the full parent share, so
-/// the registry can still detect oversubscription. Per-token validation has
-/// already enforced the `<= 10_000` cap by the time the token reaches this
-/// function.
+/// missing field is interpreted as a request for the full parent share.
+/// The parent itself must already be registered in `budgets` from
+/// verifier-owned lineage or a parent snapshot. Unknown parents fail closed.
+/// Per-token validation has already enforced the `<= 10_000` cap by the time
+/// the token reaches this function.
 pub fn verify_capability_with_floor(
     token: &CapabilityToken,
     trusted_issuers: &[PublicKey],
@@ -184,20 +185,15 @@ pub fn verify_capability_with_floor(
     // Sibling-sum budget split. Only fires for tokens that carry a
     // delegation chain; root-issued tokens have nothing to split.
     //
-    // Wave 1.5 self-bootstrapping: pass `MAX_BUDGET_SHARE_BPS` as the
-    // parent-share default so per-request registries auto-register the
-    // parent the first time a child is admitted. The cap matches the
-    // per-token validator's ceiling, so siblings whose running sum
-    // exceeds 100% are still rejected; long-lived registries that have
-    // pre-registered tighter parent shares ignore the default and use
-    // their own value.
+    // The parent must already be registered from verifier-owned lineage
+    // or a parent snapshot. Unknown parents fail closed; the verifier must
+    // not fabricate a missing parent share at MAX_BUDGET_SHARE_BPS.
     if let Some(parent_link) = token.delegation_chain.last() {
         let proposed_share = token
             .budget_share_bps
             .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
         budgets.try_admit_child(
             parent_link.capability_id.as_str(),
-            crate::budget_split::MAX_BUDGET_SHARE_BPS,
             token.id.clone(),
             proposed_share,
         )?;
@@ -444,36 +440,31 @@ pub fn verify_capability_full(
     // chain-binding before the legacy signature/floor/issuer/budget pass so
     // a witness mismatch fails closed before any budget mutation.
     //
-    // Wave 1.5: short-circuit the trust-root resolution when the peer has
-    // explicitly disabled `delegation_v2_chain_binding`. The historical
-    // ordering (resolve trust root, then call the feature-gated wrapper)
-    // would fail-closed on a peer that disabled the feature but had no
-    // registered trust-root entry, breaking interoperability with peers
-    // that have not yet rolled out v2 chain-binding. Reading the flag
-    // first and bailing out preserves the negotiated semantics. Once
-    // the flag is observed enabled here, call the non-feature-gated
-    // `validate_chain_binding` directly: routing through
-    // `validate_chain_binding_with_features` would re-read the same
-    // bit and add an unreachable branch.
+    // V2 tokens require chain binding. If a peer explicitly disables
+    // `delegation_v2_chain_binding`, treat that peer as v1-only for this
+    // verifier and reject the v2 token rather than skipping the binding
+    // check.
     if token.schema == CHIO_CAPABILITY_V2_SCHEMA {
         let chain_binding_enabled = peer
             .features
             .get(chio_core_types::capability::capability_features::DELEGATION_V2_CHAIN_BINDING)
             .copied()
             .unwrap_or(true);
-        if chain_binding_enabled {
-            let issuer_root = trust_root
-                .trust_root_scope_hash(&token.issuer)
-                .ok_or_else(|| {
-                    CapabilityError::AttenuationViolation(
-                        "v2 chain-binding: no trust-root scope hash registered for issuer"
-                            .to_string(),
-                    )
-                })?;
-            token
-                .validate_chain_binding(&issuer_root)
-                .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+        if !chain_binding_enabled {
+            return Err(CapabilityError::AttenuationViolation(
+                "v2 chain-binding: peer disabled delegation_v2_chain_binding; v2 tokens are rejected".to_string(),
+            ));
         }
+        let issuer_root = trust_root
+            .trust_root_scope_hash(&token.issuer)
+            .ok_or_else(|| {
+                CapabilityError::AttenuationViolation(
+                    "v2 chain-binding: no trust-root scope hash registered for issuer".to_string(),
+                )
+            })?;
+        token
+            .validate_chain_binding(&issuer_root)
+            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
     }
 
     // Step 3: legacy signature, issuer-trust, crypto-floor, time-bound
@@ -487,7 +478,10 @@ pub fn verify_capability_full(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chio_core_types::capability::{CapabilityTokenBody, ChioScope};
+    use chio_core_types::capability::{
+        capability_features, compute_attenuation_witness, scope_hash, AttenuationProof,
+        CapabilityTokenBody, CapabilityTokenV2Body, ChioScope, DelegationLink, DelegationLinkBody,
+    };
     use chio_core_types::crypto::Keypair;
 
     #[test]
@@ -550,5 +544,118 @@ mod tests {
         .expect("classical capability is accepted under allow_classical");
 
         assert_eq!(verified.id, "cap-classical");
+    }
+
+    fn make_v2_token(id: &str, issuer: &Keypair, subject: &Keypair) -> CapabilityToken {
+        let scope = ChioScope::default();
+        let proof = AttenuationProof {
+            parent_scope_hash: scope_hash(&scope).expect("parent scope hash"),
+            child_scope_hash: scope_hash(&scope).expect("child scope hash"),
+            normalized_subset_proof: compute_attenuation_witness(&scope, &scope)
+                .expect("attenuation witness"),
+        };
+        CapabilityToken::sign_v2(
+            CapabilityTokenV2Body {
+                body: CapabilityTokenBody {
+                    id: id.to_string(),
+                    issuer: issuer.public_key(),
+                    subject: subject.public_key(),
+                    scope,
+                    issued_at: 100,
+                    expires_at: 200,
+                    delegation_chain: Vec::new(),
+                },
+                caveats: Vec::new(),
+                scope_attenuations: Vec::new(),
+                attenuation_proof: proof,
+                budget_share_bps: None,
+            },
+            issuer,
+        )
+        .expect("sign v2 token")
+    }
+
+    #[test]
+    fn full_verifier_rejects_v2_when_chain_binding_feature_is_disabled() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let token = make_v2_token("cap-v2-disabled-chain-binding", &issuer, &subject);
+        let clock = crate::FixedClock::new(150);
+        let mut peer = CapabilityNegotiation::t1_default();
+        peer.features.insert(
+            capability_features::DELEGATION_V2_CHAIN_BINDING.to_string(),
+            false,
+        );
+        let trust_root_hash = scope_hash(&ChioScope::default()).expect("trust root hash");
+        let issuer_public = issuer.public_key();
+        let resolver_issuer = issuer_public.clone();
+        let trust_roots = move |candidate: &PublicKey| {
+            if candidate == &resolver_issuer {
+                Some(trust_root_hash.clone())
+            } else {
+                None
+            }
+        };
+        let mut budgets = NoopBudgetRegistry;
+
+        let err = verify_capability_full(
+            &token,
+            &[issuer_public],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &peer,
+            &trust_roots,
+            &mut budgets,
+        )
+        .expect_err("v2 token must fail when chain binding is disabled");
+
+        assert!(matches!(err, CapabilityError::AttenuationViolation(_)));
+    }
+
+    #[test]
+    fn delegated_budget_unknown_parent_fails_closed() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let parent_link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "missing-parent".to_string(),
+                delegator: issuer.public_key(),
+                delegatee: issuer.public_key(),
+                attenuations: Vec::new(),
+                timestamp: 100,
+                scope_hash: None,
+            },
+            &issuer,
+        )
+        .expect("sign delegation link");
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-child".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: Vec::from([parent_link]),
+            },
+            &issuer,
+        )
+        .expect("sign child token");
+        let clock = crate::FixedClock::new(150);
+        let mut budgets = crate::InMemoryBudgetRegistry::new();
+
+        let err = verify_capability_with_floor(
+            &token,
+            &[issuer.public_key()],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &mut budgets,
+        )
+        .expect_err("unknown budget parent must fail closed");
+
+        assert!(matches!(
+            err,
+            CapabilityError::BudgetSplitRejected(BudgetSplitError::UnknownParent { .. })
+        ));
     }
 }

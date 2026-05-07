@@ -218,23 +218,13 @@ pub trait BudgetRegistry {
 
     /// Try to admit a child token under the given parent.
     ///
-    /// Wave 1.5 self-bootstrapping semantics: if the parent has not been
-    /// registered, the registry auto-registers it at
-    /// `parent_share_bps_default` and then admits the child. This lets
-    /// per-request registries enforce sibling-sum across calls when a
-    /// long-lived parent registration was never staged. Callers that
-    /// know the parent's true share supply it; callers that don't (the
-    /// per-request hot-path surfaces) supply [`MAX_BUDGET_SHARE_BPS`] as
-    /// a fail-closed ceiling so siblings are still rejected when their
-    /// running sum exceeds the per-token cap.
-    ///
-    /// If the parent is already registered, `parent_share_bps_default`
-    /// is ignored and the existing share is used. Re-admitting the same
-    /// child id with the same share is idempotent.
+    /// Unknown parents fail closed. Callers that have verifier-owned parent
+    /// lineage or a parent snapshot must call [`BudgetRegistry::register_parent`]
+    /// before admitting children. This prevents a verifier from fabricating a
+    /// missing parent share at [`MAX_BUDGET_SHARE_BPS`].
     fn try_admit_child(
         &mut self,
         parent_token_id: &str,
-        parent_share_bps_default: u16,
         child_token_id: String,
         share_bps: u16,
     ) -> Result<(), BudgetSplitError>;
@@ -267,7 +257,6 @@ impl BudgetRegistry for NoopBudgetRegistry {
     fn try_admit_child(
         &mut self,
         _parent_token_id: &str,
-        _parent_share_bps_default: u16,
         _child_token_id: String,
         _share_bps: u16,
     ) -> Result<(), BudgetSplitError> {
@@ -335,28 +324,9 @@ impl BudgetRegistry for InMemoryBudgetRegistry {
     fn try_admit_child(
         &mut self,
         parent_token_id: &str,
-        parent_share_bps_default: u16,
         child_token_id: String,
         share_bps: u16,
     ) -> Result<(), BudgetSplitError> {
-        if !self.splits.contains_key(parent_token_id) {
-            // Auto-register the parent at the supplied default share so
-            // per-request registries can still enforce sibling-sum
-            // arithmetic across calls without requiring callers to
-            // pre-register every parent. Bound by MAX_BUDGET_SHARE_BPS:
-            // a default above the cap is clamped down so an attacker
-            // cannot widen the surface by passing 65_535.
-            if parent_share_bps_default > MAX_BUDGET_SHARE_BPS {
-                return Err(BudgetSplitError::ChildShareExceedsCap {
-                    child_id: parent_token_id.into(),
-                    share_bps: parent_share_bps_default,
-                });
-            }
-            self.splits.insert(
-                parent_token_id.into(),
-                BudgetSplit::new(parent_token_id.into(), parent_share_bps_default),
-            );
-        }
         match self.splits.get_mut(parent_token_id) {
             Some(split) => split.try_admit_child(child_token_id, share_bps),
             None => Err(BudgetSplitError::UnknownParent {
@@ -453,43 +423,26 @@ mod tests {
     }
 
     #[test]
-    fn in_memory_registry_auto_registers_unknown_parent() {
-        // Wave 1.5: auto-register on first try_admit_child so per-request
-        // registries can still enforce sibling-sum arithmetic across
-        // calls without requiring callers to pre-register every parent.
+    fn in_memory_registry_rejects_unknown_parent() {
         let mut registry = InMemoryBudgetRegistry::new();
-        registry
-            .try_admit_child("missing", MAX_BUDGET_SHARE_BPS, "child".to_string(), 1_000)
-            .expect("auto-register admits first child");
-        assert_eq!(
-            registry
-                .split("missing")
-                .expect("parent auto-registered")
-                .parent_share_bps,
-            MAX_BUDGET_SHARE_BPS
-        );
+        let err = registry
+            .try_admit_child("missing", "child".to_string(), 1_000)
+            .expect_err("unknown parent must fail closed");
+        assert!(matches!(err, BudgetSplitError::UnknownParent { .. }));
+        assert!(registry.split("missing").is_none());
     }
 
     #[test]
-    fn in_memory_registry_auto_register_rejects_oversized_default() {
-        let mut registry = InMemoryBudgetRegistry::new();
-        let err = registry
-            .try_admit_child("p", MAX_BUDGET_SHARE_BPS + 1, "child".to_string(), 1_000)
-            .expect_err("default share above cap must fail");
-        assert!(matches!(err, BudgetSplitError::ChildShareExceedsCap { .. }));
-    }
-
-    #[test]
-    fn auto_registered_parent_enforces_sibling_sum_across_calls() {
-        // Two siblings whose sum exceeds the cap must be rejected even
-        // when the parent was auto-registered (no prior register_parent
-        // call). This is the per-request hot-path scenario.
+    fn registered_parent_enforces_sibling_sum_across_calls() {
         let mut registry = InMemoryBudgetRegistry::new();
         registry
-            .try_admit_child("p", MAX_BUDGET_SHARE_BPS, "child-a".to_string(), 6_000)
-            .expect("first child admits under auto-registered parent");
+            .register_parent("p".to_string(), MAX_BUDGET_SHARE_BPS)
+            .expect("register parent snapshot");
+        registry
+            .try_admit_child("p", "child-a".to_string(), 6_000)
+            .expect("first child admits under registered parent");
         let err = registry
-            .try_admit_child("p", MAX_BUDGET_SHARE_BPS, "child-b".to_string(), 5_000)
+            .try_admit_child("p", "child-b".to_string(), 5_000)
             .expect_err("second sibling must oversubscribe (6_000 + 5_000 > 10_000)");
         assert!(matches!(
             err,
@@ -515,10 +468,10 @@ mod tests {
             .register_parent("p".to_string(), 5_000)
             .expect("register");
         registry
-            .try_admit_child("p", MAX_BUDGET_SHARE_BPS, "c1".to_string(), 4_000)
+            .try_admit_child("p", "c1".to_string(), 4_000)
             .expect("first child fits");
         let err = registry
-            .try_admit_child("p", MAX_BUDGET_SHARE_BPS, "c2".to_string(), 4_000)
+            .try_admit_child("p", "c2".to_string(), 4_000)
             .expect_err("second child must oversubscribe");
         assert!(matches!(
             err,
@@ -535,7 +488,7 @@ mod tests {
             .register_parent("p".to_string(), 5_000)
             .expect("register");
         let err = registry
-            .try_admit_child("p", MAX_BUDGET_SHARE_BPS, "c1".to_string(), 6_000)
+            .try_admit_child("p", "c1".to_string(), 6_000)
             .expect_err("child larger than registered parent share must fail");
         assert!(matches!(
             err,
@@ -550,20 +503,10 @@ mod tests {
             .register_parent("p".to_string(), MAX_BUDGET_SHARE_BPS)
             .expect("noop register");
         registry
-            .try_admit_child(
-                "p",
-                MAX_BUDGET_SHARE_BPS,
-                "c1".to_string(),
-                MAX_BUDGET_SHARE_BPS,
-            )
+            .try_admit_child("p", "c1".to_string(), MAX_BUDGET_SHARE_BPS)
             .expect("noop admit 1");
         registry
-            .try_admit_child(
-                "p",
-                MAX_BUDGET_SHARE_BPS,
-                "c2".to_string(),
-                MAX_BUDGET_SHARE_BPS,
-            )
+            .try_admit_child("p", "c2".to_string(), MAX_BUDGET_SHARE_BPS)
             .expect("noop admit 2");
     }
 
