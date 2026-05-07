@@ -2,7 +2,7 @@
 //!
 //! `RekorClient::publish` POSTs the canonical-JSON encoding of
 //! `batch.body` to `${endpoint}/api/v1/log/entries` with a Sigstore
-//! "intoto" envelope shape; `verify_inclusion` GETs
+//! "intoto" v0.0.2 DSSE envelope shape; `verify_inclusion` GETs
 //! `${endpoint}/api/v1/log/entries/${uuid}` and asserts that:
 //!
 //! 1. The returned `body.spec.content.hash.value` matches
@@ -137,7 +137,9 @@ struct RekorIntotoContent<'a> {
 /// ```text
 /// { "payloadType": "application/vnd.in-toto+json",
 ///   "payload": <base64(body)>,
-///   "signatures": [{"keyid": <hex|empty>, "sig": <base64>}] }
+///   "signatures": [{"keyid": <hex|empty>,
+///                   "publicKey": <base64>,
+///                   "sig": <base64>}] }
 /// ```
 ///
 /// HIGH-2 (PR #594 round-2 review): the previous shape serialized
@@ -147,12 +149,10 @@ struct RekorIntotoContent<'a> {
 /// match the SET signature input. The `rename_all` annotation
 /// fixes the wire shape.
 ///
-/// P1 (PR #594 round-2 review): the previous shape carried a
-/// custom `payload_type` of `application/vnd.chio.anchor_batch+json`
-/// and no `signatures` array. The intoto schema requires a DSSE
-/// envelope with `payloadType: application/vnd.in-toto+json` and a
-/// (possibly empty) `signatures` array. The shape now matches the
-/// schema so a real Rekor server would accept it.
+/// P1 (PR #594 round-3 review): the previous shape carried an empty
+/// `signatures` array. The intoto v0.0.2 schema requires a signature
+/// object with `publicKey` and `sig`, so the entry now forwards the
+/// batch signer key and batch signature into the DSSE envelope.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RekorIntotoEnvelope<'a> {
@@ -162,13 +162,15 @@ struct RekorIntotoEnvelope<'a> {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RekorIntotoSignature<'a> {
     keyid: &'a str,
+    public_key: &'a str,
     sig: &'a str,
 }
 
 /// DSSE payload-type constant for in-toto statements, per the
-/// sigstore intoto schema (v0.0.1).
+/// sigstore intoto schema.
 pub const REKOR_INTOTO_PAYLOAD_TYPE: &str = "application/vnd.in-toto+json";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -184,6 +186,61 @@ struct RekorEntryRequest<'a> {
     api_version: &'a str,
     kind: &'a str,
     spec: RekorIntotoSpec<'a>,
+}
+
+#[derive(Debug)]
+struct RekorIntotoSignatureMaterial {
+    keyid: String,
+    public_key: String,
+    sig: String,
+}
+
+impl RekorIntotoSignatureMaterial {
+    fn as_signature(&self) -> RekorIntotoSignature<'_> {
+        RekorIntotoSignature {
+            keyid: self.keyid.as_str(),
+            public_key: self.public_key.as_str(),
+            sig: self.sig.as_str(),
+        }
+    }
+}
+
+fn decode_unprefixed_hex(value: &str, expected_len: usize) -> Option<Vec<u8>> {
+    if value.len() == expected_len && value.as_bytes().iter().all(u8::is_ascii_hexdigit) {
+        hex::decode(value).ok()
+    } else {
+        None
+    }
+}
+
+fn decode_prefixed_hex(value: &str, prefix: &str) -> Option<Vec<u8>> {
+    value
+        .strip_prefix(prefix)
+        .and_then(|rest| hex::decode(rest).ok())
+}
+
+fn rekor_public_key_material(public_key_hex: &str) -> Vec<u8> {
+    decode_unprefixed_hex(public_key_hex, 64)
+        .or_else(|| decode_prefixed_hex(public_key_hex, "p256:"))
+        .or_else(|| decode_prefixed_hex(public_key_hex, "p384:"))
+        .unwrap_or_else(|| public_key_hex.as_bytes().to_vec())
+}
+
+fn rekor_signature_material(signature_hex: &str) -> Vec<u8> {
+    decode_unprefixed_hex(signature_hex, 128)
+        .or_else(|| decode_prefixed_hex(signature_hex, "p256:"))
+        .or_else(|| decode_prefixed_hex(signature_hex, "p384:"))
+        .unwrap_or_else(|| signature_hex.as_bytes().to_vec())
+}
+
+fn rekor_dsse_signature_material(batch: &AnchorBatch) -> RekorIntotoSignatureMaterial {
+    let keyid = batch.body.signer_key.to_hex();
+    let signature_hex = batch.signature.to_hex();
+    RekorIntotoSignatureMaterial {
+        public_key: BASE64_STANDARD.encode(rekor_public_key_material(&keyid)),
+        sig: BASE64_STANDARD.encode(rekor_signature_material(&signature_hex)),
+        keyid,
+    }
 }
 
 /// Returned by `POST /api/v1/log/entries`. Rekor's real response is a
@@ -365,22 +422,16 @@ impl AnchorWitnessClient for RekorClient {
         let body_bytes = canonical_json_bytes(&batch.body)
             .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
         let payload_b64 = BASE64_STANDARD.encode(&body_bytes);
+        let dsse_signature = rekor_dsse_signature_material(batch);
         let request = RekorEntryRequest {
-            api_version: "0.0.1",
+            api_version: "0.0.2",
             kind: "intoto",
             spec: RekorIntotoSpec {
                 content: RekorIntotoContent {
                     envelope: RekorIntotoEnvelope {
                         payload: &payload_b64,
                         payload_type: REKOR_INTOTO_PAYLOAD_TYPE,
-                        // Chio's anchor batch carries its own producer
-                        // signature inside the body; the DSSE envelope
-                        // wraps the body but does not double-sign here.
-                        // An empty signatures array satisfies the
-                        // schema's array requirement (non-empty in real
-                        // production wiring; left empty for the
-                        // out-of-band-signed batch protocol).
-                        signatures: Vec::new(),
+                        signatures: vec![dsse_signature.as_signature()],
                     },
                     hash: RekorHash {
                         algorithm: "sha256",
@@ -518,15 +569,16 @@ pub fn build_rekor_entry_body_b64(batch: &AnchorBatch) -> Result<String, AnchorW
     let canonical = canonical_json_bytes(&batch.body)
         .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
     let payload_b64 = BASE64_STANDARD.encode(&canonical);
+    let dsse_signature = rekor_dsse_signature_material(batch);
     let request = RekorEntryRequest {
-        api_version: "0.0.1",
+        api_version: "0.0.2",
         kind: "intoto",
         spec: RekorIntotoSpec {
             content: RekorIntotoContent {
                 envelope: RekorIntotoEnvelope {
                     payload: &payload_b64,
                     payload_type: REKOR_INTOTO_PAYLOAD_TYPE,
-                    signatures: Vec::new(),
+                    signatures: vec![dsse_signature.as_signature()],
                 },
                 hash: RekorHash {
                     algorithm: "sha256",
@@ -551,15 +603,16 @@ pub fn build_rekor_entry_body_b64_with_hash(
     let canonical = canonical_json_bytes(&batch.body)
         .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
     let payload_b64 = BASE64_STANDARD.encode(&canonical);
+    let dsse_signature = rekor_dsse_signature_material(batch);
     let request = RekorEntryRequest {
-        api_version: "0.0.1",
+        api_version: "0.0.2",
         kind: "intoto",
         spec: RekorIntotoSpec {
             content: RekorIntotoContent {
                 envelope: RekorIntotoEnvelope {
                     payload: &payload_b64,
                     payload_type: REKOR_INTOTO_PAYLOAD_TYPE,
-                    signatures: Vec::new(),
+                    signatures: vec![dsse_signature.as_signature()],
                 },
                 hash: RekorHash {
                     algorithm: "sha256",
@@ -716,6 +769,7 @@ mod tests {
             value.get("apiVersion").is_some(),
             "expected apiVersion key, got: {value}"
         );
+        assert_eq!(value["apiVersion"].as_str(), Some("0.0.2"));
         assert!(
             value.get("api_version").is_none(),
             "snake_case api_version leaked into wire shape: {value}"
@@ -732,12 +786,25 @@ mod tests {
             envelope.get("payload_type").is_none(),
             "snake_case payload_type leaked into wire shape: {envelope}"
         );
-        // P1: signatures array MUST be present (DSSE schema
-        // requires the field, even if it is empty for the
-        // out-of-band-signed batch protocol).
+        // P1: intoto v0.0.2 requires at least one publicKey/sig entry.
         assert!(
             envelope["signatures"].is_array(),
             "DSSE envelope must carry a signatures array: {envelope}"
+        );
+        let signatures = envelope["signatures"].as_array().unwrap();
+        assert_eq!(signatures.len(), 1);
+        let signature = &signatures[0];
+        assert!(
+            signature["publicKey"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "DSSE signature must carry publicKey material: {signature}"
+        );
+        assert!(
+            signature["sig"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "DSSE signature must carry signature material: {signature}"
         );
     }
 

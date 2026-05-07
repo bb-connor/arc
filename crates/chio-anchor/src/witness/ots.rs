@@ -13,14 +13,14 @@
 //! 3. parses the returned blob through the existing
 //!    `opentimestamps` crate (already a chio-anchor dependency for
 //!    the legacy super-root path),
-//! 4. parses the returned OTS blob as advisory timestamp material.
+//! 4. preserves the returned OTS blob as advisory timestamp material.
 //!
 //! Important: a local OTS parse plus a Bitcoin attestation marker is
 //! not enough to satisfy `require_public_witness`. Until the receipt
 //! schema carries trusted Bitcoin block-header evidence or an
-//! independently verified calendar commitment, this client fails
-//! closed instead of reporting OTS receipts as load-bearing public
-//! witnesses.
+//! independently verified calendar commitment, this client can return
+//! advisory receipts from `publish`, but `verify_inclusion` fails
+//! closed for load-bearing public-witness policy.
 //!
 //! W2.3 step 3 also moves the legacy `verify_*` helpers from
 //! `chio-anchor/src/bitcoin.rs` to take an `&AnchorBatch` rather
@@ -146,7 +146,20 @@ impl AnchorWitnessClient for OtsClient {
         }
 
         reject_stale_bitcoin_attestation(&bitcoin_heights, self.max_witness_age_seconds)?;
-        Err(ots_advisory_only_error())
+        let inclusion_proof = encode_detached_timestamp(&timestamp)?;
+        let published_at = bitcoin_heights
+            .iter()
+            .map(|height| height_to_unix_lower_bound(*height))
+            .min()
+            .unwrap_or_else(chrono_now_unix);
+        Ok(WitnessReceipt {
+            kind: AnchorBatchWitnessKind::Ots,
+            external_uuid: format!("ots:{}:{}", self.calendar_url, body_hash.to_hex()),
+            published_at,
+            inclusion_proof,
+            witness_root: batch.body.tree_root,
+            body_hash,
+        })
     }
 
     async fn verify_inclusion(&self, receipt: &WitnessReceipt) -> Result<(), AnchorWitnessError> {
@@ -196,6 +209,18 @@ fn ots_advisory_only_error() -> AnchorWitnessError {
     AnchorWitnessError::SignatureInvalid(
         "ots receipt lacks trusted Bitcoin header or calendar-backed commitment evidence; OTS is advisory-only for require_public_witness".to_string(),
     )
+}
+
+fn encode_detached_timestamp(timestamp: &Timestamp) -> Result<Vec<u8>, AnchorWitnessError> {
+    let detached = DetachedTimestampFile {
+        digest_type: DigestType::Sha256,
+        timestamp: timestamp.clone(),
+    };
+    let mut out = Vec::new();
+    detached
+        .to_writer(&mut out)
+        .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
+    Ok(out)
 }
 
 fn reject_stale_bitcoin_attestation(

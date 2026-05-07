@@ -63,18 +63,19 @@
       "summary": "A chio.anchor_batch.v1 signs a Merkle root over N receipts/checkpoints and can bind that root to a public witness lane through AnchorWitnessClient. Per-receipt local signatures stay authoritative. The enforced subset recomputes Merkle roots/proofs, checks witness root/body-hash binding, verifies Rekor signed-entry timestamps, rejects sync self-asserted Witnessed under require_public_witness, rejects OTS marker-only receipts as advisory until trusted Bitcoin header or calendar-backed commitment evidence exists, and admits Stale only from a verifier-owned batch_body_hash -> verified_at cache. Rekor Merkle inclusion-proof checking, OTS trusted-header verification, and formal public-witness anti-equivocation remain proposed evidence.",
       "introduced_in": "trajectory-4/W2.3",
       "proof_manifest_ref": "manifest.anchor.batch_continuity"
-    }
-  ],
-  "trj4_proposed_claims": [
+    },
     {
       "id": "claim.receipt.body_hash_addressing",
       "status": "enforced",
       "schema_artifact": "spec/schemas/chio-wire/v1/receipt/v2.schema.json",
-      "summary": "A v2 receipt is content-addressed by body_hash := H(canonical_jcs(ReceiptV2BodyHashInput)) where the input set strictly excludes body_hash, signature, and the legacy UUIDv7 receipt_id.",
-      "introduced_by": "trajectory-4/T1.2",
+      "summary": "A v2 receipt is content-addressed by body_hash := H(canonical_jcs(ReceiptV2BodyHashInput)) where the input set strictly excludes body_hash, signature, and the legacy UUIDv7 receipt_id. The kernel mints `ChioReceiptV2` on the production hot path when the negotiated peer profile advertises `accepts_receipt_v2`; the legacy UUIDv7 alias is non-authoritative for replay (replay key is body_hash). Closes the W2.1 plumbing-only finding on T1.2.",
+      "introduced_in": "trajectory-4/T1.2",
+      "promoted_in": "trajectory-4/W2.1",
       "depends_on_theorems": ["theorem.receipt.body_hash_input_set_pinned"],
       "proof_manifest_ref": "manifest.receipt.body_hash_addressing"
-    },
+    }
+  ],
+  "trj4_proposed_claims": [
     {
       "id": "claim.receipt.dag_acyclicity",
       "status": "enforced",

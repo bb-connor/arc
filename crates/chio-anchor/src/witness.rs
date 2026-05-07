@@ -12,9 +12,10 @@
 //! # Soundness notes (PR #594 review fixes)
 //!
 //! - The receipt's `body_hash` binds a stable [`BatchHashInput`] view
-//!   of the batch body that EXCLUDES `witness_state`. This breaks the
-//!   circular reference where signing a witnessed body would otherwise
-//!   change the body the receipt was supposed to commit to.
+//!   of the batch body that EXCLUDES `witness_state` and lane-assigned
+//!   witness identifiers. This breaks the circular reference where
+//!   signing a witnessed body would otherwise change the body the
+//!   receipt was supposed to commit to.
 //! - Honoring `WitnessState::Witnessed` against
 //!   `require_public_witness=true` requires an active call to
 //!   [`AnchorWitnessClient::verify_inclusion`]. Self-carried
@@ -36,9 +37,7 @@ use chio_core::hashing::{sha256, Hash};
 use chio_core::PublicKey;
 use serde::{Deserialize, Serialize};
 
-use crate::batch::{
-    AnchorBatch, AnchorBatchBody, AnchorBatchInclusion, AnchorBatchWitness, AnchorBatchWitnessKind,
-};
+use crate::batch::{AnchorBatch, AnchorBatchBody, AnchorBatchInclusion, AnchorBatchWitnessKind};
 
 /// Receipt returned by an [`AnchorWitnessClient`] on successful
 /// publication.
@@ -63,8 +62,9 @@ pub struct WitnessReceipt {
     /// `batch.body.tree_root` for the receipt to be accepted.
     pub witness_root: Hash,
     /// SHA-256 digest of the canonical-JSON encoding of the
-    /// [`BatchHashInput`] view of `batch.body` (every field except
-    /// `witness_state`). Used by `verify_inclusion` to detect
+    /// [`BatchHashInput`] view of `batch.body` (excluding
+    /// `witness_state`, `witness_id`, and witness observation time).
+    /// Used by `verify_inclusion` to detect
     /// lane-side substitution attacks (the lane returned an entry that
     /// does not commit to our batch).
     pub body_hash: Hash,
@@ -144,11 +144,12 @@ pub type VerifiedWitnessCache = HashMap<Hash, i64>;
 /// Stable hash-input view of [`AnchorBatchBody`] used to compute the
 /// receipt's `body_hash`.
 ///
-/// The view EXCLUDES `witness_state`, breaking the circular reference
-/// in which signing the batch with `WitnessState::Witnessed { receipt
-/// .. }` would change the body that `receipt.body_hash` was supposed
-/// to commit to. Verifiers re-derive this view from the final signed
-/// batch and recompute the SHA-256.
+/// The view EXCLUDES `witness_state` plus lane-assigned witness ids and
+/// observation timestamps, breaking the circular reference in which
+/// signing the batch with `WitnessState::Witnessed { receipt .. }`
+/// would change the body that `receipt.body_hash` was supposed to
+/// commit to. Verifiers re-derive this view from the final signed batch
+/// and recompute the SHA-256.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchHashInput<'a> {
@@ -156,9 +157,16 @@ pub struct BatchHashInput<'a> {
     pub tree_root: &'a Hash,
     pub checkpoint_ids: &'a [String],
     pub inclusions: &'a [AnchorBatchInclusion],
-    pub witness: &'a AnchorBatchWitness,
+    pub witness: BatchHashWitnessInput<'a>,
     pub issued_at: u64,
     pub signer_key: &'a PublicKey,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchHashWitnessInput<'a> {
+    pub kind: &'a AnchorBatchWitnessKind,
+    pub root: &'a Hash,
 }
 
 impl<'a> BatchHashInput<'a> {
@@ -169,7 +177,10 @@ impl<'a> BatchHashInput<'a> {
             tree_root: &body.tree_root,
             checkpoint_ids: &body.checkpoint_ids,
             inclusions: &body.inclusions,
-            witness: &body.witness,
+            witness: BatchHashWitnessInput {
+                kind: &body.witness.kind,
+                root: &body.witness.root,
+            },
             issued_at: body.issued_at,
             signer_key: &body.signer_key,
         }
@@ -177,16 +188,16 @@ impl<'a> BatchHashInput<'a> {
 }
 
 /// Compute the canonical-JSON SHA-256 of `batch.body` over the
-/// witness_state-free [`BatchHashInput`] view. Both publish and
-/// verify_inclusion bind to this value; lanes MUST commit to it.
+/// stable [`BatchHashInput`] view. Both publish and verify_inclusion
+/// bind to this value; lanes MUST commit to it.
 pub fn batch_body_hash(batch: &AnchorBatch) -> Result<Hash, AnchorWitnessError> {
     batch_body_hash_from_body(&batch.body)
 }
 
 /// Compute the canonical-JSON SHA-256 of an [`AnchorBatchBody`] over
-/// the witness_state-free [`BatchHashInput`] view. Pre-witness signing
-/// paths use this to compute the receipt body_hash before the batch
-/// has been re-signed with the receipt embedded.
+/// the stable [`BatchHashInput`] view. Pre-witness signing paths use
+/// this to compute the receipt body_hash before the batch has been
+/// re-signed with the receipt embedded.
 pub fn batch_body_hash_from_body(body: &AnchorBatchBody) -> Result<Hash, AnchorWitnessError> {
     let view = BatchHashInput::from_body(body);
     let bytes = canonical_json_bytes(&view)
@@ -271,6 +282,11 @@ pub enum WitnessPolicyError {
         receipt_hash: String,
         batch_hash: String,
     },
+    #[error("witness receipt kind {receipt_kind:?} does not match declared batch witness kind {batch_kind:?}")]
+    WitnessReceiptKindMismatch {
+        receipt_kind: AnchorBatchWitnessKind,
+        batch_kind: AnchorBatchWitnessKind,
+    },
     #[error("require_public_witness=true requires an AnchorWitnessClient verifier but none was supplied")]
     VerifierRequired,
     #[error("require_public_witness=true rejects self-asserted Witnessed without a live AnchorWitnessClient verifier")]
@@ -335,6 +351,12 @@ fn check_witnessed_invariants(
     batch: &AnchorBatch,
     receipt: &WitnessReceipt,
 ) -> Result<(), WitnessPolicyError> {
+    if receipt.kind != batch.body.witness.kind {
+        return Err(WitnessPolicyError::WitnessReceiptKindMismatch {
+            receipt_kind: receipt.kind.clone(),
+            batch_kind: batch.body.witness.kind.clone(),
+        });
+    }
     if receipt.witness_root != batch.body.tree_root {
         return Err(WitnessPolicyError::WitnessReceiptRootMismatch {
             receipt_root: receipt.witness_root.to_hex_prefixed(),
@@ -566,6 +588,29 @@ mod tests {
             .expect("advisory mode still accepts structurally-valid Witnessed state");
     }
 
+    #[test]
+    fn witnessed_receipt_kind_must_match_declared_lane() {
+        let batch = sample_batch();
+        let receipt = WitnessReceipt {
+            kind: AnchorBatchWitnessKind::Ots,
+            external_uuid: "uuid-wrong-lane".to_string(),
+            published_at: 1_700_000_010,
+            inclusion_proof: vec![1, 2, 3],
+            witness_root: batch.body.tree_root,
+            body_hash: batch_body_hash(&batch).unwrap(),
+        };
+        let state = WitnessState::Witnessed {
+            receipt,
+            observed_at: 1_700_000_010,
+        };
+        let err = evaluate_witness_policy(&batch, &state, &WitnessPolicy::default(), 1_700_000_100)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            WitnessPolicyError::WitnessReceiptKindMismatch { .. }
+        ));
+    }
+
     /// HIGH-1 regression: the body_hash bound by a receipt MUST be
     /// identical between the Pending body and the same body once
     /// signed under WitnessState::Witnessed. If batch_body_hash
@@ -609,6 +654,21 @@ mod tests {
             pending_hash, stale_hash,
             "BatchHashInput must be identical across Pending/Witnessed/Stale"
         );
+    }
+
+    #[test]
+    fn body_hash_ignores_lane_assigned_witness_id_and_observation_time() {
+        let mut batch = sample_batch();
+        let original_hash = batch_body_hash(&batch).unwrap();
+
+        batch.body.witness.witness_id = "rekor:uuid-after-publish".to_string();
+        batch.body.witness.observed_at = Some(1_700_000_500);
+        let with_lane_metadata = batch_body_hash(&batch).unwrap();
+        assert_eq!(original_hash, with_lane_metadata);
+
+        batch.body.witness.kind = AnchorBatchWitnessKind::Ots;
+        let different_lane = batch_body_hash(&batch).unwrap();
+        assert_ne!(original_hash, different_lane);
     }
 
     /// HIGH-2 regression: a self-asserted Witnessed state must NOT

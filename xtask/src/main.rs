@@ -81,6 +81,7 @@
 //! from `spec/errors/registry.yaml`. With `--check`, it renders to a temp
 //! directory and compares the generated files against the checked-in copies.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsStr;
 use std::fmt;
@@ -555,7 +556,7 @@ fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
 /// Mapping from a schema's canonical `$id` URI (and a few normalized
 /// variants) to the absolute path of the schema file on disk. Built once
 /// per `validate-scenarios` invocation by walking `spec/schemas/`.
-type SchemaIndex = std::collections::BTreeMap<String, PathBuf>;
+type SchemaIndex = BTreeMap<String, PathBuf>;
 
 fn build_schema_index(schemas_root: &Path) -> Result<SchemaIndex, XtaskError> {
     let mut index: SchemaIndex = SchemaIndex::new();
@@ -1702,26 +1703,66 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
     // Build the deterministic re-export block. Each line is
     // `from .<subpkg> import <Class1>, <Class2>` plus an `__all__` listing
     // every re-exported name and the SCHEMA_SHA256 constant.
+    //
+    // Names that collide across subpackages (e.g. `Kind` defined in both
+    // `anchor` and `capability`) are imported with a `<Subpkg><Name>` alias
+    // so the top-level `__init__.py` does not silently shadow one with the
+    // other. Both aliases are listed in `__all__`. The unaliased name is
+    // kept only when a single subpackage owns it.
+    let mut name_owners: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (subpkg, classes) in subpackages {
+        for class in classes {
+            if subpkg == "agent" && class == "CapabilityToken" {
+                continue;
+            }
+            name_owners
+                .entry(class.clone())
+                .or_default()
+                .push(subpkg.clone());
+        }
+    }
+
     let mut imports = String::new();
     let mut all_names: Vec<String> = vec!["SCHEMA_SHA256".to_string()];
     for (subpkg, classes) in subpackages {
-        let mut import_classes = classes.clone();
-        if subpkg == "agent" {
-            import_classes.retain(|name| name != "CapabilityToken");
+        let mut entries: Vec<String> = Vec::new();
+        for class in classes {
+            if subpkg == "agent" && class == "CapabilityToken" {
+                continue;
+            }
+            let owners = name_owners.get(class).map(Vec::as_slice).unwrap_or(&[]);
+            if owners.len() > 1 {
+                // Collision across subpackages: alias as <Subpkg><Class>.
+                let alias = format!("{}{}", capitalize_subpkg(subpkg), class);
+                entries.push(format!("{class} as {alias}"));
+                all_names.push(alias);
+            } else {
+                entries.push(class.clone());
+                all_names.push(class.clone());
+            }
         }
-        if import_classes.is_empty() {
+        if entries.is_empty() {
             continue;
         }
         imports.push_str(&format!(
             "from .{subpkg} import {names}\n",
-            names = import_classes.join(", ")
+            names = entries.join(", ")
         ));
-        all_names.extend(import_classes.iter().cloned());
     }
-    if subpackages.iter().any(|(subpkg, classes)| {
+    let has_capability_v1 = subpackages.iter().any(|(subpkg, classes)| {
         subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytoken")
-    }) {
-        imports.push_str("\nCapabilityToken = ChioCapabilitytoken\n");
+    });
+    let has_capability_v2 = subpackages.iter().any(|(subpkg, classes)| {
+        subpkg == "capability" && classes.iter().any(|name| name == "ChioCapabilitytokenV2")
+    });
+    if has_capability_v1 {
+        if has_capability_v2 {
+            imports.push_str(
+                "\nclass _CapabilityTokenMeta(type):\n    def __instancecheck__(cls, instance):\n        return isinstance(instance, (ChioCapabilitytoken, ChioCapabilitytokenV2))\n\n\nclass CapabilityToken(metaclass=_CapabilityTokenMeta):\n    \"\"\"Version-aware facade for canonical Chio capability tokens.\"\"\"\n\n    def __new__(cls, *args, **kwargs):\n        if len(args) > 1:\n            raise TypeError(\"CapabilityToken accepts at most one positional value\")\n        if args and kwargs:\n            raise TypeError(\"CapabilityToken accepts a value or keyword fields, not both\")\n        obj = args[0] if args else kwargs\n        return cls.model_validate(obj)\n\n    @classmethod\n    def __get_pydantic_core_schema__(cls, source_type, handler):\n        return core_schema.union_schema(\n            [\n                handler.generate_schema(ChioCapabilitytokenV2),\n                handler.generate_schema(ChioCapabilitytoken),\n            ]\n        )\n\n    @classmethod\n    def __get_pydantic_json_schema__(cls, schema, handler):\n        return handler(schema)\n\n    @classmethod\n    def _adapter(cls):\n        return TypeAdapter(cls)\n\n    @classmethod\n    def model_validate(cls, obj, *args, **kwargs):\n        return cls._adapter().validate_python(obj, *args, **kwargs)\n\n    @classmethod\n    def model_validate_json(cls, json_data, *args, **kwargs):\n        return cls._adapter().validate_json(json_data, *args, **kwargs)\n\n    @classmethod\n    def model_json_schema(cls, *args, **kwargs):\n        return cls._adapter().json_schema(*args, **kwargs)\n",
+            );
+        } else {
+            imports.push_str("\nCapabilityToken = ChioCapabilitytoken\n");
+        }
         all_names.push("CapabilityToken".to_string());
     }
     all_names.sort();
@@ -1739,12 +1780,19 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
          \n\
          Re-exports every subpackage so callers can write\n\
          ``from chio_sdk._generated import CapabilityToken`` for the canonical\n\
-         capability token shape without knowing the per-subpackage layout. The\n\
-         SCHEMA_SHA256 constant pins the schema set this build was generated from;\n\
-         the spec-drift CI lane reads it to detect tampering.\n\
+         capability token shapes without knowing the per-subpackage layout. Class\n\
+         names that collide across subpackages (for example ``Kind`` defined in\n\
+         both ``anchor`` and ``capability``) are re-exported under a\n\
+         ``<Subpkg><Class>`` alias (``AnchorKind``, ``CapabilityKind``) so\n\
+         neither definition silently shadows the other. The SCHEMA_SHA256\n\
+         constant pins the schema set this build was generated from; the\n\
+         spec-drift CI lane reads it to detect tampering.\n\
          \"\"\"\n\
          \n\
          from __future__ import annotations\n\
+         \n\
+         from pydantic import TypeAdapter\n\
+         from pydantic_core import core_schema\n\
          \n\
          #: SHA-256 of the lexicographically sorted concatenation of every\n\
          #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was\n\
@@ -1754,6 +1802,29 @@ fn build_python_top_init(schema_digest: &str, subpackages: &PythonSubpackageExpo
          {imports}\n\
          {all_block}"
     )
+}
+
+/// Convert a snake_case subpackage directory name (e.g. `trust_control`) into
+/// a CamelCase prefix (e.g. `TrustControl`) used to disambiguate class names
+/// that collide across subpackages in the top-level `__init__.py`.
+fn capitalize_subpkg(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut next_upper = true;
+    for ch in name.chars() {
+        if ch == '_' || ch == '-' {
+            next_upper = true;
+            continue;
+        }
+        if next_upper {
+            for upper in ch.to_uppercase() {
+                out.push(upper);
+            }
+            next_upper = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 /// Walk every subpackage directory under `root_dir`, scan each `*.py` module
