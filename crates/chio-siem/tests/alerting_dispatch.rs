@@ -216,7 +216,7 @@ async fn pagerduty_backend_posts_to_v2_enqueue() {
     let backend = PagerDutyBackend::with_endpoint_and_contract(
         "pd-routing-key".to_string(),
         server.uri(),
-        Some(HttpEgressContract::permissive_for_tests(&authority)),
+        HttpEgressContract::permissive_for_tests(&authority),
     )
     .expect("PagerDutyBackend builds in tests");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
@@ -245,7 +245,7 @@ async fn pagerduty_backend_propagates_http_error() {
     let backend = PagerDutyBackend::with_endpoint_and_contract(
         "pd".to_string(),
         server.uri(),
-        Some(HttpEgressContract::permissive_for_tests(&authority)),
+        HttpEgressContract::permissive_for_tests(&authority),
     )
     .expect("PagerDutyBackend builds in tests");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
@@ -277,7 +277,7 @@ async fn opsgenie_backend_posts_to_v2_alerts() {
     let backend = OpsGenieBackend::with_endpoint_and_contract(
         "og-api-key".to_string(),
         server.uri(),
-        Some(HttpEgressContract::permissive_for_tests(&authority)),
+        HttpEgressContract::permissive_for_tests(&authority),
     )
     .expect("OpsGenieBackend builds in tests");
     let exporter = AlertingExporter::builder(AlertingConfig::default())

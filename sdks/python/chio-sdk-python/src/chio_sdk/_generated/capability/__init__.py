@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 95e1bc47142b6b7f138be42872fee664e9833abfc0214512cf5057d9701def40
+# Schema sha256: d680571b15f2c519e43943d2ec4e7754e54e544f1245ac1e25d16952856342c9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -15,7 +15,7 @@ from .grant_schema import ChioCapabilityGrant, Constraint, MonetaryAmount, Opera
 from .revocation_schema import ChioCapabilityRevocationEntry
 from .token_schema import Algorithm, Attenuation, ChioCapabilitytoken, ChioScope, Constraint, DelegationLink, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
 from .token_v1_schema import Algorithm, Attenuation, ChioCapabilitytokenV1, ChioScope, Constraint, DelegationLink, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
-from .token_v2_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytokenV2, DelegationLink, GrantKind, GrantSubsetRelation, Kind, ScopeAttenuation, Subset
+from .token_v2_schema import Algorithm, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytokenV2, ChioScope, Constraint, GrantKind, GrantSubsetRelation, Kind, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ScopeAttenuation, ToolGrant
 
 __all__ = [
     "Algorithm",
@@ -41,6 +41,5 @@ __all__ = [
     "PromptGrant",
     "ResourceGrant",
     "ScopeAttenuation",
-    "Subset",
     "ToolGrant",
 ]

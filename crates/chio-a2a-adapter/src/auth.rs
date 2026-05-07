@@ -116,6 +116,44 @@ fn enforce_egress_contract(
     Ok(())
 }
 
+#[derive(Clone)]
+struct A2aContractResolver {
+    contract: HttpEgressContract,
+}
+
+impl ureq::Resolver for A2aContractResolver {
+    fn resolve(&self, netloc: &str) -> std::io::Result<Vec<SocketAddr>> {
+        let host = resolver_host_label(netloc);
+        let addrs = netloc
+            .to_socket_addrs()?
+            .map(|addr| {
+                self.contract
+                    .enforce_resolved_ip(host, addr.ip())
+                    .map(|()| addr)
+                    .map_err(|err| {
+                        std::io::Error::new(std::io::ErrorKind::PermissionDenied, err.to_string())
+                    })
+            })
+            .collect::<std::io::Result<Vec<_>>>()?;
+        if addrs.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("{netloc} resolved to no addresses"),
+            ));
+        }
+        Ok(addrs)
+    }
+}
+
+fn resolver_host_label(netloc: &str) -> &str {
+    if let Some(rest) = netloc.strip_prefix('[') {
+        if let Some((host, _)) = rest.split_once(']') {
+            return host;
+        }
+    }
+    netloc.rsplit_once(':').map_or(netloc, |(host, _)| host)
+}
+
 /// Manually drive a ureq request and validate every redirect target via
 /// the typed `HttpEgressContract`. The closure returns a fresh ureq
 /// `Response` for each URL hop; when the response is a 3xx, we extract
@@ -145,11 +183,8 @@ where
     let mut chain_len: u8 = 0;
     let mut strip_sensitive_headers = false;
     loop {
-        let response = match send(&current_url, strip_sensitive_headers) {
-            Ok(response) => response,
-            Err(ureq::Error::Status(status, response)) if (300..400).contains(&status) => response,
-            Err(error) => return Err(map_ureq_error_with_contract(error, contract)),
-        };
+        let response =
+            send(&current_url, strip_sensitive_headers).map_err(|error| map_ureq_error_with_contract(error, contract))?;
         let status = response.status();
         if !(300..400).contains(&status) {
             return Ok(response);
@@ -535,6 +570,9 @@ fn build_agent(
     // `dispatch_with_redirect_validation` can validate every hop before
     // re-issuing.
     builder = builder.redirects(0);
+    if let Some(contract) = transport_config.egress_contract.clone() {
+        builder = builder.resolver(A2aContractResolver { contract });
+    }
     let builder = match tls_mode {
         A2aTlsMode::Default => match transport_config.default_tls_config.as_ref() {
             Some(tls_config) => builder.tls_config(Arc::clone(tls_config)),

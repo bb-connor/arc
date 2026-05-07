@@ -82,6 +82,22 @@ mod tests {
     }
 
     #[test]
+    fn a2a_contract_resolver_rejects_loopback_answers() {
+        let mut contract = HttpEgressContract::permissive_for_tests("127.0.0.1:80");
+        contract.deny_loopback = true;
+        let resolver = A2aContractResolver { contract };
+
+        let error = ureq::Resolver::resolve(&resolver, "127.0.0.1:80")
+            .expect_err("loopback DNS answers are rejected at resolver time");
+
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(
+            error.to_string().contains("loopback"),
+            "unexpected resolver error: {error}"
+        );
+    }
+
+    #[test]
     fn adapter_discovers_jsonrpc_and_invokes_skill() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
             return;

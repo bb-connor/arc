@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 95e1bc47142b6b7f138be42872fee664e9833abfc0214512cf5057d9701def40
+# Schema sha256: d680571b15f2c519e43943d2ec4e7754e54e544f1245ac1e25d16952856342c9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -166,9 +166,9 @@ class ChioCapabilitytoken(BaseModel):
         extra="forbid",
     )
     schema_: Literal["chio.capability.v1"] = Field(
-        ...,
+        "chio.capability.v1",
         alias="schema",
-        description="Signed-artifact schema ID. Legacy wire tokens that omitted this field are interpreted as chio.capability.v1 by compatibility verifiers, but newly issued tokens carry it in the schema-aware signing input.",
+        description="Signed-artifact schema ID. Optional on the wire: legacy v1 tokens persisted before this field was introduced omit it entirely, and verifiers default the missing value to `chio.capability.v1` so those tokens deserialize unchanged. Newly issued tokens carry it in the schema-aware signing input.",
     )
     id: constr(min_length=1) = Field(
         ..., description="Unique token ID (UUIDv7 recommended), used for revocation."

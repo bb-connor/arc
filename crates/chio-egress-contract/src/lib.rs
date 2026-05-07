@@ -5,7 +5,7 @@
 //! malformed contract state fails closed.
 
 use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
@@ -148,9 +148,8 @@ impl HttpEgressContract {
     /// Enforce target URL, redirect hop constraints, and DNS safety.
     ///
     /// Literal IPs and localhost names are enforced directly. Domain names are
-    /// accepted here after authority allow-list checks; reqwest dispatchers
-    /// must use `client_builder_with_contract` so DNS resolution and
-    /// address-class checks happen inside the connector that opens the socket.
+    /// resolved here and every resolved IP is checked against the address-class
+    /// policy before the caller opens a socket.
     pub fn enforce_url_with_dns(
         &self,
         target_url: &str,
@@ -274,7 +273,22 @@ impl HttpEgressContract {
     pub fn enforce_resolved_ip(&self, host: &str, address: IpAddr) -> Result<(), HttpEgressError> {
         match address {
             IpAddr::V4(address) => {
-                self.enforce_ipv4_class(address)?;
+                if address.is_loopback() {
+                    if self.deny_loopback {
+                        return Err(HttpEgressError::LoopbackDenied {
+                            host: format!("{host} resolved to {address}"),
+                        });
+                    }
+                    return Ok(());
+                }
+                if address.is_link_local() {
+                    if self.deny_link_local {
+                        return Err(HttpEgressError::LinkLocalDenied {
+                            host: format!("{host} resolved to {address}"),
+                        });
+                    }
+                    return Ok(());
+                }
                 if is_ipv4_private_or_special_use(&address) {
                     return Err(HttpEgressError::PrivateNetworkDenied {
                         host: format!("{host} resolved to {address}"),
@@ -282,7 +296,33 @@ impl HttpEgressContract {
                 }
             }
             IpAddr::V6(address) => {
-                self.enforce_ipv6_class(address)?;
+                if let Some(mapped) = address.to_ipv4_mapped() {
+                    return self.enforce_resolved_ip(host, IpAddr::V4(mapped));
+                }
+                if address.is_loopback() {
+                    if self.deny_loopback {
+                        return Err(HttpEgressError::LoopbackDenied {
+                            host: format!("{host} resolved to {address}"),
+                        });
+                    }
+                    return Ok(());
+                }
+                if is_ipv6_unicast_link_local(&address) {
+                    if self.deny_link_local {
+                        return Err(HttpEgressError::LinkLocalDenied {
+                            host: format!("{host} resolved to {address}"),
+                        });
+                    }
+                    return Ok(());
+                }
+                if is_ipv6_unique_local(&address) {
+                    if self.deny_ipv6_ula {
+                        return Err(HttpEgressError::Ipv6UlaDenied {
+                            host: format!("{host} resolved to {address}"),
+                        });
+                    }
+                    return Ok(());
+                }
                 if is_ipv6_private_or_special_use(&address) {
                     return Err(HttpEgressError::PrivateNetworkDenied {
                         host: format!("{host} resolved to {address}"),
@@ -303,6 +343,28 @@ impl HttpEgressContract {
         {
             return Err(HttpEgressError::LoopbackDenied { host: normalized });
         }
+        let port = url.port_or_known_default().ok_or_else(|| {
+            HttpEgressError::InvalidUrl(format!(
+                "egress URL {url} has no explicit port or known default port"
+            ))
+        })?;
+        let addrs = (normalized.as_str(), port)
+            .to_socket_addrs()
+            .map_err(|error| HttpEgressError::DnsResolutionFailed {
+                host: normalized.clone(),
+                details: error.to_string(),
+            })?;
+        let mut saw_addr = false;
+        for addr in addrs {
+            saw_addr = true;
+            self.enforce_resolved_ip(&normalized, addr.ip())?;
+        }
+        if !saw_addr {
+            return Err(HttpEgressError::DnsResolutionFailed {
+                host: normalized,
+                details: "resolver returned no addresses".to_string(),
+            });
+        }
         Ok(())
     }
 
@@ -310,8 +372,15 @@ impl HttpEgressContract {
         if self.allowed_authority_set.contains(authority) {
             return Ok(true);
         }
+        let host_authority = normalized_url_host_authority(url)?;
+        if url.port().is_some()
+            && url.port() == url.port_or_known_default()
+            && self.allowed_authority_set.contains(&host_authority)
+        {
+            return Ok(true);
+        }
         if let Some(default_port) = url.port_or_known_default() {
-            let default_port_authority = format!("{authority}:{default_port}");
+            let default_port_authority = format!("{host_authority}:{default_port}");
             return Ok(self.allowed_authority_set.contains(&default_port_authority));
         }
         Ok(false)
@@ -336,6 +405,85 @@ impl HttpEgressContract {
         Err(HttpEgressError::AuthorityDenied {
             authority: normalized,
         })
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::{HttpEgressContract, HttpEgressError};
+    use std::collections::BTreeSet;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    fn strict_contract(authority: &str) -> HttpEgressContract {
+        let mut allowed_schemes = BTreeSet::new();
+        allowed_schemes.insert("https".to_string());
+        let mut allowed_authority_set = BTreeSet::new();
+        allowed_authority_set.insert(authority.to_string());
+        HttpEgressContract {
+            tenant_egress_namespace: "tenant-a".to_string(),
+            allowed_schemes,
+            allowed_authority_set,
+            deny_loopback: true,
+            deny_link_local: true,
+            deny_ipv6_ula: true,
+            max_redirect_chain: 3,
+            max_response_bytes: 1024,
+        }
+    }
+
+    #[test]
+    fn explicit_default_port_matches_no_port_allowlist_entry() {
+        strict_contract("api.example.com")
+            .enforce_url("https://api.example.com:443/v1", 0)
+            .expect("explicit default port should match no-port authority");
+    }
+
+    #[test]
+    fn no_port_url_matches_explicit_default_port_allowlist_entry() {
+        strict_contract("api.example.com:443")
+            .enforce_url("https://api.example.com/v1", 0)
+            .expect("no-port URL should match explicit default-port authority");
+    }
+
+    #[test]
+    fn resolved_loopback_respects_loopback_allowance() {
+        let contract = HttpEgressContract::permissive_for_tests("localhost:80");
+        contract
+            .enforce_resolved_ip("localhost", IpAddr::V4(Ipv4Addr::LOCALHOST))
+            .expect("loopback may be explicitly allowed for local test contracts");
+
+        let mut denied = contract;
+        denied.deny_loopback = true;
+        let error = denied
+            .enforce_resolved_ip("localhost", IpAddr::V4(Ipv4Addr::LOCALHOST))
+            .expect_err("loopback should fail when the flag is enabled");
+        assert!(matches!(error, HttpEgressError::LoopbackDenied { .. }));
+    }
+
+    #[test]
+    fn resolved_ipv6_ula_respects_ula_allowance() {
+        let contract = HttpEgressContract::permissive_for_tests("[fc00::1]:80");
+        contract
+            .enforce_resolved_ip("ula.test", IpAddr::V6("fc00::1".parse().unwrap()))
+            .expect("ULA may be explicitly allowed for local test contracts");
+
+        let mut denied = contract;
+        denied.deny_ipv6_ula = true;
+        let error = denied
+            .enforce_resolved_ip("ula.test", IpAddr::V6("fc00::1".parse().unwrap()))
+            .expect_err("ULA should fail when the flag is enabled");
+        assert!(matches!(error, HttpEgressError::Ipv6UlaDenied { .. }));
+    }
+
+    #[test]
+    fn resolved_public_ip_is_allowed() {
+        strict_contract("example.com")
+            .enforce_resolved_ip(
+                "example.com",
+                IpAddr::V6(Ipv6Addr::new(0x2606, 0x2800, 0x220, 0x1, 0, 0, 0, 0)),
+            )
+            .expect("global resolved addresses remain allowed");
     }
 }
 
@@ -628,6 +776,28 @@ mod reqwest_egress_tests {
         handle.join().expect("join server");
     }
 
+    #[tokio::test]
+    async fn send_with_contract_denies_oversized_response_without_content_length() {
+        let (addr, _rx, handle) = spawn_single_response_server(|_| {
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n3\r\nabc\r\n3\r\ndef\r\n0\r\n\r\n".to_string()
+        });
+        let mut contract = HttpEgressContract::permissive_for_tests(&authority(addr));
+        contract.max_response_bytes = 5;
+        let client = client_builder_with_contract(&contract)
+            .build()
+            .expect("build client");
+        let request = client
+            .get(format!("http://{}/body", authority(addr)))
+            .build()
+            .expect("build request");
+
+        let error = send_with_contract(&contract, &client, request)
+            .await
+            .expect_err("streamed response should be capped");
+        assert!(matches!(error, HttpEgressError::ResponseTooLarge { .. }));
+        handle.join().expect("join server");
+    }
+
     #[test]
     fn validate_dispatchable_accepts_production_domain_hostnames_for_pinned_resolver() {
         let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
@@ -790,15 +960,19 @@ fn normalize_domain_name(host: &str) -> String {
 }
 
 fn normalized_url_authority(url: &Url) -> Result<String, HttpEgressError> {
-    let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
-    let host = match host {
-        Host::Domain(domain) => domain.trim_end_matches('.').to_ascii_lowercase(),
-        Host::Ipv4(address) => address.to_string(),
-        Host::Ipv6(address) => format!("[{address}]"),
-    };
+    let host = normalized_url_host_authority(url)?;
     Ok(match url.port() {
         Some(port) => format!("{host}:{port}"),
         None => host,
+    })
+}
+
+fn normalized_url_host_authority(url: &Url) -> Result<String, HttpEgressError> {
+    let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
+    Ok(match host {
+        Host::Domain(domain) => domain.trim_end_matches('.').to_ascii_lowercase(),
+        Host::Ipv4(address) => address.to_string(),
+        Host::Ipv6(address) => format!("[{address}]"),
     })
 }
 
