@@ -2668,7 +2668,7 @@ enum ReceiptCommands {
     ///
     /// Pass `--inspect-bilateral` to additionally emit a structural
     /// **inspection trace** of the envelope. The previous flag spelling
-    /// (`--explain-bilateral`) labelled the output a "17-step verifier
+    /// (`--explain-bilateral`) labelled the output a "full-verifier
     /// trace" and a number of steps were marked `bounded` because the
     /// CLI does not carry the org A / org B passport public keys;
     /// Ed25519 signature verification was NOT performed. The new flag
