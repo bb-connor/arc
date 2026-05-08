@@ -162,9 +162,9 @@ pub fn render_threat_coverage_doc(
          deferred sub-vectors (`tool_server_escape` kernel sandbox \
          escape, `pq_signature_downgrade` hybrid downgrade), tracked \
          through trj6. Ship-bar / release notes that reference this \
-         page MUST NOT claim full threat closure for trj5; the closure \
+         page MUST NOT claim full threat closure for release work; the closure \
          language is reserved for the release that retires the \
-         deferred sub-vectors. See R3 audit T5-R3-P1-010 for the \
+         deferred sub-vectors. See R3 audit review item for the \
          normative wording.\n\n",
     );
     body.push_str(
@@ -178,7 +178,7 @@ pub fn render_threat_coverage_doc(
          At time of writing the gate reports 18 covered / 2 partial / 0 \
          pending / 0 uncovered (PASS). The two partial rows \
          (`tool_server_escape`, `pq_signature_downgrade`) are honest \
-         reporting per the trj5 audit P0-023: one sub-vector of each is \
+         reporting per the release work audit P0-023: one sub-vector of each is \
          closed by an in-tree conformance test today and the other \
          sub-vector is deferred to trj6 (see the `deferred_to_trj6` \
          field in each row's `audits/evidence/threats/<id>.json`).\n\n",
