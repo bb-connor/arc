@@ -466,6 +466,20 @@ pub fn verify_dsse_envelope(
         )));
     }
 
+    // Codex P2 follow-up on PR #617: require exactly one subject so
+    // downstream callers that index `subject[0]` for receipt-binding
+    // (spec §7 step 7) cannot panic on an empty vector or silently
+    // accept a malformed envelope where the first subject does not
+    // bind the named receipt. The corresponding fix on PR #610
+    // (b4-dsse-bilateral-signing) covers this for the full stack;
+    // adding it here keeps this branch self-contained.
+    if statement.subject.len() != 1 {
+        return Err(BilateralCoSigningError::CanonicalJson(format!(
+            "statement.malformed: expected exactly 1 subject, got {}",
+            statement.subject.len()
+        )));
+    }
+
     let pae_bytes = pae(&envelope.payload_type, &statement_bytes);
 
     let org_a_keyid = Keyid::from_public_key(org_a_public_key);
