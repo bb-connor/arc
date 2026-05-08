@@ -62,7 +62,7 @@ fn write_artifact_fixture(dir: &std::path::Path) -> std::path::PathBuf {
 }
 
 #[test]
-fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
+fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
     let bin = env!("CARGO_BIN_EXE_chio");
     let tmp = tempfile::tempdir().expect("tempdir");
     let fixture = write_artifact_fixture(tmp.path());
@@ -75,14 +75,17 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
             "bilateral", // sentinel receipt_id; the bilateral path is keyed off --input-file shape
             "--input-file",
             fixture.to_str().unwrap(),
-            "--explain-bilateral",
+            // P0-008 fix (audit 2026-05-08): the flag is now
+            // `--inspect-bilateral`. The legacy spelling is retained
+            // as a clap alias on the parent enum (see types.rs).
+            "--inspect-bilateral",
         ])
         .output()
         .expect("invoke chio receipt explain");
 
     assert!(
         out.status.success(),
-        "chio receipt explain --explain-bilateral exited non-zero: stderr={}",
+        "chio receipt explain --inspect-bilateral exited non-zero: stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
 
@@ -132,11 +135,21 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
         );
     }
 
-    // (3) 17-step verifier trace.
-    let trace = &parsed["bilateral_verifier_trace"];
+    // (3) Bilateral inspection trace (P0-008: not a verifier trace).
+    let trace = &parsed["bilateral_inspection_trace"];
     assert!(
         trace.is_object(),
-        "--explain-bilateral must emit bilateral_verifier_trace"
+        "--inspect-bilateral must emit bilateral_inspection_trace"
+    );
+    assert_eq!(
+        trace["trace_kind"].as_str(),
+        Some("inspection"),
+        "trace MUST self-identify as `inspection`, not a verifier trace (P0-008)"
+    );
+    assert_eq!(
+        trace["verification_performed"].as_bool(),
+        Some(false),
+        "trace MUST declare verification_performed = false (P0-008)"
     );
     let steps = trace["steps"]
         .as_array()
@@ -144,14 +157,16 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
     assert_eq!(
         steps.len(),
         17,
-        "spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md §7 prescribes a 17-step trace"
+        "trace iterates the §7 step structure even though only a subset is locally verifiable"
     );
 
-    // No step should be `fail` for a healthy hot-path artifact.
+    // P0-008: signature verification steps are now labelled
+    // `not-verified` (was `bounded`); other deferred steps remain
+    // `bounded`. No step should `fail` on a healthy hot-path artifact.
     for step in steps {
         let status = step["status"].as_str().unwrap_or("");
         assert!(
-            status == "ok" || status == "bounded",
+            status == "ok" || status == "bounded" || status == "not-verified",
             "step {} ({}) must not fail on a hot-path artifact: status={status}, note={}",
             step["step"],
             step["name"].as_str().unwrap_or("?"),
@@ -187,9 +202,26 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
         );
     }
 
-    let must_be_bounded = [
+    // P0-008 fix: cryptographic verification steps are now
+    // `not-verified` (honest about the absence of signature
+    // verification in the CLI). Other deferred steps remain
+    // `bounded` (out-of-scope, not just unverified).
+    let must_be_not_verified = [
         "ed25519_verify_org_a_pae",
         "ed25519_verify_org_b_pae",
+    ];
+    for name in must_be_not_verified {
+        let entry = steps
+            .iter()
+            .find(|s| s["name"].as_str() == Some(name))
+            .unwrap_or_else(|| panic!("trace must include step `{name}`"));
+        assert_eq!(
+            entry["status"].as_str(),
+            Some("not-verified"),
+            "step `{name}` must be `not-verified` (P0-008: CLI does not verify signatures)"
+        );
+    }
+    let must_be_bounded = [
         "capability_lease_resolution",
         "governance_receipt_resolution",
         "consistency_anchor_reconciliation",
@@ -208,7 +240,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
     }
 }
 
-/// Negative path: when `--explain-bilateral` is omitted, the renderer
+/// Negative path: when `--inspect-bilateral` is omitted, the renderer
 /// must NOT emit the trace (we don't want operators to think the trace
 /// ran when it didn't). The dual + DSSE sections still render.
 #[test]
@@ -235,13 +267,50 @@ fn receipt_explain_bilateral_without_flag_omits_trace() {
     assert_eq!(
         parsed["shape"].as_str(),
         Some("BilateralCoSignArtifacts"),
-        "shape must still be detected without --explain-bilateral"
+        "shape must still be detected without --inspect-bilateral"
     );
     // Trace key may exist but value must be null.
     assert!(
-        parsed["bilateral_verifier_trace"].is_null()
-            || parsed.get("bilateral_verifier_trace").is_none(),
-        "trace must be absent or null when --explain-bilateral is not set"
+        parsed["bilateral_inspection_trace"].is_null()
+            || parsed.get("bilateral_inspection_trace").is_none(),
+        "trace must be absent or null when --inspect-bilateral is not set"
+    );
+}
+
+/// P0-008 backwards-compat: the legacy `--explain-bilateral` spelling
+/// is retained as a clap alias so existing operator scripts continue
+/// to work. The output schema is identical to the new flag.
+#[test]
+fn legacy_explain_bilateral_flag_still_accepted_via_alias() {
+    let bin = env!("CARGO_BIN_EXE_chio");
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let fixture = write_artifact_fixture(tmp.path());
+
+    let out = Command::new(bin)
+        .args([
+            "--json",
+            "receipt",
+            "explain",
+            "bilateral",
+            "--input-file",
+            fixture.to_str().unwrap(),
+            "--explain-bilateral",
+        ])
+        .output()
+        .expect("invoke chio receipt explain with legacy flag");
+    assert!(
+        out.status.success(),
+        "--explain-bilateral alias must still be accepted: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).expect("utf8 stdout");
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("renderer must emit valid JSON");
+    let trace = &parsed["bilateral_inspection_trace"];
+    assert_eq!(
+        trace["trace_kind"].as_str(),
+        Some("inspection"),
+        "trace_kind MUST be `inspection` even when invoked via legacy alias"
     );
 }
 
@@ -262,7 +331,7 @@ fn receipt_explain_bilateral_human_renderer_marks_section6_boundary() {
             "bilateral",
             "--input-file",
             fixture.to_str().unwrap(),
-            "--explain-bilateral",
+            "--inspect-bilateral",
         ])
         .output()
         .expect("invoke chio receipt explain");
@@ -276,8 +345,16 @@ fn receipt_explain_bilateral_human_renderer_marks_section6_boundary() {
         stdout.contains("DSSE envelope"),
         "human renderer must label the §6 section: {stdout}"
     );
+    // P0-008: the human renderer now labels the trace as
+    // "inspection trace" with an explicit warning that signatures
+    // are NOT verified. The previous "17-step verifier trace"
+    // wording is gone.
     assert!(
-        stdout.contains("17-step") || stdout.contains("verifier trace"),
-        "human renderer must label the trace section: {stdout}"
+        stdout.contains("inspection trace"),
+        "human renderer must label the trace section as `inspection trace` (P0-008): {stdout}"
+    );
+    assert!(
+        stdout.contains("NOT cryptographically verified"),
+        "human renderer must warn that signatures are not verified (P0-008): {stdout}"
     );
 }

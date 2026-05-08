@@ -2664,9 +2664,19 @@ enum ReceiptCommands {
     /// `dualSignedReceipt` and a `dsseEnvelope`), the renderer auto-detects
     /// the bilateral shape and prints both the legacy DualSignedReceipt
     /// section (NON-§6-CONFORMANT per B4) and the §6 DSSE envelope
-    /// section. Pass `--explain-bilateral` to additionally execute and
-    /// emit the `spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md` §7 17-step
-    /// verifier trace.
+    /// section.
+    ///
+    /// Pass `--inspect-bilateral` to additionally emit a structural
+    /// **inspection trace** of the envelope. P0-008 honesty fix
+    /// (audit 2026-05-08): the previous flag (`--explain-bilateral`)
+    /// labelled the output a "17-step verifier trace" and a number
+    /// of steps were marked `bounded` because the CLI does not carry
+    /// the org A / org B passport public keys; Ed25519 signature
+    /// verification was NOT performed. The new flag emits an
+    /// inspection trace (structural / schema checks only) and is
+    /// honest about the absence of cryptographic verification. The
+    /// legacy spelling `--explain-bilateral` is retained as a
+    /// deprecated alias.
     Explain {
         /// Legacy receipt ID (`rcpt_...`) or v2 body_hash. Use a sentinel
         /// (e.g. `bilateral`) when reading a bilateral artifact via
@@ -2682,8 +2692,13 @@ enum ReceiptCommands {
         /// Maximum fanout siblings to render per level.
         #[arg(long, default_value_t = 32)]
         fanout_limit: usize,
-        #[arg(long, default_value_t = false)]
-        explain_bilateral: bool,
+        /// Emit a structural inspection trace of the bilateral envelope.
+        /// Note: this trace does NOT perform Ed25519 signature
+        /// verification. For real verification, use the kernel-resident
+        /// `chio_federation::bilateral_dsse::verify_dsse_envelope`
+        /// against pinned passport keys.
+        #[arg(long, alias = "explain-bilateral", default_value_t = false)]
+        inspect_bilateral: bool,
     },
 }
 

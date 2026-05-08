@@ -134,7 +134,14 @@ struct ReceiptExplainArgs<'a> {
     input_file: Option<&'a Path>,
     depth: usize,
     fanout_limit: usize,
-    explain_bilateral: bool,
+    /// P0-008 fix (audit 2026-05-08): renamed from `explain_bilateral`
+    /// because the previous output labelled itself a "17-step verifier
+    /// trace" while the CLI does not carry the org A / org B passport
+    /// public keys and could not perform real Ed25519 verification.
+    /// The trace is now an `inspect` output (structural / schema
+    /// checks only). The legacy CLI flag spelling is preserved as
+    /// `clap` alias on the parent enum.
+    inspect_bilateral: bool,
 }
 
 fn build_underwriting_policy_input_query(
@@ -2509,8 +2516,12 @@ fn render_bilateral_explain(
 
     let dual_section = explain_dual_signed_receipt(dual)?;
     let dsse_section = explain_dsse_envelope(dsse)?;
-    let trace_section = if args.explain_bilateral {
-        Some(explain_bilateral_seventeen_step_trace(dual, dsse)?)
+    // P0-008 fix (audit 2026-05-08): emit a structural inspection
+    // trace, not a "verifier trace". The CLI does not have org A /
+    // org B passport public keys in scope and cannot perform real
+    // Ed25519 verification.
+    let trace_section = if args.inspect_bilateral {
+        Some(inspect_bilateral_envelope_trace(dual, dsse)?)
     } else {
         None
     };
@@ -2520,7 +2531,7 @@ fn render_bilateral_explain(
         "shape": "BilateralCoSignArtifacts",
         "dual_signed_receipt": dual_section,
         "dsse_envelope": dsse_section,
-        "bilateral_verifier_trace": trace_section,
+        "bilateral_inspection_trace": trace_section,
     });
 
     if backend.json_output {
@@ -2529,7 +2540,7 @@ fn render_bilateral_explain(
     }
 
     // Pretty-print: boxed sections.
-    print_bilateral_human(&report, args.explain_bilateral);
+    print_bilateral_human(&report, args.inspect_bilateral);
     Ok(())
 }
 
@@ -2622,7 +2633,17 @@ fn explain_dsse_envelope(dsse: &serde_json::Value) -> Result<serde_json::Value, 
     }))
 }
 
-fn explain_bilateral_seventeen_step_trace(
+/// P0-008 fix (audit 2026-05-08): renamed from
+/// `explain_bilateral_seventeen_step_trace`. The previous name implied
+/// this was a §7 17-step verifier trace, but most steps were marked
+/// `bounded` because the CLI does not have the org A / org B
+/// passport public keys in scope and cannot perform real Ed25519
+/// verification. The function now produces an INSPECTION trace
+/// (structural / schema / fingerprint-presence checks only) and the
+/// emitted JSON labels itself accordingly. Real verification belongs
+/// in `chio_federation::bilateral_dsse::verify_dsse_envelope` against
+/// pinned passport keys.
+fn inspect_bilateral_envelope_trace(
     dual: &serde_json::Value,
     dsse: &serde_json::Value,
 ) -> Result<serde_json::Value, CliError> {
@@ -2870,21 +2891,23 @@ fn explain_bilateral_seventeen_step_trace(
 
     // Step 11: cryptographic verification of org A signature.
     // Step 12: cryptographic verification of org B signature.
-    // Both require the org A / org B passport public keys, which the
-    // CLI does not have in scope for `receipt explain`. We therefore
-    // mark these `bounded` and refer the operator to
-    // `chio_federation::bilateral_dsse::verify_dsse_envelope`.
+    // P0-008 fix (audit 2026-05-08): the CLI does not have the
+    // passport public keys in scope. The signatures are NOT verified
+    // here. The honest label is `not-verified`; operators that need
+    // real verification must route the envelope through
+    // `chio_federation::bilateral_dsse::verify_dsse_envelope` with
+    // pinned passport keys.
     step(
         11,
         "ed25519_verify_org_a_pae",
-        "bounded",
-        "requires Org A passport public key; use bilateral_dsse::verify_dsse_envelope at runtime",
+        "not-verified",
+        "CLI does not carry Org A passport public key; signature is NOT cryptographically verified by this inspect output",
     );
     step(
         12,
         "ed25519_verify_org_b_pae",
-        "bounded",
-        "requires Org B passport public key; use bilateral_dsse::verify_dsse_envelope at runtime",
+        "not-verified",
+        "CLI does not carry Org B passport public key; signature is NOT cryptographically verified by this inspect output",
     );
 
     // Step 13: predicate body schema discriminator. The
@@ -2942,7 +2965,10 @@ fn explain_bilateral_seventeen_step_trace(
 
     Ok(serde_json::json!({
         "spec": "spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md §7",
-        "scope_note": "ok = locally verifiable, bounded = explicitly out of CLI verifier scope (see step note), fail = local check failed",
+        "trace_kind": "inspection",
+        "verification_performed": false,
+        "scope_note": "ok = locally verifiable structural check, not-verified = no cryptographic verification (use bilateral_dsse::verify_dsse_envelope), bounded = step deferred to kernel-resident verifier, fail = local structural check failed",
+        "honesty_note": "P0-008 fix (audit 2026-05-08): this is an INSPECTION trace, not a verifier trace. Ed25519 signatures are NOT verified here. Pin org A / org B passport keys and call bilateral_dsse::verify_dsse_envelope for real cryptographic verification.",
         "steps": steps,
     }))
 }
@@ -3015,8 +3041,14 @@ fn print_bilateral_human(report: &serde_json::Value, with_trace: bool) {
     println!();
 
     if with_trace {
-        if let Some(trace) = report.get("bilateral_verifier_trace") {
-            println!("--- §7 17-step verifier trace ---");
+        if let Some(trace) = report.get("bilateral_inspection_trace") {
+            println!("--- bilateral envelope inspection trace ---");
+            println!(
+                "  WARNING: this is an inspection trace, not a verifier trace."
+            );
+            println!(
+                "  Ed25519 signatures are NOT cryptographically verified here."
+            );
             println!(
                 "  spec: {}",
                 trace["spec"].as_str().unwrap_or("?")
