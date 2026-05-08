@@ -173,14 +173,18 @@ pub fn render_threat_coverage_doc(
          `crates/chio-adversarial-suite/cases/` corpus.\n\n",
     );
     body.push_str(
-        "Live gate state is tracked by `scripts/check-threat-coverage.sh`. \
-         At time of writing the gate reports 18 covered / 2 partial / 0 \
-         pending / 0 uncovered (PASS). The two partial rows \
-         (`tool_server_escape`, `pq_signature_downgrade`) are honest \
-         reporting per partial-coverage rationale: one sub-vector of each is \
-         closed by an in-tree conformance test today and the other \
-         sub-vector is deferred to follow-up coverage (see the `deferred_follow_up` \
-         field in each row's `audits/evidence/threats/<id>.json`).\n\n",
+        "Live gate state is tracked by two fail-closed scripts: \
+         `scripts/check-threat-coverage.sh` validates coverage-state, \
+         partial-row, and test-body shape, while \
+         `scripts/check-threat-coverage-mutants.sh` validates per-row \
+         mutation evidence. At time of writing the combined gate reports \
+         18 covered / 2 partial / 0 pending / 0 uncovered (PASS). The \
+         two partial rows (`tool_server_escape`, `pq_signature_downgrade`) \
+         are honest reporting per partial-coverage rationale: one \
+         sub-vector of each is closed by an in-tree conformance test and \
+         caught-mutant evidence today, while the other sub-vector is \
+         deferred to follow-up coverage (see the `deferred_follow_up` field \
+         in each row's `audits/evidence/threats/<id>.json`).\n\n",
     );
     body.push_str(
         "**Hardening note**: 9 of the originally-claimed 20 covered rows \
@@ -200,9 +204,11 @@ pub fn render_threat_coverage_doc(
            mutation-testing evidence file at \
            `audits/evidence/threats/<id>.json` recording at least \
            one caught mutant.\n\
-         - `Partial` - a backing test exists but defends only part of \
-           the attack surface; the residual gap is documented in the \
-           follow-up evidence record that owns the partial coverage.\n\
+         - `Partial` - a backing test exists and the defended sub-vector \
+           has a mutation evidence file with `caught >= 1`, but the row \
+           defends only part of the attack surface; the residual gap is \
+           documented in the follow-up evidence record that owns the \
+           partial coverage.\n\
          - `Pending` - no backing test yet; the threat-model-coverage \
            CI gate accepts the entry because it is explicitly marked \
            `pending` in the JSON, but a green test must land before \
