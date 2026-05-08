@@ -155,7 +155,7 @@ release_notes_path = "releases/v0.1.0-bounded-chiodome/RELEASE-NOTES.md"
 # semantics, and tamper-detection gates ship under the bbs-stub
 # feature, but the proof bytes are a SHA-256 commitment, not a real
 # BLS12-381 BBS+ signature. Real BBS+ is reserved for follow-up work
-# and the `zk` Cargo feature name has been deliberately freed up so
+# and the legacy Cargo feature name has been deliberately freed up so
 # the follow-up can claim it without inheriting the stub's honesty
 # footnote.
 c5_status = "PARTIAL"

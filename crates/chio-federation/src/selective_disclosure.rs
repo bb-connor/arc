@@ -14,7 +14,7 @@
 //! 3. Emits a `BbsAuditView` that exposes a disclosed-message subset
 //!    plus an opaque `proof_bytes` placeholder. The placeholder is a
 //!    SHA-256 commitment to the *withheld* messages plus the disclosed
-//!    indices; this is NOT a zero-knowledge proof - a verifier with
+//!    indices; this is NOT a privacy-preserving cryptographic proof - a verifier with
 //!    access to the full receipt body can reconstruct withheld
 //!    messages and re-hash.
 //! 4. `verify_audit_view` re-runs the projection against the pinned
@@ -95,7 +95,7 @@ pub struct BbsAuditView {
     /// the message vector).
     pub projection_version: String,
     /// `sha256(canonical_json(body))` of the receipt the projection
-    /// was applied to. Auditors pin this to verify the disclosure was
+    /// was applied to. Verifiers pin this to verify the disclosure was
     /// produced from a real receipt.
     pub subject_receipt_sha256_hex: String,
     /// Disclosed messages (subset of the 14-message vector).

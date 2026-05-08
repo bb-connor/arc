@@ -135,7 +135,7 @@ struct ReceiptExplainArgs<'a> {
     depth: usize,
     fanout_limit: usize,
     /// Renamed from `explain_bilateral` because the previous output
-    /// labelled itself a "17-step verifier trace" while the CLI does
+    /// labelled itself a "full-verifier trace" while the CLI does
     /// not carry the org A / org B passport public keys and could not
     /// perform real Ed25519 verification. The trace is now an
     /// `inspect` output (structural / schema checks only). The legacy
@@ -2633,7 +2633,7 @@ fn explain_dsse_envelope(dsse: &serde_json::Value) -> Result<serde_json::Value, 
 }
 
 /// Renamed from `explain_bilateral_seventeen_step_trace`. The previous
-/// name implied this was a §7 17-step verifier trace, but most steps
+/// name implied this was a §7 full-verifier trace, but most steps
 /// were marked `bounded` because the CLI does not have the org A / org
 /// B passport public keys in scope and cannot perform real Ed25519
 /// verification. The function now produces an INSPECTION trace

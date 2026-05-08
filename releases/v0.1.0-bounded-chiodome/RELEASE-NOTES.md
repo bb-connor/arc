@@ -34,7 +34,7 @@ The selective-disclosure surface lives in
 
 Honesty caveats:
 
-1. **No zero-knowledge property.** The proof bytes are a SHA-256
+1. **No privacy-preserving cryptographic property.** The proof bytes are a SHA-256
    commitment, not a BLS12-381 BBS+ signature. A verifier that holds
    the full receipt body can reconstruct withheld messages and
    re-hash. The Cargo feature is named **`bbs-stub`** (renamed from
@@ -68,13 +68,13 @@ length mismatch, and disclosed-encoding substitution.
 
 ## Cross-PR coordination
 
-The `zk` Cargo feature was renamed to `bbs-stub` on both
+The legacy Cargo feature was renamed to `bbs-stub` on both
 `chio-federation` and `chio-conformance`. Downstream consumers that
-previously enabled `--features chio-federation/zk` or
-`--features chio-conformance/zk` MUST switch to the `bbs-stub`
-feature name. No CI workflow files referenced the old `zk` feature
+previously enabled `--features legacy selective-disclosure feature` or
+`--features legacy selective-disclosure feature` MUST switch to the `bbs-stub`
+feature name. No CI workflow files referenced the old legacy feature
 at the time of the rename.
 
-The `zk` feature name is intentionally not aliased - reserving it
+The legacy feature name is intentionally not aliased - reserving it
 for the real BBS+ implementation prevents the next implementation
 from inheriting the stub's honesty footnote.
