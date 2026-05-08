@@ -75,9 +75,9 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
             "bilateral", // sentinel receipt_id; the bilateral path is keyed off --input-file shape
             "--input-file",
             fixture.to_str().unwrap(),
-            // P0-008 fix (audit 2026-05-08): the flag is now
-            // `--inspect-bilateral`. The legacy spelling is retained
-            // as a clap alias on the parent enum (see types.rs).
+            // The flag is `--inspect-bilateral`. The legacy spelling
+            // (`--explain-bilateral`) is retained as a clap alias on the
+            // parent enum (see types.rs).
             "--inspect-bilateral",
         ])
         .output()
@@ -135,7 +135,9 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
         );
     }
 
-    // (3) Bilateral inspection trace (P0-008: not a verifier trace).
+    // (3) Bilateral inspection trace: must self-identify as inspection
+    // (not a verifier trace) so users do not mistake it for cryptographic
+    // verification.
     let trace = &parsed["bilateral_inspection_trace"];
     assert!(
         trace.is_object(),
@@ -144,12 +146,12 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
     assert_eq!(
         trace["trace_kind"].as_str(),
         Some("inspection"),
-        "trace MUST self-identify as `inspection`, not a verifier trace (P0-008)"
+        "trace MUST self-identify as `inspection`, not a verifier trace"
     );
     assert_eq!(
         trace["verification_performed"].as_bool(),
         Some(false),
-        "trace MUST declare verification_performed = false (P0-008)"
+        "trace MUST declare verification_performed = false"
     );
     let steps = trace["steps"]
         .as_array()
@@ -160,9 +162,10 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
         "trace iterates the §7 step structure even though only a subset is locally verifiable"
     );
 
-    // P0-008: signature verification steps are now labelled
-    // `not-verified` (was `bounded`); other deferred steps remain
-    // `bounded`. No step should `fail` on a healthy hot-path artifact.
+    // Signature verification steps are labelled `not-verified` (the CLI
+    // does not perform Ed25519 verification); other deferred steps
+    // remain `bounded`. No step should `fail` on a healthy hot-path
+    // artifact.
     for step in steps {
         let status = step["status"].as_str().unwrap_or("");
         assert!(
@@ -202,10 +205,9 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
         );
     }
 
-    // P0-008 fix: cryptographic verification steps are now
-    // `not-verified` (honest about the absence of signature
-    // verification in the CLI). Other deferred steps remain
-    // `bounded` (out-of-scope, not just unverified).
+    // Cryptographic verification steps are `not-verified` (honest about
+    // the absence of signature verification in the CLI). Other deferred
+    // steps remain `bounded` (out-of-scope, not just unverified).
     let must_be_not_verified = [
         "ed25519_verify_org_a_pae",
         "ed25519_verify_org_b_pae",
@@ -218,7 +220,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
         assert_eq!(
             entry["status"].as_str(),
             Some("not-verified"),
-            "step `{name}` must be `not-verified` (P0-008: CLI does not verify signatures)"
+            "step `{name}` must be `not-verified` (the CLI does not verify signatures)"
         );
     }
     let must_be_bounded = [
@@ -277,9 +279,9 @@ fn receipt_explain_bilateral_without_flag_omits_trace() {
     );
 }
 
-/// P0-008 backwards-compat: the legacy `--explain-bilateral` spelling
-/// is retained as a clap alias so existing operator scripts continue
-/// to work. The output schema is identical to the new flag.
+/// Backwards-compat: the legacy `--explain-bilateral` spelling is
+/// retained as a clap alias so existing operator scripts continue to
+/// work. The output schema is identical to the new flag.
 #[test]
 fn legacy_explain_bilateral_flag_still_accepted_via_alias() {
     let bin = env!("CARGO_BIN_EXE_chio");
@@ -345,16 +347,15 @@ fn receipt_explain_bilateral_human_renderer_marks_section6_boundary() {
         stdout.contains("DSSE envelope"),
         "human renderer must label the §6 section: {stdout}"
     );
-    // P0-008: the human renderer now labels the trace as
-    // "inspection trace" with an explicit warning that signatures
-    // are NOT verified. The previous "17-step verifier trace"
-    // wording is gone.
+    // The human renderer labels the trace as "inspection trace" with an
+    // explicit warning that signatures are NOT verified. Any "verifier
+    // trace" wording would mis-state what the CLI actually does.
     assert!(
         stdout.contains("inspection trace"),
-        "human renderer must label the trace section as `inspection trace` (P0-008): {stdout}"
+        "human renderer must label the trace section as `inspection trace`: {stdout}"
     );
     assert!(
         stdout.contains("NOT cryptographically verified"),
-        "human renderer must warn that signatures are not verified (P0-008): {stdout}"
+        "human renderer must warn that signatures are not verified: {stdout}"
     );
 }

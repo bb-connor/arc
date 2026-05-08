@@ -2667,14 +2667,13 @@ enum ReceiptCommands {
     /// section.
     ///
     /// Pass `--inspect-bilateral` to additionally emit a structural
-    /// **inspection trace** of the envelope. P0-008 honesty fix
-    /// (audit 2026-05-08): the previous flag (`--explain-bilateral`)
-    /// labelled the output a "17-step verifier trace" and a number
-    /// of steps were marked `bounded` because the CLI does not carry
-    /// the org A / org B passport public keys; Ed25519 signature
-    /// verification was NOT performed. The new flag emits an
-    /// inspection trace (structural / schema checks only) and is
-    /// honest about the absence of cryptographic verification. The
+    /// **inspection trace** of the envelope. The previous flag spelling
+    /// (`--explain-bilateral`) labelled the output a "17-step verifier
+    /// trace" and a number of steps were marked `bounded` because the
+    /// CLI does not carry the org A / org B passport public keys;
+    /// Ed25519 signature verification was NOT performed. The new flag
+    /// emits an inspection trace (structural / schema checks only) and
+    /// is honest about the absence of cryptographic verification. The
     /// legacy spelling `--explain-bilateral` is retained as a
     /// deprecated alias.
     Explain {

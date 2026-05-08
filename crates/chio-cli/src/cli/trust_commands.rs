@@ -134,13 +134,13 @@ struct ReceiptExplainArgs<'a> {
     input_file: Option<&'a Path>,
     depth: usize,
     fanout_limit: usize,
-    /// P0-008 fix (audit 2026-05-08): renamed from `explain_bilateral`
-    /// because the previous output labelled itself a "17-step verifier
-    /// trace" while the CLI does not carry the org A / org B passport
-    /// public keys and could not perform real Ed25519 verification.
-    /// The trace is now an `inspect` output (structural / schema
-    /// checks only). The legacy CLI flag spelling is preserved as
-    /// `clap` alias on the parent enum.
+    /// Renamed from `explain_bilateral` because the previous output
+    /// labelled itself a "17-step verifier trace" while the CLI does
+    /// not carry the org A / org B passport public keys and could not
+    /// perform real Ed25519 verification. The trace is now an
+    /// `inspect` output (structural / schema checks only). The legacy
+    /// CLI flag spelling is preserved as a `clap` alias on the parent
+    /// enum.
     inspect_bilateral: bool,
 }
 
@@ -2516,10 +2516,9 @@ fn render_bilateral_explain(
 
     let dual_section = explain_dual_signed_receipt(dual)?;
     let dsse_section = explain_dsse_envelope(dsse)?;
-    // P0-008 fix (audit 2026-05-08): emit a structural inspection
-    // trace, not a "verifier trace". The CLI does not have org A /
-    // org B passport public keys in scope and cannot perform real
-    // Ed25519 verification.
+    // Emit a structural inspection trace, not a "verifier trace".
+    // The CLI does not have org A / org B passport public keys in
+    // scope and cannot perform real Ed25519 verification.
     let trace_section = if args.inspect_bilateral {
         Some(inspect_bilateral_envelope_trace(dual, dsse)?)
     } else {
@@ -2633,11 +2632,10 @@ fn explain_dsse_envelope(dsse: &serde_json::Value) -> Result<serde_json::Value, 
     }))
 }
 
-/// P0-008 fix (audit 2026-05-08): renamed from
-/// `explain_bilateral_seventeen_step_trace`. The previous name implied
-/// this was a §7 17-step verifier trace, but most steps were marked
-/// `bounded` because the CLI does not have the org A / org B
-/// passport public keys in scope and cannot perform real Ed25519
+/// Renamed from `explain_bilateral_seventeen_step_trace`. The previous
+/// name implied this was a §7 17-step verifier trace, but most steps
+/// were marked `bounded` because the CLI does not have the org A / org
+/// B passport public keys in scope and cannot perform real Ed25519
 /// verification. The function now produces an INSPECTION trace
 /// (structural / schema / fingerprint-presence checks only) and the
 /// emitted JSON labels itself accordingly. Real verification belongs
@@ -2891,10 +2889,10 @@ fn inspect_bilateral_envelope_trace(
 
     // Step 11: cryptographic verification of org A signature.
     // Step 12: cryptographic verification of org B signature.
-    // P0-008 fix (audit 2026-05-08): the CLI does not have the
-    // passport public keys in scope. The signatures are NOT verified
-    // here. The honest label is `not-verified`; operators that need
-    // real verification must route the envelope through
+    // The CLI does not have the passport public keys in scope. The
+    // signatures are NOT verified here. The honest label is
+    // `not-verified`; operators that need real verification must route
+    // the envelope through
     // `chio_federation::bilateral_dsse::verify_dsse_envelope` with
     // pinned passport keys.
     step(
@@ -2968,7 +2966,7 @@ fn inspect_bilateral_envelope_trace(
         "trace_kind": "inspection",
         "verification_performed": false,
         "scope_note": "ok = locally verifiable structural check, not-verified = no cryptographic verification (use bilateral_dsse::verify_dsse_envelope), bounded = step deferred to kernel-resident verifier, fail = local structural check failed",
-        "honesty_note": "P0-008 fix (audit 2026-05-08): this is an INSPECTION trace, not a verifier trace. Ed25519 signatures are NOT verified here. Pin org A / org B passport keys and call bilateral_dsse::verify_dsse_envelope for real cryptographic verification.",
+        "honesty_note": "This is an INSPECTION trace, not a verifier trace. Ed25519 signatures are NOT verified here; this trace is informational only. For cryptographic verification, pin org A / org B passport keys and call bilateral_dsse::verify_dsse_envelope (or run `chio receipt verify --bilateral`).",
         "steps": steps,
     }))
 }
