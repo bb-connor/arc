@@ -221,4 +221,33 @@ CI=true assert_fails "CI=true forbids --dry-run" run_mutants_gate --dry-run
 grep -q "dry-run is not allowed in CI" "$ERR" \
     || { echo "FAIL: missing CI dry-run diagnostic"; cat "$ERR"; exit 1; }
 
+# Case 10 (R2-P1-009 follow-up): the per-row mutants gate only fires
+# on `covered` rows; `partial` rows are owned by the file-existence
+# gate (`check-threat-coverage.sh`) and must pass the mutants gate
+# trivially even when no audits/evidence/threats/<id>.json file is
+# written. This pins the behaviour so a future tightening of the
+# gate to also enforce mutants evidence for partial rows is a
+# deliberate, opt-in change instead of an accidental drift.
+reset_fixture
+python3 - "$MODEL" <<'PY'
+import json, sys
+with open(sys.argv[1], "w") as fh:
+    json.dump({"threats": [{
+        "id": "partial_with_deferred",
+        "name": "Partial With Deferred",
+        "surfaces": ["native_chio"],
+        "coverage_state": "partial",
+        "deferred_to": "trajectory-6.closure",
+        "coveredBy": ["crates/chio-conformance/tests/threats/partial_with_deferred.rs"],
+    }]}, fh)
+    fh.write("\n")
+PY
+# Intentionally no evidence file: partial rows are NOT gated by the
+# mutants gate today. Should still pass.
+assert_passes "partial-with-deferred row passes the per-row mutants gate" run_mutants_gate
+grep -q "passed: 0" "$OUT" \
+    || { echo "FAIL: partial row should not be counted as passed"; cat "$OUT"; exit 1; }
+grep -q "weak (real failures): 0" "$OUT" \
+    || { echo "FAIL: partial row should not produce a weak hint"; cat "$OUT"; cat "$ERR"; exit 1; }
+
 echo "PASS: check-threat-coverage-mutants evidence matrix"
