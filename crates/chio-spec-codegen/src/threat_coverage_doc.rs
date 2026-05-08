@@ -164,18 +164,25 @@ pub fn render_threat_coverage_doc(
     );
     body.push_str(
         "Live gate state is tracked by `scripts/check-threat-coverage.sh`. \
-         At time of writing the gate reports 20 covered / 0 pending / 0 \
-         uncovered (PASS).\n\n",
+         At time of writing the gate reports 18 covered / 2 partial / 0 \
+         pending / 0 uncovered (PASS). The two partial rows \
+         (`tool_server_escape`, `pq_signature_downgrade`) are honest \
+         reporting per the trj5 audit P0-023: one sub-vector of each is \
+         closed by an in-tree conformance test today and the other \
+         sub-vector is deferred to trj6 (see the `deferred_to_trj6` \
+         field in each row's `audits/evidence/threats/<id>.json`).\n\n",
     );
     body.push_str(
-        "**Wave 4 hardening note**: 9 of the 20 covered rows currently \
-         pass the gate on file-exists + no-`unimplemented!()` alone, with \
-         weak or meta-only assertions in the backing test. Wave 4 of the \
-         trj4 closeout plan (see `/Users/connor/.claude/plans/typed-coalescing-hejlsberg.md` \
-         and `.planning/trajectory-4/TRAJECTORY-4-CLOSEOUT-ERRATUM.md`) \
+        "**Wave 4 hardening note**: 9 of the originally-claimed 20 \
+         covered rows passed the gate on file-exists + no-`unimplemented!()` \
+         alone, with weak or meta-only assertions in the backing test. \
+         Wave 4 of the trj4 closeout plan (see \
+         `/Users/connor/.claude/plans/typed-coalescing-hejlsberg.md` and \
+         `.planning/trajectory-4/TRAJECTORY-4-CLOSEOUT-ERRATUM.md`) \
          hardens these rows by adding per-row cargo-mutants requirements \
-         and real negative-conformance bodies; the gate stays at 20 \
-         covered through that work.\n\n",
+         and real negative-conformance bodies; under trj5 audit P0-023 \
+         two of those rows were further demoted to `Partial` because \
+         the test only exercises one sub-vector of the named threat.\n\n",
     );
     body.push_str(
         "Coverage states:\n\

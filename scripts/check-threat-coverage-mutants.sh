@@ -273,11 +273,13 @@ echo "  passed: ${#passed[@]}"
 echo "  weak (real failures): ${#weak_hints[@]}"
 echo "  bootstrap placeholders: ${#bootstrap_hints[@]}"
 
-# Always print every hint so authors see the full picture.
-for h in "${bootstrap_hints[@]}"; do
+# Always print every hint so authors see the full picture. Use the
+# `${arr[@]+"${arr[@]}"}` indirection so an empty array does not trip
+# `set -u` (which fires on `${empty[@]}` in older bash builds).
+for h in ${bootstrap_hints[@]+"${bootstrap_hints[@]}"}; do
     echo "$h"
 done
-for h in "${weak_hints[@]}"; do
+for h in ${weak_hints[@]+"${weak_hints[@]}"}; do
     echo "$h" >&2
 done
 
