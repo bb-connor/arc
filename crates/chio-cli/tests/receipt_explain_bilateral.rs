@@ -13,9 +13,9 @@ const ORG_B_KERNEL_ID: &str = "kernel.c4-org-b";
 
 fn sample_receipt(tool_host_kp: &Keypair) -> ChioReceipt {
     let body = ChioReceiptBody {
-        id: "rcpt-trj5-c4-fixture".to_string(),
+        id: "rcpt-release work-c4-fixture".to_string(),
         timestamp: 1_736_000_000,
-        capability_id: "cap-trj5-c4".to_string(),
+        capability_id: "cap-release work-c4".to_string(),
         tool_server: "srv-c4-files".to_string(),
         tool_name: "file_read".to_string(),
         action: ToolCallAction::from_parameters(serde_json::json!({"path": "/data/c4.txt"}))

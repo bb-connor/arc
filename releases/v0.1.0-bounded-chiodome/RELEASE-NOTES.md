@@ -1,4 +1,4 @@
-# Chio v0.1.0-bounded-chiodome — Release Notes
+# Chio v0.1.0-bounded-chiodome  -  Release Notes
 
 These notes record the closeout for the bounded-chiodome release.
 Each gate (C1..C8) is marked with one of:
@@ -16,7 +16,7 @@ Each gate (C1..C8) is marked with one of:
 | ---- | ----- | ------ | ----- |
 | C5   | Selective-disclosure auditor view | **PARTIAL** | See "C5 PARTIAL" below. |
 
-## C5 PARTIAL — selective-disclosure auditor view
+## C5 PARTIAL  -  selective-disclosure auditor view
 
 The selective-disclosure surface lives in
 `crates/chio-federation/src/selective_disclosure.rs` behind the
