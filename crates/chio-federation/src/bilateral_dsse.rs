@@ -313,14 +313,26 @@ pub fn build_predicate(
 }
 
 /// Build the in-toto Statement carrying the bilateral predicate.
+///
+/// P0-004 fix (audit 2026-05-08): the subject digest binds the
+/// receipt BODY (`ChioReceiptBody`), not the full signed wrapper.
+/// An earlier revision hashed the full `ChioReceipt` (including the
+/// envelope's `signature` field), which made the verifier's "resolve
+/// the receipt from a store and re-derive the subject" path produce a
+/// different digest than the producer signed -- cross-impl resolution
+/// silently broke. Hashing the body fixes the binding so verifiers
+/// can re-derive the subject from any source that exposes the body
+/// (the receipt store's signed wrapper, an audit log, or a peer's
+/// re-emission).
 pub fn build_statement(
     receipt: &ChioReceipt,
     predicate: BilateralPredicate,
 ) -> Result<DsseStatement, BilateralCoSigningError> {
-    let receipt_canonical = canonical_json_bytes(receipt)
+    let body = receipt.body();
+    let body_canonical = canonical_json_bytes(&body)
         .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
     let mut hasher = Sha256::new();
-    hasher.update(&receipt_canonical);
+    hasher.update(&body_canonical);
     let digest_hex = hex::encode(hasher.finalize());
     Ok(DsseStatement {
         statement_type: STATEMENT_TYPE_V1.to_string(),
@@ -466,16 +478,20 @@ pub fn verify_dsse_envelope(
         )));
     }
 
-    // Codex P2 follow-up on PR #617: require exactly one subject so
-    // downstream callers that index `subject[0]` for receipt-binding
-    // (spec §7 step 7) cannot panic on an empty vector or silently
-    // accept a malformed envelope where the first subject does not
-    // bind the named receipt. The corresponding fix on PR #610
-    // (b4-dsse-bilateral-signing) covers this for the full stack;
-    // adding it here keeps this branch self-contained.
+    // P0-005 fix (audit 2026-05-08): the bilateral envelope profile
+    // binds exactly ONE subject (the receipt body). The pre-fix
+    // verifier only rejected the empty-list case, so a multi-subject
+    // envelope was accepted and only `subject[0]` was bound. A
+    // signer could insert an arbitrary second subject digest and
+    // verifiers that walked the full subject list (which is the
+    // spec-conformant behavior for in-toto subject membership) would
+    // resolve a different receipt than the producer signed.
+    // (Originally landed on this branch as a Codex P2 follow-up;
+    // re-aligned to the #610 wording to keep diagnostics consistent
+    // across the bilateral DSSE stack.)
     if statement.subject.len() != 1 {
         return Err(BilateralCoSigningError::CanonicalJson(format!(
-            "statement.malformed: expected exactly 1 subject, got {}",
+            "statement.malformed: bilateral envelope must carry exactly 1 subject, got {}",
             statement.subject.len()
         )));
     }
