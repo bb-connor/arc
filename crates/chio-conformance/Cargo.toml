@@ -111,7 +111,7 @@ base64ct = { workspace = true, features = ["alloc"] }
 # in base64 to forge a §6 envelope; chio-federation's DSSE envelope wire
 # format is RFC 4648 standard base64 (workspace-pinned `base64` crate).
 base64 = { workspace = true }
-# c5_selective_disclosure_zk.rs hex-decodes the disclosed message bytes
+# c5_selective_disclosure_stub.rs hex-decodes the disclosed message bytes
 # to assert the auditor sees the cleartext field values.
 hex = { workspace = true }
 coset = { workspace = true }
