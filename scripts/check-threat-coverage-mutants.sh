@@ -37,7 +37,7 @@
 #      is emitted with reason `bootstrap_placeholder`. The script
 #      does NOT exit 1 on bootstrap placeholders (this is the
 #      temporary scaffolding accommodation that lets the PR land
-#      while wave 4 backfills real evidence).
+#      while evidence backfill runs).
 #
 #   3. If the evidence file is missing, emit a downgrade hint with
 #      reason `missing_evidence` and exit 1 (unless `--dry-run`).
@@ -99,7 +99,7 @@ set -euo pipefail
 
 # Hard expiry for the bootstrap-placeholder accommodation. After this date,
 # `needs_real_run: true` evidence files are treated as a HARD FAIL (reason
-# `bootstrap_expired`) rather than an informational hint, so a slipped Wave 4
+# `bootstrap_expired`) rather than an informational hint, so a slipped evidence backfill
 # cannot leave 20 covered threats green forever.
 #
 # Local development can override this via the CHIO_BOOTSTRAP_EXPIRY env var
