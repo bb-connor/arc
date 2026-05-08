@@ -2762,7 +2762,7 @@ fn explain_bilateral_seventeen_step_trace(
             6,
             "subject_arity_one",
             "fail",
-            "trj5 envelopes carry exactly one subject",
+            "envelopes carry exactly one subject",
         );
     }
 
@@ -2785,7 +2785,7 @@ fn explain_bilateral_seventeen_step_trace(
             7,
             "subject_digest_present",
             "bounded",
-            "trj5 receipt-explain renders the claimed digest; full re-canonicalisation against the underlying ChioReceipt is deferred to the in-process verifier",
+            "receipt-explain renders the claimed digest; full re-canonicalisation against the underlying ChioReceipt is deferred to the in-process verifier",
         );
     } else {
         step(
@@ -2809,7 +2809,7 @@ fn explain_bilateral_seventeen_step_trace(
             8,
             "signature_count_two",
             "fail",
-            "trj5 envelopes MUST carry exactly two signatures",
+            "envelopes MUST carry exactly two signatures",
         );
     }
 
@@ -2916,33 +2916,33 @@ fn explain_bilateral_seventeen_step_trace(
         14,
         "capability_lease_resolution",
         "bounded",
-        "deferred per .planning/trajectory-5/lane-b-wiring/dsse-bilateral-signing.md (Out of scope for B4)",
+        "deferred (out of scope here; CLI verifier does not resolve this step)",
     );
 
     step(
         15,
         "governance_receipt_resolution",
         "bounded",
-        "deferred per .planning/trajectory-5/lane-b-wiring/dsse-bilateral-signing.md (Out of scope for B4)",
+        "deferred (out of scope here; CLI verifier does not resolve this step)",
     );
 
     step(
         16,
         "consistency_anchor_reconciliation",
         "bounded",
-        "deferred per .planning/trajectory-5/lane-b-wiring/dsse-bilateral-signing.md (Out of scope for B4)",
+        "deferred (out of scope here; CLI verifier does not resolve this step)",
     );
 
     step(
         17,
         "peer_pin_revocation_freshness",
         "bounded",
-        "trj5 CLI does not carry a revocation oracle handle; route to the kernel-resident verifier for steps 7-9",
+        "this CLI does not carry a revocation oracle handle; route to the kernel-resident verifier for steps 7-9",
     );
 
     Ok(serde_json::json!({
         "spec": "spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md §7",
-        "trj5_scope_note": "ok = locally verifiable, bounded = explicitly out of trj5/B4 scope (see step note), fail = local check failed",
+        "scope_note": "ok = locally verifiable, bounded = explicitly out of CLI verifier scope (see step note), fail = local check failed",
         "steps": steps,
     }))
 }
@@ -3023,7 +3023,7 @@ fn print_bilateral_human(report: &serde_json::Value, with_trace: bool) {
             );
             println!(
                 "  scope: {}",
-                trace["trj5_scope_note"].as_str().unwrap_or("?")
+                trace["scope_note"].as_str().unwrap_or("?")
             );
             if let Some(steps) = trace["steps"].as_array() {
                 for entry in steps {

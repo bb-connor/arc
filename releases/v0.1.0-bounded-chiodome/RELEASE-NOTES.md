@@ -1,14 +1,14 @@
 # Chio v0.1.0-bounded-chiodome — Release Notes
 
-These notes record the trajectory-5 closeout for the bounded-chiodome
-release. Each gate (C1..C8) is marked with one of:
+These notes record the closeout for the bounded-chiodome release.
+Each gate (C1..C8) is marked with one of:
 
 - **MET**: the gate's normative behaviour is implemented and covered
   by a passing conformance fixture.
 - **PARTIAL**: the gate's *workflow* is implemented and covered, but
   one or more honesty caveats apply (see the gate row).
 - **DEFERRED**: the gate is not implemented in this release; the
-  scope is recorded against the next trajectory.
+  scope is recorded against follow-up work.
 
 ## Gate matrix
 
@@ -18,7 +18,7 @@ release. Each gate (C1..C8) is marked with one of:
 
 ## C5 PARTIAL — selective-disclosure auditor view
 
-The trajectory-5 selective-disclosure surface lives in
+The selective-disclosure surface lives in
 `crates/chio-federation/src/selective_disclosure.rs` behind the
 `bbs-stub` Cargo feature (formerly `zk`). The implementation:
 
@@ -32,27 +32,26 @@ The trajectory-5 selective-disclosure surface lives in
   disclosed bytes, substituted encodings, and malformed `Hx`
   fields.
 
-Honesty caveats (per .planning/trajectory-5/reviews/COMPREHENSIVE-CODE-SECURITY-AUDIT-2026-05-08.md, P0-009 / P0-010 / P0-011 / P1-007):
+Honesty caveats:
 
 1. **No zero-knowledge property.** The proof bytes are a SHA-256
    commitment, not a BLS12-381 BBS+ signature. A verifier that holds
    the full receipt body can reconstruct withheld messages and
    re-hash. The Cargo feature is named **`bbs-stub`** (renamed from
    `zk` to avoid lying about ZK semantics). The `zk` (or `bbs-real`)
-   feature name is reserved for real BBS+/BLS12-381 in trj6.
-2. **Strict `Hx` decoding.** P0-010 closed the silent-rehash fallback
-   on malformed `content_hash` / `policy_hash`. Malformed input
+   feature name is reserved for real BBS+/BLS12-381 in follow-up work.
+2. **Strict `Hx` decoding.** The silent-rehash fallback on malformed
+   `content_hash` / `policy_hash` is closed. Malformed input
    (non-hex, wrong length, empty) now fails closed with
    `SelectiveDisclosureError::MalformedHexField { field, reason }`.
-3. **Encoding bound into the proof.** P0-011 added the
-   per-disclosed-index `encoding` string to the SHA-256 commitment
-   and a typed
-   `SelectiveDisclosureError::DisclosedEncodingMismatch` gate so
-   producers cannot relabel `S` (utf-8) bytes as `Hx` (or vice
-   versa) at the verifier.
+3. **Encoding bound into the proof.** The per-disclosed-index
+   `encoding` string is bound into the SHA-256 commitment and a typed
+   `SelectiveDisclosureError::DisclosedEncodingMismatch` gate fails
+   closed so producers cannot relabel `S` (utf-8) bytes as `Hx` (or
+   vice versa) at the verifier.
 4. **Predicate language v1 not yet wired.** `eq` / `cmp` / `member`
    predicates per spec §5.6 require BBS+ commitments and
-   Bulletproofs RangeStatements; those land in trj6 alongside the
+   Bulletproofs RangeStatements; those land in follow-up alongside
    real BBS+.
 
 Conformance fixture:
@@ -77,5 +76,5 @@ feature name. No CI workflow files referenced the old `zk` feature
 at the time of the rename.
 
 The `zk` feature name is intentionally not aliased - reserving it
-for the real BBS+ implementation in trj6 prevents the next
-implementation from inheriting the stub's honesty footnote.
+for the real BBS+ implementation prevents the next implementation
+from inheriting the stub's honesty footnote.

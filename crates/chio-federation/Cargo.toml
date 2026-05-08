@@ -13,17 +13,15 @@ name = "chio_federation"
 
 [features]
 pq = ["chio-core-types/pq"]
-# TRJ5-C5: selective-disclosure auditor view per
+# Selective-disclosure auditor view per
 # spec/CHIODOS_SELECTIVE_DISCLOSURE.md §6 BBS+ projection. Default-off
-# so the baseline chio build stays BBS+/BLS12-381-free per Risk Register
-# R6. Honesty note (per trj5 audit P0-009): this feature gate is named
-# `bbs-stub` (NOT `zk`) because the trj5 implementation under it is a
-# SHA-256-commitment stub of the §5/§6 projection - it captures the
-# deterministic projection and disclose/withhold semantics but provides
-# no zero-knowledge property. Real BLS12-381 BBS+ signing is deferred
-# to trj6, at which point a separate `zk` (or `bbs-real`) feature can
-# be introduced. See selective_disclosure.rs module docs and
-# .planning/trajectory-5/lane-c-demo/selective-disclosure.md.
+# so the baseline chio build stays BBS+/BLS12-381-free. The feature
+# gate is named `bbs-stub` (NOT `zk`) because the implementation under
+# it is a SHA-256-commitment stub of the §5/§6 projection - it captures
+# the deterministic projection and disclose/withhold semantics but
+# provides no zero-knowledge property. Real BLS12-381 BBS+ signing is
+# deferred; a separate `zk` (or `bbs-real`) feature can be introduced
+# then. See selective_disclosure.rs module docs.
 bbs-stub = []
 
 [dependencies]
@@ -35,7 +33,7 @@ chio-revocation-oracle = { path = "../chio-revocation-oracle" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-# TRJ5-B4.2: DSSE-conformant bilateral envelope. The §6 envelope of
+# DSSE-conformant bilateral envelope. The §6 envelope of
 # spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md serialises the canonical-JSON
 # in-toto Statement as Base64 in the wire payload; the keyid binding in §6
 # requires SHA-256 of the passport public key (hex-encoded, via the `hex`

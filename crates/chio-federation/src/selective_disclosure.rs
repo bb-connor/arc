@@ -130,17 +130,16 @@ pub enum SelectiveDisclosureError {
     ProofBindingFailed,
     #[error("audit view disclosed message at index {0} does not match the pinned projection")]
     DisclosedMessageMismatch(u8),
-    /// P0-010: an `Hx` field on the receipt body did not decode to the
-    /// 32-byte SHA-256 the §5.2 projection requires. The previous
-    /// implementation silently re-hashed the malformed string, which
-    /// labelled it `Hx` while feeding non-`Hx` bytes downstream. Fail
-    /// closed instead.
+    /// An `Hx` field on the receipt body did not decode to the 32-byte
+    /// SHA-256 the §5.2 projection requires. An earlier implementation
+    /// silently re-hashed the malformed string, which labelled it `Hx`
+    /// while feeding non-`Hx` bytes downstream. Fail closed instead.
     #[error("malformed Hx field {field}: {reason}")]
     MalformedHexField { field: String, reason: String },
-    /// P0-011: a disclosed message's `encoding` did not match the
-    /// pinned projection's encoding for that index. Without this gate
-    /// the verifier accepted views that re-tagged the same bytes
-    /// (e.g. `utf-8` -> `hex`) and misled downstream decoders.
+    /// A disclosed message's `encoding` did not match the pinned
+    /// projection's encoding for that index. Without this gate, the
+    /// verifier accepts views that re-tag the same bytes (e.g. `utf-8`
+    /// -> `hex`) and misleads downstream decoders.
     #[error("audit view disclosed message at index {0} carries an encoding that does not match the pinned projection")]
     DisclosedEncodingMismatch(u8),
 }
@@ -153,7 +152,7 @@ pub enum SelectiveDisclosureError {
 /// that decodes to exactly 32 bytes (a SHA-256 digest). Malformed input
 /// (non-hex, wrong length, empty) returns `MalformedHexField` so the
 /// projection fails closed rather than silently re-hashing the raw
-/// string under an `Hx` encoding label (P0-010).
+/// string under an `Hx` encoding label.
 fn decode_hx_field(field: &str, raw: &str) -> Result<Vec<u8>, SelectiveDisclosureError> {
     if raw.is_empty() {
         return Err(SelectiveDisclosureError::MalformedHexField {
@@ -230,10 +229,9 @@ fn project_receipt_body(
     });
 
     // 2 content_hash (Hx - already a 32-byte hex string; we MUST decode
-    // per spec §5.2 "hex-decoded 32-byte SHA-256". P0-010: reject
-    // malformed input rather than silently re-hashing the raw string,
-    // because the previous fallback fed non-Hx bytes through under an
-    // `Hx` label.)
+    // per spec §5.2 "hex-decoded 32-byte SHA-256". Reject malformed
+    // input rather than silently re-hashing the raw string; the
+    // previous fallback fed non-Hx bytes through under an `Hx` label.)
     let content_hash_bytes = decode_hx_field("content_hash", &body.content_hash)?;
     out.push(BbsMessage {
         index: 2,
@@ -302,8 +300,7 @@ fn project_receipt_body(
         wholesale_only: true,
     });
 
-    // 8 policy_hash (Hx; same strict-decode rule as content_hash per
-    // P0-010).
+    // 8 policy_hash (Hx; same strict-decode rule as content_hash).
     let policy_hash_bytes = decode_hx_field("policy_hash", &body.policy_hash)?;
     out.push(BbsMessage {
         index: 8,
@@ -390,11 +387,11 @@ fn subject_receipt_sha256(body: &ChioReceiptBody) -> Result<[u8; 32], SelectiveD
 /// receipt and the disclosure set recomputes the same hash and checks
 /// equality.
 ///
-/// P0-011: the commitment now also binds the per-disclosed-index
-/// `encoding` string (`S`/`Hx`/`H`/`U64`/`Opt<S>`). A producer that
-/// kept the same disclosed `bytes_hex` but re-tagged the encoding
-/// (e.g. `utf-8` -> `hex`) used to slip past the verifier and could
-/// mislead downstream decoders; binding the encoding shuts that gap.
+/// The commitment also binds the per-disclosed-index `encoding`
+/// string (`S`/`Hx`/`H`/`U64`/`Opt<S>`). A producer that keeps the
+/// same disclosed `bytes_hex` but re-tags the encoding (e.g. `utf-8`
+/// -> `hex`) would otherwise slip past the verifier and mislead
+/// downstream decoders; binding the encoding shuts that gap.
 fn proof_commitment(
     disclosure: &DisclosureSet,
     projection: &[BbsMessage],
@@ -521,8 +518,8 @@ pub fn verify_audit_view(
     // allows" check - a producer who tried to alter the disclosed
     // value without altering the receipt would be caught here.
     //
-    // P0-011: encoding is also checked explicitly. The proof commitment
-    // binds the encoding too (see `proof_commitment`), so a substituted
+    // Encoding is also checked explicitly. The proof commitment binds
+    // the encoding too (see `proof_commitment`), so a substituted
     // encoding will also flunk the binding check, but the typed
     // `DisclosedEncodingMismatch` makes the failure mode explicit for
     // auditors and conformance fixtures.
@@ -682,7 +679,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // P0-010: malformed Hx fields must fail closed
+    // Malformed Hx fields must fail closed
     // -----------------------------------------------------------------
 
     fn body_with_content_hash(kp: &Keypair, content_hash: &str) -> ChioReceiptBody {
@@ -779,7 +776,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // P0-011: encoding tampering must be rejected
+    // Encoding tampering must be rejected
     // -----------------------------------------------------------------
 
     #[test]

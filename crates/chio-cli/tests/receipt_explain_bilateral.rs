@@ -120,7 +120,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
     let sigs = dsse["signatures"]
         .as_array()
         .expect("dsse_envelope.signatures must be array");
-    assert_eq!(sigs.len(), 2, "trj5 envelopes carry exactly two signatures");
+    assert_eq!(sigs.len(), 2, "envelopes carry exactly two signatures");
     for sig in sigs {
         assert!(
             sig["keyid"].as_str().is_some(),
@@ -203,7 +203,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
         assert_eq!(
             entry["status"].as_str(),
             Some("bounded"),
-            "step `{name}` must be marked bounded (out of trj5 scope)"
+            "step `{name}` must be marked bounded (out of CLI verifier scope)"
         );
     }
 }

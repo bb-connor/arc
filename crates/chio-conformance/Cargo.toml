@@ -51,11 +51,10 @@ path = "src/bin/chio_native_conformance_fixture.rs"
 # directories through `ConformanceRunOptions`.
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
-# TRJ5-C5: opt-in selective-disclosure conformance test. Forwards to
+# Opt-in selective-disclosure conformance test. Forwards to
 # chio-federation's `bbs-stub` feature so the projection module compiles.
-# Honesty note (per trj5 audit P0-009): the feature is `bbs-stub`, not
-# `zk`, because the trj5 implementation is a SHA-256-commitment stub
-# without any zero-knowledge property. Per Risk Register R6, this is a
+# The feature is `bbs-stub`, not `zk`, because the implementation is a
+# SHA-256-commitment stub without any zero-knowledge property; this is a
 # separate CI matrix entry, not the default build path.
 bbs-stub = ["chio-federation/bbs-stub"]
 
@@ -107,13 +106,13 @@ chio-http-session = { version = "0.1.0", path = "../chio-http-session" }
 chio-guards = { version = "0.1.0", path = "../chio-guards" }
 chio-weights = { version = "0.1.0", path = "../chio-weights" }
 base64ct = { workspace = true, features = ["alloc"] }
-# TRJ5-B4.5: negative conformance fixture
+# Negative conformance fixture
 # `b4_bilateral_dsse_pae_only_is_conformant.rs` re-encodes signature bytes
 # in base64 to forge a §6 envelope; chio-federation's DSSE envelope wire
 # format is RFC 4648 standard base64 (workspace-pinned `base64` crate).
 base64 = { workspace = true }
-# TRJ5-C5: c5_selective_disclosure_zk.rs hex-decodes the disclosed
-# message bytes to assert the auditor sees the cleartext field values.
+# c5_selective_disclosure_zk.rs hex-decodes the disclosed message bytes
+# to assert the auditor sees the cleartext field values.
 hex = { workspace = true }
 coset = { workspace = true }
 jsonwebtoken = { workspace = true }

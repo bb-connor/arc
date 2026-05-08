@@ -147,20 +147,18 @@ trj4_slsa_trigger = "workflow_run after Release Binaries succeeds"
 trj4_final_summary_path = ".planning/trajectory-4/TRAJECTORY-4-FINAL.md"
 
 [trajectory_5]
-# Bounded-chiodome closeout. Per gate honesty audit
-# .planning/trajectory-5/reviews/COMPREHENSIVE-CODE-SECURITY-AUDIT-2026-05-08.md.
+# Bounded-chiodome closeout.
 release_tag = "v0.1.0-bounded-chiodome"
 release_notes_path = "releases/v0.1.0-bounded-chiodome/RELEASE-NOTES.md"
 # Per-gate honesty status. Each gate is one of MET / PARTIAL / DEFERRED.
 # C5 is PARTIAL (not MET): the §5.2 projection, disclose/withhold
 # semantics, and tamper-detection gates ship under the bbs-stub
 # feature, but the proof bytes are a SHA-256 commitment, not a real
-# BLS12-381 BBS+ signature. Real BBS+ is reserved for trj6 and the
-# `zk` Cargo feature name has been deliberately freed up so trj6 can
-# claim it without inheriting the stub's honesty footnote.
+# BLS12-381 BBS+ signature. Real BBS+ is reserved for follow-up work
+# and the `zk` Cargo feature name has been deliberately freed up so
+# the follow-up can claim it without inheriting the stub's honesty
+# footnote.
 c5_status = "PARTIAL"
 c5_feature_gate = "bbs-stub"
 c5_module = "crates/chio-federation/src/selective_disclosure.rs"
 c5_conformance_test = "crates/chio-conformance/tests/c5_selective_disclosure_stub.rs"
-c5_audit_findings_addressed = ["P0-009", "P0-010", "P0-011", "P1-007"]
-c5_real_bbs_plus_owner = "trj6"

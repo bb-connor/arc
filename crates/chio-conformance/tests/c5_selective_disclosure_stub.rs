@@ -31,9 +31,9 @@ use chio_federation::selective_disclosure::{
 
 fn fixture_body(kp: &Keypair) -> ChioReceiptBody {
     ChioReceiptBody {
-        id: "rcpt-trj5-c5-fixture".to_string(),
+        id: "rcpt-c5-fixture".to_string(),
         timestamp: 1_736_500_500,
-        capability_id: "cap-trj5-c5".to_string(),
+        capability_id: "cap-c5".to_string(),
         tool_server: "srv-c5-tool".to_string(),
         tool_name: "file_read".to_string(),
         action: ToolCallAction::from_parameters(serde_json::json!({"path": "/data/c5.txt"}))
@@ -88,7 +88,7 @@ fn audit_view_reveals_only_disclosed_indices_and_round_trips() {
             .bytes_hex,
     )
     .unwrap();
-    assert_eq!(cap_bytes, b"cap-trj5-c5");
+    assert_eq!(cap_bytes, b"cap-c5");
     let id_bytes = hex::decode(
         &disclosed_back
             .fields
@@ -98,7 +98,7 @@ fn audit_view_reveals_only_disclosed_indices_and_round_trips() {
             .bytes_hex,
     )
     .unwrap();
-    assert_eq!(id_bytes, b"rcpt-trj5-c5-fixture");
+    assert_eq!(id_bytes, b"rcpt-c5-fixture");
     let tool_bytes = hex::decode(
         &disclosed_back
             .fields
@@ -127,7 +127,7 @@ fn audit_view_rejects_when_pinned_receipt_is_tampered() {
     let view = project_audit_view(&body, &DisclosureSet(vec![5])).expect("projection must succeed");
 
     let mut tampered = body.clone();
-    tampered.id = "rcpt-trj5-c5-fixture-FORGED".to_string();
+    tampered.id = "rcpt-c5-fixture-FORGED".to_string();
     let result = verify_audit_view(&view, &tampered);
     assert!(
         matches!(
@@ -181,10 +181,10 @@ fn audit_view_rejects_unknown_schema_or_projection_version() {
 
 #[test]
 fn audit_view_rejects_malformed_content_hash_hex() {
-    // P0-010 / P1-007: an Hx field that does not decode to a 32-byte
-    // SHA-256 must fail closed at projection. Previously the code
-    // silently re-hashed the raw string while still labelling the
-    // message `Hx`, which lied about the encoding to the auditor.
+    // An Hx field that does not decode to a 32-byte SHA-256 must
+    // fail closed at projection. Previously the code silently
+    // re-hashed the raw string while still labelling the message
+    // `Hx`, which lied about the encoding to the auditor.
     let kp = Keypair::generate();
     let mut body = fixture_body(&kp);
     body.content_hash = "not-a-real-hex-string".to_string();
@@ -199,8 +199,8 @@ fn audit_view_rejects_malformed_content_hash_hex() {
 
 #[test]
 fn audit_view_rejects_short_policy_hash_hex() {
-    // P0-010 / P1-007: 16-byte hex (half the required SHA-256 length)
-    // must be rejected with a typed MalformedHexField error.
+    // 16-byte hex (half the required SHA-256 length) must be rejected
+    // with a typed MalformedHexField error.
     let kp = Keypair::generate();
     let mut body = fixture_body(&kp);
     body.policy_hash = "ab".repeat(16);
@@ -216,7 +216,7 @@ fn audit_view_rejects_short_policy_hash_hex() {
 
 #[test]
 fn audit_view_rejects_empty_content_hash() {
-    // P0-010 / P1-007: empty Hx string must fail closed.
+    // Empty Hx string must fail closed.
     let kp = Keypair::generate();
     let mut body = fixture_body(&kp);
     body.content_hash = String::new();
@@ -231,10 +231,10 @@ fn audit_view_rejects_empty_content_hash() {
 
 #[test]
 fn audit_view_rejects_disclosed_encoding_substitution() {
-    // P0-011 / P1-007: a producer that re-tags a disclosed message's
-    // encoding (e.g. utf-8 -> hex) MUST be rejected. Without binding
-    // the encoding into the proof commitment, downstream decoders
-    // could be misled into parsing UTF-8 bytes as a hex digest.
+    // A producer that re-tags a disclosed message's encoding (e.g.
+    // utf-8 -> hex) MUST be rejected. Without binding the encoding
+    // into the proof commitment, downstream decoders could be misled
+    // into parsing UTF-8 bytes as a hex digest.
     let kp = Keypair::generate();
     let body = fixture_body(&kp);
     let mut view = project_audit_view(&body, &DisclosureSet(vec![1, 11]))

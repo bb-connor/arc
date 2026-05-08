@@ -110,7 +110,7 @@ impl DualSignedReceipt {
     /// §6 verifier.** The signatures it checks are computed over the
     /// canonical-JSON encoding of [`CoSigningBody`]; the §6 envelope's
     /// signatures are computed over DSSE PAE bytes wrapping an in-toto
-    /// Statement. The two preimages share zero bytes (R4 finding 1).
+    /// Statement. The two preimages share zero bytes.
     pub fn verify(
         &self,
         org_a_public_key: &PublicKey,
