@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Per-row cargo-mutants gate for threat coverage.
 #
-# Owner: trajectory-4 wave-0 / E0.4.
+# Owner: threat-coverage evidence gate.
 #
-# The trajectory-4 closeout audit found that the existing
-# `check-threat-coverage.sh` only enforces "the threat-stub file
+# The first threat-coverage gate only enforced "the threat-stub file
 # exists and does not call unimplemented!()", so a one-line
 # `assert!(true)` body satisfies the 20/0/0 gate without exercising
 # any real defensive logic. This script is the per-row mutation-
@@ -66,7 +65,7 @@
 #     BOOTSTRAP_EXPIRES_DATE; the accommodation has expired and the
 #     row is now a real failure
 #   - `inconsistent_bootstrap` - needs_real_run is true with a non-1970
-#     `ran_at` timestamp (the audit's P3 finding); a real timestamp
+#     `ran_at` timestamp (the stale-timestamp check); a real timestamp
 #     contradicts the placeholder claim
 #   - `synthetic_timestamp_unlabeled` - `ran_at` looks like a normalized
 #     batch timestamp but the evidence file does not label it as generated
@@ -250,7 +249,7 @@ while IFS=$'\t' read -r tid state has_coveredby; do
     timestamp_kind="$(printf '%s' "$evidence_record" | cut -f4)"
 
     if [[ "$needs_real_run" == "1" ]]; then
-        # Bootstrap placeholder consistency: the audit's P3 finding requires
+        # Bootstrap placeholder consistency: the stale-timestamp check requires
         # `ran_at: 1970-01-01T00:00:00Z` whenever needs_real_run is true, so
         # a real cargo-mutants run timestamp combined with needs_real_run=true
         # is internally inconsistent.

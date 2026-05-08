@@ -30,7 +30,7 @@
 //   `crates/chio-wasm-guards/src/runtime.rs:1202`
 //     (`WasmtimeBackend::evaluate`).
 //
-// Revert-to-prove-it-fails recipe (trj5/A2 evidence backfill, batch 3):
+// Revert-to-prove-it-fails recipe:
 // In `crates/chio-wasm-guards/src/runtime.rs`, locate the fuel-set
 // call inside `WasmtimeBackend::evaluate` (the
 // `store.set_fuel(self.fuel_limit)` line in the wasmtime backend

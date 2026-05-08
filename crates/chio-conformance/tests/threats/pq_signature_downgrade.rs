@@ -11,13 +11,11 @@
 // Production MUST reject with `CapabilityError::CryptoFloorRejected`
 // before any trust / time / budget surface is reached.
 //
-// Scope of this row in trj5: the verifier-side floor enforcement is
+// Scope of this partial row: the verifier-side floor enforcement is
 // in tree today (`verify_capability_with_floor` -> `CapabilityToken::
 // verify_signature_with_floor`). The hybrid-PQ wire-format SIGNING
 // path (kernel mints hybrid-prefix signatures with ML-DSA-65 alongside
-// Ed25519) is DEFERRED-trj6 per
-// `.planning/trajectory-5/architecture/SPEC-TO-RUNTIME-MAP.md`
-// section 6 ("Hybrid PQ Wire Format"); the row "verifiers MUST
+// Ed25519) is deferred follow-up work; the row "verifiers MUST
 // dispatch from the signature prefix" is structural-only today. That
 // downstream signing work is intentionally out of scope here. What
 // IS in scope and what this conformance test pins is the verifier's
@@ -47,7 +45,7 @@
 //   `crates/chio-core-types/src/capability.rs` (`CapabilityCryptoFloor`,
 //     `CapabilityToken::verify_signature_with_floor`).
 //
-// Revert-to-prove-it-fails recipe (trj5/A2 evidence backfill, batch 3):
+// Revert-to-prove-it-fails recipe:
 // In `crates/chio-kernel-core/src/capability_verify.rs`, locate the
 // `match token.verify_signature_with_floor(crypto_floor) { ... }`
 // block inside `verify_capability_with_floor` (around line 162).

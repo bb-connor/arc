@@ -44,7 +44,7 @@
 // two of those escape classes through the same production backend so
 // the threat row carries both file-existence and runtime evidence.
 //
-// Revert-to-prove-it-fails recipe (trj5/A2 evidence backfill, batch 3):
+// Revert-to-prove-it-fails recipe:
 // In `crates/chio-wasm-guards/src/runtime.rs`, locate the
 // `validate_imports` (or equivalently named) helper used by
 // `WasmtimeBackend::load_module` to reject non-`chio.*` imports.

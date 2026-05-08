@@ -48,7 +48,7 @@
 //   `crates/chio-core-types/src/capability.rs` (`CapabilityToken::sign`,
 //     `verify_signature_with_floor`).
 //
-// Revert-to-prove-it-fails recipe (trj5/A2 evidence backfill, batch 3):
+// Revert-to-prove-it-fails recipe:
 // In `crates/chio-kernel-core/src/capability_verify.rs`, locate the
 // `if !trusted_issuers.contains(&token.issuer) { return
 // Err(CapabilityError::UntrustedIssuer); }` guard inside

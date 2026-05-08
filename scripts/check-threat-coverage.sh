@@ -22,7 +22,7 @@
 #      deferred. The companion evidence file
 #      `audits/evidence/threats/<id>.json` is expected to record
 #      `status: "partial"`, `closure_scope: "<scope>"`, and
-#      `deferred_to_trj6: "<rationale>"`.
+#      `deferred_follow_up: "<rationale>"`.
 #
 # Fails closed: `weak_coverage` is never accepted (the row must
 # either be raised to `covered` with real mutation-testing
@@ -37,7 +37,7 @@
 # This script handles the file-existence check only. The companion
 # `check-threat-coverage-mutants.sh` enforces the per-row mutation-
 # testing evidence requirement and is the gate that catches the
-# `assert!(true)` failure mode flagged by the trajectory-4 audit.
+# `assert!(true)` failure mode flagged by the prior closeout review.
 
 set -euo pipefail
 
@@ -111,7 +111,7 @@ while IFS=$'\t' read -r id state deferred_to; do
             # uncovered with a clear remediation hint.
             stub_partial="$STUBS_DIR/$id.rs"
             if [[ -z "${deferred_to:-}" ]]; then
-                uncovered+=("$id (coverage_state partial requires a non-empty deferred_to in $THREAT_MODEL naming the trj6 / future-milestone work that closes the deferred sub-vector)")
+                uncovered+=("$id (coverage_state partial requires a non-empty deferred_to in $THREAT_MODEL naming the future-milestone work that closes the deferred sub-vector)")
                 continue
             fi
             if [[ ! -f "$stub_partial" ]]; then

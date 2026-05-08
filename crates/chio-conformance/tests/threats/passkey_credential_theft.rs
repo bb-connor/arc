@@ -35,7 +35,7 @@
 //   `crates/chio-custody-hw/src/nonce_store.rs:194`
 //     (`InMemoryPasskeyNonceStore::record_if_fresh`).
 //
-// Revert-to-prove-it-fails recipe (trj5/A2 evidence backfill, batch 3):
+// Revert-to-prove-it-fails recipe:
 // In `crates/chio-custody-hw/src/nonce_store.rs`, locate the
 // duplicate-detection branch inside
 // `InMemoryPasskeyNonceStore::record_if_fresh` (the
