@@ -12,7 +12,7 @@
 #
 # For each threat in `spec/security/chio-threat-model.v1.json`
 # whose `coverage_state` is `covered` (or absent, which defaults to
-# covered):
+# covered) or `partial`:
 #
 #   1. Read the threat's `coveredBy` (preferred) or
 #      `covered_by_tests` cross-link list. If both are missing or
@@ -28,6 +28,7 @@
 #            "caught": <int>,
 #            "survivors": [<string>, ...],
 #            "ran_at": "<iso8601>",
+#            "timestamp_kind": "command-wall-clock|generated-metadata",
 #            "needs_real_run": <bool, optional>
 #          }
 #
@@ -47,6 +48,10 @@
 #
 #   5. If `caught >= 1`, the row passes.
 #
+# Partial rows are still required to carry evidence. The row can remain
+# `partial` in the threat model, but the defended sub-vector must have
+# a present evidence file, a non-placeholder run status, and caught >= 1.
+#
 # Downgrade hint format (single line, machine-grep-able):
 #
 #     WEAK: <threat_id> should be marked weak_coverage; reason=<reason>
@@ -63,6 +68,9 @@
 #   - `inconsistent_bootstrap` - needs_real_run is true with a non-1970
 #     `ran_at` timestamp (the audit's P3 finding); a real timestamp
 #     contradicts the placeholder claim
+#   - `synthetic_timestamp_unlabeled` - `ran_at` looks like a normalized
+#     batch timestamp but the evidence file does not label it as generated
+#     metadata
 #
 # Modes:
 #   - default: any non-bootstrap downgrade hint causes exit 1.
@@ -184,7 +192,8 @@ for t in doc.get("threats", []):
 PY
 }
 
-# Read the evidence file and emit `<caught>\t<needs_real_run>\t<ran_at>` where
+# Read the evidence file and emit
+# `<caught>\t<needs_real_run>\t<ran_at>\t<timestamp_kind>` where
 # needs_real_run is "1" or "0". Returns nonzero exit if file missing.
 read_evidence() {
     local evidence_file="$1"
@@ -201,7 +210,8 @@ with open(sys.argv[1]) as fh:
 caught = int(data.get("caught", 0))
 needs_real_run = bool(data.get("needs_real_run", False))
 ran_at = (data.get("ran_at") or "").strip()
-print(f"{caught}\t{1 if needs_real_run else 0}\t{ran_at}")
+timestamp_kind = (data.get("timestamp_kind") or data.get("timestamp_source") or "").strip()
+print(f"{caught}\t{1 if needs_real_run else 0}\t{ran_at}\t{timestamp_kind}")
 PY
 }
 
@@ -213,10 +223,11 @@ fail=0
 while IFS=$'\t' read -r tid state has_coveredby; do
     [[ -z "$tid" ]] && continue
 
-    # Only `covered` rows are gated by mutants evidence. Rows that
-    # are explicitly partial / pending / weak_coverage are handled
-    # by the file-existence gate (`check-threat-coverage.sh`).
-    if [[ "$state" != "covered" ]]; then
+    # `covered` and `partial` rows are both gated by mutants evidence.
+    # Partial rows may remain partial, but the claimed sub-vector still
+    # needs present, non-placeholder evidence with at least one caught
+    # mutant.
+    if [[ "$state" != "covered" && "$state" != "partial" ]]; then
         continue
     fi
 
@@ -236,6 +247,7 @@ while IFS=$'\t' read -r tid state has_coveredby; do
     caught="$(printf '%s' "$evidence_record" | cut -f1)"
     needs_real_run="$(printf '%s' "$evidence_record" | cut -f2)"
     ran_at="$(printf '%s' "$evidence_record" | cut -f3)"
+    timestamp_kind="$(printf '%s' "$evidence_record" | cut -f4)"
 
     if [[ "$needs_real_run" == "1" ]]; then
         # Bootstrap placeholder consistency: the audit's P3 finding requires
@@ -256,6 +268,12 @@ while IFS=$'\t' read -r tid state has_coveredby; do
         fi
         # Bootstrap placeholder still valid. Emit hint but DO NOT raise fail.
         bootstrap_hints+=("WEAK: $tid should be marked weak_coverage; reason=bootstrap_placeholder")
+        continue
+    fi
+
+    if [[ "$ran_at" == *"T00:00:00Z" && "$timestamp_kind" != "generated-metadata" && "$timestamp_kind" != "command-wall-clock" ]]; then
+        weak_hints+=("WEAK: $tid should label synthetic-looking ran_at metadata; reason=synthetic_timestamp_unlabeled")
+        fail=1
         continue
     fi
 
@@ -285,7 +303,7 @@ done
 
 if [[ "$fail" -eq 1 && "$DRY_RUN" -ne 1 ]]; then
     echo "" >&2
-    echo "FAIL: per-row mutants evidence is missing or empty for one or more covered threats." >&2
+    echo "FAIL: per-row mutants evidence is missing or empty for one or more covered/partial threats." >&2
     echo "hint: re-run cargo-mutants for the listed rows and update audits/evidence/threats/<id>.json," >&2
     echo "       or downgrade the row to coverage_state=weak_coverage in $THREAT_MODEL." >&2
     exit 1

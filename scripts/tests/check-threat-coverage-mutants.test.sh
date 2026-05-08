@@ -66,13 +66,14 @@ PY
 }
 
 write_evidence() {
-    # write_evidence <id> <caught> [<needs_real_run>=false] [<ran_at_override>]
+    # write_evidence <id> <caught> [<needs_real_run>=false] [<ran_at_override>] [<timestamp_kind>]
     # Bootstrap placeholders (needs_real_run=true) require ran_at to be the
     # 1970 epoch sentinel; real-run rows record the actual timestamp.
     local id="$1"
     local caught="$2"
     local needs_real_run="${3:-false}"
     local ran_at_override="${4:-}"
+    local timestamp_kind="${5:-command-wall-clock}"
     local ran_at
     if [[ -n "$ran_at_override" ]]; then
         ran_at="$ran_at_override"
@@ -86,6 +87,7 @@ write_evidence() {
   "caught": $caught,
   "survivors": [],
   "ran_at": "$ran_at",
+  "timestamp_kind": "$timestamp_kind",
   "needs_real_run": $needs_real_run
 }
 JSON
@@ -101,7 +103,7 @@ run_mutants_gate() {
     local extra_args=("$@")
     CHIO_THREAT_MODEL_PATH="$MODEL" \
     CHIO_THREAT_EVIDENCE_DIR="$EVIDENCE_DIR" \
-        bash "$REPO_ROOT/scripts/check-threat-coverage-mutants.sh" "${extra_args[@]}" \
+        bash "$REPO_ROOT/scripts/check-threat-coverage-mutants.sh" ${extra_args[@]+"${extra_args[@]}"} \
         >"$OUT" 2>"$ERR"
 }
 
@@ -221,13 +223,9 @@ CI=true assert_fails "CI=true forbids --dry-run" run_mutants_gate --dry-run
 grep -q "dry-run is not allowed in CI" "$ERR" \
     || { echo "FAIL: missing CI dry-run diagnostic"; cat "$ERR"; exit 1; }
 
-# Case 10 (R2-P1-009 follow-up): the per-row mutants gate only fires
-# on `covered` rows; `partial` rows are owned by the file-existence
-# gate (`check-threat-coverage.sh`) and must pass the mutants gate
-# trivially even when no audits/evidence/threats/<id>.json file is
-# written. This pins the behaviour so a future tightening of the
-# gate to also enforce mutants evidence for partial rows is a
-# deliberate, opt-in change instead of an accidental drift.
+# Case 10 (R4 P1-004): partial rows are still gated by per-row mutants
+# evidence. The row can remain partial, but the defended sub-vector must
+# have present, non-placeholder evidence with caught >= 1.
 reset_fixture
 python3 - "$MODEL" <<'PY'
 import json, sys
@@ -242,12 +240,32 @@ with open(sys.argv[1], "w") as fh:
     }]}, fh)
     fh.write("\n")
 PY
-# Intentionally no evidence file: partial rows are NOT gated by the
-# mutants gate today. Should still pass.
-assert_passes "partial-with-deferred row passes the per-row mutants gate" run_mutants_gate
-grep -q "passed: 0" "$OUT" \
-    || { echo "FAIL: partial row should not be counted as passed"; cat "$OUT"; exit 1; }
-grep -q "weak (real failures): 0" "$OUT" \
-    || { echo "FAIL: partial row should not produce a weak hint"; cat "$OUT"; cat "$ERR"; exit 1; }
+# Intentionally no evidence file: partial rows now fail the mutants gate.
+assert_fails "partial-with-deferred row without evidence fails" run_mutants_gate
+grep -q "WEAK: partial_with_deferred should be marked weak_coverage; reason=missing_evidence" "$ERR"
+
+write_evidence "partial_with_deferred" 2 false "2026-05-05T12:34:56Z"
+assert_passes "partial-with-deferred row with evidence passes" run_mutants_gate
+grep -q "passed: 1" "$OUT" \
+    || { echo "FAIL: partial row with evidence should be counted as passed"; cat "$OUT"; exit 1; }
+
+# Case 11 (R4 P2-002): exact-midnight timestamps must be explicitly
+# labeled. A generated metadata timestamp can pass when it is honest
+# about not being a command wall-clock.
+reset_fixture
+write_model_single "synthetic_timestamp_threat" "covered"
+cat > "$EVIDENCE_DIR/synthetic_timestamp_threat.json" <<JSON
+{
+  "caught": 1,
+  "survivors": [],
+  "ran_at": "2026-05-08T00:00:00Z",
+  "needs_real_run": false
+}
+JSON
+assert_fails "unlabeled synthetic timestamp fails" run_mutants_gate
+grep -q "WEAK: synthetic_timestamp_threat should label synthetic-looking ran_at metadata; reason=synthetic_timestamp_unlabeled" "$ERR"
+
+write_evidence "synthetic_timestamp_threat" 1 false "2026-05-08T00:00:00Z" "generated-metadata"
+assert_passes "labeled generated metadata timestamp passes" run_mutants_gate
 
 echo "PASS: check-threat-coverage-mutants evidence matrix"

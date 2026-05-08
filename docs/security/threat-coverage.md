@@ -10,7 +10,7 @@ Live gate state is tracked by `scripts/check-threat-coverage.sh`. At time of wri
 
 Coverage states:
 - `Covered` - the threat ID has a populated test body at `crates/chio-conformance/tests/threats/<id>.rs` AND a mutation-testing evidence file at `audits/evidence/threats/<id>.json` recording at least one caught mutant.
-- `Partial` - a backing test exists but defends only part of the attack surface; the residual gap is documented in the milestone audit doc that owns the partial coverage.
+- `Partial` - a backing test exists and the defended sub-vector has a mutation evidence file with `caught >= 1`, but the row defends only part of the attack surface; the residual gap is documented in the milestone audit doc that owns the partial coverage.
 - `Pending` - no backing test yet; the threat-model-coverage CI gate accepts the entry because it is explicitly marked `pending` in the JSON, but a green test must land before the owning milestone closes.
 - `Weak Coverage` - a backing test file exists but mutation-testing evidence is missing or shows zero kills. The row must be raised to `Covered` with real evidence under `audits/evidence/threats/<id>.json` or downgraded to `Pending` with a `deferred_to` reference before the threat-model-coverage gate accepts it.
 
@@ -220,4 +220,3 @@ Coverage states:
 - **Surfaces:** trust_control, hosted_mcp, native_chio
 - **Test stub:** `crates/chio-conformance/tests/threats/pq_signature_downgrade.rs`
 - **Corpus cases:** (none cite this threat ID)
-
