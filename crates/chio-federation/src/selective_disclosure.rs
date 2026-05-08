@@ -2,7 +2,7 @@
 //!
 //! ## Stub status (HONEST)
 //!
-//! What this module DOES today (`zk` feature):
+//! What this module DOES today (`bbs-stub` feature):
 //!
 //! 1. Implements the deterministic alphabetical-by-serde-field-name
 //!    projection from `ChioReceiptBody` to a 14-message vector per
@@ -130,11 +130,53 @@ pub enum SelectiveDisclosureError {
     ProofBindingFailed,
     #[error("audit view disclosed message at index {0} does not match the pinned projection")]
     DisclosedMessageMismatch(u8),
+    /// P0-010: an `Hx` field on the receipt body did not decode to the
+    /// 32-byte SHA-256 the §5.2 projection requires. The previous
+    /// implementation silently re-hashed the malformed string, which
+    /// labelled it `Hx` while feeding non-`Hx` bytes downstream. Fail
+    /// closed instead.
+    #[error("malformed Hx field {field}: {reason}")]
+    MalformedHexField { field: String, reason: String },
+    /// P0-011: a disclosed message's `encoding` did not match the
+    /// pinned projection's encoding for that index. Without this gate
+    /// the verifier accepted views that re-tagged the same bytes
+    /// (e.g. `utf-8` -> `hex`) and misled downstream decoders.
+    #[error("audit view disclosed message at index {0} carries an encoding that does not match the pinned projection")]
+    DisclosedEncodingMismatch(u8),
 }
 
 // ---------------------------------------------------------------------------
 // Projection (§5.2 alphabetical-by-serde-field-name table)
 // ---------------------------------------------------------------------------
+
+/// Decode an `Hx` field per spec §5.2: the input MUST be a hex string
+/// that decodes to exactly 32 bytes (a SHA-256 digest). Malformed input
+/// (non-hex, wrong length, empty) returns `MalformedHexField` so the
+/// projection fails closed rather than silently re-hashing the raw
+/// string under an `Hx` encoding label (P0-010).
+fn decode_hx_field(field: &str, raw: &str) -> Result<Vec<u8>, SelectiveDisclosureError> {
+    if raw.is_empty() {
+        return Err(SelectiveDisclosureError::MalformedHexField {
+            field: field.to_string(),
+            reason: "empty string is not a valid 32-byte SHA-256 hex digest".to_string(),
+        });
+    }
+    let bytes =
+        hex::decode(raw).map_err(|e| SelectiveDisclosureError::MalformedHexField {
+            field: field.to_string(),
+            reason: format!("not valid hex: {e}"),
+        })?;
+    if bytes.len() != 32 {
+        return Err(SelectiveDisclosureError::MalformedHexField {
+            field: field.to_string(),
+            reason: format!(
+                "decoded length {} bytes does not equal the required 32 bytes",
+                bytes.len()
+            ),
+        });
+    }
+    Ok(bytes)
+}
 
 /// Hash a structured sub-body (canonical JSON) per `H` encoding (§5.2).
 fn hash_canonical<T: Serialize>(value: &T) -> Result<[u8; 32], SelectiveDisclosureError> {
@@ -188,18 +230,11 @@ fn project_receipt_body(
     });
 
     // 2 content_hash (Hx - already a 32-byte hex string; we MUST decode
-    // first per spec §5.2 "hex-decoded 32-byte SHA-256". If the
-    // caller's content_hash is malformed we re-hash the raw bytes to
-    // remain deterministic.)
-    let content_hash_bytes = match hex::decode(&body.content_hash) {
-        Ok(b) if b.len() == 32 => b,
-        _ => {
-            // fall back to deterministic re-hash of the raw string
-            let mut h = Sha256::new();
-            h.update(body.content_hash.as_bytes());
-            h.finalize().to_vec()
-        }
-    };
+    // per spec §5.2 "hex-decoded 32-byte SHA-256". P0-010: reject
+    // malformed input rather than silently re-hashing the raw string,
+    // because the previous fallback fed non-Hx bytes through under an
+    // `Hx` label.)
+    let content_hash_bytes = decode_hx_field("content_hash", &body.content_hash)?;
     out.push(BbsMessage {
         index: 2,
         field: "content_hash".to_string(),
@@ -267,15 +302,9 @@ fn project_receipt_body(
         wholesale_only: true,
     });
 
-    // 8 policy_hash (Hx with same fallback as content_hash)
-    let policy_hash_bytes = match hex::decode(&body.policy_hash) {
-        Ok(b) if b.len() == 32 => b,
-        _ => {
-            let mut h = Sha256::new();
-            h.update(body.policy_hash.as_bytes());
-            h.finalize().to_vec()
-        }
-    };
+    // 8 policy_hash (Hx; same strict-decode rule as content_hash per
+    // P0-010).
+    let policy_hash_bytes = decode_hx_field("policy_hash", &body.policy_hash)?;
     out.push(BbsMessage {
         index: 8,
         field: "policy_hash".to_string(),
@@ -355,10 +384,17 @@ fn subject_receipt_sha256(body: &ChioReceiptBody) -> Result<[u8; 32], SelectiveD
 }
 
 /// Compute the stub-proof binding: SHA-256 over the canonical JSON of
-/// `(sorted_disclosed_indices, withheld_messages_in_index_order)`.
-/// This anchors the disclosure to the projection deterministically; a
-/// verifier with the pinned receipt and the disclosure set
-/// recomputes the same hash and checks equality.
+/// `(sorted_disclosed_indices, withheld_messages_in_index_order,
+/// disclosed_encodings_in_index_order)`. This anchors the disclosure
+/// to the projection deterministically; a verifier with the pinned
+/// receipt and the disclosure set recomputes the same hash and checks
+/// equality.
+///
+/// P0-011: the commitment now also binds the per-disclosed-index
+/// `encoding` string (`S`/`Hx`/`H`/`U64`/`Opt<S>`). A producer that
+/// kept the same disclosed `bytes_hex` but re-tagged the encoding
+/// (e.g. `utf-8` -> `hex`) used to slip past the verifier and could
+/// mislead downstream decoders; binding the encoding shuts that gap.
 fn proof_commitment(
     disclosure: &DisclosureSet,
     projection: &[BbsMessage],
@@ -369,9 +405,29 @@ fn proof_commitment(
         .iter()
         .filter(|m| !disclosed_indices.contains(&m.index))
         .collect();
+    // Canonicalise the disclosed encodings as `(index, encoding)`
+    // pairs in disclosed-index order. The disclosed bytes themselves
+    // are already covered by the auditor-side projection re-bind in
+    // `verify_audit_view`, so the commitment only needs the encoding
+    // tag and index to bind the encoding tampering vector.
+    let disclosed_encodings: Vec<serde_json::Value> = disclosed_indices
+        .iter()
+        .map(|idx| {
+            let enc = projection
+                .iter()
+                .find(|m| m.index == *idx)
+                .map(|m| m.encoding.as_str())
+                .unwrap_or("");
+            serde_json::json!({
+                "index": idx,
+                "encoding": enc,
+            })
+        })
+        .collect();
     let payload = serde_json::json!({
         "disclosed_indices": disclosed_indices,
         "withheld": withheld,
+        "disclosed_encodings": disclosed_encodings,
     });
     let bytes = canonical_json_bytes(&payload)
         .map_err(|e| SelectiveDisclosureError::CanonicalJson(e.to_string()))?;
@@ -464,6 +520,12 @@ pub fn verify_audit_view(
     // pinned projection. This is the "auditor sees what the projection
     // allows" check - a producer who tried to alter the disclosed
     // value without altering the receipt would be caught here.
+    //
+    // P0-011: encoding is also checked explicitly. The proof commitment
+    // binds the encoding too (see `proof_commitment`), so a substituted
+    // encoding will also flunk the binding check, but the typed
+    // `DisclosedEncodingMismatch` makes the failure mode explicit for
+    // auditors and conformance fixtures.
     for disclosed in &view.disclosed {
         let pinned_msg = projection
             .iter()
@@ -473,6 +535,11 @@ pub fn verify_audit_view(
             ))?;
         if pinned_msg.bytes_hex != disclosed.bytes_hex || pinned_msg.field != disclosed.field {
             return Err(SelectiveDisclosureError::DisclosedMessageMismatch(
+                disclosed.index,
+            ));
+        }
+        if pinned_msg.encoding != disclosed.encoding {
+            return Err(SelectiveDisclosureError::DisclosedEncodingMismatch(
                 disclosed.index,
             ));
         }
@@ -489,8 +556,8 @@ pub fn verify_audit_view(
 
 // ---------------------------------------------------------------------------
 // Inline tests (round-trip + tamper-detection only). End-to-end test
-// lives in crates/chio-conformance/tests/c5_selective_disclosure_zk.rs
-// behind the same `zk` feature.
+// lives in crates/chio-conformance/tests/c5_selective_disclosure_stub.rs
+// behind the same `bbs-stub` feature.
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -612,5 +679,128 @@ mod tests {
             result,
             Err(SelectiveDisclosureError::DisclosedMessageMismatch(_))
         ));
+    }
+
+    // -----------------------------------------------------------------
+    // P0-010: malformed Hx fields must fail closed
+    // -----------------------------------------------------------------
+
+    fn body_with_content_hash(kp: &Keypair, content_hash: &str) -> ChioReceiptBody {
+        let mut b = sample_body(kp);
+        b.content_hash = content_hash.to_string();
+        b
+    }
+
+    fn body_with_policy_hash(kp: &Keypair, policy_hash: &str) -> ChioReceiptBody {
+        let mut b = sample_body(kp);
+        b.policy_hash = policy_hash.to_string();
+        b
+    }
+
+    #[test]
+    fn projection_rejects_invalid_hex_content_hash() {
+        let kp = Keypair::generate();
+        // "ZZ..." is the right length for 32 bytes of hex but is not
+        // valid hex.
+        let bad = "ZZ".repeat(32);
+        let body = body_with_content_hash(&kp, &bad);
+        let result = project_audit_view(&body, &DisclosureSet(vec![2]));
+        match result {
+            Err(SelectiveDisclosureError::MalformedHexField { field, reason }) => {
+                assert_eq!(field, "content_hash");
+                assert!(
+                    reason.contains("not valid hex"),
+                    "unexpected reason: {reason}"
+                );
+            }
+            other => panic!("expected MalformedHexField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn projection_rejects_short_hex_content_hash() {
+        let kp = Keypair::generate();
+        // 16 bytes of hex (32 chars) - half the required SHA-256 length.
+        let short = "ab".repeat(16);
+        let body = body_with_content_hash(&kp, &short);
+        let result = project_audit_view(&body, &DisclosureSet(vec![2]));
+        match result {
+            Err(SelectiveDisclosureError::MalformedHexField { field, reason }) => {
+                assert_eq!(field, "content_hash");
+                assert!(reason.contains("16 bytes"), "unexpected reason: {reason}");
+            }
+            other => panic!("expected MalformedHexField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn projection_rejects_long_hex_content_hash() {
+        let kp = Keypair::generate();
+        // 64 bytes of hex - twice the required length.
+        let long = "ab".repeat(64);
+        let body = body_with_content_hash(&kp, &long);
+        let result = project_audit_view(&body, &DisclosureSet(vec![2]));
+        match result {
+            Err(SelectiveDisclosureError::MalformedHexField { field, reason }) => {
+                assert_eq!(field, "content_hash");
+                assert!(reason.contains("64 bytes"), "unexpected reason: {reason}");
+            }
+            other => panic!("expected MalformedHexField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn projection_rejects_empty_hex_content_hash() {
+        let kp = Keypair::generate();
+        let body = body_with_content_hash(&kp, "");
+        let result = project_audit_view(&body, &DisclosureSet(vec![2]));
+        match result {
+            Err(SelectiveDisclosureError::MalformedHexField { field, reason }) => {
+                assert_eq!(field, "content_hash");
+                assert!(reason.contains("empty"), "unexpected reason: {reason}");
+            }
+            other => panic!("expected MalformedHexField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn projection_rejects_malformed_policy_hash() {
+        let kp = Keypair::generate();
+        // 16 bytes of hex - half the required SHA-256 length.
+        let short = "00".repeat(16);
+        let body = body_with_policy_hash(&kp, &short);
+        let result = project_audit_view(&body, &DisclosureSet(vec![8]));
+        match result {
+            Err(SelectiveDisclosureError::MalformedHexField { field, .. }) => {
+                assert_eq!(field, "policy_hash");
+            }
+            other => panic!("expected MalformedHexField, got {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // P0-011: encoding tampering must be rejected
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn audit_view_rejects_tampered_disclosed_encoding() {
+        let kp = Keypair::generate();
+        let body = sample_body(&kp);
+        // Disclose capability_id (S) and tool_name (S).
+        let mut view = project_audit_view(&body, &DisclosureSet(vec![1, 11])).unwrap();
+        // Producer relabels capability_id's encoding from S (utf-8) to
+        // Hx so that downstream decoders parse the bytes as a hex
+        // digest instead of a UTF-8 string.
+        view.disclosed[0].encoding = "Hx".to_string();
+        let result = verify_audit_view(&view, &body);
+        // Either the explicit encoding-mismatch gate or the proof
+        // binding gate (which now also covers encoding) must reject.
+        match result {
+            Err(SelectiveDisclosureError::DisclosedEncodingMismatch(_)) => {}
+            Err(SelectiveDisclosureError::ProofBindingFailed) => {}
+            other => panic!(
+                "expected DisclosedEncodingMismatch or ProofBindingFailed, got {other:?}"
+            ),
+        }
     }
 }

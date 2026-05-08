@@ -52,10 +52,12 @@ path = "src/bin/chio_native_conformance_fixture.rs"
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
 # TRJ5-C5: opt-in selective-disclosure conformance test. Forwards to
-# chio-federation's `zk` feature so the projection module compiles. Per
-# Risk Register R6, this is a separate CI matrix entry, not the default
-# build path.
-zk = ["chio-federation/zk"]
+# chio-federation's `bbs-stub` feature so the projection module compiles.
+# Honesty note (per trj5 audit P0-009): the feature is `bbs-stub`, not
+# `zk`, because the trj5 implementation is a SHA-256-commitment stub
+# without any zero-knowledge property. Per Risk Register R6, this is a
+# separate CI matrix entry, not the default build path.
+bbs-stub = ["chio-federation/bbs-stub"]
 
 [dependencies]
 chio-core = { package = "chio-core-types", version = "0.1.0", path = "../chio-core-types" }

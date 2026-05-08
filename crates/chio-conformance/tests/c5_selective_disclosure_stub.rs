@@ -19,7 +19,7 @@
 //!    or unknown projection version fails closed at the
 //!    `SchemaMismatch` / `ProjectionVersionMismatch` gates.
 
-#![cfg(feature = "zk")]
+#![cfg(feature = "bbs-stub")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chio_core::crypto::{sha256_hex, Keypair};
@@ -177,6 +177,89 @@ fn audit_view_rejects_unknown_schema_or_projection_version() {
         res,
         Err(SelectiveDisclosureError::ProjectionVersionMismatch(_))
     ));
+}
+
+#[test]
+fn audit_view_rejects_malformed_content_hash_hex() {
+    // P0-010 / P1-007: an Hx field that does not decode to a 32-byte
+    // SHA-256 must fail closed at projection. Previously the code
+    // silently re-hashed the raw string while still labelling the
+    // message `Hx`, which lied about the encoding to the auditor.
+    let kp = Keypair::generate();
+    let mut body = fixture_body(&kp);
+    body.content_hash = "not-a-real-hex-string".to_string();
+    let result = project_audit_view(&body, &DisclosureSet(vec![2]));
+    match result {
+        Err(SelectiveDisclosureError::MalformedHexField { field, .. }) => {
+            assert_eq!(field, "content_hash");
+        }
+        other => panic!("expected MalformedHexField for content_hash, got {other:?}"),
+    }
+}
+
+#[test]
+fn audit_view_rejects_short_policy_hash_hex() {
+    // P0-010 / P1-007: 16-byte hex (half the required SHA-256 length)
+    // must be rejected with a typed MalformedHexField error.
+    let kp = Keypair::generate();
+    let mut body = fixture_body(&kp);
+    body.policy_hash = "ab".repeat(16);
+    let result = project_audit_view(&body, &DisclosureSet(vec![8]));
+    match result {
+        Err(SelectiveDisclosureError::MalformedHexField { field, reason }) => {
+            assert_eq!(field, "policy_hash");
+            assert!(reason.contains("16 bytes"), "unexpected reason: {reason}");
+        }
+        other => panic!("expected MalformedHexField for policy_hash, got {other:?}"),
+    }
+}
+
+#[test]
+fn audit_view_rejects_empty_content_hash() {
+    // P0-010 / P1-007: empty Hx string must fail closed.
+    let kp = Keypair::generate();
+    let mut body = fixture_body(&kp);
+    body.content_hash = String::new();
+    let result = project_audit_view(&body, &DisclosureSet(vec![2]));
+    match result {
+        Err(SelectiveDisclosureError::MalformedHexField { field, .. }) => {
+            assert_eq!(field, "content_hash");
+        }
+        other => panic!("expected MalformedHexField for empty content_hash, got {other:?}"),
+    }
+}
+
+#[test]
+fn audit_view_rejects_disclosed_encoding_substitution() {
+    // P0-011 / P1-007: a producer that re-tags a disclosed message's
+    // encoding (e.g. utf-8 -> hex) MUST be rejected. Without binding
+    // the encoding into the proof commitment, downstream decoders
+    // could be misled into parsing UTF-8 bytes as a hex digest.
+    let kp = Keypair::generate();
+    let body = fixture_body(&kp);
+    let mut view = project_audit_view(&body, &DisclosureSet(vec![1, 11]))
+        .expect("projection must succeed");
+    // capability_id is encoded as S (utf-8 bytes). Forge it to claim
+    // hex encoding instead.
+    let target = view
+        .disclosed
+        .iter_mut()
+        .find(|m| m.field == "capability_id")
+        .expect("capability_id must be in the disclosure set");
+    assert_eq!(
+        target.encoding, "S",
+        "fixture invariant: capability_id is encoded as S in §5.2"
+    );
+    target.encoding = "hex".to_string();
+
+    let result = verify_audit_view(&view, &body);
+    match result {
+        Err(SelectiveDisclosureError::DisclosedEncodingMismatch(_)) => {}
+        Err(SelectiveDisclosureError::ProofBindingFailed) => {}
+        other => panic!(
+            "expected DisclosedEncodingMismatch or ProofBindingFailed, got {other:?}"
+        ),
+    }
 }
 
 #[test]
