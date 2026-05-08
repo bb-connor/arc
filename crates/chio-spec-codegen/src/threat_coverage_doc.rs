@@ -173,16 +173,15 @@ pub fn render_threat_coverage_doc(
          field in each row's `audits/evidence/threats/<id>.json`).\n\n",
     );
     body.push_str(
-        "**Wave 4 hardening note**: 9 of the originally-claimed 20 \
-         covered rows passed the gate on file-exists + no-`unimplemented!()` \
-         alone, with weak or meta-only assertions in the backing test. \
-         Wave 4 of the trj4 closeout plan (see \
-         `/Users/connor/.claude/plans/typed-coalescing-hejlsberg.md` and \
-         `.planning/trajectory-4/TRAJECTORY-4-CLOSEOUT-ERRATUM.md`) \
-         hardens these rows by adding per-row cargo-mutants requirements \
-         and real negative-conformance bodies; under trj5 audit P0-023 \
-         two of those rows were further demoted to `Partial` because \
-         the test only exercises one sub-vector of the named threat.\n\n",
+        "**Hardening note**: 9 of the originally-claimed 20 covered rows \
+         passed the gate on file-exists + no-`unimplemented!()` alone, \
+         with weak or meta-only assertions in the backing test. The \
+         hardening pass adds per-row cargo-mutants requirements and \
+         real negative-conformance bodies; two of those rows were \
+         further demoted to `Partial` because the test only exercises \
+         one sub-vector of the named threat (see the `deferred_to` \
+         field in each row's threat-model entry and the partial \
+         evidence file in `audits/evidence/threats/<id>.json`).\n\n",
     );
     body.push_str(
         "Coverage states:\n\
