@@ -1,0 +1,310 @@
+//! TRJ5-C4: integration test for `chio receipt explain` bilateral
+//! rendering. Builds a real `BilateralCoSignArtifacts` via the
+//! production federation hot-path emitter (`co_sign_with_origin_full`),
+//! serialises it to a JSON fixture file under `tempdir`, and shells out
+//! to the actual `chio` binary with `--input-file <fixture>` plus
+//! `--explain-bilateral`. The test then parses the JSON output and
+//! asserts:
+//!
+//! 1. The detected `shape` is `BilateralCoSignArtifacts`.
+//! 2. The `dual_signed_receipt` section carries the §6 non-conformance
+//!    disclaimer per B4 doc-comment.
+//! 3. The `dsse_envelope` section carries `payloadType ==
+//!    application/vnd.in-toto+json` (§6 PAE binding) plus exactly two
+//!    signatures with `keyid` + `sig` fields.
+//! 4. The `bilateral_verifier_trace` carries 17 step entries, with
+//!    locally-verifiable steps marked `ok` and out-of-trj5-scope steps
+//!    marked `bounded` (matching the B4 disclaimer surface). No step is
+//!    marked `fail` for a healthy hot-path artifact.
+//! 5. The renderer's keyids match the predicate's
+//!    `tool_server_*.passport_key_fingerprint` (§7 step 10).
+//!
+//! Following the B4 conformance test pattern, this test runs the actual
+//! production emitter — no mocks — and shells the actual binary so it
+//! exercises the same code path operators use.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use std::process::Command;
+
+use chio_core_types::crypto::Keypair;
+use chio_core_types::receipt::{
+    ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel,
+};
+use chio_federation::bilateral::{co_sign_with_origin_full, InProcessCoSigner};
+
+const ORG_A_KERNEL_ID: &str = "kernel.c4-org-a";
+const ORG_B_KERNEL_ID: &str = "kernel.c4-org-b";
+
+fn sample_receipt(tool_host_kp: &Keypair) -> ChioReceipt {
+    let body = ChioReceiptBody {
+        id: "rcpt-trj5-c4-fixture".to_string(),
+        timestamp: 1_736_000_000,
+        capability_id: "cap-trj5-c4".to_string(),
+        tool_server: "srv-c4-files".to_string(),
+        tool_name: "file_read".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({"path": "/data/c4.txt"}))
+            .unwrap(),
+        decision: Decision::Allow,
+        content_hash: chio_core_types::crypto::sha256_hex(br#"{"c4":true}"#),
+        policy_hash: "c4-policy-hash".to_string(),
+        evidence: Vec::new(),
+        metadata: None,
+        trust_level: TrustLevel::default(),
+        tenant_id: None,
+        kernel_key: tool_host_kp.public_key(),
+    };
+    ChioReceipt::sign(body, tool_host_kp).unwrap()
+}
+
+fn write_artifact_fixture(dir: &std::path::Path) -> std::path::PathBuf {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let receipt = sample_receipt(&kp_b);
+    let cosigner = InProcessCoSigner::new(ORG_A_KERNEL_ID, kp_a.clone(), kp_b.public_key());
+    let artifacts = co_sign_with_origin_full(
+        ORG_A_KERNEL_ID,
+        &kp_a,
+        ORG_B_KERNEL_ID,
+        &kp_b,
+        receipt,
+        &cosigner,
+        "file_read",
+        1_736_000_000_000,
+    )
+    .expect("hot path must produce both artifacts");
+
+    // Hand-serialise to the snake_case shape the renderer detects. We
+    // include both halves so the renderer detection (`is_bilateral_artifacts_value`)
+    // fires unambiguously.
+    let value = serde_json::json!({
+        "dual_signed_receipt": serde_json::to_value(&artifacts.dual_signed_receipt).unwrap(),
+        "dsse_envelope": serde_json::to_value(&artifacts.dsse_envelope).unwrap(),
+    });
+    let path = dir.join("bilateral.json");
+    std::fs::write(&path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
+    path
+}
+
+#[test]
+fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
+    let bin = env!("CARGO_BIN_EXE_chio");
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let fixture = write_artifact_fixture(tmp.path());
+
+    let out = Command::new(bin)
+        .args([
+            "--json",
+            "receipt",
+            "explain",
+            "bilateral", // sentinel receipt_id; the bilateral path is keyed off --input-file shape
+            "--input-file",
+            fixture.to_str().unwrap(),
+            "--explain-bilateral",
+        ])
+        .output()
+        .expect("invoke chio receipt explain");
+
+    assert!(
+        out.status.success(),
+        "chio receipt explain --explain-bilateral exited non-zero: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let stdout = String::from_utf8(out.stdout).expect("utf8 stdout");
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("renderer must emit valid JSON");
+
+    assert_eq!(
+        parsed["shape"].as_str(),
+        Some("BilateralCoSignArtifacts"),
+        "renderer must detect BilateralCoSignArtifacts shape"
+    );
+    assert_eq!(
+        parsed["schema"].as_str(),
+        Some("chio.cli.receipt-explain.bilateral.v1"),
+        "renderer must declare its own report schema"
+    );
+
+    // (1) DualSignedReceipt section disclaimer per B4 doc-comment.
+    let dual = &parsed["dual_signed_receipt"];
+    let disclaimer = dual["non_section6_disclaimer"]
+        .as_str()
+        .expect("dual section must carry non-§6 disclaimer string");
+    assert!(
+        disclaimer.contains("NOT §6-conformant") || disclaimer.contains("NOT \u{00a7}6"),
+        "disclaimer must call out non-§6 status: got {disclaimer}"
+    );
+
+    // (2) DSSE envelope section: §6 binding.
+    let dsse = &parsed["dsse_envelope"];
+    assert_eq!(
+        dsse["payload_type"].as_str(),
+        Some("application/vnd.in-toto+json"),
+        "DSSE envelope MUST use the in-toto payloadType"
+    );
+    let sigs = dsse["signatures"]
+        .as_array()
+        .expect("dsse_envelope.signatures must be array");
+    assert_eq!(sigs.len(), 2, "trj5 envelopes carry exactly two signatures");
+    for sig in sigs {
+        assert!(
+            sig["keyid"].as_str().is_some(),
+            "each DSSE signature must expose its keyid"
+        );
+        assert!(
+            sig["sig"].as_str().is_some(),
+            "each DSSE signature must expose its base64 signature bytes"
+        );
+    }
+
+    // (3) 17-step verifier trace.
+    let trace = &parsed["bilateral_verifier_trace"];
+    assert!(
+        trace.is_object(),
+        "--explain-bilateral must emit bilateral_verifier_trace"
+    );
+    let steps = trace["steps"]
+        .as_array()
+        .expect("trace.steps must be array");
+    assert_eq!(
+        steps.len(),
+        17,
+        "spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md §7 prescribes a 17-step trace"
+    );
+
+    // No step should be `fail` for a healthy hot-path artifact.
+    for step in steps {
+        let status = step["status"].as_str().unwrap_or("");
+        assert!(
+            status == "ok" || status == "bounded",
+            "step {} ({}) must not fail on a hot-path artifact: status={status}, note={}",
+            step["step"],
+            step["name"].as_str().unwrap_or("?"),
+            step["note"].as_str().unwrap_or("")
+        );
+    }
+
+    // The "ok" set must include the locally-checkable §7 prerequisites:
+    // payload type, payload base64, predicate type recognised, statement
+    // type, subject arity, signature count, signature fields, keyid<->
+    // predicate fingerprint binding, and predicate body schema.
+    let must_be_ok = [
+        "receipt_body_present",
+        "payload_type_binding",
+        "payload_base64_decodable",
+        "predicate_type_recognised",
+        "statement_type_v1",
+        "subject_arity_one",
+        "signature_count_two",
+        "signature_fields_present",
+        "keyids_match_predicate_fingerprints",
+        "predicate_body_schema",
+    ];
+    for name in must_be_ok {
+        let entry = steps
+            .iter()
+            .find(|s| s["name"].as_str() == Some(name))
+            .unwrap_or_else(|| panic!("trace must include step `{name}`"));
+        assert_eq!(
+            entry["status"].as_str(),
+            Some("ok"),
+            "step `{name}` must be ok on a hot-path artifact"
+        );
+    }
+
+    // Steps explicitly out of trj5/B4 scope must be `bounded`, not `ok`.
+    let must_be_bounded = [
+        "ed25519_verify_org_a_pae",
+        "ed25519_verify_org_b_pae",
+        "capability_lease_resolution",
+        "governance_receipt_resolution",
+        "consistency_anchor_reconciliation",
+        "peer_pin_revocation_freshness",
+    ];
+    for name in must_be_bounded {
+        let entry = steps
+            .iter()
+            .find(|s| s["name"].as_str() == Some(name))
+            .unwrap_or_else(|| panic!("trace must include step `{name}`"));
+        assert_eq!(
+            entry["status"].as_str(),
+            Some("bounded"),
+            "step `{name}` must be marked bounded (out of trj5 scope)"
+        );
+    }
+}
+
+/// Negative path: when `--explain-bilateral` is omitted, the renderer
+/// must NOT emit the trace (we don't want operators to think the trace
+/// ran when it didn't). The dual + DSSE sections still render.
+#[test]
+fn receipt_explain_bilateral_without_flag_omits_trace() {
+    let bin = env!("CARGO_BIN_EXE_chio");
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let fixture = write_artifact_fixture(tmp.path());
+
+    let out = Command::new(bin)
+        .args([
+            "--json",
+            "receipt",
+            "explain",
+            "bilateral",
+            "--input-file",
+            fixture.to_str().unwrap(),
+        ])
+        .output()
+        .expect("invoke chio receipt explain");
+    assert!(out.status.success());
+    let stdout = String::from_utf8(out.stdout).expect("utf8 stdout");
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("renderer must emit valid JSON");
+    assert_eq!(
+        parsed["shape"].as_str(),
+        Some("BilateralCoSignArtifacts"),
+        "shape must still be detected without --explain-bilateral"
+    );
+    // Trace key may exist but value must be null.
+    assert!(
+        parsed["bilateral_verifier_trace"].is_null()
+            || parsed.get("bilateral_verifier_trace").is_none(),
+        "trace must be absent or null when --explain-bilateral is not set"
+    );
+}
+
+/// Pretty-print path: when `--json` is omitted, the human renderer must
+/// emit the boxed sections. We don't lock the exact text formatting,
+/// but we do require the §6 marker so operators see the conformance
+/// boundary.
+#[test]
+fn receipt_explain_bilateral_human_renderer_marks_section6_boundary() {
+    let bin = env!("CARGO_BIN_EXE_chio");
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let fixture = write_artifact_fixture(tmp.path());
+
+    let out = Command::new(bin)
+        .args([
+            "receipt",
+            "explain",
+            "bilateral",
+            "--input-file",
+            fixture.to_str().unwrap(),
+            "--explain-bilateral",
+        ])
+        .output()
+        .expect("invoke chio receipt explain");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("DualSignedReceipt"),
+        "human renderer must label the legacy section: {stdout}"
+    );
+    assert!(
+        stdout.contains("DSSE envelope"),
+        "human renderer must label the §6 section: {stdout}"
+    );
+    assert!(
+        stdout.contains("17-step") || stdout.contains("verifier trace"),
+        "human renderer must label the trace section: {stdout}"
+    );
+}

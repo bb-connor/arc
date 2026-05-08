@@ -2658,10 +2658,22 @@ enum ReceiptCommands {
         cursor: Option<u64>,
     },
     /// Explain why a receipt was allowed or denied.
+    ///
+    /// When `--input-file` points at a `BilateralCoSignArtifacts` JSON
+    /// document (the §6 federation hot-path emission with both a
+    /// `dualSignedReceipt` and a `dsseEnvelope`), the renderer auto-detects
+    /// the bilateral shape and prints both the legacy DualSignedReceipt
+    /// section (NON-§6-CONFORMANT per B4) and the §6 DSSE envelope
+    /// section. Pass `--explain-bilateral` to additionally execute and
+    /// emit the `spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md` §7 17-step
+    /// verifier trace.
     Explain {
-        /// Legacy receipt ID (`rcpt_...`) or v2 body_hash.
+        /// Legacy receipt ID (`rcpt_...`) or v2 body_hash. Use a sentinel
+        /// (e.g. `bilateral`) when reading a bilateral artifact via
+        /// `--input-file`; the receipt_id is informational for that path.
         receipt_id: String,
-        /// Optional JSON file containing one v1 or v2 receipt.
+        /// Optional JSON file containing one v1 or v2 receipt, or a
+        /// `BilateralCoSignArtifacts` document.
         #[arg(long)]
         input_file: Option<PathBuf>,
         /// Maximum parent depth to render.
@@ -2670,6 +2682,13 @@ enum ReceiptCommands {
         /// Maximum fanout siblings to render per level.
         #[arg(long, default_value_t = 32)]
         fanout_limit: usize,
+        /// Emit the §7 17-step bilateral verifier trace alongside the
+        /// rendered DSSE envelope. Requires `--input-file` to point at a
+        /// `BilateralCoSignArtifacts` document. The trace marks each step
+        /// with one of `ok`, `bounded` (out of trj5 scope per B4), or
+        /// `fail` plus a one-line note.
+        #[arg(long, default_value_t = false)]
+        explain_bilateral: bool,
     },
 }
 
