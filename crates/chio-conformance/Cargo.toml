@@ -51,6 +51,11 @@ path = "src/bin/chio_native_conformance_fixture.rs"
 # directories through `ConformanceRunOptions`.
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
+# TRJ5-C5: opt-in selective-disclosure conformance test. Forwards to
+# chio-federation's `zk` feature so the projection module compiles. Per
+# Risk Register R6, this is a separate CI matrix entry, not the default
+# build path.
+zk = ["chio-federation/zk"]
 
 [dependencies]
 chio-core = { package = "chio-core-types", version = "0.1.0", path = "../chio-core-types" }
@@ -105,6 +110,9 @@ base64ct = { workspace = true, features = ["alloc"] }
 # in base64 to forge a §6 envelope; chio-federation's DSSE envelope wire
 # format is RFC 4648 standard base64 (workspace-pinned `base64` crate).
 base64 = { workspace = true }
+# TRJ5-C5: c5_selective_disclosure_zk.rs hex-decodes the disclosed
+# message bytes to assert the auditor sees the cleartext field values.
+hex = { workspace = true }
 coset = { workspace = true }
 jsonwebtoken = { workspace = true }
 sha2 = { workspace = true }

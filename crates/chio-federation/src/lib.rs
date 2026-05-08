@@ -13,6 +13,14 @@ pub mod bilateral;
 pub mod bilateral_dsse;
 pub mod metrics;
 pub mod revocation_gossip;
+// TRJ5-C5: selective-disclosure auditor view per
+// spec/CHIODOS_SELECTIVE_DISCLOSURE.md §6 BBS+ projection. Default-off
+// per Risk Register R6 (zk feature CI weight). The trj5 implementation
+// is a STUB BBS+ that captures the deterministic projection and
+// disclose/withhold semantics; real BLS12-381 BBS+ signing is deferred
+// to trj6. See module docs for bounded-claim language.
+#[cfg(feature = "zk")]
+pub mod selective_disclosure;
 pub mod trust_establishment;
 
 pub use metrics::{
@@ -40,12 +48,19 @@ pub use bilateral_dsse::{
     DEFAULT_COSIGN_MODE, DEFAULT_CROSS_ORG_VISIBILITY, PAYLOAD_TYPE_IN_TOTO, PREDICATE_BODY_SCHEMA,
     PREDICATE_TYPE_BILATERAL, STATEMENT_TYPE_V1,
 };
+// TRJ5-C5: selective-disclosure auditor view (zk feature).
 pub use revocation_gossip::{
     respond_to_catchup, RevocationCatchupHistory, RevocationCatchupRequest,
     RevocationCatchupResponse, RevocationGossipBatch, RevocationGossipError,
     RevocationGossipPushQueue, RevocationRootGossip, REVOCATION_CATCHUP_MAX_EPOCHS,
     REVOCATION_CATCHUP_REQUEST_SCHEMA, REVOCATION_CATCHUP_RESPONSE_SCHEMA,
     REVOCATION_ROOT_GOSSIP_BATCH_SCHEMA, REVOCATION_ROOT_GOSSIP_SCHEMA,
+};
+#[cfg(feature = "zk")]
+pub use selective_disclosure::{
+    project_audit_view, verify_audit_view, BbsAuditView, BbsMessage, DisclosedFields,
+    DisclosedMessage, DisclosureSet, SelectiveDisclosureError, AUDIT_VIEW_SCHEMA_STUB,
+    PROJECTION_VERSION_RECEIPT_V1,
 };
 pub use trust_establishment::{
     ConformanceEvidence, ConformanceTier, FederationPeer, FederationPeerStore, HandshakeChallenge,
