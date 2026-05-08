@@ -1,28 +1,3 @@
-//! TRJ5-C4: integration test for `chio receipt explain` bilateral
-//! rendering. Builds a real `BilateralCoSignArtifacts` via the
-//! production federation hot-path emitter (`co_sign_with_origin_full`),
-//! serialises it to a JSON fixture file under `tempdir`, and shells out
-//! to the actual `chio` binary with `--input-file <fixture>` plus
-//! `--explain-bilateral`. The test then parses the JSON output and
-//! asserts:
-//!
-//! 1. The detected `shape` is `BilateralCoSignArtifacts`.
-//! 2. The `dual_signed_receipt` section carries the §6 non-conformance
-//!    disclaimer per B4 doc-comment.
-//! 3. The `dsse_envelope` section carries `payloadType ==
-//!    application/vnd.in-toto+json` (§6 PAE binding) plus exactly two
-//!    signatures with `keyid` + `sig` fields.
-//! 4. The `bilateral_verifier_trace` carries 17 step entries, with
-//!    locally-verifiable steps marked `ok` and out-of-trj5-scope steps
-//!    marked `bounded` (matching the B4 disclaimer surface). No step is
-//!    marked `fail` for a healthy hot-path artifact.
-//! 5. The renderer's keyids match the predicate's
-//!    `tool_server_*.passport_key_fingerprint` (§7 step 10).
-//!
-//! Following the B4 conformance test pattern, this test runs the actual
-//! production emitter — no mocks — and shells the actual binary so it
-//! exercises the same code path operators use.
-
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::process::Command;
@@ -126,7 +101,6 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
         "renderer must declare its own report schema"
     );
 
-    // (1) DualSignedReceipt section disclaimer per B4 doc-comment.
     let dual = &parsed["dual_signed_receipt"];
     let disclaimer = dual["non_section6_disclaimer"]
         .as_str()
@@ -213,7 +187,6 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_seventeen_step_trace() {
         );
     }
 
-    // Steps explicitly out of trj5/B4 scope must be `bounded`, not `ok`.
     let must_be_bounded = [
         "ed25519_verify_org_a_pae",
         "ed25519_verify_org_b_pae",

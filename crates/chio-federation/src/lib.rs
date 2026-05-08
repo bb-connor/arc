@@ -13,12 +13,9 @@ pub mod bilateral;
 pub mod bilateral_dsse;
 pub mod metrics;
 pub mod revocation_gossip;
-// TRJ5-C5: selective-disclosure auditor view per
 // spec/CHIODOS_SELECTIVE_DISCLOSURE.md §6 BBS+ projection. Default-off
-// per Risk Register R6 (zk feature CI weight). The trj5 implementation
 // is a STUB BBS+ that captures the deterministic projection and
 // disclose/withhold semantics; real BLS12-381 BBS+ signing is deferred
-// to trj6. See module docs for bounded-claim language.
 #[cfg(feature = "zk")]
 pub mod selective_disclosure;
 pub mod trust_establishment;
@@ -36,11 +33,6 @@ pub use bilateral::{
     CoSigningResponse, DualSignedReceipt, InProcessCoSigner, BILATERAL_COSIGNING_SCHEMA,
     BILATERAL_DUAL_RECEIPT_SCHEMA,
 };
-// TRJ5-B4: §6-conformant bilateral envelope (DSSE PAE). Coexists with
-// the legacy `DualSignedReceipt`; verifiers seeking spec
-// `CHIODOS_BILATERAL_COSIGN_INVOCATION.md` §6 conformance MUST use
-// `verify_dsse_envelope`. See `bilateral_dsse.rs` module docs for the
-// cohabitation rationale.
 pub use bilateral_dsse::{
     build_predicate, build_statement, pae, sign_dsse_envelope, verify_dsse_envelope,
     BilateralPredicate, DsseEnvelope, DsseSignature, DsseStatement, KernelIdentity, Keyid,
@@ -48,7 +40,6 @@ pub use bilateral_dsse::{
     DEFAULT_COSIGN_MODE, DEFAULT_CROSS_ORG_VISIBILITY, PAYLOAD_TYPE_IN_TOTO, PREDICATE_BODY_SCHEMA,
     PREDICATE_TYPE_BILATERAL, STATEMENT_TYPE_V1,
 };
-// TRJ5-C5: selective-disclosure auditor view (zk feature).
 pub use revocation_gossip::{
     respond_to_catchup, RevocationCatchupHistory, RevocationCatchupRequest,
     RevocationCatchupResponse, RevocationGossipBatch, RevocationGossipError,

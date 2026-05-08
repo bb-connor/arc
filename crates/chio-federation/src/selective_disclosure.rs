@@ -1,20 +1,6 @@
-//! TRJ5-C5: selective-disclosure auditor view per
-//! `spec/CHIODOS_SELECTIVE_DISCLOSURE.md` §6 BBS+ projection.
-//!
 //! ## Why this module exists
 //!
-//! Lane C demos a 3-vendor buyer auditor flow. The auditor must verify
-//! constraints over a receipt without learning the full receipt body
-//! ("did the refund step transfer no more than $250 to a tier-2+ KYC
-//! customer", per spec §6.4). Real BBS+ projections satisfy this with
-//! BLS12-381 commitments + AnonCreds-v2 RangeStatement; trj5 ships the
-//! deterministic projection algorithm and the disclose/withhold
-//! semantics so callers can wire the auditor view today, while the
-//! actual zero-knowledge cryptography lands in trj6.
-//!
 //! ## Stub status (HONEST)
-//!
-//! NOTE: stub BBS+ implementation; real crypto deferred to trj6.
 //!
 //! What this module DOES today (`zk` feature):
 //!
@@ -28,7 +14,7 @@
 //! 3. Emits a `BbsAuditView` that exposes a disclosed-message subset
 //!    plus an opaque `proof_bytes` placeholder. The placeholder is a
 //!    SHA-256 commitment to the *withheld* messages plus the disclosed
-//!    indices; this is NOT a zero-knowledge proof — a verifier with
+//!    indices; this is NOT a zero-knowledge proof - a verifier with
 //!    access to the full receipt body can reconstruct withheld
 //!    messages and re-hash.
 //! 4. `verify_audit_view` re-runs the projection against the pinned
@@ -39,39 +25,20 @@
 //!    zero-knowledge of the withheld content from a verifier that
 //!    holds the full receipt.
 //!
-//! What this module does NOT do (deferred to trj6):
-//!
 //! - Actual BLS12-381 BBS+ signing (no `bbs_plus` dep is pulled in).
-//! - Predicate language v1 (`eq`, `cmp`, `member`) — those need real
+//! - Predicate language v1 (`eq`, `cmp`, `member`) - those need real
 //!   BBS+ commitments + Bulletproofs RangeStatements, not SHA-256.
 //! - WorkflowReceipt projection (only `ChioReceiptBody` here, not
 //!   `WorkflowReceiptBody` from chio-workflow).
 //! - Issuer fingerprint binding to `chio-credentials` passport.
 //! - Wholesale-vs-disclosable enforcement at projection time
 //!   (wholesale-only fields are flagged in the message metadata but
-//!   not refused at projection — that lives in the predicate layer
+//!   not refused at projection - that lives in the predicate layer
 //!   per §5.6 and arrives with the predicate-language pass).
 //!
 //! ## Bounded-claim language (per selective-disclosure.md)
 //!
-//! - **Single-party local proof**, not transparency-log: the audit
-//!   view binds a specific `(receipt, disclosure_set)` to a SHA-256
-//!   commitment under one issuer. No external witness, no inclusion
-//!   proof against a Merkle tree, no rotation guarantee.
-//! - **The auditor sees what the projection allows, no more**: the
-//!   projection is deterministic and indexed by alphabetised serde
-//!   field name; disclosed messages are revealed in the clear,
-//!   withheld messages are NOT revealed by this module. (Note the
-//!   stub-status caveat above: a verifier with the full receipt could
-//!   recompute withheld messages itself; trj6's real BBS+ removes that
-//!   side channel.)
-//!
 //! ## Crate placement note
-//!
-//! Spec §10 calls for a `chio-zk-receipts` crate adjacent to
-//! `chio-attest-verify`. To keep the trj5 surface narrow we land the
-//! stub in `chio-federation` under a `zk` feature; the trj6 follow-up
-//! moves it into the dedicated crate when real BBS+ deps land.
 
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::receipt::ChioReceiptBody;
@@ -81,11 +48,6 @@ use sha2::{Digest, Sha256};
 /// Schema discriminator for the §5.2 receipt-body projection.
 pub const PROJECTION_VERSION_RECEIPT_V1: &str = "chio.bbs-projection.receipt.v1";
 
-/// Schema discriminator emitted on every audit view produced by this
-/// module. The `.stub` suffix is load-bearing — it tells downstream
-/// verifiers that the artifact carries the deterministic projection
-/// but NOT zero-knowledge crypto, so they can fail closed if they
-/// expected a real BBS+ proof.
 pub const AUDIT_VIEW_SCHEMA_STUB: &str = "chio.federation-bbs-audit-view.v1.stub";
 
 /// One message in the §5 projection.
@@ -127,7 +89,7 @@ pub struct DisclosedMessage {
 /// real BBS+ proof.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BbsAuditView {
-    /// `AUDIT_VIEW_SCHEMA_STUB` — note the `.stub` suffix.
+    /// `AUDIT_VIEW_SCHEMA_STUB` - note the `.stub` suffix.
     pub schema: String,
     /// `PROJECTION_VERSION_RECEIPT_V1` (the projection that produced
     /// the message vector).
@@ -138,12 +100,6 @@ pub struct BbsAuditView {
     pub subject_receipt_sha256_hex: String,
     /// Disclosed messages (subset of the 14-message vector).
     pub disclosed: Vec<DisclosedMessage>,
-    /// SHA-256 of the canonical-JSON of `(disclosed_indices,
-    /// withheld_messages)`. The verifier recomputes this from the
-    /// pinned receipt + the same disclosure set and compares
-    /// byte-for-byte. This is the stub stand-in for the real BBS+
-    /// proof; trj6 replaces with `bbs_plus::ProofG1` over the
-    /// disclosed/withheld split.
     pub proof_bytes_hex: String,
 }
 
@@ -231,7 +187,7 @@ fn project_receipt_body(
         wholesale_only: false,
     });
 
-    // 2 content_hash (Hx — already a 32-byte hex string; we MUST decode
+    // 2 content_hash (Hx - already a 32-byte hex string; we MUST decode
     // first per spec §5.2 "hex-decoded 32-byte SHA-256". If the
     // caller's content_hash is malformed we re-hash the raw bytes to
     // remain deterministic.)
@@ -481,7 +437,7 @@ pub fn project_audit_view(
 /// The pinned `body` is the verifier's locally-resolved receipt
 /// (matching spec §9 step 2, `pinned_receipt` argument). Verifiers
 /// that cannot resolve a pinned body MUST refuse to call this function
-/// — there is no "proof-carrying-receipt" mode in v0.1.
+/// - there is no "proof-carrying-receipt" mode in v0.1.
 pub fn verify_audit_view(
     view: &BbsAuditView,
     pinned: &ChioReceiptBody,
@@ -506,7 +462,7 @@ pub fn verify_audit_view(
     let disclosed_indices: Vec<u8> = view.disclosed.iter().map(|m| m.index).collect();
     // For each disclosed message in the view, the bytes MUST match the
     // pinned projection. This is the "auditor sees what the projection
-    // allows" check — a producer who tried to alter the disclosed
+    // allows" check - a producer who tried to alter the disclosed
     // value without altering the receipt would be caught here.
     for disclosed in &view.disclosed {
         let pinned_msg = projection

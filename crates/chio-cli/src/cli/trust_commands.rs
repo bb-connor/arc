@@ -134,9 +134,6 @@ struct ReceiptExplainArgs<'a> {
     input_file: Option<&'a Path>,
     depth: usize,
     fanout_limit: usize,
-    /// TRJ5-C4: when set, emit the §7 17-step bilateral verifier trace.
-    /// Only meaningful when `input_file` points at a
-    /// `BilateralCoSignArtifacts` document.
     explain_bilateral: bool,
 }
 
@@ -2433,12 +2430,6 @@ fn cmd_receipt_explain(
     } else {
         load_receipt_for_explain(args.receipt_id, &backend)?
     };
-    // TRJ5-C4: detect a `BilateralCoSignArtifacts` JSON document and
-    // route to the bilateral renderer. Detection is shape-based (the
-    // struct lives in chio-federation and serdes both fields with
-    // camelCase keys via `BilateralCoSignArtifacts` in the demo
-    // serializer; we accept both snake_case and camelCase here for
-    // robustness). The legacy single-receipt path is unchanged.
     if is_bilateral_artifacts_value(&value) {
         return render_bilateral_explain(&value, &args, &backend);
     }
@@ -2480,17 +2471,7 @@ fn cmd_receipt_explain(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// TRJ5-C4: bilateral receipt-explain rendering (BilateralCoSignArtifacts).
-// ---------------------------------------------------------------------------
 
-/// Returns `true` when `value` looks like a serialised
-/// `BilateralCoSignArtifacts` (has both a `dual_signed_receipt`/
-/// `dualSignedReceipt` and a `dsse_envelope`/`dsseEnvelope`). The shape
-/// check intentionally tolerates both naming conventions because the
-/// upstream `BilateralCoSignArtifacts` derives `Debug, Clone` only and
-/// is hand-serialised by callers; the C4 fixture writer uses
-/// snake_case but a future serde-derived emitter may camelCase.
 fn is_bilateral_artifacts_value(value: &serde_json::Value) -> bool {
     let Some(obj) = value.as_object() else {
         return false;
@@ -2641,14 +2622,6 @@ fn explain_dsse_envelope(dsse: &serde_json::Value) -> Result<serde_json::Value, 
     }))
 }
 
-/// Run the §7 17-step verifier trace. Each step result is one of:
-/// - `ok`: the step passes locally with the data on hand.
-/// - `bounded`: the step is explicitly out of trj5/B4 scope per
-///   `dsse-bilateral-signing.md` §"Out of scope for B4" (lease
-///   resolution, governance receipt, anchor reconciliation, etc.). The
-///   verifier returns `bounded` rather than `ok` because trj5 cannot
-///   resolve external state.
-/// - `fail`: the step's local check failed.
 fn explain_bilateral_seventeen_step_trace(
     dual: &serde_json::Value,
     dsse: &serde_json::Value,
@@ -2939,7 +2912,6 @@ fn explain_bilateral_seventeen_step_trace(
         );
     }
 
-    // Step 14: capability-lease resolution. Out of B4 scope.
     step(
         14,
         "capability_lease_resolution",
@@ -2947,7 +2919,6 @@ fn explain_bilateral_seventeen_step_trace(
         "deferred per .planning/trajectory-5/lane-b-wiring/dsse-bilateral-signing.md (Out of scope for B4)",
     );
 
-    // Step 15: governance-receipt resolution. Out of B4 scope.
     step(
         15,
         "governance_receipt_resolution",
@@ -2955,7 +2926,6 @@ fn explain_bilateral_seventeen_step_trace(
         "deferred per .planning/trajectory-5/lane-b-wiring/dsse-bilateral-signing.md (Out of scope for B4)",
     );
 
-    // Step 16: consistency-anchor reconciliation. Out of B4 scope.
     step(
         16,
         "consistency_anchor_reconciliation",
@@ -2963,8 +2933,6 @@ fn explain_bilateral_seventeen_step_trace(
         "deferred per .planning/trajectory-5/lane-b-wiring/dsse-bilateral-signing.md (Out of scope for B4)",
     );
 
-    // Step 17: peer pinning / revocation freshness. Out of trj5 scope (the CLI
-    // has no live revocation oracle handle here).
     step(
         17,
         "peer_pin_revocation_freshness",

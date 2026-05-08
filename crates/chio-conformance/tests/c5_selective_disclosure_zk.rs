@@ -1,8 +1,3 @@
-//! TRJ5-C5: end-to-end conformance test for the selective-disclosure
-//! auditor view. Gated behind `--features zk` so the default
-//! workspace build does NOT exercise the path (Risk Register R6:
-//! `zk` feature CI weight stays out of the default matrix).
-//!
 //! What this test asserts:
 //!
 //! 1. **Round-trip honesty.** A receipt body projected with the
@@ -23,11 +18,6 @@
 //! 4. **Schema/version discipline.** A view with an unknown schema
 //!    or unknown projection version fails closed at the
 //!    `SchemaMismatch` / `ProjectionVersionMismatch` gates.
-//!
-//! See `crates/chio-federation/src/selective_disclosure.rs` for the
-//! bounded-claim language: trj5 ships a stub BBS+ that captures the
-//! deterministic projection but NOT zero-knowledge crypto. Real BLS12-381
-//! BBS+ signing is deferred to trj6.
 
 #![cfg(feature = "zk")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -155,9 +145,6 @@ fn audit_view_rejects_disclosed_field_substitution() {
     let mut view =
         project_audit_view(&body, &DisclosureSet(vec![1, 11])).expect("projection must succeed");
 
-    // Producer tries to substitute "cap-trj5-c5" -> "cap-FORGED" while
-    // keeping the same subject_receipt_sha256_hex. The verifier
-    // re-projects against the pinned body and catches the mismatch.
     view.disclosed[0].bytes_hex = hex::encode("cap-FORGED".as_bytes());
     let result = verify_audit_view(&view, &body);
     assert!(

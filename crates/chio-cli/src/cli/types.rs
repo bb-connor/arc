@@ -2682,11 +2682,6 @@ enum ReceiptCommands {
         /// Maximum fanout siblings to render per level.
         #[arg(long, default_value_t = 32)]
         fanout_limit: usize,
-        /// Emit the §7 17-step bilateral verifier trace alongside the
-        /// rendered DSSE envelope. Requires `--input-file` to point at a
-        /// `BilateralCoSignArtifacts` document. The trace marks each step
-        /// with one of `ok`, `bounded` (out of trj5 scope per B4), or
-        /// `fail` plus a one-line note.
         #[arg(long, default_value_t = false)]
         explain_bilateral: bool,
     },
