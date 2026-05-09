@@ -2660,11 +2660,11 @@ enum ReceiptCommands {
     /// Explain why a receipt was allowed or denied.
     ///
     /// When `--input-file` points at a `BilateralCoSignArtifacts` JSON
-    /// document (the §6 federation hot-path emission with both a
+    /// document (the federation signature-slice API emission with both a
     /// `dualSignedReceipt` and a `dsseEnvelope`), the renderer auto-detects
     /// the bilateral shape and prints both the legacy DualSignedReceipt
-    /// section (NON-§6-CONFORMANT per B4) and the §6 DSSE envelope
-    /// section.
+    /// section (NON-§6-CONFORMANT per B4) and the DSSE signature-slice
+    /// section. It does not claim strict CHIODOS §6 predicate conformance.
     ///
     /// Pass `--inspect-bilateral` to additionally emit a structural
     /// **inspection trace** of the envelope. The previous flag spelling
@@ -2677,8 +2677,11 @@ enum ReceiptCommands {
     /// legacy spelling `--explain-bilateral` is retained as a
     /// deprecated alias.
     Explain {
-        /// Legacy receipt ID (`rcpt_...`) or v2 body_hash. Use a sentinel
-        /// (e.g. `bilateral`) when reading a bilateral artifact via
+        /// Legacy receipt ID (`rcpt_...`). v2 bodyHash explanation is
+        /// supported only when the v2 receipt JSON is supplied through
+        /// `--input-file`; persisted DB/control-plane bodyHash lookup is
+        /// not implemented on this CLI path. Use a sentinel (e.g.
+        /// `bilateral`) when reading a bilateral artifact via
         /// `--input-file`; the receipt_id is informational for that path.
         receipt_id: String,
         /// Optional JSON file containing one v1 or v2 receipt, or a

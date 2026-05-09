@@ -2628,7 +2628,7 @@ fn explain_dsse_envelope(dsse: &serde_json::Value) -> Result<serde_json::Value, 
         "payload_b64": payload_b64,
         "payload_hex": payload_hex,
         "signatures": signatures,
-        "section6_conformance_note": "This is the §6 load-bearing artifact. The signatures cover Ed25519(pae(payloadType, base64_decode(payload))) per spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md §6 lines 308-353.",
+        "section6_conformance_note": "This is the DSSE signature-slice API artifact. The signatures cover Ed25519(pae(payloadType, base64_decode(payload))), but the predicate is not the strict CHIODOS §6 invocation schema.",
     }))
 }
 
@@ -2922,7 +2922,7 @@ fn inspect_bilateral_envelope_trace(
             13,
             "predicate_body_schema",
             "ok",
-            "predicate.schema matches chio.bilateral-cosign.invocation.v1",
+            "predicate.schema matches chio.bilateral-cosign.signature-slice.v1",
         );
     } else {
         step(
@@ -2966,7 +2966,7 @@ fn inspect_bilateral_envelope_trace(
         "trace_kind": "inspection",
         "verification_performed": false,
         "scope_note": "ok = locally verifiable structural check, not-verified = no cryptographic verification (use bilateral_dsse::verify_dsse_envelope), bounded = step deferred to kernel-resident verifier, fail = local structural check failed",
-        "honesty_note": "This is an INSPECTION trace, not a verifier trace. Ed25519 signatures are NOT verified here; this trace is informational only. For cryptographic verification, pin org A / org B passport keys and call bilateral_dsse::verify_dsse_envelope (or run `chio receipt verify --bilateral`).",
+        "honesty_note": "This is an INSPECTION trace, not a verifier trace. Ed25519 signatures are NOT verified here; this trace is informational only. For cryptographic verification, pin org A / org B passport keys and call bilateral_dsse::verify_dsse_envelope or the kernel-resident bilateral verifier.",
         "steps": steps,
     }))
 }
@@ -3001,7 +3001,7 @@ fn print_bilateral_human(report: &serde_json::Value, with_trace: bool) {
     );
     println!();
 
-    println!("--- DSSE envelope (§6 load-bearing) ---");
+    println!("--- DSSE envelope (signature-slice API artifact) ---");
     let dsse = &report["dsse_envelope"];
     println!(
         "  schema:        {}",
@@ -3196,7 +3196,7 @@ fn finish_receipt_for_explain(
         return Ok(matches.remove(0));
     }
     Err(CliError::cli_other_error(format!(
-        "receipt `{receipt_id}` not found in paginated receipt rows from {source}; use --input-file for direct v2 body_hash lookup"
+        "receipt `{receipt_id}` not found in paginated receipt rows from {source}; persisted v2 bodyHash lookup is not implemented on this path, so use --input-file with the v2 receipt JSON"
     )))
 }
 
