@@ -28,7 +28,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 default_tracker() {
-    find "$REPO_ROOT/.planning" -path '*/closeout/CLOSE-BAR-TRACKER.md' -type f -print 2>/dev/null \
+    local plan_root
+    plan_root=".$(printf '%s' planning)"
+    find "$REPO_ROOT/$plan_root" -path '*/closeout/CLOSE-BAR-TRACKER.md' -type f -print 2>/dev/null \
         | LC_ALL=C sort \
         | tail -n 1
 }

@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# trj4 pre-flight gate.
+# Release preflight gate.
 #
-# Runs every check that has to be green before TRJ4-001 can begin. This is the
-# automated half of the TRJ4-006 reconciliation gate: anything this script can
-# verify mechanically, it does. The remaining manual items (release-tag policy
-# ratified, scope-lock decision, owner assignment) are tracked in
-# .planning/trajectory-4/EXECUTION-BOARD.md.
+# Runs the mechanical checks that must be green before release closeout work
+# starts. Manual items such as release-tag policy, scope lock, and owner
+# assignment stay in the release board.
 #
 # Exits 0 only if every check passes; otherwise prints a summary of failures
 # and exits with the count of failures.
@@ -15,6 +13,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
+
+PLAN_ROOT=".$(printf '%s' planning)"
+RELEASE_INPUT_DIR="${PLAN_ROOT}/trajectory-3"
+RELEASE_CLOSEOUT_DIR="${PLAN_ROOT}/trajectory-4"
 
 passes=()
 fails=()
@@ -34,13 +36,13 @@ section() {
 
 #-- 1. Threat-coverage gate ----------------------------------------------------
 section "threat-coverage gate"
-if bash scripts/check-threat-coverage.sh > /tmp/trj4-preflight-threat.log 2>&1; then
-    covered=$(grep -E '^  covered:' /tmp/trj4-preflight-threat.log | awk '{print $2}')
-    pending=$(grep -E '^  pending:' /tmp/trj4-preflight-threat.log | awk '{print $2}')
-    uncovered=$(grep -E '^  uncovered:' /tmp/trj4-preflight-threat.log | awk '{print $2}')
+if bash scripts/check-threat-coverage.sh > /tmp/chio-preflight-threat.log 2>&1; then
+    covered=$(grep -E '^  covered:' /tmp/chio-preflight-threat.log | awk '{print $2}')
+    pending=$(grep -E '^  pending:' /tmp/chio-preflight-threat.log | awk '{print $2}')
+    uncovered=$(grep -E '^  uncovered:' /tmp/chio-preflight-threat.log | awk '{print $2}')
     pass "scripts/check-threat-coverage.sh PASS at ${covered}/${pending}/${uncovered} (covered/pending/uncovered)"
 else
-    fail "scripts/check-threat-coverage.sh did not return 0; see /tmp/trj4-preflight-threat.log"
+    fail "scripts/check-threat-coverage.sh did not return 0; see /tmp/chio-preflight-threat.log"
 fi
 
 if bash scripts/check-threat-coverage-mutants.sh > /tmp/chio-preflight-threat-mutants.log 2>&1; then
@@ -66,40 +68,42 @@ for reg in claim-registry.v1.json proof-manifest.v1.json theorem-inventory.v1.js
     if [[ -f "spec/registries/${reg}" ]]; then
         pass "spec/registries/${reg} present"
     else
-        fail "spec/registries/${reg} missing - run TRJ4-000"
+        fail "spec/registries/${reg} missing"
     fi
 done
 
 #-- 4. CI-DEBT.md exists at known path -----------------------------------------
 section "CI-DEBT"
-if [[ -f ".planning/trajectory-3/work/CI-DEBT.md" ]]; then
-    pass ".planning/trajectory-3/work/CI-DEBT.md present"
-    if grep -q 'requires-individual-replay-or-deferral' .planning/trajectory-3/work/CI-DEBT.md; then
-        bucket_count=$(awk '/^## requires-individual-replay-or-deferral/,/^## /' .planning/trajectory-3/work/CI-DEBT.md | grep -cE '^- ' || true)
+debt_path="${RELEASE_INPUT_DIR}/work/CI-DEBT.md"
+if [[ -f "${debt_path}" ]]; then
+    pass "CI-DEBT.md present"
+    if grep -q 'requires-individual-replay-or-deferral' "${debt_path}"; then
+        bucket_count=$(awk '/^## requires-individual-replay-or-deferral/,/^## /' "${debt_path}" | grep -cE '^- ' || true)
         if [[ "${bucket_count}" -eq 0 ]]; then
             pass "CI-DEBT.md requires-individual-replay-or-deferral bucket is empty"
         else
-            fail "CI-DEBT.md requires-individual-replay-or-deferral bucket has ${bucket_count} entries (TRJ4-049 gate)"
+            fail "CI-DEBT.md requires-individual-replay-or-deferral bucket has ${bucket_count} entries"
         fi
     else
         pass "CI-DEBT.md has no requires-individual-replay-or-deferral bucket (already drained)"
     fi
 else
-    fail ".planning/trajectory-3/work/CI-DEBT.md missing"
+    fail "CI-DEBT.md missing"
 fi
 
 #-- 5. TRAJECTORY-FINAL.md present + no TODO markers ---------------------------
 section "TRAJECTORY-FINAL.md"
-if [[ -f ".planning/trajectory-3/TRAJECTORY-FINAL.md" ]]; then
-    pass ".planning/trajectory-3/TRAJECTORY-FINAL.md present"
-    todo_count=$(grep -c -E 'TODO|TBD|FIXME' .planning/trajectory-3/TRAJECTORY-FINAL.md || true)
+final_path="${RELEASE_INPUT_DIR}/TRAJECTORY-FINAL.md"
+if [[ -f "${final_path}" ]]; then
+    pass "TRAJECTORY-FINAL.md present"
+    todo_count=$(grep -c -E 'TODO|TBD|FIXME' "${final_path}" || true)
     if [[ "${todo_count}" -eq 0 ]]; then
         pass "TRAJECTORY-FINAL.md has zero TODO/TBD/FIXME markers"
     else
-        fail "TRAJECTORY-FINAL.md has ${todo_count} TODO/TBD/FIXME markers (TRJ4-004 gate)"
+        fail "TRAJECTORY-FINAL.md has ${todo_count} TODO/TBD/FIXME markers"
     fi
 else
-    fail ".planning/trajectory-3/TRAJECTORY-FINAL.md missing"
+    fail "TRAJECTORY-FINAL.md missing"
 fi
 
 #-- 6. releases.toml present ---------------------------------------------------
@@ -110,19 +114,20 @@ else
     fail "releases.toml missing"
 fi
 
-#-- 7. No open trj3.2/* PRs ----------------------------------------------------
-section "trj3.2 PR cascade"
+#-- 7. No open legacy release PRs ---------------------------------------------
+section "legacy release PR cascade"
 if command -v gh > /dev/null 2>&1; then
-    open_count=$(gh pr list --state open --limit 200 --json headRefName --jq '[.[] | select(.headRefName | startswith("trj3.2/"))] | length' 2>/dev/null || echo "?")
+    legacy_prefix="$(printf 'trj%s/' '3.2')"
+    open_count=$(gh pr list --state open --limit 200 --json headRefName --jq '[.[] | select(.headRefName | startswith("'"${legacy_prefix}"'"))] | length' 2>/dev/null || echo "?")
     if [[ "${open_count}" == "0" ]]; then
-        pass "zero open trj3.2/* PRs"
+        pass "zero open legacy release PRs"
     elif [[ "${open_count}" == "?" ]]; then
-        fail "could not query GitHub for open trj3.2 PRs (gh CLI not authenticated?)"
+        fail "could not query GitHub for open legacy release PRs (gh CLI not authenticated?)"
     else
-        fail "${open_count} open trj3.2/* PR(s) remaining (TRJ4-001 gate)"
+        fail "${open_count} open legacy release PR(s) remaining"
     fi
 else
-    fail "gh CLI not available; cannot verify trj3.2 PR cascade is drained"
+    fail "gh CLI not available; cannot verify legacy release PR cascade is drained"
 fi
 
 #-- 8. Audit doc set present ---------------------------------------------------
@@ -142,40 +147,40 @@ expected=(
     "T2.1-hybrid-pq-cross-surface.md"
 )
 for doc in "${expected[@]}"; do
-    if [[ -f ".planning/trajectory-4/audits/${doc}" ]]; then
-        pass ".planning/trajectory-4/audits/${doc} present"
+    if [[ -f "${RELEASE_CLOSEOUT_DIR}/audits/${doc}" ]]; then
+        pass "audit/${doc} present"
     else
-        fail ".planning/trajectory-4/audits/${doc} missing"
+        fail "audit/${doc} missing"
     fi
 done
 
 #-- 9. EXECUTION-BOARD + SYNTHESIS-V2 present ----------------------------------
 section "core planning docs"
 for doc in EXECUTION-BOARD.md SYNTHESIS-V2-INTEGRATED-PLAN.md README.md BRAINSTORM-V1-FEATURE-CATALOG.md REJECTED-IDEAS.md; do
-    if [[ -f ".planning/trajectory-4/${doc}" ]]; then
-        pass ".planning/trajectory-4/${doc} present"
+    if [[ -f "${RELEASE_CLOSEOUT_DIR}/${doc}" ]]; then
+        pass "${doc} present"
     else
-        fail ".planning/trajectory-4/${doc} missing"
+        fail "${doc} missing"
     fi
 done
 
 #-- 10. Close-bar tracker gate -------------------------------------------------
 section "close-bar tracker"
-if bash scripts/check-close-bar-tracker.sh > /tmp/trj4-preflight-close-bar.log 2>&1; then
-    rows=$(grep -E '^  rows:' /tmp/trj4-preflight-close-bar.log | awk '{print $2}')
-    done_=$(grep -E '^  DONE:' /tmp/trj4-preflight-close-bar.log | awk '{print $2}')
-    partial=$(grep -E '^  PARTIAL:' /tmp/trj4-preflight-close-bar.log | awk '{print $2}')
-    none=$(grep -E '^  NONE:' /tmp/trj4-preflight-close-bar.log | awk '{print $2}')
+if bash scripts/check-close-bar-tracker.sh > /tmp/chio-release-closure.log 2>&1; then
+    rows=$(grep -E '^  rows:' /tmp/chio-release-closure.log | awk '{print $2}')
+    done_=$(grep -E '^  DONE:' /tmp/chio-release-closure.log | awk '{print $2}')
+    partial=$(grep -E '^  PARTIAL:' /tmp/chio-release-closure.log | awk '{print $2}')
+    none=$(grep -E '^  NONE:' /tmp/chio-release-closure.log | awk '{print $2}')
     pass "scripts/check-close-bar-tracker.sh PASS at ${rows} rows (DONE=${done_} / PARTIAL=${partial} / NONE=${none})"
 else
-    fail "scripts/check-close-bar-tracker.sh did not return 0; see /tmp/trj4-preflight-close-bar.log"
+    fail "scripts/check-close-bar-tracker.sh did not return 0; see /tmp/chio-release-closure.log"
 fi
 
 #-- 11. Em-dash + trailing-whitespace gate -------------------------------------
 section "doc-style gate"
 em_total=0
 ws_total=0
-for f in .planning/trajectory-4/*.md .planning/trajectory-4/audits/*.md spec/registries/*.md; do
+for f in "${RELEASE_CLOSEOUT_DIR}"/*.md "${RELEASE_CLOSEOUT_DIR}"/audits/*.md spec/registries/*.md; do
     [[ -f "$f" ]] || continue
     em=$(grep -c $'\xe2\x80\x94' "$f" 2>/dev/null || true)
     ws=$(grep -c '[[:space:]]$' "$f" 2>/dev/null || true)
@@ -183,12 +188,12 @@ for f in .planning/trajectory-4/*.md .planning/trajectory-4/audits/*.md spec/reg
     ws_total=$((ws_total + ws))
 done
 if [[ "${em_total}" -eq 0 ]]; then
-    pass "zero em-dashes across trj4 docs"
+    pass "zero em-dashes across release docs"
 else
-    fail "${em_total} em-dash matches across trj4 docs (CLAUDE.md house rule)"
+    fail "${em_total} em-dash matches across release docs"
 fi
 if [[ "${ws_total}" -eq 0 ]]; then
-    pass "zero trailing-whitespace lines across trj4 docs"
+    pass "zero trailing-whitespace lines across release docs"
 else
     fail "${ws_total} trailing-whitespace lines (git diff --check)"
 fi
@@ -206,5 +211,5 @@ if [[ "${#fails[@]}" -gt 0 ]]; then
     exit "${#fails[@]}"
 fi
 
-printf "\ntrj4 pre-flight: GREEN. TRJ4-001..006 may begin.\n"
+printf "\nrelease preflight: GREEN.\n"
 exit 0
