@@ -32,8 +32,9 @@
 # Override paths:
 #   1. Title-based (preferred): PR title includes `mutants-gate-override`
 #      and clears cycle_end_tag in releases.toml (CODEOWNERS review required).
-#   2. Env-var escape hatch: set MUTANTS_GATE_OVERRIDE_REASON=<reason>; the
-#      gate script downgrades a blocking-fail to a loud advisory pass. See
+#   2. Env-var audit hook: set MUTANTS_GATE_OVERRIDE_REASON=<reason>; the
+#      gate script records the reason but still exits nonzero so required
+#      lanes cannot treat it as closure evidence. See
 #      docs/fuzzing/mutants.md "Override paths".
 
 name: mutants
@@ -239,9 +240,9 @@ jobs:
           MUTANTS_PACKAGE: ${{ matrix.package }}
           MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
           MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
-          # Env-var override (single CI run). Setting this variable downgrades
-          # a blocking-fail to a loud advisory pass. Title-based override is
-          # preferred; this env-var is for in-flight CI runs only.
+          # Env-var audit hook (single CI run). Setting this variable records
+          # a blocking-fail reason, but the gate still exits nonzero so this
+          # cannot become closure evidence. Title-based override is preferred.
           MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
           MUTANTS_NO_DIFF: ${{ steps.diff.outputs.no_diff }}
           GITHUB_ACTOR: ${{ github.actor }}
@@ -401,9 +402,9 @@ jobs:
           MUTANTS_PACKAGE: ${{ matrix.package }}
           MUTANTS_OUTPUT_DIR: mutants-out/${{ matrix.package }}
           MUTANTS_EXIT: ${{ steps.mutate.outputs.exit }}
-          # Env-var override (nightly). Forward when the repository variable
-          # is set; the gate script downgrades a blocking-fail to advisory-pass
-          # for this run only.
+          # Env-var audit hook (nightly). Forward when the repository
+          # variable is set; the gate records the reason but still exits
+          # nonzero so this cannot become closure evidence.
           MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
           GITHUB_ACTOR: ${{ github.actor }}
           CHIO_MUTANTS_GATE: blocking

@@ -97,6 +97,123 @@ if ! grep -q "cargo-mutants exit was nonzero" "${TMP_DIR}/stderr"; then
   exit 1
 fi
 
+python3 - "${TMP_DIR}/mutants-out/outcomes.json" <<'PY'
+import json
+import sys
+
+outcomes = [{"summary": "CaughtMutant"} for _ in range(13)]
+outcomes.extend({"summary": "Missed"} for _ in range(7))
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump({"outcomes": outcomes}, handle)
+    handle.write("\n")
+PY
+
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=0 \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "FAIL: blocking mutation gate passed a 65% run below the 80% target" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "caught_ratio=65.0%" "${TMP_DIR}/stderr"; then
+  echo "FAIL: below-target run did not report the 65% caught ratio" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+: >"${TMP_DIR}/override.log"
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=0 \
+  MUTANTS_GATE_OVERRIDE_REASON="test override must not close release" \
+  MUTANTS_OVERRIDE_AUDIT_LOG="${TMP_DIR}/override.log" \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "FAIL: MUTANTS_GATE_OVERRIDE_REASON produced closure/pass evidence" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "verdict=override-nonclosure" "${TMP_DIR}/stdout"; then
+  echo "FAIL: override did not emit a non-closure verdict" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "test override must not close release" "${TMP_DIR}/override.log"; then
+  echo "FAIL: override audit log was not written" >&2
+  cat "${TMP_DIR}/override.log" >&2
+  exit 1
+fi
+
+cat >"${TMP_DIR}/mutants-out/outcomes.json" <<'JSON'
+{"outcomes":[{"summary":"CaughtMutant"}]}
+JSON
+
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=0 \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "FAIL: blocking mutation gate passed a one-mutant subset" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "scoreable=1" "${TMP_DIR}/stderr"; then
+  echo "FAIL: one-mutant subset failure did not report scoreable=1" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=0 \
+  MUTANTS_MIN_SCOREABLE=1 \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "FAIL: blocking mutation gate accepted MUTANTS_MIN_SCOREABLE=1" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "blocking posture requires >= 2" "${TMP_DIR}/stderr"; then
+  echo "FAIL: low min-scoreable override did not report the blocking lower bound" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
 cat >"${TMP_DIR}/mutants-out/outcomes.json" <<'JSON'
 {"outcomes":[]}
 JSON
@@ -124,4 +241,4 @@ if ! grep -q "scoreable=0" "${TMP_DIR}/stderr"; then
   exit 1
 fi
 
-echo "PASS: blocking mutation gate fails closed on missing/empty outcomes without explicit no-diff mode"
+echo "PASS: blocking mutation gate fails closed on missing, empty, tiny, below-target, and override-nonclosure outcomes"

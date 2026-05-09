@@ -12,10 +12,9 @@
 #                    : per-crate caught-ratio target required before the
 #                      gate may flip from advisory to blocking.
 #   activation_threshold_percent_per_crate
-#                    : per-crate caught-ratio floor enforced by the gate
-#                      after D08 honest-threshold activation. If absent,
-#                      scripts/mutants-gate.sh falls back to
-#                      target_catch_ratio_percent.
+#                    : historical D08 honest-floor diagnostic. This is not a
+#                      release-closure threshold; scripts/mutants-gate.sh
+#                      fails blocking posture below target_catch_ratio_percent.
 #   required_consecutive_nightly_successes
 #                    : number of consecutive mutants-nightly full sweeps that
 #                      must meet target_catch_ratio_percent across every

@@ -418,11 +418,13 @@ bar1_crates=(
   "chio-anchor"
 )
 
-# Activation floor (per `releases.toml` activation_threshold_percent_per_crate).
+# Activation floor telemetry (per `releases.toml`
+# activation_threshold_percent_per_crate). This is not a closure threshold.
 bar1_floor_pct=65
-# Per-crate target (per `releases.toml` target_catch_ratio_percent and
-# `SHIP-BAR-TRACKER.md` Claim A chio-attest-verify >=80% requirement).
-bar1_target_chio_attest_verify_pct=80
+# Per-crate release target (per `releases.toml`
+# target_catch_ratio_percent). Every trust-boundary crate must meet this
+# target before Claim A can close.
+bar1_target_pct=80
 
 # Lane A writes release-cycle evidence under
 # audits/evidence/mutants/<crate>/ (plural). Earlier singular paths are
@@ -478,23 +480,17 @@ for crate in "${bar1_crates[@]}"; do
     continue
   fi
   # Use awk for floating-point comparison.
-  meets_floor=$(awk -v r="$rate" -v f="$bar1_floor_pct" \
-    'BEGIN { print (r + 0 >= f + 0) ? "yes" : "no" }')
-  if [ "$crate" = "chio-attest-verify" ]; then
-    meets_target=$(awk -v r="$rate" -v t="$bar1_target_chio_attest_verify_pct" \
-      'BEGIN { print (r + 0 >= t + 0) ? "yes" : "no" }')
-    if [ "$meets_target" = "yes" ]; then
-      ok "Claim A $crate measured ${rate}% (>= ${bar1_target_chio_attest_verify_pct}% target)"
-    elif [ "$meets_floor" = "yes" ]; then
-      partial "Claim A $crate measured ${rate}% (below ${bar1_target_chio_attest_verify_pct}% target, above ${bar1_floor_pct}% floor)"
-    else
-      partial "Claim A $crate measured ${rate}% (below ${bar1_floor_pct}% floor; baseline recorded honestly)"
-    fi
+  meets_target=$(awk -v r="$rate" -v t="$bar1_target_pct" \
+    'BEGIN { print (r + 0 >= t + 0) ? "yes" : "no" }')
+  if [ "$meets_target" = "yes" ]; then
+    ok "Claim A $crate measured ${rate}% (>= ${bar1_target_pct}% target)"
   else
+    meets_floor=$(awk -v r="$rate" -v f="$bar1_floor_pct" \
+      'BEGIN { print (r + 0 >= f + 0) ? "yes" : "no" }')
     if [ "$meets_floor" = "yes" ]; then
-      ok "Claim A $crate measured ${rate}% (>= ${bar1_floor_pct}% floor)"
+      partial "Claim A $crate measured ${rate}% (below ${bar1_target_pct}% target, above ${bar1_floor_pct}% floor)"
     else
-      partial "Claim A $crate measured ${rate}% (below ${bar1_floor_pct}% floor; baseline recorded honestly)"
+      partial "Claim A $crate measured ${rate}% (below ${bar1_target_pct}% target and below ${bar1_floor_pct}% floor; baseline recorded honestly)"
     fi
   fi
 done

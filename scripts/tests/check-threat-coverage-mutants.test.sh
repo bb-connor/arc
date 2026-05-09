@@ -272,6 +272,16 @@ CI=true assert_fails "CI=true forbids --dry-run" run_mutants_gate --dry-run
 grep -q "dry-run is not allowed in CI" "$ERR" \
     || { echo "FAIL: missing CI dry-run diagnostic"; cat "$ERR"; exit 1; }
 
+# Case 9b: CI=true + --allow-bootstrap-placeholders is rejected. The flag is
+# non-release fixture mode only and must not satisfy required/release lanes.
+reset_fixture
+write_model_single "ci_bootstrap_threat" "covered"
+write_evidence "ci_bootstrap_threat" 0 true
+CI=true assert_fails "CI=true forbids bootstrap placeholder fixture mode" \
+    run_mutants_gate --allow-bootstrap-placeholders
+grep -q "allow-bootstrap-placeholders is non-release fixture mode only" "$ERR" \
+    || { echo "FAIL: missing CI bootstrap-placeholder diagnostic"; cat "$ERR"; exit 1; }
+
 # Case 10: partial rows are still gated by per-row mutants
 # evidence. The row can remain partial, but the defended sub-vector must
 # have present, non-placeholder evidence with caught >= 1.

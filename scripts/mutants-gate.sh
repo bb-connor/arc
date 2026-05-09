@@ -16,8 +16,7 @@
 #     required_consecutive_nightly_successes -> advisory; exit 0.
 #   - cycle_end_tag non-empty and the required nightly evidence streak is
 #     present -> blocking; exit 1 when outcomes.json reports a caught-mutant
-#     ratio below activation_threshold_percent_per_crate when present, else
-#     target_catch_ratio_percent.
+#     ratio below target_catch_ratio_percent.
 #
 # Environment:
 #   MUTANTS_PACKAGE     : crate name being scored (informational).
@@ -28,13 +27,13 @@
 #                         (0 = clean, non-zero = survivors).
 #   MUTANTS_GATE_OVERRIDE_REASON
 #                       : optional escape hatch. When set to a non-empty
-#                         string, a blocking-fail verdict is
-#                         downgraded to a loud advisory pass: the script
+#                         string, a blocking-fail verdict remains a
+#                         non-closure failure: the script
 #                         emits a `WARN mutants-gate-override` line on
 #                         stderr, appends an audit row to
 #                         docs/fuzzing/mutants-overrides.log (timestamp,
 #                         package, exit code, cycle_end_tag, reason) and
-#                         exits 0. Empty/unset = no override (default).
+#                         exits 1. Empty/unset = no override (default).
 #                         The corresponding title-based override path is a
 #                         PR whose title includes `mutants-gate-override`
 #                         and clears
@@ -48,14 +47,19 @@
 #   MUTANTS_MIN_SCOREABLE
 #                       : minimum number of scoreable mutants required in
 #                         blocking mode unless explicit no-diff mode is set.
-#                         Defaults to 1.
+#                         Defaults to 2, so a one-mutant subset cannot
+#                         satisfy a blocking/release lane as closure
+#                         evidence. Blocking posture refuses values below 2.
+#   MUTANTS_OVERRIDE_AUDIT_LOG
+#                       : optional path for override audit rows, used by
+#                         tests to avoid mutating the repository log.
 #   CHIO_RELEASES_TOML  : optional path to a releases.toml fixture.
 #
 # Exit codes:
-#   0 advisory pass (or blocking pass when caught ratio meets target, or
-#     blocking-fail downgraded by MUTANTS_GATE_OVERRIDE_REASON)
+#   0 advisory pass (or blocking pass when caught ratio meets target)
 #   1 blocking fail (cycle_end_tag non-empty AND caught ratio below target AND
-#     no override reason supplied)
+#     no override reason supplied, or override reason supplied and logged as
+#     non-closure)
 #
 # This script is invoked by .github/workflows/mutants.yml's mutants-pr
 # and mutants-nightly jobs. It is also safe to run locally:
@@ -66,9 +70,9 @@
 # nightly successes, so this script exits 0. The evidence-gated
 # release-binaries activation starts enforcing without a workflow edit only
 # after releases.toml records the two-consecutive-nightly >= 80 percent
-# evidence streak and the release PR writes cycle_end_tag. D08 honest-floor
-# activation records activation_threshold_percent_per_crate separately from
-# the 80 percent target.
+# evidence streak and the release PR writes cycle_end_tag. The D08
+# activation_threshold_percent_per_crate value is retained as an honest-floor
+# annotation in diagnostics; it is not the blocking release target.
 
 set -euo pipefail
 
@@ -77,7 +81,8 @@ OUTPUT_DIR="${MUTANTS_OUTPUT_DIR:-}"
 EXIT_CODE="${MUTANTS_EXIT:-0}"
 OVERRIDE_REASON="${MUTANTS_GATE_OVERRIDE_REASON:-}"
 NO_DIFF_MODE="${MUTANTS_NO_DIFF:-${CHIO_MUTANTS_NO_DIFF:-0}}"
-MIN_SCOREABLE="${MUTANTS_MIN_SCOREABLE:-1}"
+MIN_SCOREABLE="${MUTANTS_MIN_SCOREABLE:-2}"
+OVERRIDE_AUDIT_LOG="${MUTANTS_OVERRIDE_AUDIT_LOG:-}"
 
 # Locate releases.toml relative to the script. The script lives in
 # scripts/ at the repo root, so releases.toml sits one directory up.
@@ -174,6 +179,12 @@ if (( observed_successes < required_successes )); then
     exit 0
 fi
 
+if (( MIN_SCOREABLE < 2 )); then
+    printf 'mutants-gate: invalid MUTANTS_MIN_SCOREABLE=%s; blocking posture requires >= 2 so one-mutant subsets cannot close the gate\n' \
+        "${MIN_SCOREABLE}" >&2
+    exit 2
+fi
+
 outcomes_json=""
 if [[ -n "${OUTPUT_DIR}" ]]; then
     for candidate in \
@@ -248,7 +259,7 @@ if [[ -f "${outcomes_json}" ]]; then
             "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" \
             "$(( pct_x10 / 10 ))" "$(( pct_x10 % 10 ))" "${caught}" "${scoreable}" "${total}" "${unviable}" \
             "${observed_successes}" "${required_successes}" >&2
-    elif (( caught * 100 >= threshold_percent * scoreable )); then
+    elif (( caught * 100 >= target_percent * scoreable )); then
         pct_x10=$(( caught * 1000 / scoreable ))
         printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=pass (cycle_end_tag=%s target=%s%% activation_threshold=%s%% caught_ratio=%s.%s%% caught=%s scoreable=%s total=%s unviable=%s observed_nightly_successes=%s/%s)\n' \
             "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" \
@@ -280,15 +291,15 @@ if [[ -n "${OUTPUT_DIR}" && -d "${OUTPUT_DIR}" ]]; then
     printf 'mutants-gate: see %s for outcomes.json detail\n' "${OUTPUT_DIR}" >&2
 fi
 
-# MUTANTS_GATE_OVERRIDE_REASON downgrades a blocking fail to a loud advisory
-# pass and appends an audit row. The corresponding permanent path is a PR
+# MUTANTS_GATE_OVERRIDE_REASON records a non-closure override attempt and keeps
+# the blocking lane failed. The corresponding permanent path is a PR
 # whose title includes `mutants-gate-override` and clears cycle_end_tag in
 # releases.toml; CODEOWNERS gates that PR on principal engineer review. The
 # env-var path here exists for in-flight CI runs where waiting on a
 # CODEOWNERS-reviewed PR is not feasible (e.g. a release-train hot-fix).
 # Either path leaves an audit trail.
 if [[ -n "${OVERRIDE_REASON}" ]]; then
-    audit_log="${repo_root}/docs/fuzzing/mutants-overrides.log"
+    audit_log="${OVERRIDE_AUDIT_LOG:-${repo_root}/docs/fuzzing/mutants-overrides.log}"
     timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     # Sanitize the reason: collapse newlines/tabs to single spaces so the
     # audit row stays on one line. Pipe character is reserved as the field
@@ -307,9 +318,9 @@ if [[ -n "${OVERRIDE_REASON}" ]]; then
     fi
     printf 'mutants-gate: WARN mutants-gate-override engaged package=%s actor=%s reason=%s\n' \
         "${PACKAGE}" "${actor}" "${reason_clean}" >&2
-    printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=override (cycle_end_tag=%s)\n' \
+    printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=override-nonclosure (cycle_end_tag=%s closure_status=nonclosure)\n' \
         "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}"
-    exit 0
+    exit 1
 fi
 
 exit 1

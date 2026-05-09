@@ -89,7 +89,8 @@
 #     by relying on the lenient mode.
 #   - --allow-bootstrap-placeholders: bootstrap placeholders are
 #     reported but do not fail. This exists only for non-release
-#     scaffolding fixtures; release and preflight callers must not use it.
+#     scaffolding fixtures; CI, required-gate, release, and preflight callers
+#     cannot use it.
 #
 # Bootstrap expiry:
 #   The `needs_real_run: true` accommodation is bounded by
@@ -101,11 +102,12 @@
 #
 # Exit codes:
 #   0 - all covered rows have caught >= 1 evidence (or --dry-run, or
-#       --allow-bootstrap-placeholders for bootstrap-only fixtures).
+#       --allow-bootstrap-placeholders for non-release bootstrap-only fixtures).
 #   1 - one or more covered rows are missing real evidence and we are
 #       not in --dry-run.
 #   2 - argument or config error (unknown flag, --dry-run in CI,
-#       invalid CHIO_BOOTSTRAP_EXPIRY, or missing python3).
+#       --allow-bootstrap-placeholders in CI/release posture, invalid
+#       CHIO_BOOTSTRAP_EXPIRY, or missing python3).
 
 set -euo pipefail
 
@@ -146,6 +148,23 @@ done
 if [[ "${CI:-}" == "true" && "$DRY_RUN" == "1" ]]; then
     echo "error: --dry-run is not allowed in CI" >&2
     exit 2
+fi
+
+release_posture="${CHIO_RELEASE_POSTURE:-${CHIO_REQUIRED_GATE:-${CHIO_MUTANTS_GATE:-}}}"
+case "${release_posture}" in
+    1|true|TRUE|blocking|BLOCKING|required|REQUIRED|release|RELEASE|preflight|PREFLIGHT)
+        RELEASE_POSTURE=1
+        ;;
+    *)
+        RELEASE_POSTURE=0
+        ;;
+esac
+
+if [[ "$ALLOW_BOOTSTRAP_PLACEHOLDERS" == "1" ]]; then
+    if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" || "$RELEASE_POSTURE" == "1" ]]; then
+        echo "error: --allow-bootstrap-placeholders is non-release fixture mode only" >&2
+        exit 2
+    fi
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

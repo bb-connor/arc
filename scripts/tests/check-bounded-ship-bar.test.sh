@@ -51,7 +51,8 @@ chmod +x "$WORK/scripts/check-threat-coverage-mutants.sh"
 GATE="$WORK/scripts/check-bounded-ship-bar.sh"
 
 # Bar 1 evidence:
-#   * Five trust-boundary crates with full target-met baselines.
+#   * Five trust-boundary crates with full target-met baselines at or above
+#     the 80% release target.
 #   * chio-policy with high kill_rate_percent but target_met=false,
 #     result_label=PARTIAL, incomplete evaluated counts, interrupted
 #     run status, and hand-picked subset scope -> PARTIAL row.
@@ -61,16 +62,9 @@ cat > "$WORK/audits/evidence/mutants/banner.json" <<'EOF'
 EOF
 for crate in chio-credentials chio-attest-verify chio-kernel-core chio-guards chio-anchor; do
     mkdir -p "$WORK/audits/evidence/mutants/$crate"
-    if [ "$crate" = "chio-attest-verify" ]; then
-        # chio-attest-verify has a 80% target; meet it cleanly.
-        cat > "$WORK/audits/evidence/mutants/$crate/2026-05-08.json" <<EOF
+    cat > "$WORK/audits/evidence/mutants/$crate/2026-05-08.json" <<EOF
 {"crate":"$crate","kill_rate_percent":85.0,"caught":85,"viable":100,"target_met":true,"result_label":"FULL","run_status":"COMPLETE","evaluated":100,"total_discovered":100,"examine_scope":"full-crate"}
 EOF
-    else
-        cat > "$WORK/audits/evidence/mutants/$crate/2026-05-08.json" <<EOF
-{"crate":"$crate","kill_rate_percent":75.0,"caught":75,"viable":100,"target_met":true,"result_label":"FULL","run_status":"COMPLETE","evaluated":100,"total_discovered":100,"examine_scope":"full-crate"}
-EOF
-    fi
 done
 # chio-policy: R4 false-pass fixture. Numeric rate is high enough to
 # pass the old gate, but every metadata field says it is partial.
@@ -295,6 +289,28 @@ if ! grep -q 'result_label missing full-scope marker' "$OUT"; then
     exit 1
 fi
 echo "ok: stage 4 assurance-gate mode exits 1 when result_label full-scope marker is missing (rc=1)"
+
+# ---------------------------------------------------------------------
+# Stage 4b: a complete, full-scope row below the 80% release target is
+# still PARTIAL. The 65% activation floor is diagnostic only, not closure.
+# ---------------------------------------------------------------------
+cat > "$WORK/audits/evidence/mutants/chio-policy/2026-05-08-per-crate-baseline.json" <<'EOF'
+{"crate":"chio-policy","kill_rate_percent":75.0,"caught":75,"viable":100,"target_met":true,"result_label":"FULL","run_status":"COMPLETE","evaluated":100,"total_discovered":100,"examine_scope":"full-crate"}
+EOF
+rc=0
+bash "$GATE" >"$OUT" 2>"$ERR" || rc=$?
+if [ "$rc" -ne 1 ]; then
+    echo "FAIL: stage 4b assurance-gate mode: expected rc=1 below 80% target, got rc=$rc" >&2
+    echo "--- stdout ---" >&2; cat "$OUT" >&2
+    echo "--- stderr ---" >&2; cat "$ERR" >&2
+    exit 1
+fi
+if ! grep -q 'Claim A chio-policy measured 75.0% (below 80% target, above 65% floor)' "$OUT"; then
+    echo "FAIL: stage 4b missing below-target diagnostic" >&2
+    cat "$OUT" >&2
+    exit 1
+fi
+echo "ok: stage 4b assurance-gate mode exits 1 when a full row is below the 80% target (rc=1)"
 
 # Restore the original PARTIAL fixture for the final diagnostic-mode sanity
 # check so the test keeps covering target_met=false plus result_label=PARTIAL.
