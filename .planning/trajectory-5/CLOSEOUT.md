@@ -14,11 +14,12 @@ records, baseline files, and the midpoint security audit at
 honestly partial or absent from #620, this document says so. The integrator
 decides merge order; this document gives them the map.
 
-RW5 correction: read the rows below as assurance and sequencing evidence, not
-as product release claims. The current order is Lane B integration first, Lane A
-evidence regenerated from the merged Lane B code second, Lane C canary after
-Lane B, and #618 deferred package seed work last from merged `main`; it is not
-a release vehicle.
+RW7 correction: read the rows below as assurance and sequencing context, not as
+product release claims. The active train is #620 planning truth plus Lane B
+integration. Lane A evidence must be regenerated from the merged Lane B code
+after Lane B lands on `main`; it is not active evidence closure. Lane C is a
+post-Lane-B canary. #618 is excluded/deferred package seed work from merged
+`main` only after future package-owner promotion; it is not a release vehicle.
 
 ## Closure Contract
 
@@ -190,8 +191,9 @@ merged `main`, and checks are green on the integrated merge SHA.
 
 The demo runner and receipt rendering are branch-local evidence and are absent
 from the #620 tree. They do not make Claim C assurance-complete until
-#614/#615/#617/#618 merge, fixtures are regenerated from merged `main`, and
-checks are green on the integrated merge SHA.
+#614/#615/#617 merge, canary fixtures are regenerated from merged `main`, and
+checks are green on the integrated merge SHA. #618 is excluded package seed
+work, not canary evidence.
 
 C3 (KB-MCP-mediated receipts) is PARTIAL: the wrap path produces
 mediation transcripts, not kernel-signed receipts. The old release-bar
@@ -211,8 +213,9 @@ The remaining items are integrator-only:
 - **P0-024** (stacked PRs duplicate code): integrator rebases
   #614/#615/#617 onto #610 and #612 onto #606 during the merge
   sequence below.
-- **P0-026** (#618 deferred/non-release package seed last): integrator merges
-  #618 last only after regenerating fixtures, release notes, and
+- **P0-026** (#618 deferred/non-release package seed excluded): integrator
+  keeps #618 excluded until a future package-owner promotion after regenerating
+  fixtures, release notes, and
   `releases.toml [v0_1_0_bounded_chiodome]` from merged `main`.
 - **P0-007 partial** (predicate schema completion for the bilateral
   verifier): downgraded to "partial local verifier"; tracked in
@@ -238,11 +241,12 @@ Use `R4-MERGE-TOPOLOGY.md` as the current truth. The short form is:
 2. Release-source integration starts with Lane B enforcement on a clean branch.
 3. Lane A assurance evidence is regenerated from the merged Lane B code after
    branch ownership is clean.
-4. #608 and #616 remain active, not superseded, until the threat owner
-   collapses or rebases the threat series.
+4. #608 and #616 remain known threat-evidence branches, not active train
+   closure, until the threat owner collapses or rebases the threat series after
+   Lane B lands.
 5. Lane C canary work starts only after Lane B source integration is real.
-6. #618 deferred/non-release package seed remains last and must be regenerated
-   from merged `main`.
+6. #618 deferred/non-release package seed remains excluded and must be
+   regenerated from merged `main` only after future package-owner promotion.
 
 ## Non-Blocking Future Work Outside Closure
 
@@ -294,7 +298,7 @@ map or assurance matrix, and they must not be used as release readiness:
 | #615 | C | PR branch | feat(release work/C2): bilateral cosigned invocation flow + partial §7 verifier subset |
 | #616 | A | PR branch | Threat-evidence backfill batch 3; threat-mutants evidence remains blocked until non-placeholder evidence exists |
 | #617 | C | PR branch | Receipt explain bilateral and bbs-stub selective-disclosure placeholder |
-| #618 | C | PR branch | PARKED/DEFERRED: trajectory 5 C6 packaging seed |
+| #618 | excluded/deferred | PR branch | PARKED/DEFERRED: trajectory 5 C6 packaging seed |
 | #619 | A | PR branch | feat(release work/A1): mutation baseline for chio-attest-verify (44.1% measured; target >=80%) |
 | #620 | (planning) | planning branch | Trajectory 5 planning artifacts (lanes A/B/C, assurance matrix, kickoff prereqs) |
 | #621 | A | PR branch | Mutation baseline for chio-guards (78.2% measured; target >=65%) |
@@ -309,7 +313,7 @@ map or assurance matrix, and they must not be used as release readiness:
 | Issue | Closure in this document |
 |---|---|
 | RW5-BI-P0-001 | Closure is limited to accepted planning/integration map or assurance matrix. Future work is non-blocking. |
-| RW5-BI-P0-002 | Replaces autonomous-train framing with Lane B, regenerated Lane A, Lane C canary, #618 last. |
+| RW5-BI-P0-002 | Replaces autonomous-train framing with Lane B, regenerated Lane A, Lane C canary, and #618 excluded/deferred. |
 | RW5-BI-P1-003 | C5 is not a closure row; it is future work outside current closure. |
 | RW5-BI-P1-004 | Async migration is containment/integration only; durable async architecture is later work. |
 | RW5-BI-P2-002 | RELEASE_AUDIT local-go posture is explicitly non-inherited. |

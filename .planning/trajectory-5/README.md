@@ -6,17 +6,17 @@ and not a tag vehicle.
 
 Trajectory 5 may close only as an accepted planning/integration map or assurance
 matrix. It cannot close as release readiness, tag readiness, or proof that
-future work has been completed. The corrected security-reviewable execution
-order is:
+future work has been completed. The active train is intentionally narrow:
 
-1. **Lane B integration first**: make the spec hot path real in source.
-2. **Lane A assurance addendum second**: regenerate mutation, threat, Kani,
+1. **#620 planning truth**: control data only, not release approval.
+2. **Lane B integration**: make the spec hot path real in source.
+3. **Lane A assurance addendum after Lane B**: regenerate mutation, threat, Kani,
    TLA+, and Lean evidence from the merged Lane B source state.
-3. **Lane C canary demo after Lane B**: prove composition only after the Lane B
+4. **Lane C canary demo after Lane B**: prove composition only after the Lane B
    enforcement stack exists on merged source.
-4. **#618 deferred package seed last**: regenerate any bounded chiodome package
-   from merged `main`, not from the current open PR set; it is not a release
-   vehicle and remains a seed until a package owner promotes it.
+5. **#618 deferred package seed excluded**: regenerate any bounded chiodome
+   package from merged `main`, not from the current open PR set, only if a
+   future package owner promotes it.
 
 The prior "one ship-bar visible from outside" language is superseded. The active
 contract is the claim-by-claim assurance matrix in `SHIP-BAR-TRACKER.md`; that
@@ -45,7 +45,7 @@ PR #620 does not own:
 | Claim | Lane | Purpose | Current posture |
 |---|---|---|---|
 | B | Lane B hot-path enforcement | Single-entry verifier, receipt v2 fail-closed, anchor-batch async-only, DSSE bilateral signing. | Must integrate first from a clean source branch. |
-| A | Lane A assurance addendum | Mutation, broad threat coverage, Kani, TLA+, and Lean evidence. | Regenerated from merged Lane B code; threat-mutants remain FAIL/BLOCKED until non-placeholder evidence and the bounded assurance manifest exist. |
+| A | Lane A assurance addendum | Mutation, broad threat coverage, Kani, TLA+, and Lean evidence. | Post-Lane-B regeneration only; current branch-local evidence is not active closure. Threat-mutants remain FAIL/BLOCKED until non-placeholder evidence and the bounded assurance manifest exist. |
 | C | Lane C canary demo | Bounded chiodome end-to-end composition fixture. | Canary only; downstream of Lane B. |
 
 The assurance checker is `scripts/check-bounded-ship-bar.sh`. The filename is
@@ -59,8 +59,8 @@ C5 selective disclosure is future work outside the current closure matrix.
 for a bounded release candidate. Trajectory 5 does not inherit that posture.
 For this trajectory, local-go is false: Lane B must integrate first, Lane A
 evidence must be regenerated from merged code, Lane C is only a canary after
-Lane B, and #618 deferred package seed stays pending-upstream-merges until a
-later package owner regenerates from `main`.
+Lane B, and #618 deferred package seed stays excluded until a later package
+owner regenerates from `main`.
 
 The branch-scoped non-inheritance rule is recorded in
 `RELEASE-AUDIT-NON-INHERITANCE.md`.
@@ -79,8 +79,8 @@ release_status = "blocked_pending_lane_b_integration"
 ```
 
 PR #620 does not author that root status. It records the boundary: #618 or the
-release owner may add package truth only after Lane B integration and merged-main
-canary regeneration.
+release owner may add package truth only after Lane B integration, Lane A
+evidence regeneration, and merged-main canary regeneration.
 
 ## Gate Semantics
 
@@ -102,11 +102,25 @@ not wired as a root release gate.
 Planning docs can track tickets. Executable gates cannot pass or fail because a
 ticket file exists.
 
+## Active Train
+
+The active train is only:
+
+```text
+#620 -> #606 -> #612 -> #611 -> #609 -> #610
+```
+
+Lane A evidence PRs are recorded as post-Lane-B regeneration work in
+`MERGE-TRAIN.toml`. They are not active train entries and must not be cited as
+merged-main evidence until regenerated from the Lane B integrated source state.
+Local merge simulations are conflict checks only; GitHub merge state, required
+checks, required reviews, and review-thread state remain blocking.
+
 ## Document Layout
 
 | File | Purpose |
 |---|---|
-| `MERGE-TRAIN.toml` | Machine-readable merge-commit-only train policy, active order, exclusions, and aggregate-tail quarantine. |
+| `MERGE-TRAIN.toml` | Machine-readable merge-commit-only train policy, narrow active order, post-Lane-B regeneration list, exclusions, and aggregate-tail quarantine. |
 | `R4-MERGE-TOPOLOGY.md` | Current merge topology and replacement strategy. |
 | `SHIP-BAR-TRACKER.md` | Legacy filename for the claim-by-claim assurance matrix. |
 | `EXECUTION-BOARD.md` | Planning board; not an executable release gate. |

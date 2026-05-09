@@ -6,21 +6,24 @@ Audit source: `reviews/FOURTH-ROUND-CODE-SECURITY-AUDIT-2026-05-08.md`
 
 ## Verdict
 
-The old advertised merge train is invalid and must not be used. The release
-source train starts with Lane B enforcement, not with a planning-led release
-sequence. PR #620 is the sole owner for `.planning/trajectory-5/**`; source,
-evidence, mutation, and threat PRs must not carry planning files.
+The old advertised merge train is invalid and must not be used. The active train
+is now limited to #620 planning truth plus Lane B source integration. Lane A
+evidence is explicitly post-Lane-B regeneration work, not active evidence
+closure. PR #620 is the sole owner for `.planning/trajectory-5/**`; source,
+evidence, mutation, threat, demo, gate, and release-package PRs must not carry
+planning files.
 
 Do not tag `v0.1.0-bounded-chiodome` from the current PR set. The #618
-deferred package seed is not a release vehicle; it remains last and must be
-regenerated from merged `main` after upstream source and evidence branches
-land.
+deferred package seed is not a release vehicle; it is excluded from the active
+train until a future package owner promotes it after upstream source and evidence
+branches land and regenerate from merged `main`.
 
 RW5 correction: Trajectory 5 is not a product release or tag vehicle. It is a
-source-integration and assurance program with this order: Lane B integration
-first, Lane A assurance regenerated from the merged Lane B source state second,
-Lane C canary after Lane B, then #618 deferred package seed (not a release
-vehicle) only after merged-main regeneration.
+source-integration and assurance program with this boundary: #620 planning truth
+and Lane B integration are active; Lane A assurance is regenerated from the
+merged Lane B source state afterward; Lane C canary follows Lane B; #618 remains
+excluded/deferred unless a later package owner promotes it after merged-main
+regeneration.
 
 ## RW6 Merge Policy
 
@@ -29,8 +32,9 @@ rules are:
 
 1. Use merge commits only: `gh pr merge <number> --merge`. Do not squash, do not
    rebase-merge, and do not enable automerge.
-2. Merge in the exact manifest order. A clean conflict simulation is not
-   permission to skip or reorder a semantic dependency.
+2. Merge in the exact manifest order for the active train only. A clean conflict
+   simulation is not permission to skip or reorder a semantic dependency, and it
+   is not a merge-readiness signal while GitHub state is `UNSTABLE`.
 3. Stop before every step unless GitHub state is clean: PR is not draft, merge
    state is clean, required checks are successful, required reviews are
    satisfied, and no unresolved actionable review thread remains.
@@ -43,13 +47,16 @@ rules are:
 The active order is:
 
 ```text
-#620
--> #606 -> #612 -> #611 -> #609 -> #610
--> #601 -> #602 -> #605 -> #613 -> #607
--> #603 -> #619 -> #621 -> #622 -> #623 -> #626 -> #624 -> #625
--> #604 -> #608 -> #616
--> #614 -> #615 -> #617
+#620 -> #606 -> #612 -> #611 -> #609 -> #610
 ```
+
+Lane A is excluded from the active train until Lane B has landed on `main` and
+the evidence owner regenerates mutation, threat, Kani, TLA+, and Lean evidence
+from that merged source state. The old Lane A branch-local evidence remains
+context only; it is not active evidence closure.
+
+Lane C is excluded from the active train until Lane B is real on merged source
+and canary fixtures are regenerated from `main`.
 
 #618 is excluded from release qualification as a deferred packaging seed. It can
 only be reconsidered after Lane B has landed on `main`, Lane A evidence has been
@@ -93,7 +100,8 @@ must be able to inspect one integrated source posture, then regenerated evidence
 then a canary, then packaging.
 
 1. Merge or keep #620 as the planning truth record. Treat it as planning
-   control data, not as a release signal.
+   control data, not as a release signal. It is not merge-ready unless GitHub
+   state is clean under the stop conditions in `MERGE-TRAIN.toml`.
 2. Create a clean Lane B enforcement integration branch from current `main`.
    Land enforcement sources before canary/demo/deferred package seed work. The
    source order is:
@@ -102,23 +110,24 @@ then a canary, then packaging.
    - #611 receipt v2 fail-closed
    - #609 anchor batch async-only
    - #610 DSSE signing foundation
-3. Regenerate and merge Lane A assurance evidence after Lane B enforcement is
-   real on the merged source state:
+3. Regenerate Lane A assurance evidence after Lane B enforcement is real on the
+   merged source state. The listed PRs are not active evidence closure before
+   that regeneration:
    - #601 and #602 formal evidence
    - #605, #613, and #607 Kani harness and CI evidence
    - #603 mutation aggregate owner
    - #619, #621, #622, #623, #626 per-crate mutation evidence
    - #624 and #625 after their owners confirm the same ownership rule
-4. Threat evidence is now merge-clean in the Worker G chain. The refreshed
-   sequence #604 -> #608 -> #616 is active and ordered. #608 and #616 are not
-   branch-enforced ancestry guarantees; the train policy enforces the order. Do
-   not treat the older #608 conflict note as current without a fresh simulation
-   transcript and current branch-tip SHAs.
+4. Threat evidence is now post-Lane-B regeneration work. #604, #608, and #616
+   remain the known threat-evidence branch sequence, but they are not active
+   train evidence and are not branch-ancestry guarantees. Do not treat an older
+   #608 conflict note or a clean local simulation as release readiness without a
+   fresh transcript, current branch-tip SHAs, and clean GitHub state.
 5. Lane C is a canary only after Lane B is merged and evidence is rerun.
    Rebase #614, #615, and #617 after #610 and #612 land. C5 selective
    disclosure is not a closure row; it remains future work outside this
    topology unless a later protocol-owned branch supplies real proof evidence.
-6. #618 deferred package seed is last, is not a release vehicle, and is not
+6. #618 deferred package seed is excluded, is not a release vehicle, and is not
    active package evidence. Regenerate release notes, fixtures, and the
    assurance matrix from merged `main` only if a package owner later promotes the
    seed. If package metadata is authored, root `releases.toml`
@@ -133,7 +142,10 @@ then a canary, then packaging.
 
 Refresh time: 2026-05-08T22:53:03Z
 
-Worker A's Lane B slice is now explicitly stacked after #620 in this order:
+Worker A's Lane B slice is now policy-ordered after #620 in this order. The
+manifest uses `policy_order_enforced = true` and
+`branch_ancestry_required = false`; it does not claim that required-prior edges
+are enforced by branch ancestry.
 
 | Step | PR | Head used for simulation | Role | Sequencing note |
 |---:|---|---|---|---|
@@ -258,13 +270,23 @@ This topology chooses quarantine over a side-selection ledger. That means:
 | R6-P2-002 | Closed. The load-bearing mutation evidence path is `audits/evidence/mutants/**`. |
 | R6-P2-003 | Closed. The current checker is `scripts/check-bounded-ship-bar.sh`; stale script names are not part of the load-bearing contract. |
 | R6-P2-007 | Closed. Lane C is a post-Lane-B canary. |
-| R6-P2-009 | Closed. #618 deferred package seed is last, is not a release vehicle, and is regenerated from merged `main`. |
+| R6-P2-009 | Closed. #618 deferred package seed is excluded from the active train, is not a release vehicle, and can be regenerated from merged `main` only after future package-owner promotion. |
 
 ## RW5 Release-Architecture Closure
 
 | Issue | Status |
 |---|---|
 | RW5-BI-P0-001 | Closed. Closure is planning/integration map or assurance matrix only, not release readiness. |
-| RW5-BI-P0-002 | Closed. The review unit is Lane B integration, regenerated Lane A evidence, Lane C canary, and #618 deferred package seed last, not a release vehicle. |
+| RW5-BI-P0-002 | Closed. The review unit is Lane B integration, regenerated Lane A evidence, Lane C canary, and #618 excluded/deferred package seed, not a release vehicle. |
 | RW5-BI-P1-003 | Closed. C5 is future work outside the closure topology. |
 | RW5-BI-P2-003 | Closed. `ship-bar` is treated as legacy compatibility naming only. |
+
+## RW7 Planning Closure
+
+| Issue | Status after this update |
+|---|---|
+| RW7-MG-P0-001 | Closed for graph/planning scope only: `MERGE-TRAIN.toml` now records that local simulation is not merge readiness and every active step still stops on non-clean GitHub state. Live GitHub check/thread triage remains open for the GitHub Triage domain. |
+| RW7-BI-P0-001 | Closed: Lane A is no longer in the active train and is marked post-Lane-B regeneration, not active evidence closure. |
+| RW7-MG-P1-001 | Closed: the old ambiguous branch-claim field is removed. The manifest now separates policy ordering from branch ancestry with `policy_order_enforced` and `branch_ancestry_required`. |
+| RW7-BI-P1-001 | Closed for planning metadata: `OWNERS.toml` names Protocol/API, Kernel Runtime, Evidence, Gates/CI, Release Docs, Integration, and GitHub Triage review domains, each with non-self review required. |
+| RW7-MG-P2-001 | Closed: #618 is described as excluded/deferred pending future package-owner promotion, not as an active train step. |

@@ -18,8 +18,8 @@ matrix.
 - Lane A evidence is regenerated from merged Lane B source after ownership is
   clean.
 - Lane C is a canary demo after Lane B, not a release driver.
-- #618 deferred package seed remains last; it is not a release vehicle, not
-  active package evidence, and remains excluded from release qualification until
+- #618 deferred package seed remains excluded; it is not a release vehicle, not
+  active package evidence, and remains outside release qualification until
   package-owner promotion after merged-main regeneration.
 - #627 and #628 are draft aggregate tails quarantined outside release/security
   review units.
@@ -45,12 +45,14 @@ matrix.
 
 ## Merge-Train Policy
 
-The active train is #620, then Lane B (#606, #612, #611, #609, #610), then Lane
-A assurance (#601, #602, #605, #613, #607, #603, #619, #621, #622, #623, #626,
-#624, #625, #604, #608, #616), then Lane C canary (#614, #615, #617).
+The active train is #620, then Lane B (#606, #612, #611, #609, #610). Lane A
+assurance (#601, #602, #605, #613, #607, #603, #619, #621, #622, #623, #626,
+#624, #625, #604, #608, #616) is post-Lane-B regeneration work only. Lane C
+canary (#614, #615, #617) is post-Lane-B canary work only.
 
-#608 and #616 remain active ordered threat-evidence items. Their order is
-enforced by the train policy, not by a branch-ancestry guarantee.
+#608 and #616 remain known threat-evidence branch sequence items. Their order is
+policy-tracked for post-Lane-B regeneration, not branch-ancestry enforced and
+not active train evidence closure.
 
 #618, #627, and #628 are outside the active train: #618 is a deferred packaging
 seed, while #627/#628 are quarantined draft aggregate tails.

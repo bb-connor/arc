@@ -1,9 +1,9 @@
 # Trajectory 5 merge-train policy.
 # This is planning control data from PR #620. It is not release approval.
 
-schema_version = 1
-updated_utc = "2026-05-09T10:12:55Z"
-policy_owner = "rw6-graph-topology-owner"
+schema_version = 2
+updated_utc = "2026-05-09T10:37:36Z"
+policy_owner = "rw7-active-train-and-planning-boundary-owner"
 source_pr = 620
 base_ref = "origin/main"
 release_authorization = false
@@ -12,6 +12,11 @@ release_authorization = false
 method = "merge_commit_only"
 allowed_github_command = "gh pr merge <number> --merge"
 forbidden_methods = ["squash", "rebase", "automerge"]
+active_train_scope = "planning plus Lane B source integration only"
+lane_a_evidence_scope = "post-Lane-B regeneration, not active evidence closure"
+lane_c_scope = "post-Lane-B canary regeneration, not active release evidence"
+github_state_required_for_merge = true
+local_simulation_is_merge_readiness = false
 stop_on = [
   "draft_pr",
   "merge_state_not_clean",
@@ -27,11 +32,12 @@ tail_policy = "draft aggregate tails are quarantined and excluded from release a
 step = 1
 pr = 620
 lane = "planning"
-unit = "planning truth"
+unit = "planning truth and merge policy"
 disposition = "active_ordered"
-branch_enforced = true
+policy_order_enforced = true
+branch_ancestry_required = false
 required_prior = []
-notes = "Merge first or treat as control data only. It is not a release signal."
+notes = "Planning control data only. It is not a release signal and is not merge-ready unless GitHub state is clean."
 
 [[train]]
 step = 2
@@ -39,8 +45,10 @@ pr = 606
 lane = "B"
 unit = "B0 async trait foundation"
 disposition = "active_ordered"
-branch_enforced = true
+policy_order_enforced = true
+branch_ancestry_required = false
 required_prior = [620]
+notes = "Lane B source integration. Train order is policy-enforced; do not infer branch ancestry from this field."
 
 [[train]]
 step = 3
@@ -48,8 +56,10 @@ pr = 612
 lane = "B"
 unit = "B1 single-entry verifier"
 disposition = "active_ordered"
-branch_enforced = true
+policy_order_enforced = true
+branch_ancestry_required = false
 required_prior = [620, 606]
+notes = "Lane B source integration. Train order is policy-enforced; do not infer branch ancestry from this field."
 
 [[train]]
 step = 4
@@ -57,8 +67,10 @@ pr = 611
 lane = "B"
 unit = "B2 receipt v2 fail-closed"
 disposition = "active_ordered"
-branch_enforced = true
+policy_order_enforced = true
+branch_ancestry_required = false
 required_prior = [620, 606, 612]
+notes = "Lane B source integration. Train order is policy-enforced; do not infer branch ancestry from this field."
 
 [[train]]
 step = 5
@@ -66,204 +78,228 @@ pr = 609
 lane = "B"
 unit = "B3 anchor-batch async-only"
 disposition = "active_ordered"
-branch_enforced = true
+policy_order_enforced = true
+branch_ancestry_required = false
 required_prior = [620, 606, 612, 611]
+notes = "Lane B source integration. Train order is policy-enforced; do not infer branch ancestry from this field."
 
 [[train]]
 step = 6
 pr = 610
 lane = "B"
-unit = "B4 bilateral DSSE signing"
+unit = "B4 bilateral DSSE signing foundation"
 disposition = "active_ordered"
-branch_enforced = true
+policy_order_enforced = true
+branch_ancestry_required = false
 required_prior = [620, 606, 612, 611, 609]
+notes = "Lane B source integration. Full DSSE PAE conformance is still a separate Protocol/API review item."
 
-[[train]]
-step = 7
+[[post_lane_b_regeneration]]
 pr = 601
 lane = "A"
 unit = "A5 Lean negotiation safety"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 8
+[[post_lane_b_regeneration]]
 pr = 602
 lane = "A"
 unit = "A4 TLA rewrites"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 9
+[[post_lane_b_regeneration]]
 pr = 605
 lane = "A"
 unit = "A3 Kani attest-verify"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 10
+[[post_lane_b_regeneration]]
 pr = 613
 lane = "A"
 unit = "A3 Kani anchor and weights"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 11
+[[post_lane_b_regeneration]]
 pr = 607
 lane = "A"
 unit = "A3.5 Kani CI multi-crate"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610, 605, 613]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete", "Gates/CI non-self review complete"]
 
-[[train]]
-step = 12
+[[post_lane_b_regeneration]]
 pr = 603
 lane = "A"
 unit = "A1 mutation aggregate owner"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 13
+[[post_lane_b_regeneration]]
 pr = 619
 lane = "A"
 unit = "A1 mutation chio-attest-verify"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 14
+[[post_lane_b_regeneration]]
 pr = 621
 lane = "A"
 unit = "A1 mutation chio-guards"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 15
+[[post_lane_b_regeneration]]
 pr = 622
 lane = "A"
 unit = "A1 mutation chio-anchor"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 16
+[[post_lane_b_regeneration]]
 pr = 623
 lane = "A"
 unit = "A1 mutation chio-policy"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 17
+[[post_lane_b_regeneration]]
 pr = 626
 lane = "A"
 unit = "A1 mutation chio-kernel-core"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 18
+[[post_lane_b_regeneration]]
 pr = 624
 lane = "A"
 unit = "A1 mutation chio-weights"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 19
+[[post_lane_b_regeneration]]
 pr = 625
 lane = "A"
 unit = "A1 attest-verify gap closure"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 603, 619]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 20
+[[post_lane_b_regeneration]]
 pr = 604
 lane = "A"
 unit = "A2 threat evidence batch 1"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 21
+[[post_lane_b_regeneration]]
 pr = 608
 lane = "A"
 unit = "A2 threat evidence batch 2"
-disposition = "active_ordered"
-branch_enforced = false
-required_prior = [620, 604]
-notes = "Active ordered train item. The ordering is graph policy, not guaranteed by branch ancestry."
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 22
+[[post_lane_b_regeneration]]
 pr = 616
 lane = "A"
 unit = "A2 threat evidence batch 3"
-disposition = "active_ordered"
-branch_enforced = false
-required_prior = [620, 604, 608]
-notes = "Active ordered train item. The ordering is graph policy, not guaranteed by branch ancestry."
+disposition = "post_lane_b_regeneration_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "evidence regenerated from merged main", "Evidence domain non-self review complete"]
 
-[[train]]
-step = 23
+[[post_lane_b_canary]]
 pr = 614
 lane = "C"
 unit = "C1-C3 demo scaffolding and KB MCP"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610]
+disposition = "post_lane_b_canary_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "canary fixtures regenerated from merged main", "Integration domain non-self review complete"]
 
-[[train]]
-step = 24
+[[post_lane_b_canary]]
 pr = 615
 lane = "C"
 unit = "C2 bilateral cosign flow"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610, 614]
+disposition = "post_lane_b_canary_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "canary fixtures regenerated from merged main", "Protocol/API non-self review complete", "Kernel Runtime non-self review complete"]
 
-[[train]]
-step = 25
+[[post_lane_b_canary]]
 pr = 617
 lane = "C"
-unit = "C4 receipt explain and C5 placeholder"
-disposition = "active_ordered"
-branch_enforced = true
-required_prior = [620, 606, 612, 611, 609, 610, 614, 615]
+unit = "C4 receipt inspect and C5 placeholder"
+disposition = "post_lane_b_canary_required"
+active_train = false
+active_evidence_closure = false
+merge_eligible_before_lane_b_main = false
+required_before_promotion = ["Lane B merged on main", "canary fixtures regenerated from merged main", "Integration domain non-self review complete"]
 notes = "C5 remains future work and is not release evidence."
 
 [[excluded]]
 pr = 618
-disposition = "deferred_seed_excluded_from_release_qualification"
+disposition = "excluded_deferred_packaging_seed"
 release_review_unit = false
 security_review_unit = false
+active_train = false
+active_evidence_closure = false
 required_before_promotion = [
   "Lane B integrated on main",
   "Lane A evidence regenerated from merged main",
   "Lane C canary fixtures regenerated from merged main",
   "package owner records bounded package metadata",
+  "Release Docs non-self review complete",
 ]
-notes = "Packaging seed only. It is not active package evidence for Trajectory 5 qualification."
+notes = "Packaging seed only. It is excluded and deferred until future package-owner promotion; it is not an active train step."
 
 [[quarantined_tail]]
 pr = 627
@@ -273,7 +309,7 @@ disposition = "quarantined_deferred_tail"
 release_review_unit = false
 security_review_unit = false
 merge_eligible = false
-allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."
+allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the Lane B active train if source dependencies change."
 known_conflict_pairs = [610, 615, 628]
 
 [[quarantined_tail]]
@@ -284,5 +320,5 @@ disposition = "quarantined_deferred_tail"
 release_review_unit = false
 security_review_unit = false
 merge_eligible = false
-allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."
+allowed_next = "Split useful changes back into owned gate or evidence PRs; do not use the aggregate tail as active train evidence."
 known_conflict_pairs = [609, 610, 615, 627]

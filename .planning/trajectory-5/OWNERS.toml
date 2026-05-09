@@ -43,6 +43,75 @@ owner_pr = 620
 owner_globs = [".planning/trajectory-5/**"]
 rule = "No non-planning PR may carry .planning/trajectory-5 paths. Lane docs are planning truth owned by PR 620, not by source/evidence lanes."
 
+# ---- Review-domain records ----
+#
+# RW7 correction: security/release review is by review domain, not by a generic
+# lane owner self-review. Every domain below requires review by someone outside
+# the authoring lane or worker for the touched PR.
+
+[review_domains.protocol_api]
+display_name = "Protocol/API"
+scope = "PROTOCOL.md, wire schemas, DSSE envelope semantics, capability and receipt API contracts"
+applies_to_prs = [609, 610, 611, 612, 615]
+required_counter_domains = ["Kernel Runtime", "Integration"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
+[review_domains.kernel_runtime]
+display_name = "Kernel Runtime"
+scope = "kernel dispatch, ToolServerConnection async boundaries, admission and finalization behavior"
+applies_to_prs = [606, 611, 612, 615]
+required_counter_domains = ["Protocol/API", "Gates/CI"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
+[review_domains.evidence]
+display_name = "Evidence"
+scope = "mutation, threat, Kani, TLA+, Lean, assurance manifests, and regenerated Lane A evidence"
+applies_to_prs = [601, 602, 603, 604, 605, 607, 608, 613, 616, 619, 621, 622, 623, 624, 625, 626]
+required_counter_domains = ["Gates/CI", "Integration"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
+[review_domains.gates_ci]
+display_name = "Gates/CI"
+scope = "required checks, evidence gate scripts, conformance fixtures, workflow names, and hosted-nightly evidence gates"
+applies_to_prs = [605, 607, 609, 611, 612, 613, 620, 628]
+required_counter_domains = ["Evidence", "GitHub Triage"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
+[review_domains.release_docs]
+display_name = "Release Docs"
+scope = "release-truth boundaries, non-inheritance notes, package seed wording, readiness and closeout docs"
+applies_to_prs = [618, 620]
+required_counter_domains = ["Integration", "GitHub Triage"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
+[review_domains.integration]
+display_name = "Integration"
+scope = "active train ordering, post-Lane-B regeneration sequencing, merge simulation, and cross-lane dependency closure"
+applies_to_prs = [606, 609, 610, 611, 612, 620]
+required_counter_domains = ["Protocol/API", "Kernel Runtime", "GitHub Triage"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
+[review_domains.github_triage]
+display_name = "GitHub Triage"
+scope = "merge state, required checks, required reviews, unresolved review threads, draft/quarantine state"
+applies_to_prs = [601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 628]
+required_counter_domains = ["Integration", "Release Docs"]
+non_self_review_required = true
+author_cannot_approve = true
+review_required_before_merge = true
+
 # ---- Per-lane records ----
 
 [lanes.A]
@@ -53,6 +122,7 @@ duration_weeks = 8
 parallelizable = true
 primary_role = "substrate-rust"
 secondary_roles = ["formal-tla", "formal-lean", "formal-kani", "threat-modeling", "quality-rust"]
+review_domains = ["Evidence", "Gates/CI", "Integration"]
 owner_globs = [
   "audits/evidence/mutants/**",
   "audits/evidence/threats/**",
@@ -86,6 +156,7 @@ duration_weeks = 6
 parallelizable = false
 primary_role = "protocol-rust"
 secondary_roles = ["kernel-rust", "spec-rust"]
+review_domains = ["Protocol/API", "Kernel Runtime", "Gates/CI", "Integration"]
 owner_globs = [
   "crates/chio-kernel/src/kernel/mod.rs",
   "crates/chio-kernel-core/**",
@@ -119,6 +190,7 @@ duration_weeks = 4
 parallelizable = false
 primary_role = "federation-rust"
 secondary_roles = ["cli-rust", "examples", "spec-rust"]
+review_domains = ["Protocol/API", "Kernel Runtime", "Release Docs", "Integration"]
 owner_globs = [
   "crates/chio-federation/src/bilateral.rs",
   "crates/chio-credit/**",
