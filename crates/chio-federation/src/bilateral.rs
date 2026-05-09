@@ -14,7 +14,7 @@
 //! [`crate::bilateral_dsse::verify_dsse_envelope`]. `DualSignedReceipt::verify*`
 //! remains a compatibility adapter for the older detached-signature
 //! envelope only; it is not a DSSE verifier and must not be used as the
-//! authorization or audit verifier for the signature-slice profile.
+//! authorization or audit verifier for the DSSE signature-slice local profile.
 //!
 //! ## Design notes
 //!
@@ -395,7 +395,7 @@ pub struct BilateralCoSignArtifacts {
     /// `dsse_envelope`.
     pub dual_signed_receipt: DualSignedReceipt,
     /// Canonical bilateral verification artifact for this crate's
-    /// signature-slice profile.
+    /// DSSE signature-slice local profile.
     pub dsse_envelope: crate::bilateral_dsse::DsseEnvelope,
 }
 
