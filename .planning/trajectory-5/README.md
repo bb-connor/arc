@@ -2,7 +2,7 @@
 
 **Status**: RW5 release-architecture correction applied. PR #620 is the
 planning-truth owner for `.planning/trajectory-5/**`; it is not a product
-release, release package, or tag vehicle.
+release, not a package, and not a tag vehicle.
 
 Trajectory 5 may close only as an accepted planning/integration map or assurance
 matrix. It cannot close as release readiness, tag readiness, or proof that
@@ -14,8 +14,9 @@ order is:
    TLA+, and Lean evidence from the merged Lane B source state.
 3. **Lane C canary demo after Lane B**: prove composition only after the Lane B
    enforcement stack exists on merged source.
-4. **#618 packaging last**: regenerate any bounded chiodome package from
-   merged `main`, not from the current open PR set.
+4. **#618 deferred package seed last**: regenerate any bounded chiodome package
+   from merged `main`, not from the current open PR set; it is not a release
+   vehicle.
 
 The prior "one ship-bar visible from outside" language is superseded. The active
 contract is the claim-by-claim assurance matrix in `SHIP-BAR-TRACKER.md`; that
@@ -36,7 +37,7 @@ PR #620 does not own:
 - Lane B source enforcement
 - Lane A mutation/threat/formal evidence branches
 - Lane C demo sources
-- #618 release packaging
+- #618 deferred package seed (not a release vehicle)
 - a tag push for `v0.1.0-bounded-chiodome`
 
 ## Assurance Claims
@@ -44,7 +45,7 @@ PR #620 does not own:
 | Claim | Lane | Purpose | Current posture |
 |---|---|---|---|
 | B | Lane B hot-path enforcement | Single-entry verifier, receipt v2 fail-closed, anchor-batch async-only, DSSE bilateral signing. | Must integrate first from a clean source branch. |
-| A | Lane A assurance addendum | Mutation, threat, Kani, TLA+, and Lean evidence. | Regenerated from merged Lane B code; partial rows stay partial. |
+| A | Lane A assurance addendum | Mutation, broad threat coverage, Kani, TLA+, and Lean evidence. | Regenerated from merged Lane B code; threat-mutants remain FAIL/BLOCKED until non-placeholder evidence and the bounded assurance manifest exist. |
 | C | Lane C canary demo | Bounded chiodome end-to-end composition fixture. | Canary only; downstream of Lane B. |
 
 The assurance checker is `scripts/check-bounded-ship-bar.sh`. The filename is
@@ -58,8 +59,8 @@ C5 selective disclosure is future work outside the current closure matrix.
 for a bounded release candidate. Trajectory 5 does not inherit that posture.
 For this trajectory, local-go is false: Lane B must integrate first, Lane A
 evidence must be regenerated from merged code, Lane C is only a canary after
-Lane B, and #618 packaging stays pending-upstream-merges until a later package
-owner regenerates from `main`.
+Lane B, and #618 deferred package seed stays pending-upstream-merges until a
+later package owner regenerates from `main`.
 
 The branch-scoped non-inheritance rule is recorded in
 `RELEASE-AUDIT-NON-INHERITANCE.md`.

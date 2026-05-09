@@ -17,7 +17,8 @@ decides merge order; this document gives them the map.
 RW5 correction: read the rows below as assurance and sequencing evidence, not
 as product release claims. The current order is Lane B integration first, Lane A
 evidence regenerated from the merged Lane B code second, Lane C canary after
-Lane B, and #618 packaging last from merged `main`.
+Lane B, and #618 deferred package seed work last from merged `main`; it is not
+a release vehicle.
 
 ## Closure Contract
 
@@ -48,11 +49,12 @@ artifacts listed in this section.
   observed band is 44 to 80 percent depending on crate, with several
   rows honestly labeled PARTIAL because cargo-mutants ran under a
   budget cap or against a subset of the crate surface.
-- 20-of-20 threat-evidence rows backfilled with real attack-call deny
-  tests (PRs #604, #608, #616). Two rows (`pq_signature_downgrade`,
-  `tool_server_escape`) are honestly marked partial because the
-  deferred sub-vectors (hybrid-artifact downgrade, kernel sandbox
-  escape) are scoped to a future trajectory.
+- Broad threat coverage may report PASS or partial-with-deferral on the source
+  PR chain (#604, #608, #616), but threat-mutants evidence is FAIL/BLOCKED in
+  #620 until non-placeholder cargo-mutants evidence exists. The current #620
+  diagnostic run sees 20 bootstrap-placeholder threat JSONs, `passed: 0`, and
+  a failing `scripts/check-threat-coverage-mutants.sh`. Treat any 20-row
+  coverage count as taxonomy status only, not Bar 1 mutants evidence.
 - Kani harnesses for chio-attest-verify (PR #605), chio-anchor and
   chio-weights (PR #613). This is PARTIAL release evidence:
   chio-attest-verify is DEFERRED-PARTIAL/MODEL-PARTIAL, and the three
@@ -91,11 +93,11 @@ conformance fixture under `crates/chio-conformance/tests/`:
   gate `scripts/check-anchor-batch-async-witness.sh` flags obvious
   sync-call patterns; a conformance fixture proves enforcement at
   runtime.
-- **B4 DSSE-conformant bilateral signing** (PR #610):
-  `bilateral_dsse.rs` implements Ed25519 over DSSE PAE; subject
-  digest binds the `ChioReceiptBody` (cleanup-wave fix to audit
-  P0-004); multi-subject envelopes are rejected (audit P0-005);
-  legacy `DualSignedReceipt` retained with non-§6-conformant
+- **B4 bilateral DSSE signing support, full PAE conformance pending** (PR
+  #610): `bilateral_dsse.rs` implements the signing foundation; subject digest
+  binding and multi-subject rejection are source-branch claims that remain
+  pending until a full DSSE PAE conformance fixture exists on the integrated
+  merge SHA. Legacy `DualSignedReceipt` is retained with a non-§6-conformant
   disclaimer.
 
 The architectural prerequisite (B0 async-trait migration of
@@ -126,11 +128,11 @@ whose merkle root uses RFC6962 leaf hashing.
 
 `chio receipt --inspect-bilateral` (renamed from `--explain-bilateral`
 after the audit caught the over-claim of cryptographic verification
-in P0-008) renders the artifacts. The `chio-federation` `bbs-stub`
-cargo feature (renamed from `bbs-stub` per audit P0-009) provides a
-structured selective-disclosure placeholder that is explicitly labeled
-NOT zero-knowledge; real BBS+ is future work outside current trajectory
-closure. C5 selective disclosure is not a closure row. KB MCP integration (PR
+in P0-008) renders the artifacts. The `chio-federation`
+selective-disclosure stub from #617 is a structured placeholder that is
+explicitly labeled NOT zero-knowledge and is not release evidence; real BBS+ is
+future work outside current trajectory closure. C5 selective disclosure is not
+a closure row. KB MCP integration (PR
 #614) uses an `mcp-remote` stdio bridge against `:8111/mcp/`; the wrap path
 produces mediation transcripts (not kernel-signed receipts) so C3 is honestly
 labeled PARTIAL in the release map.
@@ -156,9 +158,12 @@ caps and is the authoritative re-baseline. The per-crate breakdown
 table replaces the placeholder `>=65%` banner that
 `SHIP-BAR-TRACKER.md` originally targeted as the close signal.
 
-Threat-evidence: 20 of 20 rows have real attack-call deny tests with
-non-1970 `ran_at` and `caught >= 1`. Two rows (`pq_signature_downgrade`,
-`tool_server_escape`) carry partial sub-vector closure as documented.
+Threat coverage taxonomy may be broad, but real threat-mutants evidence is
+currently FAIL/BLOCKED. In #620, `scripts/check-bounded-ship-bar.sh
+--diagnostic` fails because the bounded assurance manifest is missing and
+`scripts/check-threat-coverage-mutants.sh` reports 20 bootstrap placeholders
+with zero passed rows. Bar 1 remains blocked until those placeholders are
+replaced by non-placeholder per-row mutants evidence.
 
 Claim A closes only after the hosted-nightly authoritative run lands;
 this trajectory delivered the measurement infrastructure, the floor
@@ -206,8 +211,8 @@ The remaining items are integrator-only:
 - **P0-024** (stacked PRs duplicate code): integrator rebases
   #614/#615/#617 onto #610 and #612 onto #606 during the merge
   sequence below.
-- **P0-026** (release package #618 last): integrator merges #618
-  last and regenerates fixtures, release notes, and
+- **P0-026** (#618 deferred/non-release package seed last): integrator merges
+  #618 last only after regenerating fixtures, release notes, and
   `releases.toml [v0_1_0_bounded_chiodome]` from merged `main`.
 - **P0-007 partial** (predicate schema completion for the bilateral
   verifier): downgraded to "partial local verifier"; tracked in
@@ -236,8 +241,8 @@ Use `R4-MERGE-TOPOLOGY.md` as the current truth. The short form is:
 4. #608 and #616 remain active, not superseded, until the threat owner
    collapses or rebases the threat series.
 5. Lane C canary work starts only after Lane B source integration is real.
-6. #618 release packaging remains last and must be regenerated from merged
-   `main`.
+6. #618 deferred/non-release package seed remains last and must be regenerated
+   from merged `main`.
 
 ## Non-Blocking Future Work Outside Closure
 
@@ -281,15 +286,15 @@ map or assurance matrix, and they must not be used as release readiness:
 | #607 | A | PR branch | feat(release work/A3.5): Kani CI multi-crate manifest + workflow |
 | #608 | A | PR branch | feat(release work/A2): backfill threat evidence (batch 2, 7 rows) |
 | #609 | B | PR branch | feat(release work/B3): anchor-batch async-only when require_public_witness=true |
-| #610 | B | PR branch | feat(release work/B4): DSSE-conformant bilateral signing per CHIODOS §6 |
+| #610 | B | PR branch | Bilateral DSSE signing support; full PAE conformance still pending |
 | #611 | B | PR branch | feat(release work/B2): receipt v2 fail-closed under negotiated v2 |
 | #612 | B | PR branch | feat(release work/b1): single-entry capability verifier |
 | #613 | A | PR branch | feat(release work/a3): kani harnesses for chio-anchor and chio-weights |
 | #614 | C | PR branch | feat(release work/C1+C3): chiodome bilateral demo scaffolding + KB MCP integration |
 | #615 | C | PR branch | feat(release work/C2): bilateral cosigned invocation flow + partial §7 verifier subset |
-| #616 | A | PR branch | feat(release work/A2): backfill threat evidence (batch 3, 6 rows; complete 20/20) |
-| #617 | C | PR branch | feat(release work/C4+C5): receipt-explain bilateral + `chio-federation` `bbs-stub` placeholder |
-| #618 | C | PR branch | feat(release work/C6): v0.1.0-bounded-chiodome release packaging |
+| #616 | A | PR branch | Threat-evidence backfill batch 3; threat-mutants evidence remains blocked until non-placeholder evidence exists |
+| #617 | C | PR branch | Receipt explain bilateral and bbs-stub selective-disclosure placeholder |
+| #618 | C | PR branch | PARKED/DEFERRED: trajectory 5 C6 packaging seed |
 | #619 | A | PR branch | feat(release work/A1): mutation baseline for chio-attest-verify (44.1% measured; target >=80%) |
 | #620 | (planning) | planning branch | Trajectory 5 planning artifacts (lanes A/B/C, assurance matrix, kickoff prereqs) |
 | #621 | A | PR branch | Mutation baseline for chio-guards (78.2% measured; target >=65%) |

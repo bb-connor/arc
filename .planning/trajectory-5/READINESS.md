@@ -16,8 +16,8 @@ matrix.
 - Lane A evidence is regenerated from merged Lane B source after ownership is
   clean.
 - Lane C is a canary demo after Lane B, not a release driver.
-- #618 release packaging remains last and must be regenerated from merged
-  `main`.
+- #618 deferred package seed remains last and must be regenerated from merged
+  `main`; it is not a release vehicle.
 - C5 selective disclosure is future work outside the current closure matrix.
 - `docs/release/RELEASE_AUDIT.md` local-go posture does not apply to this
   trajectory.
@@ -31,9 +31,9 @@ matrix.
 |---|---|---|
 | Planning ownership | READY | #620 is the sole planning owner and can close only as planning/assurance truth. |
 | Lane B integration | BLOCKING | Source enforcement must land before canary or packaging. |
-| Lane A assurance | PARTIAL | Evidence must be regenerated from merged Lane B source; current rows include bounded or partial evidence. |
+| Lane A assurance | BLOCKED/PARTIAL | Evidence must be regenerated from merged Lane B source; the current #620 diagnostic also fails because the bounded assurance manifest is missing and threat-mutants evidence is still bootstrap-placeholder only. |
 | Lane C canary | BLOCKED | Canary evidence is downstream of Lane B. |
-| #618 package | BLOCKED | Must regenerate from merged `main` last. |
+| #618 deferred/non-release package seed | BLOCKED | Must regenerate from merged `main` last; it is not a release/tag vehicle. |
 | C5 selective disclosure | FUTURE | Not a closure row and not release evidence. |
 
 ## Assurance Matrix
@@ -52,9 +52,12 @@ checker output is not a Trajectory 5 closure requirement.
 
 - `bash .planning/trajectory-5/tools/planning-preflight.sh`
 - `bash scripts/tests/check-bounded-ship-bar.test.sh`
-- `bash scripts/check-bounded-ship-bar.sh --diagnostic`
+- `bash scripts/check-bounded-ship-bar.sh --diagnostic` (expected FAIL while
+  `audits/evidence/bounded-assurance-manifest.json` and non-placeholder
+  threat-mutants evidence are missing)
 
 Strict `scripts/check-bounded-ship-bar.sh` must fail while any claim is partial.
+The diagnostic mode must also fail while real `FAIL` rows remain.
 
 ## RW5 Closure
 

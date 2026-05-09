@@ -11,15 +11,16 @@ source train starts with Lane B enforcement, not with a planning-led release
 sequence. PR #620 is the sole owner for `.planning/trajectory-5/**`; source,
 evidence, mutation, and threat PRs must not carry planning files.
 
-Do not tag `v0.1.0-bounded-chiodome` from the current PR set. Release packaging
-#618 remains last and must be regenerated from merged `main` after upstream
-source and evidence branches land.
+Do not tag `v0.1.0-bounded-chiodome` from the current PR set. The #618
+deferred package seed is not a release vehicle; it remains last and must be
+regenerated from merged `main` after upstream source and evidence branches
+land.
 
 RW5 correction: Trajectory 5 is not a product release or tag vehicle. It is a
 source-integration and assurance program with this order: Lane B integration
 first, Lane A assurance regenerated from the merged Lane B source state second,
-Lane C canary after Lane B, then #618 packaging only after merged-main
-regeneration.
+Lane C canary after Lane B, then #618 deferred package seed (not a release
+vehicle) only after merged-main regeneration.
 
 ## Planning Ownership
 
@@ -60,8 +61,8 @@ then a canary, then packaging.
 1. Merge or keep #620 as the planning truth record. Treat it as planning
    control data, not as a release signal.
 2. Create a clean Lane B enforcement integration branch from current `main`.
-   Land enforcement sources before canary/demo/release packaging. The source
-   order is:
+   Land enforcement sources before canary/demo/deferred package seed work. The
+   source order is:
    - #606 async trait foundation
    - #612 single-entry verifier, rebased to B1-only if needed
    - #611 receipt v2 fail-closed
@@ -81,10 +82,11 @@ then a canary, then packaging.
    Rebase #614, #615, and #617 after #610 and #612 land. C5 selective
    disclosure is not a closure row; it remains future work outside this
    topology unless a later protocol-owned branch supplies real proof evidence.
-6. #618 release packaging is last. Regenerate release notes, fixtures, and the
-   assurance matrix from merged `main`. If package metadata is authored, root
-   `releases.toml` `[v0_1_0_bounded_chiodome]` is updated by the release owner
-   then, not by #620.
+6. #618 deferred package seed is last and is not a release vehicle. Regenerate
+   release notes, fixtures, and the assurance matrix from merged `main`. If
+   package metadata is authored, root `releases.toml`
+   `[v0_1_0_bounded_chiodome]` is updated by the release owner then, not by
+   #620.
 
 ## Fix Wave 2 Lane B Sequencing
 
@@ -170,7 +172,7 @@ the current branch-tip SHAs.
 | R4-P0-001 | Closed for this Lane B slice. The false advertised train is replaced with the explicit #620 -> #606 -> #612 -> #611 -> #609 order above. Full-graph status still depends on other owners' lanes. |
 | R5-P0-001 | Fixed-pending-review for this Lane B slice after local ordered simulation. Other R5 full-graph edges remain outside this slice. |
 | R4-P1-008 | Fixed-pending-review for this slice. The #606 current-thread runtime diagnostic was propagated through #612's branch head. |
-| P0-008 | Closed for planning truth. The plan now separates Lane B enforcement, Lane A evidence, Lane C canary, and release packaging. |
+| P0-008 | Closed for planning truth. The plan now separates Lane B enforcement, Lane A evidence, Lane C canary, and deferred package seed work that is not a release vehicle. |
 | P1-011 | Closed for owned branches. `.planning/trajectory-5/**` is centralized in #620 for the target PR set. |
 | P1-013 | Partial. Titles can be cleaned, but AI/trajectory branch names still require PR recreation or branch rename outside this planning-file cleanup. |
 | P2-003 | Partial. Per-crate mutation branches no longer carry aggregate README or shared triage files. Known source duplicate cleanup outside the owned set remains with source/evidence owners. |
@@ -187,13 +189,13 @@ the current branch-tip SHAs.
 | R6-P2-002 | Closed. The load-bearing mutation evidence path is `audits/evidence/mutants/**`. |
 | R6-P2-003 | Closed. The current checker is `scripts/check-bounded-ship-bar.sh`; stale script names are not part of the load-bearing contract. |
 | R6-P2-007 | Closed. Lane C is a post-Lane-B canary. |
-| R6-P2-009 | Closed. #618 packaging is last and regenerated from merged `main`. |
+| R6-P2-009 | Closed. #618 deferred package seed is last, is not a release vehicle, and is regenerated from merged `main`. |
 
 ## RW5 Release-Architecture Closure
 
 | Issue | Status |
 |---|---|
 | RW5-BI-P0-001 | Closed. Closure is planning/integration map or assurance matrix only, not release readiness. |
-| RW5-BI-P0-002 | Closed. The review unit is Lane B integration, regenerated Lane A evidence, Lane C canary, and #618 packaging last. |
+| RW5-BI-P0-002 | Closed. The review unit is Lane B integration, regenerated Lane A evidence, Lane C canary, and #618 deferred package seed last, not a release vehicle. |
 | RW5-BI-P1-003 | Closed. C5 is future work outside the closure topology. |
 | RW5-BI-P2-003 | Closed. `ship-bar` is treated as legacy compatibility naming only. |

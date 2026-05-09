@@ -10,7 +10,7 @@ readiness record, or tag authorization.
 | 1 | B | Source integration for B0/B1/B2/B3/B4. | Source branches merge cleanly and production-call-path conformance fixtures exist; B4 needs full DSSE PAE conformance, not only the interim signature-slice regression. |
 | 2 | A | Assurance addendum. | Mutation, threat, Kani, TLA+, and Lean rows are regenerated or explicitly partial against the merged Lane B source state. |
 | 3 | C | Canary demo. | `examples/chiodome-bilateral/` canary runs after Lane B and writes pinned fixtures. |
-| 4 | #618 | Package regeneration. | Release notes, fixtures, and any `[v0_1_0_bounded_chiodome]` root metadata are regenerated from merged `main` by the package owner. |
+| 4 | #618 | Deferred/non-release package seed regeneration. | Release notes, fixtures, and any `[v0_1_0_bounded_chiodome]` root metadata are regenerated from merged `main` by the package owner. |
 
 ## Lane B Source Integration
 
@@ -20,7 +20,7 @@ readiness record, or tag authorization.
 | B1 | Single-entry capability verifier. | B0 |
 | B2 | Receipt v2 fail-closed under negotiated v2. | B0, B1 preferred |
 | B3 | Anchor-batch async-only when public witness is required. | B0 |
-| B4 | DSSE-conformant bilateral signing. | B0, B1 preferred |
+| B4 | Bilateral DSSE signing support; full PAE conformance pending. | B0, B1 preferred |
 
 ## Lane A Assurance Addendum
 
