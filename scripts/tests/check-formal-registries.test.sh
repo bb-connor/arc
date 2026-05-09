@@ -142,7 +142,7 @@ doc["manifests"][0]["evidence"].append({"kind": "lean_theorem", "ref": "proof.as
 open(path, "w").write(json.dumps(doc, indent=2) + "\n")
 PY
 assert_fails "assumed theorem in release evidence"
-grep -q "non-release theorem proof.assumed status=assumed appears in release evidence" "${OUT}"
+grep -q "assumed theorem proof.assumed appears in release evidence" "${OUT}"
 
 write_manifest_pass
 python3 - "${SPEC_INV}" <<'PY'
@@ -155,5 +155,34 @@ open(path, "w").write(json.dumps(doc, indent=2) + "\n")
 PY
 assert_fails "proven theorem missing proof_path"
 grep -q "status=proven requires proof_path" "${OUT}"
+
+write_formal_inventory
+write_spec_inventory_pass
+write_manifest_pass
+python3 - "${SPEC_INV}" "${SPEC_MANIFEST}" <<'PY'
+import json
+import sys
+inventory_path = sys.argv[1]
+manifest_path = sys.argv[2]
+inventory = json.load(open(inventory_path))
+inventory["theorems"].append(
+    {
+        "id": "proof.assumed",
+        "kind": "lean",
+        "status": "assumed",
+        "proof_path": "formal/lean4/Chio/Chio/Proofs/Safe.lean",
+        "statement": "Assumed theorem.",
+        "depends_on": [],
+    }
+)
+manifest = json.load(open(manifest_path))
+manifest["manifests"][0]["evidence"].append(
+    {"kind": "lean_theorem", "ref": "proof.assumed"}
+)
+open(inventory_path, "w").write(json.dumps(inventory, indent=2) + "\n")
+open(manifest_path, "w").write(json.dumps(manifest, indent=2) + "\n")
+PY
+assert_fails "assumed theorem in release evidence"
+grep -q "assumed theorem proof.assumed appears in release evidence" "${OUT}"
 
 echo "PASS: formal registry validator self-test"

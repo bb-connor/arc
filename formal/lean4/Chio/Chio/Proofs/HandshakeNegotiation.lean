@@ -7,8 +7,10 @@
   runs. This blocks a v1-only Mallory from forcing a v2-aware Alice to
   parse v2-only fields (W1.3 downgrade-attack defense).
 
-  The Lean toolchain is currently unavailable in CI, so the manifest
-  status for this theorem is `assumed`. The Rust shell is exercised by
+  This module is root-imported and built by the formal proof gate. Its
+  registry status remains `assumed`, so the theorem is proposed formal
+  evidence rather than release evidence until a formal owner promotes the
+  inventory row to `proven`. The Rust shell is exercised by
   `crates/chio-conformance/tests/verify_rejects_v2_token_when_peer_negotiated_v1_only.rs`.
 -/
 
