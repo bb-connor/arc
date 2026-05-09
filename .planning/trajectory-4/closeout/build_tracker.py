@@ -469,8 +469,19 @@ def snapshot_text(s: str) -> str:
     s = s.replace("trj3 entries", "admin-merge entries")
     s = s.replace("trj4", "release closeout")
     s = s.replace("close-bar-#18", "the receipt DAG follow-up")
+    s = re.sub(r"close-bar-#(\d+)", r"release-closure-\1", s)
     s = s.replace("scripts/trj4-preflight.sh", "scripts/check-close-bar-tracker.sh")
     return s
+
+
+def snapshot_id(id_: str) -> str:
+    match = re.fullmatch(r"close-bar-#(\d+)", id_)
+    if match:
+        return f"release-closure-{match.group(1)}"
+    match = re.fullmatch(r"T(\d+)\.(\d+)\.E", id_)
+    if match:
+        return f"evidence-gate-t{match.group(1)}-{match.group(2)}"
+    return snapshot_text(id_)
 
 
 def release_bucket(row: Row) -> Row:
@@ -560,10 +571,10 @@ Per the post-Wave-0 E0.1 demotion, all 9 trj4 theorems start as `proposed`.
 
     # ---- Render snapshot JSON ----
     snapshot = {
-        "schema": "chio.close-bar-snapshot.v1",
+        "schema": "chio.release-closure-snapshot.v1",
         "rows": [
             {
-                "id": snapshot_text(r[0]),
+                "id": snapshot_id(r[0]),
                 "title": snapshot_text(r[1]),
                 "bucket": r[2],
                 "wired_runtime_path": r[3],

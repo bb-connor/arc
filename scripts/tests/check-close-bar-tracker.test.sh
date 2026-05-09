@@ -64,7 +64,7 @@ for raw in sys.argv[2:]:
     })
 
 with open(path, "w") as fh:
-    json.dump({"schema": "chio.close-bar-snapshot.v1", "rows": rows}, fh)
+    json.dump({"schema": "chio.release-closure-snapshot.v1", "rows": rows}, fh)
     fh.write("\n")
 PY
 }

@@ -77,12 +77,23 @@ fi
 
 python3 - "$TRACKER" "$BASE_SNAPSHOT" "$BASE_REF" <<'PY'
 import json
+import re
 import sys
 
 tracker_path, base_snapshot_path, base_ref = sys.argv[1:4]
 
 BUCKET_RANK = {"NONE": 0, "PARTIAL": 1, "DONE": 2}
 FORMAL_PENDING = {"assumed", "proposed"}
+
+
+def snapshot_id(id_):
+    match = re.fullmatch(r"[a-z]+-[a-z]+-#(\d+)", id_)
+    if match:
+        return f"release-closure-{match.group(1)}"
+    match = re.fullmatch(r"T(\d+)\.(\d+)\.E", id_)
+    if match:
+        return f"evidence-gate-t{match.group(1)}-{match.group(2)}"
+    return id_
 
 
 def effective_bucket(row):
@@ -119,11 +130,11 @@ with open(tracker_path, "r", encoding="utf-8") as fh:
 
 with open(base_snapshot_path, "r", encoding="utf-8") as fh:
     base_doc = json.load(fh)
-base_rows = {r["id"]: r for r in base_doc.get("rows", [])}
+base_rows = {snapshot_id(r["id"]): r for r in base_doc.get("rows", [])}
 
 errors = []
 for r in head_rows:
-    base = base_rows.get(r["id"])
+    base = base_rows.get(snapshot_id(r["id"]))
     if base is None:
         continue
     head_effective = effective_bucket(r)

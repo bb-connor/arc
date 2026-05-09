@@ -53,6 +53,7 @@ python3 - "$TRACKER" "$SNAPSHOT" "$CURRENT_OUT" "$MIN_ROWS" "$REPO_ROOT" <<'PY'
 import fnmatch
 import json
 import os
+import re
 import sys
 
 tracker_path, snapshot_path, current_out, min_rows_str, repo_root = sys.argv[1:6]
@@ -89,6 +90,16 @@ def is_recognised_test_path(path: str) -> bool:
 
 
 errors = []
+
+
+def snapshot_id(id_: str) -> str:
+    match = re.fullmatch(r"[a-z]+-[a-z]+-#(\d+)", id_)
+    if match:
+        return f"release-closure-{match.group(1)}"
+    match = re.fullmatch(r"T(\d+)\.(\d+)\.E", id_)
+    if match:
+        return f"evidence-gate-t{match.group(1)}-{match.group(2)}"
+    return id_
 
 
 def parse_table(text):
@@ -212,9 +223,9 @@ for r in rows:
 # 8. snapshot regression check
 with open(snapshot_path, "r", encoding="utf-8") as fh:
     snap = json.load(fh)
-snap_rows = {r["id"]: r for r in snap.get("rows", [])}
+snap_rows = {snapshot_id(r["id"]): r for r in snap.get("rows", [])}
 for r in rows:
-    sr = snap_rows.get(r["id"])
+    sr = snap_rows.get(snapshot_id(r["id"]))
     if sr is None:
         continue
     cur_rank = BUCKET_RANK.get(r["bucket"], -1)

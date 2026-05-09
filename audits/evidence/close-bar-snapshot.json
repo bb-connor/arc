@@ -1,5 +1,5 @@
 {
-  "schema": "chio.close-bar-snapshot.v1",
+  "schema": "chio.release-closure-snapshot.v1",
   "rows": [
     {
       "id": "DX-1",
@@ -1064,7 +1064,7 @@
       "notes": "Not yet productized."
     },
     {
-      "id": "T1.0.E",
+      "id": "evidence-gate-t1-0",
       "title": "Evidence Gate for T1.0 capability negotiation + token versioning",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1073,7 +1073,7 @@
       "notes": "T1.0 Evidence Gate (PROTOCOL.md, schemas, claim/proof/theorem registries, negative conformance) not yet closed"
     },
     {
-      "id": "T1.1.E",
+      "id": "evidence-gate-t1-1",
       "title": "Evidence Gate for T1.1 macaroon capability attenuation",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1082,7 +1082,7 @@
       "notes": "claim.capability.attenuation_proof promoted to active; manifest.handshake.capability_negotiation promoted to active; Lean theorem.attenuation.witness_soundness, theorem.handshake.negotiation_safety, theorem.budget.sibling_sum_soundness authored (status=assumed); conformance test wave1_hot_path_enforcement.rs DENY-asserts the inflated-parent attack, the v1-only-peer downgrade attack, and the oversubscribed-siblings attack through the kernel hot path"
     },
     {
-      "id": "T1.2.E",
+      "id": "evidence-gate-t1-2",
       "title": "Evidence Gate for T1.2 multi-agent receipt DAG + receipt-id migration",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1091,7 +1091,7 @@
       "notes": "claim.receipt.body_hash_addressing promoted to active; manifest.receipt.body_hash_addressing promoted to active; theorem.receipt.body_hash_input_set_pinned promoted (status=assumed); kernel hot path mints ChioReceiptV2 alongside v1; chio_receipts_v2 sqlite migration ships; multi-parent DAG (the receipt DAG follow-up) and theorem.receipt.dag_acyclicity remain open"
     },
     {
-      "id": "T1.3.E",
+      "id": "evidence-gate-t1-3",
       "title": "Evidence Gate for T1.3 anchor-batch Merkle trees",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1100,7 +1100,7 @@
       "notes": "PROTOCOL.md section 6.4.1 expanded with public-witness lane semantics; spec/schemas/chio-wire/v1/anchor/batch.schema.json carries witnessState; claim.anchor.batch_continuity promoted to active; manifest.anchor.batch_continuity references all 4 conformance tests + the witness clients; theorems remain proposed pending Lean toolchain"
     },
     {
-      "id": "T2.1.E",
+      "id": "evidence-gate-t2-1",
       "title": "Evidence Gate for T2.1 hybrid PQ end-to-end + cross-surface conformance",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1109,7 +1109,7 @@
       "notes": "T2.1 Evidence Gate not yet closed"
     },
     {
-      "id": "close-bar-#1",
+      "id": "release-closure-1",
       "title": "CI-DEBT fully reconciled",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1118,7 +1118,7 @@
       "notes": "CI-DEBT.md still has admin-merge entries; final pass scheduled in T0 phase D"
     },
     {
-      "id": "close-bar-#2",
+      "id": "release-closure-2",
       "title": "Hosted nightly cargo-mutants kill rate >= 65% per trust-boundary, >= 80% on chio-attest-verify",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1127,7 +1127,7 @@
       "notes": "hosted nightly cargo-mutants exists; per-crate kill-rate not yet >= thresholds"
     },
     {
-      "id": "close-bar-#3",
+      "id": "release-closure-3",
       "title": "6/6 trust-boundary crates have Kani harnesses passing in nightly",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1136,7 +1136,7 @@
       "notes": "Kani harnesses present for some trust-boundary crates; 6/6 nightly green not yet"
     },
     {
-      "id": "close-bar-#4",
+      "id": "release-closure-4",
       "title": "RevocationCutCompleteness transitive + ReceiptBeforeAllow split landed; RevocationEventuallySeen apalache lane required",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1145,7 +1145,7 @@
       "notes": "TLA+ rewrites pending; RevocationEventuallySeen apalache lane currently optional"
     },
     {
-      "id": "close-bar-#5",
+      "id": "release-closure-5",
       "title": "Equivalence property test passing 1M cases nightly, zero divergence",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1154,7 +1154,7 @@
       "notes": "hosted-vs-portable equivalence test exists; 1M nightly not yet green"
     },
     {
-      "id": "close-bar-#6",
+      "id": "release-closure-6",
       "title": "trust_control_cluster_multi_region_partition_qualification 100/100 runs at 20 partition/heal cycles",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1163,7 +1163,7 @@
       "notes": "trust_control_cluster_multi_region_partition_qualification flake-fix in progress"
     },
     {
-      "id": "close-bar-#7",
+      "id": "release-closure-7",
       "title": "Mobile attestation entry points return real verdicts on real fixtures; xcframework binary in tree",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1172,7 +1172,7 @@
       "notes": "Apple App Attest + Play Integrity verifiers return AttestationUnavailable; xcframework binary missing"
     },
     {
-      "id": "close-bar-#8",
+      "id": "release-closure-8",
       "title": "Threat-model coverage at 20 covered / 0 pending / 0 uncovered",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1181,7 +1181,7 @@
       "notes": "live gate PASS at 11 covered / 9 pending-with-deferred_to / 0 uncovered; target 20/0/0"
     },
     {
-      "id": "close-bar-#9",
+      "id": "release-closure-9",
       "title": "v3.18.1 tag shipped with green release-binaries + slsa + reproducible-build artifacts",
       "bucket": "DONE",
       "wired_runtime_path": "y",
@@ -1190,7 +1190,7 @@
       "notes": "v3.18.1 tagged; release-binaries/slsa/reproducible-build workflows green at release close; qualify-release.sh exits non-zero on missing artifacts"
     },
     {
-      "id": "close-bar-#10",
+      "id": "release-closure-10",
       "title": "TRAJECTORY-FINAL.md committed with real close SHA",
       "bucket": "DONE",
       "wired_runtime_path": "y",
@@ -1199,7 +1199,7 @@
       "notes": "TRAJECTORY-FINAL.md committed; preflight enforces zero TODO/TBD/FIXME"
     },
     {
-      "id": "close-bar-#11",
+      "id": "release-closure-11",
       "title": "HttpEgressContract enforced on every kernel/guard/adapter outbound HTTP path; SSRF negative conformance tests pass",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1208,7 +1208,7 @@
       "notes": "HttpEgressContract not yet defined in chio-http-core"
     },
     {
-      "id": "close-bar-#12",
+      "id": "release-closure-12",
       "title": "Policy/manifest semantic-diff gate live on every PR touching chio-policy or manifest schemas",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1217,7 +1217,7 @@
       "notes": "policy/manifest semantic-diff CI gate not yet built"
     },
     {
-      "id": "close-bar-#13",
+      "id": "release-closure-13",
       "title": "chio.capabilities.v1 capability-negotiation handshake live; peers advertise feature bitsets",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1226,7 +1226,7 @@
       "notes": "wired the negotiated max_capability_schema as a verifier ceiling. FederationTrustExchange.negotiated_with stores the per-peer ceiling on FederationPeer.capabilities; verify_capability_with_negotiated_floor enforces it before signature/time/floor checks. Lean theorem theorem.handshake.negotiation_safety models the ceiling check (status assumed pending Lean toolchain in CI)."
     },
     {
-      "id": "close-bar-#14",
+      "id": "release-closure-14",
       "title": "CapabilityToken schema-tagged; chio.capability.v2 envelope shipped with caveats and attenuation_proof; signed-artifact registry rejects unknown schema IDs",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1235,7 +1235,7 @@
       "notes": "CapabilityToken carries a schema-tag; chio.capability.v1 and chio.capability.v2 are recognized; the verifier rejects any v2 token whose declared schema exceeds the peer-negotiated ceiling, closing the downgrade attack."
     },
     {
-      "id": "close-bar-#15",
+      "id": "release-closure-15",
       "title": "delegation_v2 promoted default-on; Attenuation/ScopeAttenuation first-class; compute_attenuation_witness/verify_attenuation_witness ship; attenuation_proof on wire",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1244,7 +1244,7 @@
       "notes": "attenuation witness API ships; chain-binding rule enforced via verify_capability_full across all 5 hot-path surfaces (chio-kernel, chio-kernel-browser, chio-kernel-mobile, chio-cpp-kernel-ffi, chio-ag-ui-proxy); attenuation_proof.parent_scope_hash bound to trust root or last delegation link's scope_hash; capability_features::DELEGATION_V2_CHAIN_BINDING advertised true in t1_default"
     },
     {
-      "id": "close-bar-#16",
+      "id": "release-closure-16",
       "title": "SubAgentBudgetPropagation enforced at join, using fixed-point integer share units",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1253,7 +1253,7 @@
       "notes": "BudgetSplit type + BudgetRegistry trait shipped; verifier consults registry on every delegated child via verify_capability_full; ChioKernel wires InMemoryBudgetRegistry into evaluate_portable_verdict; per-request InMemoryBudgetRegistry on browser/mobile/cpp/ag-ui-proxy adapter surfaces; fixed-point u16 basis-point share representation enforced at admit time"
     },
     {
-      "id": "close-bar-#17",
+      "id": "release-closure-17",
       "title": "chio.receipt.v2 ships with signed body_hash; receipt_id_v2 = body_hash; legacy UUIDv7 verifies on v1; v1->v2 negotiation works",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1262,7 +1262,7 @@
       "notes": "kernel mints ChioReceiptV2 on the production hot path (record_chio_receipt_with_federation) when the negotiated peer profile advertises ACCEPTS_RECEIPT_V2; chio_receipts_v2 table persists body_hash + non-authoritative legacy alias; ReceiptV2ReplaySet keys exclusively on body_hash; integration test mints, replays, tampers with alias, mismatches body_hash, and asserts v1-only fallback through ChioKernel::evaluate_tool_call_blocking"
     },
     {
-      "id": "the receipt DAG follow-up",
+      "id": "release-closure-18",
       "title": "call_chain extended to DAG with cross-kernel-safe formal model; chio.receipt_lineage_statement.v2 deployed",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1271,7 +1271,7 @@
       "notes": "lineage v1 single-parent; v2 multi-parent + dag_ordinal not yet shipped"
     },
     {
-      "id": "close-bar-#19",
+      "id": "release-closure-19",
       "title": "chio.anchor_batch.v1 published with witness lane; claim registry/proof manifest/public-witness semantics doc updated; negative conformance tests pass",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1280,7 +1280,7 @@
       "notes": "AnchorWitnessClient trait + RekorClient (real Sigstore HTTP) + OtsClient (OpenTimestamps calendar HTTP) live in crates/chio-anchor/src/witness*; WitnessState (Pending/Witnessed/Stale) wired into verify_anchor_batch_with_witness_policy; 4 standalone negative-conformance tests at crates/chio-conformance/tests/anchor_batch_*_rejected.rs (forged_root, misordered_proof, witness_impersonation, stale_witness_fallback) all green; claim.anchor.batch_continuity promoted to active; manifest.anchor.batch_continuity references real conformance evidence; spec/PROTOCOL.md section 6.4.1 expanded with subsection"
     },
     {
-      "id": "close-bar-#20",
+      "id": "release-closure-20",
       "title": "chio-hosted-mcp no longer #[path]-splices CLI internals",
       "bucket": "DONE",
       "wired_runtime_path": "y",
@@ -1289,7 +1289,7 @@
       "notes": "chio-hosted-mcp extraction landed in hosted MCP extraction; lib.rs is pure pub-use of published library APIs; cross-crate pipeline test exercises real runtime path"
     },
     {
-      "id": "close-bar-#21",
+      "id": "release-closure-21",
       "title": "Provider-adapter-core extracted; existing 7 adapters refactored to consume it",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1298,7 +1298,7 @@
       "notes": "chio-provider-adapter-core not yet a crate; 7 adapters still cookie-cutter"
     },
     {
-      "id": "close-bar-#22",
+      "id": "release-closure-22",
       "title": "Cargo-vet exemption count: no net-new during release closeout; top-50 burn-down (target: 819 -> <= 769)",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1307,7 +1307,7 @@
       "notes": "exemption count 819 today; no net-new gate not yet in CI; top-50 burn-down not yet started"
     },
     {
-      "id": "close-bar-#23",
+      "id": "release-closure-23",
       "title": "T1 Evidence Gate enforced for every T1.x slice (PROTOCOL.md, schemas, claim registry, proof manifest, theorem inventory, proof report, negative conformance test)",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1316,7 +1316,7 @@
       "notes": "spec/registries/* present; per-T1 slice gate enforcement comes online with each slice close"
     },
     {
-      "id": "close-bar-#24",
+      "id": "release-closure-24",
       "title": "chio-metrics-spec workspace-wide registry live; alert pack deployed (T1.5)",
       "bucket": "PARTIAL",
       "wired_runtime_path": "y",
@@ -1325,7 +1325,7 @@
       "notes": "closes registry consumption and SRE-recording correctness for the touched metrics: 6 edges + chio-wasm-guards consume the registry through production emission boundaries where feasible, receipt-write burn ratios count only outcome=\"error\", HITL PendingApproval is outcome=\"pending_approval\", and histogram quantiles target emitted _bucket families. Deployment proof and full T1.5 alert-pack rollout remain pending deployment proof."
     },
     {
-      "id": "close-bar-#25",
+      "id": "release-closure-25",
       "title": "chio-log-redact enforces redaction at log layer with compile-time redacted!() macro (T1.5)",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1334,7 +1334,7 @@
       "notes": "chio-log-redact crate not yet authored; redacted!() macro not yet defined"
     },
     {
-      "id": "close-bar-#26",
+      "id": "release-closure-26",
       "title": "chio explain <receipt-id> CLI ships and renders DAG + attenuation chain + batch witness + repair hint",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1343,7 +1343,7 @@
       "notes": "chio explain CLI subcommand not yet a binary; T1.6 work"
     },
     {
-      "id": "close-bar-#27",
+      "id": "release-closure-27",
       "title": "KernelTrustExchange accepts generic SigningBackend; HybridBackend works in federation handshake",
       "bucket": "PARTIAL",
       "wired_runtime_path": "n",
@@ -1352,7 +1352,7 @@
       "notes": "KernelTrustExchange currently stores concrete Keypair; HybridBackend type exists"
     },
     {
-      "id": "close-bar-#28",
+      "id": "release-closure-28",
       "title": "Capability-token schema adds hybrid algorithm; wire-format encoder/decoder paths first-class",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1361,7 +1361,7 @@
       "notes": "spec/schemas/chio-wire/v1/capability/token.schema.json algorithm enum still ed25519/p256/p384"
     },
     {
-      "id": "close-bar-#29",
+      "id": "release-closure-29",
       "title": "Conformance-tier handshake gating live; tier derived from substrate evidence",
       "bucket": "NONE",
       "wired_runtime_path": "n",
@@ -1370,7 +1370,7 @@
       "notes": "FederationPeer.conformance_tier field not yet defined"
     },
     {
-      "id": "close-bar-#30",
+      "id": "release-closure-30",
       "title": "Cross-surface conformance suite passes on MCP wrapped, hosted/native, and A2A/HTTP - deny receipts emit, lineage preserved, revocation propagates, budget enforced, no adapter bypass",
       "bucket": "NONE",
       "wired_runtime_path": "n",
