@@ -43,11 +43,11 @@ else
     fail "scripts/check-threat-coverage.sh did not return 0; see /tmp/trj4-preflight-threat.log"
 fi
 
-if bash scripts/check-threat-coverage-mutants.sh > /tmp/trj4-preflight-threat-mutants.log 2>&1; then
-    passed=$(grep -E '^  passed:' /tmp/trj4-preflight-threat-mutants.log | awk '{print $2}')
+if bash scripts/check-threat-coverage-mutants.sh > /tmp/chio-preflight-threat-mutants.log 2>&1; then
+    passed=$(grep -E '^  passed:' /tmp/chio-preflight-threat-mutants.log | awk '{print $2}')
     pass "scripts/check-threat-coverage-mutants.sh PASS at ${passed} release-covered threat row(s)"
 else
-    fail "scripts/check-threat-coverage-mutants.sh did not return 0; placeholder or missing mutants evidence is not release-covered; see /tmp/trj4-preflight-threat-mutants.log"
+    fail "scripts/check-threat-coverage-mutants.sh did not return 0; placeholder or missing mutants evidence is not release-covered; see /tmp/chio-preflight-threat-mutants.log"
 fi
 
 #-- 2. Required release workflows present --------------------------------------

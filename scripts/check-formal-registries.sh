@@ -54,7 +54,7 @@ formal_theorems = {
     if item.get("id")
 }
 spec_entries: list[tuple[str, dict]] = []
-for section in ("theorems", "proposed_theorems", "trj4_proposed_theorems"):
+for section in ("theorems", "proposed_theorems"):
     for item in spec_theorems_doc.get(section, []):
         spec_entries.append((section, item))
 
@@ -133,10 +133,7 @@ def validate_manifest_group(group_name: str, manifests: list[dict]) -> None:
 
 
 validate_manifest_group("manifests", spec_manifest_doc.get("manifests", []))
-validate_manifest_group(
-    "trj4_proposed_manifests",
-    spec_manifest_doc.get("trj4_proposed_manifests", []),
-)
+validate_manifest_group("proposed_manifests", spec_manifest_doc.get("proposed_manifests", []))
 
 if errors:
     print("formal registry validator: FAIL")

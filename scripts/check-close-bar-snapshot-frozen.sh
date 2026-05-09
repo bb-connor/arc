@@ -17,8 +17,10 @@
 # Failure modes (any one fails the gate):
 #   1. base snapshot cannot be loaded;
 #   2. head snapshot cannot be loaded;
-#   3. any row's bucket regresses on the head tracker relative to the
-#      base snapshot (DONE -> PARTIAL/NONE, PARTIAL -> NONE).
+#   3. any row's effective release bucket regresses on the head tracker
+#      relative to the base snapshot (DONE -> PARTIAL/NONE, PARTIAL -> NONE).
+#      A base DONE row with assumed/proposed theorem status is treated as
+#      PARTIAL so old formal-evidence false positives are not frozen forever.
 #
 # Environment overrides (used by integration tests):
 #   CHIO_CLOSE_BAR_TRACKER         path to the head tracker markdown
@@ -80,6 +82,13 @@ import sys
 tracker_path, base_snapshot_path, base_ref = sys.argv[1:4]
 
 BUCKET_RANK = {"NONE": 0, "PARTIAL": 1, "DONE": 2}
+FORMAL_PENDING = {"assumed", "proposed"}
+
+
+def effective_bucket(row):
+    if row.get("bucket") == "DONE" and row.get("theorem_status") in FORMAL_PENDING:
+        return "PARTIAL"
+    return row.get("bucket")
 
 
 def parse_tracker(text):
@@ -101,7 +110,7 @@ def parse_tracker(text):
             continue
         if len(cells) < 8:
             continue
-        rows.append({"id": cells[0], "bucket": cells[2]})
+        rows.append({"id": cells[0], "bucket": cells[2], "theorem_status": cells[5]})
     return rows
 
 
@@ -117,8 +126,10 @@ for r in head_rows:
     base = base_rows.get(r["id"])
     if base is None:
         continue
-    head_rank = BUCKET_RANK.get(r["bucket"], -1)
-    base_rank = BUCKET_RANK.get(base["bucket"], -1)
+    head_effective = effective_bucket(r)
+    base_effective = effective_bucket(base)
+    head_rank = BUCKET_RANK.get(head_effective, -1)
+    base_rank = BUCKET_RANK.get(base_effective, -1)
     if head_rank < base_rank:
         errors.append(
             f"{r['id']}: head bucket {r['bucket']!r} regresses against {base_ref} bucket {base['bucket']!r}"

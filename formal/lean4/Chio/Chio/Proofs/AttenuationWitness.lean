@@ -1,5 +1,5 @@
 /-
-  Attenuation witness soundness with v2 chain-binding (W1.1).
+  Attenuation witness soundness with v2 chain-binding.
 
   Models `theorem.attenuation.witness_soundness`: a v2 capability token is
   rejected by the verifier whenever its `attenuation_proof.parent_scope_hash`
@@ -95,7 +95,7 @@ theorem chain_binding_admits_honest_direct_issue
   unfold chainBindingCheck
   simp
 
-/-- The W1.1 P0 attack scenario: an issuer with true authority
+/-- Inflated-parent attack scenario: an issuer with true authority
     `scopeX` mints a token whose `parentScopeHash` points at
     `scopeBigger != scopeX`. The verifier rejects it with
     `rejectChainBinding`, even if the witness body internally proves

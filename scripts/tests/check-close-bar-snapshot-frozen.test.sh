@@ -6,7 +6,9 @@
 #   2. tracker downgrades a base-DONE row to PARTIAL even though the head
 #      snapshot would not catch it, gate fails;
 #   3. tracker downgrades a base-PARTIAL row to NONE, gate fails;
-#   4. tracker upgrades a row (allowed), gate passes.
+#   4. tracker upgrades a row (allowed), gate passes;
+#   5. tracker corrects an old DONE + assumed theorem false positive to
+#      PARTIAL (allowed), gate passes.
 
 set -uo pipefail
 
@@ -132,5 +134,14 @@ write_tracker "$T4" \
 write_snapshot "$B4" \
     "c-3 | x | PARTIAL | n | NONE | n-a | 02 | base says PARTIAL"
 assert_passes "upgrade NONE -> DONE allowed" "$T4" "$B4"
+
+# ---- Case 5: false DONE formal status can be corrected -------------------
+T5="$TMP_DIR/formal-pending-correction.md"
+B5="$TMP_DIR/formal-pending-correction.snapshot.json"
+write_tracker "$T5" \
+    "c-4 | x | PARTIAL | y | scripts/mutants-gate.sh | assumed | 02 | formal evidence pending"
+write_snapshot "$B5" \
+    "c-4 | x | DONE | y | scripts/mutants-gate.sh | assumed | 02 | base overstated closure"
+assert_passes "DONE + assumed theorem correction allowed" "$T5" "$B5"
 
 echo "PASS: check-close-bar-snapshot-frozen integration test"

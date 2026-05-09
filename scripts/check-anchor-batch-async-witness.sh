@@ -66,9 +66,8 @@
 # `crates/chio-anchor/src/batch.rs::verify_anchor_batch_with_witness_policy`.
 # This lint is a fast-feedback companion: it fails loudly on detected
 # violations, but a clean exit does NOT prove the absence of a bypass.
-# Audit R4 P1-010 requires CI posture to be non-advisory; the
-# [PUBLIC-WITNESS-LINT] prefix below makes the blocking companion
-# contract visible in logs.
+# CI callers run this as a blocking lint; the [PUBLIC-WITNESS-LINT]
+# prefix makes that companion contract visible in logs.
 
 set -uo pipefail
 

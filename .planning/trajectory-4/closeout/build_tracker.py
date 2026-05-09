@@ -9,6 +9,7 @@ brainstorm catalog changes.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import List, Tuple
 
@@ -458,6 +459,28 @@ def md_escape(s: str) -> str:
     return s.replace("|", "\\|")
 
 
+def snapshot_text(s: str) -> str:
+    s = re.sub(r"audit-derived default; ship via [A-Z0-9]+ lens roadmap", "Not yet productized.", s)
+    s = re.sub(r"\bW[12]\.\d(?: \+ W[12]\.\d)?(?::)?\s*", "", s)
+    s = s.replace("pending Wave 6", "pending deployment proof")
+    s = s.replace("v3.18.1-trj3.1", "v3.18.1")
+    s = s.replace("trj3.2", "hosted MCP extraction")
+    s = s.replace("trj3 close", "release close")
+    s = s.replace("trj3 entries", "admin-merge entries")
+    s = s.replace("trj4", "release closeout")
+    s = s.replace("close-bar-#18", "the receipt DAG follow-up")
+    s = s.replace("scripts/trj4-preflight.sh", "scripts/check-close-bar-tracker.sh")
+    return s
+
+
+def release_bucket(row: Row) -> Row:
+    """Keep formal-release rows partial until their theorem evidence is proven."""
+    id_, title, bucket, wired, neg, theorem, wave, notes = row
+    if bucket == "DONE" and theorem in {"assumed", "proposed"}:
+        return (id_, title, "PARTIAL", wired, neg, theorem, wave, notes)
+    return row
+
+
 def main() -> None:
     rows: List[Row] = []
     for id_, title in DX:
@@ -482,6 +505,8 @@ def main() -> None:
         rows.append(evidence_row(id_, title))
     for num, title in CLOSE_BAR:
         rows.append(closebar_row(num, title))
+
+    rows = [release_bucket(r) for r in rows]
 
     assert len(rows) >= 153, f"expected >=153 rows, got {len(rows)}"
 
@@ -536,17 +561,15 @@ Per the post-Wave-0 E0.1 demotion, all 9 trj4 theorems start as `proposed`.
     # ---- Render snapshot JSON ----
     snapshot = {
         "schema": "chio.close-bar-snapshot.v1",
-        "generated_from": ".planning/trajectory-4/closeout/build_tracker.py",
         "rows": [
             {
-                "id": r[0],
-                "title": r[1],
+                "id": snapshot_text(r[0]),
+                "title": snapshot_text(r[1]),
                 "bucket": r[2],
                 "wired_runtime_path": r[3],
-                "negative_conformance_test": r[4],
+                "negative_conformance_test": snapshot_text(r[4]),
                 "theorem_status": r[5],
-                "wave": r[6],
-                "notes": r[7],
+                "notes": snapshot_text(r[7]),
             }
             for r in rows
         ],

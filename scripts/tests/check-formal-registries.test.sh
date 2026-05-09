@@ -47,7 +47,7 @@ write_spec_inventory_pass() {
       "depends_on": []
     }
   ],
-  "trj4_proposed_theorems": [
+  "proposed_theorems": [
     {
       "id": "proof.future",
       "kind": "lean",
@@ -83,7 +83,7 @@ write_manifest_pass() {
       ]
     }
   ],
-  "trj4_proposed_manifests": []
+  "proposed_manifests": []
 }
 JSON
 }
