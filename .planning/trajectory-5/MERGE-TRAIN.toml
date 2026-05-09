@@ -1,0 +1,286 @@
+# Trajectory 5 merge-train policy.
+# This is planning control data from PR #620. It is not release approval.
+
+schema_version = 1
+updated_utc = "2026-05-09T09:10:03Z"
+policy_owner = "rw6-graph-topology-owner"
+source_pr = 620
+base_ref = "origin/main"
+release_authorization = false
+
+[merge_policy]
+method = "merge_commit_only"
+allowed_github_command = "gh pr merge <number> --merge"
+forbidden_methods = ["squash", "rebase", "automerge"]
+stop_on = [
+  "draft_pr",
+  "merge_state_not_clean",
+  "failing_required_check",
+  "pending_required_check",
+  "missing_required_review",
+  "unresolved_actionable_review_thread",
+  "conflict",
+]
+tail_policy = "draft aggregate tails are quarantined and excluded from release and security review units"
+
+[[train]]
+step = 1
+pr = 620
+lane = "planning"
+unit = "planning truth"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = []
+notes = "Merge first or treat as control data only. It is not a release signal."
+
+[[train]]
+step = 2
+pr = 606
+lane = "B"
+unit = "B0 async trait foundation"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620]
+
+[[train]]
+step = 3
+pr = 612
+lane = "B"
+unit = "B1 single-entry verifier"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606]
+
+[[train]]
+step = 4
+pr = 611
+lane = "B"
+unit = "B2 receipt v2 fail-closed"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612]
+
+[[train]]
+step = 5
+pr = 609
+lane = "B"
+unit = "B3 anchor-batch async-only"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611]
+
+[[train]]
+step = 6
+pr = 610
+lane = "B"
+unit = "B4 bilateral DSSE signing"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609]
+
+[[train]]
+step = 7
+pr = 601
+lane = "A"
+unit = "A5 Lean negotiation safety"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 8
+pr = 602
+lane = "A"
+unit = "A4 TLA rewrites"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 9
+pr = 605
+lane = "A"
+unit = "A3 Kani attest-verify"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 10
+pr = 613
+lane = "A"
+unit = "A3 Kani anchor and weights"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 11
+pr = 607
+lane = "A"
+unit = "A3.5 Kani CI multi-crate"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610, 605, 613]
+
+[[train]]
+step = 12
+pr = 603
+lane = "A"
+unit = "A1 mutation aggregate owner"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 13
+pr = 619
+lane = "A"
+unit = "A1 mutation chio-attest-verify"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603]
+
+[[train]]
+step = 14
+pr = 621
+lane = "A"
+unit = "A1 mutation chio-guards"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603]
+
+[[train]]
+step = 15
+pr = 622
+lane = "A"
+unit = "A1 mutation chio-anchor"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603]
+
+[[train]]
+step = 16
+pr = 623
+lane = "A"
+unit = "A1 mutation chio-policy"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603]
+
+[[train]]
+step = 17
+pr = 626
+lane = "A"
+unit = "A1 mutation chio-kernel-core"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603]
+
+[[train]]
+step = 18
+pr = 624
+lane = "A"
+unit = "A1 mutation chio-weights"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603]
+
+[[train]]
+step = 19
+pr = 625
+lane = "A"
+unit = "A1 attest-verify gap closure"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 603, 619]
+
+[[train]]
+step = 20
+pr = 604
+lane = "A"
+unit = "A2 threat evidence batch 1"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 21
+pr = 608
+lane = "A"
+unit = "A2 threat evidence batch 2"
+disposition = "active_ordered"
+branch_enforced = false
+required_prior = [620, 604]
+notes = "Active ordered train item. The ordering is graph policy, not guaranteed by branch ancestry."
+
+[[train]]
+step = 22
+pr = 616
+lane = "A"
+unit = "A2 threat evidence batch 3"
+disposition = "active_ordered"
+branch_enforced = false
+required_prior = [620, 604, 608]
+notes = "Active ordered train item. The ordering is graph policy, not guaranteed by branch ancestry."
+
+[[train]]
+step = 23
+pr = 614
+lane = "C"
+unit = "C1-C3 demo scaffolding and KB MCP"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610]
+
+[[train]]
+step = 24
+pr = 615
+lane = "C"
+unit = "C2 bilateral cosign flow"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610, 614]
+
+[[train]]
+step = 25
+pr = 617
+lane = "C"
+unit = "C4 receipt explain and C5 placeholder"
+disposition = "active_ordered"
+branch_enforced = true
+required_prior = [620, 606, 612, 611, 609, 610, 614, 615]
+notes = "C5 remains future work and is not release evidence."
+
+[[excluded]]
+pr = 618
+disposition = "deferred_seed_excluded_from_release_qualification"
+release_review_unit = false
+security_review_unit = false
+required_before_promotion = [
+  "Lane B integrated on main",
+  "Lane A evidence regenerated from merged main",
+  "Lane C canary fixtures regenerated from merged main",
+  "package owner records bounded package metadata",
+]
+notes = "Packaging seed only. It is not active package evidence for Trajectory 5 qualification."
+
+[[quarantined_tail]]
+pr = 627
+observed_head = "c6e4c3ff3d61299f7f2e2a7b6edc1da017317c87"
+draft = true
+disposition = "quarantined_deferred_tail"
+release_review_unit = false
+security_review_unit = false
+merge_eligible = false
+allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."
+
+[[quarantined_tail]]
+pr = 628
+observed_head = "a9f58307d1f51a00a6940265e74512501986ec9a"
+draft = true
+disposition = "quarantined_deferred_tail"
+release_review_unit = false
+security_review_unit = false
+merge_eligible = false
+allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."

@@ -1,8 +1,8 @@
 # Trajectory 5 Planning
 
-**Status**: RW5 release-architecture correction applied. PR #620 is the
-planning-truth owner for `.planning/trajectory-5/**`; it is not a product
-release, not a package, and not a tag vehicle.
+**Status**: RW6 merge-train policy applied. PR #620 is the planning-truth owner
+for `.planning/trajectory-5/**`; it is not a product release, not a package,
+and not a tag vehicle.
 
 Trajectory 5 may close only as an accepted planning/integration map or assurance
 matrix. It cannot close as release readiness, tag readiness, or proof that
@@ -16,7 +16,7 @@ order is:
    enforcement stack exists on merged source.
 4. **#618 deferred package seed last**: regenerate any bounded chiodome package
    from merged `main`, not from the current open PR set; it is not a release
-   vehicle.
+   vehicle and remains a seed until a package owner promotes it.
 
 The prior "one ship-bar visible from outside" language is superseded. The active
 contract is the claim-by-claim assurance matrix in `SHIP-BAR-TRACKER.md`; that
@@ -106,6 +106,7 @@ ticket file exists.
 
 | File | Purpose |
 |---|---|
+| `MERGE-TRAIN.toml` | Machine-readable merge-commit-only train policy, active order, exclusions, and aggregate-tail quarantine. |
 | `R4-MERGE-TOPOLOGY.md` | Current merge topology and replacement strategy. |
 | `SHIP-BAR-TRACKER.md` | Legacy filename for the claim-by-claim assurance matrix. |
 | `EXECUTION-BOARD.md` | Planning board; not an executable release gate. |

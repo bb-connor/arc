@@ -22,6 +22,40 @@ first, Lane A assurance regenerated from the merged Lane B source state second,
 Lane C canary after Lane B, then #618 deferred package seed (not a release
 vehicle) only after merged-main regeneration.
 
+## RW6 Merge Policy
+
+The machine-readable train policy is `MERGE-TRAIN.toml`. The human-readable
+rules are:
+
+1. Use merge commits only: `gh pr merge <number> --merge`. Do not squash, do not
+   rebase-merge, and do not enable automerge.
+2. Merge in the exact manifest order. A clean conflict simulation is not
+   permission to skip or reorder a semantic dependency.
+3. Stop before every step unless GitHub state is clean: PR is not draft, merge
+   state is clean, required checks are successful, required reviews are
+   satisfied, and no unresolved actionable review thread remains.
+4. If any step fails local merge simulation or GitHub state, stop the train and
+   repair the owning PR. Do not side-select through the failure on a tail branch.
+5. PRs #627 and #628 are draft aggregate tails. They are quarantined deferred
+   tails, not release-review units, not security-review units, and not fallback
+   merge vehicles for Trajectory 5 qualification.
+
+The active order is:
+
+```text
+#620
+-> #606 -> #612 -> #611 -> #609 -> #610
+-> #601 -> #602 -> #605 -> #613 -> #607
+-> #603 -> #619 -> #621 -> #622 -> #623 -> #626 -> #624 -> #625
+-> #604 -> #608 -> #616
+-> #614 -> #615 -> #617
+```
+
+#618 is excluded from release qualification as a deferred packaging seed. It can
+only be reconsidered after Lane B has landed on `main`, Lane A evidence has been
+regenerated from merged `main`, Lane C canary fixtures have been regenerated from
+merged `main`, and the package owner records bounded package metadata.
+
 ## Planning Ownership
 
 PR #620 owns all trajectory-5 planning truth:
@@ -71,22 +105,29 @@ then a canary, then packaging.
 3. Regenerate and merge Lane A assurance evidence after Lane B enforcement is
    real on the merged source state:
    - #601 and #602 formal evidence
+   - #605, #613, and #607 Kani harness and CI evidence
    - #603 mutation aggregate owner
    - #619, #621, #622, #623, #626 per-crate mutation evidence
    - #624 and #625 after their owners confirm the same ownership rule
 4. Threat evidence is now merge-clean in the Worker G chain. The refreshed
-   sequence #604 -> #608 -> #616 merges cleanly against `origin/main` in local
-   simulation. Keep the three branches ordered in that sequence; do not treat
-   the older #608 conflict note as current.
+   sequence #604 -> #608 -> #616 is active and ordered. #608 and #616 are not
+   branch-enforced ancestry guarantees; the train policy enforces the order. Do
+   not treat the older #608 conflict note as current without a fresh simulation
+   transcript and current branch-tip SHAs.
 5. Lane C is a canary only after Lane B is merged and evidence is rerun.
    Rebase #614, #615, and #617 after #610 and #612 land. C5 selective
    disclosure is not a closure row; it remains future work outside this
    topology unless a later protocol-owned branch supplies real proof evidence.
-6. #618 deferred package seed is last and is not a release vehicle. Regenerate
-   release notes, fixtures, and the assurance matrix from merged `main`. If
-   package metadata is authored, root `releases.toml`
+6. #618 deferred package seed is last, is not a release vehicle, and is not
+   active package evidence. Regenerate release notes, fixtures, and the
+   assurance matrix from merged `main` only if a package owner later promotes the
+   seed. If package metadata is authored, root `releases.toml`
    `[v0_1_0_bounded_chiodome]` is updated by the release owner then, not by
    #620.
+7. Keep #627 and #628 quarantined. They may preserve aggregate-tail scratch
+   work, but they must not ratify side-selection conflict resolutions. Useful
+   changes must be split back into owned PRs or a new explicitly scoped PR before
+   release or security review.
 
 ## Fix Wave 2 Lane B Sequencing
 
@@ -164,6 +205,34 @@ merge #616 (6c6270f9fa) ... OK
 The older #608 conflict is closed for this planning topology record. Any future
 threat-chain conflict should be reopened with a fresh simulation transcript and
 the current branch-tip SHAs.
+
+## RW6 Tail Quarantine
+
+PR #627 (`codex/wave4a-base-hygiene`) and PR #628
+(`codex/wave4a-evidence-gates-formal-kani`) are draft aggregate tails. Their
+current role is deferred scratch aggregation only.
+
+This topology chooses quarantine over a side-selection ledger. That means:
+
+- No conflict resolution inside #627 or #628 is accepted as release truth.
+- No side-selected file from #627 or #628 may override an owned active-train PR.
+- #627 and #628 are excluded from ordered merge simulation pass/fail.
+- #627 and #628 are excluded from the security-reviewable unit list.
+- Any useful tail change must be split into the owning branch class: planning
+  into #620, source into the Lane B or Lane C source PR, evidence into the Lane A
+  evidence PR, or packaging into a later package-owner PR after #618 promotion.
+
+## RW6 Graph Closure
+
+| Issue | Status after this update |
+|---|---|
+| RW6-MG-P0-001 | Closed by `MERGE-TRAIN.toml` and RW6 Merge Policy: merge commits only, exact order, no squash, no rebase-merge, no automerge, and stop on any failing GitHub state. |
+| RW6-MG-P1-001 | Closed by quarantining #627 and #628 as deferred aggregate tails instead of accepting side-selection conflict resolutions. |
+| RW6-MG-P2-001 | Closed for #608/#616: both remain active ordered threat evidence items, but the ordering is graph-policy enforced rather than branch-ancestry enforced. |
+| RW6-MG-P2-002 | Closed for #618: it is a deferred packaging seed excluded from release qualification until package-owner promotion after merged-main regeneration. |
+| RW6-BI-P0-003 | Closed for graph scope: release/security review units are the active ordered PRs, not aggregate tails. |
+| RW6-BI-P0-004 | Closed for graph scope: #627/#628 cannot be used as release/security review substitutes. |
+| RW6-BI-P2-001 | Closed for graph scope: the manifest distinguishes active, excluded, and quarantined PR dispositions. |
 
 ## review finding Status
 
