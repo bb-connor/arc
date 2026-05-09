@@ -1,10 +1,10 @@
-# Trajectory 5 C6 Packaging Seed
+# Deferred Release Packaging Seed
 
-Status: deferred and parked.
+Status: deferred.
 
 This branch is not a tag vehicle. It carries no versioned notes, fixture
 pins, hash table, readiness claim, release ledger status, or local-go gate.
-It is a reminder stub for a future packaging pass after the upstream
+It is a restart note for a future packaging pass after the upstream
 implementation and evidence branches have landed on `main`.
 
 The previous draft tried to package a named version from branch-local
@@ -25,14 +25,3 @@ implementation PRs have merged. At minimum, that future branch must:
   actually cover that surface;
 - keep any readiness or release metadata out of the tree until the evidence is
   regenerated from the final merge base.
-
-Review close-out:
-
-| ID | Closure |
-|----|---------|
-| R7-P0-001 | Closed by removing the active versioned notes and pinned artifacts from this branch. |
-| R7-P1-005 | Closed by deleting stale demo fixture pins instead of preserving invalid hashes. |
-| R7-P1-010 | Closed by deleting the command block that referenced unavailable local scripts and feature flags. |
-| R7-P1-011 | Closed by removing full verifier wording from the branch payload. |
-| R7-P2-001 | Closed by removing readiness/reconciliation wording from the branch payload. |
-| R7-P2-004 | Closed by parking this work outside the active merge train and documenting the future restart conditions. |
