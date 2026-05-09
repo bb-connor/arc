@@ -130,7 +130,7 @@ trj3_1_release_binaries_run_url = "https://github.com/bb-connor/arc/actions/runs
 trj3_1_reproducible_build_run_url = "https://github.com/bb-connor/arc/actions/runs/25355058217"
 trj3_1_slsa_trigger = "workflow_run after Release Binaries succeeds"
 # trj4 release tag retracted. The prior v3.20.0-trj4 closeout claim is reopened
-# pending the wave-based closeout in local trajectory-4 closeout plan.
+# pending the wave-based closeout in /Users/connor/.claude/plans/typed-coalescing-hejlsberg.md.
 # See trj4_erratum_path below for the retraction record.
 trj4_release_status = "reopened"
 trj4_erratum_path = ".planning/trajectory-4/TRAJECTORY-4-CLOSEOUT-ERRATUM.md"
@@ -145,97 +145,3 @@ trj4_slsa_trigger = "workflow_run after Release Binaries succeeds"
 # trj4_final_summary_path is retained for provenance. The summary has been
 # superseded; read trj4_erratum_path first for the retraction.
 trj4_final_summary_path = ".planning/trajectory-4/TRAJECTORY-4-FINAL.md"
-
-[v0_1_0_bounded_chiodome]
-# Bounded-chiodome release readiness opens 2026-05-08 with three coupled
-# lanes, autonomous-execution mode, and three externally-verifiable ship bars.
-# R4+ release truth: the worker branches are still open. Keep the release in
-# pending_upstream_merges until all upstream PRs merge, release packaging is
-# regenerated from merged main, checks are green on the integrated merge SHA,
-# and a human pushes the tag.
-# See .planning/trajectory-5/READINESS.md and KICKOFF-CHECKLIST.md.
-release_status = "pending_upstream_merges"
-started_at = "2026-05-08T00:00:00Z"
-kickoff_date = "2026-05-08"
-baseline_sha = "708c7bb33df43594f5e76542b05fca7a56d9689e"
-baseline_branch = "planning branch"
-planning_artifacts = ".planning/trajectory-5/"
-synthesis_path = ".planning/trajectory-5/debate/00-SYNTHESIS.md"
-ship_bar_tracker_path = ".planning/trajectory-5/SHIP-BAR-TRACKER.md"
-readiness_path = ".planning/trajectory-5/READINESS.md"
-kickoff_checklist_path = ".planning/trajectory-5/KICKOFF-CHECKLIST.md"
-closeout_matrix_path = ".planning/trajectory-5/reviews/W4-closeout-matrix.md"
-owners_path = ".planning/trajectory-5/OWNERS.toml"
-execution_board_path = ".planning/trajectory-5/EXECUTION-BOARD.md"
-scope_lock_path = ".planning/trajectory-5/SCOPE-LOCK.md"
-timeline_path = ".planning/trajectory-5/TIMELINE.md"
-baselines_dir = ".planning/trajectory-5/baselines/"
-preflight_script = "scripts/bounded-release-preflight.sh"
-ship_bar_script = "scripts/check-bounded-ship-bar.sh"
-execution_mode = "autonomous"
-human_escalation = "release owner"
-automation_coordinator = "release automation coordinator"
-lanes = ["A-floor", "B-wiring", "C-demo"]
-ship_bars = ["bar-1-mutation", "bar-2-conformance-fixtures", "bar-3-bilateral-demo"]
-lane_b_primitives = ["B0-async-trait", "B1-single-entry-verifier", "B2-receipt-v2-failclosed", "B3-anchor-batch-async", "B4-dsse-bilateral-signing"]
-wave_2_reviews = [
-  ".planning/trajectory-5/reviews/R1-cross-lane.md",
-  ".planning/trajectory-5/reviews/R2-lane-a-depth.md",
-  ".planning/trajectory-5/reviews/R3-lane-b-compliance.md",
-  ".planning/trajectory-5/reviews/R4-lane-c-feasibility.md",
-]
-wave_3_fix_logs = [
-  ".planning/trajectory-5/reviews/W3-lane-a-fixes.md",
-  ".planning/trajectory-5/reviews/W3-lane-b-fixes.md",
-  ".planning/trajectory-5/reviews/W3-lane-c-fixes.md",
-]
-wave_2_signoffs = [
-  ".planning/trajectory-5/reviews/lane-a-wave2.md",
-  ".planning/trajectory-5/reviews/lane-b-wave2.md",
-  ".planning/trajectory-5/reviews/lane-c-wave2.md",
-]
-blocker_count_closed = 13
-major_count_closed = 29
-major_count_deferred = 1
-minor_observation_count_addressed = "informational; see W4-closeout-matrix.md sample MINOR coverage"
-# Bar 1 -- mutation banner. Baseline: 31% (pre-release measurement, measured 2026-04-29).
-bar1_mutation_baseline_pct = 31
-bar1_mutation_baseline_date = "2026-04-29"
-bar1_mutation_target_pct_workspace = 65
-bar1_mutation_target_pct_chio_attest_verify = 80
-bar1_threats_baseline = "20 of 20 placeholder, all caught:0, ran_at:1970-01-01"
-bar1_threats_target = "20 of 20 with caught >= 1 and non-1970 ran_at, or n of 20 with explicit follow-up deferrals"
-# Bar 2 -- four primitives protected by signed negative conformance.
-bar2_baseline = "0 of 4 primitives protected"
-bar2_target = "4 of 4 primitives protected by signed negative conformance fixture"
-# Bar 3 -- bilateral demo end-to-end.
-bar3_baseline = "examples/chiodome-bilateral/ does not exist; demo runs zero times"
-bar3_target = "demo fixtures regenerated from merged main; receipt explain works on pinned receipt; KB MCP default transcripts are not kernel-signed receipts; human tag only after green integrated checks"
-release_tag = "pending"
-release_sha = "pending"
-release_binaries_run_url = "pending"
-reproducible_build_run_url = "pending"
-sbom_run_url = "pending"
-slsa_trigger = "pending"
-final_summary_path = "pending; will be .planning/trajectory-5/TRAJECTORY-5-FINAL.md after closeout"
-# Note: pending fields are filled only after upstream merges, release-package
-# regeneration from merged main, each ship bar reading DONE in
-# `.planning/trajectory-5/SHIP-BAR-TRACKER.md`, and
-# `scripts/check-bounded-ship-bar.sh` exiting 0 against committed evidence.
-
-[trajectory_5]
-# Bounded-chiodome closeout.
-release_tag = "v0.1.0-bounded-chiodome"
-release_notes_path = "releases/v0.1.0-bounded-chiodome/RELEASE-NOTES.md"
-# Per-gate honesty status. Each gate is one of MET / PARTIAL / DEFERRED.
-# C5 is PARTIAL (not MET): the §5.2 projection, disclose/withhold
-# semantics, and tamper-detection gates ship under the bbs-stub
-# feature, but the proof bytes are a SHA-256 commitment, not a real
-# BLS12-381 BBS+ signature. Real BBS+ is reserved for follow-up work
-# and the legacy Cargo feature name has been deliberately freed up so
-# the follow-up can claim it without inheriting the stub's honesty
-# footnote.
-c5_status = "PARTIAL"
-c5_feature_gate = "bbs-stub"
-c5_module = "crates/chio-federation/src/selective_disclosure.rs"
-c5_conformance_test = "crates/chio-conformance/tests/c5_selective_disclosure_stub.rs"
