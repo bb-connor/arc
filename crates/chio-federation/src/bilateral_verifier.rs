@@ -1,32 +1,30 @@
-//! Implements a partial local verifier for the bilateral DSSE
-//! signature-slice profile produced by
+//! Implements the canonical trust-boundary verifier for the DSSE
+//! signature-slice local profile produced by
 //! [`crate::bilateral_dsse::sign_dsse_envelope_full`].
 //!
-//! ## Partial-verifier scope
+//! ## Local-profile scope
 //!
 //! This module previously self-described as a "full verifier" and
-//! implied full §7 conformance. The
-//! implementation does not yet cover the full predicate schema:
+//! implied full CHIODOS predicate conformance. The implementation does
+//! not cover the strict target predicate schema:
 //!
-//!   - `BilateralPredicate` is intentionally not the strict CHIODOS
-//!     predicate: it is missing required fields the spec
-//!     enumerates (e.g. `tool_args_hash` per
-//!     `CHIODOS_BILATERAL_COSIGN_INVOCATION.md` §5/§6) and accepts
-//!     internal non-schema fields that the spec does not define.
+//!   - `BilateralPredicate` is intentionally the local-profile
+//!     predicate, not the strict CHIODOS predicate. It lacks target
+//!     fields such as `tool_args_hash` and accepts local helper fields
+//!     such as `receipt_canonical_json`.
 //!   - The error mapping conflates parseable-but-schema-malformed
 //!     Statement JSON with `dsse.malformed` rather than the spec's
 //!     `statement.malformed`.
 //!   - The receipt digest binding shape was wrong in an earlier
 //!     revision, now fixed in `bilateral_dsse::build_statement`.
 //!
-//! This verifier is labeled as a **partial local verifier**: it
-//! implements the structural / cryptographic core
-//! plus a meaningful subset of the §7 step list against the local
-//! signature-slice profile. Strict CHIODOS predicate completion belongs
-//! in a separate predicate-profile implementation.
+//! This function is the one verifier intended for trust-boundary
+//! acceptance of `DsseEnvelope` values in this local profile. Strict
+//! CHIODOS predicate completion belongs in a separate predicate-profile
+//! implementation.
 //!
 //! Receipts that surface verifier output should NOT advertise full
-//! §7 conformance based on this implementation alone.
+//! CHIODOS predicate conformance based on this implementation alone.
 //!
 //! ## Public API summary
 //!
@@ -39,21 +37,21 @@
 //! * [`PinnedEpoch`] - verifier's wall clock + epoch height.
 //! * [`VerifierConfig`] - bundles the trait objects + epoch.
 //! * [`verify_bilateral_cosign_invocation`] - the canonical verifier for
-//!   the local bilateral DSSE signature-slice profile. This is not full
-//!   §7 conformance pending strict predicate-profile completion.
+//!   the DSSE signature-slice local profile. This is not full CHIODOS
+//!   predicate conformance pending strict predicate-profile completion.
 //! * [`VerifiedBilateralCoSignInvocation`] - successful verifier output
-//!   (mirrors §7 step 17 for the steps this implementation covers).
-//! * [`VerifierError`] - fail-closed error codes for the spec §7.1-compatible
-//!   subset this partial verifier can reach (e.g. `subject.digest_mismatch`,
+//!   for the checks this implementation covers.
+//! * [`VerifierError`] - fail-closed error codes this local-profile
+//!   verifier can reach (e.g. `subject.digest_mismatch`,
 //!   `peer.unpinned_or_keyid_mismatch`).
 //!
 //! ## Usage from the local fixture helper
 //!
 //! [`crate::bilateral::execute_local_bilateral_invocation_fixture`] is the
 //! local fixture helper that drives [`sign_dsse_envelope_full`] and
-//! immediately runs this partial local verifier before returning the
-//! [`crate::bilateral::BilateralCoSignArtifacts`]. Callers that want to
-//! verify externally produced envelopes call
+//! immediately runs this verifier before returning the
+//! [`crate::bilateral::BilateralCoSignArtifacts`]. Trust-boundary callers
+//! that want to verify externally produced envelopes call
 //! [`verify_bilateral_cosign_invocation`] directly.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -79,7 +77,7 @@ use crate::bilateral_dsse::{
 /// impl emits the code itself); kernels that surface verifier output in
 /// receipts SHOULD log the code as the canonical value. Strict CHIODOS
 /// consistency errors for `totally-ordered` and `quorum-required`
-/// predicates are intentionally not exposed by this signature-slice
+/// predicates are intentionally not exposed by this local-profile
 /// verifier because those modes fail earlier as `predicate.schema_invalid`.
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum VerifierError {
@@ -466,20 +464,18 @@ pub struct VerifiedBilateralCoSignInvocation {
 }
 
 // ---------------------------------------------------------------------------
-// Partial local verifier (subset of spec §7 step list)
+// Canonical verifier for the DSSE signature-slice local profile
 // ---------------------------------------------------------------------------
 
 /// Fail-closed: any error short-circuits and returns the corresponding
 /// `VerifierError` variant whose `.code()` matches the spec §7.1
 /// canonical string verbatim.
 ///
-/// **Partial-verifier scope**: this is a partial
-/// local verifier. It implements the structural / cryptographic core
-/// plus a meaningful subset of the §7 step list but is not full §7
-/// conformance: predicate schema fields are missing (e.g.
-/// `tool_args_hash`) and the `statement.malformed` vs
-/// `dsse.malformed` mapping is approximate. Full schema completion
-/// belongs in a separate strict predicate-profile implementation.
+/// **Local-profile scope**: this is the canonical trust-boundary verifier
+/// for the DSSE signature-slice local profile. It is not full CHIODOS
+/// predicate conformance: target predicate fields such as
+/// `tool_args_hash` are not present, and strict schema completion
+/// belongs in a separate predicate-profile implementation.
 pub fn verify_bilateral_cosign_invocation(
     envelope: &DsseEnvelope,
     config: &VerifierConfig<'_>,
@@ -821,18 +817,18 @@ pub fn verify_bilateral_cosign_invocation(
         }
     };
 
-    // ---- Step 16: consistency anchor reconciliation -------------------
+    // ---- Local-profile consistency boundary ---------------------------
     //
-    // The signature-slice profile deliberately supports only
+    // The DSSE signature-slice local profile deliberately supports only
     // `crdt-commutative`. `verify_dsse_envelope` rejects
     // `totally-ordered` and `quorum-required` before this point with
     // `predicate.schema_invalid`, so this verifier does not expose
     // unreachable `consistency.*` error codes. Strict ordered/quorum
-    // reconciliation belongs to the future CHIODOS predicate-profile
+    // reconciliation belongs to a future CHIODOS predicate-profile
     // implementation.
     if pred.consistency_model != crate::bilateral_dsse::DEFAULT_CONSISTENCY_MODEL {
         return Err(VerifierError::PredicateSchemaInvalid(format!(
-            "consistency_model {:?} is not supported by the signature-slice profile",
+            "consistency_model {:?} is not supported by the DSSE signature-slice local profile",
             pred.consistency_model
         )));
     }
@@ -1823,7 +1819,8 @@ mod tests {
         cfg.action_classes.clear();
 
         // Empty action_classes + DefaultRoutine = silently treats the
-        // tool as Routine, passing through to step 16+. The verifier
+        // tool as Routine, passing through to the local-profile
+        // consistency boundary. The verifier
         // must not raise `governance.unknown_action_class`.
         let result = verify_bilateral_cosign_invocation(&envelope, &cfg);
         if let Err(err) = result {

@@ -9,12 +9,13 @@
 //! [`BilateralCoSigningProtocol`] trait that the kernel calls after it
 //! signs a receipt locally.
 //!
-//! The canonical verification API for new bilateral artifacts is
+//! The canonical verification API for new DSSE signature-slice local
+//! profile artifacts is
 //! [`crate::bilateral_verifier::verify_bilateral_cosign_invocation`] over a
 //! [`crate::bilateral_dsse::DsseEnvelope`]. `DualSignedReceipt::verify*`
 //! remains a compatibility adapter for the older detached-signature
 //! envelope only; it is not a DSSE verifier and must not be used as the
-//! authorization or audit verifier for the signature-slice profile.
+//! authorization or audit verifier for the DSSE signature-slice local profile.
 //!
 //! ## Design notes
 //!
@@ -148,8 +149,8 @@ impl DualSignedReceipt {
     /// signatures it checks are computed over the canonical-JSON encoding
     /// of [`CoSigningBody`]; the DSSE signature-slice signatures are
     /// computed over DSSE PAE bytes wrapping an in-toto
-    /// Statement. The DSSE artifact is a signature-slice profile, not the
-    /// strict CHIODOS invocation predicate.
+    /// Statement. The DSSE artifact is the signature-slice local profile,
+    /// not the strict CHIODOS invocation predicate.
     pub fn verify_pinned(
         &self,
         expected: ExpectedBilateralPeers<'_>,
@@ -453,7 +454,7 @@ pub struct BilateralCoSignArtifacts {
     /// `dsse_envelope`.
     pub dual_signed_receipt: DualSignedReceipt,
     /// Canonical bilateral verification artifact for this crate's
-    /// signature-slice profile.
+    /// DSSE signature-slice local profile.
     pub dsse_envelope: crate::bilateral_dsse::DsseEnvelope,
 }
 
@@ -531,7 +532,7 @@ pub struct LocalBilateralInvocationFixtureRequest<'a> {
     pub tool_name: &'a str,
     /// Org B's wall-clock at predicate canonicalisation (Unix ms).
     pub timestamp_unix_ms: u64,
-    /// §5 predicate extensions; the §7 verifier requires
+    /// Local-profile predicate extensions. The verifier requires
     /// `capability_lease_ref` and `policy_evaluation_summary` to be
     /// present, otherwise verification fails-closed at step 13/14.
     pub predicate_extensions: crate::bilateral_dsse::BilateralPredicateExtensions,
@@ -545,8 +546,8 @@ pub struct LocalBilateralInvocationFixtureRequest<'a> {
 pub struct BilateralInvocationOutcome {
     /// Legacy + DSSE signature-slice artifacts produced by the hot path.
     pub artifacts: BilateralCoSignArtifacts,
-    /// Verifier output. Constructed by running the partial local
-    /// verifier (subset of §7) against the freshly-signed envelope.
+    /// Verifier output. Constructed by running the canonical local-profile
+    /// verifier against the freshly-signed envelope.
     pub verified: crate::bilateral_verifier::VerifiedBilateralCoSignInvocation,
 }
 
@@ -559,9 +560,9 @@ pub enum BilateralInvocationError {
     /// The signing path failed before the verifier ran.
     #[error("co-signing failed: {0}")]
     CoSigning(#[from] BilateralCoSigningError),
-    /// The partial local verifier (subset of §7) rejected the
-    /// freshly-signed envelope.
-    #[error("§7 verifier rejected envelope: {0}")]
+    /// The canonical local-profile verifier rejected the freshly-signed
+    /// envelope.
+    #[error("local-profile verifier rejected envelope: {0}")]
     Verifier(#[from] crate::bilateral_verifier::VerifierError),
 }
 
@@ -570,7 +571,7 @@ pub enum BilateralInvocationError {
 ///    DSSE signature-slice envelope) but layered with the
 ///    [`crate::bilateral_dsse::BilateralPredicateExtensions`] (lease ref,
 ///    policy summary, etc.) the verifier needs.
-/// 2. Runs the partial local verifier (subset of §7) from
+/// 2. Runs the canonical local-profile verifier from
 ///    [`crate::bilateral_verifier::verify_bilateral_cosign_invocation`]
 ///    against the just-emitted envelope. The verifier resolves the
 ///    receipt store, lease registry, governance store, and revocation
@@ -613,7 +614,7 @@ pub fn execute_local_bilateral_invocation_fixture(
         dsse_envelope,
     };
 
-    // Step 2: partial local verifier (subset of §7).
+    // Step 2: canonical local-profile verifier.
     let verified = crate::bilateral_verifier::verify_bilateral_cosign_invocation(
         &artifacts.dsse_envelope,
         verifier_config,
