@@ -62,7 +62,7 @@ struct CountingToolServer {
     counter: Arc<InvocationCounter>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl ToolServerConnection for CountingToolServer {
     fn server_id(&self) -> &str {
         &self.server_id
