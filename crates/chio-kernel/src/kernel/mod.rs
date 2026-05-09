@@ -1741,6 +1741,18 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub(crate) fn ensure_federated_chio_receipt_persistence_ready(
+        &self,
+    ) -> Result<(), KernelError> {
+        if self.receipt_store.is_none() {
+            return Err(KernelError::Internal(
+                "federation receipt persistence unavailable: no durable local receipt store configured before remote co-sign"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn scope_receipt_federation_admission_for_request(
         &self,
         request_id: &str,

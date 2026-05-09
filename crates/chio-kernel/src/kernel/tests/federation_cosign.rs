@@ -18,19 +18,52 @@ use chio_federation::{
     FederationPeer, InProcessCoSigner, KernelTrustExchange, PeerHandshakeEnvelope,
 };
 
-struct CountingRejectingCosigner {
+struct CountingSucceedingCosigner {
     calls: std::sync::Arc<AtomicU64>,
+    inner: InProcessCoSigner,
 }
 
-impl BilateralCoSigningProtocol for CountingRejectingCosigner {
+impl BilateralCoSigningProtocol for CountingSucceedingCosigner {
     fn request_cosignature(
         &self,
-        _request: &CoSigningRequest,
+        request: &CoSigningRequest,
     ) -> Result<CoSigningResponse, BilateralCoSigningError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        Err(BilateralCoSigningError::PeerRejected(
-            "test cosigner should not be called before local durability".to_string(),
+        self.inner.request_cosignature(request)
+    }
+}
+
+struct V2SucceedsV1FailsStore {
+    v1_called: std::sync::Arc<AtomicBool>,
+    v2_called: std::sync::Arc<AtomicBool>,
+}
+
+impl ReceiptStore for V2SucceedsV1FailsStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.v1_called.store(true, Ordering::SeqCst);
+        Err(ReceiptStoreError::Conflict(
+            "v1 receipt write failed".to_string(),
         ))
+    }
+
+    fn supports_chio_receipt_v2(&self) -> bool {
+        true
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_chio_receipt_v2(
+        &self,
+        _receipt: &ChioReceiptV2,
+        _legacy_receipt_id_alias: Option<&str>,
+    ) -> Result<u64, ReceiptStoreError> {
+        self.v2_called.store(true, Ordering::SeqCst);
+        Ok(1)
     }
 }
 
@@ -61,6 +94,8 @@ fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
 
     // Build the tool-host kernel (Org B) on the test-local keypair.
     let mut kernel = make_kernel(make_config());
+    let path = unique_receipt_db_path("federated-dual-signed");
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
     let tool_host_public_key = kernel.config.keypair.public_key();
     let tool_host_kernel_id = "kernel.org-b";
     kernel.set_federation_local_kernel_id(tool_host_kernel_id);
@@ -152,8 +187,13 @@ fn federation_cosigner_not_called_when_local_v2_persistence_fails() {
     let mut kernel = kernel;
 
     let cosigner_calls = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_federation_cosigner(std::sync::Arc::new(CountingRejectingCosigner {
+    kernel.set_federation_cosigner(std::sync::Arc::new(CountingSucceedingCosigner {
         calls: std::sync::Arc::clone(&cosigner_calls),
+        inner: InProcessCoSigner::new(
+            origin_kernel_id,
+            origin_kp.clone(),
+            kernel.config.keypair.public_key(),
+        ),
     }));
 
     let agent_kp = make_keypair();
@@ -189,6 +229,154 @@ fn federation_cosigner_not_called_when_local_v2_persistence_fails() {
     assert!(
         !v1_called.load(Ordering::SeqCst),
         "v1 receipt append must not happen after v2 persistence fails"
+    );
+}
+
+#[test]
+fn federation_cosigner_not_called_when_local_v1_persistence_fails_after_v2() {
+    let origin_kp = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let tool_host_kernel_id = "kernel.org-b";
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_v2_default(true);
+    kernel.set_federation_local_kernel_id(tool_host_kernel_id);
+
+    let v1_called = std::sync::Arc::new(AtomicBool::new(false));
+    let v2_called = std::sync::Arc::new(AtomicBool::new(false));
+    kernel.set_receipt_store(Box::new(V2SucceedsV1FailsStore {
+        v1_called: std::sync::Arc::clone(&v1_called),
+        v2_called: std::sync::Arc::clone(&v2_called),
+    }));
+
+    let trust = KernelTrustExchange::new(tool_host_kernel_id, kernel.config.keypair.clone())
+        .with_trusted_peer(origin_kernel_id, origin_kp.public_key());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut peer = handshake_and_pin(&trust, origin_kernel_id, &origin_kp, now);
+    peer.capabilities = CapabilityNegotiation::t1_default();
+    let kernel = kernel.with_federation_peers(vec![peer]);
+    let mut kernel = kernel;
+
+    let cosigner_calls = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_federation_cosigner(std::sync::Arc::new(CountingSucceedingCosigner {
+        calls: std::sync::Arc::clone(&cosigner_calls),
+        inner: InProcessCoSigner::new(
+            origin_kernel_id,
+            origin_kp.clone(),
+            kernel.config.keypair.public_key(),
+        ),
+    }));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-fed", "file_read")]),
+        300,
+    );
+    let mut request = make_request_with_arguments(
+        "req-fed-v1-store-fails-after-v2",
+        &cap,
+        "file_read",
+        "srv-fed",
+        serde_json::json!({ "path": "/data/fed.txt" }),
+    );
+    request.federated_origin_kernel_id = Some(origin_kernel_id.to_string());
+    let receipt = make_signed_receipt(&kernel.config.keypair, "rcpt-fed-v1-store-fails");
+
+    let err = kernel
+        .record_chio_receipt_with_federation(&request, &receipt)
+        .expect_err("local v1 persistence failure must abort before federation cosign");
+
+    let error = format!("{err}");
+    assert!(
+        error.contains("v1 receipt write failed") || error.contains("receipt persistence failed"),
+        "unexpected error: {err}"
+    );
+    assert!(
+        v2_called.load(Ordering::SeqCst),
+        "v2 receipt should be attempted before v1 fallback persistence"
+    );
+    assert!(
+        v1_called.load(Ordering::SeqCst),
+        "v1 receipt append should be attempted and fail"
+    );
+    assert_eq!(
+        cosigner_calls.load(Ordering::SeqCst),
+        0,
+        "cosigner must not be called until local v2 and v1 receipt state is durable"
+    );
+    assert!(
+        kernel.dual_signed_receipt(&receipt.id).is_none(),
+        "failed local persistence must not leave a federated artifact"
+    );
+}
+
+#[test]
+fn federation_cosigner_not_called_without_durable_v1_store() {
+    let origin_kp = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let tool_host_kernel_id = "kernel.org-b";
+    let kernel = make_kernel(make_config());
+    kernel.set_receipt_v2_default(false);
+    kernel.set_federation_local_kernel_id(tool_host_kernel_id);
+
+    let trust = KernelTrustExchange::new(tool_host_kernel_id, kernel.config.keypair.clone())
+        .with_trusted_peer(origin_kernel_id, origin_kp.public_key());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut peer = handshake_and_pin(&trust, origin_kernel_id, &origin_kp, now);
+    peer.capabilities = CapabilityNegotiation::v1_default();
+    let kernel = kernel.with_federation_peers(vec![peer]);
+    let mut kernel = kernel;
+
+    let cosigner_calls = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_federation_cosigner(std::sync::Arc::new(CountingSucceedingCosigner {
+        calls: std::sync::Arc::clone(&cosigner_calls),
+        inner: InProcessCoSigner::new(
+            origin_kernel_id,
+            origin_kp.clone(),
+            kernel.config.keypair.public_key(),
+        ),
+    }));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-fed", "file_read")]),
+        300,
+    );
+    let mut request = make_request_with_arguments(
+        "req-fed-no-durable-v1-store",
+        &cap,
+        "file_read",
+        "srv-fed",
+        serde_json::json!({ "path": "/data/fed.txt" }),
+    );
+    request.federated_origin_kernel_id = Some(origin_kernel_id.to_string());
+    let receipt = make_signed_receipt(&kernel.config.keypair, "rcpt-fed-no-durable-v1");
+
+    let err = kernel
+        .record_chio_receipt_with_federation(&request, &receipt)
+        .expect_err("federated v1 receipt without durable storage must not co-sign");
+
+    assert!(
+        format!("{err}").contains("federation receipt persistence unavailable"),
+        "unexpected error: {err}"
+    );
+    assert_eq!(
+        cosigner_calls.load(Ordering::SeqCst),
+        0,
+        "cosigner must not be called without durable local receipt evidence"
+    );
+    assert!(
+        kernel.dual_signed_receipt(&receipt.id).is_none(),
+        "missing local durability must not leave a federated artifact"
     );
 }
 
@@ -322,6 +510,8 @@ fn federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_disp
     let tool_host_kernel_id = "kernel.org-b";
 
     let mut kernel = make_kernel(make_config());
+    let path = unique_receipt_db_path("federated-missing-cosigner");
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
     kernel.set_federation_local_kernel_id(tool_host_kernel_id);
     kernel.register_tool_server(Box::new(EchoServer::new(
         "srv-fed",

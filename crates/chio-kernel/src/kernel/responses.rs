@@ -1533,7 +1533,11 @@ impl ChioKernel {
                 })?;
             self.record_chio_receipt_v2(&v2, Some(receipt.id.as_str()))?;
         }
-        self.record_chio_receipt(receipt)?;
+        if request.federated_origin_kernel_id.is_some() {
+            self.record_federated_chio_receipt(receipt)?;
+        } else {
+            self.record_chio_receipt(receipt)?;
+        }
         self.apply_federation_cosign(
             request,
             receipt,
@@ -1543,6 +1547,18 @@ impl ChioKernel {
     }
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+        self.record_chio_receipt_with_required_store(receipt, false)
+    }
+
+    fn record_federated_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+        self.record_chio_receipt_with_required_store(receipt, true)
+    }
+
+    fn record_chio_receipt_with_required_store(
+        &self,
+        receipt: &ChioReceipt,
+        require_durable_store: bool,
+    ) -> Result<(), KernelError> {
         // Scope the receipt-store write lock so it is released before
         // the settlement observer runs. Holding the mutex across
         // `run_settlement_observer` would serialize all concurrent
@@ -1553,6 +1569,9 @@ impl ChioKernel {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
+            if require_durable_store {
+                self.ensure_federated_chio_receipt_persistence_ready()?;
+            }
             if let Some(seq) = self
                 .with_receipt_store(|store| Ok(store.append_chio_receipt_returning_seq(receipt)?))?
                 .flatten()
