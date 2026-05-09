@@ -5,7 +5,7 @@ Three artifacts live here once `chiodome-bilateral-demo` runs:
 | File | Producer | Schema | Bound to |
 |------|----------|--------|----------|
 | `receipt.json` | `chio_core::receipt::ChioReceipt::sign` | `chio.receipt_v1` (v1 receipt body; B2 receipt-v2 negotiation lives downstream) | Org B's keypair |
-| `envelope.json` | `chio_federation::bilateral_dsse::sign_dsse_envelope` | DSSE v1 + `chio.bilateral-cosign-signature-slice.v1` predicate | both org keypairs |
+| `envelope.json` | `chio_federation::bilateral_dsse::sign_dsse_envelope` | DSSE v1 envelope with no top-level `schema`; signed payload predicate `chio.bilateral-signature-slice.v1` | both org keypairs |
 | `checkpoint.json` | this demo (single-leaf merkle root) | `chio.checkpoint_statement.v1` | Org B's keypair |
 
 ## Reproduce
@@ -43,6 +43,10 @@ checkpoint root:   0x18f67a939b2cc6303b33bc1dec7fbb1c5ee3cac91adbb096461bcd11add
 Reviewers can verify these match the `kernel_key` / `merkle_root` fields
 in the pinned `*.json` files by rerunning the seeded command and diffing
 against the checked-in fixtures.
+
+The DSSE envelope is the standard envelope shape: `payloadType`, `payload`,
+and `signatures`. Its signed in-toto payload carries both `predicateType`
+and predicate `schema` as `chio.bilateral-signature-slice.v1`.
 
 ## Real-run vs placeholder
 

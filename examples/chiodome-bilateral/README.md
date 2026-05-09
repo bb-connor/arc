@@ -53,14 +53,14 @@ count, and the merkle root of the emitted checkpoint statement.
 `--release-fixture-seed=<u64>` (or `CHIODOME_DEMO_FIXTURE_SEED=<u64>`)
 seeds both keypairs deterministically so reruns produce byte-identical
 artefacts. Without the seed, `Keypair::generate()` rolls fresh randomness
-per run and only the schema/scenario/tool-name fields are stable.
+per run and only the profile/scenario/tool-name fields are stable.
 
 What lands on disk:
 
 | File | Producer | Schema |
 |------|----------|--------|
 | `receipt.json` | `chio_core::receipt::ChioReceipt::sign` | `chio.receipt_v1` |
-| `envelope.json` | `chio_federation::bilateral_dsse::sign_dsse_envelope` | DSSE v1 + `chio.bilateral-cosign-signature-slice.v1` predicate |
+| `envelope.json` | `chio_federation::bilateral_dsse::sign_dsse_envelope` | DSSE v1 envelope with no top-level `schema`; signed payload predicate `chio.bilateral-signature-slice.v1` |
 | `checkpoint.json` | this demo (single-leaf root) | `chio.checkpoint_statement.v1` |
 
 ## Inspecting receipts (`chio receipt explain`)
