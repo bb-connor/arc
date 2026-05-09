@@ -2,11 +2,10 @@
 //! signature-slice profile produced by
 //! [`crate::bilateral_dsse::sign_dsse_envelope_full`].
 //!
-//! ## P0-007 honesty downgrade (audit 2026-05-08)
+//! ## Bounded Scope
 //!
-//! This module previously self-described as a "full verifier" and
-//! implied full §7 conformance. Per the 2026-05-08 audit, the
-//! implementation does not yet cover the full predicate schema:
+//! This module is a **partial local verifier**, not a full §7 conformance
+//! verifier. The implementation does not yet cover the full predicate schema:
 //!
 //!   - `BilateralPredicate` is intentionally not the strict CHIODOS
 //!     predicate: it is missing required fields the spec
@@ -16,17 +15,13 @@
 //!   - The error mapping conflates parseable-but-schema-malformed
 //!     Statement JSON with `dsse.malformed` rather than the spec's
 //!     `statement.malformed`.
-//!   - The receipt digest binding shape was wrong in an earlier
-//!     revision (P0-004; fixed alongside this label change in
-//!     `bilateral_dsse::build_statement`).
+//!   - Receipt digest binding must stay aligned with
+//!     `bilateral_dsse::build_statement`, which hashes the receipt body.
 //!
-//! Per the audit's guidance ("partial labels are acceptable when
-//! honest"), this verifier is now labeled as a **partial local
-//! verifier**: it implements the structural / cryptographic core
-//! plus a meaningful subset of the §7 step list against the local
-//! signature-slice profile. Strict CHIODOS predicate completion is
-//! deferred to TRJ6 (see `dsse-bilateral-signing.md` "TRJ6 schema
-//! completion" and the PR description).
+//! The verifier implements the structural / cryptographic core plus a
+//! meaningful subset of the §7 step list against the local signature-slice
+//! profile. Strict CHIODOS predicate completion is deferred to a
+//! schema-complete verifier.
 //!
 //! Receipts that surface verifier output should NOT advertise full
 //! §7 conformance based on this implementation alone.
@@ -137,8 +132,8 @@ pub enum VerifierError {
     /// predicate's envelope lacks the declared quorum's signatures.
     #[error("consistency.quorum_underpopulated: {0}")]
     ConsistencyQuorumUnderpopulated(String),
-    /// P0-006 fix (audit 2026-05-08): `governance.unknown_action_class`.
-    /// The predicate's `tool_name` is not registered in the verifier's
+    /// `governance.unknown_action_class` - the predicate's `tool_name`
+    /// is not registered in the verifier's
     /// `action_classes` table. The pre-fix verifier silently fell back
     /// to `Routine` (no governance receipt required) when the table
     /// did not contain the tool, which is fail-OPEN for receipt-backed
@@ -416,8 +411,7 @@ pub enum ActionClassKind {
     ReceiptBacked,
 }
 
-/// P0-006 fix (audit 2026-05-08): policy controlling step 15's
-/// reaction to an unknown `tool_name`.
+/// Policy controlling step 15's reaction to an unknown `tool_name`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum UnknownActionClassPolicy {
     /// Default. An unknown tool name is rejected with
@@ -447,11 +441,10 @@ pub struct VerifierConfig<'a> {
     /// this with the predicate's `tool_name` to decide whether
     /// `governance_receipt_ref` is required.
     pub action_classes: BTreeMap<String, ActionClassKind>,
-    /// P0-006 fix (audit 2026-05-08): controls how step 15 reacts
-    /// to a `tool_name` that is not present in `action_classes`.
+    /// Controls how step 15 reacts to a `tool_name` that is not present
+    /// in `action_classes`.
     ///
-    /// - [`UnknownActionClassPolicy::Reject`] (default per the
-    ///   audit): the verifier returns
+    /// - [`UnknownActionClassPolicy::Reject`] (default): the verifier returns
     ///   [`VerifierError::UnknownActionClass`] so a misspelled or
     ///   missing registration cannot silently downgrade a
     ///   receipt-backed class to `Routine`.
@@ -488,13 +481,11 @@ pub struct VerifiedBilateralCoSignInvocation {
 /// `VerifierError` variant whose `.code()` matches the spec §7.1
 /// canonical string verbatim.
 ///
-/// **P0-007 honesty downgrade (audit 2026-05-08)**: this is a partial
-/// local verifier. It implements the structural / cryptographic core
-/// plus a meaningful subset of the §7 step list but is not full §7
-/// conformance: predicate schema fields are missing (e.g.
-/// `tool_args_hash`) and the `statement.malformed` vs
-/// `dsse.malformed` mapping is approximate. Full schema completion
-/// is deferred to TRJ6.
+/// This is a partial local verifier. It implements the structural /
+/// cryptographic core plus a meaningful subset of the §7 step list but is
+/// not full §7 conformance: predicate schema fields are missing (e.g.
+/// `tool_args_hash`) and the `statement.malformed` vs `dsse.malformed`
+/// mapping is approximate. Full schema completion is deferred.
 pub fn verify_bilateral_cosign_invocation(
     envelope: &DsseEnvelope,
     config: &VerifierConfig<'_>,
@@ -523,16 +514,12 @@ pub fn verify_bilateral_cosign_invocation(
             statement.statement_type, STATEMENT_TYPE_V1
         )));
     }
-    // P0-005 fix (audit 2026-05-08): the bilateral envelope profile
-    // binds exactly ONE subject (the receipt body). The pre-fix
-    // verifier only rejected the empty-list case, so a multi-subject
-    // envelope was accepted and `subject[0]` alone was bound. A
-    // signer could insert an arbitrary second subject digest and
-    // verifiers that walked the full subject list (the in-toto
-    // convention for subject membership) would resolve a different
-    // receipt than the producer signed. Mirror the
-    // `bilateral_dsse::verify_dsse_envelope` check at this layer so
-    // the §7 verifier path also fails closed.
+    // The bilateral envelope profile binds exactly one subject (the receipt
+    // body). Accepting additional subjects would let a signer include an
+    // arbitrary second digest that full subject-list consumers might resolve
+    // instead of the producer-signed receipt. Mirror the
+    // `bilateral_dsse::verify_dsse_envelope` check at this layer so the §7
+    // verifier path also fails closed.
     if statement.subject.len() != 1 {
         return Err(VerifierError::StatementSchemaInvalid(format!(
             "statement.malformed: bilateral envelope must carry exactly 1 subject, got {}",
@@ -554,11 +541,10 @@ pub fn verify_bilateral_cosign_invocation(
     let pred = &statement.predicate;
 
     // ---- Step 7: subject digest = sha256(canonical_json(resolve_receipt.body()))
-    // P0-004 fix (audit 2026-05-08): the subject digest binds the
-    // receipt BODY (`ChioReceiptBody`), not the full signed wrapper.
-    // The producer-side `bilateral_dsse::build_statement` was fixed
-    // in #610 to hash the body; this verifier path must hash the
-    // same input, otherwise the §7 step-7 check rejects every
+    // The subject digest binds the receipt BODY (`ChioReceiptBody`), not the
+    // full signed wrapper. The producer-side
+    // `bilateral_dsse::build_statement` hashes the body; this verifier path
+    // must hash the same input, otherwise the §7 step-7 check rejects every
     // freshly-signed envelope.
     let resolved_receipt = config
         .receipt_store
@@ -723,13 +709,12 @@ pub fn verify_bilateral_cosign_invocation(
             resolved_lease.expires_at_unix_ms, config.pinned_epoch.now_unix_ms
         )));
     }
-    // Scope-digest binding (codex P2 follow-up on PR #615): for a
-    // scoped capability lease the predicate's `scope_digest` and the
-    // registry record's `scope_digest_hex` must BOTH be present and
-    // agree. Treating one-sided presence as "skip validation" lets an
-    // envelope claim a specific scope digest while the trusted
-    // registry never confirms that scope (or vice versa); step 14
-    // would silently accept an unbound or differently-scoped lease.
+    // Scope-digest binding: for a scoped capability lease the predicate's
+    // `scope_digest` and the registry record's `scope_digest_hex` must both
+    // be present and agree. Treating one-sided presence as "skip validation"
+    // lets an envelope claim a specific scope digest while the trusted
+    // registry never confirms that scope (or vice versa); step 14 would
+    // silently accept an unbound or differently-scoped lease.
     // Fail-closed on any mismatch in presence or value.
     match (&lease_ref.scope_digest, &resolved_lease.scope_digest_hex) {
         (Some(predicate_scope), Some(registry_scope)) => {
@@ -764,11 +749,10 @@ pub fn verify_bilateral_cosign_invocation(
 
     // ---- Step 15: governance receipt for receipt-backed classes -------
     //
-    // P0-006 fix (audit 2026-05-08): an unknown `tool_name` previously
-    // silently fell back to `Routine`, which is fail-OPEN for any
-    // receipt-backed class that was misspelled or omitted from the
-    // registry. The default policy now rejects unknown tools; legacy
-    // behavior is available as an explicit opt-in via
+    // An unknown `tool_name` must not silently fall back to `Routine`,
+    // which would fail open for any receipt-backed class that was misspelled
+    // or omitted from the registry. The default policy rejects unknown
+    // tools; legacy behavior is available as an explicit opt-in via
     // `UnknownActionClassPolicy::DefaultRoutine`.
     let class = match config.action_classes.get(&pred.tool_name).copied() {
         Some(known) => known,
@@ -1034,14 +1018,14 @@ mod tests {
         revocation_oracle: &'a dyn RevocationOracle,
         now_ms: u64,
     ) -> VerifierConfig<'a> {
-        // R3W4 P1-002 fix: the helper now returns the strict default
-        // (`UnknownActionClassPolicy::Reject`) and pre-registers the
-        // tool exercised by `fixture` (`file_read`) as `Routine`. The
-        // happy-path test must pass under the production-shape policy
-        // rather than relying on the legacy `DefaultRoutine` fallback.
-        // Negative tests that exercise the strict-mode rejection or
-        // the receipt-backed class path mutate `action_classes` /
-        // `unknown_action_class_policy` explicitly.
+        // The helper returns the strict default
+        // (`UnknownActionClassPolicy::Reject`) and pre-registers the tool
+        // exercised by `fixture` (`file_read`) as `Routine`. The happy-path
+        // test must pass under the production-shape policy rather than
+        // relying on the legacy `DefaultRoutine` fallback. Negative tests
+        // that exercise the strict-mode rejection or the receipt-backed
+        // class path mutate `action_classes` / `unknown_action_class_policy`
+        // explicitly.
         let mut action_classes = BTreeMap::new();
         action_classes.insert("file_read".to_string(), ActionClassKind::Routine);
         VerifierConfig {
@@ -1105,8 +1089,8 @@ mod tests {
         assert_eq!(err.code(), "subject.digest_mismatch");
     }
 
-    /// P0-005 (audit 2026-05-08): the §7 verifier must reject a multi-subject
-    /// envelope structurally (mirror of the
+    /// The §7 verifier must reject a multi-subject envelope structurally
+    /// (mirror of the
     /// `bilateral_dsse::verify_dsse_envelope` check). Splices a second
     /// subject digest into a freshly-signed envelope and asserts the
     /// verifier returns `statement.schema_invalid` BEFORE any per-subject
@@ -1291,12 +1275,11 @@ mod tests {
 
     #[test]
     fn step_15_unknown_action_class_rejected_under_strict_policy() {
-        // P0-006 fix (audit 2026-05-08): the pre-fix verifier silently
-        // fell back to `Routine` for any tool name not present in
-        // `action_classes`, fail-OPEN for receipt-backed classes
-        // misspelled or omitted from the registry. The strict default
-        // (Reject) returns the typed `governance.unknown_action_class`
-        // diagnostic.
+        // The verifier must not silently fall back to `Routine` for any
+        // tool name not present in `action_classes`, which would fail open
+        // for receipt-backed classes misspelled or omitted from the
+        // registry. The strict default (Reject) returns the typed
+        // `governance.unknown_action_class` diagnostic.
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
         let receipt = sample_receipt(&kp_b);
@@ -1314,9 +1297,9 @@ mod tests {
         );
         // Strict policy: any unregistered tool is rejected. The
         // `action_classes` table is intentionally cleared so the
-        // predicate's `tool_name` cannot resolve. (The R3W4 helper
-        // pre-registers `file_read` for the happy path; this negative
-        // test removes that registration.)
+        // predicate's `tool_name` cannot resolve. The fixture helper
+        // pre-registers `file_read` for the happy path; this negative test
+        // removes that registration.
         cfg.unknown_action_class_policy = UnknownActionClassPolicy::Reject;
         cfg.action_classes.clear();
 
@@ -1334,11 +1317,9 @@ mod tests {
     fn happy_path_under_legacy_default_routine_fallback() {
         // The legacy policy (DefaultRoutine) is retained for explicit
         // opt-in by integrators whose registry is incomplete during
-        // bootstrap. It must continue to pass when no governance
-        // receipt is required (Routine class). Renamed in R3W4
-        // P1-002 to make clear this is the legacy fallback path,
-        // distinct from the strict happy path
-        // (`happy_path_passes_partial_local_verifier`).
+        // bootstrap. It must continue to pass when no governance receipt is
+        // required (Routine class). Keep this distinct from the strict happy
+        // path (`happy_path_passes_partial_local_verifier`).
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
         let receipt = sample_receipt(&kp_b);

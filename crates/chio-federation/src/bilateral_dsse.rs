@@ -468,16 +468,13 @@ pub fn build_predicate_full(
 
 /// Build the in-toto Statement carrying the bilateral predicate.
 ///
-/// P0-004 fix (audit 2026-05-08): the subject digest binds the
-/// receipt BODY (`ChioReceiptBody`), not the full signed wrapper.
-/// An earlier revision hashed the full `ChioReceipt` (including the
-/// envelope's `signature` field), which made the verifier's "resolve
-/// the receipt from a store and re-derive the subject" path produce a
-/// different digest than the producer signed -- cross-impl resolution
-/// silently broke. Hashing the body fixes the binding so verifiers
-/// can re-derive the subject from any source that exposes the body
-/// (the receipt store's signed wrapper, an audit log, or a peer's
-/// re-emission).
+/// The subject digest binds the receipt BODY (`ChioReceiptBody`), not the
+/// full signed wrapper. Hashing the full `ChioReceipt` would include the
+/// envelope's `signature` field, making a verifier that resolves the receipt
+/// body from a store derive a different digest than the producer signed.
+/// Hashing the body keeps cross-implementation resolution stable for any
+/// source that exposes the body (the receipt store's signed wrapper, an
+/// audit log, or a peer's re-emission).
 pub fn build_statement(
     receipt: &ChioReceipt,
     predicate: BilateralPredicate,
@@ -648,14 +645,10 @@ pub fn verify_dsse_envelope(
         )));
     }
 
-    // P0-005 fix (audit 2026-05-08): the bilateral envelope profile
-    // binds exactly ONE subject (the receipt body). The pre-fix
-    // verifier only rejected the empty-list case, so a multi-subject
-    // envelope was accepted and only `subject[0]` was bound. A
-    // signer could insert an arbitrary second subject digest and
-    // verifiers that walked the full subject list (which is the
-    // spec-conformant behavior for in-toto subject membership) would
-    // resolve a different receipt than the producer signed.
+    // The bilateral envelope profile binds exactly one subject (the receipt
+    // body). Accepting additional subjects would let a signer include an
+    // arbitrary second digest that full subject-list consumers might resolve
+    // instead of the producer-signed receipt.
     if statement.subject.len() != 1 {
         return Err(BilateralCoSigningError::CanonicalJson(format!(
             "statement.malformed: bilateral envelope must carry exactly 1 subject, got {}",
@@ -830,11 +823,10 @@ mod tests {
 
     #[test]
     fn keyid_is_sha256_of_raw_ed25519_public_key_bytes() {
-        // P0-003 fix (audit 2026-05-08): the spec's keyid contract is
-        // SHA-256 of RAW key material (Ed25519 = 32 verifying-key
-        // bytes). An earlier revision hashed `to_hex().as_bytes()`
-        // which silently broke cross-implementation interop. This
-        // test pins the raw-bytes invariant.
+        // The keyid contract is SHA-256 of raw key material (Ed25519 = 32
+        // verifying-key bytes). Hashing `to_hex().as_bytes()` would silently
+        // break cross-implementation interop. This test pins the raw-bytes
+        // invariant.
         let kp = Keypair::generate();
         let pk = kp.public_key();
         let keyid = Keyid::from_public_key(&pk);

@@ -181,13 +181,12 @@ fn run_invocation_with(
         predicate_extensions: extensions,
         cosigner: &setup.cosigner as &dyn BilateralCoSigningProtocol,
     };
-    // P1-015 fix (audit 2026-05-08): positive helpers must run under
-    // the strict fail-closed default `Reject` so they actually prove
-    // the new default. Tests that don't pass a custom class for `TOOL`
-    // get a `Routine` registration here so the assertion still proves
-    // the *non-step-15* code path; tests that exercise step 15 (the
-    // `step_15_*` cases) pass their own `ReceiptBacked` mapping which
-    // is preserved via the `entry().or_insert(...)` semantics below.
+    // Positive helpers must run under the strict fail-closed default
+    // `Reject` so they actually prove the default. Tests that do not pass a
+    // custom class for `TOOL` get a `Routine` registration here so the
+    // assertion still proves the non-step-15 code path; tests that exercise
+    // step 15 pass their own `ReceiptBacked` mapping which is preserved via
+    // the `entry().or_insert(...)` semantics below.
     action_classes
         .entry(TOOL.to_string())
         .or_insert(ActionClassKind::Routine);
@@ -825,12 +824,11 @@ fn step_16_totally_ordered_with_chio_anchor_passes() {
 }
 
 // ---------------------------------------------------------------------------
-// P1-015 fix (audit 2026-05-08): legacy DefaultRoutine fallback regression.
-// All other positive tests in this file run under the strict `Reject`
-// default. This test (and only this test) explicitly opts into the
-// legacy `DefaultRoutine` behavior so the legacy bootstrap path is
-// still covered by the conformance suite. If the legacy variant is
-// ever removed, this test should be deleted with it.
+// Legacy DefaultRoutine fallback regression. All other positive tests in
+// this file run under the strict `Reject` default. This test explicitly opts
+// into the legacy `DefaultRoutine` behavior so the legacy bootstrap path is
+// still covered by the conformance suite. If the legacy variant is ever
+// removed, this test should be deleted with it.
 // ---------------------------------------------------------------------------
 
 #[test]

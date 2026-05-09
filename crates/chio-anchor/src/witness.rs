@@ -1,15 +1,14 @@
 //! Public-witness lane clients for `chio.anchor_batch.v1`.
 //!
-//! W2.3 closes the audit P0 on T1.3 by providing a real
-//! [`AnchorWitnessClient`] trait, Rekor production verification, OTS
-//! advisory parsing, and the [`WitnessState`] state machine consumed by
-//! `verify_anchor_batch_with_witness_policy`.
+//! Provides a real [`AnchorWitnessClient`] trait, Rekor production
+//! verification, OTS advisory parsing, and the [`WitnessState`] state
+//! machine consumed by `verify_anchor_batch_with_witness_policy`.
 //!
 //! The clients implement the actual HTTP protocols used by Rekor REST
 //! and OpenTimestamps calendars. Tests substitute mock servers where
 //! load-bearing verification is available.
 //!
-//! # Soundness notes (PR #594 review fixes)
+//! # Soundness notes
 //!
 //! - The receipt's `body_hash` binds a stable [`BatchHashInput`] view
 //!   of the batch body that EXCLUDES `witness_state` and lane-assigned

@@ -106,7 +106,7 @@ chio-http-session = { version = "0.1.0", path = "../chio-http-session" }
 chio-guards = { version = "0.1.0", path = "../chio-guards" }
 chio-weights = { version = "0.1.0", path = "../chio-weights" }
 base64ct = { workspace = true, features = ["alloc"] }
-# Negative conformance fixture `b4_bilateral_dsse_signature_slice.rs`
+# Negative conformance fixture: `b4_bilateral_dsse_signature_slice.rs`
 # re-encodes signature bytes in base64 to forge a DSSE envelope;
 # chio-federation's DSSE envelope wire format is RFC 4648 standard
 # base64 (workspace-pinned `base64` crate).
@@ -146,8 +146,8 @@ zeroize = "1"
 # trait surface; tiny_http stages the mock Rekor server.
 chio-anchor = { version = "0.1.0", path = "../chio-anchor" }
 async-trait = "0.1"
-# Negative conformance test
-# anchor_batch_witness_impersonation_rejected.rs forges a Rekor SET
+# Negative conformance test: anchor_batch_witness_impersonation_rejected.rs
+# forges a Rekor SET
 # under an attacker-held P-256 key to prove the verifier rejects it.
 p256 = { version = "0.13", default-features = false, features = ["ecdsa", "pem"] }
 rand = { workspace = true }
