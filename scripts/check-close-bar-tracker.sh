@@ -13,8 +13,9 @@
 #   4. any Bucket=DONE row points at a Negative conformance test file that is missing on disk;
 #   5. any Bucket=DONE row points at a Negative conformance test path that is not in the
 #      recognised test/evidence allowlist (rejects e.g. Cargo.toml, README.md);
-#   6. any Theorem status=proven row points at a missing file;
-#   7. any row regresses against the snapshot (DONE -> PARTIAL/NONE, PARTIAL -> NONE).
+#   6. any DONE row relies on assumed/proposed theorem status;
+#   7. any Theorem status=proven row points at a missing file;
+#   8. any row regresses against the snapshot (DONE -> PARTIAL/NONE, PARTIAL -> NONE).
 #
 # Environment overrides (used by the integration tests in scripts/tests):
 #   CHIO_CLOSE_BAR_TRACKER       path to the tracker markdown
@@ -175,7 +176,14 @@ for r in rows:
             errors.append(
                 f"{r['id']}: Bucket=DONE but Negative conformance test path is not a recognised test/evidence path: {rel_path}"
             )
-    # 5. theorem proven + missing file
+    # 6. DONE rows cannot be release-facing closure while formal status is
+    # assumed or proposed. They may remain PARTIAL until the theorem is proven,
+    # or set theorem_status=n-a when the row has no formal-release dependency.
+    if r["bucket"] == "DONE" and r["theorem_status"] in {"assumed", "proposed"}:
+        errors.append(
+            f"{r['id']}: Bucket=DONE but Theorem status={r['theorem_status']} (formal release evidence is not proven)"
+        )
+    # 7. theorem proven + missing file
     if r["theorem_status"] == "proven":
         # Proven theorems must point at a real file in Notes (heuristic: first
         # whitespace-separated token containing a slash and ending in .lean).
@@ -201,7 +209,7 @@ for r in rows:
                     f"{r['id']}: Theorem status=proven but no referenced .lean file exists on disk: {candidate_paths!r}"
                 )
 
-# 6. snapshot regression check
+# 8. snapshot regression check
 with open(snapshot_path, "r", encoding="utf-8") as fh:
     snap = json.load(fh)
 snap_rows = {r["id"]: r for r in snap.get("rows", [])}

@@ -200,15 +200,36 @@ assert_fails "DONE + README.md as test path" "$T9" "$S9" 1
 grep -q "not a recognised test/evidence path" "$ERR" \
     || { echo "FAIL: missing diagnostic for README.md as test"; cat "$ERR"; exit 1; }
 
-# ---- Case 9: DONE + recognised scripts/*.sh path passes --------------------
-# The path allowlist accepts scripts/*.sh; pointing at the gate script itself
-# is a real on-disk file and matches the allowlist, so this row should pass.
-T10="$TMP_DIR/done-allowed.md"
-S10="$TMP_DIR/done-allowed.snapshot.json"
+# ---- Case 9: DONE + assumed/proposed theorem status fails ------------------
+T10="$TMP_DIR/done-assumed-theorem.md"
+S10="$TMP_DIR/done-assumed-theorem.snapshot.json"
 write_tracker "$T10" \
-    "row-1 | t1 | DONE | y | scripts/check-close-bar-tracker.sh | n-a | 04 | DONE with allowlisted test"
+    "row-1 | t1 | DONE | y | scripts/check-close-bar-tracker.sh | assumed | 04 | runtime/test done but formal release proof still assumed"
 write_snapshot "$S10" \
     "row-1 | t1 | NONE | n | NONE | n-a | 04 | placeholder"
-assert_passes "DONE + allowlisted scripts/*.sh path" "$T10" "$S10" 1
+assert_fails "DONE + assumed theorem status" "$T10" "$S10" 1
+grep -q "formal release evidence is not proven" "$ERR" \
+    || { echo "FAIL: missing diagnostic for DONE + assumed theorem status"; cat "$ERR"; exit 1; }
+
+T11="$TMP_DIR/done-proposed-theorem.md"
+S11="$TMP_DIR/done-proposed-theorem.snapshot.json"
+write_tracker "$T11" \
+    "row-1 | t1 | DONE | y | scripts/check-close-bar-tracker.sh | proposed | 04 | runtime/test done but formal release proof still proposed"
+write_snapshot "$S11" \
+    "row-1 | t1 | NONE | n | NONE | n-a | 04 | placeholder"
+assert_fails "DONE + proposed theorem status" "$T11" "$S11" 1
+grep -q "formal release evidence is not proven" "$ERR" \
+    || { echo "FAIL: missing diagnostic for DONE + proposed theorem status"; cat "$ERR"; exit 1; }
+
+# ---- Case 10: DONE + recognised scripts/*.sh path passes -------------------
+# The path allowlist accepts scripts/*.sh; pointing at the gate script itself
+# is a real on-disk file and matches the allowlist, so this row should pass.
+T12="$TMP_DIR/done-allowed.md"
+S12="$TMP_DIR/done-allowed.snapshot.json"
+write_tracker "$T12" \
+    "row-1 | t1 | DONE | y | scripts/check-close-bar-tracker.sh | n-a | 04 | DONE with allowlisted test"
+write_snapshot "$S12" \
+    "row-1 | t1 | NONE | n | NONE | n-a | 04 | placeholder"
+assert_passes "DONE + allowlisted scripts/*.sh path" "$T12" "$S12" 1
 
 echo "PASS: check-close-bar-tracker integration test"

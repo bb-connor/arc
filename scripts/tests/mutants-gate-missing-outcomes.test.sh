@@ -64,6 +64,39 @@ if ! grep -q "verdict=pass-no-diff" "${TMP_DIR}/stdout"; then
 fi
 
 mkdir -p "${TMP_DIR}/mutants-out"
+python3 - "${TMP_DIR}/mutants-out/outcomes.json" <<'PY'
+import json
+import sys
+
+outcomes = [{"summary": "CaughtMutant"} for _ in range(10)]
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump({"outcomes": outcomes}, handle)
+    handle.write("\n")
+PY
+
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=124 \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "FAIL: blocking mutation gate passed interrupted run despite 100% caught outcomes" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "cargo-mutants exit was nonzero" "${TMP_DIR}/stderr"; then
+  echo "FAIL: interrupted high-kill run did not report nonzero cargo-mutants exit" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
 cat >"${TMP_DIR}/mutants-out/outcomes.json" <<'JSON'
 {"outcomes":[]}
 JSON
