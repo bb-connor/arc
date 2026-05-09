@@ -1,11 +1,11 @@
 # Deferred Release Packaging Seed
 
-Status: deferred.
+Status: pending_upstream_merges.
 
 This branch is not a tag vehicle. It carries no versioned notes, fixture
-pins, hash table, readiness claim, release ledger status, or local-go gate.
-It is a restart note for a future packaging pass after the upstream
-implementation and evidence branches have landed on `main`.
+pins, hash table, readiness claim, tag-ready state, release ledger go-state, or
+local release approval gate. It is a restart note for a future packaging pass
+after the upstream implementation and evidence branches have landed on `main`.
 
 The previous draft tried to package a named version from branch-local
 artifacts. That shape is deliberately removed here because it could be read
@@ -24,4 +24,10 @@ implementation PRs have merged. At minimum, that future branch must:
 - avoid full section 7 verifier language unless the implementation and tests
   actually cover that surface;
 - keep any readiness or release metadata out of the tree until the evidence is
-  regenerated from the final merge base.
+  regenerated from the final merge base;
+- keep the package state at `pending_upstream_merges` until Lane B integration,
+  regenerated Lane A evidence, Lane C canary fixtures, and human package review
+  all exist on merged `main`.
+
+Do not translate this seed into a tag-ready state. That state is not available
+on this PR branch.
