@@ -62,10 +62,12 @@
       "claim_ref": "claim.capability.budget_split",
       "introduced_by": "trajectory-4/W1.2",
       "evidence": [
-        {"kind": "lean_theorem", "ref": "theorem.budget.sibling_sum_soundness"},
         {"kind": "rust_test", "ref": "crates/chio-kernel-core/src/budget_split.rs::second_oversubscribed_sibling_is_rejected"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs::parent_at_5000_bps_cannot_mint_two_children_at_4000_bps_each"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/budget_split_cross_hop_rejects_amplification.rs::parent_5000_child_4000_two_grandchildren_3000_each_second_rejected"}
+      ],
+      "evidence_proposed": [
+        {"kind": "lean_theorem", "ref": "theorem.budget.sibling_sum_soundness"}
       ]
     },
     {
@@ -73,12 +75,12 @@
       "claim_ref": "claim.capability.attenuation_proof",
       "introduced_by": "trajectory-4/W1.1",
       "evidence": [
-        {"kind": "lean_theorem", "ref": "theorem.attenuation.witness_soundness"},
         {"kind": "rust_test", "ref": "crates/chio-core-types/src/capability.rs::attenuation_witness_roundtrip_and_forgery_rejection"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/protocol_primitives_t1.rs::forged_attenuation_proof_rejected"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/attenuation_witness_rejects_inflated_parent_scope.rs::v2_token_with_inflated_parent_scope_hash_is_rejected"}
       ],
       "evidence_proposed": [
+        {"kind": "lean_theorem", "ref": "theorem.attenuation.witness_soundness"},
         {"kind": "lean_theorem", "ref": "theorem.attenuation.witness_completeness"}
       ]
     },
@@ -88,10 +90,12 @@
       "introduced_by": "trajectory-4/T1.0",
       "promoted_by": "trajectory-4/wave-1.5",
       "evidence": [
-        {"kind": "lean_theorem", "ref": "theorem.handshake.negotiation_safety"},
         {"kind": "rust_test", "ref": "crates/chio-core-types/src/capability.rs::capability_negotiation_intersection_rejects_malformed_feature"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/protocol_primitives_t1.rs::capability_v2_unknown_schema_rejected"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/verify_rejects_v2_token_when_peer_negotiated_v1_only.rs::v2_token_rejected_when_peer_negotiated_v1_only"}
+      ],
+      "evidence_proposed": [
+        {"kind": "lean_theorem", "ref": "theorem.handshake.negotiation_safety"}
       ]
     },
     {
@@ -100,7 +104,6 @@
       "introduced_by": "trajectory-4/T1.2",
       "promoted_by": "trajectory-4/W2.1",
       "evidence": [
-        {"kind": "lean_theorem", "ref": "theorem.receipt.body_hash_input_set_pinned"},
         {"kind": "rust_test", "ref": "crates/chio-core-types/src/receipt.rs::receipt_v2_body_hash_and_signature_fail_closed"},
         {"kind": "rust_test", "ref": "crates/chio-core-types/src/receipt.rs::receipt_v2_legacy_alias_does_not_affect_replay_identity"},
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/protocol_primitives_t1.rs::receipt_v2_negative_conformance_cases"},
@@ -111,6 +114,7 @@
         {"kind": "conformance_test", "ref": "crates/chio-conformance/tests/v2_receipt_kernel_round_trip.rs::negotiation_v1_only_peer_disables_v2_minting"}
       ],
       "evidence_proposed": [
+        {"kind": "lean_theorem", "ref": "theorem.receipt.body_hash_input_set_pinned"},
         {"kind": "lean_theorem", "ref": "theorem.receipt.body_hash_collision_resistance"}
       ]
     },

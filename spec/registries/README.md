@@ -20,7 +20,7 @@ threat / claim ----> claim-registry ----> proof-manifest ----> theorem-inventory
 A trj4 slice closes when:
 - The new artifact (or behavior) is registered in `claim-registry.v1.json`.
 - A `proof-manifest.v1.json` row ties the claim to one or more entries in `theorem-inventory.v1.json` and / or named conformance tests.
-- The referenced theorem entries are status `proven` (or explicitly status `assumed` with a deferral target).
+- Lean theorem entries in release evidence are status `proven`. `proposed`, `assumed`, `proven_partial`, and `advisory_only` theorem entries belong in `evidence_proposed` until the proof evidence is promotable.
 
 ## Status conventions
 
@@ -32,7 +32,7 @@ A trj4 slice closes when:
 `theorem-inventory.v1.json[*].status`:
 - `proposed` - theorem statement drafted; proof in progress.
 - `proven` - proof script accepted by the listed checker (lean / apalache / kani).
-- `assumed` - axiom or unproved assumption with `deferral_target` pointing at a tracking ticket.
+- `assumed` - axiom, model sketch, or unproved theorem that is not release evidence.
 
 ## Bootstrap status (trj4)
 

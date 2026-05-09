@@ -15,8 +15,10 @@
   that a registry that admits never lets the sum exceed the parent's
   share.
 
-  The Lean toolchain is currently unavailable in CI, so the manifest
-  status for this theorem is `assumed`. The Rust shell is exercised by
+  This module is root-imported and built by the formal proof gate. Its
+  registry status remains `assumed`, so the theorem is proposed formal
+  evidence rather than release evidence until a formal owner promotes the
+  inventory row to `proven`. The Rust shell is exercised by
   `crates/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs`
   and the cross-hop case by
   `crates/chio-conformance/tests/budget_split_cross_hop_rejects_amplification.rs`.
