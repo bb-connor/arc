@@ -1,8 +1,8 @@
 //! Bilateral cross-kernel runtime co-signing.
 //!
 //! When an agent from Organisation A invokes a tool hosted by Organisation B,
-//! both kernels need to sign the same receipt so that either org can
-//! independently verify the chain. This module defines the wire-level
+//! older federation deployments may still exchange a detached co-signature
+//! artifact for compatibility. This module defines the wire-level
 //! [`CoSigningRequest`] / [`CoSigningResponse`] envelope, the
 //! legacy [`DualSignedReceipt`] compatibility artifact (which carries both
 //! signatures side-by-side without mutating the core `ChioReceipt` body), and a
@@ -376,9 +376,8 @@ fn co_sign_with_origin_inner(
         org_a_signature: response.org_a_signature,
         org_b_signature,
     };
-    // Double-check the assembled artifact verifies end-to-end. The kernel
-    // relies on this invariant to persist only dual-signed artifacts that
-    // would themselves pass third-party verification.
+    // Double-check the assembled compatibility artifact verifies against
+    // the legacy CoSigningBody preimage before it is exposed.
     dual.verify(origin_public_key, &tool_host_keypair.public_key())?;
     Ok(dual)
 }

@@ -1056,11 +1056,12 @@ pub struct ChioKernel {
     /// runtime can install it independently -- for instance, a deployment
     /// can declare peers while still using a mock cosigner in tests.
     federation_cosigner: Option<Arc<dyn chio_federation::BilateralCoSigningProtocol>>,
-    /// Phase 20.3 locally-signed dual receipts, indexed by ChioReceipt.id.
-    /// Populated only when the post-sign hook fires successfully. Kept
-    /// in-memory; persistent storage plugs in via the federation-state
-    /// APIs already in chio-federation.
-    federation_dual_receipts: DashMap<String, chio_federation::DualSignedReceipt>,
+    /// Compatibility-only legacy dual receipts, indexed by ChioReceipt.id.
+    /// These artifacts are not DSSE envelopes, are not CHIODOS protocol
+    /// acceptance proof, and must not be used in place of the canonical
+    /// bilateral DSSE verifier. Kept only for callers that still consume
+    /// the older `CoSigningBody` detached-signature shape.
+    federation_compat_dual_receipts: DashMap<String, chio_federation::DualSignedReceipt>,
     /// Phase 20.3 operator-declared kernel identifier used as the
     /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
     /// encoding of the kernel's signing public key, but operators can
@@ -1532,7 +1533,7 @@ impl ChioKernel {
             capability_trust_roots: ArcSwap::from_pointee(HashMap::new()),
             capability_trust_roots_write_lock: Mutex::new(()),
             federation_cosigner: None,
-            federation_dual_receipts: DashMap::new(),
+            federation_compat_dual_receipts: DashMap::new(),
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
             signing_task,
             settlement_observer: None,
@@ -2068,18 +2069,32 @@ impl ChioKernel {
         self.federation_peers.load().values().cloned().collect()
     }
 
-    /// Phase 20.3: look up a dual-signed receipt by the underlying
-    /// [`chio_core::receipt::ChioReceipt`] id. Returns `None` when the
-    /// receipt did not cross a federation boundary or when the
-    /// co-signing hook has not yet produced a dual-signed artifact
-    /// for it.
+    /// Look up the compatibility-only legacy dual-signed receipt by the
+    /// underlying [`chio_core::receipt::ChioReceipt`] id.
+    ///
+    /// This accessor exposes the older `CoSigningBody` detached-signature
+    /// artifact only. It is not DSSE, is not CHIODOS bilateral acceptance,
+    /// and must not be used as the audit verifier for the DSSE
+    /// signature-slice profile.
+    pub fn compat_dual_signed_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Option<chio_federation::DualSignedReceipt> {
+        self.federation_compat_dual_receipts
+            .get(receipt_id)
+            .map(|entry| entry.value().clone())
+    }
+
+    /// Compatibility lookup alias for callers that still use the pre-DSSE
+    /// name.
+    ///
+    /// New code should call [`Self::compat_dual_signed_receipt`] so the
+    /// compatibility boundary is visible at the call site.
     pub fn dual_signed_receipt(
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::DualSignedReceipt> {
-        self.federation_dual_receipts
-            .get(receipt_id)
-            .map(|entry| entry.value().clone())
+        self.compat_dual_signed_receipt(receipt_id)
     }
 
     /// Local kernel identifier used in bilateral co-signing. Falls back
@@ -2091,13 +2106,20 @@ impl ChioKernel {
         self.config.keypair.public_key().to_hex()
     }
 
-    /// Phase 20.3 post-sign hook. Invoked immediately after
+    /// Compatibility federation post-sign hook. Invoked immediately after
     /// [`Self::build_and_sign_receipt`] so the local (tool-host)
     /// signature has already landed in the `ChioReceipt`. When
     /// `federated_origin_kernel_id` is set and the peer is pinned fresh,
-    /// this dispatches the receipt to the cosigner, assembles a
+    /// this dispatches the receipt to the legacy cosigner, assembles a
     /// [`chio_federation::DualSignedReceipt`], and stashes it for
-    /// retrieval via [`Self::dual_signed_receipt`].
+    /// retrieval via [`Self::compat_dual_signed_receipt`].
+    ///
+    /// Boundary: this hook records only the compatibility
+    /// detached-signature artifact. It does not emit or verify a DSSE
+    /// signature-slice envelope and therefore is not CHIODOS bilateral
+    /// protocol acceptance. Callers that need canonical bilateral
+    /// acceptance must verify a `DsseEnvelope` through chio-federation's
+    /// DSSE verifier path.
     ///
     /// Fail-closed: any error from the peer lookup or the cosigner is
     /// surfaced as a [`KernelError::Internal`] so operators see the
@@ -2136,7 +2158,7 @@ impl ChioKernel {
         )
         .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
 
-        self.federation_dual_receipts
+        self.federation_compat_dual_receipts
             .insert(receipt.id.clone(), dual);
         Ok(())
     }

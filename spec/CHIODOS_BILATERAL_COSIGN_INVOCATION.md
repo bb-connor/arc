@@ -93,6 +93,11 @@ Strict CHIODOS bilateral predicate conformance remains future work until
 the producer emits every required target predicate field and removes
 signature-slice-only helper fields.
 
+The legacy `chio.federation-dual-signed-receipt.v1`
+`DualSignedReceipt` remains a compatibility artifact only. It signs
+`CoSigningBody` bytes, not DSSE PAE bytes, and MUST NOT be presented as
+acceptance of this protocol or of the signature-slice profile.
+
 ---
 
 ## 4. Subject Definition
